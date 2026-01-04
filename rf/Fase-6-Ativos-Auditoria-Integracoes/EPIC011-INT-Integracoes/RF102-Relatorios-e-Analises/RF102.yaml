@@ -1,0 +1,708 @@
+# =============================================
+# RF102 - Relatórios e Análises (v2.0)
+# Versão Governança: 2.0
+# Autor: Claude Code
+# Data: 2025-12-31
+# =============================================
+
+rf:
+  id: "RF102"
+  nome: "Relatórios e Análises"
+  versao: "2.0"
+  versao_governanca: "2.0"
+  data: "2025-12-31"
+  data_migracao: "2025-12-31"
+  fase: "Fase 6 - Ativos, Auditoria e Integrações"
+  epic: "EPIC011-INT-Integracoes"
+  status: "aprovado"
+
+descricao:
+  objetivo: "Fornecer capacidade de criar, personalizar, executar, agendar e distribuir relatórios analíticos e gerenciais, consolidando dados operacionais de múltiplos módulos."
+  problema_resolvido: "Automação de relatórios recorrentes, análise profunda de dados operacionais, conformidade LGPD, exportação multi-formato e processamento assíncrono para relatórios volumosos."
+  publico_afetado: "Analistas, Gerentes, Administradores, RH, Compliance Officers, Operadores"
+
+escopo:
+  incluso:
+    - "Criação de relatórios personalizados via designer visual"
+    - "Execução de relatórios predefinidos (templates)"
+    - "Aplicação de filtros parametrizados"
+    - "Exportação multi-formato (PDF, Excel, CSV, JSON, XML)"
+    - "Agendamento de execuções periódicas"
+    - "Envio automático por e-mail"
+    - "Histórico de execuções (90 dias)"
+    - "Processamento assíncrono (Hangfire) para relatórios > 10.000 registros"
+    - "Conformidade LGPD (justificativa obrigatória)"
+    - "Controle de acesso granular (RBAC)"
+    - "Auditoria imutável de todas as execuções"
+    - "Isolamento multi-tenant (ClienteId)"
+  fora:
+    - "Interface visual específica (definida em WF-RF102)"
+    - "Tecnologia de geração de PDF/Excel"
+    - "Layout, UX ou identidade visual específica"
+    - "Estratégia de deploy ou infraestrutura"
+
+entidades:
+  - nome: "Relatorio"
+    descricao: "Definição de relatório (personalizado ou predefinido)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "Id"
+      - "ClienteId"
+      - "Nome"
+      - "Modulo"
+      - "CamposSelecionados"
+      - "Filtros"
+      - "Ativo"
+      - "Created"
+      - "CreatedBy"
+      - "LastModified"
+      - "LastModifiedBy"
+
+  - nome: "AgendamentoRelatorio"
+    descricao: "Configuração de execução periódica de relatório"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "Id"
+      - "ClienteId"
+      - "RelatorioId"
+      - "Frequencia"
+      - "HorarioExecucao"
+      - "EmailsDestinatarios"
+      - "Ativo"
+
+  - nome: "HistoricoRelatorio"
+    descricao: "Registro de execução anterior (mantido 90 dias)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+    campos_principais:
+      - "Id"
+      - "ClienteId"
+      - "RelatorioId"
+      - "UsuarioId"
+      - "DataExecucao"
+      - "FiltrosUtilizados"
+      - "UrlDownload"
+      - "TamanoArquivo"
+      - "DataExpiracao"
+
+  - nome: "AuditoriaRelatorio"
+    descricao: "Registro imutável de auditoria de acesso"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+    imutavel: true
+    campos_principais:
+      - "Id"
+      - "ClienteId"
+      - "RelatorioId"
+      - "UsuarioId"
+      - "DataExecucao"
+      - "FiltrosUtilizados"
+      - "TamanoArquivo"
+      - "JustificativaLGPD"
+      - "IpUsuario"
+      - "UserAgent"
+      - "CamposSensiveisAcessados"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF102-001"
+    titulo: "Relatório deve ter no mínimo 1 campo selecionado"
+    descricao: "Um relatório válido deve ter pelo menos um campo de dados selecionado para exibição. Campos de filtro não contam."
+    criticidade: "CRÍTICA"
+    tipo: "validacao"
+    campos_afetados: ["CamposSelecionados"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "campo_obrigatorio"
+      mensagem_erro: "Relatório deve ter no mínimo 1 campo selecionado"
+      http_code: 400
+
+  - id: "RN-RF102-002"
+    titulo: "Relatórios sensíveis exigem justificativa (LGPD)"
+    descricao: "Quando um relatório incluir dados pessoais (CPF, RG, Salário, Endereço, Telefone, Email, DataNascimento, NomeMãe, Dependentes), o usuário deve fornecer justificativa comercial antes de gerar. A justificativa é auditada."
+    criticidade: "CRÍTICA"
+    tipo: "seguranca"
+    campos_afetados: ["JustificativaLGPD", "CamposSelecionados"]
+    obrigatorio: true
+    campos_sensiveis:
+      - "CPF"
+      - "RG"
+      - "Salario"
+      - "Endereco"
+      - "Telefone"
+      - "Email"
+      - "DataNascimento"
+      - "NomeMae"
+      - "Dependentes"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "condicional"
+      mensagem_erro: "Justificativa LGPD é obrigatória para acessar dados pessoais"
+      http_code: 400
+
+  - id: "RN-RF102-003"
+    titulo: "Agendamento máximo 10 relatórios por usuário"
+    descricao: "Um usuário pode agendar no máximo 10 relatórios recorrentes simultaneamente."
+    criticidade: "ALTA"
+    tipo: "regra_negocio"
+    campos_afetados: ["UsuarioId", "Ativo"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "range"
+      min: 0
+      max: 10
+      mensagem_erro: "Você já possui 10 relatórios agendados. Cancele um para agendar novo."
+      http_code: 400
+
+  - id: "RN-RF102-004"
+    titulo: "Relatórios com > 10.000 registros processados em background"
+    descricao: "Quando um relatório retorna mais de 10.000 registros após aplicação de filtros, deve ser processado assincronamente via Hangfire. Usuário recebe notificação quando pronto."
+    criticidade: "ALTA"
+    tipo: "performance"
+    campos_afetados: ["TotalRegistros"]
+    obrigatorio: true
+    threshold: 10000
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "condicional"
+      mensagem_erro: "Relatório em processamento (background). Você receberá notificação."
+      http_code: 200
+
+  - id: "RN-RF102-005"
+    titulo: "Export PDF deve ter logo do cliente e metadados"
+    descricao: "PDFs devem incluir cabeçalho com logo do cliente, título do relatório, data/hora de geração e nome do usuário que gerou."
+    criticidade: "MÉDIA"
+    tipo: "formatacao"
+    campos_afetados: ["LogoCliente", "TituloRelatorio", "DataGeracao", "UsuarioGeracao"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+
+  - id: "RN-RF102-006"
+    titulo: "Relatórios com dados pessoais exigem permissão especial"
+    descricao: "Para criar ou executar relatórios que incluam campos sensíveis, o usuário deve ter permissão lgpd:relatorio:dados-sensiveis."
+    criticidade: "CRÍTICA"
+    tipo: "seguranca"
+    campos_afetados: ["CamposSelecionados"]
+    obrigatorio: true
+    permissao_obrigatoria: "lgpd:relatorio:dados-sensiveis"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "autorizacao"
+      mensagem_erro: "Você não tem permissão para acessar dados sensíveis"
+      http_code: 403
+
+  - id: "RN-RF102-007"
+    titulo: "Histórico de relatórios mantido por 90 dias"
+    descricao: "Todas as execuções são registradas com data, hora, usuário, filtros e link para download. Histórico mantido por 90 dias. Após 90 dias, registros e arquivos são automaticamente deletados."
+    criticidade: "ALTA"
+    tipo: "retencao_dados"
+    campos_afetados: ["DataExpiracao"]
+    obrigatorio: true
+    dias_retencao: 90
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+      job_hangfire: true
+
+  - id: "RN-RF102-008"
+    titulo: "Relatórios devem respeitar filtro multi-tenancy"
+    descricao: "Todos os relatórios devem incluir filtro automático por ClienteId. Um usuário só pode ver dados do seu cliente."
+    criticidade: "CRÍTICA"
+    tipo: "seguranca"
+    campos_afetados: ["ClienteId"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "isolamento_tenant"
+      mensagem_erro: "Acesso negado - cross-tenant"
+      http_code: 403
+
+  - id: "RN-RF102-009"
+    titulo: "Designer visual limitado a 20 campos"
+    descricao: "No designer visual, o usuário pode selecionar no máximo 20 campos para incluir no relatório."
+    criticidade: "MÉDIA"
+    tipo: "validacao"
+    campos_afetados: ["CamposSelecionados"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "range"
+      min: 1
+      max: 20
+      mensagem_erro: "Máximo 20 campos permitidos por relatório"
+      http_code: 400
+
+  - id: "RN-RF102-010"
+    titulo: "Auditoria obrigatória de todos os relatórios"
+    descricao: "Toda execução gera registro de auditoria imutável incluindo: ClienteId, RelatórioId, UsuarioId, DataHora, FiltrosUtilizados, TamanoArquivo, JustificativaLGPD, IpUsuario, UserAgent."
+    criticidade: "CRÍTICA"
+    tipo: "auditoria"
+    campos_afetados: ["AuditoriaRelatorio"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "imutavel"
+      mensagem_erro: "Auditoria é imutável - operação não permitida"
+      http_code: 403
+
+# ==============================================================================
+# ESTADOS DA ENTIDADE
+# ==============================================================================
+
+estados:
+  - id: "rascunho"
+    descricao: "Criado, não finalizado"
+  - id: "ativo"
+    descricao: "Disponível para execução"
+  - id: "inativo"
+    descricao: "Desabilitado temporariamente"
+  - id: "excluido"
+    descricao: "Excluído logicamente (soft delete)"
+
+transicoes:
+  permitidas:
+    - de: "rascunho"
+      para: "ativo"
+    - de: "ativo"
+      para: "inativo"
+    - de: "inativo"
+      para: "ativo"
+    - de: "ativo"
+      para: "excluido"
+    - de: "inativo"
+      para: "excluido"
+  proibidas:
+    - de: "excluido"
+      para: "ativo"
+    - de: "excluido"
+      para: "inativo"
+
+# ==============================================================================
+# EVENTOS DE DOMÍNIO
+# ==============================================================================
+
+eventos:
+  - evento: "relatorio.criado"
+    descricao: "Após criação de relatório personalizado"
+  - evento: "relatorio.atualizado"
+    descricao: "Após edição de relatório"
+  - evento: "relatorio.executado"
+    descricao: "Após execução com sucesso"
+  - evento: "relatorio.agendado"
+    descricao: "Após criação de agendamento"
+  - evento: "relatorio.enviado"
+    descricao: "Após envio por e-mail"
+  - evento: "relatorio.expirado"
+    descricao: "Após 90 dias (histórico deletado)"
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes:
+  - codigo: "relatorio:relatorio:create"
+    descricao: "Criar relatório"
+    roles_autorizadas:
+      - "Analista"
+      - "Gerente"
+      - "Administrador"
+
+  - codigo: "relatorio:relatorio:read"
+    descricao: "Visualizar relatórios"
+    roles_autorizadas:
+      - "Analista"
+      - "Gerente"
+      - "Administrador"
+      - "Operador"
+
+  - codigo: "relatorio:relatorio:update"
+    descricao: "Editar relatório"
+    roles_autorizadas:
+      - "Gerente"
+      - "Administrador"
+
+  - codigo: "relatorio:relatorio:delete"
+    descricao: "Excluir relatório"
+    roles_autorizadas:
+      - "Administrador"
+
+  - codigo: "relatorio:relatorio:execute"
+    descricao: "Executar relatório"
+    roles_autorizadas:
+      - "Analista"
+      - "Gerente"
+      - "Administrador"
+      - "Operador"
+
+  - codigo: "relatorio:relatorio:export"
+    descricao: "Exportar relatório"
+    roles_autorizadas:
+      - "Analista"
+      - "Gerente"
+      - "Administrador"
+      - "Operador"
+
+  - codigo: "relatorio:agendamento:create"
+    descricao: "Agendar execução"
+    roles_autorizadas:
+      - "Gerente"
+      - "Administrador"
+
+  - codigo: "lgpd:relatorio:dados-sensiveis"
+    descricao: "Acessar dados pessoais em relatórios"
+    roles_autorizadas:
+      - "Gerente RH"
+      - "Administrador"
+
+  - codigo: "audit:relatorio:read"
+    descricao: "Visualizar auditoria de relatórios"
+    roles_autorizadas:
+      - "Administrador"
+      - "Compliance Officer"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  # CRUD Principal
+  - method: "GET"
+    route: "/api/relatorios"
+    descricao: "Listar relatórios do usuário"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:read"
+    request_dto: null
+    response_dto: "PaginatedListDto<RelatorioDto>"
+
+  - method: "GET"
+    route: "/api/relatorios/{id}"
+    descricao: "Obter definição de relatório"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:read"
+    request_dto: null
+    response_dto: "RelatorioDto"
+
+  - method: "POST"
+    route: "/api/relatorios"
+    descricao: "Criar novo relatório personalizado"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:create"
+    request_dto: "CreateRelatorioCommand"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/relatorios/{id}"
+    descricao: "Atualizar relatório"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:update"
+    request_dto: "UpdateRelatorioCommand"
+    response_dto: "void"
+
+  - method: "DELETE"
+    route: "/api/relatorios/{id}"
+    descricao: "Excluir relatório"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:delete"
+    request_dto: null
+    response_dto: "void"
+
+  # Operações Especiais
+  - method: "POST"
+    route: "/api/relatorios/{id}/executar"
+    descricao: "Executar relatório e retornar dados"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:execute"
+    request_dto: "ExecutarRelatorioCommand"
+    response_dto: "ArquivoRelatorioDto"
+
+  - method: "POST"
+    route: "/api/relatorios/{id}/export/pdf"
+    descricao: "Exportar para PDF"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:export"
+    request_dto: "ExportarRelatorioPdfCommand"
+    response_dto: "byte[]"
+
+  - method: "POST"
+    route: "/api/relatorios/{id}/export/excel"
+    descricao: "Exportar para Excel"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:export"
+    request_dto: "ExportarRelatorioExcelCommand"
+    response_dto: "byte[]"
+
+  - method: "POST"
+    route: "/api/relatorios/{id}/export/csv"
+    descricao: "Exportar para CSV"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:export"
+    request_dto: "ExportarRelatorioCsvCommand"
+    response_dto: "byte[]"
+
+  - method: "POST"
+    route: "/api/relatorios/{id}/agendar"
+    descricao: "Agendar execução periódica"
+    autenticacao: true
+    authorization_policy: "relatorio:agendamento:create"
+    request_dto: "AgendasRelatorioCommand"
+    response_dto: "AgendamentoRelatorioDto"
+
+  - method: "GET"
+    route: "/api/relatorios/{id}/historico"
+    descricao: "Histórico de execuções anteriores"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:read"
+    request_dto: null
+    response_dto: "PaginatedListDto<HistoricoRelatorioDto>"
+
+  - method: "GET"
+    route: "/api/relatorios/predefinidos/{modulo}"
+    descricao: "Listar relatórios predefinidos por módulo"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:read"
+    request_dto: null
+    response_dto: "List<RelatorioDto>"
+
+  - method: "GET"
+    route: "/api/relatorios/{id}/preview"
+    descricao: "Preview do relatório (primeiras 100 linhas)"
+    autenticacao: true
+    authorization_policy: "relatorio:relatorio:read"
+    request_dto: null
+    response_dto: "RelatorioPreviewDto"
+
+# ==============================================================================
+# INTEGRAÇÕES OBRIGATÓRIAS
+# ==============================================================================
+
+integracoes:
+  internas:
+    - "Central de Funcionalidades (Feature Flags)"
+    - "Internacionalização (i18n)"
+    - "Auditoria"
+    - "Controle de Acesso (RBAC)"
+    - "Multi-Tenancy"
+    - "Hangfire (Background Jobs)"
+
+  feature_flags:
+    - feature_key: "RELATORIO_DESIGNER_VISUAL"
+      nome: "Designer Visual de Relatórios"
+      descricao: "Permite criar relatórios sem SQL"
+      habilitado: true
+      is_system_feature: false
+
+    - feature_key: "RELATORIO_AGENDAMENTO"
+      nome: "Agendamento de Relatórios"
+      descricao: "Execução automática periódica"
+      habilitado: true
+      is_system_feature: false
+
+    - feature_key: "RELATORIO_BACKGROUND_PROCESSING"
+      nome: "Processamento em Background"
+      descricao: "Hangfire para relatórios > 10k registros"
+      habilitado: true
+      is_system_feature: false
+
+    - feature_key: "RELATORIO_LGPD_COMPLIANCE"
+      nome: "Conformidade LGPD"
+      descricao: "Justificativa obrigatória para dados sensíveis"
+      habilitado: true
+      is_system_feature: false
+
+  auditoria:
+    retencao_anos: 7
+    operacoes:
+      - codigo: "REL_RELATORIO_CREATE"
+        descricao: "Criar Relatório"
+        dados: "ClienteId, Nome, Módulo, CamposSelecionados, Filtros, UsuarioId"
+
+      - codigo: "REL_RELATORIO_EXECUTE"
+        descricao: "Executar Relatório"
+        dados: "ClienteId, RelatórioId, FiltrosUtilizados, TamanoArquivo, JustificativaLGPD, UsuarioId, IpUsuario"
+
+      - codigo: "REL_AGENDAMENTO_CREATE"
+        descricao: "Agendar Relatório"
+        dados: "ClienteId, RelatórioId, Frequência, EmailsDestinatarios, UsuarioId"
+
+# ==============================================================================
+# SEGURANÇA
+# ==============================================================================
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  protecoes:
+    - "Multi-tenancy por ClienteId"
+    - "RBAC (permissões granulares)"
+    - "LGPD Justificativa Obrigatória"
+    - "Auditoria Imutável"
+    - "Expiração de Histórico (90 dias)"
+    - "SQL Injection Prevention (EF Core + LINQ)"
+    - "XSS Protection (sanitização automática)"
+    - "CSRF Protection (tokens)"
+    - "IP Logging"
+
+  testes_obrigatorios:
+    - "SQL Injection em filtros"
+    - "XSS em nome de relatório"
+    - "CSRF sem token"
+    - "Validação de permissões"
+    - "Multi-tenancy cross-tenant"
+    - "LGPD sem justificativa"
+    - "Tentativa de deletar auditoria"
+    - "Download de histórico expirado"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Tempo Médio de Execução"
+    descricao: "Tempo médio para relatórios < 1.000 linhas"
+    meta: "< 5s"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Sucesso"
+    descricao: "Percentual de execuções bem-sucedidas"
+    meta: "> 98%"
+    log_obrigatorio: true
+
+  - nome: "Relatórios Criados/Mês"
+    descricao: "Novos relatórios criados por cliente/mês"
+    meta: "> 5"
+    log_obrigatorio: true
+
+  - nome: "Agendamentos Ativos"
+    descricao: "Média de agendamentos ativos por usuário"
+    meta: "3-5"
+    log_obrigatorio: true
+
+  - nome: "Tamanho Médio Arquivo"
+    descricao: "Tamanho médio dos arquivos gerados"
+    meta: "< 5 MB"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "Relatório Lento"
+    threshold: "Execução > 30s"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+
+  - evento: "Falha Hangfire"
+    threshold: "Job falha 3x consecutivas"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+  - evento: "Armazenamento Cheio"
+    threshold: "Blob > 80% quota"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+  - evento: "Acesso Dados Sensíveis"
+    threshold: "Múltiplos acessos LGPD em 1h"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "sms"
+
+  - evento: "Auditoria Desabilitada"
+    threshold: "Nenhuma auditoria em 24h"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "sms"
+
+# ==============================================================================
+# RASTREABILIDADE
+# ==============================================================================
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-RF102"
+    - "UC01-RF102"
+    - "UC02-RF102"
+    - "UC03-RF102"
+    - "UC04-RF102"
+  artefatos_derivados:
+    - "UC-RF102.md"
+    - "MD-RF102.md"
+    - "WF-RF102.md"
+    - "TC-RF102.yaml"
+    - "MT-RF102.yaml"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_regras_negocio: 10
+  total_endpoints_api: 13
+  total_permissoes_rbac: 9
+  total_integracoes_obrigatorias: 4
+  total_feature_flags: 4
+  total_entidades: 4
+  total_estados: 4
+  total_eventos: 6
+  total_kpis: 5
+  total_alertas: 5

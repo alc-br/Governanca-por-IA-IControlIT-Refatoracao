@@ -1,0 +1,483 @@
+# =============================================
+# RL-RF102 - Referência ao Legado (v1.0)
+# Versão Governança: 2.0
+# Autor: Claude Code
+# Data: 2025-12-31
+# =============================================
+
+rf_id: RF102
+rf_title: "Relatórios e Análises"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+
+# ==============================================================================
+# ITENS LEGADO RASTREADOS
+# ==============================================================================
+
+itens_legado:
+  # ------------------------------------------------------------------------------
+  # TELAS ASPX
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF102-001"
+    tipo: "tela"
+    titulo: "RelatóriosListar.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Relatorios/RelatóriosListar.aspx"
+    descricao: |
+      Lista todos os relatórios disponíveis (predefinidos + personalizados).
+      Grid com colunas: Nome, Módulo, Última Execução, Total Execuções.
+      Botões: Novo, Executar, Editar, Excluir.
+    regras_implicitas:
+      - "Filtro automático por Cd_Usuario (não por ClienteId - problema isolamento)"
+      - "Nenhuma validação de permissões RBAC"
+      - "Ordenação fixa por Dt_Criacao DESC (sem customização)"
+      - "Sem paginação (carrega tudo de uma vez)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tela Angular moderna com paginação, filtros, RBAC e multi-tenancy"
+    rastreabilidade:
+      rf_moderno: "RF102 - Seção 4 (Funcionalidades)"
+      uc_moderno: "UC00-RF102 (Listar Relatórios)"
+    migracao_moderna:
+      componente_angular: "relatorios-list.component.ts"
+      rota_frontend: "/relatorios"
+
+  - id: "LEG-RF102-002"
+    tipo: "tela"
+    titulo: "RelatóriosDesigner.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Relatorios/RelatóriosDesigner.aspx"
+    descricao: |
+      Designer visual usando Crystal Reports para criar/editar relatórios.
+      CrystalReportViewer pesado, requer runtime instalado.
+    regras_implicitas:
+      - "Crystal Reports obrigatório (licença cara)"
+      - "Sem limite de campos (usuários selecionam 100+)"
+      - "Query SQL gerada automaticamente por Crystal"
+      - "Sem validação de campos sensíveis (problema LGPD)"
+      - "Nenhum preview (só vê após salvar e executar)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Designer drag-and-drop Angular, máximo 20 campos, preview em tempo real, sem licenças caras"
+    rastreabilidade:
+      rf_moderno: "RF102 - Seção 4, RN-RF102-009"
+      uc_moderno: "UC01-RF102 (Criar Relatório)"
+    migracao_moderna:
+      componente_angular: "relatorios-designer.component.ts"
+      rota_frontend: "/relatorios/novo"
+
+  - id: "LEG-RF102-003"
+    tipo: "tela"
+    titulo: "RelatóriosExecutar.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Relatorios/RelatóriosExecutar.aspx"
+    descricao: |
+      Executar relatório e exibir resultados.
+      Filtros parametrizados, botões de export PDF/Excel.
+    regras_implicitas:
+      - "Processamento síncrono (bloqueia tela durante execução)"
+      - "Timeout HTTP para relatórios > 100k registros"
+      - "Nenhuma justificativa LGPD para dados sensíveis"
+      - "Auditoria manual (inconsistente)"
+      - "Sem notificação de conclusão"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Execução assíncrona Hangfire (> 10k registros), justificativa LGPD obrigatória, notificação ao usuário"
+    rastreabilidade:
+      rf_moderno: "RF102 - Seção 4, RN-RF102-002, RN-RF102-004"
+      uc_moderno: "UC02-RF102 (Executar Relatório)"
+    migracao_moderna:
+      componente_angular: "relatorios-execute.component.ts"
+      rota_frontend: "/relatorios/{id}/executar"
+
+  - id: "LEG-RF102-004"
+    tipo: "tela"
+    titulo: "AgendamentosListar.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Relatorios/AgendamentosListar.aspx"
+    descricao: |
+      Lista agendamentos de relatórios do usuário.
+      Botões: Novo, Cancelar.
+    regras_implicitas:
+      - "Agendamento via SQL Agent (requer permissões DBA)"
+      - "Sem limite de agendamentos (abuso de recursos)"
+      - "Email hard-coded em Web.config (inflexível)"
+      - "Frequência limitada: apenas diário às 08:00"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Hangfire, máximo 10 agendamentos/usuário, horário customizável, múltiplos emails"
+    rastreabilidade:
+      rf_moderno: "RF102 - Seção 4, RN-RF102-003"
+      uc_moderno: "UC03-RF102 (Agendar Execução)"
+    migracao_moderna:
+      componente_angular: "agendamentos-list.component.ts"
+      rota_frontend: "/relatorios/agendamentos"
+
+  - id: "LEG-RF102-005"
+    tipo: "tela"
+    titulo: "HistoricoRelatorios.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Relatorios/HistoricoRelatorios.aspx"
+    descricao: |
+      Visualizar execuções anteriores de um relatório.
+      Grid com data, usuário, tamanho, botão download.
+    regras_implicitas:
+      - "Histórico ilimitado (mantido indefinidamente)"
+      - "Sem política de retenção (sem limpeza automática)"
+      - "Arquivos em servidor local (não escalável)"
+      - "Auditoria incompleta (sem IP, sem justificativa LGPD)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Histórico 90 dias, job Hangfire limpeza automática, Azure Blob Storage, auditoria completa"
+    rastreabilidade:
+      rf_moderno: "RF102 - Seção 4, RN-RF102-007, RN-RF102-010"
+      uc_moderno: "UC04-RF102 (Consultar Histórico)"
+    migracao_moderna:
+      componente_angular: "historico-list.component.ts"
+      rota_frontend: "/relatorios/{id}/historico"
+
+  # ------------------------------------------------------------------------------
+  # WEBSERVICES
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF102-006"
+    tipo: "webservice"
+    titulo: "WSRelatorios.asmx"
+    caminho_legado: "ic1_legado/WebService/WSRelatorios.asmx.vb"
+    metodos:
+      - nome: "ListarRelatorios"
+        parametros: "Nenhum"
+        retorno: "DataTable"
+      - nome: "GetRelatorio"
+        parametros: "id (INT)"
+        retorno: "DataRow"
+      - nome: "ExecutarRelatorio"
+        parametros: "id (INT), filtros (TEXT)"
+        retorno: "DataTable"
+      - nome: "ExportarPDF"
+        parametros: "id (INT), filtros (TEXT)"
+        retorno: "byte[]"
+      - nome: "ExportarExcel"
+        parametros: "id (INT), filtros (TEXT)"
+        retorno: "byte[]"
+      - nome: "CriarAgendamento"
+        parametros: "relId (INT), freq (INT), email (VARCHAR)"
+        retorno: "INT (Id_Agendamento)"
+    descricao: |
+      API SOAP para operações de relatórios.
+      Retorna DataTable (não tipado).
+      Sem autenticação JWT (usa Windows Auth).
+      Queries SQL inline (SQL Injection).
+    destino: "SUBSTITUÍDO"
+    justificativa: "REST API moderna com endpoints /api/relatorios, autenticação JWT, DTOs tipados, EF Core"
+    rastreabilidade:
+      rf_moderno: "RF102 - Seção 11 (Endpoints API)"
+      endpoint_moderno: "GET /api/relatorios, POST /api/relatorios/{id}/executar, etc."
+    migracao_moderna:
+      minimal_api: "Relatorios.cs (Endpoint Group)"
+      handlers: "GetRelatoriosQuery, ExecutarRelatorioCommand, ExportarRelatorioPdfCommand"
+
+  # ------------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF102-007"
+    tipo: "stored_procedure"
+    titulo: "pa_GerarRelatorioAtivos"
+    caminho_legado: "ic1_legado/Database/Procedures/pa_GerarRelatorioAtivos.sql"
+    parametros_entrada:
+      - "@Cd_Usuario INT"
+      - "@Dt_Inicio DATETIME"
+      - "@Dt_Fim DATETIME"
+    parametros_saida:
+      - "@Result INT OUTPUT"
+    descricao: |
+      Valida usuário, monta query dinâmica com filtros (concatenação - SQL Injection),
+      executa query, insere em tabela temporária global ##Temp_Relatorio (conflitos),
+      retorna total de registros.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Handler CQRS ExecutarRelatorioHandler com EF Core, LINQ, multi-tenancy automático, sem SQL inline"
+    rastreabilidade:
+      rf_moderno: "RF102 - RN-RF102-001 a RN-RF102-010"
+      handler_moderno: "ExecutarRelatorioHandler"
+    migracao_moderna:
+      handler: "ExecutarRelatorioCommandHandler"
+      validacao: "ExecutarRelatorioCommandValidator (FluentValidation)"
+
+  - id: "LEG-RF102-008"
+    tipo: "stored_procedure"
+    titulo: "pa_ExportarRelatorioExcel"
+    caminho_legado: "ic1_legado/Database/Procedures/pa_ExportarRelatorioExcel.sql"
+    parametros_entrada:
+      - "@Id_Relatorio INT"
+      - "@Tx_Filtros TEXT"
+    parametros_saida: []
+    descricao: |
+      Busca definição do relatório (campo [Tx_SQL]), executa query,
+      gera Excel via SSIS, salva em pasta física D:\IControlIT\Relatorios\.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Biblioteca EPPlus em .NET, arquivos salvos em Azure Blob Storage, auditoria completa"
+    rastreabilidade:
+      rf_moderno: "RF102 - Seção 11 (POST /api/relatorios/{id}/export/excel)"
+      handler_moderno: "ExportarRelatorioExcelCommandHandler"
+    migracao_moderna:
+      handler: "ExportarRelatorioExcelCommandHandler"
+      biblioteca: "EPPlus (NuGet)"
+      storage: "Azure Blob Storage"
+
+  - id: "LEG-RF102-009"
+    tipo: "stored_procedure"
+    titulo: "pa_LimparHistoricoRelatorios"
+    caminho_legado: "ic1_legado/Database/Procedures/pa_LimparHistoricoRelatorios.sql"
+    parametros_entrada: []
+    parametros_saida: []
+    descricao: |
+      Deleta registros de tblHistoricoRelatorios com > 365 dias.
+      PROBLEMA: Não deleta arquivos físicos correspondentes.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Job Hangfire LimparHistoricoExpiradoJob com política 90 dias, deleta registros + arquivos Azure Blob"
+    rastreabilidade:
+      rf_moderno: "RF102 - RN-RF102-007"
+      job_hangfire: "LimparHistoricoExpiradoJob"
+    migracao_moderna:
+      job: "LimparHistoricoExpiradoJob (Hangfire recurring job)"
+      frequencia: "Diário às 02:00"
+
+  # ------------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF102-010"
+    tipo: "tabela"
+    titulo: "tblRelatorios"
+    schema_legado: "[dbo].[tblRelatorios]"
+    problemas_identificados:
+      - "Falta FK para validar Cd_Modulo"
+      - "Campo Tx_SQL (TEXT) armazena query SQL inline (inseguro)"
+      - "Sem auditoria (sem Created, CreatedBy, LastModified, LastModifiedBy)"
+      - "Sem multi-tenancy (sem ClienteId)"
+      - "Nomenclatura legada (prefixos [Nm_], [Cd_], [Tx_])"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tabela Relatorio redesenhada com multi-tenancy, auditoria, sem SQL inline"
+    rastreabilidade:
+      rf_moderno: "RF102 - Seção 7 (Modelo de Dados)"
+      md_moderno: "MD-RF102.md - Tabela Relatorio"
+    migracao_moderna:
+      tabela_moderna: "Relatorio"
+      migration_ef_core: "20251231_CreateRelatorioTable.cs"
+
+  - id: "LEG-RF102-011"
+    tipo: "tabela"
+    titulo: "tblAgendamentos"
+    schema_legado: "[dbo].[tblAgendamentos]"
+    problemas_identificados:
+      - "Falta FK definida para Id_Relatorio e Cd_Usuario"
+      - "Campo Tx_Email (VARCHAR(MAX)) como string delimitada por ponto-e-vírgula (difícil validar)"
+      - "Sem limite de agendamentos por usuário (sem constraint CHECK)"
+      - "Sem auditoria (sem CreatedBy, LastModified)"
+      - "Sem multi-tenancy (sem ClienteId)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tabela AgendamentoRelatorio com multi-tenancy, auditoria, EmailsDestinatarios como List<string>"
+    rastreabilidade:
+      rf_moderno: "RF102 - RN-RF102-003"
+      md_moderno: "MD-RF102.md - Tabela AgendamentoRelatorio"
+    migracao_moderna:
+      tabela_moderna: "AgendamentoRelatorio"
+      migration_ef_core: "20251231_CreateAgendamentoRelatorioTable.cs"
+
+  - id: "LEG-RF102-012"
+    tipo: "tabela"
+    titulo: "tblHistoricoRelatorios"
+    schema_legado: "[dbo].[tblHistoricoRelatorios]"
+    problemas_identificados:
+      - "Sem política de retenção (dados mantidos indefinidamente)"
+      - "Sem campo DataExpiracao (nenhuma limpeza automática)"
+      - "Campo Tx_Filtros (TEXT) como texto livre (difícil queryar)"
+      - "Sem auditoria LGPD (sem IP, UserAgent, JustificativaLGPD)"
+      - "Sem multi-tenancy (sem ClienteId)"
+      - "Arquivos em servidor local (Nm_Arquivo aponta path físico)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tabela HistoricoRelatorio com DataExpiracao, job Hangfire limpeza 90 dias, Azure Blob Storage"
+    rastreabilidade:
+      rf_moderno: "RF102 - RN-RF102-007, RN-RF102-010"
+      md_moderno: "MD-RF102.md - Tabela HistoricoRelatorio"
+    migracao_moderna:
+      tabela_moderna: "HistoricoRelatorio"
+      migration_ef_core: "20251231_CreateHistoricoRelatorioTable.cs"
+
+  # ------------------------------------------------------------------------------
+  # REGRAS IMPLÍCITAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF102-013"
+    tipo: "regra_negocio"
+    titulo: "Relatórios ordenados por data de criação decrescente"
+    localizacao_codigo: "RelatóriosListar.aspx.vb - Linha 42-45"
+    descricao: |
+      Query SQL sempre ordena por Dt_Criacao DESC (mais recentes primeiro).
+      Não há opção de customização de ordenação.
+    destino: "ASSUMIDO"
+    justificativa: "Ordem padrão mantida no sistema moderno, mas permitir customização via query params"
+    rastreabilidade:
+      rf_moderno: "RF102 - Seção 11 (GET /api/relatorios?orderBy=DataCriacao&desc=true)"
+      uc_moderno: "UC00-RF102 (Listar com ordenação customizada)"
+    migracao_moderna:
+      query_param: "?orderBy=DataCriacao&desc=true"
+      handler: "GetRelatoriosQuery (suporta ordenação dinâmica)"
+
+  - id: "LEG-RF102-014"
+    tipo: "regra_negocio"
+    titulo: "Agendamentos executam apenas às 08:00"
+    localizacao_codigo: "WSRelatorios.asmx.vb - Método CriarAgendamento - Linha 120"
+    descricao: |
+      Todos os agendamentos criados via SQL Agent têm horário fixo 08:00.
+      Não há opção de customização de horário.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Sistema moderno permite horário customizável (campo HorarioExecucao do tipo TimeSpan)"
+    rastreabilidade:
+      rf_moderno: "RF102 - RN-RF102-003"
+      uc_moderno: "UC03-RF102 (Agendar com horário customizado)"
+    migracao_moderna:
+      campo_moderno: "AgendamentoRelatorio.HorarioExecucao (TimeSpan)"
+      validador: "AgendasRelatorioCommandValidator"
+
+  - id: "LEG-RF102-015"
+    tipo: "regra_negocio"
+    titulo: "Exportação PDF sempre inclui logo do primeiro cliente"
+    localizacao_codigo: "RelatóriosExecutar.aspx.vb - Linha 200"
+    descricao: |
+      Logo hard-coded em Web.config - AppSettings["LogoClientePadrao"].
+      Não é dinâmico por cliente (todos os relatórios usam mesmo logo).
+    destino: "SUBSTITUÍDO"
+    justificativa: "Logo dinâmico obtido de SistemaCliente ou SistemaConfiguracaoGeral por ClienteId"
+    rastreabilidade:
+      rf_moderno: "RF102 - RN-RF102-005"
+      uc_moderno: "UC02-RF102 (Export PDF com logo do cliente)"
+    migracao_moderna:
+      servico: "IClienteService.GetLogoAsync(ClienteId)"
+      handler: "ExportarRelatorioPdfCommandHandler"
+
+  - id: "LEG-RF102-016"
+    tipo: "regra_negocio"
+    titulo: "Usuários sem permissão podem acessar qualquer relatório"
+    localizacao_codigo: "Múltiplas telas ASPX (code-behind)"
+    descricao: |
+      Code-behind apenas valida User.Identity.IsAuthenticated (autenticação básica).
+      Não valida permissões específicas (RBAC inexistente).
+    destino: "SUBSTITUÍDO"
+    justificativa: "RBAC com permissões granulares (relatorio:relatorio:create, relatorio:relatorio:execute, etc.)"
+    rastreabilidade:
+      rf_moderno: "RF102 - Seção 9.4 (Controle de Acesso RBAC)"
+      uc_moderno: "Todos os UCs (UC00-UC04) validam permissões"
+    migracao_moderna:
+      autorizacao: "RequireAuthorization(AuthorizationPolicies.RelatoriosRead)"
+      matriz_rbac: "9 permissões definidas (relatorio:*, lgpd:*, audit:*)"
+
+  - id: "LEG-RF102-017"
+    tipo: "regra_negocio"
+    titulo: "Histórico mantido indefinidamente"
+    localizacao_codigo: "Ausência de procedure de limpeza"
+    descricao: |
+      Não há job de limpeza automática.
+      Dados de tblHistoricoRelatorios acumulam infinitamente.
+      Arquivos físicos nunca são deletados.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Job Hangfire limpeza automática com política 90 dias (registros + arquivos Azure Blob)"
+    rastreabilidade:
+      rf_moderno: "RF102 - RN-RF102-007"
+      job_moderno: "LimparHistoricoExpiradoJob (Hangfire recurring)"
+    migracao_moderna:
+      job: "LimparHistoricoExpiradoJob"
+      frequencia: "Diário às 02:00"
+      retencao: "90 dias"
+
+  - id: "LEG-RF102-018"
+    tipo: "regra_negocio"
+    titulo: "Campos sensíveis acessíveis sem justificativa"
+    localizacao_codigo: "RelatóriosDesigner.aspx.vb"
+    descricao: |
+      Usuários podem criar relatórios com CPF, Salário, RG sem fornecer justificativa LGPD.
+      Nenhuma auditoria de acesso a dados pessoais.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Validação obrigatória de justificativa LGPD + auditoria imutável"
+    rastreabilidade:
+      rf_moderno: "RF102 - RN-RF102-002, RN-RF102-006, RN-RF102-010"
+      uc_moderno: "UC02-RF102 (Executar com justificativa LGPD obrigatória)"
+    migracao_moderna:
+      validador: "ExecutarRelatorioCommandValidator"
+      auditoria: "AuditoriaRelatorio (tabela imutável)"
+
+# ==============================================================================
+# BANCOS LEGADOS MAPEADOS
+# ==============================================================================
+
+bancos_legados:
+  - nome: "IC1_Producao"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "tblRelatorios"
+      - "tblAgendamentos"
+      - "tblHistoricoRelatorios"
+      - "tblUsuarios"
+    destino: "CONSOLIDADO"
+    justificativa: "Migrado para banco único com multi-tenancy (Row-Level Security). Multi-database por cliente não escala."
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF102-001"
+    titulo: "Multi-database por cliente dificulta consolidação"
+    severidade: "ALTA"
+    descricao: |
+      Cada cliente possui banco separado (IC1_Cliente01, IC1_Cliente02, etc.).
+      Dificulta análise consolidada, backups, manutenção e escalabilidade.
+    impacto: "Impossível fazer queries cross-tenant, dificulta expansão SaaS"
+    solucao_moderna: "Single database com multi-tenancy via ClienteId + Row-Level Security"
+
+  - id: "PROB-RF102-002"
+    titulo: "SQL inline (risco SQL Injection)"
+    severidade: "CRÍTICA"
+    descricao: |
+      Queries SQL montadas via concatenação de strings em code-behind VB.NET e stored procedures.
+      Campo [Tx_SQL] armazena query como TEXT.
+    impacto: "Vulnerabilidade crítica de SQL Injection (CVE)"
+    solucao_moderna: "EF Core + LINQ (parameterização automática, sem SQL inline)"
+
+  - id: "PROB-RF102-003"
+    titulo: "Crystal Reports (caro e complexo)"
+    severidade: "ALTA"
+    descricao: |
+      Licenças Crystal Reports caras.
+      Requer runtime instalado.
+      Complexo para usuários não técnicos.
+    impacto: "Alto custo de licenciamento, barreira de entrada para usuários"
+    solucao_moderna: "Designer drag-and-drop Angular (sem licenças, intuitivo)"
+
+  - id: "PROB-RF102-004"
+    titulo: "Processamento síncrono (bloqueia tela)"
+    severidade: "ALTA"
+    descricao: |
+      Relatórios grandes processados sincronamente bloqueiam tela durante minutos.
+      Timeout HTTP para > 100k registros.
+    impacto: "UX ruim, timeouts frequentes, usuários frustrados"
+    solucao_moderna: "Hangfire para relatórios > 10k registros, notificação ao usuário"
+
+  - id: "PROB-RF102-005"
+    titulo: "Nenhuma conformidade LGPD"
+    severidade: "CRÍTICA"
+    descricao: |
+      Usuários podem acessar CPF, Salário, RG sem justificativa.
+      Nenhuma auditoria de acesso a dados pessoais.
+    impacto: "Risco legal (multas LGPD), exposição de dados sensíveis"
+    solucao_moderna: "Justificativa obrigatória + auditoria imutável + permissão lgpd:relatorio:dados-sensiveis"
+
+  - id: "PROB-RF102-006"
+    titulo: "Auditoria manual e inconsistente"
+    severidade: "ALTA"
+    descricao: |
+      Logs escritos manualmente em algumas operações.
+      Não registra IP, UserAgent, justificativa LGPD.
+      Sem imutabilidade (registros podem ser deletados).
+    impacto: "Rastreabilidade incompleta, dificulta investigações"
+    solucao_moderna: "Auditoria automática via AuditInterceptor + tabela AuditoriaRelatorio imutável"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 18
+  itens_assumidos: 1
+  itens_substituidos: 17
+  itens_descartados: 0
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"

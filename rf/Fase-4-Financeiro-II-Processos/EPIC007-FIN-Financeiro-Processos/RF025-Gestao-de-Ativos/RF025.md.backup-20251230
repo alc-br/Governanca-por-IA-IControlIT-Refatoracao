@@ -1,0 +1,717 @@
+﻿# RF-022: Gestão Completa de Ativos de TI e Telecom
+
+**Versão**: 3.0
+**Última Atualização**: 04/11/2025
+**Status**: ✅ Estrutura Simplificada (5 seções)
+**Fase**: Fase 2 - Serviços Essenciais
+**EPIC**: AST - Gestão de Ativos
+**Prioridade**: CRÍTICA
+**Complexidade**: MUITO ALTA
+
+[← Voltar](../README.md)
+
+---
+
+## 📋 1. RESUMO EXECUTIVO
+
+### Descrição Geral
+
+Sistema completo de gestão de ativos de TI (notebooks, desktops, servidores, smartphones, tablets, impressoras) e Telecom (linhas móveis, fixas, aparelhos telefônicos) com rastreamento de ciclo de vida completo desde aquisição até baixa patrimonial. Suporta inventário automatizado via QR Code/RFID, cálculo de depreciação contábil automática, geolocalização GPS de transferências, histórico completo de movimentações, integração com sistema de patrimônio e analytics de utilização para otimização de custos.
+
+**Objetivo Principal**: Eliminar perda de ativos (redução de 40% no extravio), automatizar inventário físico (reduzindo tempo de 2 semanas para 2 dias com mobile app), garantir compliance contábil com depreciação automatizada e fornecer visibilidade 360° do parque tecnológico para decisões estratégicas de renovação e compra.
+
+### Contexto: Legado vs. Modernização
+
+| Aspecto | Legado (VB.NET) | Modernização (.NET 10) |
+|---------|----------------|----------------------|
+| **Cadastro** | Planilha Excel manual | Sistema centralizado com QR Code automático |
+| **Rastreamento** | Nenhum histórico de movimentações | Auditoria completa de transferências com GPS |
+| **Inventário** | Físico manual (2 semanas, 40h/pessoa) | Mobile app com scan QR Code (2 dias, 8h/pessoa) |
+| **Depreciação** | Cálculo manual mensal em planilha | Hangfire job automático com método linear/acelerado |
+| **Identificação** | Etiquetas papel (descolam, ilegíveis) | QR Code durável + backup RFID opcional |
+| **Localização** | Campo texto "sala 201" | Geolocalização GPS + mapa interativo |
+| **Garantia** | Sem alertas (descobre após vencer) | Notificação 30/60/90 dias antes vencimento |
+| **Disponibilidade** | Status manual (desatualizado) | Workflow automático (alocado → manutenção → disponível) |
+| **Relatórios** | Excel estático exportado | Dashboards Chart.js tempo real + export PDF/Excel |
+| **Mobile** | Nenhum app | MAUI app Android/iOS para inventário campo |
+
+### 10 Funcionalidades Principais
+
+1. **CRUD Completo de Ativos**: Cadastro, edição, exclusão lógica de ativos TI e Telecom com todos os campos obrigatórios
+2. **Geração Automática QR Code**: QR Code único gerado ao cadastrar ativo, imprimível em etiquetas 30x30mm
+3. **Workflow de Movimentações**: Alocação, transferência, devolução, manutenção, baixa com aprovação multi-nível
+4. **Inventário Mobile**: App MAUI para scan QR Code, validar localização GPS, tirar fotos, atualizar status
+5. **Depreciação Automática**: Hangfire job mensal calcula depreciação linear/acelerada/soma-dígitos com integração contábil
+6. **Alertas de Garantia**: E-mail/push notification 30/60/90 dias antes vencimento garantia fabricante
+7. **Dashboard Executivo**: Gráficos ativos por status, tipo, localização, taxa utilização, top 10 mais caros
+8. **Histórico Completo**: Timeline visual de todas as movimentações (chain of custody) com responsáveis e datas
+9. **Geolocalização GPS**: Captura GPS ao alocar/transferir ativo via mobile app para rastreamento
+10. **Integração Patrimônio**: Sincronização bidirecional com sistema contábil/ERP para baixas e depreciação
+
+### Impacto de Negócio
+
+- **Redução de Extravio:** De 15% para 5% dos ativos (economia de R$500k/ano)
+- **Inventário Físico:** De 2 semanas (40h/pessoa) para 2 dias (8h/pessoa) = 80% redução
+- **Compliance Contábil:** Depreciação automática elimina 100% dos erros de cálculo manual
+- **ROI:** Sistema paga-se em 6 meses com redução de perdas e otimização de inventário
+
+---
+
+## 📐 2. REGRAS DE NEGÓCIO
+
+### RN-CAD-001-01: Número de Patrimônio Único Global
+
+**Descrição**: Cada ativo DEVE ter um número de patrimônio único no sistema, gerado automaticamente no formato `PAT-{TipoAbrev}-{Ano}-{Sequencial}` (ex: PAT-NB-2025-0001).
+
+**Unicidade**: Sistema valida unicidade ANTES de salvar. Constraint UNIQUE INDEX no banco previne duplicatas.
+
+**Geração Automática**: Backend gera número sequencial por tipo de ativo e ano (reinicia contador a cada ano).
+
+**Erro**: 409 Conflict se número já existe (não deve ocorrer com geração automática correta).
+
+### RN-CAD-001-02: QR Code Gerado Automaticamente
+
+**Descrição**: Ao criar ativo, sistema DEVE gerar QR Code único apontando para URL `https://api.icontrolit.com.br/ativos/qr/{Id_Ativo}`. QR Code armazenado em Base64 (campo `QR_Code_Base64`) para impressão offline e URL (campo `QR_Code_URL`) para acesso online.
+
+**Formato:** Biblioteca QRCoder em .NET com correção erro nível "High" (30% da imagem pode ser danificada e ainda funcionar).
+
+**Tamanho:** QR Code gerado em 300x300px para impressão em etiquetas 30x30mm (alta densidade).
+
+**Impressão:** Frontend pode gerar PDF com múltiplos QR Codes para impressão em lote (Zebra ZD421 ou similar).
+
+### RN-CAD-001-03: Status de Ativo com Transições Válidas
+
+**Descrição**: Ativo possui status (Enum: Disponivel, Alocado, Manutencao, Baixado, Perdido, Reservado) com transições válidas:
+
+- **Disponivel** → Alocado, Reservado, Manutencao, Baixado
+- **Alocado** → Disponivel (devolução), Manutencao, Perdido, Baixado
+- **Manutencao** → Disponivel (reparo concluído), Baixado (irreparável)
+- **Reservado** → Disponivel (cancelamento), Alocado (efetivação)
+- **Baixado** → Nenhum (estado final)
+- **Perdido** → Disponivel (encontrado), Baixado (baixa patrimonial)
+
+**Validação**: Sistema valida transição antes de salvar e retorna 400 Bad Request se inválida com mensagem explicativa.
+
+### RN-CAD-001-04: Alocação Requer Usuário Responsável
+
+**Descrição**: Ao mudar status para "Alocado", campo `Id_Usuario_Responsavel` DEVE ser preenchido obrigatoriamente. Campo é validado como FK existente na tabela Users.
+
+**Notificação**: Usuário responsável DEVE receber email/push notification com Termo de Responsabilidade digital para aceite (via DocuSign API ou equivalente).
+
+**Devolução**: Ao mudar status de "Alocado" para "Disponivel", campo `Id_Usuario_Responsavel` é limpo (NULL) automaticamente.
+
+### RN-CAD-001-05: Histórico Completo de Movimentações (Chain of Custody)
+
+**Descrição**: TODA alteração de status ou responsável DEVE gerar registro em tabela `Ativo_Movimentacao` com campos obrigatórios:
+
+- `Tipo_Movimentacao`: Enum (Alocacao, Transferencia, Devolucao, Manutencao, Baixa)
+- `Status_Origem` e `Status_Destino`
+- `Usuario_Origem_Id` e `Usuario_Destino_Id` (se aplicável)
+- `Localizacao_Origem_Id` e `Localizacao_Destino_Id` (se aplicável)
+- `Latitude` e `Longitude` (se capturado via mobile app)
+- `Data_Movimentacao` (timestamp UTC)
+- `Usuario_Responsavel_Movimentacao` (quem executou a ação)
+- `Justificativa` (obrigatória para Baixa e Perdido, opcional para demais)
+
+**Imutabilidade**: Registros em `Ativo_Movimentacao` NUNCA podem ser editados ou deletados (apenas INSERT).
+
+### RN-CAD-001-06: Depreciação Automática Mensal
+
+**Descrição**: Hangfire job executa TODO mês (dia 1 às 02:00 UTC) cálculo de depreciação para ativos com `Dt_Aquisicao` preenchida. Métodos suportados:
+
+1. **Linear**: Depreciação constante por mês = (Valor_Aquisicao - Valor_Residual) / (Taxa_Depreciacao_Anual * 12)
+2. **Acelerada**: Depreciação maior no início (Declining Balance Method) = Valor_Atual × Taxa_Anual / 12
+3. **Soma_Digitos**: Soma dos dígitos dos anos (Sum-of-Years' Digits Method)
+
+**Atualização**: Job atualiza campos `Valor_Atual_Depreciado` e `Dt_Ultima_Depreciacao` após cálculo.
+
+**Integração ERP**: Job envia lançamentos contábeis via API REST para sistema ERP (SAP, TOTVS, etc.) com retry 3x se falha.
+
+### RN-CAD-001-07: Alertas de Garantia Automáticos
+
+**Descrição**: Hangfire job executa DIARIAMENTE (às 08:00 UTC) verificando ativos com `Dt_Garantia_Fim` nos próximos 90, 60 ou 30 dias. Envia notificações:
+
+- **90 dias antes**: Email para gestor de TI com lista de ativos
+- **60 dias antes**: Email + Push notification para responsável direto + gestor
+- **30 dias antes**: Email + Push + In-App notification para todos stakeholders + alerta no dashboard
+
+**Duplicação**: Sistema registra notificações enviadas em tabela `Ativo_Notificacoes_Enviadas` para evitar duplicatas.
+
+### RN-CAD-001-08: Validação de Campos Obrigatórios por Tipo
+
+**Descrição**: Campos obrigatórios variam por `Tipo_Ativo`:
+
+**Ativos TI (Notebook, Desktop, Servidor):**
+- Obrigatórios: Tipo_Ativo, Categoria, Numero_Serie, Id_Marca, Id_Modelo, Valor_Aquisicao, Dt_Aquisicao
+- Opcionais mas recomendados: Sistema_Operacional, Processador, Memoria_RAM_GB, MAC_Address, Hostname
+
+**Ativos Telecom (Smartphone, Linha_Movel):**
+- Obrigatórios: Tipo_Ativo, Categoria, Numero_Linha, Operadora, Tipo_Plano
+- Opcionais: IMEI (obrigatório se Smartphone), Numero_Serie
+
+**Validação**: FluentValidation com regras condicionais baseadas em `Tipo_Ativo`. Retorna 400 Bad Request com lista de campos faltantes.
+
+### RN-CAD-001-09: Geolocalização Obrigatória para Inventário Mobile
+
+**Descrição**: Ao usar app mobile para inventário (scan QR Code), sistema DEVE capturar latitude e longitude (GPS) obrigatoriamente. Se GPS desabilitado ou sem sinal, app exibe erro e impede confirmar movimentação.
+
+**Precisão**: Aceitar apenas coordenadas com precisão ≤ 20 metros (accuracy ≤ 20m).
+
+**Motivo**: Prevenir fraudes (ex: marcar inventário sem estar fisicamente no local) e rastrear localização real de ativos.
+
+**Exceção**: Inventário via web (desktop) permite preencher localização manual (sem GPS) mas registra flag `InventarioRemoto=TRUE` para auditoria.
+
+### RN-CAD-001-10: Baixa de Ativo Requer Aprovação
+
+**Descrição**: Baixa patrimonial (Status → "Baixado") DEVE passar por workflow de aprovação de 2 níveis:
+
+1. **Nível 1**: Gestor imediato do responsável atual
+2. **Nível 2**: Controller/Gerente Financeiro
+
+**Justificativa Obrigatória**: Campo `Justificativa` com mínimo 50 caracteres explicando motivo (ex: "Equipamento danificado sem conserto econômico viável", "Roubo conforme BO 123456/2025").
+
+**Anexos**: Upload obrigatório de documentos (BO para roubo, laudo técnico para dano irreparável, NF de venda para alienação).
+
+### RN-CAD-001-11: IMEI Validation para Smartphones
+
+**Descrição**: Se `Tipo_Ativo = 'Smartphone'`, campo `IMEI` DEVE ser validado:
+
+1. Formato: 15 dígitos numéricos
+2. Checksum: Algoritmo de Luhn (último dígito verificador)
+3. Não blacklist: Consulta API Anatel para verificar se IMEI não está bloqueado
+
+**Bloqueio**: Se IMEI bloqueado, sistema exibe alerta mas permite cadastro (pode ser equipamento recuperado de roubo).
+
+**Registro**: Salvar resultado da consulta Anatel em campo `IMEI_Status` (Ativo, Bloqueado, Irregulação).
+
+### RN-CAD-001-12: Isolamento Multi-Tenant Obrigatório
+
+**Descrição**: TODAS as queries e operações DEVEM filtrar por `Id_Conglomerado` obtido do JWT token do usuário logado.
+
+**Segurança**: Usuário de Conglomerado A NÃO pode ver/editar/deletar ativos de Conglomerado B mesmo se descobrir o ID.
+
+**Performance**: Índice composto (Id_Conglomerado, Status_Ativo) otimiza queries mais comuns.
+
+### RN-CAD-001-13: Soft Delete Obrigatório
+
+**Descrição**: Sistema NUNCA deve fazer DELETE físico de ativos. Exclusão lógica via flag `Fl_Ativo = FALSE`.
+
+**Motivo**: Preservar histórico completo para auditorias e compliance (manter dados por 7 anos conforme legislação).
+
+**Queries**: Todas as queries incluem `WHERE Fl_Ativo = 1` por padrão (EF Core Query Filter global).
+
+**Restauração**: Administrador pode reativar ativo via endpoint `POST /api/ativos/{id}/reativar` com justificativa.
+
+### RN-CAD-001-14: Integração com Sistema de Patrimônio Externo
+
+**Descrição**: Sistema DEVE sincronizar bidireccionalmente com ERP/sistema de patrimônio via:
+
+1. **Webhook Outbound**: Enviar evento ao criar/atualizar/baixar ativo
+2. **API REST Inbound**: Receber atualizações de valor contábil, depreciação acumulada, centro custo
+
+**Formato**: JSON payload com schema versionado (v1, v2) para backward compatibility.
+
+**Retry**: Polly policy com 3 tentativas (backoff exponencial 2s, 4s, 8s) se falha.
+
+**Dead Letter Queue**: Eventos não sincronizados após 3 tentativas vão para DLQ (RabbitMQ) para reprocessamento manual.
+
+### RN-CAD-001-15: Inventário Periódico Obrigatório
+
+**Descrição**: Sistema DEVE rastrear data do último inventário físico por ativo (campo `Dt_Ultimo_Inventario`). Alertas disparados se:
+
+- **Ativos >R$5.000**: Inventário obrigatório a cada 6 meses
+- **Ativos >R$1.000**: Inventário obrigatório a cada 12 meses
+- **Ativos <R$1.000**: Inventário obrigatório a cada 24 meses
+
+**Dashboard**: Exibir contador de ativos "atrasados" para inventário (semáforo vermelho se >10%).
+
+**Notificação**: Email semanal para gestores com lista de ativos pendentes de inventário.
+
+---
+
+## 🗄️ 3. BANCO DE DADOS LEGADO
+
+### Contexto do Sistema Legado
+
+Sistema legado VB.NET/ASP.NET Web Forms utilizava estrutura rudimentar de gestão de ativos com problemas críticos de rastreamento e compliance. Empresa mantinha paralelamente planilha Excel (fonte da verdade) devido à desconfiança no sistema legado, criando duplicidade de trabalho e inconsistências.
+
+### Problemas Identificados
+
+1. **Sem Histórico de Movimentações**: Tabela `Ativo` tinha apenas snapshot do estado atual - impossível rastrear quem usou ativo antes ou quando foi transferido
+2. **Etiquetas Papel Ineficientes**: Etiquetas impressas descolavam ou ficavam ilegíveis - taxa de falha 30% após 6 meses
+3. **Depreciação Manual em Excel**: Controlador baixava dados mensalmente e calculava depreciação em planilha - erros frequentes de fórmula e versões desatualizadas
+4. **Sem Alertas de Garantia**: Descobriam garantia vencida apenas quando precisavam acionar suporte técnico (perda de ~R$80k/ano em reparos fora garantia)
+5. **Inventário Manual Doloroso**: 2 colaboradores levavam 2 semanas para inventariar 800 ativos - checklist papel, digitar depois no sistema
+6. **Localização Texto Livre**: Campo `Localizacao` aceitava texto livre ("sala do João", "depósito do 2º andar") - impossível gerar mapas ou relatórios confiáveis
+7. **Sem Status Workflow**: Status era apenas "Ativo" ou "Inativo" - não diferenciava "em manutenção", "alocado", "disponível para reuso"
+8. **Integração Manual com ERP**: Controlador exportava CSV mensalmente e importava no SAP manualmente - esquecimento causava descompasso contábil
+
+### Estrutura Legado Existente
+
+Sistema legado tinha apenas 3 tabelas básicas:
+
+**Ativo** (tabela principal): Campos básicos (Id_Ativo, Tipo, Numero_Patrimonio, Numero_Serie, Marca, Modelo, Valor_Aquisicao, Dt_Aquisicao, Status, Usuario_Atual). Não tinha campos de garantia, GPS, QR Code, depreciação calculada ou método de depreciação.
+
+**Marca** e **Modelo**: Tabelas de apoio para normalização (Dell, HP, Lenovo / Latitude 5420, ProBook 450).
+
+**Tabelas Ausentes**: Não existiam `Ativo_Movimentacao` (histórico), `Ativo_Depreciacao` (cálculos), `Ativo_Inventario` (auditorias físicas), `Ativo_Garantia` (alertas) ou `Ativo_Localizacao` (GPS).
+
+### Migração para Sistema Moderno
+
+Sistema moderno introduz estrutura completa com 8 tabelas:
+
+**Ativo (Evoluída)**: Adicionados 30+ campos incluindo QR Code (QR_Code_URL, QR_Code_Base64), Geolocalização (Latitude, Longitude, Id_Localizacao), Garantia (Dt_Garantia_Inicio, Dt_Garantia_Fim, Tipo_Garantia, Numero_Tag_Service), Depreciação (Metodo_Depreciacao, Taxa_Depreciacao_Anual, Valor_Residual, Valor_Atual_Depreciado, Dt_Ultima_Depreciacao), Características Técnicas (Sistema_Operacional, Processador, Memoria_RAM_GB, MAC_Address, Hostname) e Telecom (IMEI, Numero_Linha, Operadora, Tipo_Plano).
+
+**Ativo_Movimentacao (Nova)**: Registra TODAS as mudanças de status, responsável ou localização com timestamp, GPS, responsável pela ação e justificativa. Permite auditoria "chain of custody" completa.
+
+**Ativo_Depreciacao (Nova)**: Log de cálculos mensais de depreciação com método usado, valor antes, valor depois e saldo depreciação acumulada. Permite recalcular histórico se parâmetros mudarem.
+
+**Ativo_Inventario (Nova)**: Registra cada inventário físico realizado com data, responsável, resultado (confirmado, não encontrado, divergência), foto tirada no momento e coordenadas GPS onde foi escaneado.
+
+**Ativo_Garantia_Alerta (Nova)**: Log de notificações de garantia enviadas (data envio, tipo alerta 30/60/90 dias, destinatários, status entrega) para evitar duplicatas e rastrear efetividade.
+
+**Localizacao (Nova)**: Estrutura hierárquica (Edificio → Andar → Sala → Estacao) com coordenadas GPS do centro de cada local para mapa interativo.
+
+**Ativo_Anexos (Nova)**: Armazena anexos vinculados a ativos (fotos, NFs, laudos técnicos, BOs) em Azure Blob Storage com metadata (tipo documento, data upload, hash SHA-256).
+
+**Ativo_Integracao_ERP (Nova)**: Fila de sincronização com SAP/TOTVS registrando eventos pendentes, tentativas, erros e status (pendente, sincronizado, falha).
+
+### Dados Iniciais e Migração
+
+**Migração de Ativos Existentes**: Script SQL extrai 800 ativos do legado, gera QR Codes (job assíncrono), calcula depreciação retroativa desde `Dt_Aquisicao` e popula campos novos com defaults (Metodo_Depreciacao=Linear, Taxa=20%, Status_Ativo=inferido de status legado).
+
+**Histórico Perdido**: Movimentações anteriores não podem ser recuperadas (dados não existiam). Sistema marca ativos migrados com flag `Migrado_Legado=TRUE` e `Dt_Primeira_Movimentacao_Rastreada` para transparência.
+
+**Geração de QR Codes**: Job Hangfire gera 800 QR Codes em lote (processamento assíncrono para não travar migração). Admin recebe relatório ao final com PDF consolidado para impressão em gráfica.
+
+**Capacidade**: Sistema dimensionado para 10.000 ativos sem degradação de performance (índices otimizados, cache Redis para queries frequentes, paginação padrão 50 items).
+
+---
+
+## 🔌 4. WEBSERVICES LEGADO
+
+### Contexto
+
+Sistema legado VB.NET utilizava Web Services SOAP básicos hospedados em IIS com autenticação Windows integrada. Estrutura monolítica sem separação de camadas dificultava manutenção e testes.
+
+### Web Services SOAP Existentes
+
+**Endpoint Base**: `http://servidor/IControlIT/Ativo.asmx`
+**Protocolo**: SOAP 1.1
+**Autenticação**: Windows Authentication (NTLM/Kerberos)
+
+#### Métodos Principais
+
+**1. CadastrarAtivo()**
+- **Entrada**: TipoAtivo, NumeroSerie, IdMarca, IdModelo, ValorAquisicao, DataAquisicao
+- **Saída**: IdAtivo (INT) ou Exception
+- **Lógica**: INSERT na tabela Ativo com validação básica (campos obrigatórios). Não gerava QR Code nem registrava movimentação inicial.
+- **Problema**: Sem validação de número patrimônio único - duplicatas possíveis
+
+**2. AlocarAtivo()**
+- **Entrada**: IdAtivo, IdUsuario, Observacao
+- **Saída**: Boolean (sucesso) ou Exception
+- **Lógica**: UPDATE Ativo SET Usuario_Atual = @IdUsuario. Não validava se ativo estava disponível nem enviava notificação ao usuário.
+- **Problema**: Sem registro de histórico - impossível saber quem usou antes
+
+**3. ConsultarAtivos()**
+- **Entrada**: Filtros opcionais (TipoAtivo, Status, IdMarca)
+- **Saída**: Array de AtivoDto
+- **Lógica**: SELECT com filtros dinâmicos. Query sem paginação - retornava todos os registros.
+- **Problema**: Performance horrível com >500 ativos (timeout frequente)
+
+**4. BaixarAtivo()**
+- **Entrada**: IdAtivo, Motivo
+- **Saída**: Boolean (sucesso)
+- **Lógica**: UPDATE Ativo SET Status = 'Inativo', MotivoInativacao = @Motivo
+- **Problema**: Sem workflow de aprovação - qualquer usuário podia baixar patrimônio de R$10k+
+
+**5. GerarRelatorioInventario()**
+- **Entrada**: DataInicio, DataFim
+- **Saída**: XML com lista de ativos e movimentações (se existissem)
+- **Lógica**: Gerava XML malformado frequentemente (encoding UTF-8 quebrado)
+- **Problema**: Frontend tinha que parsear XML manualmente - erros frequentes
+
+### Limitações Críticas
+
+1. **Windows Auth Apenas**: Impossível usar de mobile apps ou sistemas externos (B2B)
+2. **SOAP Verboso**: Payloads 10-15x maiores que JSON equivalente
+3. **Sem Versionamento**: Mudanças no WSDL quebravam clientes sem aviso
+4. **Processamento Síncrono**: Operações longas (relatórios, importações) causavam timeout HTTP
+5. **Sem Retry Logic**: Falhas temporárias (rede, DB deadlock) resultavam em erro final
+6. **Logs Insuficientes**: Impossível debug de problemas em produção
+7. **Sem Rate Limiting**: Cliente mal comportado podia derrubar servidor
+
+### Evolução para REST API Moderna
+
+Sistema moderno substitui SOAP por REST API (.NET 10 Web API) com 15 endpoints principais:
+
+**Ativos (CRUD)**:
+- `POST /api/v1/ativos` - Criar ativo (gera QR Code automaticamente)
+- `GET /api/v1/ativos` - Listar com paginação, filtros, ordenação
+- `GET /api/v1/ativos/{id}` - Buscar por ID
+- `PUT /api/v1/ativos/{id}` - Atualizar dados
+- `DELETE /api/v1/ativos/{id}` - Soft delete
+- `GET /api/v1/ativos/{id}/qr` - Buscar ativo por scan QR Code (mobile app)
+
+**Movimentações**:
+- `POST /api/v1/ativos/{id}/alocar` - Alocar para usuário (cria movimentação)
+- `POST /api/v1/ativos/{id}/transferir` - Transferir entre localizações
+- `POST /api/v1/ativos/{id}/devolver` - Devolver (liberar para reutilização)
+- `POST /api/v1/ativos/{id}/manutencao` - Enviar para manutenção
+- `POST /api/v1/ativos/{id}/baixar` - Baixa patrimonial (workflow aprovação)
+- `GET /api/v1/ativos/{id}/historico` - Histórico completo movimentações
+
+**Inventário**:
+- `POST /api/v1/ativos/{id}/inventariar` - Registrar inventário físico (mobile app)
+- `GET /api/v1/ativos/inventario/pendentes` - Ativos pendentes inventário
+- `GET /api/v1/ativos/inventario/relatorio` - Relatório consolidado
+
+**Tecnologias REST Moderno**:
+- **.NET 10 Minimal APIs**: Performance otimizada
+- **JWT Bearer**: Autenticação stateless (mobile + web)
+- **EF Core**: ORM com lazy loading desabilitado (evitar N+1)
+- **AutoMapper**: DTOs sem expor entidades domain
+- **FluentValidation**: Validações centralizadas
+- **Hangfire**: Jobs background (depreciação, alertas)
+- **QRCoder**: Geração QR Codes
+- **Polly**: Resiliência (retry, circuit breaker)
+- **Serilog**: Logging estruturado (JSON)
+- **Swagger/OpenAPI**: Documentação interativa
+
+**Performance**:
+- Paginação padrão (50 items) com cursor-based pagination para listas grandes
+- Cache Redis de 5min para queries frequentes (filtros comuns, dashboards)
+- Compressão Gzip/Brotli (reduz payload 70%)
+- Índices otimizados para queries complexas
+
+**Segurança**:
+- Rate limiting (100 req/min por usuário, 500 req/min por IP)
+- CORS restrito a domínios autorizados
+- Content-Security-Policy headers
+- Input sanitization (prevenir XSS)
+- SQL injection impossível (EF Core parameterizado)
+
+---
+
+## 🔗 5. REFERÊNCIAS AO LEGADO
+
+### Mapeamento de Conceitos
+
+| Conceito Legado | Conceito Moderno | Observações |
+|----------------|------------------|-------------|
+| Etiquetas papel | QR Code + RFID | Durabilidade 10x maior |
+| Planilha Excel depreciação | Hangfire job automático | Elimina erro humano |
+| Inventário manual 2 semanas | App mobile 2 dias | 80% redução tempo |
+| Localização texto livre | GPS + hierarquia estruturada | Mapas interativos possíveis |
+| Status binário (Ativo/Inativo) | Workflow 6 estados | Rastreamento preciso |
+| Sem histórico | Chain of custody completa | Auditoria 100% rastreável |
+| Integração manual (CSV) | Webhook + API REST | Tempo real |
+| Windows Auth | JWT Bearer | Mobile + B2B compatível |
+
+### Funcionalidades Legado → Moderno
+
+| ID | Funcionalidade Legado | Funcionalidade Moderna | Status |
+|----|----------------------|------------------------|--------|
+| WS01 | CadastrarAtivo (SOAP) | POST /api/v1/ativos | 🔄 Refatorado |
+| WS02 | AlocarAtivo (sem histórico) | POST /api/v1/ativos/{id}/alocar | 🔄 + Movimentacao |
+| WS03 | ConsultarAtivos (sem paginação) | GET /api/v1/ativos?page=1&size=50 | 🔄 Otimizado |
+| WS04 | BaixarAtivo (sem aprovação) | POST /api/v1/ativos/{id}/baixar | 🔄 + Workflow |
+| WS05 | GerarRelatorioInventario (XML) | GET /api/v1/ativos/inventario/relatorio | 🔄 JSON/PDF |
+| N/A | QR Code automático | Gerado ao criar ativo | ✅ Nova |
+| N/A | App mobile inventário | MAUI Android/iOS | ✅ Nova |
+| N/A | Depreciação automática | Hangfire job mensal | ✅ Nova |
+| N/A | Alertas garantia | Hangfire job diário | ✅ Nova |
+| N/A | Dashboard executivo | Chart.js real-time | ✅ Nova |
+| N/A | Geolocalização GPS | Captura mobile | ✅ Nova |
+| N/A | Integração ERP | Webhook outbound | ✅ Nova |
+
+### Endpoints: Legado vs. Moderno
+
+| Operação | Legado (SOAP) | Moderno (REST) | Método |
+|----------|--------------|----------------|--------|
+| Criar ativo | Ativo.asmx/CadastrarAtivo | /api/v1/ativos | POST |
+| Listar ativos | Ativo.asmx/ConsultarAtivos | /api/v1/ativos?page=1 | GET |
+| Buscar por ID | Ativo.asmx/ObterAtivo | /api/v1/ativos/{id} | GET |
+| Alocar | Ativo.asmx/AlocarAtivo | /api/v1/ativos/{id}/alocar | POST |
+| Baixar | Ativo.asmx/BaixarAtivo | /api/v1/ativos/{id}/baixar | POST |
+| Inventariar | ❌ Não existia | /api/v1/ativos/{id}/inventariar | POST |
+| Histórico | ❌ Não existia | /api/v1/ativos/{id}/historico | GET |
+| Scan QR | ❌ Não existia | /api/v1/ativos/{id}/qr | GET |
+
+### Telas Legado vs. Moderno
+
+| Tela ASP.NET WebForms | Angular Moderno | Melhorias |
+|-----------------------|-----------------|-----------|
+| Ativo\Cadastro.aspx | /ativos/novo | QR Code preview, validação inline |
+| Ativo\Lista.aspx | /ativos | Filtros avançados, export Excel/PDF |
+| Ativo\Detalhes.aspx | /ativos/{id} | Timeline movimentações, mapa GPS |
+| N/A | /ativos/inventario | App mobile MAUI com camera QR |
+| N/A | /dashboard/ativos | Gráficos Chart.js real-time |
+| Relatorios\Inventario.aspx | /relatorios/inventario | Export PDF com gráficos |
+
+### Migração de Dados
+
+**Ativos Legado**: 800 ativos migrados via script SQL preservando dados essenciais (patrimônio, série, marca, modelo, valor, data aquisição, responsável atual).
+
+**Geração Retroativa**: QR Codes gerados para todos os ativos migrados via Hangfire background job. PDF consolidado gerado para impressão em gráfica.
+
+**Depreciação Retroativa**: Cálculo retroativo desde `Dt_Aquisicao` até data migração aplicando método Linear (default) e taxa 20% (default). Admin pode recalcular manualmente se necessário.
+
+**Histórico**: Movimentações anteriores PERDIDAS (dados não existiam no legado). Flag `Migrado_Legado=TRUE` identifica ativos sem histórico completo.
+
+**Validação**: Script pós-migração valida 100% dos ativos (campos obrigatórios, FKs válidas, QR Codes gerados). Relatório de inconsistências gerado para correção manual.
+
+### Notas de Compatibilidade
+
+- Sistema legado permanece acessível read-only por 90 dias pós-migração para consultas emergenciais
+- Webhooks configurados para sincronizar baixas/transferências do legado para moderno durante período de transição
+- Planilhas Excel históricas mantidas em SharePoint como backup por 7 anos (compliance)
+- QR Codes impressos em lote e enviados por correio para todas as filiais (custo: R$2.500)
+
+---
+
+## 📚 REFERÊNCIAS TÉCNICAS
+
+### Documentação Relacionada
+
+- [ROADMAP-BASE.md](../../../../ROADMAP-BASE.md) - Roadmap geral do projeto
+- [RF-CAD-002: Gestão de Consumidores](../RF-CAD-002-Gestao-de-Consumidores/RF-CAD-002-Gestao-de-Consumidores.md) - Consumidores vinculados a ativos
+- [RF-NOT-001: Notificações](../../EPIC-NOT-Notificacoes/RF-NOT-001-Notificacoes-e-Alertas/RF-NOT-001-Notificacoes-e-Alertas.md) - Alertas de garantia
+- [RF-APR-001: Workflows](../../EPIC-WFL-Workflows/RF-APR-001-Aprovacoes-e-Workflows/RF-APR-001-Aprovacoes-e-Workflows.md) - Aprovação de baixas
+
+### Tecnologias Utilizadas
+
+- **.NET 10**: Framework backend
+- **Entity Framework Core**: ORM
+- **Hangfire**: Jobs background (depreciação, alertas)
+- **QRCoder**: Geração QR Codes
+- **.NET MAUI**: App mobile inventário
+- **Azure Blob Storage**: Armazenamento anexos
+- **Chart.js**: Dashboards interativos
+- **SignalR**: Notificações real-time
+- **Redis**: Cache distribuído
+- **SQL Server**: Banco de dados
+
+### Padrões Aplicados
+
+- **CQRS** (Command Query Responsibility Segregation)
+- **Repository Pattern** (abstração dados)
+- **Chain of Custody** (auditoria movimentações)
+- **Soft Delete** (exclusão lógica)
+- **Background Jobs** (processamento assíncrono)
+- **Event Sourcing** (histórico completo)
+
+---
+
+**Última Revisão**: 04/11/2025
+**Revisado Por**: Equipe de Arquitetura IControlIT v2
+**Próxima Revisão**: 04/02/2026
+
+
+## TELAS DO LEGADO
+
+### Tela: Ativo.aspx
+**Localização**: `D:\IC2\ic1_legado\IControlIT\IControlIT\Cadastro\Ativo.aspx`
+
+**Descrição**: Tela de cadastro/edição de ativos (equipamentos, linhas telefônicas, chips, etc.) usando ASP.NET Web Forms. Tela complexa com gestão de atribuições de ativos a consumidores, termos de responsabilidade e dados complementares dinâmicos.
+
+**Modais da Tela**:
+1. **pnlConfirmacao** - Modal "Lixeira" para restaurar ativo desativado
+   - Mensagem: "Este Ativo está desativado. Deseja restaurar antes de continuar?"
+   - Botões: Não (btContinuar), Sim (btRestaurar)
+2. **pnlObservacao** - Modal de observação obrigatória
+   - Campo: Observação (txtObservacaoObrigarotia) - TextBox MultiLine, MaxLength=300, Height=350px
+   - Validação: RequiredFieldValidator
+   - Botões: Fechar (btCancela), Confirmar (btOk)
+3. **pnlRegistro** - Modal "Dados Adicionais"
+   - Observação ReadOnly (txtObservacao) - ForeColor=#FF9900
+   - Finalidade (txtFinalidade) - TextBox editável
+   - Chave do banco (txtIdentificacao) - ReadOnly, ForeColor=#FF9900
+
+**Campos da Tela Principal**:
+1. **Número do ativo** (txtNumeroAtivo) - TextBox obrigatório, MaxLength=50, ForeColor=#006600, TabIndex=1
+   - Validação: RequiredFieldValidator + ValidatorCalloutExtender
+   - Número identificador do ativo (ex: linha telefônica, número de série)
+2. **Tipo do ativo** (cboAtivoTipo) - DropDownList obrigatório, TabIndex=3, AutoPostBack=True
+   - Validação: RequiredFieldValidator + ValidatorCalloutExtender
+   - Cascata: Ao mudar, atualiza campo Modelo e Dados Complementares
+3. **Fornecedor** (cboConglomerado) - DropDownList obrigatório, TabIndex=4
+   - Validação: RequiredFieldValidator + ValidatorCalloutExtender
+   - Operadora/fornecedor do ativo
+4. **Modelo do ativo** (cboAtivoModelo) - DropDownList opcional, TabIndex=5
+   - Depende de Tipo do ativo (filtrado)
+5. **Status do ativo** (cboAtivoStatus) - DropDownList opcional, TabIndex=6
+   - Ex: Ativo, Inativo, Em Manutenção, Disponível
+6. **Entrega do termo** (txtDataAtivacao) - TextBox com máscara de data, MaxLength=19, TabIndex=7
+   - Máscara: `99/99/9999` (MaskedEditExtender + MaskedEditValidator)
+   - Data de ativação/entrega do ativo ao consumidor
+7. **Retorno Suspensão** (txtSuspenssao) - TextBox com máscara de data, MaxLength=19, TabIndex=7
+   - Máscara: `99/99/9999`
+   - Data prevista para retorno de suspensão temporária
+8. **Equipamento** (txtEquipamento) - TextBox MultiLine, ReadOnly, MaxLength=5, ForeColor=#006600
+   - Campo somente leitura (preenchido automaticamente)
+9. **Endereço** (txtEndereco) - TextBox, ForeColor=#006600
+   - Endereço do ativo (se aplicável)
+10. **Numero Sim Card** (txtSimCard) - TextBox, ForeColor=#006600
+    - Para ativos de telefonia móvel
+11. **Valor do contrato** (txtVlrContrato) - TextBox, ForeColor=#006600
+    - Valor mensal do contrato/aluguel do ativo
+12. **Plano do contrato** (txtPlanoContrato) - TextBox, ForeColor=#006600
+    - Descrição do plano contratado (ex: 5GB, 1000 minutos)
+13. **Velocidade** (txtVelocidade) - TextBox, ForeColor=#006600
+    - Para ativos de internet/rede (ex: 100 Mbps)
+
+**Grid de Consumidores (dtgUsuario)**:
+- DataGrid para vincular ativo a múltiplos consumidores ao longo do tempo
+- Colunas:
+  1. **Ações** - ImageButton Adicionar/Excluir
+  2. **Colaborador ou Login** (cboConsumidor / txtDescricao) - DropDownList + TextBox
+     - AutoPostBack=True no dropdown
+  3. **Ativação** (txtLote_Ativacao) - TextBox com CalendarExtender (formato: dd/MM/yyyy HH:mm:ss)
+  4. **Termo Ativação** (btTermo) - ImageButton (ícone Word) para gerar termo de responsabilidade
+  5. **Devolução** (txtLote_Devolucao) - TextBox com CalendarExtender
+  6. **Termo Devolução** (btDevolucao) - ImageButton (ícone Word)
+  7. **Id_Consumidor** - Coluna oculta (Visible=False)
+  8. **Lupa/Editar** (btLupa / btVoltar) - ImageButtons para buscar consumidor ou editar
+
+**Grid de Dados Complementares (dtgDadosComplemento)**:
+- DataGrid dinâmico sem cabeçalho (ShowHeader=False)
+- Exibe campos customizados conforme tipo de ativo
+- Exemplo: Para computadores (RAM, HD, Processador), para linhas (DDD, Ramal)
+- Cada linha do grid exibe: Label (Nm_Ativo_Complemento) + TextBox (Descricao)
+
+**Botões de Ação**:
+- **Voltar** (btVoltar)
+- **Novo** (btLimpar)
+- **Salvar** (btSalvar)
+- **Excluir** (btDesativar) - Inativação lógica
+- **Config** (btConfiguracao)
+- **PDF** (btPDF)
+- **Dados** (btAbrir) - Abre modal "Dados Adicionais"
+
+#### O Que Modernizar
+
+1. **UI/UX Moderna**:
+   - ❌ Substituir ASP.NET Web Forms por Angular 18 + PrimeNG
+   - ❌ Eliminar PostBacks (AutoPostBack) - usar reatividade Angular
+   - ❌ Eliminar campos ReadOnly laranjas/verdes - usar badges estilizados
+   - ✅ Implementar design responsivo (mobile-first) com PrimeNG Grid System
+   - ✅ Breadcrumb: Cadastros → Ativos → Editar Ativo
+   - ✅ Tabs para organizar: Dados Básicos | Atribuições | Histórico | Anexos | Manutenção
+   - ✅ Stepper para cadastro guiado (Tipo → Fornecedor → Modelo → Dados Complementares)
+
+2. **Gestão de Ativos Completa**:
+   - ✅ **QR Code / RFID Tag**: Gerar e imprimir etiquetas com QR Code para rastreamento
+   - ✅ **Código Patrimonial** (alfanumérico, único) separado de Número do Ativo
+   - ✅ **Tag Asset** (tag física do ativo, ex: etiqueta na lateral do notebook)
+   - ✅ **Localização GPS**: Lat/Long para ativos móveis (rastreamento em tempo real)
+   - ✅ **Local Físico**: Dropdown hierárquico (Filial → Andar → Sala → Mesa)
+   - ✅ **Foto do Ativo**: Upload de múltiplas fotos (drag-and-drop, preview, galeria)
+   - ✅ **Número de Série** (Serial Number) - campo separado, único
+   - ✅ **IMEI** (para celulares/tablets) - validação automática (15 dígitos)
+   - ✅ **MAC Address** (para equipamentos de rede) - validação de formato
+
+3. **Gestão de Contratos e Custos**:
+   - ✅ **Contrato vinculado** (dropdown) - link para RF-CTR-001
+   - ✅ **Valor de Aquisição** (histórico) vs **Valor Residual** (calculado)
+   - ✅ **Data de Compra** + **Nota Fiscal** (número, arquivo XML/PDF)
+   - ✅ **Depreciação Automática**: Calcular depreciação mensal (linear ou acelerada)
+   - ✅ **Vida Útil**: Definir vida útil esperada (meses) conforme tipo
+   - ✅ **Custo Total de Propriedade (TCO)**: Aquisição + Manutenção + Operação
+   - ✅ **Garantia**: Início, Fim, Tipo (fabricante, estendida), Fornecedor
+   - ✅ **Seguro**: Número da apólice, seguradora, vigência, valor segurado
+
+4. **Atribuição e Custódia de Ativos**:
+   - ✅ Redesenhar grid de consumidores com PrimeNG Table (editável inline)
+   - ✅ **Histórico de Atribuições**: Timeline visual com todas as movimentações
+   - ✅ **Termo de Responsabilidade Digital**: Gerar PDF + assinar digitalmente (DocuSign, Clicksign)
+   - ✅ **Notificação ao Consumidor**: E-mail/SMS automático ao atribuir ativo
+   - ✅ **Workflow de Aprovação**: Gestor aprovar atribuição de ativos > R$ 5.000
+   - ✅ **Devolução Programada**: Agendar devolução com alerta X dias antes
+   - ✅ **Status de Custódia**: Em Uso, Devolvido, Extraviado, Danificado
+   - ✅ **Checklist de Devolução**: Verificar acessórios, estado físico, resetar configurações
+
+5. **Gestão de Manutenção e Suporte**:
+   - ✅ Aba "Manutenção" com histórico de ordens de serviço
+   - ✅ **Manutenção Preventiva**: Agendar (ex: a cada 6 meses, km rodados)
+   - ✅ **Manutenção Corretiva**: Vincular a chamados/tickets (RF-CHA-001)
+   - ✅ **Fornecedor de Manutenção**: Autorizada, terceirizada, interna
+   - ✅ **Histórico de Defeitos**: Lista de problemas registrados
+   - ✅ **Peças Substituídas**: Grid com peça, quantidade, data, custo
+   - ✅ **Status de Manutenção**: Funcionando, Em Manutenção, Aguardando Peças, Irrecuperável
+   - ✅ **Alertas de Manutenção**: Notificar gestor quando ativo entrar em manutenção
+
+6. **Dados Complementares Dinâmicos**:
+   - ✅ Substituir DataGrid por formulário dinâmico (JSON Schema)
+   - ✅ **Atributos Customizados por Tipo**: Cada tipo de ativo tem seus campos
+     - Computadores: RAM, HD/SSD, Processador, SO, Placa de Vídeo
+     - Linhas Móveis: DDD, Número, Operadora, ICC, PIN/PUK
+     - Veículos: Placa, Ano, KM Rodados, Combustível
+   - ✅ **Validação de Atributos**: Tipo (texto, número, data, dropdown), Obrigatório (Sim/Não)
+   - ✅ **Templates de Atributos**: Salvar conjuntos de atributos reutilizáveis
+   - ✅ **Importação de Dados Técnicos**: Extrair specs de arquivos (CSV, XML de NF-e)
+
+7. **Gestão de Inventário e Estoque**:
+   - ✅ **Status de Estoque**: Disponível, Em Uso, Reservado, Em Manutenção, Baixado
+   - ✅ **Lote de Compra**: Agrupar ativos comprados juntos
+   - ✅ **Almoxarifado**: Local de armazenamento (dropdown: Almoxarifado Central, Filial X)
+   - ✅ **Reserva de Ativo**: Permitir reservar ativo disponível para consumidor futuro
+   - ✅ **Movimentação de Estoque**: Registrar entrada/saída (Filial A → Filial B)
+   - ✅ **Inventário Físico**: Checklist de conferência (QR Code scanning)
+   - ✅ **Alertas de Estoque Baixo**: Notificar quando quantidade < mínimo (por tipo)
+
+8. **Compliance e Auditoria**:
+   - ✅ **Log de Alterações**: Registrar TODAS as mudanças em Log_Alteracao_Ativo
+   - ✅ **Justificativa Obrigatória**: Ao alterar Status, Valor, Atribuição (modal de observação)
+   - ✅ **Workflow de Baixa de Ativo**: Baixa > R$ 10k requer aprovação Diretoria
+   - ✅ **Rastreabilidade Completa**: Quem criou, quando, quem alterou, quando, o quê
+   - ✅ **Anexos Obrigatórios**: NF-e (XML), Termo de Garantia, Manual
+   - ✅ **Conformidade Fiscal**: Vincular ativo a centro de custo para controle contábil
+   - ✅ **LGPD**: Anonimizar dados de consumidores após X anos de devolução
+
+9. **Integrações e Automações**:
+   - ✅ **Importação de NF-e (XML)**: Extrair dados do ativo (modelo, valor, data compra)
+   - ✅ **Integração ERP**: SAP, TOTVS, Protheus (sincronizar ativos, custos)
+   - ✅ **MDM (Mobile Device Management)**: AirWatch, Intune (gestão de smartphones corporativos)
+   - ✅ **CMDB (Configuration Management Database)**: ServiceNow (ativos de TI)
+   - ✅ **API de Rastreamento GPS**: Integrar com Vivo Track, Omnilink (veículos, equipamentos)
+   - ✅ **Notificações Automáticas**: E-mail/SMS ao ativar linha, expirar garantia, agendar manutenção
+   - ✅ **Sincronização com Operadoras**: Buscar dados de linhas (Vivo, Claro, TIM) via API
+
+10. **Relatórios e Analytics**:
+    - ✅ Dashboard de ativos (total, em uso, disponíveis, manutenção, extraviados)
+    - ✅ **Custo Total por Tipo**: Gráfico de pizza (Telefonia, TI, Veículos, etc.)
+    - ✅ **Taxa de Utilização**: % de ativos em uso vs disponíveis
+    - ✅ **Tempo Médio de Uso**: Quantos dias/meses um ativo fica com mesmo consumidor
+    - ✅ **Ativos Ociosos**: Lista de ativos sem atribuição > 90 dias
+    - ✅ **Depreciação Acumulada**: Relatório fiscal com valor depreciado
+    - ✅ **Previsão de Renovação**: Alertar contratos/garantias a vencer (30/60/90 dias)
+    - ✅ **Top 10 Ativos com Mais Defeitos**: Identificar equipamentos problemáticos
+
+11. **Performance e Usabilidade**:
+    - ✅ **Autocomplete de Número do Ativo**: Buscar ativos existentes (evitar duplicados)
+    - ✅ **Busca Avançada**: Filtro combinado (Tipo + Fornecedor + Status + Local + Consumidor)
+    - ✅ **Escaneamento de QR Code**: App mobile para localizar ativo fisicamente
+    - ✅ **Importação em Lote**: CSV/Excel com 1.000+ ativos de uma vez
+    - ✅ **Exportar para Excel**: Listagem de ativos com filtros aplicados
+    - ✅ **Templates de Ativo**: Criar modelos pré-definidos (ex: "Notebook Padrão", "Linha Executiva")
+    - ✅ **Duplicar Ativo**: Copiar dados de ativo existente (economizar tempo)
+    - ✅ **Cache Inteligente**: Redis para tipos, modelos, fornecedores (1 hora)
+    - ✅ **Paginação Server-Side**: Carregar grids de atribuições sob demanda
+    - ✅ **Lazy Loading de Imagens**: Carregar fotos do ativo apenas quando visualizar
+
+12. **Mobile e Acessibilidade**:
+    - ✅ App mobile (Android/iOS) para gestão de ativos em campo
+    - ✅ **Scan de QR Code/RFID**: Identificar ativo fisicamente
+    - ✅ **Registro de Ocorrências**: Foto + GPS + Descrição (ativo danificado, extraviado)
+    - ✅ **Assinatura Digital de Termos**: No próprio celular (touch screen)
+    - ✅ **Modo Offline**: Sincronizar dados quando voltar online
+    - ✅ **Notificações Push**: Alertar sobre atribuições, devoluções, manutenções
+
+13. **Segurança e Controle de Acesso**:
+    - ✅ **Permissões Granulares**: Visualizar, Criar, Editar, Excluir, Atribuir, Baixar
+    - ✅ **Restrição por Tipo de Ativo**: Apenas TI pode gerenciar ativos de TI
+    - ✅ **Aprovação Hierárquica**: Atribuir ativo > R$ 10k requer aprovação Gerente
+    - ✅ **2FA para Operações Sensíveis**: Baixa de ativo, alteração de valor
+    - ✅ **Logs Imutáveis**: Blockchain para trilha de auditoria (opcional)

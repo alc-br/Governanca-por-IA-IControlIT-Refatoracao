@@ -1,0 +1,567 @@
+rf:
+  id: RF032
+  nome: Gestão de Notas Fiscais e Faturas
+  versao: '2.0'
+  data: '2025-12-30'
+  fase: Fase 3 - Financeiro I (Base Contábil)
+  epic: EPIC006-FIN-Financeiro-Base
+  status: aprovado
+descricao:
+  objetivo: Implementar gestão completa do ciclo de vida de Notas Fiscais Eletrônicas (NF-e) com importação, validação, conciliação,
+    cálculo de impostos, rateio e conformidade fiscal.
+  problema_resolvido: Automatiza validação de NF-e, cálculo de impostos, conciliação com pedidos, rateio entre filiais, e
+    garante conformidade fiscal (SPED, DCTF, LGPD).
+  publico_afetado: Gerente Fiscal, Analista Fiscal, Contador, CFO, Auditor, Contabilista, Gerente de Compras.
+escopo:
+  incluso:
+  - Importação de NF-e via XML, DANFE PDF, lote CSV
+  - Validação de estrutura XML (schema XSD 4.00 SEFAZ)
+  - Validação de assinatura digital (RSA-2048, SHA-256, ICP-Brasil)
+  - Consulta status SEFAZ (autorizada, rejeitada, cancelada)
+  - Extração automática de metadados (emitente, itens, impostos)
+  - Cálculo automático de impostos (ICMS, IPI, PIS, COFINS, ISS, IRRF, CSLL, INSS)
+  - Conciliação automática NF-e vs Pedido (RF026)
+  - Detecção e classificação de divergências (crítica, importante, menor)
+  - Workflow de aprovação multi-nível para divergências
+  - Rateio de notas entre filiais e centros de custo
+  - Armazenamento permanente em Azure Blob Storage (7 anos LGPD)
+  - Geração de relatórios fiscais (SPED, DCTF, Livro Registro)
+  - Dashboard de monitoramento e KPIs
+  - OCR de DANFE PDF (Azure Cognitive Services + Tesseract fallback)
+  fora:
+  - Interface visual específica
+  - Emissão de notas fiscais (apenas gestão de NF recebidas)
+  - Integração com sistemas contábeis de terceiros (exceto exportação)
+entidades:
+- nome: NotaFiscal
+  descricao: Entidade principal com metadados, status, URLs blob
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: NotaFiscalItem
+  descricao: Itens da nota (produtos/serviços)
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: NotaFiscalImposto
+  descricao: Impostos calculados por tipo (ICMS, IPI, PIS, COFINS, retenções)
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: NotaFiscalDivergencia
+  descricao: Divergências detectadas na conciliação com pedido
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: RateioNotaFiscal
+  descricao: Rateio entre filiais/centros de custo
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: NotaFiscalAprovacao
+  descricao: Histórico de aprovações de divergências
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+regras_negocio:
+- id: RN-NFE-032-01
+  descricao: Importação de NF-e com Validação de Estrutura XML (schema XSD 4.00 SEFAZ)
+  tipo: validacao
+  campos_afetados:
+  - XmlOriginal
+  - ChaveAcesso
+  obrigatorio: true
+- id: RN-NFE-032-02
+  descricao: Validação de Assinatura Digital (RSA-2048 com SHA-256, ICP-Brasil)
+  tipo: seguranca
+  campos_afetados:
+  - AssinaturaValidada
+  - CertificadoThumbprint
+  obrigatorio: true
+- id: RN-NFE-032-03
+  descricao: Consulta Automática de Status na SEFAZ (autorizada, rejeitada, cancelada)
+  tipo: integracao
+  campos_afetados:
+  - Status
+  - ProtocoloAutorizacao
+  - MotivoRejeicao
+  obrigatorio: true
+- id: RN-NFE-032-04
+  descricao: Detecção de Divergências entre NF-e e Pedido (<1% auto-ajuste, >5% bloqueio)
+  tipo: regra_negocio
+  campos_afetados:
+  - Divergencias
+  - Status
+  obrigatorio: true
+- id: RN-NFE-032-05
+  descricao: Cálculo Automático de Impostos (ICMS, IPI, PIS, COFINS, ISS, retenções)
+  tipo: regra_negocio
+  campos_afetados:
+  - ImpostosCalculados
+  obrigatorio: true
+- id: RN-NFE-032-06
+  descricao: Bloqueio de Pagamento se Divergência Crítica não Aprovada
+  tipo: regra_negocio
+  campos_afetados:
+  - Status
+  - BloqueioPagamento
+  obrigatorio: true
+- id: RN-NFE-032-07
+  descricao: Rateio Automático entre Filiais/Centros de Custo (soma 100%, tolerância 0,01%)
+  tipo: regra_negocio
+  campos_afetados:
+  - Rateios
+  obrigatorio: false
+- id: RN-NFE-032-08
+  descricao: Armazenamento Permanente XML e DANFE em Azure Blob Storage (7 anos LGPD)
+  tipo: seguranca
+  campos_afetados:
+  - UriXmlBlob
+  - UriDanfePdfBlob
+  obrigatorio: true
+- id: RN-NFE-032-09
+  descricao: OCR de DANFE em PDF quando XML Indisponível (Azure Cognitive + Tesseract)
+  tipo: integracao
+  campos_afetados:
+  - ChaveAcesso
+  - NumeroNota
+  - ValorTotal
+  obrigatorio: false
+- id: RN-NFE-032-10
+  descricao: Auditoria Completa com Retenção de 7 Anos (LGPD, SOX)
+  tipo: auditoria
+  campos_afetados:
+  - '*'
+  obrigatorio: true
+estados:
+- id: aguardando_processamento
+  descricao: NF importada, aguardando validação
+- id: validando
+  descricao: Em processo de validação de assinatura/estrutura
+- id: assinatura_validada
+  descricao: Assinatura digital confirmada
+- id: autorizada
+  descricao: Confirmada pela SEFAZ como autorizada
+- id: rejeitada
+  descricao: Rejeitada pela SEFAZ (motivo registrado)
+- id: cancelada
+  descricao: Cancelada (por emitente ou destinatário)
+- id: conciliada
+  descricao: Reconciliada com pedido sem divergências
+- id: divergencia_detectada
+  descricao: Divergências identificadas na conciliação
+- id: aprovacao_pendente
+  descricao: Aguardando aprovação de divergência crítica
+- id: rateiada
+  descricao: Rateio configurado e validado
+- id: impostos_calculados
+  descricao: Todos impostos calculados automaticamente
+- id: pronta
+  descricao: Pronta para pagamento
+- id: paga
+  descricao: Pagamento realizado
+- id: bloqueada
+  descricao: Bloqueada para pagamento (divergência não aprovada)
+transicoes:
+  permitidas:
+  - de: aguardando_processamento
+    para: validando
+  - de: validando
+    para: assinatura_validada
+  - de: validando
+    para: rejeitada
+  - de: assinatura_validada
+    para: autorizada
+  - de: assinatura_validada
+    para: cancelada
+  - de: autorizada
+    para: conciliada
+  - de: autorizada
+    para: divergencia_detectada
+  - de: divergencia_detectada
+    para: aprovacao_pendente
+  - de: aprovacao_pendente
+    para: conciliada
+  - de: aprovacao_pendente
+    para: bloqueada
+  - de: conciliada
+    para: rateiada
+  - de: conciliada
+    para: impostos_calculados
+  - de: rateiada
+    para: impostos_calculados
+  - de: impostos_calculados
+    para: pronta
+  - de: pronta
+    para: paga
+  proibidas:
+  - de: paga
+    para: '*'
+    motivo: Pagamento é irreversível
+  - de: cancelada
+    para: autorizada
+    motivo: Cancelamento é definitivo
+  - de: rejeitada
+    para: autorizada
+    motivo: Rejeição SEFAZ é definitiva
+permissoes:
+- codigo: fin:notasfiscais:read
+  descricao: Visualizar notas fiscais
+- codigo: fin:notasfiscais:create
+  descricao: Criar/importar notas fiscais
+- codigo: fin:notasfiscais:update
+  descricao: Editar metadados de notas fiscais
+- codigo: fin:notasfiscais:delete
+  descricao: Excluir notas fiscais (soft delete)
+- codigo: fin:notasfiscais:importar
+  descricao: Importar XML/DANFE
+- codigo: fin:notasfiscais:validar
+  descricao: Validar assinatura digital
+- codigo: fin:notasfiscais:conciliar
+  descricao: Reconciliar com pedidos
+- codigo: fin:notasfiscais:ratear
+  descricao: Configurar rateio entre filiais/centros de custo
+- codigo: fin:notasfiscais:aprovar
+  descricao: Aprovar divergências críticas
+- codigo: fin:notasfiscais:cancelar
+  descricao: Cancelar notas fiscais
+- codigo: fin:notasfiscais:exportar
+  descricao: Exportar relatórios fiscais (SPED, DCTF)
+- codigo: fin:notasfiscais:pagar
+  descricao: Marcar nota como paga
+integracoes:
+  internas:
+  - Autenticacao (JWT)
+  - Multi-Tenancy (ConglomeradoId)
+  - Auditoria (RF004)
+  - Central de Funcionalidades (Feature Flags)
+  - Internacionalização (i18n)
+  - Controle de Acesso (RBAC)
+  - Pedidos (RF026 - conciliação)
+  externas:
+  - sistema: SEFAZ
+    tipo: WebService
+    obrigatoria: true
+  - sistema: Azure Blob Storage
+    tipo: Cloud Storage
+    obrigatoria: true
+  - sistema: Azure Cognitive Services (OCR)
+    tipo: AI/ML
+    obrigatoria: false
+  - sistema: Tesseract OCR
+    tipo: Open Source
+    obrigatoria: false
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  protecoes:
+  - Validação de Assinatura Digital (RSA-2048, SHA-256, ICP-Brasil)
+  - SQL Injection Protection (Entity Framework Core)
+  - XSS Protection (Angular DomSanitizer)
+  - CSRF Protection (Anti-forgery token)
+  - RBAC Granular (12 permissões)
+  - TLS 1.3 obrigatório
+  - Azure SQL TDE (encriptação em repouso)
+  - Row-Level Security (ConglomeradoId)
+  - Rate Limiting (100 req/min por IP)
+  - Timeout SEFAZ (30s com retry)
+rastreabilidade:
+  ucs_esperados:
+  - UC00-listar-notas-fiscais
+  - UC01-importar-nota-fiscal
+  - UC02-validar-nota-fiscal
+  - UC03-conciliar-nota-fiscal
+  - UC04-ratear-nota-fiscal
+  artefatos_derivados:
+  - UC-RF032.md
+  - MD-RF032.md
+  - WF-RF032.md
+  - user-stories.yaml
+  - TC-RF032-BACKEND.yaml
+  - TC-RF032-FRONTEND.yaml
+  - TC-RF032-SEGURANCA.yaml
+  - TC-RF032-E2E.yaml
+catalog:
+  crud:
+  - id: RF-CRUD-01
+    title: Importar Nota Fiscal (XML/DANFE/CSV)
+    required: true
+  - id: RF-CRUD-02
+    title: Listar Notas Fiscais (paginação, filtros)
+    required: true
+  - id: RF-CRUD-03
+    title: Visualizar Nota Fiscal (detalhes completos)
+    required: true
+  - id: RF-CRUD-04
+    title: Atualizar Metadados de Nota Fiscal
+    required: true
+  - id: RF-CRUD-05
+    title: Excluir Nota Fiscal (soft delete)
+    required: true
+  validacoes:
+  - id: RF-VAL-01
+    title: Validar estrutura XML (schema XSD 4.00 SEFAZ)
+    required: true
+  - id: RF-VAL-02
+    title: Validar assinatura digital (RSA-2048, SHA-256)
+    required: true
+  - id: RF-VAL-03
+    title: Validar chave de acesso (44 dígitos, unicidade)
+    required: true
+  - id: RF-VAL-04
+    title: Validar CNPJ emitente/destinatário
+    required: true
+  - id: RF-VAL-05
+    title: Validar datas (emissão, entrada, saída)
+    required: true
+  seguranca:
+  - id: RF-SEC-01
+    title: Isolamento de tenant (ConglomeradoId)
+    required: true
+  - id: RF-SEC-02
+    title: Permissões RBAC (12 permissões granulares)
+    required: true
+  - id: RF-SEC-03
+    title: Auditoria completa (100% operações)
+    required: true
+  - id: RF-SEC-04
+    title: Validação de certificado ICP-Brasil
+    required: true
+  - id: RF-SEC-05
+    title: SQL Injection / XSS / CSRF Protection
+    required: true
+  funcionalidades:
+  - id: RF-FUNC-01
+    title: Consultar status SEFAZ (autorizada/rejeitada/cancelada)
+    required: true
+  - id: RF-FUNC-02
+    title: Extrair metadados automaticamente do XML
+    required: true
+  - id: RF-FUNC-03
+    title: Calcular impostos (ICMS, IPI, PIS, COFINS, ISS, retenções)
+    required: true
+  - id: RF-FUNC-04
+    title: Conciliar NF-e com Pedido (RF026)
+    required: true
+  - id: RF-FUNC-05
+    title: Detectar divergências (quantidade, valor, CFOP, NCM)
+    required: true
+  - id: RF-FUNC-06
+    title: Aprovar/rejeitar divergências (workflow multi-nível)
+    required: true
+  - id: RF-FUNC-07
+    title: Ratear entre filiais/centros de custo
+    required: true
+  - id: RF-FUNC-08
+    title: Armazenar XML/DANFE em Azure Blob Storage
+    required: true
+  - id: RF-FUNC-09
+    title: Gerar relatórios fiscais (SPED, DCTF, Livro Registro)
+    required: true
+  - id: RF-FUNC-10
+    title: OCR de DANFE PDF (Azure Cognitive + Tesseract)
+    required: false
+  - id: RF-FUNC-11
+    title: Dashboard de monitoramento e KPIs
+    required: true
+  kpis:
+  - id: RF-KPI-01
+    title: Tempo de Importação < 2s
+    meta: < 2 segundos
+    alerta: '> 5 segundos'
+  - id: RF-KPI-02
+    title: Taxa Sucesso Validação > 98%
+    meta: '> 98%'
+    alerta: < 95%
+  - id: RF-KPI-03
+    title: Precisão Conciliação > 95%
+    meta: '> 95%'
+    alerta: < 90%
+  - id: RF-KPI-04
+    title: Tempo Resposta SEFAZ < 30s
+    meta: < 30 segundos
+    alerta: '> 45 segundos'
+  - id: RF-KPI-05
+    title: Precisão Cálculo Impostos 99,99%
+    meta: 99,99%
+    alerta: '> 0,01 desvio'
+  - id: RF-KPI-06
+    title: Auditoria Completa 100%
+    meta: 100%
+    alerta: < 100%
+endpoints:
+- metodo: GET
+  path: /api/notas-fiscais
+  descricao: Listar notas fiscais (paginação, filtros)
+  permissao: fin:notasfiscais:read
+  status_codes:
+  - 200
+- metodo: GET
+  path: /api/notas-fiscais/{id}
+  descricao: Obter nota fiscal por ID
+  permissao: fin:notasfiscais:read
+  status_codes:
+  - 200
+  - 404
+- metodo: POST
+  path: /api/notas-fiscais/importar
+  descricao: Importar XML de nota fiscal
+  permissao: fin:notasfiscais:importar
+  status_codes:
+  - 201
+  - 400
+  - 409
+- metodo: POST
+  path: /api/notas-fiscais/importar-lote
+  descricao: Importar múltiplos XMLs
+  permissao: fin:notasfiscais:importar
+  status_codes:
+  - 202
+  - 400
+- metodo: PUT
+  path: /api/notas-fiscais/{id}
+  descricao: Atualizar metadados
+  permissao: fin:notasfiscais:update
+  status_codes:
+  - 200
+  - 400
+  - 404
+- metodo: DELETE
+  path: /api/notas-fiscais/{id}
+  descricao: Excluir nota fiscal (soft delete)
+  permissao: fin:notasfiscais:delete
+  status_codes:
+  - 204
+  - 404
+  - 403
+- metodo: POST
+  path: /api/notas-fiscais/{id}/validar-assinatura
+  descricao: Validar assinatura digital RSA-2048
+  permissao: fin:notasfiscais:validar
+  status_codes:
+  - 200
+  - 400
+  - 422
+- metodo: POST
+  path: /api/notas-fiscais/{id}/consultar-sefaz
+  descricao: Consultar status na SEFAZ
+  permissao: sistema
+  status_codes:
+  - 200
+  - 408
+  - 503
+- metodo: POST
+  path: /api/notas-fiscais/{id}/conciliar
+  descricao: Reconciliar com pedido
+  permissao: fin:notasfiscais:conciliar
+  status_codes:
+  - 200
+  - 400
+  - 404
+- metodo: POST
+  path: /api/notas-fiscais/{id}/calcular-impostos
+  descricao: Calcular todos impostos
+  permissao: fin:notasfiscais:update
+  status_codes:
+  - 200
+  - 400
+- metodo: POST
+  path: /api/notas-fiscais/{id}/rateio
+  descricao: Configurar rateio
+  permissao: fin:notasfiscais:ratear
+  status_codes:
+  - 200
+  - 400
+  - 422
+- metodo: POST
+  path: /api/notas-fiscais/{id}/aprovar-divergencia
+  descricao: Aprovar divergência crítica
+  permissao: fin:notasfiscais:aprovar
+  status_codes:
+  - 200
+  - 400
+  - 403
+- metodo: POST
+  path: /api/notas-fiscais/{id}/marcar-paga
+  descricao: Marcar como paga
+  permissao: fin:notasfiscais:pagar
+  status_codes:
+  - 200
+  - 400
+  - 403
+- metodo: POST
+  path: /api/notas-fiscais/{id}/cancelar
+  descricao: Cancelar nota fiscal
+  permissao: fin:notasfiscais:cancelar
+  status_codes:
+  - 200
+  - 400
+  - 403
+- metodo: GET
+  path: /api/notas-fiscais/{id}/xml
+  descricao: Download XML
+  permissao: fin:notasfiscais:read
+  status_codes:
+  - 200
+  - 404
+- metodo: GET
+  path: /api/notas-fiscais/{id}/danfe
+  descricao: Download DANFE PDF
+  permissao: fin:notasfiscais:read
+  status_codes:
+  - 200
+  - 404
+- metodo: POST
+  path: /api/notas-fiscais/ocr-danfe
+  descricao: Extrair dados de DANFE PDF via OCR
+  permissao: fin:notasfiscais:importar
+  status_codes:
+  - 200
+  - 400
+  - 422
+- metodo: GET
+  path: /api/relatorios/sped-fiscal
+  descricao: Exportar SPED Fiscal
+  permissao: fin:notasfiscais:exportar
+  status_codes:
+  - 200
+  - 400
+- metodo: GET
+  path: /api/relatorios/dctf
+  descricao: Exportar DCTF
+  permissao: fin:notasfiscais:exportar
+  status_codes:
+  - 200
+  - 400
+- metodo: GET
+  path: /api/relatorios/livro-registro
+  descricao: Exportar Livro de Registro
+  permissao: fin:notasfiscais:exportar
+  status_codes:
+  - 200
+  - 400
+- metodo: GET
+  path: /api/relatorios/impostos-retidos
+  descricao: Relatório de Impostos Retidos
+  permissao: fin:notasfiscais:exportar
+  status_codes:
+  - 200
+  - 400
+exclusions:
+  rf_items:
+  - id: EX-RF032-01
+    justificativa: Emissão de notas fiscais (fora do escopo)
+  - id: EX-RF032-02
+    justificativa: Integração com sistemas contábeis de terceiros (exceto exportação)
+  - id: EX-RF032-03
+    justificativa: Emissão de certificado digital (gestão de certificados existentes apenas)
+historico:
+- versao: '2.0'
+  data: '2025-12-30'
+  autor: Agência ALC - alc.dev.br
+  descricao: 'Migração v1.0 → v2.0: Separação completa RF/RL, reestruturação conforme template RF.yaml oficial'
+- versao: '1.0'
+  data: '2025-01-14'
+  autor: Architect Agent
+  descricao: Versão inicial (RF+RL misturados)

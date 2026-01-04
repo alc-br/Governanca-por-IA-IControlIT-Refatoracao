@@ -1,0 +1,1756 @@
+# RF-099: Dashboards e KPIs
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF-100, RF-101 | **EPIC**: EPIC008-SD-Service-Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+Este requisito especifica o modulo de **Dashboards e KPIs** do sistema IControlIT, responsavel por fornecer visualizacoes executivas em tempo real de indicadores estrategicos e operacionais. O modulo permite que usuarios seniores (diretores, gerentes) acompanhem metricas criticas do negocio atraves de dashboards customizaveis, alertas inteligentes e comparativos temporais.
+
+O RF099 implementa a camada de **visualizacao avancada de dados** com refresh automatico via SignalR, filtros dinamicos (cliente, filial, periodo), widgets drag-and-drop, e export para multiplos formatos (PDF, Excel, Power BI). O objetivo e transformar dados brutos em inteligencia acionavel, permitindo decisoes rapidas baseadas em KPIs reais.
+
+### 1.2 Importancia Estrategica
+
+O modulo de Dashboards e KPIs e critico para:
+
+- **Governanca Executiva**: Diretores acompanham metricas estrategicas em tempo real, identificam gargalos operacionais e tomam decisoes rapidas.
+- **Conformidade e Compliance**: Auditoria de KPIs sensibeis (seguranca, SLA, custos) com rastreabilidade completa de acessos.
+- **Performance Operacional**: Gerentes monitoram SLA, taxa de resolucao de chamados, custos por servico e ajustam recursos em tempo real.
+- **BI e Analytics**: Base para integracao com Power BI, ElasticSearch e ferramentas de analytics externas.
+- **Alerta Proativo**: Sistema de alertas automaticos dispara quando KPI sai do intervalo aceitavel, evitando falhas.
+
+### 1.3 Conceitos Fundamentais
+
+**Dashboard**: Colecao de widgets (graficos, tabelas, scorecards) que exibem metricas relacionadas. Cada dashboard pode ter 4-12 widgets configuraveis. Dashboard executivo: metricas estrategicas (receita, SLA geral, compliance). Dashboard operacional: metricas taticas (chamados em espera, tempo medio de resolucao, custos por cliente).
+
+- **Tipos**: Executivo (C-Level), Operacional (Gerentes), Departamental (Times), Pessoal (Analistas)
+
+**Widget**: Elemento visual individual que exibe um metrica (grafico de linha, barra, pizza, gauge, tabela, scorecard). Widgets sao posicionaveis (drag-and-drop) e permitem drill-down interativo.
+
+- **Variacoes**: Timeseries (tendencia), Composition (pizza, stack), Comparison (multiplas metricas), Number (gauge com alerta)
+
+**KPI (Key Performance Indicator)**: Metrica quantitativa que mede desempenho contra uma meta. Exemplo: "Tempo medio de resolucao de chamados P1: 4 horas (meta: 2 horas)". Cada KPI possui formula de calculo (agregacao), meta configuravel e limites de alerta (80%=amarelo, 60%=vermelho).
+
+- **Componentes**: Id, Nome, Descricao, Entidade origem (Chamados, Faturas, Ativos), Campo de agregacao, Operacao (SUM, AVG, COUNT, MAX, MIN), Filtros base, Meta em %, Limites de alerta
+
+**Filtro Dinamico**: Permite segmentar dados sem recarregar dashboard. Tipos: Data (periodo), Clientes (multi-select), Filiais (hierarquica), Centro de Custo, Status. Filtros sao persistidos no perfil do usuario.
+
+- **Persistencia**: Locale Storage (frontend) + Api (backend)
+
+**Alerta**: Condicao que dispara quando KPI viola limite (abaixo de 80% da meta). Alertas podem ser notificados via email, SMS ou dashboard notificacao. Historico de alertas e auditado.
+
+- **Tipos**: Above (acima de X%), Below (abaixo de X%), Equals (exatamente X%), Change (mudanca de Y% em periodo)
+
+**Drill-down**: Usuario clica em um widget e visualiza dados mais detalhados do proximo nivel. Exemplo: Clica em "Chamados por Cliente" e ve chamados de aquele cliente especifico. Drill-down automaticamente aplica filtro no proximo nivel.
+
+- **Profundidade**: 3-4 niveis tipicamente
+
+**Export**: Permite gerar relatorio em PDF (com logo cliente, data), Excel (com multiplas abas, graficos), ou conexao direta a Power BI (via API de dados). Export e auditado (quem, quando, que dados).
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Atualizacao de Dados** | Refresh manual (F5) ou agendado 1x/hora | Real-time via SignalR (30s) + WebSocket |
+| **Widgets** | Relatorios fixos, nao customizaveis | Widgets drag-and-drop, reposicionaveis |
+| **Filtros** | Parametros fixos em relatorio | Filtros dinamicos, multi-select, com dropdown |
+| **Alertas** | Sem alertas em tempo real | Alertas com limites configuráveis, email + SMS |
+| **Export** | Excel apenas, sem logo/branding | PDF com branding, Excel, Power BI API |
+| **Tecnologia Frontend** | ASP.NET WebForms, Crystal Reports | Angular 19, Chart.js, ngx-charts, SignalR |
+| **Tecnologia Backend** | VB.NET, SQL Server views | .NET 10, EF Core, CQRS + MediatR |
+| **Performance** | Queries lentas para grandes datasets | Redis cache, agregacoes ElasticSearch |
+| **Multi-tenancy** | ClienteId em relatorios fixos | ClienteId em filtros, separacao de dados garantida |
+| **Auditoria** | Logs basicos | Auditoria completa (acesso, export, alertas) |
+
+### 1.5 Funcionalidades Principais
+
+1. **Dashboard Executivo** - KPIs estrategicos (receita total, SLA geral, compliance, custos por servico, margem operacional). Atualizado em tempo real, visivel para diretores.
+
+2. **Dashboard Operacional** - Metricas taticas (chamados em aberto, tempo medio de resolucao, taxa de resolucao por turno, custos por cliente, fila de atendimento). Atualizado a cada 30 segundos.
+
+3. **Widgets Configuráveis** - Drag-and-drop para reposicionar widgets. Cada usuario pode criar layout pessoal. Opcoes de widget: timeseries (ultima 30 dias), composicao (pizza/stack), comparacao (mes vs mes), gauge (amarelo/vermelho).
+
+4. **Filtros Dinamicos** - Segmentacao por periodo (data inicio/fim, presets: hoje, ultima semana, ultimo mes, YTD), cliente (multi-select, hierarquico), filial, centro de custo, status, tipo de chamado. Filtros aplicam instantaneamente sem recarregar pagina.
+
+5. **Drill-down Interativo** - Usuario clica em grafico e visualiza dados detalhados. Exemplo: Clica em "Chamados por Cliente" → ve lista de chamados, clica em linha → ve detalhes do chamado. Filtros sao aplicados automaticamente em cada nivel.
+
+6. **Scorecards com Semáforo** - Indicadores com cores: Verde (acima de 90% meta), Amarelo (80-90%), Vermelho (abaixo de 80%). Exibe valor atual, meta, variacao percentual. Atualizado em tempo real.
+
+7. **Alertas Automaticos** - Sistema monitora KPIs configurados. Quando um KPI sai do intervalo aceitavel (< 80% meta), dispara alerta. Alertas podem notificar via email, SMS, push notification ou apenas dashboard. Historico auditado.
+
+8. **Comparativo Temporal** - Permite comparar metricas entre periodos (mes anterior vs mes atual, ano anterior vs ano atual). Exibe graficos lado-a-lado com variacao percentual. Util para identificar tendencias.
+
+9. **Real-time com SignalR** - Dashboard atualiza automaticamente a cada 30 segundos via WebSocket (SignalR). Nao ha polling HTTP, economia de bandwidth. Usuarios recebem notificacoes de alerta em tempo real.
+
+10. **Export para Multiplos Formatos** - PDF (com logo do cliente, data, assinatura digital), Excel (com multiplas abas: resumo, detalhes, graficos), Power BI Embedded (visualizacoes interativas direto no sistema), Email (relatorio programado).
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-DSH-099-01: Dashboard deve ter no minimo 4 widgets
+
+**Descricao**: Um dashboard e considerado valido se contem no minimo 4 widgets. Um widget vazio (sem dados) nao e valido. Cada dashboard pode ter maximo 12 widgets para nao sobrecarregar a interface.
+
+**Justificativa**: Implementar limite minimo para garantir que dashboard seja significativo e maximo para evitar poluicao visual. Um dashboard com 1-3 widgets nao agrega suficiente valor.
+
+**Implementacao**:
+```csharp
+public class CreateDashboardCommand : IRequest<DashboardResponse>
+{
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public string ClienteId { get; set; }
+    public List<CreateWidgetRequest> Widgets { get; set; } // Minimo 4, maximo 12
+
+    public class Validator : AbstractValidator<CreateDashboardCommand>
+    {
+        public Validator()
+        {
+            RuleFor(x => x.Name)
+                .NotEmpty().WithMessage("Nome obrigatorio")
+                .MaximumLength(100);
+
+            RuleFor(x => x.Widgets)
+                .NotEmpty()
+                .Must(w => w.Count >= 4 && w.Count <= 12)
+                .WithMessage("Dashboard deve ter minimo 4 e maximo 12 widgets")
+                .ForEach(w => w.SetValidator(new WidgetValidator()));
+
+            RuleFor(x => x.ClienteId)
+                .NotEmpty()
+                .Must(c => c.Length == 36) // GUID
+                .WithMessage("ClienteId invalido (multi-tenancy)");
+        }
+    }
+
+    public class Handler : IRequestHandler<CreateDashboardCommand, DashboardResponse>
+    {
+        private readonly IMediator _mediator;
+        private readonly IDashboardRepository _repo;
+
+        public async Task<DashboardResponse> Handle(CreateDashboardCommand cmd, CancellationToken ct)
+        {
+            // Validacao de widgets
+            if (cmd.Widgets.Count < 4 || cmd.Widgets.Count > 12)
+                throw new BusinessException("Dashboard_InvalidWidgetCount");
+
+            // Persistencia
+            var dashboard = new Dashboard
+            {
+                Id = Guid.NewGuid(),
+                ClienteId = cmd.ClienteId,
+                Name = cmd.Name,
+                Widgets = cmd.Widgets.Select((w, idx) => new Widget
+                {
+                    Id = Guid.NewGuid(),
+                    Position = idx,
+                    Type = w.Type,
+                    KpiId = w.KpiId
+                }).ToList(),
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = ctx.UserId
+            };
+
+            await _repo.AddAsync(dashboard, ct);
+            return dashboard.ToResponse();
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Valido: Dashboard com 6 widgets (executivo, SLA, custos, receita, compliance, chamados)
+- Invalido: Dashboard com 2 widgets (muito vazio)
+- Invalido: Dashboard com 15 widgets (poluicao visual)
+
+---
+
+### RN-DSH-099-02: KPI deve ter formula de calculo definida
+
+**Descricao**: Cada KPI e associado a uma formula de calculo que define como o valor e computado. Formulas validas: SUM (total), AVG (media), COUNT (quantidade), MAX (maximo), MIN (minimo), PERCENTAGE (percentual). Formula deve especificar: entidade origem, campo para agregar, filtros opcionais, periodo.
+
+**Justificativa**: Formulas definem o contrato de calculo do KPI. Sem formula explicitada, ha ambiguidade sobre como KPI e calculado. Permite auditoria e reproducao de calculo.
+
+**Implementacao**:
+```csharp
+public class KpiFormulaEntity
+{
+    public Guid Id { get; set; }
+    public string ClienteId { get; set; }
+    public string Name { get; set; } // "Tempo Medio Resolucao P1"
+    public string Description { get; set; }
+    public string Unit { get; set; } // "horas", "minutos", "%", "reais"
+
+    // Formula
+    public KpiAggregationType AggregationType { get; set; } // SUM, AVG, COUNT, MAX, MIN, PERCENTAGE
+    public string EntityName { get; set; } // "Chamado", "Fatura", "Ativo"
+    public string FieldName { get; set; } // "TempoResolucao", "Valor", "Quantidade"
+
+    // Filtros base
+    public Dictionary<string, object> BaseFilters { get; set; }
+        // { "Prioridade": "P1", "Status": "Resolvido" }
+
+    // Limites
+    public decimal MetaValue { get; set; } // 4 (horas)
+    public decimal AlertYellowThreshold { get; set; } // 80% = 3.2 horas
+    public decimal AlertRedThreshold { get; set; } // 60% = 2.4 horas
+
+    public DateTime CreatedAt { get; set; }
+    public string CreatedBy { get; set; }
+}
+
+// Query para calcular KPI
+public class CalculateKpiQuery : IRequest<KpiValueResponse>
+{
+    public Guid KpiId { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+    public Dictionary<string, object> DynamicFilters { get; set; } // Filtros do usuario (cliente, filial)
+
+    public class Handler : IRequestHandler<CalculateKpiQuery, KpiValueResponse>
+    {
+        private readonly IKpiRepository _kpiRepo;
+        private readonly IDataRepository _dataRepo;
+        private readonly IAuditService _audit;
+
+        public async Task<KpiValueResponse> Handle(CalculateKpiQuery query, CancellationToken ct)
+        {
+            var kpi = await _kpiRepo.GetByIdAsync(query.KpiId, ct);
+            if (kpi == null)
+                throw new NotFoundException("KPI_NotFound");
+
+            // Combina filtros base + dinamicos
+            var filters = new Dictionary<string, object>(kpi.BaseFilters);
+            foreach (var df in query.DynamicFilters)
+                filters[df.Key] = df.Value; // Usuario filter sobrescreve
+
+            filters["DateRange"] = (query.StartDate, query.EndDate);
+
+            // Calcula baseado em formula
+            decimal value = kpi.AggregationType switch
+            {
+                KpiAggregationType.SUM =>
+                    await _dataRepo.SumAsync(kpi.EntityName, kpi.FieldName, filters, ct),
+
+                KpiAggregationType.AVG =>
+                    await _dataRepo.AverageAsync(kpi.EntityName, kpi.FieldName, filters, ct),
+
+                KpiAggregationType.COUNT =>
+                    await _dataRepo.CountAsync(kpi.EntityName, filters, ct),
+
+                KpiAggregationType.MAX =>
+                    await _dataRepo.MaxAsync(kpi.EntityName, kpi.FieldName, filters, ct),
+
+                _ => throw new InvalidOperationException("Unknown aggregation type")
+            };
+
+            // Calcula alerta
+            var alertLevel = value < (kpi.MetaValue * (kpi.AlertRedThreshold / 100m))
+                ? AlertLevel.Red
+                : value < (kpi.MetaValue * (kpi.AlertYellowThreshold / 100m))
+                ? AlertLevel.Yellow
+                : AlertLevel.Green;
+
+            // Auditoria
+            await _audit.LogAsync(new AuditEntry
+            {
+                ClienteId = kpi.ClienteId,
+                EntityName = "KPI",
+                EntityId = kpi.Id.ToString(),
+                Action = "KPI_CALCULATED",
+                Details = new { kpiId = kpi.Id, value, alertLevel, filters },
+                CreatedAt = DateTime.UtcNow
+            }, ct);
+
+            return new KpiValueResponse
+            {
+                KpiId = kpi.Id,
+                Name = kpi.Name,
+                CurrentValue = value,
+                MetaValue = kpi.MetaValue,
+                Variance = ((value - kpi.MetaValue) / kpi.MetaValue) * 100,
+                AlertLevel = alertLevel,
+                Unit = kpi.Unit,
+                CalculatedAt = DateTime.UtcNow
+            };
+        }
+    }
+}
+
+public enum KpiAggregationType
+{
+    SUM,
+    AVG,
+    COUNT,
+    MAX,
+    MIN,
+    PERCENTAGE
+}
+
+public enum AlertLevel
+{
+    Green,  // >= 90% meta
+    Yellow, // 80-89% meta
+    Red     // < 80% meta
+}
+```
+
+**Exemplos**:
+- Valido: AVG(Chamado.TempoResolucao) WHERE Prioridade='P1' = 3.5 horas (meta 4h)
+- Invalido: KPI sem formula definida (ambiguo)
+
+---
+
+### RN-DSH-099-03: Meta de KPI deve ser configuravel
+
+**Descricao**: A meta de cada KPI (target value) deve ser configuravel por usuario com permissao `dashboard:kpi:configure`. Meta pode variar por periodo (meta 2h em Q1, 4h em Q2). Meta e armazenada por cliente (multi-tenancy) e pode ter diferentes valores para diferentes filiais/centros de custo.
+
+**Justificativa**: Diferentes periodos e clientes tem diferentes metas operacionais. Permitir configuracao flexivel de meta permite personalizacao de dashboards por segmento.
+
+**Implementacao**:
+```csharp
+public class ConfigureKpiMetaCommand : IRequest<KpiMetaResponse>
+{
+    public Guid KpiId { get; set; }
+    public decimal NewMetaValue { get; set; }
+    public DateTime EffectiveFrom { get; set; }
+    public string ClienteId { get; set; }
+    public string FilialId { get; set; } // Opcional, se null aplica a todo cliente
+
+    public class Validator : AbstractValidator<ConfigureKpiMetaCommand>
+    {
+        public Validator()
+        {
+            RuleFor(x => x.NewMetaValue)
+                .GreaterThan(0m)
+                .WithMessage("Meta deve ser maior que zero");
+
+            RuleFor(x => x.EffectiveFrom)
+                .GreaterThanOrEqualTo(DateTime.UtcNow.Date)
+                .WithMessage("Data efetiva deve ser no futuro ou hoje");
+
+            RuleFor(x => x.ClienteId)
+                .NotEmpty()
+                .Must(c => c.Length == 36);
+        }
+    }
+
+    public class Handler : IRequestHandler<ConfigureKpiMetaCommand, KpiMetaResponse>
+    {
+        private readonly IKpiRepository _kpiRepo;
+        private readonly IAuditService _audit;
+        private readonly IAuthorizationService _authz;
+
+        public async Task<KpiMetaResponse> Handle(ConfigureKpiMetaCommand cmd, CancellationToken ct)
+        {
+            // Auditoria: usuario requer permissao dashboard:kpi:configure
+            var authorized = await _authz.AuthorizeAsync(
+                new[] { "dashboard:kpi:configure" },
+                cmd.ClienteId,
+                ct);
+
+            if (!authorized)
+                throw new UnauthorizedAccessException("dashboard:kpi:configure");
+
+            var kpi = await _kpiRepo.GetByIdAsync(cmd.KpiId, ct);
+            if (kpi == null)
+                throw new NotFoundException("KPI_NotFound");
+
+            // Cria novo registro de meta historico
+            var kpiMeta = new KpiMetaEntity
+            {
+                Id = Guid.NewGuid(),
+                KpiId = cmd.KpiId,
+                ClienteId = cmd.ClienteId,
+                FilialId = cmd.FilialId, // Pode ser null (aplica a todo cliente)
+                MetaValue = cmd.NewMetaValue,
+                EffectiveFrom = cmd.EffectiveFrom,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = ctx.UserId
+            };
+
+            await _kpiRepo.AddKpiMetaAsync(kpiMeta, ct);
+
+            // Auditoria
+            await _audit.LogAsync(new AuditEntry
+            {
+                ClienteId = cmd.ClienteId,
+                EntityName = "KPI_META",
+                EntityId = cmd.KpiId.ToString(),
+                Action = "KPI_META_UPDATED",
+                Details = new { oldMeta = kpi.MetaValue, newMeta = cmd.NewMetaValue, filialId = cmd.FilialId },
+                CreatedAt = DateTime.UtcNow
+            }, ct);
+
+            return new KpiMetaResponse
+            {
+                KpiId = cmd.KpiId,
+                MetaValue = cmd.NewMetaValue,
+                EffectiveFrom = cmd.EffectiveFrom,
+                FilialId = cmd.FilialId
+            };
+        }
+    }
+}
+
+public class KpiMetaEntity
+{
+    public Guid Id { get; set; }
+    public Guid KpiId { get; set; }
+    public string ClienteId { get; set; }
+    public string FilialId { get; set; } // Null = aplica a todo cliente
+    public decimal MetaValue { get; set; }
+    public DateTime EffectiveFrom { get; set; }
+    public DateTime? EffectiveTo { get; set; } // Null = vigente
+    public DateTime CreatedAt { get; set; }
+    public string CreatedBy { get; set; }
+}
+```
+
+**Exemplos**:
+- Valido: Meta para RF099-TempoResolucao = 4h para Cliente A, Filial SP
+- Valido: Meta diferente 2h para Cliente A, Filial RJ
+- Invalido: Meta negativa ou zero
+
+---
+
+### RN-DSH-099-04: Alertas disparam quando KPI < 80% da meta (amarelo) ou < 60% (vermelho)
+
+**Descricao**: Sistema monitora KPIs em tempo real. Quando um KPI cai para 80% da meta, dispara alerta amarelo. Quando cai para 60%, dispara alerta vermelho (critico). Alertas podem ser notificados via email, SMS ou apenas dashboard. Cada alerta e registrado na auditoria.
+
+**Justificativa**: Alertas proativos permitem agir antes que KPI saia completamente do controle. Limites de 80% (amarelo) e 60% (vermelho) sao estandar em SLAs.
+
+**Implementacao**:
+```csharp
+public class MonitorKpiAlertsBackgroundService : BackgroundService
+{
+    private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<MonitorKpiAlertsBackgroundService> _logger;
+    private readonly TimeSpan _interval = TimeSpan.FromSeconds(30); // Monitora a cada 30s
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+                var kpiRepo = scope.ServiceProvider.GetRequiredService<IKpiRepository>();
+                var alertService = scope.ServiceProvider.GetRequiredService<IAlertService>();
+
+                // Obtem todos os KPIs configurados
+                var kpis = await kpiRepo.GetAllConfiguredKpisAsync(stoppingToken);
+
+                foreach (var kpi in kpis)
+                {
+                    // Calcula valor atual
+                    var query = new CalculateKpiQuery
+                    {
+                        KpiId = kpi.Id,
+                        StartDate = DateTime.UtcNow.AddDays(-1),
+                        EndDate = DateTime.UtcNow,
+                        DynamicFilters = new Dictionary<string, object>()
+                    };
+
+                    var result = await mediator.Send(query, stoppingToken);
+
+                    // Determina nivel de alerta
+                    var yellowThreshold = kpi.MetaValue * 0.80m;
+                    var redThreshold = kpi.MetaValue * 0.60m;
+
+                    AlertLevel newAlertLevel = result.CurrentValue < redThreshold
+                        ? AlertLevel.Red
+                        : result.CurrentValue < yellowThreshold
+                        ? AlertLevel.Yellow
+                        : AlertLevel.Green;
+
+                    // Se mudou para amarelo ou vermelho, notifica
+                    if (newAlertLevel != AlertLevel.Green)
+                    {
+                        var alert = new AlertEntity
+                        {
+                            Id = Guid.NewGuid(),
+                            KpiId = kpi.Id,
+                            ClienteId = kpi.ClienteId,
+                            AlertLevel = newAlertLevel,
+                            CurrentValue = result.CurrentValue,
+                            MetaValue = kpi.MetaValue,
+                            Variance = result.Variance,
+                            Message = $"KPI '{kpi.Name}' em nível {newAlertLevel.ToString().ToUpper()}: " +
+                                      $"{result.CurrentValue:F2}{kpi.Unit} (meta: {kpi.MetaValue:F2}{kpi.Unit})",
+                            CreatedAt = DateTime.UtcNow,
+                            IsActive = true
+                        };
+
+                        await alertService.CreateAlertAsync(alert, stoppingToken);
+
+                        // Notifica usuarios com permissao
+                        await alertService.NotifyUsersAsync(alert, stoppingToken);
+                    }
+                }
+
+                await Task.Delay(_interval, stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao monitorar KPIs");
+                await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken); // Retry em 60s
+            }
+        }
+    }
+}
+
+public class AlertService : IAlertService
+{
+    private readonly IAlertRepository _alertRepo;
+    private readonly INotificationService _notificationService;
+    private readonly IHubContext<DashboardHub> _hubContext;
+
+    public async Task CreateAlertAsync(AlertEntity alert, CancellationToken ct)
+    {
+        await _alertRepo.AddAsync(alert, ct);
+    }
+
+    public async Task NotifyUsersAsync(AlertEntity alert, CancellationToken ct)
+    {
+        // Notificar via SignalR em tempo real
+        await _hubContext.Clients
+            .Group($"client_{alert.ClienteId}")
+            .SendAsync("OnKpiAlert", new
+            {
+                kpiId = alert.KpiId,
+                level = alert.AlertLevel,
+                message = alert.Message
+            }, ct);
+
+        // Notificar via email usuarios com permissao dashboard:alert:receive
+        var usersToNotify = await _notificationService
+            .GetUsersWithPermissionAsync("dashboard:alert:receive", alert.ClienteId, ct);
+
+        foreach (var user in usersToNotify)
+        {
+            if (alert.AlertLevel == AlertLevel.Red) // Sempre envia email para Red
+            {
+                await _notificationService.SendEmailAsync(
+                    user.Email,
+                    $"ALERTA CRITICO: {alert.Message}",
+                    alert.Message,
+                    ct);
+            }
+        }
+    }
+}
+
+public class AlertEntity
+{
+    public Guid Id { get; set; }
+    public Guid KpiId { get; set; }
+    public string ClienteId { get; set; }
+    public AlertLevel AlertLevel { get; set; }
+    public decimal CurrentValue { get; set; }
+    public decimal MetaValue { get; set; }
+    public decimal Variance { get; set; } // Percentual de variacao
+    public string Message { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public bool IsActive { get; set; } // False quando resolvido
+    public DateTime? ResolvedAt { get; set; }
+    public string ResolvedBy { get; set; }
+}
+```
+
+**Exemplos**:
+- Alerta amarelo: Tempo medio resolucao = 3.2h (80% de 4h meta) → email de aviso
+- Alerta vermelho: Tempo medio resolucao = 2.4h (60% de 4h meta) → email critico + SMS
+
+---
+
+### RN-DSH-099-05: Refresh automatico a cada 30 segundos via SignalR
+
+**Descricao**: Dashboard atualiza dados automaticamente a cada 30 segundos. Nao ha polling HTTP. Usa WebSocket (SignalR) para push de dados do servidor para cliente. Quando usuario navega para tela de dashboard, conecta ao hub SignalR. Quando deixa a tela, desconecta. Se nao ha mudancas nos dados, server nao envia notificacao (otimizacao).
+
+**Justificativa**: SignalR com WebSocket economiza bandwidth vs polling HTTP. 30 segundos e intervalo equilibrado entre atualizacao em tempo real e performance do servidor.
+
+**Implementacao**:
+```csharp
+// Backend Hub
+public class DashboardHub : Hub
+{
+    private readonly IMediator _mediator;
+    private readonly ILogger<DashboardHub> _logger;
+
+    public override async Task OnConnectedAsync()
+    {
+        var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var clienteId = Context.User?.FindFirst("ClienteId")?.Value;
+
+        await Groups.AddToGroupAsync(
+            Context.ConnectionId,
+            $"client_{clienteId}");
+
+        _logger.LogInformation($"Usuario {userId} conectado ao dashboard");
+        await base.OnConnectedAsync();
+    }
+
+    public async Task SubscribeToDashboard(Guid dashboardId)
+    {
+        var clienteId = Context.User?.FindFirst("ClienteId")?.Value;
+        await Groups.AddToGroupAsync(
+            Context.ConnectionId,
+            $"dashboard_{dashboardId}");
+    }
+
+    public async Task UnsubscribeFromDashboard(Guid dashboardId)
+    {
+        await Groups.RemoveFromGroupAsync(
+            Context.ConnectionId,
+            $"dashboard_{dashboardId}");
+    }
+}
+
+// Background Service para refresh
+public class DashboardRefreshService : BackgroundService
+{
+    private readonly IHubContext<DashboardHub> _hubContext;
+    private readonly IMediator _mediator;
+    private readonly TimeSpan _interval = TimeSpan.FromSeconds(30);
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                // Obtem todos os dashboards ativos (conectados)
+                var activeDashboards = await GetActiveDashboardsAsync(stoppingToken);
+
+                foreach (var dashboard in activeDashboards)
+                {
+                    // Calcula dados atualizados
+                    var query = new GetDashboardDataQuery { DashboardId = dashboard.Id };
+                    var data = await _mediator.Send(query, stoppingToken);
+
+                    // Envia para todos os usuarios conectados ao dashboard
+                    await _hubContext.Clients
+                        .Group($"dashboard_{dashboard.Id}")
+                        .SendAsync("OnDashboardRefresh", data, stoppingToken);
+                }
+
+                await Task.Delay(_interval, stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao fazer refresh de dashboards");
+            }
+        }
+    }
+
+    private async Task<List<Dashboard>> GetActiveDashboardsAsync(CancellationToken ct)
+    {
+        // Retorna apenas dashboards com usuarios conectados
+        // Isso evita calcular dados para dashboards inativos
+        return await _dashboardRepo.GetDashboardsWithActiveConnectionsAsync(ct);
+    }
+}
+
+// Frontend (Angular)
+export class DashboardComponent implements OnInit, OnDestroy {
+    private hubConnection: signalR.HubConnection;
+    dashboardData: DashboardData;
+
+    constructor(private dashboardService: DashboardService) {}
+
+    ngOnInit() {
+        this.initializeSignalR();
+    }
+
+    private initializeSignalR() {
+        this.hubConnection = new signalR.HubConnectionBuilder()
+            .withUrl('/hubs/dashboard', {
+                accessTokenFactory: () => this.getToken()
+            })
+            .withAutomaticReconnect()
+            .build();
+
+        this.hubConnection.on('OnDashboardRefresh', (data: DashboardData) => {
+            this.dashboardData = data;
+            // Angular change detection automaticamente atualiza view
+        });
+
+        this.hubConnection.start()
+            .then(() => {
+                // Se conectou, subscreve ao dashboard
+                this.hubConnection.invoke('SubscribeToDashboard', this.dashboardId);
+            });
+    }
+
+    ngOnDestroy() {
+        if (this.hubConnection) {
+            this.hubConnection.invoke('UnsubscribeFromDashboard', this.dashboardId);
+            this.hubConnection.stop();
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Usuario abre dashboard em browser. 30s depois dados sao atualizados automaticamente sem F5.
+- Sistema calcula novos valores de KPI a cada 30s, push para clientes conectados.
+
+---
+
+### RN-DSH-099-06: Export para PDF deve incluir logo do cliente
+
+**Descricao**: Quando usuario clica em "Export PDF", sistema gera relatorio em PDF que inclui: logo da empresa cliente (dinamico), data/hora de geracao, nome do usuario que exportou, dados do dashboard (graficos, tabelas), filtros aplicados. PDF e salvo no Azure Blob Storage e retornado para download.
+
+**Justificativa**: Branding e importante para clientes. Rastreabilidade de quem exportou e quando (auditoria).
+
+**Implementacao**:
+```csharp
+public class ExportDashboardPdfCommand : IRequest<ExportResponse>
+{
+    public Guid DashboardId { get; set; }
+    public string ClienteId { get; set; }
+    public Dictionary<string, object> AppliedFilters { get; set; }
+
+    public class Handler : IRequestHandler<ExportDashboardPdfCommand, ExportResponse>
+    {
+        private readonly IDashboardRepository _dashboardRepo;
+        private readonly IMediator _mediator;
+        private readonly IClienteRepository _clienteRepo;
+        private readonly IBlobStorageService _blobStorage;
+        private readonly IPdfGeneratorService _pdfGenerator;
+        private readonly IAuditService _audit;
+
+        public async Task<ExportResponse> Handle(ExportDashboardPdfCommand cmd, CancellationToken ct)
+        {
+            var dashboard = await _dashboardRepo.GetByIdAsync(cmd.DashboardId, ct);
+            if (dashboard == null)
+                throw new NotFoundException("Dashboard_NotFound");
+
+            // Valida permissao
+            if (dashboard.ClienteId != cmd.ClienteId)
+                throw new ForbiddenException("dashboard:export:pdf");
+
+            // Obtem cliente para logo
+            var cliente = await _clienteRepo.GetByIdAsync(cmd.ClienteId, ct);
+            var logoUrl = cliente?.LogoUrl ?? "default-logo.png";
+
+            // Calcula dados do dashboard
+            var dashboardData = new GetDashboardDataQuery { DashboardId = cmd.DashboardId };
+            var data = await _mediator.Send(dashboardData, ct);
+
+            // Gera PDF
+            var pdfContent = await _pdfGenerator.GenerateAsync(new PdfGenerationRequest
+            {
+                ClienteName = cliente.Name,
+                ClienteLogo = logoUrl,
+                DashboardName = dashboard.Name,
+                DashboardWidgets = data.Widgets,
+                AppliedFilters = cmd.AppliedFilters,
+                GeneratedAt = DateTime.UtcNow,
+                GeneratedBy = ctx.UserId
+            }, ct);
+
+            // Salva no Azure Blob Storage
+            var fileName = $"dashboard_{cmd.DashboardId}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
+            var blobUrl = await _blobStorage.UploadAsync(
+                "dashboards-exports",
+                fileName,
+                pdfContent,
+                "application/pdf",
+                ct);
+
+            // Auditoria
+            await _audit.LogAsync(new AuditEntry
+            {
+                ClienteId = cmd.ClienteId,
+                EntityName = "DASHBOARD_EXPORT",
+                EntityId = cmd.DashboardId.ToString(),
+                Action = "DASHBOARD_EXPORT_PDF",
+                Details = new { fileName, blobUrl, filters = cmd.AppliedFilters },
+                CreatedAt = DateTime.UtcNow
+            }, ct);
+
+            return new ExportResponse
+            {
+                DownloadUrl = blobUrl,
+                FileName = fileName,
+                ExportedAt = DateTime.UtcNow
+            };
+        }
+    }
+}
+
+public class PdfGeneratorService : IPdfGeneratorService
+{
+    public async Task<byte[]> GenerateAsync(PdfGenerationRequest req, CancellationToken ct)
+    {
+        using var document = new Document();
+        using var stream = new MemoryStream();
+        PdfWriter.GetInstance(document, stream);
+        document.Open();
+
+        // Logo
+        if (!string.IsNullOrEmpty(req.ClienteLogo))
+        {
+            var logo = Image.GetInstance(req.ClienteLogo);
+            logo.ScaleToFit(100, 50);
+            document.Add(logo);
+        }
+
+        // Header
+        var title = new Paragraph($"Dashboard: {req.DashboardName}")
+        {
+            Alignment = Element.ALIGN_CENTER,
+            Font = new Font(Font.HELVETICA, 16, Font.BOLD)
+        };
+        document.Add(title);
+
+        var generatedInfo = new Paragraph(
+            $"Gerado em: {req.GeneratedAt:dd/MM/yyyy HH:mm:ss} por {req.GeneratedBy}"
+        )
+        {
+            Alignment = Element.ALIGN_RIGHT,
+            Font = new Font(Font.HELVETICA, 10)
+        };
+        document.Add(generatedInfo);
+
+        // Widgets como tabelas/graficos
+        foreach (var widget in req.DashboardWidgets)
+        {
+            var widgetTitle = new Paragraph(widget.Name)
+            {
+                Font = new Font(Font.HELVETICA, 12, Font.BOLD)
+            };
+            document.Add(widgetTitle);
+
+            // Renderiza grafico como imagem (via Chart.js canvas)
+            var chartImage = await ConvertChartToImage(widget, ct);
+            var img = Image.GetInstance(chartImage);
+            img.ScaleToFit(400, 200);
+            document.Add(img);
+
+            document.Add(new Paragraph(" ")); // Espacador
+        }
+
+        document.Close();
+        return stream.ToArray();
+    }
+
+    private async Task<byte[]> ConvertChartToImage(Widget widget, CancellationToken ct)
+    {
+        // Renderiza Chart.js em browser headless (Puppeteer/Playwright)
+        // Retorna PNG como byte array
+        return await _chartConverter.ConvertAsync(widget.ChartConfig, ct);
+    }
+}
+```
+
+**Exemplos**:
+- Usuario exporta dashboard "Metricas Operacionais". PDF inclui logo da empresa, data, graficos.
+
+---
+
+### RN-DSH-099-07: Drill-down deve filtrar automaticamente proximo nivel
+
+**Descricao**: Usuario clica em um elemento de grafico (barra, slice, linha). Sistema aplica filtro automaticamente para isolar dados daquele elemento e apresenta proximo nivel de detalhe. Exemplo: Clica em "Cliente A" em grafico de pizza → listagem de chamados do Cliente A. Filtro e preservado na URL (para compartilhamento).
+
+**Justificativa**: Drill-down interativo permite exploracao rapida de dados sem recarregar pagina. Filtros automaticos economizam clicks do usuario.
+
+**Implementacao**:
+```csharp
+// Backend: endpoint para drill-down
+public class DrillDownDashboardQuery : IRequest<DrillDownResponse>
+{
+    public Guid DashboardId { get; set; }
+    public Guid WidgetId { get; set; }
+    public string DimensionValue { get; set; } // "ClienteA", "FilialSP", etc
+    public int DrillDownLevel { get; set; } // 1, 2, 3...
+
+    public class Handler : IRequestHandler<DrillDownDashboardQuery, DrillDownResponse>
+    {
+        private readonly IMediator _mediator;
+        private readonly IWidgetRepository _widgetRepo;
+
+        public async Task<DrillDownResponse> Handle(DrillDownDashboardQuery query, CancellationToken ct)
+        {
+            var widget = await _widgetRepo.GetByIdAsync(query.WidgetId, ct);
+            if (widget == null)
+                throw new NotFoundException("Widget_NotFound");
+
+            // Determina proximo nivel de detalhe baseado na dimensao
+            var nextLevel = query.DrillDownLevel + 1;
+            var newFilters = new Dictionary<string, object>(widget.BaseFilters)
+            {
+                [widget.DimensionField] = query.DimensionValue
+            };
+
+            // Obtem dados do proximo nivel
+            var detailedQuery = new GetWidgetDataQuery
+            {
+                WidgetId = query.WidgetId,
+                DrillDownLevel = nextLevel,
+                Filters = newFilters
+            };
+
+            var data = await _mediator.Send(detailedQuery, ct);
+
+            return new DrillDownResponse
+            {
+                Data = data,
+                CurrentLevel = nextLevel,
+                SelectedDimension = query.DimensionValue,
+                CanDrillDown = nextLevel < 4 // Limite de profundidade
+            };
+        }
+    }
+}
+
+// Frontend: click handler para drill-down
+export class DashboardComponent {
+    onChartElementClick(event: any) {
+        const dimensionValue = event.data?.name; // "ClienteA"
+        const widgetId = event.widget.id;
+
+        this.dashboardService.drillDown(
+            this.dashboardId,
+            widgetId,
+            dimensionValue,
+            this.currentLevel
+        ).subscribe(response => {
+            // Atualiza widget com dados detalhados
+            this.currentWidget.data = response.data;
+            this.currentLevel = response.currentLevel;
+
+            // Atualiza URL para permitir compartilhamento
+            this.router.navigate([
+                '/dashboard',
+                this.dashboardId
+            ], {
+                queryParams: {
+                    drillDown: response.selectedDimension,
+                    level: response.currentLevel
+                }
+            });
+        });
+    }
+}
+```
+
+**Exemplos**:
+- Dashboard exibe grafico "Chamados por Cliente" (pizza). Usuario clica em "Cliente A" → sistema filtra e exibe lista de chamados de Cliente A.
+- Clica em um chamado na lista → exibe detalhes completos do chamado.
+
+---
+
+### RN-DSH-099-08: Multi-tenancy obrigatorio (ClienteId em filtros)
+
+**Descricao**: Toda operacao de dashboard deve validar ClienteId do usuario contra ClienteId do dashboard. Filtros dinamicos do usuario (cliente, filial) sao intersectados com dados que usuario tem acesso. Nenhum usuario pode visualizar dados de outro cliente.
+
+**Justificativa**: Segregacao de dados e obrigatoriedade em SaaS multi-tenant. ClienteId e incluido em permissoes RBAC.
+
+**Implementacao**:
+```csharp
+public class DashboardAuthorizationMiddleware
+{
+    public async Task InvokeAsync(HttpContext context, IDashboardRepository dashboardRepo)
+    {
+        var clienteIdClaim = context.User?.FindFirst("ClienteId")?.Value;
+        if (string.IsNullOrEmpty(clienteIdClaim))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        // Extrai ClienteId da rota ou query string
+        var routeClienteId = context.GetRouteValue("clienteId")?.ToString();
+        var queryClienteId = context.Request.Query["clienteId"].ToString();
+
+        var dashboardClienteId = routeClienteId ?? queryClienteId;
+
+        // Valida que ClienteId do usuario == ClienteId do dashboard
+        if (!string.IsNullOrEmpty(dashboardClienteId) && dashboardClienteId != clienteIdClaim)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new ErrorResponse
+            {
+                Code = "TENANT_MISMATCH",
+                Message = "Acesso negado para outro cliente"
+            });
+            return;
+        }
+
+        await context.Request.delegate.Invoke(context);
+    }
+}
+
+public class GetDashboardDataQuery : IRequest<DashboardDataResponse>
+{
+    public Guid DashboardId { get; set; }
+    public string ClienteId { get; set; } // Obrigatorio
+    public Dictionary<string, object> UserFilters { get; set; } // Filtros dinamicos
+
+    public class Handler : IRequestHandler<GetDashboardDataQuery, DashboardDataResponse>
+    {
+        private readonly IDashboardRepository _dashboardRepo;
+        private readonly IDataRepository _dataRepo;
+
+        public async Task<DashboardDataResponse> Handle(GetDashboardDataQuery query, CancellationToken ct)
+        {
+            var dashboard = await _dashboardRepo.GetByIdAsync(query.DashboardId, ct);
+
+            // Valida ClienteId
+            if (dashboard.ClienteId != query.ClienteId)
+                throw new ForbiddenException("Tenant mismatch");
+
+            // Combina filtros obrigatorios (ClienteId) + dinamicos (usuario)
+            var secureFilters = new Dictionary<string, object>
+            {
+                ["ClienteId"] = query.ClienteId // Obrigatorio
+            };
+
+            foreach (var uf in query.UserFilters)
+                secureFilters[uf.Key] = uf.Value;
+
+            // Carrega dados apenas do cliente
+            var widgets = new List<WidgetData>();
+            foreach (var widget in dashboard.Widgets)
+            {
+                var data = await _dataRepo.GetWidgetDataAsync(
+                    widget.KpiId,
+                    secureFilters, // Filtros com ClienteId
+                    ct);
+
+                widgets.Add(new WidgetData { WidgetId = widget.Id, Data = data });
+            }
+
+            return new DashboardDataResponse { Widgets = widgets };
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Usuario de ClienteA tenta acessar dashboard de ClienteB → HTTP 403 Forbidden
+- Filtro automaticamente inclui ClienteId=ClienteA em todas as queries
+
+---
+
+### RN-DSH-099-09: Auditoria de acesso a dashboards sensiveis
+
+**Descricao**: Acesso a dashboards sensíveis (ex: Dashboard Executivo com dados financeiros) deve ser auditado. Registra: usuario, timestamp, IP, dashboard acessado, dados exportados, alertas acionados. Auditoria e retida por 7 anos conforme LGPD.
+
+**Justificativa**: Conformidade regulatoria. Rastreabilidade de quem acessou dados sensíveis.
+
+**Implementacao**:
+```csharp
+public class DashboardAccessAuditAttribute : Attribute
+{
+    public DashboardAccessAuditAttribute(string dashboardType)
+    {
+        DashboardType = dashboardType; // "EXECUTIVO", "OPERACIONAL", etc
+    }
+
+    public string DashboardType { get; }
+}
+
+[DashboardAccessAudit("EXECUTIVO")]
+public class GetExecutiveDashboardQuery : IRequest<ExecutiveDashboardResponse> { }
+
+public class DashboardAccessAuditInterceptor : IRequestPreProcessor<DashboardAccessAuditAttribute>
+{
+    private readonly IAuditService _audit;
+
+    public async Task Process(IRequest request, CancellationToken ct)
+    {
+        var auditAttr = request.GetType()
+            .GetCustomAttribute<DashboardAccessAuditAttribute>();
+
+        if (auditAttr != null)
+        {
+            var entry = new AuditEntry
+            {
+                ClienteId = ctx.ClienteId,
+                EntityName = "DASHBOARD",
+                EntityId = request.GetType().Name,
+                Action = "DASHBOARD_ACCESS",
+                Details = new
+                {
+                    dashboardType = auditAttr.DashboardType,
+                    userId = ctx.UserId,
+                    ipAddress = ctx.IpAddress,
+                    userAgent = ctx.UserAgent
+                },
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _audit.LogAsync(entry, ct);
+        }
+    }
+}
+
+public class AuditEntity
+{
+    public Guid Id { get; set; }
+    public string ClienteId { get; set; }
+    public string EntityName { get; set; }
+    public string EntityId { get; set; }
+    public string Action { get; set; } // DASHBOARD_ACCESS, DASHBOARD_EXPORT, ALERT_TRIGGERED
+    public string UserId { get; set; }
+    public string IpAddress { get; set; }
+    public Dictionary<string, object> Details { get; set; }
+    public DateTime CreatedAt { get; set; }
+
+    // LGPD: retention de 7 anos
+    public DateTime? DeletedAt { get; set; } // Soft delete
+
+    [Index]
+    public int TenantId { get; set; } // Para particionar por cliente
+}
+
+// Scheduler para apagar registros com mais de 7 anos
+public class AuditDataRetentionJob : IJob
+{
+    private readonly IAuditRepository _auditRepo;
+
+    public async Task Execute(IJobExecutionContext context)
+    {
+        var sevenYearsAgo = DateTime.UtcNow.AddYears(-7);
+        await _auditRepo.SoftDeleteAsync(
+            a => a.CreatedAt < sevenYearsAgo && a.DeletedAt == null);
+    }
+}
+```
+
+**Exemplos**:
+- Usuario acessa Dashboard Executivo às 14:30 de 2025-12-28, registra no audit log
+- Exporta como PDF, tambem registra (com arquivo, hash, tamanho)
+
+---
+
+### RN-DSH-099-10: Permissao granular por dashboard (dashboard:executivo:read, dashboard:operacional:read)
+
+**Descricao**: Permissions sao granulares. Nao existe apenas "dashboard:read" generico. Cada dashboard tipo tem sua propria permissao: dashboard:executivo:read (C-Level), dashboard:operacional:read (Gerentes), dashboard:departamental:read (Teams). Usuario sem permissao nao pode acessar dashboard.
+
+**Justificativa**: Controle fino de acesso. CEO ve Dashboard Executivo, Gerente nao. Gerente ve Dashboard Operacional, Team Lead nao.
+
+**Implementacao**:
+```csharp
+public enum DashboardType
+{
+    Executivo,    // C-Level only
+    Operacional,  // Gerentes+
+    Departamental,// Team Leads+
+    Pessoal       // Individual contributors
+}
+
+public class Dashboard
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; }
+    public DashboardType Type { get; set; }
+    public string ClienteId { get; set; }
+    public List<Widget> Widgets { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string CreatedBy { get; set; }
+}
+
+public class GetDashboardQuery : IRequest<DashboardResponse>
+{
+    public Guid DashboardId { get; set; }
+    public string ClienteId { get; set; }
+
+    public class Handler : IRequestHandler<GetDashboardQuery, DashboardResponse>
+    {
+        private readonly IDashboardRepository _dashboardRepo;
+        private readonly IAuthorizationService _authz;
+
+        public async Task<DashboardResponse> Handle(GetDashboardQuery query, CancellationToken ct)
+        {
+            var dashboard = await _dashboardRepo.GetByIdAsync(query.DashboardId, ct);
+            if (dashboard == null)
+                throw new NotFoundException("Dashboard_NotFound");
+
+            // Valida ClienteId
+            if (dashboard.ClienteId != query.ClienteId)
+                throw new ForbiddenException("Tenant mismatch");
+
+            // Valida permissao granular
+            var permissionRequired = $"dashboard:{dashboard.Type.ToString().ToLower()}:read";
+            var hasPermission = await _authz.AuthorizeAsync(
+                new[] { permissionRequired },
+                query.ClienteId,
+                ct);
+
+            if (!hasPermission)
+                throw new ForbiddenException(permissionRequired);
+
+            return dashboard.ToResponse();
+        }
+    }
+}
+
+// Configuracao de roles e permissoes
+public static class DashboardPermissions
+{
+    public static readonly Dictionary<string, string[]> DashboardRoleMap = new()
+    {
+        { "CEO", new[] { "dashboard:executivo:read", "dashboard:operacional:read" } },
+        { "Director", new[] { "dashboard:executivo:read", "dashboard:operacional:read" } },
+        { "Manager", new[] { "dashboard:operacional:read", "dashboard:departamental:read" } },
+        { "TeamLead", new[] { "dashboard:departamental:read", "dashboard:pessoal:read" } },
+        { "Analyst", new[] { "dashboard:pessoal:read" } }
+    };
+}
+```
+
+**Exemplos**:
+- Usuario com role "CEO" pode acessar dashboard:executivo:read
+- Usuario com role "Analyst" nao pode (403 Forbidden)
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `ic1_legado` (SQL Server)
+
+**Tabelas Relevantes**:
+
+Nao ha tabelas de dashboard propriamente ditas no legado. O sistema VB.NET utilizava Crystal Reports e relatorios fixos. Abaixo estao as tabelas que servem como FONTE DE DADOS para KPIs:
+
+```sql
+-- Tabelas de origem para KPIs
+CREATE TABLE [dbo].[Chamados](
+    [IdChamado] [int] IDENTITY(1,1) NOT NULL,
+    [IdCliente] [int] NOT NULL,
+    [IdFilial] [int] NULL,
+    [Descricao] [varchar](500) NOT NULL,
+    [DataAbertura] [datetime] NOT NULL,
+    [DataFechamento] [datetime] NULL,
+    [TempoResolucao] [int] NULL, -- Minutos
+    [Prioridade] [varchar](10) NOT NULL, -- P1, P2, P3
+    [Status] [varchar](20) NOT NULL, -- Aberto, Resolvido, Fechado
+    CONSTRAINT [PK_Chamados] PRIMARY KEY CLUSTERED ([IdChamado] ASC)
+);
+
+CREATE TABLE [dbo].[Faturas](
+    [IdFatura] [int] IDENTITY(1,1) NOT NULL,
+    [IdCliente] [int] NOT NULL,
+    [IdFilial] [int] NULL,
+    [Valor] [decimal](18,2) NOT NULL,
+    [DataFatura] [datetime] NOT NULL,
+    [Status] [varchar](20) NOT NULL, -- Pendente, Pago, Atrasado
+    CONSTRAINT [PK_Faturas] PRIMARY KEY CLUSTERED ([IdFatura] ASC)
+);
+
+CREATE TABLE [dbo].[Ativos](
+    [IdAtivo] [int] IDENTITY(1,1) NOT NULL,
+    [IdCliente] [int] NOT NULL,
+    [IdFilial] [int] NULL,
+    [Descricao] [varchar](100) NOT NULL,
+    [DataAquisicao] [datetime] NOT NULL,
+    [ValorAquisicao] [decimal](18,2) NOT NULL,
+    CONSTRAINT [PK_Ativos] PRIMARY KEY CLUSTERED ([IdAtivo] ASC)
+);
+```
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descricao | Migracao |
+|-----------|-----------|----------|
+| `pa_RelatorioChamados` | Retorna chamados filtrados | Substituida por GetDashboardDataQuery (CQRS) |
+| `pa_RelatorioFaturas` | Retorna faturas por periodo | Substituida por CalculateKpiQuery |
+| `pa_DashboardExecutivo` | Consolida KPIs executivos | Substituida por GetExecutiveDashboardQuery |
+
+### 3.3 Telas ASPX
+
+| Pagina | Descricao | Tela Moderna |
+|--------|-----------|--------------|
+| `DashboardExecutivo.aspx` | Dashboard fixo com Crystal Reports | `/dashboard/executivo` (Angular component) |
+| `RelatoriosChamados.aspx` | Relatorios de chamados | `/dashboard/operacional` + drill-down |
+| `RelatóriosFaturas.aspx` | Relatorios financeiros | `/dashboard/financeiro` (novo) |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSDashboard.asmx.vb`
+
+| Metodo | Descricao | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `GetDashboardExecutivo()` | Retorna dados do dashboard executivo | `GET /api/dashboards/{id}/data` |
+| `GetRelatoriosChamados()` | Retorna relatorios de chamados | `GET /api/dashboards/{id}/widgets/{widgetId}/drill-down` |
+| `ExportarPDF()` | Exporta relatorio como PDF | `POST /api/dashboards/{id}/export/pdf` |
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `DASHBOARD_REALTIME_REFRESH`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "DASHBOARD_REALTIME_REFRESH",
+    "nome": "Refresh em Tempo Real (SignalR)",
+    "descricao": "Habilita atualização automática de dashboards via SignalR a cada 30 segundos",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "clienteId": null // Global para todos os clientes
+}
+```
+
+**FeatureKey**: `DASHBOARD_ALERTS_ENABLED`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "DASHBOARD_ALERTS_ENABLED",
+    "nome": "Alertas de KPI",
+    "descricao": "Habilita sistema de alertas quando KPI sai de meta",
+    "habilitado": true,
+    "isSystemFeature": false
+}
+```
+
+**FeatureKey**: `DASHBOARD_EXPORT_PDF`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "DASHBOARD_EXPORT_PDF",
+    "nome": "Export para PDF",
+    "descricao": "Permite usuarios exportar dashboards como PDF com branding",
+    "habilitado": true,
+    "isSystemFeature": false
+}
+```
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao**:
+
+```json
+{
+    "dashboard": {
+        "menu": {
+            "dashboards": "Dashboards",
+            "createDashboard": "Novo Dashboard",
+            "myDashboards": "Meus Dashboards"
+        },
+        "executivo": {
+            "title": "Dashboard Executivo",
+            "description": "Metricas estrategicas em tempo real",
+            "kpi_sla_general": "SLA Geral",
+            "kpi_revenue": "Receita Total",
+            "kpi_compliance": "Taxa de Compliance",
+            "kpi_cost_per_service": "Custo por Servico"
+        },
+        "operacional": {
+            "title": "Dashboard Operacional",
+            "description": "Metricas operacionais e taticas",
+            "kpi_open_tickets": "Chamados Abertos",
+            "kpi_avg_resolution_time": "Tempo Medio Resolucao",
+            "kpi_resolution_rate": "Taxa de Resolucao",
+            "kpi_customer_cost": "Custo por Cliente"
+        },
+        "widgets": {
+            "refresh": "Atualizar",
+            "export_pdf": "Exportar PDF",
+            "export_excel": "Exportar Excel",
+            "drill_down": "Detalhar",
+            "filter": "Filtrar",
+            "add_widget": "Adicionar Widget"
+        },
+        "filters": {
+            "period": "Periodo",
+            "today": "Hoje",
+            "last_week": "Ultima Semana",
+            "last_month": "Ultimo Mes",
+            "ytd": "Ano ate Agora",
+            "custom_date": "Data Customizada",
+            "client": "Cliente",
+            "filial": "Filial",
+            "cost_center": "Centro de Custo",
+            "status": "Status",
+            "ticket_type": "Tipo de Chamado"
+        },
+        "alerts": {
+            "alert_title": "Alerta de KPI",
+            "level_green": "OK",
+            "level_yellow": "Aviso",
+            "level_red": "Critico",
+            "below_target": "KPI abaixo da meta",
+            "above_target": "KPI acima da meta",
+            "message_format": "{kpiName} em nível {level}: {value}{unit} (meta: {target}{unit})"
+        },
+        "messages": {
+            "success": "Dashboard salvo com sucesso",
+            "error_save": "Erro ao salvar dashboard",
+            "error_access": "Acesso negado a este dashboard",
+            "error_export": "Erro ao exportar dashboard",
+            "export_success": "Dashboard exportado com sucesso",
+            "no_data": "Nenhum dado disponivel para este dashboard"
+        },
+        "validation": {
+            "required_name": "Nome do dashboard obrigatorio",
+            "required_widgets": "Dashboard deve ter minimo 4 widgets",
+            "max_widgets": "Dashboard pode ter maximo 12 widgets",
+            "invalid_kpi": "KPI invalido"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Acesso a Dashboard | `DASHBOARD_ACCESS` | DashboardId, DashboardType, UserId, IpAddress, Timestamp |
+| Criacao de Dashboard | `DASHBOARD_CREATE` | DashboardId, Name, Widgets, CreatedBy, CreatedAt |
+| Atualizacao de Dashboard | `DASHBOARD_UPDATE` | DashboardId, OldState, NewState, UpdatedBy, UpdatedAt |
+| Exclusao de Dashboard | `DASHBOARD_DELETE` | DashboardId, DeletedBy, DeletedAt |
+| Export PDF | `DASHBOARD_EXPORT_PDF` | DashboardId, FileName, ExportedBy, ExportedAt, FiltersCopy |
+| Export Excel | `DASHBOARD_EXPORT_EXCEL` | DashboardId, FileName, ExportedBy, ExportedAt |
+| Alerta Disparado | `ALERT_TRIGGERED` | AlertId, KpiId, AlertLevel, CurrentValue, MetaValue, Timestamp |
+| KPI Configurado | `KPI_CONFIGURE` | KpiId, OldMeta, NewMeta, EffectiveFrom, ConfiguredBy |
+| Widget Adicionado | `WIDGET_ADDED` | DashboardId, WidgetId, WidgetType, Position |
+| Widget Removido | `WIDGET_REMOVED` | DashboardId, WidgetId |
+
+**Retencao**: 7 anos (conforme LGPD)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `dashboard:executivo:read` | Visualizar Dashboard Executivo | CEO, Director, VP |
+| `dashboard:executivo:configure` | Configurar Dashboard Executivo | CEO, VP |
+| `dashboard:operacional:read` | Visualizar Dashboard Operacional | Director, Manager, Supervisor |
+| `dashboard:operacional:configure` | Configurar Dashboard Operacional | Manager |
+| `dashboard:departamental:read` | Visualizar Dashboard Departamental | TeamLead, Analyst |
+| `dashboard:departamental:configure` | Configurar Dashboard Departamental | TeamLead |
+| `dashboard:pessoal:read` | Visualizar Dashboards Pessoais | All |
+| `dashboard:pessoal:create` | Criar novo Dashboard Pessoal | All |
+| `dashboard:export:pdf` | Exportar Dashboard como PDF | Manager+ |
+| `dashboard:export:excel` | Exportar Dashboard como Excel | Manager+ |
+| `dashboard:alert:create` | Criar alertas de KPI | Manager+ |
+| `dashboard:alert:receive` | Receber notificacoes de alerta | Manager+ |
+| `dashboard:kpi:read` | Visualizar definicoes de KPI | Manager+ |
+| `dashboard:kpi:configure` | Configurar KPIs e metas | VP, Director |
+| `dashboard:widget:edit` | Mover/editar widgets | Dashboard Owner |
+
+**Nota**: Permissoes sempre validam ClienteId do usuario contra ClienteId do dashboard.
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/dashboards` | Listar dashboards do cliente | `dashboard:*:read` |
+| GET | `/api/dashboards/{id}` | Obter dashboard por ID | `dashboard:{type}:read` |
+| POST | `/api/dashboards` | Criar novo dashboard | `dashboard:pessoal:create` |
+| PUT | `/api/dashboards/{id}` | Atualizar dashboard | `dashboard:{type}:configure` |
+| DELETE | `/api/dashboards/{id}` | Excluir dashboard | `dashboard:{type}:configure` |
+
+**Request/Response Exemplos**:
+
+```http
+POST /api/dashboards
+Content-Type: application/json
+
+{
+    "name": "Dashboard Operacional",
+    "description": "Metricas operacionais em tempo real",
+    "type": "Operacional",
+    "clienteId": "550e8400-e29b-41d4-a716-446655440000",
+    "widgets": [
+        {
+            "name": "Chamados Abertos",
+            "type": "Number",
+            "position": 0,
+            "kpiId": "123e4567-e89b-12d3-a456-426614174000",
+            "refreshInterval": 30
+        }
+    ]
+}
+
+HTTP/1.1 201 Created
+{
+    "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "name": "Dashboard Operacional",
+    "type": "Operacional",
+    "widgets": [...]
+}
+```
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/dashboards/{id}/data` | Obter dados atualizados do dashboard | `dashboard:{type}:read` |
+| GET | `/api/dashboards/{id}/widgets/{widgetId}/drill-down` | Detalhar widget | `dashboard:{type}:read` |
+| POST | `/api/dashboards/{id}/export/pdf` | Exportar como PDF com branding | `dashboard:export:pdf` |
+| POST | `/api/dashboards/{id}/export/excel` | Exportar como Excel | `dashboard:export:excel` |
+| GET | `/api/dashboards/{id}/alerts` | Obter alertas ativos do dashboard | `dashboard:alert:read` |
+| POST | `/api/dashboards/{id}/widgets/{widgetId}/position` | Reposicionar widget (drag-and-drop) | `dashboard:{type}:configure` |
+| DELETE | `/api/dashboards/{id}/widgets/{widgetId}` | Remover widget | `dashboard:{type}:configure` |
+| POST | `/api/dashboards/{id}/subscribe` | Subscrever a updates via SignalR | `dashboard:{type}:read` |
+| GET | `/api/kpis` | Listar KPIs disponiveis | `dashboard:kpi:read` |
+| POST | `/api/kpis` | Criar novo KPI | `dashboard:kpi:configure` |
+| PUT | `/api/kpis/{id}/meta` | Configurar meta de KPI | `dashboard:kpi:configure` |
+| POST | `/api/alerts/{id}/acknowledge` | Reconhecer alerta | `dashboard:alert:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Acesso a Dashboard Executivo
+
+```
+Usuario (CEO) acessa /dashboard/executivo
+    |
+    v
+Middleware valida ClienteId do usuario vs permissao "dashboard:executivo:read"
+    |
+    +--- Permissao negada? → HTTP 403 Forbidden
+    |
+    v (Permissao OK)
+Backend carrega Dashboard Executivo (4-6 widgets com KPIs estrategicos)
+    |
+    v
+Sistema conecta SignalR WebSocket ao cliente
+    |
+    v
+Frontend renderiza widgets (Chart.js para graficos)
+    |
+    v
+A cada 30 segundos, backend calcula KPIs atualizados
+    |
+    v
+Push dados via SignalR para todos os clientes conectados
+    |
+    +--- KPI saiu de meta? → Dispara Alerta (vermelho/amarelo)
+    |
+    v
+Usuario clica em widget para drill-down
+    |
+    v
+Sistema aplica filtro automaticamente e exibe proximo nivel
+    |
+    v
+Usuario clica "Exportar PDF"
+    |
+    v
+Sistema gera PDF com logo do cliente, data, dados
+    |
+    v
+Salva no Azure Blob Storage
+    |
+    v
+Retorna URL de download para cliente
+    |
+    v
+Auditoria registra: quem exportou, quando, que dados
+    |
+    v
+Done
+```
+
+### 6.2 Fluxo de Monitoramento de Alertas
+
+```
+Background Service monitora KPIs a cada 30 segundos
+    |
+    v
+Para cada KPI configurado:
+    +--- Calcula valor atual da metrica
+    |
+    v
+Compara contra meta configurada
+    |
+    +--- Valor >= 90% meta? → AlertLevel = Green
+    |
+    +--- 80-89% meta? → AlertLevel = Yellow
+    |
+    +--- < 80% meta? → AlertLevel = Red
+    |
+    v (Se mudou para Yellow/Red)
+Cria AlertEntity no banco
+    |
+    v
+Notifica via SignalR (push em tempo real)
+    |
+    v (Se Level = Red)
+Envia email para usuarios com permissao "dashboard:alert:receive"
+    |
+    v
+Auditoria registra alerta disparado
+    |
+    v
+Usuario reconhece alerta (POST /api/alerts/{id}/acknowledge)
+    |
+    v
+AlertEntity.IsActive = false
+    |
+    v
+Done
+```
+
+### 6.3 Fluxo de Configuracao de Meta de KPI
+
+```
+Usuario (Manager) acessa /settings/kpis
+    |
+    v
+Middleware valida permissao "dashboard:kpi:configure"
+    |
+    +--- Negada? → HTTP 403
+    |
+    v (OK)
+Sistema lista KPIs disponiveis
+    |
+    v
+Usuario seleciona KPI "Tempo Medio Resolucao"
+    |
+    v
+Formulario exibe:
+    - Nome: "Tempo Medio Resolucao"
+    - Meta atual: 4 horas
+    - Limites: 80% amarelo, 60% vermelho
+    - Data efetiva: hoje
+    |
+    v
+Usuario modifica meta para 3 horas, clica salvar
+    |
+    v
+POST /api/kpis/{id}/meta com NovaMetaValue=3
+    |
+    v
+Backend valida: nova meta > 0
+    |
+    v
+Cria KpiMetaEntity com EffectiveFrom=hoje
+    |
+    v
+Auditoria: KPI_META_UPDATED (oldMeta=4h, newMeta=3h)
+    |
+    v
+Resposta HTTP 200 OK
+    |
+    v
+A partir de hoje, KPI usa nova meta (3h)
+    |
+    v
+Dashboard Operacional automaticamente mostra novo valor de meta
+    |
+    v
+Done
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| **Autenticacao JWT** | Todos os endpoints requerem token JWT valido com ClienteId |
+| **RBAC Granular** | Permissoes por tipo de dashboard (executivo, operacional, departamental) |
+| **Validacao de ClienteId** | Multi-tenancy: usuario so ve dados do seu cliente |
+| **Validacao de Entrada** | FluentValidation em todos os commands |
+| **CORS Restritivo** | CORS so permite origem conhecida (frontend) |
+| **Rate Limiting** | Limita requisicoes por usuario (100 req/min) para evitar DoS |
+| **SQL Injection** | EF Core com parametros, nunca SQL raw |
+| **XSS Prevention** | Angular sanitiza HTML automaticamente |
+| **CSRF Protection** | CSRF tokens em POST/PUT/DELETE |
+| **Soft Delete (LGPD)** | Dados nunca sao fisicamente deletados, apenas marcados |
+| **Criptografia de Dados Sensıveis** | Campos como IpAddress com hash |
+| **Auditoria Completa** | Toda operacao registrada (acesso, export, alerta) |
+| **Retenção de Dados** | 7 anos conforme LGPD, depois soft-deleted automaticamente |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [x] SQL Injection em filtros dinamicos (ClienteId, DataRange)
+- [x] XSS em nomes de dashboards e widgets
+- [x] CSRF Protection em formularios de criacacao
+- [x] Validacao de permissoes RBAC granular
+- [x] Multi-tenancy: usuario de ClienteA nao acessa ClienteB
+- [x] Autenticacao JWT: token expirado rejeita requisicao
+- [x] Rate limiting: 101 requisicoes em 1 minuto retorna HTTP 429
+- [x] Logs de auditoria: acesso, export, alerta auditados
+- [x] LGPD: dados > 7 anos sao soft-deleted automaticamente
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao |
+|-----|------|---------|
+| SLA Geral | 95% | (Chamados resolvidos no SLA / Total chamados) * 100 |
+| Tempo Medio Resolucao | 4h | AVG(DataFechamento - DataAbertura) para Chamados |
+| Taxa de Resolucao | 90% | (Chamados Resolvidos / Total Chamados) * 100 |
+| Custo por Cliente | Variavel | SUM(Custo) / COUNT(Clientes) por periodo |
+| Taxa de Compliance | 98% | (Registros auditados OK / Total registros) * 100 |
+| Disponibilidade do Sistema | 99.9% | (Tempo ativo / Tempo total) * 100 |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| SLA em Risco (Amarelo) | SLA < 80% da meta | Email para Manager |
+| SLA Critico (Vermelho) | SLA < 60% da meta | Email + SMS para Director |
+| Tempo Resolucao Alto | Tempo medio > 80% da meta | Notificacao Dashboard |
+| Custo Elevado | Custo por cliente > 110% do budget | Email para CFO |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-099](./MD-RF099-Dashboards.md)
+2. **Casos de Uso**: Criar [UC-099](./UC-RF099-Dashboards.md)
+3. **Fluxos de Trabalho**: Criar [WF-099](./WF-RF099-Dashboards.md)
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml)
+5. **Implementacao Backend**: Commands/Queries/Handlers (CQRS + MediatR)
+6. **Implementacao Frontend**: Componentes Angular, Chart.js, SignalR
+7. **Testes**: Backend unit tests, Frontend E2E (Playwright)
+8. **Auditoria**: Validar conformidade com RF especifico
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial com 10 regras de negocio, 13+ endpoints, integrações e segurança | Claude Code |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code
+**Revisao**: Pendente
+**Status**: Draft

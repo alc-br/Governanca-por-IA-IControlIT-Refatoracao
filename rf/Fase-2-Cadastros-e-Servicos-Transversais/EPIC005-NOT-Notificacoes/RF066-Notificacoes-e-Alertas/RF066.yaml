@@ -1,0 +1,959 @@
+# ==============================================================================
+# RF066 - Notificações e Alertas
+# Versão: 2.0 (Governance v2.0 - Natural Language Only)
+# Data: 2025-12-30
+# ==============================================================================
+
+metadata:
+  rf_id: RF066
+  versao: "2.0"
+  data_criacao: "2025-12-30"
+  fase: Fase-2-Cadastros-e-Servicos-Transversais
+  epic: EPIC005-NOT-Notificacoes
+  titulo: Notificações e Alertas
+  modulo: Notificações
+  responsavel: Sistema IControlIT
+  status: documentado
+
+# ==============================================================================
+# SEÇÃO 1: VISÃO GERAL
+# ==============================================================================
+
+visao_geral:
+  objetivo: |
+    Permitir que o sistema IControlIT envie notificações e alertas automáticos
+    para usuários através de múltiplos canais de comunicação (E-mail, SMS, Push,
+    WhatsApp, In-App), com regras de priorização, agrupamento inteligente, retry
+    automático e rastreamento de entrega, garantindo que informações críticas
+    cheguem aos destinatários corretos no momento adequado.
+
+  importancia_estrategica:
+    - Aumentar engajamento dos usuários com o sistema através de notificações contextuais
+    - Reduzir tempo de resposta a eventos críticos (SLA vencendo, aprovações pendentes)
+    - Melhorar experiência do usuário com comunicação proativa ao invés de reativa
+    - Permitir escolha de canal de comunicação baseado em preferências individuais
+    - Garantir entrega redundante através de múltiplos canais simultâneos
+    - Reduzir carga de trabalho manual através de alertas automáticos baseados em eventos
+
+  escopo:
+    dentro_do_escopo:
+      - Envio de notificações multi-canal (E-mail, SMS, Push, WhatsApp, In-App)
+      - Processamento assíncrono de envios via Hangfire
+      - Retry automático com backoff exponencial para falhas de entrega
+      - Preferências de canal por usuário e por tipo de notificação
+      - Quiet hours (horários de silêncio) para notificações não urgentes
+      - Agrupamento inteligente de notificações similares em 30 minutos
+      - Digest diário (consolidação de notificações em e-mail único às 18h)
+      - Rate limiting (máximo 50 notificações por usuário por 24h)
+      - Rastreamento de entrega via webhooks de providers externos
+      - Quick actions (botões de ação direta dentro da notificação)
+      - Notificações de conformidade (obrigatórias, não podem ser desabilitadas)
+      - Histórico completo de notificações enviadas com métricas de abertura/clique
+      - Dashboard de métricas de notificações (taxa de entrega, abertura, conversão)
+      - Integração com RF063 (Templates de Notificações) para mensagens padronizadas
+
+    fora_do_escopo:
+      - Criação de templates de mensagens (coberto por RF063)
+      - Gerenciamento de contatos externos não cadastrados no sistema
+      - Notificações via canais não suportados (Telegram, Slack, Microsoft Teams)
+      - Análise de sentimento ou resposta automática a notificações
+      - Chatbots ou assistentes virtuais
+      - Integração com sistemas de CRM externos
+
+# ==============================================================================
+# SEÇÃO 2: FUNCIONALIDADES
+# ==============================================================================
+
+funcionalidades:
+  - id: F-NOT-066-01
+    nome: Enviar Notificação Multi-Canal
+    descricao: |
+      Permite ao sistema ou usuário autorizado enviar notificação para um ou
+      múltiplos destinatários através de um ou mais canais de comunicação
+      simultaneamente (E-mail, SMS, Push, WhatsApp, In-App).
+    atores:
+      - Sistema (automático via eventos)
+      - Administrador
+      - Gestor de Notificações
+    permissao_required: NOT.NOTIFICACOES.SEND
+    prioridade: Crítica
+    complexidade: Alta
+
+  - id: F-NOT-066-02
+    nome: Configurar Preferências de Canal por Usuário
+    descricao: |
+      Permite que cada usuário defina suas preferências de canal para cada tipo
+      de notificação (ex: SLA via E-mail + SMS, aprovações via In-App + Push,
+      relatórios via E-mail digest).
+    atores:
+      - Usuário comum
+      - Administrador (configurar em nome de outro usuário)
+    permissao_required: NOT.PREFERENCIAS.MANAGE
+    prioridade: Alta
+    complexidade: Média
+
+  - id: F-NOT-066-03
+    nome: Configurar Quiet Hours (Horários de Silêncio)
+    descricao: |
+      Permite definir horários em que notificações não urgentes devem ser
+      silenciadas (padrão 22h-8h), aplicado por usuário ou globalmente.
+    atores:
+      - Usuário comum (suas próprias quiet hours)
+      - Administrador (quiet hours globais)
+    permissao_required: NOT.QUIET_HOURS.MANAGE
+    prioridade: Média
+    complexidade: Baixa
+
+  - id: F-NOT-066-04
+    nome: Visualizar Histórico de Notificações
+    descricao: |
+      Permite consultar histórico completo de notificações enviadas/recebidas
+      com filtros por canal, tipo, período, status de entrega e usuário.
+    atores:
+      - Usuário comum (seu próprio histórico)
+      - Administrador (histórico de todos os usuários)
+      - Auditor
+    permissao_required: NOT.HISTORICO.VIEW
+    prioridade: Alta
+    complexidade: Média
+
+  - id: F-NOT-066-05
+    nome: Marcar Notificação como Lida/Não Lida
+    descricao: |
+      Permite marcar notificações in-app como lidas ou não lidas manualmente,
+      além da marcação automática ao abrir a notificação.
+    atores:
+      - Usuário comum
+    permissao_required: NOT.NOTIFICACOES.MARK_READ
+    prioridade: Baixa
+    complexidade: Baixa
+
+  - id: F-NOT-066-06
+    nome: Executar Quick Actions em Notificações
+    descricao: |
+      Permite executar ações rápidas diretamente da notificação sem abrir o
+      sistema (ex: "Aprovar", "Rejeitar", "Ver Detalhes", "Adiar").
+    atores:
+      - Usuário comum
+    permissao_required: "Herda da permissão da ação (ex: APV.APROVACOES.APPROVE)"
+    prioridade: Alta
+    complexidade: Alta
+
+  - id: F-NOT-066-07
+    nome: Configurar Agrupamento Inteligente
+    descricao: |
+      Permite configurar regras de agrupamento para consolidar múltiplas
+      notificações do mesmo tipo em uma única notificação agrupada se >5
+      notificações ocorrerem em janela de 30 minutos.
+    atores:
+      - Administrador
+      - Gestor de Notificações
+    permissao_required: NOT.AGRUPAMENTO.CONFIGURE
+    prioridade: Média
+    complexidade: Alta
+
+  - id: F-NOT-066-08
+    nome: Ativar/Desativar Digest Diário
+    descricao: |
+      Permite ativar modo digest onde ao invés de enviar notificações
+      individuais via e-mail, o sistema envia um único e-mail consolidado
+      diariamente às 18h com todas as notificações do dia.
+    atores:
+      - Usuário comum (seu próprio digest)
+      - Administrador (digest de outros usuários)
+    permissao_required: NOT.DIGEST.MANAGE
+    prioridade: Média
+    complexidade: Média
+
+  - id: F-NOT-066-09
+    nome: Rastrear Métricas de Entrega
+    descricao: |
+      Rastreia métricas de entrega através de webhooks dos providers externos
+      (SendGrid, Twilio, Firebase) incluindo: enviado, entregue, aberto,
+      clicado, bounced, spam.
+    atores:
+      - Sistema (automático via webhooks)
+      - Administrador (visualizar métricas)
+      - Auditor
+    permissao_required: NOT.METRICAS.VIEW
+    prioridade: Alta
+    complexidade: Alta
+
+  - id: F-NOT-066-10
+    nome: Configurar Retry Policy
+    descricao: |
+      Permite configurar política de retry automático para falhas de envio com
+      backoff exponencial (tentativas: imediata, +2min, +4min, +8min).
+    atores:
+      - Administrador
+      - Gestor de Notificações
+    permissao_required: NOT.RETRY.CONFIGURE
+    prioridade: Alta
+    complexidade: Média
+
+  - id: F-NOT-066-11
+    nome: Aplicar Rate Limiting
+    descricao: |
+      Aplica limite de 50 notificações por usuário por 24 horas para prevenir
+      spam, com exceção de notificações de conformidade obrigatórias.
+    atores:
+      - Sistema (automático)
+    permissao_required: null # Regra automática do sistema
+    prioridade: Crítica
+    complexidade: Média
+
+  - id: F-NOT-066-12
+    nome: Gerenciar Notificações de Conformidade
+    descricao: |
+      Permite marcar tipos de notificação como "obrigatórias" (conformidade)
+      que não podem ser desabilitadas pelo usuário e ignoram quiet hours e
+      rate limiting.
+    atores:
+      - Administrador
+      - Compliance Officer
+    permissao_required: NOT.COMPLIANCE.MANAGE
+    prioridade: Crítica
+    complexidade: Média
+
+  - id: F-NOT-066-13
+    nome: Dashboard de Métricas de Notificações
+    descricao: |
+      Exibe dashboard com métricas agregadas de notificações: total enviadas,
+      taxa de entrega, taxa de abertura, taxa de conversão (quick actions
+      executadas), notificações por canal, evolução temporal.
+    atores:
+      - Administrador
+      - Gestor de Notificações
+      - Auditor
+    permissao_required: NOT.DASHBOARD.VIEW
+    prioridade: Média
+    complexidade: Alta
+
+# ==============================================================================
+# SEÇÃO 3: REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: RN-NOT-066-01
+    titulo: Canais de Notificação Suportados
+    descricao: |
+      O sistema deve suportar exatamente 5 canais de notificação: E-mail (via
+      SMTP configurado), SMS (via API de provider externo como Twilio ou Nexmo),
+      Push Notifications (via Firebase Cloud Messaging para web push), WhatsApp
+      Business (via WhatsApp Business API) e In-App (via SignalR WebSocket).
+    motivacao: |
+      Permitir que usuários escolham o canal mais conveniente para cada tipo de
+      notificação, aumentando engajamento e garantindo entrega mesmo se um canal
+      falhar.
+    impacto: |
+      Backend deve implementar interface abstrata INotificationChannel com
+      implementações concretas para cada canal. Frontend deve permitir seleção
+      individual de canais nas preferências do usuário.
+
+  - id: RN-NOT-066-02
+    titulo: Níveis de Prioridade
+    descricao: |
+      Notificações devem ter exatamente 5 níveis de prioridade: Baixa, Normal,
+      Alta, Urgente, Crítica. Prioridade determina se notificação ignora quiet
+      hours (Urgente e Crítica ignoram) e ordem de processamento na fila.
+    motivacao: |
+      Garantir que notificações importantes sejam entregues imediatamente
+      enquanto notificações menos importantes respeitam horários de silêncio.
+    impacto: |
+      Sistema deve ter enum Prioridade no backend e lógica de processamento de
+      fila do Hangfire deve ordenar por prioridade.
+
+  - id: RN-NOT-066-03
+    titulo: Quiet Hours (Horários de Silêncio)
+    descricao: |
+      Notificações com prioridade Baixa ou Normal não devem ser enviadas durante
+      quiet hours configuradas pelo usuário (padrão 22h-8h). Notificações Urgentes
+      e Críticas ignoram quiet hours. Notificações acumuladas durante quiet hours
+      devem ser enviadas às 8h (fim do período de silêncio).
+    motivacao: |
+      Respeitar horários de descanso dos usuários e evitar fadiga de notificações.
+    impacto: |
+      Backend deve validar prioridade e horário antes de enviar, enfileirando
+      notificações para envio posterior se aplicável.
+
+  - id: RN-NOT-066-04
+    titulo: Agrupamento Inteligente
+    descricao: |
+      Se mais de 5 notificações do mesmo tipo para o mesmo usuário ocorrerem em
+      janela de 30 minutos, o sistema deve agrupar essas notificações em uma única
+      notificação consolidada com contador (ex: "Você tem 12 novas aprovações
+      pendentes").
+    motivacao: |
+      Reduzir fadiga de notificações e melhorar experiência do usuário quando há
+      múltiplas notificações similares.
+    impacto: |
+      Backend deve ter job que verifica notificações enfileiradas a cada 5 minutos
+      e agrupa quando aplicável.
+
+  - id: RN-NOT-066-05
+    titulo: Retry com Backoff Exponencial
+    descricao: |
+      Em caso de falha de envio (timeout, erro HTTP 5xx, provider offline), o
+      sistema deve tentar reenviar automaticamente seguindo backoff exponencial:
+      tentativa imediata, após 2 minutos, após 4 minutos, após 8 minutos. Após
+      4 tentativas, marcar como "Falha Permanente".
+    motivacao: |
+      Garantir máxima chance de entrega mesmo em caso de falhas temporárias de
+      providers externos.
+    impacto: |
+      Hangfire deve configurar jobs com retry policy customizado. Backend deve
+      registrar cada tentativa no histórico.
+
+  - id: RN-NOT-066-06
+    titulo: Rate Limiting (Anti-Spam)
+    descricao: |
+      Usuário não pode receber mais de 50 notificações em janela de 24 horas,
+      exceto notificações marcadas como "Conformidade Obrigatória". Se limite
+      for atingido, notificações adicionais devem ser descartadas e administrador
+      deve ser alertado.
+    motivacao: |
+      Prevenir spam acidental devido a loops ou bugs no sistema e proteger
+      usuários de sobrecarga.
+    impacto: |
+      Backend deve validar contador de notificações antes de enviar. Frontend
+      deve exibir aviso se usuário estiver próximo do limite.
+
+  - id: RN-NOT-066-07
+    titulo: Digest Diário
+    descricao: |
+      Usuário pode ativar modo "Digest" onde ao invés de receber e-mails
+      individuais, recebe um único e-mail consolidado diariamente às 18h com
+      todas as notificações do dia agrupadas por tipo. Digest não se aplica a
+      notificações Urgentes ou Críticas.
+    motivacao: |
+      Reduzir sobrecarga de e-mails para usuários que preferem revisar
+      notificações em lote.
+    impacto: |
+      Backend deve ter job agendado às 18h que busca notificações pendentes de
+      usuários com digest ativo e envia e-mail consolidado.
+
+  - id: RN-NOT-066-08
+    titulo: Rastreamento de Entrega
+    descricao: |
+      O sistema deve rastrear status de entrega de notificações via webhooks dos
+      providers externos (SendGrid para e-mail, Twilio para SMS, Firebase para
+      push). Status possíveis: Enfileirada, Enviada, Entregue, Aberta, Clicada,
+      Bounced, Spam, Falha.
+    motivacao: |
+      Permitir auditoria completa e métricas de efetividade de notificações.
+    impacto: |
+      Backend deve expor endpoints de webhook públicos (autenticados via token)
+      e processar eventos assincronamente via Azure Service Bus.
+
+  - id: RN-NOT-066-09
+    titulo: Quick Actions (Ações Rápidas)
+    descricao: |
+      Notificações podem conter até 3 botões de ação rápida (ex: "Aprovar",
+      "Rejeitar", "Ver Detalhes") que executam comandos backend sem abrir o
+      sistema. Quick actions devem respeitar permissões RBAC do usuário.
+    motivacao: |
+      Aumentar produtividade permitindo ações diretas da notificação.
+    impacto: |
+      Backend deve validar permissões antes de executar quick action. Frontend
+      (in-app) deve renderizar botões. E-mail/SMS devem conter links únicos com
+      tokens de ação.
+
+  - id: RN-NOT-066-10
+    titulo: Notificações de Conformidade (Obrigatórias)
+    descricao: |
+      Notificações marcadas como "Conformidade Obrigatória" não podem ser
+      desabilitadas pelo usuário, ignoram quiet hours, ignoram rate limiting e
+      têm prioridade máxima na fila.
+    motivacao: |
+      Garantir que notificações críticas de compliance (LGPD, auditoria,
+      segurança) sempre sejam entregues.
+    impacto: |
+      Backend deve ter flag booleana IsComplianceRequired na entidade Notificacao
+      e validar em todas as regras de negócio.
+
+  - id: RN-NOT-066-11
+    titulo: Integração com Templates (RF063)
+    descricao: |
+      Todas as notificações devem usar templates padronizados definidos no RF063
+      (Gestão de Templates de Notificações). Templates contêm placeholders que
+      são substituídos dinamicamente (ex: {{nomeUsuario}}, {{dataVencimento}}).
+    motivacao: |
+      Garantir consistência visual e de linguagem em todas as notificações,
+      facilitando manutenção e traduções (i18n).
+    impacto: |
+      Backend deve integrar com serviço de templates (TemplatesService) e
+      resolver placeholders antes de enviar notificação.
+
+  - id: RN-NOT-066-12
+    titulo: Multi-Tenancy (Isolamento por Empresa)
+    descricao: |
+      Notificações devem respeitar isolamento de multi-tenancy. Usuário só pode
+      visualizar notificações da(s) empresa(s) a que pertence. Administradores
+      globais podem visualizar notificações de todas as empresas.
+    motivacao: |
+      Garantir isolamento de dados entre empresas diferentes no sistema.
+    impacto: |
+      Backend deve filtrar queries por EmpresaId. Frontend deve validar escopo
+      de empresa no token JWT.
+
+  - id: RN-NOT-066-13
+    titulo: Auditoria de Notificações
+    descricao: |
+      Todas as notificações enviadas devem ser auditadas automaticamente
+      registrando: usuário destinatário, canal utilizado, horário de envio,
+      status de entrega, IP de origem (se manual), quick actions executadas.
+    motivacao: |
+      Garantir rastreabilidade completa para compliance e debugging.
+    impacto: |
+      Backend deve usar AuditInterceptor padrão do sistema. Tabela Notificacao
+      deve ter campos de auditoria (DataCriacao, UsuarioCriacaoId, etc.).
+
+  - id: RN-NOT-066-14
+    titulo: Internacionalização (i18n)
+    descricao: |
+      Notificações devem ser enviadas no idioma preferido do usuário destinatário
+      (pt-BR, en-US, es-ES). Templates devem ter versões traduzidas. Se tradução
+      não existir, fallback para pt-BR.
+    motivacao: |
+      Garantir experiência localizada para usuários de diferentes países.
+    impacto: |
+      Backend deve consultar idioma preferido do usuário e buscar template na
+      língua correta. Integração com i18n do RF063.
+
+  - id: RN-NOT-066-15
+    titulo: Processamento Assíncrono (Hangfire)
+    descricao: |
+      Envio de notificações deve SEMPRE ser assíncrono via jobs do Hangfire para
+      não bloquear requisições HTTP. Job deve processar envio, retry e registro
+      de métricas em background.
+    motivacao: |
+      Garantir performance do sistema mesmo com alto volume de notificações.
+    impacto: |
+      Backend deve enfileirar jobs Hangfire ao invés de enviar notificações
+      sincronamente. Endpoints HTTP devem retornar imediatamente após enfileirar.
+
+# ==============================================================================
+# SEÇÃO 4: INTEGRAÇÕES OBRIGATÓRIAS
+# ==============================================================================
+
+integracoes_obrigatorias:
+  central_funcionalidades:
+    required: true
+    chave: NOT.NOTIFICACOES
+    descricao: Módulo de Notificações e Alertas
+    permissoes_associadas:
+      - NOT.NOTIFICACOES.SEND
+      - NOT.NOTIFICACOES.VIEW
+      - NOT.NOTIFICACOES.MARK_READ
+      - NOT.PREFERENCIAS.MANAGE
+      - NOT.QUIET_HOURS.MANAGE
+      - NOT.HISTORICO.VIEW
+      - NOT.AGRUPAMENTO.CONFIGURE
+      - NOT.DIGEST.MANAGE
+      - NOT.METRICAS.VIEW
+      - NOT.RETRY.CONFIGURE
+      - NOT.COMPLIANCE.MANAGE
+      - NOT.DASHBOARD.VIEW
+
+  i18n:
+    required: true
+    idiomas_suportados:
+      - pt-BR
+      - en-US
+      - es-ES
+    fallback: pt-BR
+    chaves_principais:
+      - notificacoes.titulo
+      - notificacoes.mensagem_padrao
+      - notificacoes.canais.email
+      - notificacoes.canais.sms
+      - notificacoes.canais.push
+      - notificacoes.canais.whatsapp
+      - notificacoes.canais.inapp
+      - notificacoes.prioridades.baixa
+      - notificacoes.prioridades.normal
+      - notificacoes.prioridades.alta
+      - notificacoes.prioridades.urgente
+      - notificacoes.prioridades.critica
+      - notificacoes.preferencias.titulo
+      - notificacoes.quiet_hours.titulo
+      - notificacoes.historico.titulo
+      - notificacoes.dashboard.titulo
+
+  auditoria:
+    required: true
+    campos_auditados:
+      - DataCriacao
+      - UsuarioCriacaoId
+      - DataAlteracao
+      - UsuarioAlteracaoId
+      - IP
+    tabelas:
+      - Notificacao
+      - NotificacaoPreferencia
+      - NotificacaoHistorico
+
+  rbac:
+    required: true
+    matriz_permissoes:
+      # Permissões de envio de notificações
+      - permission_code: NOT.NOTIFICACOES.SEND
+        permission_name: Enviar Notificações
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+
+      # Permissões de visualização
+      - permission_code: NOT.NOTIFICACOES.VIEW
+        permission_name: Visualizar Notificações
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+          - Usuário Comum
+
+      # Permissões de marcação de leitura
+      - permission_code: NOT.NOTIFICACOES.MARK_READ
+        permission_name: Marcar Notificações como Lida
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+          - Usuário Comum
+
+      # Permissões de preferências
+      - permission_code: NOT.PREFERENCIAS.MANAGE
+        permission_name: Gerenciar Preferências de Notificações
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+          - Usuário Comum
+
+      # Permissões de quiet hours
+      - permission_code: NOT.QUIET_HOURS.MANAGE
+        permission_name: Gerenciar Horários de Silêncio
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+          - Usuário Comum
+
+      # Permissões de histórico
+      - permission_code: NOT.HISTORICO.VIEW
+        permission_name: Visualizar Histórico de Notificações
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+          - Auditor
+          - Usuário Comum
+
+      # Permissões de agrupamento
+      - permission_code: NOT.AGRUPAMENTO.CONFIGURE
+        permission_name: Configurar Agrupamento de Notificações
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+
+      # Permissões de digest
+      - permission_code: NOT.DIGEST.MANAGE
+        permission_name: Gerenciar Digest Diário
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+          - Usuário Comum
+
+      # Permissões de métricas
+      - permission_code: NOT.METRICAS.VIEW
+        permission_name: Visualizar Métricas de Notificações
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+          - Auditor
+
+      # Permissões de retry
+      - permission_code: NOT.RETRY.CONFIGURE
+        permission_name: Configurar Política de Retry
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+
+      # Permissões de conformidade
+      - permission_code: NOT.COMPLIANCE.MANAGE
+        permission_name: Gerenciar Notificações de Conformidade
+        roles:
+          - Super Admin
+          - Administrador
+          - Compliance Officer
+
+      # Permissões de dashboard
+      - permission_code: NOT.DASHBOARD.VIEW
+        permission_name: Visualizar Dashboard de Notificações
+        roles:
+          - Super Admin
+          - Administrador
+          - Gestor de Notificações
+          - Auditor
+
+# ==============================================================================
+# SEÇÃO 5: MODELO DE DADOS
+# ==============================================================================
+
+modelo_dados:
+  tabelas_principais:
+    - nome: Notificacao
+      descricao: Armazena notificações enviadas/enfileiradas
+      campos_criticos:
+        - Id (Guid, PK)
+        - UsuarioDestinatarioId (Guid, FK Usuario)
+        - "Tipo (string, ex: SLA_VENCENDO, APROVACAO_PENDENTE)"
+        - Titulo (string, 200 chars)
+        - Mensagem (string, 2000 chars)
+        - "Prioridade (enum: Baixa, Normal, Alta, Urgente, Critica)"
+        - "CanaisUtilizados (JSON array: [Email, SMS, Push])"
+        - "Status (enum: Enfileirada, Enviada, Entregue, Aberta, Falha)"
+        - IsComplianceRequired (bool, default false)
+        - QuickActions (JSON array de botões)
+        - DataEnvio (DateTime nullable)
+        - DataEntrega (DateTime nullable)
+        - DataAbertura (DateTime nullable)
+        - NumeroTentativas (int, default 0)
+        - EmpresaId (Guid, multi-tenancy)
+        - DataCriacao, UsuarioCriacaoId (auditoria)
+
+    - nome: NotificacaoPreferencia
+      descricao: Preferências de canal por usuário e tipo de notificação
+      campos_criticos:
+        - Id (Guid, PK)
+        - UsuarioId (Guid, FK Usuario)
+        - "TipoNotificacao (string, ex: SLA_VENCENDO)"
+        - "CanaisAtivados (JSON array: [Email, InApp])"
+        - DigestAtivo (bool, default false)
+        - "QuietHoursInicio (TimeSpan, default 22:00)"
+        - "QuietHoursFim (TimeSpan, default 08:00)"
+        - EmpresaId (Guid, multi-tenancy)
+        - DataCriacao, UsuarioCriacaoId (auditoria)
+
+    - nome: NotificacaoHistorico
+      descricao: Histórico de eventos de notificação (envio, entrega, abertura)
+      campos_criticos:
+        - Id (Guid, PK)
+        - NotificacaoId (Guid, FK Notificacao)
+        - "Evento (enum: Enfileirada, Enviada, Entregue, Aberta, Clicada, Bounced, Spam, Falha)"
+        - "Canal (enum: Email, SMS, Push, WhatsApp, InApp)"
+        - ProviderResponse (JSON, resposta do provider externo)
+        - DataEvento (DateTime)
+        - EmpresaId (Guid, multi-tenancy)
+
+    - nome: NotificacaoMetrica
+      descricao: Métricas agregadas de notificações (taxa de abertura, conversão)
+      campos_criticos:
+        - Id (Guid, PK)
+        - Data (Date)
+        - TotalEnviadas (int)
+        - TotalEntregues (int)
+        - TotalAbertas (int)
+        - TotalClicadas (int)
+        - TotalBounced (int)
+        - TotalSpam (int)
+        - TotalFalhas (int)
+        - TaxaEntrega (decimal, calculado)
+        - TaxaAbertura (decimal, calculado)
+        - TaxaConversao (decimal, calculado)
+        - EmpresaId (Guid, multi-tenancy)
+
+# ==============================================================================
+# SEÇÃO 6: ENDPOINTS REST API
+# ==============================================================================
+
+endpoints_api:
+  - metodo: POST
+    rota: /api/notificacoes
+    descricao: Envia nova notificação (enfileira job Hangfire)
+    permissao: NOT.NOTIFICACOES.SEND
+    payload:
+      - usuarioDestinatarioIds (array de Guid)
+      - tipo (string)
+      - titulo (string)
+      - mensagem (string)
+      - prioridade (enum)
+      - canais (array de string)
+      - quickActions (array opcional)
+      - isComplianceRequired (bool)
+    resposta: NotificacaoDto com Id e status "Enfileirada"
+
+  - metodo: GET
+    rota: /api/notificacoes
+    descricao: Lista notificações do usuário autenticado
+    permissao: NOT.NOTIFICACOES.VIEW
+    query_params:
+      - canal (opcional)
+      - tipo (opcional)
+      - dataInicio (opcional)
+      - dataFim (opcional)
+      - status (opcional)
+      - pageNumber (int)
+      - pageSize (int)
+    resposta: Paginação de NotificacaoDto
+
+  - metodo: GET
+    rota: /api/notificacoes/{id}
+    descricao: Obtém notificação específica por ID
+    permissao: NOT.NOTIFICACOES.VIEW
+    resposta: NotificacaoDto
+
+  - metodo: PATCH
+    rota: /api/notificacoes/{id}/marcar-lida
+    descricao: Marca notificação como lida
+    permissao: NOT.NOTIFICACOES.MARK_READ
+    resposta: 204 No Content
+
+  - metodo: GET
+    rota: /api/notificacoes/preferencias
+    descricao: Obtém preferências de notificação do usuário
+    permissao: NOT.PREFERENCIAS.MANAGE
+    resposta: NotificacaoPreferenciaDto
+
+  - metodo: PUT
+    rota: /api/notificacoes/preferencias
+    descricao: Atualiza preferências de notificação
+    permissao: NOT.PREFERENCIAS.MANAGE
+    payload: NotificacaoPreferenciaDto
+    resposta: NotificacaoPreferenciaDto atualizado
+
+  - metodo: GET
+    rota: /api/notificacoes/historico
+    descricao: Obtém histórico de eventos de notificações
+    permissao: NOT.HISTORICO.VIEW
+    query_params:
+      - notificacaoId (opcional)
+      - evento (opcional)
+      - canal (opcional)
+      - dataInicio (opcional)
+      - dataFim (opcional)
+    resposta: Array de NotificacaoHistoricoDto
+
+  - metodo: GET
+    rota: /api/notificacoes/dashboard
+    descricao: Obtém métricas agregadas de notificações
+    permissao: NOT.DASHBOARD.VIEW
+    query_params:
+      - dataInicio
+      - dataFim
+    resposta: NotificacaoDashboardDto com métricas agregadas
+
+  - metodo: POST
+    rota: /api/notificacoes/{id}/quick-action
+    descricao: Executa quick action de notificação
+    permissao: "Herda da ação (ex: APV.APROVACOES.APPROVE)"
+    payload:
+      - actionId (string)
+      - parameters (JSON opcional)
+    resposta: 200 OK com resultado da ação
+
+  - metodo: POST
+    rota: /api/notificacoes/webhooks/sendgrid
+    descricao: Webhook para eventos SendGrid (e-mail)
+    permissao: null # Autenticado via token secreto
+    payload: SendGrid Event Webhook formato
+    resposta: 200 OK
+
+  - metodo: POST
+    rota: /api/notificacoes/webhooks/twilio
+    descricao: Webhook para eventos Twilio (SMS)
+    permissao: null # Autenticado via token secreto
+    payload: Twilio Status Callback formato
+    resposta: 200 OK
+
+  - metodo: POST
+    rota: /api/notificacoes/webhooks/firebase
+    descricao: Webhook para eventos Firebase (Push)
+    permissao: null # Autenticado via token secreto
+    payload: Firebase Cloud Messaging formato
+    resposta: 200 OK
+
+# ==============================================================================
+# SEÇÃO 7: TECNOLOGIAS E DEPENDÊNCIAS
+# ==============================================================================
+
+tecnologias:
+  backend:
+    - .NET 10
+    - Entity Framework Core 10
+    - Hangfire (background jobs)
+    - SignalR (real-time in-app notifications)
+    - Azure Service Bus (webhook event processing)
+    - SendGrid SDK (e-mail)
+    - Twilio SDK (SMS)
+    - Firebase Admin SDK (push notifications)
+    - WhatsApp Business API Client
+
+  frontend:
+    - Angular 19
+    - Transloco (i18n)
+    - SignalR Client (receber notificações in-app)
+    - Service Worker (push notifications web)
+
+  external_providers:
+    - SendGrid (e-mail delivery + webhooks)
+    - Twilio ou Nexmo (SMS delivery + webhooks)
+    - Firebase Cloud Messaging (web push + webhooks)
+    - WhatsApp Business API (mensagens transacionais)
+
+# ==============================================================================
+# SEÇÃO 8: REQUISITOS NÃO FUNCIONAIS
+# ==============================================================================
+
+requisitos_nao_funcionais:
+  performance:
+    - Envio de notificação deve enfileirar job em <200ms
+    - Job de envio deve processar notificação em <5s por canal
+    - Dashboard de métricas deve carregar em <2s
+    - SignalR deve entregar notificação in-app em <1s
+
+  escalabilidade:
+    - Sistema deve suportar 10.000 notificações/hora
+    - Hangfire deve processar jobs em paralelo (mínimo 5 workers)
+    - SignalR deve suportar 1.000 conexões simultâneas
+
+  confiabilidade:
+    - Retry automático deve garantir 99.5% de taxa de entrega
+    - Webhooks devem ser idempotentes (processar evento duplicado sem efeito colateral)
+    - Sistema deve continuar funcionando se um provider externo estiver offline
+
+  seguranca:
+    - Webhooks externos devem ser autenticados via token secreto
+    - Quick action links devem ter token único de uso único com expiração de 24h
+    - "Notificações sensíveis devem ter campos criptografados (ex: dados financeiros)"
+
+  usabilidade:
+    - Preferências de notificação devem ter valores padrão sensatos
+    - Quiet hours padrão devem ser 22h-8h
+    - Digest padrão desabilitado
+
+# ==============================================================================
+# SEÇÃO 9: DEPENDÊNCIAS E IMPACTOS
+# ==============================================================================
+
+dependencias:
+  rf_dependentes:
+    - codigo: RF063
+      titulo: Gestão de Templates de Notificações
+      motivo: Notificações utilizam templates padronizados definidos no RF063
+      tipo: CRÍTICA
+
+    - codigo: RF001
+      titulo: Gestão de Usuários
+      motivo: Notificações são enviadas para usuários cadastrados
+      tipo: CRÍTICA
+
+    - codigo: RF002
+      titulo: Gestão de Empresas
+      motivo: Multi-tenancy isolamento por empresa
+      tipo: CRÍTICA
+
+    - codigo: RF003
+      titulo: Gestão de Permissões (RBAC)
+      motivo: Quick actions respeitam permissões RBAC
+      tipo: CRÍTICA
+
+  rf_impactados:
+    - codigo: RF070
+      titulo: Gestão de SLA
+      motivo: Envia notificações quando SLA está vencendo
+      tipo: ALTA
+
+    - codigo: RF071
+      titulo: Gestão de Aprovações
+      motivo: Envia notificações de aprovações pendentes
+      tipo: ALTA
+
+    - codigo: RF072
+      titulo: Gestão de Relatórios Agendados
+      motivo: Envia notificações quando relatório está pronto
+      tipo: MÉDIA
+
+# ==============================================================================
+# SEÇÃO 10: CRITÉRIOS DE ACEITE
+# ==============================================================================
+
+criterios_aceite:
+  backend:
+    - Todas as 15 regras de negócio implementadas
+    - Hangfire configurado com retry policy exponencial
+    - SignalR hub implementado para notificações in-app
+    - 5 implementações de INotificationChannel (Email, SMS, Push, WhatsApp, InApp)
+    - Webhooks configurados para SendGrid, Twilio, Firebase
+    - Rate limiting funcionando (50 notificações/24h)
+    - Quiet hours respeitadas para prioridades Baixa/Normal
+    - Agrupamento inteligente funcionando (>5 notificações em 30min)
+    - Digest diário enviado às 18h
+    - Multi-tenancy isolamento garantido
+    - Auditoria automática funcionando
+    - Testes unitários com cobertura >80%
+    - Testes de integração com providers mockados
+
+  frontend:
+    - Tela de preferências de notificações implementada
+    - Centro de notificações in-app com contador de não lidas
+    - SignalR client conectando e recebendo notificações real-time
+    - Quick actions renderizando botões funcionais
+    - Histórico de notificações com filtros
+    - Dashboard de métricas com gráficos
+    - Quiet hours configurável via UI
+    - Digest ativável/desativável via toggle
+    - Tradução completa (pt-BR, en-US, es-ES)
+    - Testes E2E com Playwright cobrindo fluxos principais
+
+  testes:
+    - "Bateria Backend: 100% RNs validadas"
+    - "Bateria Sistema: Fluxos E2E completos"
+    - "Bateria Outros: Webhooks, retry policy, rate limiting"
+    - "Testes de carga: 10.000 notificações/hora"
+
+# ==============================================================================
+# SEÇÃO 11: CENTRAL DE FUNCIONALIDADES
+# ==============================================================================
+
+central_funcionalidades:
+  chave: NOT.NOTIFICACOES
+  nome: Notificações e Alertas
+  descricao: |
+    Módulo de envio de notificações multi-canal com suporte a E-mail, SMS, Push,
+    WhatsApp e In-App. Inclui agrupamento inteligente, retry automático, quiet
+    hours, digest diário, rate limiting e rastreamento de métricas.
+  icone: notifications
+  categoria: Comunicação
+  ordem: 500
+  ativo: true
+  sub_funcionalidades:
+    - chave: NOT.NOTIFICACOES.SEND
+      nome: Enviar Notificações
+      descricao: Enviar notificações multi-canal
+      ordem: 1
+
+    - chave: NOT.PREFERENCIAS.MANAGE
+      nome: Preferências de Notificações
+      descricao: Configurar canais e horários preferidos
+      ordem: 2
+
+    - chave: NOT.HISTORICO.VIEW
+      nome: Histórico de Notificações
+      descricao: Visualizar histórico completo de notificações
+      ordem: 3
+
+    - chave: NOT.DASHBOARD.VIEW
+      nome: Dashboard de Métricas
+      descricao: Visualizar métricas de entrega e engajamento
+      ordem: 4
+
+    - chave: NOT.COMPLIANCE.MANAGE
+      nome: Notificações de Conformidade
+      descricao: Gerenciar notificações obrigatórias
+      ordem: 5

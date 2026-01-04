@@ -1,0 +1,625 @@
+# RF055 - Gestão de Rateio de Custos
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Visão Geral
+Sistema de rateio automático e manual de custos de telecom/TI entre centros de custo, departamentos, projetos e filiais. Suporta múltiplas regras de rateio (fixo, proporcional, por uso real), simulação antes de aplicar, histórico completo e integração com sistemas de contabilidade (SAP, TOTVS).
+
+### 1.2 Importância Estratégica
+- **Transparência:** Visibilidade clara de custos por área/projeto
+- **Justiça:** Cobrar cada área proporcionalmente ao uso real
+- **Controle:** Reduzir 30-40% de custos com visibilidade
+- **Automação:** Eliminar rateios manuais mensais (economia 80h/mês)
+- **Integração:** Export direto para ERP contábil
+
+### 1.3 Funcionalidades Principais
+
+1. **Configuração de Regras de Rateio**
+   - Rateio fixo (ex: 40% Vendas, 30% Marketing, 30% TI)
+   - Rateio proporcional por headcount
+   - Rateio por uso real (minutos, dados, licenças)
+   - Rateio por projetos com datas início/fim
+
+2. **Processamento Automático Mensal**
+   - Job automático dia 5 de cada mês
+   - Aplicação de regras configuradas
+   - Validação de totalizações (100%)
+   - Geração de relatórios por centro de custo
+
+3. **Simulação de Cenários**
+   - Simular rateio antes de aplicar
+   - Comparar diferentes regras
+   - Análise de impacto por mudança de regra
+   - Gráficos de distribuição
+
+4. **Integração Contábil**
+   - Export para SAP (BAPI)
+   - Export para TOTVS Protheus (REST API)
+   - Export para Conta Azul
+   - Formato CSV padronizado
+
+5. **Auditoria e Compliance**
+   - Histórico completo 7 anos
+   - Comparativo mês a mês
+   - Aprovação antes de enviar para contabilidade
+   - Log de todas as alterações
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN001: Tipos de Rateio Suportados
+**Descrição:** Sistema deve suportar 4 tipos de rateio configuráveis.
+
+**Tipos:**
+1. **Fixo:** Percentuais fixos por centro de custo
+2. **Proporcional Headcount:** Baseado em número de colaboradores
+3. **Uso Real:** Baseado em consumo medido (minutos, MB, licenças)
+4. **Por Projeto:** Rateio temporário para projetos específicos
+
+**Implementação:**
+```csharp
+public enum TipoRateio
+{
+    Fixo,
+    ProporcionalHeadcount,
+    UsoReal,
+    PorProjeto
+}
+
+public abstract class RegraRateio
+{
+    public TipoRateio Tipo { get; set; }
+    public abstract Dictionary<string, decimal> Calcular(decimal valorTotal);
+}
+
+public class RateioFixo : RegraRateio
+{
+    public Dictionary<string, decimal> Percentuais { get; set; } // CentroCusto → %
+
+    public override Dictionary<string, decimal> Calcular(decimal valorTotal)
+    {
+        return Percentuais.ToDictionary(
+            p => p.Key,
+            p => valorTotal * (p.Value / 100m)
+        );
+    }
+}
+```
+
+---
+
+### RN002: Validação de Totalização 100%
+**Descrição:** Soma dos percentuais de rateio fixo deve ser exatamente 100%.
+
+**Justificativa:** Evitar valores perdidos ou duplicados.
+
+**Implementação:**
+```csharp
+public async Task<Result> ValidarRegraRateio(RegraRateio regra)
+{
+    if (regra is RateioFixo fixo)
+    {
+        var soma = fixo.Percentuais.Values.Sum();
+        if (Math.Abs(soma - 100m) > 0.01m)
+            return Result.Failure($"Soma dos percentuais {soma}% diferente de 100%");
+    }
+
+    return Result.Success();
+}
+```
+
+---
+
+### RN003: Processamento Automático Mensal
+**Descrição:** Todo dia 5 às 03:00, processar rateio do mês anterior.
+
+**Justificativa:** Automatizar processo manual, garantir consistência.
+
+**Implementação:**
+```csharp
+[Hangfire.RecurringJob("0 3 5 * *")] // Dia 5, 03:00
+public async Task ProcessarRateioMensal()
+{
+    var mesAnterior = DateTime.Today.AddMonths(-1);
+    var inicio = new DateTime(mesAnterior.Year, mesAnterior.Month, 1);
+    var fim = inicio.AddMonths(1).AddDays(-1);
+
+    // Buscar todos os custos do mês
+    var custos = await _context.Custos
+        .Where(c => c.DataReferencia >= inicio && c.DataReferencia <= fim)
+        .ToListAsync();
+
+    var totalCustos = custos.Sum(c => c.Valor);
+
+    // Aplicar regras de rateio ativas
+    var regras = await _context.RegrasRateio
+        .Where(r => r.Ativa && r.DataInicioVigencia <= fim)
+        .ToListAsync();
+
+    foreach (var regra in regras)
+    {
+        var rateado = regra.Calcular(totalCustos);
+        await SalvarRateio(mesAnterior, regra, rateado);
+    }
+
+    // Notificar gestores
+    await NotificarRateioConcluido(mesAnterior);
+}
+```
+
+---
+
+### RN004: Rateio Proporcional por Headcount
+**Descrição:** Distribuir custos proporcionalmente ao número de funcionários por centro de custo.
+
+**Justificativa:** Métrica justa quando não há medição de uso individual.
+
+**Implementação:**
+```csharp
+public class RateioProporcionalHeadcount : RegraRateio
+{
+    public override Dictionary<string, decimal> Calcular(decimal valorTotal)
+    {
+        // Buscar headcount por centro de custo
+        var headcounts = _context.Funcionarios
+            .Where(f => f.Ativo)
+            .GroupBy(f => f.CentroCusto)
+            .Select(g => new { CentroCusto = g.Key, Total = g.Count() })
+            .ToList();
+
+        var totalFunc = headcounts.Sum(h => h.Total);
+
+        return headcounts.ToDictionary(
+            h => h.CentroCusto,
+            h => valorTotal * (h.Total / (decimal)totalFunc)
+        );
+    }
+}
+```
+
+---
+
+### RN005: Rateio por Uso Real
+**Descrição:** Distribuir custos baseado em consumo medido (minutos, MB de dados).
+
+**Justificativa:** Máxima justiça: quem consome mais, paga mais.
+
+**Implementação:**
+```csharp
+public class RateioUsoReal : RegraRateio
+{
+    public string TipoConsumo { get; set; } // "MINUTOS", "DADOS_MB", "LICENCAS"
+
+    public override Dictionary<string, decimal> Calcular(decimal valorTotal)
+    {
+        var consumos = _context.Consumos
+            .Where(c => c.Tipo == TipoConsumo && c.Periodo == _periodoAtual)
+            .GroupBy(c => c.CentroCusto)
+            .Select(g => new { CentroCusto = g.Key, Total = g.Sum(x => x.Quantidade) })
+            .ToList();
+
+        var totalConsumo = consumos.Sum(c => c.Total);
+
+        return consumos.ToDictionary(
+            c => c.CentroCusto,
+            c => valorTotal * (c.Total / totalConsumo)
+        );
+    }
+}
+```
+
+---
+
+### RN006: Simulação Antes de Aplicar
+**Descrição:** Permitir simular rateio com diferentes regras antes de aplicar definitivamente.
+
+**Justificativa:** Evitar erros, testar cenários.
+
+**Implementação:**
+```csharp
+public async Task<SimulacaoRateio> Simular(Guid regraId, DateTime periodo)
+{
+    var regra = await _context.RegrasRateio.FindAsync(regraId);
+    var custos = await ObterCustosPeriodo(periodo);
+    var totalCustos = custos.Sum(c => c.Valor);
+
+    var rateado = regra.Calcular(totalCustos);
+
+    return new SimulacaoRateio
+    {
+        Periodo = periodo,
+        ValorTotal = totalCustos,
+        Distribuicao = rateado,
+        GraficoDistribuicao = GerarGrafico(rateado)
+    };
+}
+```
+
+---
+
+### RN007: Aprovação Antes de Enviar para Contabilidade
+**Descrição:** Rateio processado deve ser aprovado por gestor antes de export para ERP.
+
+**Justificativa:** Revisão humana, evitar lançamentos incorretos.
+
+**Implementação:**
+```csharp
+public async Task<Result> AprovarRateio(Guid rateioId, Guid aprovadorId)
+{
+    var rateio = await _context.Rateios.FindAsync(rateioId);
+
+    if (rateio.Status != "PROCESSADO")
+        return Result.Failure("Apenas rateios processados podem ser aprovados");
+
+    rateio.Status = "APROVADO";
+    rateio.AprovadorId = aprovadorId;
+    rateio.DataAprovacao = DateTime.UtcNow;
+
+    await _context.SaveChangesAsync();
+
+    // Liberar para export contábil
+    await _integracaoContabilService.EnviarRateio(rateio);
+
+    return Result.Success();
+}
+```
+
+---
+
+### RN008: Histórico de Alterações de Regras
+**Descrição:** Todas as mudanças em regras de rateio devem ser versionadas com vigência.
+
+**Justificativa:** Rastreabilidade, auditoria.
+
+**Implementação:**
+```csharp
+public async Task AlterarRegraRateio(Guid regraId, Dictionary<string, decimal> novosPercentuais)
+{
+    var regraAtual = await _context.RegrasRateio.FindAsync(regraId);
+
+    // Arquivar versão atual
+    var historico = new RegraRateioHistorico
+    {
+        RegraId = regraId,
+        Versao = regraAtual.Versao,
+        Percentuais = regraAtual.Percentuais,
+        DataInicioVigencia = regraAtual.DataInicioVigencia,
+        DataFimVigencia = DateTime.Today.AddDays(-1),
+        UsuarioAlteracaoId = _currentUser.Id
+    };
+
+    _context.RegrasRateioHistorico.Add(historico);
+
+    // Criar nova versão
+    regraAtual.Percentuais = novosPercentuais;
+    regraAtual.Versao++;
+    regraAtual.DataInicioVigencia = DateTime.Today;
+
+    await _context.SaveChangesAsync();
+}
+```
+
+---
+
+### RN009: Rateio por Projeto com Data de Vigência
+**Descrição:** Projetos temporários podem ter rateio específico com início/fim.
+
+**Justificativa:** Alocação correta de custos em projetos limitados no tempo.
+
+**Implementação:**
+```csharp
+public class RateioPorProjeto : RegraRateio
+{
+    public Guid ProjetoId { get; set; }
+    public DateTime DataInicio { get; set; }
+    public DateTime DataFim { get; set; }
+    public decimal PercentualAlocado { get; set; }
+
+    public override Dictionary<string, decimal> Calcular(decimal valorTotal)
+    {
+        if (DateTime.Today < DataInicio || DateTime.Today > DataFim)
+            return new Dictionary<string, decimal>(); // Projeto fora de vigência
+
+        var valorProjeto = valorTotal * (PercentualAlocado / 100m);
+        var valorRestante = valorTotal - valorProjeto;
+
+        // Ratear restante entre centros de custo padrão
+        var rateado = new Dictionary<string, decimal>
+        {
+            { $"PROJETO-{ProjetoId}", valorProjeto }
+        };
+
+        // Distribuir restante proporcionalmente
+        // ...
+
+        return rateado;
+    }
+}
+```
+
+---
+
+### RN010: Comparativo Mensal
+**Descrição:** Gerar relatório comparando rateio do mês atual vs mês anterior.
+
+**Justificativa:** Identificar variações anormais, tendências.
+
+**Implementação:**
+```csharp
+public async Task<ComparativoRateio> GerarComparativo(DateTime mesAtual)
+{
+    var mesAnterior = mesAtual.AddMonths(-1);
+
+    var rateioAtual = await ObterRateio(mesAtual);
+    var rateioAnterior = await ObterRateio(mesAnterior);
+
+    var comparativo = new ComparativoRateio();
+
+    foreach (var centroCusto in rateioAtual.Keys)
+    {
+        var valorAtual = rateioAtual[centroCusto];
+        var valorAnterior = rateioAnterior.GetValueOrDefault(centroCusto, 0m);
+        var variacao = valorAtual - valorAnterior;
+        var percentualVariacao = valorAnterior > 0 ? (variacao / valorAnterior) * 100m : 0m;
+
+        comparativo.Itens.Add(new ItemComparativo
+        {
+            CentroCusto = centroCusto,
+            ValorAtual = valorAtual,
+            ValorAnterior = valorAnterior,
+            Variacao = variacao,
+            PercentualVariacao = percentualVariacao,
+            Alerta = Math.Abs(percentualVariacao) > 20 // Alerta se variação > 20%
+        });
+    }
+
+    return comparativo;
+}
+```
+
+---
+
+### RN011: Export para SAP
+**Descrição:** Exportar rateios aprovados para SAP via BAPI.
+
+**Justificativa:** Integração com sistema contábil corporativo.
+
+**Implementação:**
+```csharp
+public async Task ExportarParaSAP(Guid rateioId)
+{
+    var rateio = await _context.Rateios
+        .Include(r => r.Itens)
+        .FirstAsync(r => r.Id == rateioId);
+
+    if (rateio.Status != "APROVADO")
+        throw new InvalidOperationException("Apenas rateios aprovados podem ser exportados");
+
+    var lancamentos = rateio.Itens.Select(item => new LancamentoSAP
+    {
+        CentroCusto = item.CentroCusto,
+        ContaContabil = "6.1.1.01.001", // Despesas Telecom
+        Valor = item.Valor,
+        DataLancamento = rateio.Periodo,
+        Documento = rateio.Numero,
+        Texto = $"Rateio Telecom {rateio.Periodo:MM/yyyy}"
+    }).ToList();
+
+    await _sapService.EnviarLancamentos(lancamentos);
+
+    rateio.Status = "EXPORTADO";
+    rateio.DataExportacao = DateTime.UtcNow;
+    await _context.SaveChangesAsync();
+}
+```
+
+---
+
+### RN012: Rateio Multinível
+**Descrição:** Suportar rateio em cascata (empresa → diretoria → departamento → projeto).
+
+**Justificativa:** Estruturas organizacionais complexas.
+
+**Implementação:**
+```csharp
+public class RateioMultinivel
+{
+    public List<NivelRateio> Niveis { get; set; }
+}
+
+public class NivelRateio
+{
+    public int Ordem { get; set; }
+    public string TipoNivel { get; set; } // "EMPRESA", "DIRETORIA", "DEPARTAMENTO", "PROJETO"
+    public RegraRateio Regra { get; set; }
+}
+
+public async Task<Dictionary<string, decimal>> ProcessarMultinivel(RateioMultinivel multinivel, decimal valorTotal)
+{
+    var resultado = new Dictionary<string, decimal>();
+    var valorAtual = valorTotal;
+
+    foreach (var nivel in multinivel.Niveis.OrderBy(n => n.Ordem))
+    {
+        var rateado = nivel.Regra.Calcular(valorAtual);
+
+        foreach (var (chave, valor) in rateado)
+        {
+            if (!resultado.ContainsKey(chave))
+                resultado[chave] = 0;
+            resultado[chave] += valor;
+        }
+    }
+
+    return resultado;
+}
+```
+
+---
+
+### RN013: Alertas de Variação Anormal
+**Descrição:** Notificar automaticamente se rateio de um centro de custo variar > 30% vs mês anterior.
+
+**Justificativa:** Detectar erros ou mudanças significativas.
+
+**Implementação:**
+```csharp
+public async Task VerificarAlertas(Guid rateioId)
+{
+    var rateio = await _context.Rateios.FindAsync(rateioId);
+    var comparativo = await GerarComparativo(rateio.Periodo);
+
+    var itensComAlerta = comparativo.Itens.Where(i => Math.Abs(i.PercentualVariacao) > 30).ToList();
+
+    foreach (var item in itensComAlerta)
+    {
+        var mensagem = $"Alerta: Centro de custo {item.CentroCusto} variou {item.PercentualVariacao:N2}% em {rateio.Periodo:MM/yyyy}";
+
+        await _notificationService.NotificarGestor(item.CentroCusto, mensagem);
+    }
+}
+```
+
+---
+
+### RN014: Rateio de Ajustes e Créditos
+**Descrição:** Ajustes, créditos e descontos devem ser rateados proporcionalmente.
+
+**Justificativa:** Justiça na distribuição de benefícios.
+
+**Implementação:**
+```csharp
+public async Task RatearAjustes(Guid rateioId, decimal valorAjuste, string tipoAjuste)
+{
+    var rateio = await _context.Rateios
+        .Include(r => r.Itens)
+        .FirstAsync(r => r.Id == rateioId);
+
+    var totalRateado = rateio.Itens.Sum(i => i.Valor);
+
+    foreach (var item in rateio.Itens)
+    {
+        var proporcao = item.Valor / totalRateado;
+        var ajusteItem = valorAjuste * proporcao;
+
+        item.ValorAjustado = item.Valor + ajusteItem;
+        item.Ajustes.Add(new AjusteRateio
+        {
+            Tipo = tipoAjuste,
+            Valor = ajusteItem,
+            Justificativa = $"Ajuste proporcional de {tipoAjuste}"
+        });
+    }
+
+    await _context.SaveChangesAsync();
+}
+```
+
+---
+
+### RN015: Dashboard de Rateios
+**Descrição:** Dashboard com gráficos de evolução mensal, top centros de custo, distribuição.
+
+**Justificativa:** Visibilidade executiva.
+
+**Implementação:**
+```csharp
+public async Task<DashboardRateio> GerarDashboard(int meses = 12)
+{
+    var dataLimite = DateTime.Today.AddMonths(-meses);
+
+    var rateios = await _context.Rateios
+        .Where(r => r.Periodo >= dataLimite)
+        .Include(r => r.Itens)
+        .ToListAsync();
+
+    return new DashboardRateio
+    {
+        EvolucaoMensal = rateios.GroupBy(r => r.Periodo)
+            .OrderBy(g => g.Key)
+            .Select(g => new { Periodo = g.Key, Total = g.Sum(r => r.ValorTotal) })
+            .ToList(),
+
+        TopCentrosCusto = rateios.SelectMany(r => r.Itens)
+            .GroupBy(i => i.CentroCusto)
+            .OrderByDescending(g => g.Sum(i => i.Valor))
+            .Take(10)
+            .Select(g => new { CentroCusto = g.Key, Total = g.Sum(i => i.Valor) })
+            .ToList(),
+
+        DistribuicaoAtual = rateios
+            .Where(r => r.Periodo.Month == DateTime.Today.Month)
+            .SelectMany(r => r.Itens)
+            .GroupBy(i => i.CentroCusto)
+            .Select(g => new { CentroCusto = g.Key, Percentual = (g.Sum(i => i.Valor) / rateios.Sum(r => r.ValorTotal)) * 100 })
+            .ToList()
+    };
+}
+```
+
+---
+
+## 3. REQUISITOS NÃO FUNCIONAIS
+
+- Performance: Processar rateio com 10.000 centros de custo em < 5 minutos
+- Precisão: Cálculos com 4 casas decimais, arredondamento final
+- Auditoria: Histórico completo 7 anos
+- Segurança: Apenas gestores podem aprovar rateios
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades
+```sql
+INSERT INTO SistemaFuncionalidade (Codigo, Nome, Modulo)
+VALUES ('GES.RATEIO', 'Gestão de Rateio de Custos', 'Gestão');
+```
+
+### 4.2 RBAC
+```csharp
+public static class RateioPermissions
+{
+    public const string Create = "GES.RATEIO.CREATE";
+    public const string Approve = "GES.RATEIO.APPROVE";
+    public const string Export = "GES.RATEIO.EXPORT";
+}
+```
+
+---
+
+## 5. MODELO DE DADOS
+
+```csharp
+public class Rateio : AuditableEntity
+{
+    public Guid Id { get; set; }
+    public string Numero { get; set; } // RAT-202501
+    public DateTime Periodo { get; set; }
+    public decimal ValorTotal { get; set; }
+    public string Status { get; set; } // PROCESSADO, APROVADO, EXPORTADO
+    public Guid? AprovadorId { get; set; }
+    public DateTime? DataAprovacao { get; set; }
+    public DateTime? DataExportacao { get; set; }
+    public List<RateioItem> Itens { get; set; }
+    public Guid EmpresaId { get; set; }
+}
+
+public class RateioItem
+{
+    public Guid Id { get; set; }
+    public Guid RateioId { get; set; }
+    public string CentroCusto { get; set; }
+    public decimal Valor { get; set; }
+    public decimal PercentualTotal { get; set; }
+    public decimal? ValorAjustado { get; set; }
+    public List<AjusteRateio> Ajustes { get; set; }
+}
+```
+
+---
+
+**Documento gerado em:** 2025-01-14
+**Versão:** 1.0
+**Status:** Aprovado

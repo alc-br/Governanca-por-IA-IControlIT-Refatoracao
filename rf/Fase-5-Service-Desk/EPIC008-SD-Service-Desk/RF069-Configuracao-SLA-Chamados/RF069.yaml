@@ -1,0 +1,367 @@
+# =============================================
+# RF-069 - Configuração de SLA para Chamados
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# Data: 2025-12-30
+# =============================================
+
+rf:
+  id: "RF069"
+  nome: "Configuração de SLA para Chamados"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 5 - Service Desk"
+  epic: "EPIC008-SD"
+  status: "aprovado" # draft | aprovado | em_desenvolvimento | concluido
+
+descricao:
+  objetivo: "Especificar sistema de configuração e gerenciamento de SLAs para chamados de Service Desk"
+  problema_resolvido: "Centralizar configuração de SLAs dispersa em tabelas, stored procedures e código hardcoded, permitindo gestão visual com validação real-time"
+  publico_afetado: "Gestores Service Desk, Administradores TI, Auditores, Operadores de Chamados"
+
+escopo:
+  incluso:
+    - "Cadastro completo de SLAs (nome, descrição, prioridade, tempos, calendário)"
+    - "Matriz de prioridades (Urgência × Impacto)"
+    - "Gestão de calendários de operação (comercial, 24x7, feriados)"
+    - "Regras de pausa automática de SLA por status"
+    - "Escalações multi-nível (até 5 níveis com percentuais configuráveis)"
+    - "Simulador de impacto de mudanças em SLA"
+    - "Relatórios de compliance SLA"
+    - "Versionamento completo de alterações"
+    - "Aplicação automática de SLA ao criar chamado"
+    - "Controle de acesso e isolamento por tenant"
+    - "Auditoria de todas operações"
+  fora:
+    - "Interface visual específica (wireframes em WF-RF069.md)"
+    - "Tecnologia, framework ou linguagem de implementação"
+    - "Layout, UX ou identidade visual"
+    - "Estratégia de deploy ou infraestrutura"
+    - "Gestão de chamados (RF-073)"
+    - "SLA de operações (RF-028) e serviços (RF-029)"
+
+entidades:
+  - nome: "SLA_Chamado"
+    descricao: "Entidade principal que representa um acordo de nível de serviço"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "Calendario"
+    descricao: "Calendário de operação (horários úteis, feriados)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "Feriado"
+    descricao: "Feriados nacionais, estaduais, municipais e corporativos"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "Escalacao_SLA"
+    descricao: "Escalações automáticas por percentual de tempo decorrido"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF069-01"
+    descricao: "Tempos Obrigatórios e Válidos - Todo SLA deve ter tempo de resposta e resolução > 0, resolução >= resposta"
+    tipo: "validacao"
+    campos_afetados: ["Tempo_Resposta_Minutos", "Tempo_Resolucao_Minutos"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Tempo resposta ausente ou ≤ 0 → HTTP 400"
+      - "Tempo resolução ausente ou ≤ 0 → HTTP 400"
+      - "Tempo resolução < tempo resposta → HTTP 400"
+
+  - id: "RN-RF069-02"
+    descricao: "Unicidade por Cliente/Tipo/Prioridade - Não pode existir SLA duplicado ativo para mesma combinação"
+    tipo: "unicidade"
+    campos_afetados: ["Id_Cliente", "Id_Tipo_Chamado", "Prioridade", "Fl_Ativo"]
+    obrigatorio: true
+    criterio_aceite:
+      - "SLA duplicado → HTTP 400 com mensagem clara"
+
+  - id: "RN-RF069-03"
+    descricao: "Calendário Obrigatório - Todo SLA deve estar associado a calendário válido e ativo"
+    tipo: "validacao"
+    campos_afetados: ["Id_Calendario"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Calendário ausente → HTTP 400"
+      - "Calendário inválido/inativo → HTTP 400"
+      - "Referential integrity por FK"
+
+  - id: "RN-RF069-04"
+    descricao: "Pausas Automáticas por Status - Sistema pausa/retoma SLA automaticamente conforme status do chamado"
+    tipo: "regra_negocio"
+    campos_afetados: ["Fl_SLA_Pausado", "Dt_Inicio_Pausa_SLA", "Tempo_Total_Pausado_Minutos"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Status com Fl_Pausa_SLA=true → SLA pausa"
+      - "Status sem pausa → SLA retoma, acumula tempo"
+      - "Auditoria registra início/fim com motivo"
+
+  - id: "RN-RF069-05"
+    descricao: "Escalações em Percentuais Configuráveis - Disparo automático em percentuais configurados (50%, 75%, 90%, 100%)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Percentual_Tempo", "Nivel_Escalacao", "Canal", "Destinatarios"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Percentual atingido → notificação única"
+      - "Suporte a email, SMS, push, webhook"
+      - "Auditoria de cada disparo"
+
+  - id: "RN-RF069-06"
+    descricao: "Cálculo em Horário Útil - Tempo decorrido calculado apenas em horário útil do calendário"
+    tipo: "regra_negocio"
+    campos_afetados: ["Id_Calendario", "Dt_Prazo_Resposta", "Dt_Prazo_Resolucao"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Chamado fora de horário → início no próximo útil"
+      - "Fins de semana e feriados não contam"
+      - "Pausas respeitadas independente de horário"
+
+  - id: "RN-RF069-07"
+    descricao: "Feriados Customizáveis - Suporte a feriados nacionais, estaduais, municipais, corporativos com importação via API"
+    tipo: "regra_negocio"
+    campos_afetados: ["Dt_Feriado", "Tipo_Feriado", "Fl_Recorrente"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Cadastro manual com tipos variados"
+      - "Importação via BrasilAPI"
+      - "Feriados recorrentes marcados"
+
+  - id: "RN-RF069-08"
+    descricao: "Versionamento Imutável - Registro de todas alterações com data, usuário, before/after e motivo obrigatório"
+    tipo: "auditoria"
+    campos_afetados: ["todos"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Alteração sem motivo → HTTP 400"
+      - "Histórico acessível por ID"
+      - "Temporal Tables SQL Server"
+
+  - id: "RN-RF069-09"
+    descricao: "Simulador What-If - Calcula impacto no compliance histórico ao alterar parâmetros de SLA"
+    tipo: "regra_negocio"
+    campos_afetados: ["Tempo_Resposta_Minutos", "Tempo_Resolucao_Minutos"]
+    obrigatorio: false
+    criterio_aceite:
+      - "Simulação usa dados reais 90 dias"
+      - "Mostra compliance atual vs projetado"
+      - "Alerta se impacto > 10% queda"
+
+  - id: "RN-RF069-10"
+    descricao: "Aplicação Automática de SLA - SLA aplicado automaticamente ao criar chamado (específico → genérico → default)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Id_Cliente", "Id_Tipo_Chamado", "Prioridade"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Chamado criado → SLA aplicado automaticamente"
+      - "Nenhum SLA encontrado → HTTP 400"
+      - "Auditoria registra regra usada"
+
+  - id: "RN-RF069-11"
+    descricao: "Isolamento Multi-Tenant - Usuário só acessa SLAs do próprio conglomerado"
+    tipo: "seguranca"
+    campos_afetados: ["Id_Conglomerado"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Acesso cruzado → HTTP 404"
+      - "Filtro Id_Conglomerado em todas queries"
+
+  - id: "RN-RF069-12"
+    descricao: "Permissões Granulares - Cada operação exige permissão explícita via RBAC"
+    tipo: "seguranca"
+    campos_afetados: ["Permission_Code"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Operação sem permissão → HTTP 403"
+      - "Validação backend via Policies"
+
+estados:
+  - id: "Ativo"
+    descricao: "SLA em uso, pode ser aplicado a chamados"
+  - id: "Inativo"
+    descricao: "SLA desativado, não será aplicado a novos chamados"
+  - id: "Excluido"
+    descricao: "Soft delete (Fl_Excluido=true)"
+
+transicoes:
+  permitidas:
+    - de: "Ativo"
+      para: "Inativo"
+    - de: "Inativo"
+      para: "Ativo"
+    - de: "Ativo"
+      para: "Excluido"
+    - de: "Inativo"
+      para: "Excluido"
+  proibidas:
+    - de: "Excluido"
+      para: "Ativo"
+    - de: "Excluido"
+      para: "Inativo"
+
+permissoes:
+  - codigo: "servicedesk:sla:read"
+    descricao: "Listar e visualizar SLAs"
+  - codigo: "servicedesk:sla:create"
+    descricao: "Criar novos SLAs"
+  - codigo: "servicedesk:sla:update"
+    descricao: "Atualizar SLAs existentes"
+  - codigo: "servicedesk:sla:delete"
+    descricao: "Inativar SLAs"
+  - codigo: "servicedesk:sla:simulate"
+    descricao: "Usar simulador de impacto"
+  - codigo: "servicedesk:sla:escalation:manage"
+    descricao: "Configurar escalações"
+  - codigo: "servicedesk:sla:calendar:manage"
+    descricao: "Gerenciar calendários e feriados"
+  - codigo: "servicedesk:sla:report:view"
+    descricao: "Visualizar relatórios de compliance"
+  - codigo: "servicedesk:sla:audit:view"
+    descricao: "Visualizar histórico de auditoria"
+
+integracoes:
+  internas:
+    - "Autenticacao (JWT Bearer Token)"
+    - "Multi-Tenancy (Id_Conglomerado)"
+    - "Auditoria (AuditInterceptor)"
+    - "RBAC (Authorization Policies)"
+    - "i18n (Transloco pt-BR/en/es)"
+    - "Central de Funcionalidades (Feature Flags)"
+  externas:
+    - sistema: "BrasilAPI"
+      tipo: "API REST"
+      obrigatoria: false
+      descricao: "Importação automática de feriados nacionais"
+    - sistema: "RF-073 Gestão de Chamados"
+      tipo: "Integração Interna"
+      obrigatoria: true
+      descricao: "Aplicação de SLA ao criar chamado"
+    - sistema: "RF-028 SLA Operações"
+      tipo: "Integração Interna"
+      obrigatoria: false
+      descricao: "Consolidação de métricas estratégicas"
+    - sistema: "RF-029 SLA Serviços"
+      tipo: "Integração Interna"
+      obrigatoria: false
+      descricao: "Consolidação de métricas estratégicas"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_dupla: true # Backend FluentValidation + Frontend Reactive Forms
+  rate_limiting: "100 requests/min por usuário/IP"
+  criptografia_dados_sensiveis: true # E-mails de escalação (AES-256)
+  versionamento_imutavel: true # Temporal Tables SQL Server
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00 - Listar SLAs"
+    - "UC01 - Criar SLA"
+    - "UC02 - Visualizar SLA"
+    - "UC03 - Editar SLA"
+    - "UC04 - Inativar SLA"
+    - "UC05 - Simular Impacto"
+    - "UC06 - Gerenciar Calendários"
+    - "UC07 - Gerenciar Feriados"
+    - "UC08 - Configurar Escalações"
+
+  rfs_relacionados:
+    - "RF-073: Gestão de Chamados (consumidor de SLA)"
+    - "RF-028: SLA Operações (consolidação métricas)"
+    - "RF-029: SLA Serviços (consolidação métricas)"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar SLA"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar SLAs"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar SLA"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar SLA"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Inativar SLA"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar tempos obrigatórios e válidos"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar unicidade por Cliente/Tipo/Prioridade"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar calendário obrigatório"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento multi-tenant"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC granulares"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria completa de operações"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Versionamento imutável"
+      required: true
+
+  funcionalidades_especiais:
+    - id: "RF-FUNC-01"
+      title: "Simulador de impacto"
+      required: false
+    - id: "RF-FUNC-02"
+      title: "Escalações multi-nível"
+      required: true
+    - id: "RF-FUNC-03"
+      title: "Pausas automáticas por status"
+      required: true
+    - id: "RF-FUNC-04"
+      title: "Cálculo em horário útil"
+      required: true
+    - id: "RF-FUNC-05"
+      title: "Aplicação automática de SLA"
+      required: true
+
+exclusions:
+  rf_items: []
+
+kpis:
+  - nome: "Compliance SLA Resposta"
+    meta: ">= 95%"
+    descricao: "Percentual de chamados com primeira resposta no prazo"
+  - nome: "Compliance SLA Resolução"
+    meta: ">= 90%"
+    descricao: "Percentual de chamados resolvidos no prazo"
+  - nome: "Latência Consulta SLA"
+    meta: "< 200ms"
+    descricao: "Tempo de resposta endpoint GET /api/sla/{id}"
+  - nome: "Disponibilidade Job Monitoramento"
+    meta: "> 99.9%"
+    descricao: "Uptime do job Hangfire de cálculo de SLA"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0 - Separação RF/RL completa. RF limpo sem referências ao legado."
+
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Claude Code (IControlIT Architect Agent)"
+    descricao: "Versão inicial com mapeamento legado incluído"

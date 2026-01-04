@@ -1,0 +1,362 @@
+# RF052 - Gestão de Consumidores
+
+**Versão:** 1.0
+**Data:** 2025-12-18
+**Status:** Rascunho
+**Autor:** IControlIT Architect Agent
+
+---
+
+## 1. Resumo Executivo
+
+A Gestão de Consumidores é o coração do IControlIT v2, sendo a funcionalidade central que gerencia todos os usuários finais de recursos de telecomunicações (colaboradores, departamentos, prestadores de serviço, visitantes). O sistema oferece cadastro completo de consumidores com dados pessoais/profissionais, alocação de ativos (linhas móveis, ramais, aparelhos), controle de custos individualizados, hierarquia organizacional, perfis de uso, políticas aplicadas, histórico completo de consumo, e integração profunda com todos os módulos do sistema.
+
+Este RF implementa a entidade mais importante do IControlIT, servindo como ponto central de agregação de dados de consumo, custos, ativos, políticas, chamados, auditoria e faturamento. A funcionalidade oferece visibilidade 360° de cada consumidor, permitindo rastrear exatamente quem consome o quê, quanto custa, quais políticas se aplicam, qual o histórico de uso, e quais ativos estão alocados. É essencial para rateio preciso de custos, controle de acessos, aplicação de políticas, auditoria de conformidade, e tomada de decisões gerenciais baseadas em dados reais.
+
+O sistema suporta diferentes tipos de consumidores (Funcionário, Prestador, Departamento, Visitante), múltiplos vínculos (um consumidor pode ter várias linhas/ramais), movimentação de consumidores entre departamentos/cargos com histórico completo, integração com RH para sincronização automática, e workflow de onboarding/offboarding automatizado. A funcionalidade é estratégica para garantir que TODOS os custos de telecomunicações sejam rastreáveis até o consumidor final, permitindo rateio justo, identificação de abusos, e otimização de gastos.
+
+A interface Angular 19 oferece perfil completo do consumidor com abas (Dados, Ativos, Consumo, Custos, Políticas, Histórico), dashboard de consumo individual, comparação com média do departamento, e relatórios exportáveis. Integração completa com TODOS os RFs do sistema: Linhas (RF050), Ativos (RF025), Políticas (RF049), Status (RF048), Faturamento (RF026), Auditoria (RF003/RF034/RF035), Chamados (RF033), Contratos (RF023).
+
+### 1.1 Objetivo
+
+Implementar sistema completo de gestão de consumidores com:
+- Cadastro completo de consumidores (dados pessoais, profissionais, contatos)
+- Tipos de consumidores: Funcionário, Prestador, Departamento, Visitante
+- Hierarquia organizacional (departamento, cargo, gestor)
+- Alocação de ativos (linhas móveis, ramais, aparelhos, acessos)
+- Controle de custos individualizados por consumidor
+- Perfis de uso e políticas aplicadas
+- Histórico completo de movimentações e consumo
+- Workflow de onboarding/offboarding automatizado
+- Integração com RH para sincronização automática
+- Dashboard 360° de consumidor
+- Relatórios de custos por consumidor/departamento
+- Comparação de consumo (individual vs média)
+- API REST completa com permissões RBAC
+- Interface Angular 19 com perfil rico
+
+### 1.2 Escopo
+
+**Incluído:**
+- CRUD completo de consumidores
+- Tipos: Funcionário, Prestador de Serviço, Departamento, Visitante
+- Dados pessoais: Nome, CPF, RG, Data Nascimento, Contatos
+- Dados profissionais: Matrícula, Departamento, Cargo, Gestor, Centro de Custo
+- Alocação de ativos: Linhas móveis, Ramais, Aparelhos, Acessos
+- Controle de custos: Custos mensais por consumidor, Histórico, Rateio
+- Perfis de uso: Executivo, Gerente, Colaborador, Estagiário, Externo
+- Políticas aplicadas: Limites de consumo, Restrições, Franquias
+- Status: Ativo, Suspenso, Bloqueado, Inativo, Pendente
+- Histórico: Movimentações, Mudanças de status, Alocações de ativos
+- Workflow onboarding: Criação automática, Alocação de ativos, Aplicação de políticas
+- Workflow offboarding: Desalocação de ativos, Cancelamento de linhas, Inativação
+- Integração RH: Sincronização de dados, Admissões, Demissões
+- Dashboard 360°: Consumo, Custos, Ativos, Políticas, Histórico
+- Relatórios: Custos por consumidor, Custos por departamento, Top consumidores
+- Comparação: Individual vs Média do departamento, Tendência temporal
+- Importação/Exportação: CSV/Excel
+- API REST completa com permissões RBAC
+- Interface Angular 19 com perfil rico
+- Auditoria completa de todas as operações
+- Suporte multi-tenant com isolamento de dados
+
+**Excluído:**
+- Gerenciamento de departamentos (RF024)
+- Gerenciamento de cargos (RF018)
+- Gerenciamento de usuários do sistema (RF006)
+- Gerenciamento de permissões (RF006)
+- Gestão de RH completa (folha de pagamento, férias, etc.)
+- Gerenciamento de ativos/aparelhos (RF025)
+- Gerenciamento de linhas móveis (RF050)
+- Gerenciamento de políticas (RF049)
+- Faturamento detalhado (RF026)
+- Auditoria de bilhetes (RF034, RF035)
+
+---
+
+## 2. Regras de Negócio
+
+### RN01 - Tipos de Consumidores Suportados
+
+- **Descrição:** Sistema deve suportar diferentes tipos de consumidores com características específicas
+- **Regra:** Tipos: Funcionário (CLT, vínculo permanente, tem matrícula), Prestador de Serviço (vínculo temporário, tem contrato com prazo), Departamento (consumo coletivo, não é pessoa física), Visitante (vínculo temporário curto, <30 dias). Cada tipo tem campos obrigatórios diferentes: Funcionário requer CPF/Matrícula, Prestador requer CNPJ/Contrato, Departamento requer Centro de Custo, Visitante requer Empresa de Origem
+- **Validação:** Sistema valida campos obrigatórios conforme tipo selecionado
+- **Exceção:** Super Admin pode criar consumidor customizado sem tipo específico
+
+### RN02 - Unicidade de Identificadores
+
+- **Descrição:** Identificadores pessoais devem ser únicos no sistema
+- **Regra:** CPF único por fornecedor (um CPF não pode ter 2 cadastros ativos no mesmo fornecedor), Matrícula única por fornecedor, E-mail único por fornecedor. Sistema permite mesmo CPF em diferentes fornecedores (multi-tenancy). Validação de formato: CPF (11 dígitos, validação de dígitos verificadores), E-mail (formato RFC 5322)
+- **Validação:** Sistema valida unicidade ao criar/atualizar consumidor
+- **Exceção:** Consumidores tipo "Departamento" não possuem CPF (usar CNPJ se aplicável)
+
+### RN03 - Hierarquia Organizacional Obrigatória
+
+- **Descrição:** Consumidores funcionários devem estar vinculados a hierarquia organizacional
+- **Regra:** Obrigatório para Funcionários: Departamento (RF024), Cargo (RF018), Gestor Responsável (outro consumidor ou usuário RF006), Centro de Custo. Opcional para Prestadores. Não aplicável para Departamento/Visitante. Histórico: Sistema registra todas as mudanças de departamento/cargo com data de vigência
+- **Validação:** Sistema valida existência de departamento e cargo antes de salvar
+- **Exceção:** CEO/Presidente podem não ter gestor (campo null)
+
+### RN04 - Alocação de Ativos Múltiplos
+
+- **Descrição:** Consumidor pode ter múltiplos ativos alocados simultaneamente
+- **Regra:** Um consumidor pode ter: 1 ou mais Linhas Móveis (RF050), 1 ou mais Ramais VoIP, 1 ou mais Aparelhos (RF025), 1 ou mais Acessos (sistemas, VPN, etc.). Histórico: Sistema registra todas as alocações/desalocações com data. Custo: Soma de todos os custos dos ativos alocados = Custo Total do Consumidor
+- **Validação:** Sistema valida disponibilidade do ativo antes de alocar
+- **Exceção:** Ativos compartilhados (ex: ramal de departamento) podem ter múltiplos consumidores
+
+### RN05 - Controle de Custos Individualizados
+
+- **Descrição:** Sistema deve rastrear custos exatos de cada consumidor mês a mês
+- **Regra:** Custos incluem: Custo Fixo (planos de linhas, mensalidades), Custo Variável (chamadas, dados excedentes), Custo de Ativos (depreciação de aparelhos), Custo de Serviços (manutenções, reparos). Cálculo: Custo Total Mês = Soma de todos os custos dos ativos alocados + Consumo variável. Histórico: Manter 7 anos de histórico de custos
+- **Validação:** Job mensal calcula custos e armazena na tabela ConsumidorCustoMensal
+- **Exceção:** Consumidores inativos não acumulam custos
+
+### RN06 - Perfis de Uso e Aplicação Automática de Políticas
+
+- **Descrição:** Cada consumidor tem perfil de uso que determina políticas aplicadas
+- **Regra:** Perfis padrão: Executivo (sem limites), Gerente (limite R$ 500), Colaborador (limite R$ 200), Estagiário (limite R$ 50), Externo (limite R$ 100, apenas local). Ao criar consumidor com perfil X, políticas do perfil (RF049) são aplicadas automaticamente. Mudança de perfil aplica novas políticas e remove antigas
+- **Validação:** Sistema valida existência de políticas para o perfil selecionado
+- **Exceção:** Políticas customizadas podem sobrescrever políticas de perfil
+
+### RN07 - Status de Consumidor e Impactos
+
+- **Descrição:** Status do consumidor controla acessos, políticas e faturamento
+- **Regra:** Status possíveis (RF048): Ativo (acesso total, faturamento normal), Suspenso (bloqueio de novas operações, mantém consulta), Bloqueado (bloqueio total, sem acesso), Inativo (desligado, sem custo, sem acesso), Pendente (aguardando aprovação/configuração). Impactos: Status Inativo suspende faturamento de linhas, Status Bloqueado impede novas chamadas
+- **Validação:** Sistema valida transições de status permitidas (RF048)
+- **Exceção:** Super Admin pode forçar qualquer status com justificativa
+
+### RN08 - Workflow de Onboarding Automatizado
+
+- **Descrição:** Admissão de novo consumidor deve seguir workflow padronizado
+- **Regra:** Etapas: 1. Criar cadastro de consumidor (dados pessoais/profissionais), 2. Atribuir perfil de uso e políticas, 3. Alocar ativos (linha móvel, ramal, aparelho), 4. Configurar acessos (e-mail, VPN, sistemas), 5. Enviar kit de boas-vindas (notificação), 6. Ativar status (Ativo). Aprovações: Criação requer aprovação de Gestor, Alocação de ativos >R$ 5000 requer aprovação de Financeiro
+- **Validação:** Sistema executa workflow via Hangfire, notificando responsáveis em cada etapa
+- **Exceção:** Onboarding emergencial pode pular aprovações (com justificativa)
+
+### RN09 - Workflow de Offboarding Automatizado
+
+- **Descrição:** Desligamento de consumidor deve seguir workflow padronizado
+- **Regra:** Etapas: 1. Notificar Gestor (15 dias antes), 2. Desalocar ativos (devolver linha, aparelho, ramal), 3. Cancelar acessos (e-mail, VPN, sistemas), 4. Calcular custos finais (proporcional, multas), 5. Atualizar status para Inativo. Retenção: Dados do consumidor devem ser mantidos por 7 anos (LGPD), Status Inativo impede login mas mantém histórico
+- **Validação:** Sistema valida devolução de ativos antes de finalizar offboarding
+- **Exceção:** Offboarding por justa causa pode ser imediato (sem período de transição)
+
+### RN10 - Integração com RH para Sincronização Automática
+
+- **Descrição:** Sistema deve sincronizar dados com sistema de RH automaticamente
+- **Regra:** Dados sincronizados: Nome, CPF, Matrícula, Departamento, Cargo, Data Admissão, Data Demissão, Status (Ativo/Inativo). Frequência: Sincronização diária via API ou arquivo (CSV). Em caso de divergência, RH é fonte da verdade (com alerta para revisão manual)
+- **Validação:** Job noturno sincroniza dados do RH, gerando relatório de divergências
+- **Exceção:** Prestadores e Visitantes não são sincronizados (cadastro manual)
+
+### RN11 - Dashboard 360° de Consumidor
+
+- **Descrição:** Interface deve exibir visão completa de consumidor em abas organizadas
+- **Regra:** Abas: Dados (pessoais, profissionais, contatos), Ativos (linhas, ramais, aparelhos alocados), Consumo (dados, voz, SMS do mês), Custos (custo total, histórico mensal, gráfico), Políticas (políticas aplicadas, conformidade), Histórico (movimentações, mudanças de status), Chamados (chamados abertos pelo consumidor). Atualização em tempo real via SignalR para aba Consumo
+- **Validação:** Dashboard carrega em ≤2 segundos, abas carregam sob demanda
+- **Exceção:** Usuários sem permissão veem apenas dados básicos (sem custos/consumo)
+
+### RN12 - Comparação de Consumo Individual vs Média
+
+- **Descrição:** Sistema deve permitir comparar consumo do consumidor com média do departamento
+- **Regra:** Comparação: Consumo Individual vs Média do Departamento, Custo Individual vs Média do Departamento, Percentual de desvio (verde se <média, vermelho se >média). Gráfico: Linha temporal mostrando evolução vs média. Alerta: Se consumidor está consistentemente >150% da média por 3 meses, gerar alerta para Gestor
+- **Validação:** Cálculo de médias atualizado mensalmente via job
+- **Exceção:** Departamentos com <3 consumidores não têm média calculada
+
+### RN13 - Movimentação de Consumidores com Histórico
+
+- **Descrição:** Mudanças de departamento/cargo devem ser registradas com histórico completo
+- **Regra:** Movimentações rastreadas: Mudança de Departamento, Mudança de Cargo, Mudança de Gestor, Mudança de Centro de Custo. Histórico: Data da mudança, Valor anterior, Valor novo, Usuário responsável, Justificativa. Impacto: Mudança de departamento pode mudar políticas aplicadas, Mudança de cargo pode mudar perfil de uso
+- **Validação:** Sistema registra movimentação na tabela ConsumidorHistoricoMovimentacao
+- **Exceção:** Movimentações em massa (reestruturação) podem ser processadas via job
+
+### RN14 - Relatórios de Custos por Consumidor/Departamento
+
+- **Descrição:** Sistema deve gerar relatórios detalhados de custos para análise gerencial
+- **Regra:** Relatórios disponíveis: Custos por Consumidor (lista todos os consumidores com custo mensal), Custos por Departamento (soma de custos dos consumidores do departamento), Top 10 Consumidores de Maior Custo, Top 10 Consumidores de Maior Crescimento, Consumidores Subutilizados (custo alto, consumo baixo). Exportação: Excel, PDF, CSV
+- **Validação:** Relatórios gerados sob demanda, cacheados por 1 hora
+- **Exceção:** Relatórios históricos (>1 ano) podem levar mais tempo para processar
+
+### RN15 - Validação de Permissões RBAC
+
+- **Descrição:** Operações sobre consumidores devem respeitar permissões por perfil
+- **Regra:** Permissões: GESTAO.CONSUMIDORES.VIEW (visualizar), GESTAO.CONSUMIDORES.CREATE (criar), GESTAO.CONSUMIDORES.UPDATE (editar), GESTAO.CONSUMIDORES.DELETE (excluir - inativar), GESTAO.CONSUMIDORES.VIEW_CUSTOS (visualizar custos), GESTAO.CONSUMIDORES.EXPORT (exportar relatórios). Gestores veem apenas consumidores de seus departamentos. Financeiro vê todos os consumidores
+- **Validação:** Endpoints validam permissões via RequireAuthorization, Commands validam via Authorize(Roles)
+- **Exceção:** Super Admin vê todos os consumidores cross-tenant
+
+---
+
+## 3. Referências Técnicas
+
+### 3.1 Componentes Relacionados
+
+| Componente | Descrição | Localização |
+|------------|-----------|-------------|
+| Consumidor (Entity) | Entidade de domínio principal | `backend/Domain/Entities/Gestao/Consumidor.cs` |
+| ConsumidorCustoMensal (Entity) | Custos mensais do consumidor | `backend/Domain/Entities/Gestao/ConsumidorCustoMensal.cs` |
+| ConsumidorHistoricoMovimentacao (Entity) | Histórico de movimentações | `backend/Domain/Entities/Gestao/ConsumidorHistoricoMovimentacao.cs` |
+| ConsumidorAtivo (Entity) | Associação consumidor-ativo | `backend/Domain/Entities/Gestao/ConsumidorAtivo.cs` |
+| CreateConsumidorCommand | Command para criar consumidor | `backend/Application/Gestao/Commands/Consumidores/CreateConsumidorCommand.cs` |
+| UpdateConsumidorCommand | Command para atualizar | `backend/Application/Gestao/Commands/Consumidores/UpdateConsumidorCommand.cs` |
+| AllocateAtivoCommand | Command para alocar ativo | `backend/Application/Gestao/Commands/Consumidores/AllocateAtivoCommand.cs` |
+| DeallocateAtivoCommand | Command para desalocar ativo | `backend/Application/Gestao/Commands/Consumidores/DeallocateAtivoCommand.cs` |
+| OnboardingConsumidorCommand | Command para onboarding | `backend/Application/Gestao/Commands/Consumidores/OnboardingConsumidorCommand.cs` |
+| OffboardingConsumidorCommand | Command para offboarding | `backend/Application/Gestao/Commands/Consumidores/OffboardingConsumidorCommand.cs` |
+| GetConsumidoresQuery | Query para listar consumidores | `backend/Application/Gestao/Queries/Consumidores/GetConsumidoresQuery.cs` |
+| GetConsumidorDashboardQuery | Query para dashboard 360° | `backend/Application/Gestao/Queries/Consumidores/GetConsumidorDashboardQuery.cs` |
+| GetCustosPorConsumidorQuery | Query para relatório de custos | `backend/Application/Gestao/Queries/Consumidores/GetCustosPorConsumidorQuery.cs` |
+| ConsumidoresService | Lógica de negócio de consumidores | `backend/Infrastructure/Services/Gestao/ConsumidoresService.cs` |
+| RHIntegrationService | Integração com sistema de RH | `backend/Infrastructure/Services/Gestao/RHIntegrationService.cs` |
+| ConsumidoresEndpoints | Endpoints da API | `backend/Web/Endpoints/Gestao/Consumidores.cs` |
+| ConsumidoresComponent | Componente Angular principal | `frontend/src/app/modules/gestao/consumidores/consumidores.component.ts` |
+| ConsumidorDashboardComponent | Dashboard 360° | `frontend/src/app/modules/gestao/consumidores/components/consumidor-dashboard.component.ts` |
+| OnboardingWizardComponent | Wizard de onboarding | `frontend/src/app/modules/gestao/consumidores/components/onboarding-wizard.component.ts` |
+
+### 3.2 APIs Utilizadas
+
+| API | Método | Endpoint | Descrição |
+|-----|--------|----------|-----------|
+| Listar Consumidores | GET | /api/gestao/consumidores | Lista consumidores com filtros |
+| Obter Consumidor | GET | /api/gestao/consumidores/{id} | Obtém detalhes de um consumidor |
+| Criar Consumidor | POST | /api/gestao/consumidores | Cria novo consumidor |
+| Atualizar Consumidor | PUT | /api/gestao/consumidores/{id} | Atualiza consumidor existente |
+| Inativar Consumidor | DELETE | /api/gestao/consumidores/{id} | Inativa consumidor (soft delete) |
+| Alocar Ativo | POST | /api/gestao/consumidores/{id}/alocar-ativo | Aloca ativo ao consumidor |
+| Desalocar Ativo | POST | /api/gestao/consumidores/{id}/desalocar-ativo | Desaloca ativo do consumidor |
+| Onboarding | POST | /api/gestao/consumidores/{id}/onboarding | Executa workflow de onboarding |
+| Offboarding | POST | /api/gestao/consumidores/{id}/offboarding | Executa workflow de offboarding |
+| Dashboard 360° | GET | /api/gestao/consumidores/{id}/dashboard | Obtém dados do dashboard completo |
+| Obter Custos | GET | /api/gestao/consumidores/{id}/custos | Obtém histórico de custos |
+| Obter Histórico | GET | /api/gestao/consumidores/{id}/historico | Obtém histórico de movimentações |
+| Comparar Consumo | GET | /api/gestao/consumidores/{id}/comparar | Compara consumo com média |
+| Relatório Custos | GET | /api/gestao/consumidores/relatorio-custos | Gera relatório de custos |
+| Importar Consumidores | POST | /api/gestao/consumidores/importar | Importa consumidores via CSV/Excel |
+| Exportar Consumidores | GET | /api/gestao/consumidores/exportar | Exporta consumidores para arquivo |
+| Sincronizar RH | POST | /api/gestao/consumidores/sincronizar-rh | Sincroniza dados com RH |
+
+### 3.3 Serviços Externos
+
+- **Sistema de RH:** Sincronização de dados de colaboradores
+- **Central de E-mails (RF067):** Notificações de onboarding/offboarding
+- **Central de Notificações (RF066):** Notificações in-app
+- **Serviço de Auditoria (RF003):** Registro de operações
+- **Serviço de Faturamento (RF026):** Integração para custos
+- **Serviço de Políticas (RF049):** Aplicação automática de políticas
+- **Serviço de Status (RF048):** Gerenciamento de status
+- **Hangfire:** Workflows de onboarding/offboarding, sincronização RH
+- **SignalR:** Atualizações em tempo real do dashboard
+
+---
+
+## 4. Dependências
+
+### 4.1 Dependências de Outros RFs
+
+| RF | Nome | Tipo de Dependência |
+|----|------|---------------------|
+| RF003 | Logs, Monitoramento e Observabilidade | Obrigatória (auditoria) |
+| RF006 | Gestão de Usuários | Obrigatória (permissões) |
+| RF018 | Gestão de Cargos | Obrigatória (hierarquia) |
+| RF024 | Gestão de Departamentos | Obrigatória (hierarquia) |
+| RF025 | Gestão de Ativos | Obrigatória (alocação de aparelhos) |
+| RF026 | Gestão de Faturas | Obrigatória (custos) |
+| RF033 | Gestão de Chamados | Opcional (histórico de chamados) |
+| RF048 | Gestão de Status de Consumidores | Obrigatória (status) |
+| RF049 | Gestão de Políticas de Consumidores | Obrigatória (políticas) |
+| RF050 | Gestão de Linhas Móveis e Chips SIM | Obrigatória (alocação de linhas) |
+| RF066 | Notificações e Alertas | Obrigatória (notificações) |
+| RF067 | Central de E-mails | Obrigatória (e-mails) |
+
+### 4.2 Dependências Externas
+
+- **Entity Framework Core 10:** ORM
+- **MediatR 12.x:** CQRS
+- **FluentValidation 11.x:** Validações
+- **Hangfire 1.8.x:** Jobs e workflows
+- **SignalR:** Tempo real
+- **Angular 19:** Frontend
+- **Angular Material 19:** UI
+- **ApexCharts:** Gráficos
+- **Transloco 6.x:** i18n
+- **EPPlus/ClosedXML:** Excel
+
+---
+
+## 5. Requisitos Não-Funcionais
+
+### 5.1 Performance
+
+- **Tempo de resposta:** CRUD ≤ 300ms (P95)
+- **Dashboard 360°:** Carregar em ≤ 2 segundos
+- **Throughput:** 10.000 operações/dia
+- **Importação:** 1.000 consumidores em ≤ 3 minutos
+- **Relatórios:** Gerar em ≤ 5 segundos
+- **Índices:** CPF, Matrícula, Departamento, Status
+
+### 5.2 Segurança
+
+- **Autenticação:** JWT obrigatório
+- **Autorização:** RBAC granular
+- **LGPD:** Dados sensíveis protegidos
+- **Auditoria:** Todas as operações registradas
+- **Multi-tenancy:** Isolamento por fornecedor
+- **Criptografia:** AES-256 (repouso), TLS 1.3 (trânsito)
+
+### 5.3 Disponibilidade
+
+- **Uptime:** 99.9%
+- **Backup:** Diário, retenção 30 dias
+- **Retenção:** 7 anos (LGPD)
+- **DR:** RPO ≤ 1h, RTO ≤ 4h
+
+---
+
+## 6. Critérios de Aceitação
+
+- [ ] CRUD completo via API REST
+- [ ] Tipos de consumidores implementados
+- [ ] Hierarquia organizacional funcionando
+- [ ] Alocação/Desalocação de ativos
+- [ ] Workflow onboarding/offboarding
+- [ ] Integração com RH sincronizando
+- [ ] Dashboard 360° completo
+- [ ] Comparação com média departamento
+- [ ] Relatórios de custos
+- [ ] Importação/Exportação CSV/Excel
+- [ ] Auditoria completa
+- [ ] Permissões RBAC
+- [ ] Todos CN/TC passando
+- [ ] Cobertura ≥ 80%
+- [ ] Performance conforme requisitos
+- [ ] Documentação completa
+
+---
+
+## 7. Observações
+
+### 7.1 Implementação
+
+**Backend:**
+- Entity com relacionamentos para Departamento, Cargo, Ativos
+- Domain Events para aplicação automática de políticas
+- Jobs Hangfire para workflows e sincronização RH
+- Query Filters para multi-tenancy
+
+**Frontend:**
+- Dashboard com abas organizadas
+- Gráficos ApexCharts para consumo/custos
+- Wizard para onboarding
+- Formulários com validação CPF
+
+### 7.2 Migração
+
+Migrar consumidores do legado:
+1. Importar funcionários ativos
+2. Importar prestadores
+3. Associar linhas/ramais existentes
+4. Recriar hierarquia departamental
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-12-18 | IControlIT Architect Agent | Versão inicial - Especificação completa de Gestão de Consumidores |

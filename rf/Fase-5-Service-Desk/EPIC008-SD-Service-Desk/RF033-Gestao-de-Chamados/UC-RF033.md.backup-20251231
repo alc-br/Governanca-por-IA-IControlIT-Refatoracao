@@ -1,0 +1,444 @@
+# Casos de Uso - RF033 - Gestão de Chamados
+
+**Versão:** 1.0
+**Data:** 2025-12-18
+**RF Relacionado:** [RF033 - Gestão de Chamados](./RF033.md)
+
+---
+
+## Índice de Casos de Uso
+
+| UC | Nome | Descrição | Complexidade |
+|----|------|-----------|--------------|
+| UC00 | Listar Chamados | Listagem paginada com filtros avançados e priorização | Média |
+| UC01 | Criar Chamado | Abertura de chamado com anexos e SLA automático | Média |
+| UC02 | Visualizar Chamado | Detalhes completos com histórico de interações | Baixa |
+| UC03 | Editar Chamado | Alteração de prioridade, categoria e reatribuição | Média |
+| UC04 | Fechar Chamado | Encerramento com solução e avaliação | Baixa |
+| UC05 | Comentar em Chamado | Adicionar comentários internos/externos | Baixa |
+| UC06 | Escalar Chamado | Escalonamento automático por SLA ou manual | Alta |
+| UC07 | Anexar Arquivos | Upload de evidências e documentos | Baixa |
+| UC08 | Atribuir Técnico | Distribuição manual ou automática via round-robin | Média |
+| UC09 | Acompanhar SLA | Monitoramento de prazos e alertas de vencimento | Média |
+
+---
+
+## UC00 - Listar Chamados
+
+**Complexidade:** Média
+**Estimativa:** 4h Backend + 6h Frontend
+
+### Objetivo
+Exibir listagem paginada de chamados com filtros avançados (status, prioridade, técnico, categoria), ordenação, busca textual e indicadores visuais de SLA (verde/amarelo/vermelho).
+
+### Atores
+- Técnico de Suporte, Gestor de TI, Solicitante
+
+### Pré-condições
+- Usuário autenticado
+- Permissão: `CHAMADOS.LISTAR`
+
+### Fluxo Principal
+1. Sistema exibe grid com colunas: Número, Título, Solicitante, Técnico, Prioridade, Status, SLA, Data Abertura
+2. Aplica filtros padrão: Status ≠ Fechado, ordenado por Prioridade DESC, Data Abertura DESC
+3. Exibe badge de SLA: 🟢 > 50% prazo | 🟡 20-50% | 🔴 < 20% ou vencido
+4. Usuário clica em chamado → redireciona para UC02 (Visualizar)
+
+### Regras de Negócio
+- **RN-033-001**: Técnico vê apenas chamados atribuídos a ele (exceto gestor)
+- **RN-033-002**: Solicitante vê apenas seus próprios chamados
+- **RN-033-003**: SLA crítico (< 20%) exibe em vermelho piscante
+
+---
+
+## UC01 - Criar Chamado
+
+**Complexidade:** Média
+**Estimativa:** 5h Backend + 7h Frontend
+
+### Objetivo
+Abrir novo chamado com título, descrição, categoria, prioridade sugerida, anexos opcionais e cálculo automático de SLA baseado em matriz prioridade × categoria.
+
+### Atores
+- Qualquer usuário autenticado (auto-atribuição como solicitante)
+
+### Pré-condições
+- Usuário autenticado
+- Permissão: `CHAMADOS.CRIAR`
+
+### Fluxo Principal
+1. Usuário preenche:
+   - **Título*** (min 10 caracteres)
+   - **Descrição*** (rich text, min 30 caracteres)
+   - **Categoria***: Hardware, Software, Rede, Acesso, Outro
+   - **Prioridade sugerida**: Baixa, Média, Alta, Urgente (sistema sugere baseado em palavras-chave)
+   - **Anexos**: até 5 arquivos, 10MB cada (imagens, PDFs, logs)
+2. Sistema calcula SLA automaticamente:
+   - Urgente + Hardware = 2h
+   - Alta + Software = 4h
+   - Média = 24h
+   - Baixa = 72h
+3. Cria chamado com Status = "Aberto"
+4. Envia notificação para fila de técnicos
+5. Envia email confirmação ao solicitante
+
+### Regras de Negócio
+- **RN-033-004**: Palavras-chave como "parado", "urgente", "travado" → Prioridade Alta automaticamente
+- **RN-033-005**: SLA inicia imediatamente após criação (horário comercial 8h-18h)
+- **RN-033-006**: Número do chamado formato: `YYYY-NNNNNN` (ex: 2025-000042)
+
+---
+
+## UC02 - Visualizar Chamado
+
+**Complexidade:** Baixa
+**Estimativa:** 3h Backend + 4h Frontend
+
+### Objetivo
+Exibir todos os detalhes do chamado incluindo histórico cronológico de interações (comentários, mudanças de status, reatribuições), anexos e timeline de SLA.
+
+### Atores
+- Técnico atribuído, Gestor, Solicitante
+
+### Pré-condições
+- Chamado existe
+- Permissão: `CHAMADOS.VISUALIZAR` (filtro por atribuição/solicitante)
+
+### Fluxo Principal
+1. Sistema exibe:
+   - **Cabeçalho**: Número, Status, Prioridade, SLA restante
+   - **Detalhes**: Título, Descrição, Categoria, Solicitante, Técnico, Datas
+   - **Timeline**: Histórico de ações (abertura, comentários, mudanças status, escalonamentos)
+   - **Anexos**: Lista de arquivos com preview/download
+   - **Ações**: Comentar, Editar, Fechar, Escalar (conforme permissões)
+
+### Fluxos Alternativos
+- **FA-01**: Se SLA vencido, exibe alerta vermelho: "⚠️ SLA vencido há X horas"
+- **FA-02**: Se comentário interno, exibe apenas para técnicos (oculto de solicitante)
+
+---
+
+## UC03 - Editar Chamado
+
+**Complexidade:** Média
+**Estimativa:** 4h Backend + 5h Frontend
+
+### Objetivo
+Alterar prioridade, categoria, descrição, técnico atribuído ou status do chamado. Registra auditoria de mudanças e recalcula SLA se necessário.
+
+### Atores
+- Técnico atribuído, Gestor
+
+### Pré-condições
+- Chamado não está Fechado
+- Permissão: `CHAMADOS.EDITAR`
+
+### Fluxo Principal
+1. Usuário altera campos permitidos:
+   - Prioridade → Recalcula SLA
+   - Categoria → Recalcula SLA
+   - Técnico → Notifica novo técnico
+   - Status → Valida transição permitida (Aberto → Em Atendimento → Aguardando Cliente → Resolvido → Fechado)
+2. Sistema registra auditoria: campo alterado, valor anterior, valor novo, usuário, timestamp
+3. Notifica solicitante sobre mudança crítica (prioridade, técnico, status)
+
+### Regras de Negócio
+- **RN-033-007**: Apenas gestor pode rebaixar prioridade de Urgente para Baixa
+- **RN-033-008**: Mudança de prioridade Baixa→Urgente requer justificativa obrigatória
+- **RN-033-009**: Reatribuição para técnico com > 10 chamados abertos exige confirmação
+
+---
+
+## UC04 - Fechar Chamado
+
+**Complexidade:** Baixa
+**Estimativa:** 3h Backend + 4h Frontend
+
+### Objetivo
+Encerrar chamado com registro de solução aplicada, tempo total de atendimento, avaliação do solicitante (1-5 estrelas) e opção de reabrir em 48h.
+
+### Atores
+- Técnico atribuído
+
+### Pré-condições
+- Chamado em Status = "Resolvido"
+- Permissão: `CHAMADOS.FECHAR`
+
+### Fluxo Principal
+1. Técnico marca Status = "Resolvido" e preenche:
+   - **Solução aplicada*** (min 50 caracteres)
+   - **Causa raiz**: Identificada ou Não Identificada
+   - **Tempo de atendimento**: calculado automaticamente (abertura → fechamento)
+2. Sistema envia email ao solicitante:
+   - "Seu chamado foi resolvido. Avalie o atendimento: ⭐⭐⭐⭐⭐"
+   - Link para reabrir se problema persistir (válido 48h)
+3. Solicitante avalia (opcional) e confirma fechamento
+4. Status muda para "Fechado" após avaliação OU 48h sem resposta
+
+### Regras de Negócio
+- **RN-033-010**: Chamado pode ser reaberto apenas 1 vez em 48h
+- **RN-033-011**: Avaliação < 3 estrelas notifica gestor automaticamente
+- **RN-033-012**: SLA cumprido? (Sim/Não) registrado para métricas
+
+---
+
+## UC05 - Comentar em Chamado
+
+**Complexidade:** Baixa
+**Estimativa:** 2h Backend + 3h Frontend
+
+### Objetivo
+Adicionar comentários internos (visíveis apenas para técnicos) ou externos (visíveis para solicitante) com notificações por email.
+
+### Atores
+- Técnico, Gestor, Solicitante
+
+### Pré-condições
+- Chamado não está Fechado
+- Permissão: `CHAMADOS.COMENTAR`
+
+### Fluxo Principal
+1. Usuário digita comentário (rich text, min 10 caracteres)
+2. Seleciona visibilidade:
+   - ⚫ **Externo** (solicitante vê)
+   - ⚪ **Interno** (apenas técnicos)
+3. Anexa arquivos opcionais (screenshots, logs)
+4. Sistema:
+   - Salva comentário com timestamp
+   - Notifica destinatários por email
+   - Adiciona à timeline do chamado
+
+### Regras de Negócio
+- **RN-033-013**: Comentário interno não notifica solicitante
+- **RN-033-014**: Solicitante só pode criar comentários externos
+- **RN-033-015**: @mencionar técnico no comentário envia notificação individual
+
+---
+
+## UC06 - Escalar Chamado
+
+**Complexidade:** Alta
+**Estimativa:** 6h Backend + 5h Frontend
+
+### Objetivo
+Escalonar chamado para nível superior (N1→N2→N3) automaticamente por SLA vencido ou manualmente por decisão do técnico/gestor.
+
+### Atores
+- Sistema (automático), Técnico, Gestor
+
+### Pré-condições
+- SLA vencido OU decisão manual de escalonamento
+
+### Fluxo Principal - Automático
+1. Job Hangfire executa a cada 15 minutos:
+   ```sql
+   SELECT * FROM Chamados
+   WHERE Status IN ('Aberto', 'Em Atendimento')
+     AND DATEDIFF(MINUTE, Dt_Abertura, GETDATE()) > SLA_Minutos
+     AND Fl_Escalado = 0;
+   ```
+2. Para cada chamado vencido:
+   - Incrementa nível (N1→N2)
+   - Reatribui para fila do nível superior
+   - Adiciona comentário automático: "🔴 Escalado automaticamente por SLA vencido"
+   - Notifica gestor do nível superior
+3. Se N3 vencido → Cria incidente crítico e notifica diretoria
+
+### Fluxo Principal - Manual
+1. Técnico/Gestor clica "Escalar Chamado"
+2. Preenche:
+   - **Motivo***: Complexidade técnica, Falta de acesso, Outro
+   - **Justificativa***: (min 30 caracteres)
+   - **Nível destino**: N2, N3, Especialista
+3. Sistema reatribui e notifica
+
+### Regras de Negócio
+- **RN-033-016**: Escalonamento automático ocorre a cada 15min (job)
+- **RN-033-017**: N3 vencido cria incidente crítico automaticamente
+- **RN-033-018**: Histórico de escalonamentos visível na timeline
+
+---
+
+## UC07 - Anexar Arquivos
+
+**Complexidade:** Baixa
+**Estimativa:** 3h Backend + 3h Frontend
+
+### Objetivo
+Fazer upload de arquivos (screenshots, logs, documentos) para o chamado com armazenamento em Azure Blob Storage e preview inline para imagens.
+
+### Atores
+- Técnico, Solicitante
+
+### Pré-condições
+- Chamado existe
+- Permissão: `CHAMADOS.ANEXAR`
+
+### Fluxo Principal
+1. Usuário arrasta arquivos ou clica "Anexar Arquivo"
+2. Valida:
+   - Tamanho ≤ 10MB por arquivo
+   - Máximo 5 arquivos por upload
+   - Tipos permitidos: `.png, .jpg, .pdf, .txt, .log, .docx, .xlsx`
+3. Faz upload para Azure Blob Storage (`chamados/{id}/{timestamp}-{filename}`)
+4. Salva metadados no banco (nome, tamanho, tipo, URL, hash SHA-256)
+5. Exibe preview inline para imagens
+
+### Regras de Negócio
+- **RN-033-019**: Arquivos excluídos logicamente (soft delete, retenção 90 dias)
+- **RN-033-020**: Hash SHA-256 calculado para verificação de integridade
+- **RN-033-021**: Executáveis bloqueados (`.exe, .bat, .sh`)
+
+---
+
+## UC08 - Atribuir Técnico
+
+**Complexidade:** Média
+**Estimativa:** 4h Backend + 4h Frontend
+
+### Objetivo
+Atribuir chamado a técnico específico manualmente ou via distribuição automática round-robin considerando carga de trabalho atual.
+
+### Atores
+- Sistema (automático), Gestor
+
+### Pré-condições
+- Chamado em Status = "Aberto"
+- Permissão: `CHAMADOS.ATRIBUIR`
+
+### Fluxo Principal - Automático
+1. Sistema detecta novo chamado sem técnico atribuído
+2. Executa algoritmo round-robin:
+   ```sql
+   SELECT TOP 1 t.Id_Usuario, COUNT(c.Id_Chamado) AS Carga
+   FROM Tecnicos t
+   LEFT JOIN Chamados c ON t.Id_Usuario = c.Id_Tecnico
+     AND c.Status NOT IN ('Fechado', 'Cancelado')
+   WHERE t.Fl_Ativo = 1
+     AND t.Nivel = @NivelChamado
+   GROUP BY t.Id_Usuario
+   ORDER BY COUNT(c.Id_Chamado) ASC;
+   ```
+3. Atribui ao técnico com menor carga
+4. Notifica técnico: "Novo chamado #2025-000042 atribuído a você"
+
+### Fluxo Principal - Manual
+1. Gestor acessa chamado → "Atribuir Técnico"
+2. Seleciona técnico da lista (exibe carga atual)
+3. Confirma atribuição
+4. Sistema notifica técnico e registra auditoria
+
+### Regras de Negócio
+- **RN-033-022**: Reatribuição > 3 vezes notifica gestor (possível chamado complexo)
+- **RN-033-023**: Técnico pode recusar chamado se carga > 15 chamados abertos
+- **RN-033-024**: SLA pausa durante reatribuição (max 15min)
+
+---
+
+## UC09 - Acompanhar SLA
+
+**Complexidade:** Média
+**Estimativa:** 5h Backend + 6h Frontend
+
+### Objetivo
+Monitorar tempo restante de SLA com indicadores visuais, alertas progressivos (80%, 90%, 100%) e dashboard gerencial de cumprimento de SLAs.
+
+### Atores
+- Técnico, Gestor
+
+### Pré-condições
+- Chamado possui SLA definido
+
+### Fluxo Principal
+1. Sistema calcula tempo restante em tempo real:
+   ```typescript
+   const slaMinutos = chamado.sla_minutos;
+   const tempoDecorrido = minutosEntre(chamado.dt_abertura, now);
+   const tempoRestante = slaMinutos - tempoDecorrido;
+   const percentualRestante = (tempoRestante / slaMinutos) * 100;
+   ```
+2. Exibe badge visual:
+   - 🟢 > 50% restante
+   - 🟡 20-50% restante (alerta amarelo)
+   - 🔴 < 20% restante (alerta vermelho)
+   - ⚫ Vencido (alerta crítico)
+3. Envia notificações:
+   - 80% decorrido → Email técnico
+   - 90% decorrido → Email técnico + gestor
+   - 100% vencido → Email gestor + escalonamento automático (UC06)
+
+### Dashboard Gestor
+```
+┌────────────────────────────────────────┐
+│ SLA - Últimos 30 dias                  │
+├────────────────────────────────────────┤
+│ ✅ Cumpridos: 142 (85%)                │
+│ ⚠️ Vencidos: 25 (15%)                  │
+│                                        │
+│ 📊 Por Categoria:                      │
+│ Hardware: 90% cumprimento              │
+│ Software: 82% cumprimento              │
+│ Rede: 78% cumprimento (crítico)        │
+│                                        │
+│ 🔥 Chamados Críticos (SLA < 20%):      │
+│ #2025-000142 - Rede instável (15%)     │
+│ #2025-000138 - Login travado (8%)      │
+└────────────────────────────────────────┘
+```
+
+### Regras de Negócio
+- **RN-033-025**: SLA conta apenas horário comercial (8h-18h, seg-sex)
+- **RN-033-026**: Feriados não contam para SLA (configurável)
+- **RN-033-027**: Status "Aguardando Cliente" pausa SLA temporariamente
+- **RN-033-028**: Métrica de cumprimento SLA impacta avaliação de técnicos
+
+---
+
+## Integrações Obrigatórias
+
+### 1. Central de Funcionalidades
+- Registrar feature "Gestão de Chamados" com 10 UCs
+- Vincular permissões: CHAMADOS.LISTAR, CRIAR, EDITAR, FECHAR, etc.
+
+### 2. Internacionalização (i18n)
+- Chaves de tradução: `chamados.titulo`, `chamados.status.aberto`, `chamados.prioridade.urgente`
+- Idiomas: pt-BR, en-US, es-ES
+
+### 3. Auditoria
+- Auditar: Criação, Edição, Fechamento, Escalonamento, Reatribuição
+- Retenção: 7 anos (LGPD)
+
+### 4. Controle de Acesso (RBAC)
+- Perfis: Solicitante (criar/visualizar), Técnico (atribuir/resolver), Gestor (escalar/reatribuir)
+- Regra: Técnico vê apenas chamados atribuídos a ele (exceto gestor)
+
+---
+
+## Chaves de Tradução (i18n)
+
+```json
+{
+  "chamados.titulo": "Gestão de Chamados",
+  "chamados.criar": "Abrir Chamado",
+  "chamados.numero": "Número",
+  "chamados.status.aberto": "Aberto",
+  "chamados.status.em_atendimento": "Em Atendimento",
+  "chamados.status.resolvido": "Resolvido",
+  "chamados.status.fechado": "Fechado",
+  "chamados.prioridade.baixa": "Baixa",
+  "chamados.prioridade.media": "Média",
+  "chamados.prioridade.alta": "Alta",
+  "chamados.prioridade.urgente": "Urgente",
+  "chamados.sla.vencido": "SLA vencido há {horas} horas",
+  "chamados.escalar": "Escalar Chamado",
+  "chamados.avaliar": "Avaliar Atendimento"
+}
+```
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-12-18 | Architect Agent | Criação inicial - 10 casos de uso |

@@ -1,0 +1,821 @@
+# =============================================
+# RL-RF089: Referência ao Legado (Conciliação e Auditoria de Faturas)
+# Versão: 1.0
+# Data: 2025-12-31
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF089
+titulo: "Conciliação e Auditoria de Faturas"
+
+legado:
+  sistema: "ASP.NET Web Forms 4.8 + VB.NET + SQL Server 2019"
+  versao: "v1.0 (2010-2025)"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2019 (múltiplos bancos por cliente)"
+  multi_tenant: false
+  auditoria: "partial"  # Apenas Created/Modified, sem hash
+
+# ==============================================================================
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+# ==============================================================================
+
+referencias:
+  # ----------------------------------------------------------------------------
+  # TELAS ASPX
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF089-001"
+    tipo: "tela"
+    nome: "ConciliacaoNFe.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/ConciliacaoNFe.aspx"
+    descricao: |
+      Tela principal de conciliação manual de Notas Fiscais com Pedidos de Compra.
+      Usuário insere CHAVE_NFE, seleciona PC e clica em "Conciliar".
+      Matching manual, sem tolerâncias configuráveis, sem workflow de aprovação.
+    regras_implicitas:
+      - "Validação de CHAVE_NFE apenas em client-side (JavaScript)"
+      - "Matching de valor exato (sem tolerância)"
+      - "Divergências não classificadas por severidade"
+      - "Aprovação via e-mail manual (sem rastreabilidade)"
+    destino: "substituido"
+    justificativa: |
+      Funcionalidade completamente redesenhada com matching automático multi-nível,
+      tolerâncias configuráveis, workflow de aprovação com SLA, ML para anomalias.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-01, RN-FIN-089-02, RN-FIN-089-03"
+      uc_moderno: "UC05-conciliar-fatura"
+    migracao_moderna:
+      componente_angular: "conciliacao-faturas.component.ts"
+      rota_frontend: "/financial/reconciliation/invoices"
+      cqrs_command: "ReconciliarNotaFiscalCommand"
+      cqrs_handler: "ReconciliarNotaFiscalCommandHandler"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF089-002"
+    tipo: "tela"
+    nome: "DivergenciasAprovacao.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/DivergenciasAprovacao.aspx"
+    descricao: |
+      Tela de aprovação manual de divergências detectadas.
+      GridView com divergências pendentes, usuário aprova/rejeita com justificativa.
+    regras_implicitas:
+      - "Divergências sem classificação de severidade"
+      - "Sem roteamento automático (qualquer usuário pode aprovar)"
+      - "Sem SLA (divergências ficam pendentes indefinidamente)"
+      - "Auditoria simples (usuário/data, sem hash)"
+    destino: "substituido"
+    justificativa: |
+      Workflow de aprovação redesenhado com roteamento automático por severidade,
+      SLA diferenciado (CRÍTICA: 4h, ALTA: 24h), notificações SignalR, auditoria com hash SHA-512.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-06"
+      uc_moderno: "UC06-aprovar-divergencia"
+    migracao_moderna:
+      componente_angular: "divergencias-aprovacao.component.ts"
+      rota_frontend: "/financial/reconciliation/discrepancies"
+      cqrs_command: "AprovarDivergenciaCommand"
+      cqrs_handler: "AprovarDivergenciaCommandHandler"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF089-003"
+    tipo: "tela"
+    nome: "RelatorioFiscal.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/RelatorioFiscal.aspx"
+    descricao: |
+      Geração de relatórios de conciliação em RDLC (Report Builder).
+      Exportação em PDF ou Excel, sem SPED automatizado.
+    regras_implicitas:
+      - "Relatórios hardcoded (RDLC)"
+      - "Timeout em períodos >3 meses (50k+ faturas)"
+      - "Sem filtros avançados (fornecedor, status, severidade)"
+      - "Sem exportação SPED (E-100, E-200, E-310)"
+    destino: "substituido"
+    justificativa: |
+      Relatórios dinâmicos com exportação SPED (E-100, E-200, E-310),
+      Excel, PDF, JSON, processamento assíncrono via Hangfire, sem limite de volume.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-10"
+      uc_moderno: "UC08-exportar-relatorios"
+    migracao_moderna:
+      componente_angular: "relatorios-fiscais.component.ts"
+      rota_frontend: "/financial/reconciliation/reports"
+      service: "RelatorioFiscalExportService"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF089-004"
+    tipo: "tela"
+    nome: "ConciliaBancaria.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/ConciliaBancaria.aspx"
+    descricao: |
+      Conciliação manual de faturas com pagamentos bancários.
+      Usuário seleciona fatura + pagamento e clica em "Vincular".
+    regras_implicitas:
+      - "Conciliação 100% manual (sem automação)"
+      - "Sem matching automático por valor ou data"
+      - "Sem detecção de atrasos/adiantamentos"
+      - "Sem cálculo de juros e multas"
+      - "Importação de extrato bancário feita em Excel separado"
+    destino: "substituido"
+    justificativa: |
+      Conciliação bancária automática com matching de valor (±R$ 0,01) e data (±5 dias),
+      cálculo de juros/multas, detecção de órfãos, integração com APIs bancárias.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-08"
+      uc_moderno: "UC07-conciliar-bancariamente"
+    migracao_moderna:
+      componente_angular: "conciliacao-bancaria.component.ts"
+      rota_frontend: "/financial/reconciliation/banking"
+      service: "ConciliacaoBancariaService"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF089-005"
+    tipo: "webservice"
+    nome: "WSNotaFiscal.asmx"
+    caminho: "ic1_legado/IControlIT/WebService/WSNotaFiscal.asmx.vb"
+    metodos:
+      - nome: "ObterNotaFiscal"
+        parametros: "id As Integer"
+        retorno: "DataTable"
+      - nome: "ListarNotasFiscais"
+        parametros: "filtro As FiltroNFe"
+        retorno: "DataTable"
+      - nome: "ConciliarNFe"
+        parametros: "nfeId As Integer, pcId As Integer"
+        retorno: "Boolean"
+      - nome: "AprovaDivergencia"
+        parametros: "divId As Integer, justificativa As String"
+        retorno: "Boolean"
+      - nome: "RejeitaDivergencia"
+        parametros: "divId As Integer, justificativa As String"
+        retorno: "Boolean"
+      - nome: "ExportarRelatorio"
+        parametros: "filtro As FiltroRelatorio"
+        retorno: "Byte()"
+    descricao: |
+      WebService ASMX para operações de conciliação de faturas.
+      Sem autenticação JWT, sem paginação, sem RBAC, métodos síncronos.
+    regras_implicitas:
+      - "Sem autenticação JWT (vulnerável)"
+      - "Sem paginação (retorna todas as faturas, estouro de memória)"
+      - "Sem validação de permissões RBAC"
+      - "Métodos síncronos (timeout em operações demoradas)"
+      - "DataTable como retorno (acoplamento forte)"
+    destino: "substituido"
+    justificativa: |
+      WebService ASMX substituído por REST API com autenticação JWT,
+      paginação, RBAC, async/await, DTOs tipados (Clean Architecture).
+    rastreabilidade:
+      rf_moderno: "Seção 11 - Rastreabilidade"
+      endpoints_modernos:
+        - "GET /api/v1/invoices"
+        - "GET /api/v1/invoices/{id}"
+        - "POST /api/v1/invoices/{id}/reconcile"
+        - "PUT /api/v1/discrepancies/{id}/approve"
+        - "PUT /api/v1/discrepancies/{id}/reject"
+        - "GET /api/v1/reports/export"
+    migracao_moderna:
+      controller: "InvoicesController (Minimal API)"
+      queries: "GetInvoicesQuery, GetInvoiceByIdQuery"
+      commands: "ReconciliarNotaFiscalCommand, AprovarDivergenciaCommand"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF089-006"
+    tipo: "stored_procedure"
+    nome: "pa_ConciliarNotaFiscal"
+    caminho: "Database/dbo.pa_ConciliarNotaFiscal"
+    parametros_entrada:
+      - "@ChaveNFe VARCHAR(44)"
+      - "@PedidoCompraId INT"
+    parametros_saida:
+      - "@Result INT OUTPUT"
+    descricao: |
+      Executa matching entre NF-e e PC.
+      Valida fornecedor, valor total (exato, sem tolerância), quantidade (exato).
+      Registra divergências em tblDivergenciaFatura.
+    regras_implicitas:
+      - "Matching apenas two-way (NF-e ↔ PC), sem RM"
+      - "Validação de valor exato (sem tolerância configurável)"
+      - "Sem validação de datas, CFOP, alíquotas"
+      - "Sem classificação de severidade"
+      - "Performance ruim (consultas N+1)"
+    destino: "substituido"
+    justificativa: |
+      Lógica migrada para Application Layer (CQRS Handler) com three-way matching,
+      tolerâncias configuráveis, validação completa (datas, CFOP, alíquotas),
+      classificação de severidade.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-03"
+      handler_moderno: "ThreeWayMatchingEngine.cs"
+    migracao_moderna:
+      handler: "ExecuteThreeWayMatchingAsync (Application/Commands/Matching/)"
+      validacao: "FluentValidation em ReconciliarNotaFiscalCommandValidator"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF089-007"
+    tipo: "stored_procedure"
+    nome: "pa_DetectarDivergencias"
+    caminho: "Database/dbo.pa_DetectarDivergencias"
+    parametros_entrada:
+      - "@NotaFiscalId INT"
+      - "@PedidoCompraId INT"
+    parametros_saida:
+      - "@DivergenciasCount INT OUTPUT"
+    descricao: |
+      Identifica divergências entre NF-e e PC (valor, quantidade).
+      Registra em tblDivergenciaFatura sem classificação de severidade.
+    regras_implicitas:
+      - "Divergências registradas sem severidade (todas iguais)"
+      - "Sem validação de CFOP, alíquotas, datas"
+      - "Sem detecção de anomalias (ML)"
+    destino: "substituido"
+    justificativa: |
+      Lógica migrada para DivergenciaClassifier.cs com classificação automática
+      de severidade (CRÍTICA, ALTA, MÉDIA, BAIXA) e ML para detecção de anomalias.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-02, RN-FIN-089-05"
+      service_moderno: "DivergenciaClassifier, AnomalyDetectionService"
+    migracao_moderna:
+      classifier: "DivergenciaClassifier.ClassificarDivergencia()"
+      ml_service: "AnomalyDetectionService.DetectarAnomaliaAsync()"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF089-008"
+    tipo: "stored_procedure"
+    nome: "pa_GerarRelatorioFiscal"
+    caminho: "Database/dbo.pa_GerarRelatorioFiscal"
+    parametros_entrada:
+      - "@DataInicio DATETIME"
+      - "@DataFim DATETIME"
+      - "@ClienteCNPJ VARCHAR(14)"
+    parametros_saida:
+      - "@ResultSet TABLE"
+    descricao: |
+      Gera dataset para relatório RDLC de conciliação.
+      Timeout em volume >10k faturas, sem exportação SPED.
+    regras_implicitas:
+      - "Dataset hardcoded para RDLC"
+      - "Timeout em volume >10k"
+      - "Sem filtros avançados (fornecedor, status)"
+    destino: "substituido"
+    justificativa: |
+      Lógica migrada para RelatorioFiscalExportService.cs com exportação SPED
+      (E-100, E-200, E-310), Excel, PDF, JSON, processamento assíncrono (Hangfire).
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-10"
+      service_moderno: "RelatorioFiscalExportService"
+    migracao_moderna:
+      service: "ExportarSPEDAsync(), ExportarExcelAsync()"
+      job_hangfire: "GerarRelatorioFiscalJob (execução noturna)"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF089-009"
+    tipo: "stored_procedure"
+    nome: "pa_AtualizarStatusDivergencia"
+    caminho: "Database/dbo.pa_AtualizarStatusDivergencia"
+    parametros_entrada:
+      - "@DivergenciaId INT"
+      - "@NovoStatus VARCHAR(20)"
+      - "@UsuarioResolucao VARCHAR(100)"
+      - "@JustificativaResolucao NVARCHAR(500)"
+    parametros_saida:
+      - "@Success BIT OUTPUT"
+    descricao: |
+      Atualiza status de divergência (Aprovada/Rejeitada).
+      Registra usuário e justificativa, sem hash de integridade.
+    regras_implicitas:
+      - "Sem validação de permissões (qualquer usuário pode aprovar)"
+      - "Sem workflow de roteamento automático"
+      - "Sem SLA"
+      - "Auditoria simples (sem hash SHA-512)"
+    destino: "substituido"
+    justificativa: |
+      Lógica migrada para DivergenciaWorkflowService.cs com roteamento automático
+      por severidade, SLA, RBAC multi-nível, auditoria com hash SHA-512.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-06, RN-FIN-089-09"
+      service_moderno: "DivergenciaWorkflowService, AuditoriaFinanceiraService"
+    migracao_moderna:
+      service: "RotearDivergenciaAsync(), LogarOperacaoAsync()"
+      auditoria: "Event sourcing com hash SHA-512"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF089-010"
+    tipo: "tabela"
+    nome: "tblNotaFiscalEletronica"
+    caminho: "ic1_legado/Database/dbo.tblNotaFiscalEletronica"
+    titulo: "tblNotaFiscalEletronica"
+    schema_legado: "[dbo].[tblNotaFiscalEletronica]"
+    problemas_identificados:
+      - "SEM campo ClienteId (multi-tenancy): um banco por cliente"
+      - "SEM campos de auditoria completa: apenas UsuarioCriacao/DataAlteracao, sem hash"
+      - "SEM soft delete (Fl_Excluido): exclusão física (perda de dados)"
+      - "SEM índices em DataEmissao, StatusConciliacao, FornecedorCNPJ"
+      - "CNPJ em VARCHAR: deveria ser criptografado (LGPD)"
+      - "StatusConciliacao VARCHAR: deveria ser Enum ou FK"
+    descricao: |
+      Tabela principal de Notas Fiscais Eletrônicas recebidas de fornecedores.
+      Problemas: sem multi-tenancy, auditoria fraca, exclusão física.
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com multi-tenancy (ClienteId), auditoria completa
+      (Created, Modified, hash SHA-512), soft delete (Fl_Excluido), índices estratégicos,
+      CNPJ criptografado, StatusConciliacao como Enum.
+    rastreabilidade:
+      rf_moderno: "Seção 6 - Estados da Entidade"
+      md_moderno: "MD-RF089.md - NotaFiscal (Entity)"
+    migracao_moderna:
+      tabela_moderna: "NotaFiscal"
+      migration_ef_core: "20251231_CreateNotaFiscalTable.cs"
+      campos_novos:
+        - "ClienteId (multi-tenancy)"
+        - "Fl_Excluido (soft delete)"
+        - "HashIntegridade (SHA-512)"
+        - "Created/Modified (auditoria)"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF089-011"
+    tipo: "tabela"
+    nome: "tblNotaFiscalEletronicaItem"
+    caminho: "ic1_legado/Database/dbo.tblNotaFiscalEletronicaItem"
+    titulo: "tblNotaFiscalEletronicaItem"
+    schema_legado: "[dbo].[tblNotaFiscalEletronicaItem]"
+    problemas_identificados:
+      - "SEM validação de CFOP: VARCHAR(4) sem CHECK CONSTRAINT"
+      - "SEM auditoria: itens alterados sem rastreamento"
+      - "Cascade delete: risco de perda de dados"
+      - "SEM índice em NotaFiscalId (FK): performance ruim em JOINs"
+    descricao: |
+      Itens de Notas Fiscais Eletrônicas (produtos/serviços faturados).
+      Problemas: sem validação de CFOP, cascade delete perigoso.
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com validação de CFOP (FK para tabela de CFOPs válidos),
+      auditoria, soft delete, índices em FK.
+    rastreabilidade:
+      rf_moderno: "Seção 4 - Funcionalidades Cobertas"
+      md_moderno: "MD-RF089.md - NotaFiscalItem (Entity)"
+    migracao_moderna:
+      tabela_moderna: "NotaFiscalItem"
+      migration_ef_core: "20251231_CreateNotaFiscalItemTable.cs"
+      campos_novos:
+        - "CFOPId (FK para tabela CFOPs)"
+        - "Fl_Excluido (soft delete)"
+        - "Created/Modified (auditoria)"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF089-012"
+    tipo: "tabela"
+    nome: "tblDivergenciaFatura"
+    caminho: "ic1_legado/Database/dbo.tblDivergenciaFatura"
+    titulo: "tblDivergenciaFatura"
+    schema_legado: "[dbo].[tblDivergenciaFatura]"
+    problemas_identificados:
+      - "SEM campo DataSLA: sem controle de prazo de aprovação"
+      - "SEM campo Roteadores: workflow não rastreável"
+      - "Severidade VARCHAR: sem validação (pode ser qualquer string)"
+      - "SEM auditoria de quem CRIOU a divergência"
+      - "SEM hash de integridade"
+    descricao: |
+      Divergências detectadas no matching de documentos.
+      Problemas: sem SLA, sem roteamento, auditoria fraca.
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com DataSLA, Roteadores (JSON array), Severidade Enum,
+      auditoria completa, hash SHA-512.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-02, RN-FIN-089-06"
+      md_moderno: "MD-RF089.md - Divergencia (Entity)"
+    migracao_moderna:
+      tabela_moderna: "Divergencia"
+      migration_ef_core: "20251231_CreateDivergenciaTable.cs"
+      campos_novos:
+        - "DataSLA (DateTime)"
+        - "Roteadores (JSON array de UsuarioId)"
+        - "Severidade (Enum: CRÍTICA, ALTA, MÉDIA, BAIXA)"
+        - "HashIntegridade (SHA-512)"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF089-013"
+    tipo: "tabela"
+    nome: "tblMatchingDocumentos"
+    caminho: "ic1_legado/Database/dbo.tblMatchingDocumentos"
+    titulo: "tblMatchingDocumentos"
+    schema_legado: "[dbo].[tblMatchingDocumentos]"
+    problemas_identificados:
+      - "SEM campo TipoMatching: não diferencia two-way de three-way"
+      - "SEM auditoria: não registra quem executou o matching"
+      - "PercentualConcordancia: cálculo não documentado"
+      - "SEM campos de tolerância: hardcoded no código"
+    descricao: |
+      Registro de matching entre documentos (NF-e, PC, RM).
+      Problemas: sem tipo de matching, auditoria fraca.
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com TipoMatching (Enum), auditoria completa,
+      ToleranciaValor/ToleranciaQuantidade configuráveis.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-03"
+      md_moderno: "MD-RF089.md - Conciliacao (Entity)"
+    migracao_moderna:
+      tabela_moderna: "Conciliacao"
+      migration_ef_core: "20251231_CreateConciliacaoTable.cs"
+      campos_novos:
+        - "TipoMatching (Enum: TwoWay, ThreeWay)"
+        - "ToleranciaValor (Decimal)"
+        - "ToleranciaQuantidade (Decimal)"
+        - "UsuarioExecutor (auditoria)"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # REGRAS IMPLÍCITAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF089-014"
+    tipo: "regra_negocio"
+    nome: "Validação de CHAVE_NFE apenas client-side"
+    caminho: "ic1_legado/IControlIT/Financeiro/ConciliacaoNFe.aspx"
+    titulo: "Validação de CHAVE_NFE apenas client-side"
+    localizacao_codigo: "ConciliacaoNFe.aspx - JavaScript inline"
+    descricao: |
+      CHAVE_NFE é validada apenas via JavaScript no browser, sem validação server-side robusta.
+      Risco: usuário pode burlar validação e inserir CHAVE_NFE inválida.
+    destino: "substituido"
+    justificativa: |
+      Validação server-side obrigatória no Command Validator (FluentValidation),
+      44 dígitos + dígito verificador.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-01"
+      validador_moderno: "ReconciliarNotaFiscalCommandValidator"
+    migracao_moderna:
+      validador: "FluentValidation: RuleFor(x => x.ChaveNFe).Must(BeValidChaveNFe)"
+      linha_codigo: "Application/Commands/Reconciliation/ReconciliarNotaFiscalCommandValidator.cs"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF089-015"
+    tipo: "regra_negocio"
+    nome: "Matching exato de valor (sem tolerância)"
+    caminho: "ic1_legado/IControlIT/Financeiro/ConciliacaoNFe.aspx.vb"
+    titulo: "Matching exato de valor (sem tolerância)"
+    localizacao_codigo: "ConciliacaoNFe.aspx.vb - btnConciliar_Click"
+    descricao: |
+      Matching de valor exige correspondência exata (valorNFe <> valorPC), sem tolerância.
+      Problema: diferenças de centavos (arredondamento) geram divergências desnecessárias.
+    destino: "substituido"
+    justificativa: |
+      Tolerâncias configuráveis por empresa e tipo de item (absoluta R$ e percentual %).
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-03"
+      service_moderno: "ThreeWayMatchingEngine"
+    migracao_moderna:
+      service: "ExecuteThreeWayMatchingAsync() com config.GetTolerancia()"
+      linha_codigo: "Application/Services/Matching/ThreeWayMatchingEngine.cs"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF089-016"
+    tipo: "regra_negocio"
+    nome: "Divergências tratadas igualmente (sem severidade)"
+    caminho: "ic1_legado/Database/dbo.pa_DetectarDivergencias"
+    titulo: "Divergências tratadas igualmente (sem severidade)"
+    localizacao_codigo: "pa_DetectarDivergencias - stored procedure"
+    descricao: |
+      Todas as divergências são registradas sem classificação de impacto.
+      Problema: divergências críticas (CFOP inválido) tratadas igual a divergências baixas (0,5%).
+    destino: "substituido"
+    justificativa: |
+      Classificação automática em CRÍTICA, ALTA, MÉDIA, BAIXA conforme impacto financeiro.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-02"
+      service_moderno: "DivergenciaClassifier"
+    migracao_moderna:
+      service: "ClassificarDivergencia() retorna DivergenciaClassificacao Enum"
+      linha_codigo: "Application/Services/Divergencias/DivergenciaClassifier.cs"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF089-017"
+    tipo: "regra_negocio"
+    nome: "Aprovação sem controle de permissões"
+    caminho: "ic1_legado/IControlIT/Financeiro/DivergenciasAprovacao.aspx.vb"
+    titulo: "Aprovação sem controle de permissões"
+    localizacao_codigo: "DivergenciasAprovacao.aspx.vb - btnAprovar_Click"
+    descricao: |
+      Qualquer usuário com acesso à tela pode aprovar divergências, sem validação de role.
+      Risco: usuário sem autoridade pode aprovar divergências críticas.
+    destino: "substituido"
+    justificativa: |
+      RBAC multi-nível com permissões específicas por severidade
+      (ex: apenas Diretor aprova CRÍTICA).
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-06, Seção 9 - Segurança"
+      permissoes_modernos:
+        - "fin.conciliacao.aprovar_critica (DIRETOR)"
+        - "fin.conciliacao.aprovar_alta (DIRETOR, CONTROLLER)"
+    migracao_moderna:
+      authorization: "RequirePermission em AprovarDivergenciaCommandHandler"
+      linha_codigo: "Application/Commands/Divergencias/AprovarDivergenciaCommandHandler.cs"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF089-018"
+    tipo: "regra_negocio"
+    nome: "Conciliação bancária 100% manual"
+    caminho: "ic1_legado/IControlIT/Financeiro/ConciliaBancaria.aspx.vb"
+    titulo: "Conciliação bancária 100% manual"
+    localizacao_codigo: "ConciliaBancaria.aspx.vb - btnVincular_Click"
+    descricao: |
+      Vinculação de fatura × pagamento feita manualmente pelo usuário.
+      Problema: 100% trabalho manual, sujeito a erros.
+    destino: "substituido"
+    justificativa: |
+      Conciliação bancária automática com matching de valor (±R$ 0,01) e data (±5 dias).
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-08"
+      service_moderno: "ConciliacaoBancariaService"
+    migracao_moderna:
+      service: "ExecutarConciliaBancariaAsync() com matching automático"
+      linha_codigo: "Application/Services/Conciliacao/ConciliacaoBancariaService.cs"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF089-019"
+    tipo: "regra_negocio"
+    nome: "Relatórios hardcoded sem SPED"
+    caminho: "ic1_legado/IControlIT/Financeiro/RelatorioFiscal.aspx"
+    titulo: "Relatórios hardcoded sem SPED"
+    localizacao_codigo: "RelatorioFiscal.aspx - ReportViewer (RDLC)"
+    descricao: |
+      Relatórios gerados em RDLC (Report Builder), sem exportação SPED automatizada.
+      Problema: não atende conformidade fiscal (SPED Fiscal E-100, E-200, E-310).
+    destino: "substituido"
+    justificativa: |
+      Exportação SPED automatizada conforme layout da Receita Federal.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-10"
+      service_moderno: "RelatorioFiscalExportService"
+    migracao_moderna:
+      service: "ExportarSPEDAsync() gera arquivo .txt com registros E-100, E-200, E-310"
+      linha_codigo: "Application/Services/Relatorios/RelatorioFiscalExportService.cs"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF089-020"
+    tipo: "regra_negocio"
+    nome: "Auditoria simples (sem hash SHA-512)"
+    caminho: "ic1_legado/Database/dbo.tblNotaFiscalEletronica"
+    titulo: "Auditoria simples (sem hash SHA-512)"
+    localizacao_codigo: "Campos UsuarioCriacao/DataCriacao em tblNotaFiscalEletronica"
+    descricao: |
+      Auditoria registra apenas usuário e data, sem hash SHA-512 para garantir integridade.
+      Risco: dados de auditoria podem ser alterados sem detecção.
+    destino: "substituido"
+    justificativa: |
+      Event sourcing com hash SHA-512 em TODOS os eventos de auditoria.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-09"
+      service_moderno: "AuditoriaFinanceiraService"
+    migracao_moderna:
+      service: "LogarOperacaoAsync() gera hash SHA-512(timestamp|usuarioId|operacao|descricao)"
+      linha_codigo: "Application/Services/Auditoria/AuditoriaFinanceiraService.cs"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF089-021"
+    tipo: "regra_negocio"
+    nome: "Sem detecção de anomalias (fraudes manuais)"
+    caminho: "ic1_legado/IControlIT/Financeiro/"
+    titulo: "Sem detecção de anomalias (fraudes manuais)"
+    localizacao_codigo: "Não existe no legado"
+    descricao: |
+      Detecção de fraudes/erros feita manualmente por revisão humana (sem ML).
+      Problema: alto risco de fraudes não detectadas, carga manual excessiva.
+    destino: "assumido"
+    justificativa: |
+      Modelo de Machine Learning treinado em 24 meses de histórico,
+      score de anomalia >0.75 = revisar.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-05"
+      rf_item_relacionado: "RN-FIN-089-05"
+      service_moderno: "AnomalyDetectionService"
+    migracao_moderna:
+      service: "DetectarAnomaliaAsync() usando Azure ML (modelo-fraude-faturas)"
+      linha_codigo: "Application/Services/ML/AnomalyDetectionService.cs"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF089-022"
+    tipo: "regra_negocio"
+    nome: "Matching apenas two-way (NF-e ↔ PC)"
+    caminho: "ic1_legado/Database/dbo.pa_ConciliarNotaFiscal"
+    titulo: "Matching apenas two-way (NF-e ↔ PC)"
+    localizacao_codigo: "pa_ConciliarNotaFiscal - stored procedure"
+    descricao: |
+      Matching valida apenas NF-e vs PC, sem validar Recebimento de Mercadoria (RM).
+      Problema: não detecta divergências entre quantidade recebida e faturada.
+    destino: "substituido"
+    justificativa: |
+      Three-way matching obrigatório (NF-e ↔ PC ↔ RM).
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-03"
+      service_moderno: "ThreeWayMatchingEngine"
+    migracao_moderna:
+      service: "ExecuteThreeWayMatchingAsync(pc, rm, nfe, config)"
+      linha_codigo: "Application/Services/Matching/ThreeWayMatchingEngine.cs"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF089-023"
+    tipo: "regra_negocio"
+    nome: "Bloqueio de pagamento manual (sem automação)"
+    caminho: "ic1_legado/IControlIT/Financeiro/"
+    titulo: "Bloqueio de pagamento manual (sem automação)"
+    localizacao_codigo: "Processo manual via telefone/e-mail (não sistematizado)"
+    descricao: |
+      Bloqueio de fatura para pagamento feito manualmente via telefone/e-mail.
+      Problema: risco de pagamento de faturas divergentes.
+    destino: "substituido"
+    justificativa: |
+      Bloqueio automático de pagamentos em divergências CRÍTICAS e ALTAS,
+      auditoria de tentativas de bypass.
+    rastreabilidade:
+      rf_moderno: "RN-FIN-089-07"
+      service_moderno: "PagamentoAutoProhibitionService"
+    migracao_moderna:
+      service: "ValidarLiberacaoPagamentoAsync() retorna ProhibitionResult.Blocked()"
+      linha_codigo: "Application/Services/Pagamentos/PagamentoAutoProhibitionService.cs"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+# ==============================================================================
+# BANCOS LEGADOS MAPEADOS
+# ==============================================================================
+
+bancos_legados:
+  - nome: "IC1_Cliente01"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "tblNotaFiscalEletronica"
+      - "tblNotaFiscalEletronicaItem"
+      - "tblDivergenciaFatura"
+      - "tblMatchingDocumentos"
+      - "tblPedidoCompra"
+      - "tblRecebimentoMercadoria"
+    destino: "CONSOLIDADO"
+    justificativa: |
+      Migrado para banco único com multi-tenancy (ClienteId + Row-Level Security).
+      Reduz custos de infraestrutura, facilita reporting consolidado.
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+  - nome: "IC1_Cliente02"
+    servidor: "SQL-LEGADO-02"
+    tabelas_relacionadas:
+      - "tblNotaFiscalEletronica"
+      - "tblDivergenciaFatura"
+    destino: "CONSOLIDADO"
+    justificativa: "Consolidado em banco único com ClienteId"
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+  - nome: "IC1_Cliente03"
+    servidor: "SQL-LEGADO-03"
+    tabelas_relacionadas:
+      - "tblNotaFiscalEletronica"
+      - "tblDivergenciaFatura"
+    destino: "CONSOLIDADO"
+    justificativa: "Consolidado em banco único com ClienteId"
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF089-001"
+    titulo: "Acoplamento de Dados (um banco por cliente)"
+    severidade: "CRÍTICA"
+    descricao: |
+      Cada cliente possui banco SQL Server separado, dificultando consolidação,
+      reporting e manutenção. Custos elevados de infraestrutura.
+    impacto: "Impossibilita reporting consolidado, aumenta custos, dificulta backup/restore"
+    solucao_moderna: |
+      Migração para banco único com multi-tenancy (ClienteId + Row-Level Security).
+      Reduz custos, facilita reporting, simplifica manutenção.
+
+  - id: "PROB-RF089-002"
+    titulo: "Conciliação Manual (90% em Excel)"
+    severidade: "ALTA"
+    descricao: |
+      90% do matching é feito manualmente em Excel, sem automação.
+      Alto risco de erros humanos, lentidão operacional.
+    impacto: "Erros manuais, lentidão, carga excessiva de trabalho, SLA não cumprido"
+    solucao_moderna: |
+      Matching automático two-way e three-way com tolerâncias configuráveis,
+      processamento batch noturno via Hangfire, taxa de automação ≥85%.
+
+  - id: "PROB-RF089-003"
+    titulo: "Ausência de Machine Learning (fraudes não detectadas)"
+    severidade: "ALTA"
+    descricao: |
+      Não há detecção de anomalias via ML. Fraudes são identificadas manualmente
+      (se identificadas). Alto risco de perdas financeiras.
+    impacto: "Fraudes não detectadas, perdas financeiras, risco reputacional"
+    solucao_moderna: |
+      Modelo de ML treinado em histórico de 24 meses, score de anomalia >0.75 = revisar,
+      acurácia ≥92%, retreino mensal.
+
+  - id: "PROB-RF089-004"
+    titulo: "Stored Procedures Complexas (lógica embutida em SQL)"
+    severidade: "MÉDIA"
+    descricao: |
+      Lógica de negócio embutida em stored procedures (SQL), difícil de testar,
+      manter e evoluir. Sem testes unitários.
+    impacto: "Dificulta manutenção, evolução, testes, aumenta risco de bugs"
+    solucao_moderna: |
+      Migração de toda lógica para Application Layer (CQRS Handlers C#),
+      testes unitários com xUnit, cobertura ≥80%.
+
+  - id: "PROB-RF089-005"
+    titulo: "Sem Event Sourcing (auditoria fraca)"
+    severidade: "ALTA"
+    descricao: |
+      Auditoria simples (before/after), sem trilha imutável, sem hash de integridade.
+      Dados de auditoria podem ser alterados sem detecção.
+    impacto: "Risco de fraude interna, não atende SOX, LGPD, investigações inviáveis"
+    solucao_moderna: |
+      Event sourcing com hash SHA-512 em TODAS as operações, trilha imutável,
+      retenção 7 anos, validação de integridade em cada acesso.
+
+  - id: "PROB-RF089-006"
+    titulo: "Performance Ruim (consultas N+1, timeouts >50k faturas)"
+    severidade: "MÉDIA"
+    descricao: |
+      Consultas N+1 em telas de listagem, timeout em relatórios com >50k faturas,
+      sem índices estratégicos.
+    impacto: "Lentidão para usuários, timeouts frequentes, necessidade de hardware extra"
+    solucao_moderna: |
+      Índices estratégicos (DataEmissao, StatusConciliacao, FornecedorCNPJ),
+      paginação obrigatória, processamento assíncrono via Hangfire, cache Redis.
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 23
+  itens_assumidos: 1
+  itens_substituidos: 22
+  itens_descartados: 0
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+  data_ultima_atualizacao: "2025-12-31"
+  autor_ultima_atualizacao: "Agência ALC - alc.dev.br"
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-31"
+    descricao: "Criação inicial do RL-RF089.yaml com rastreabilidade completa (100% destinos)"
+    autor: "Agência ALC - alc.dev.br"

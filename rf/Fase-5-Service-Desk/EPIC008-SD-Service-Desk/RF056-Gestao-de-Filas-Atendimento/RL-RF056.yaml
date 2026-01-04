@@ -1,0 +1,499 @@
+# RL-RF056 - Referência ao Legado (Gestão de Filas de Atendimento)
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF056
+titulo: "Gestão de Filas de Atendimento"
+versao_governanca: "2.0"
+data_migracao: "2025-12-30"
+
+# ==============================================================================
+# CONTEXTO DO LEGADO
+# ==============================================================================
+
+legado:
+  sistema: "IControlIT v1.0 (ASP.NET Web Forms + VB.NET)"
+  versao: "1.0"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server (multi-database por cliente)"
+  multi_tenant: false
+  auditoria: "none"
+
+# ==============================================================================
+# REFERÊNCIAS AO LEGADO (COM DESTINO OBRIGATÓRIO)
+# ==============================================================================
+
+referencias:
+  # ----------------------------------------------------------------------------
+  # TELAS ASPX
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF056-001"
+    tipo: "tela"
+    nome: "FilaAtendimento.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/FilaAtendimento.aspx"
+    descricao: |
+      Tela de visualização básica de solicitações pendentes.
+      Exibia GridView com todas as solicitações sem filtro automático de fila.
+      Supervisor atribuía solicitações manualmente via botão "Atribuir".
+      Sem ordenação automática por prioridade ou SLA.
+      Sem refresh automático (usuário precisava pressionar F5).
+    regras_implicitas:
+      - "Priorização manual via arraste de linhas no GridView"
+      - "Sem validação de skills do atendente ao atribuir"
+      - "Sem validação de carga de trabalho atual do atendente"
+      - "Contador total de fila sem atualização em tempo real"
+    destino: "substituido"
+    justificativa: "Substituído por sistema automático de filas com priorização inteligente, routing por skills e balanceamento de carga."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 4 (Funcionalidades)"
+      uc_moderno: "UC00-Listar-Filas"
+    migracao_moderna:
+      componente_angular: "filas-list.component.ts"
+      rota_frontend: "/service-desk/filas"
+
+  - id: "LEG-RF056-002"
+    tipo: "tela"
+    nome: "AtendimentoSolicitacao.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/AtendimentoSolicitacao.aspx"
+    descricao: |
+      Interface individual de atendimento.
+      Atendente precisava "puxar" solicitação manualmente da lista.
+      Sem notificação quando nova solicitação entrava na fila.
+      Transferência entre atendentes sem validação de skill.
+      Histórico de transferências não era registrado formalmente.
+    regras_implicitas:
+      - "Atendente escolhia livremente qual solicitação atender (modelo pull)"
+      - "Sem limite formal de solicitações simultâneas"
+      - "Transferência manual sem campos obrigatórios (motivo)"
+    destino: "substituido"
+    justificativa: "Substituído por modelo push com atribuição automática, notificações em tempo real e transferência validada."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (Regras de Negócio)"
+      uc_moderno: "UC01-Distribuir-Solicitacao, UC03-Transferir-Solicitacao"
+    migracao_moderna:
+      componente_angular: "solicitacao-atendimento.component.ts"
+      rota_frontend: "/service-desk/atendimento/{id}"
+
+  - id: "LEG-RF056-003"
+    tipo: "tela"
+    nome: "RelatorioFilas.aspx"
+    caminho: "ic1_legado/IControlIT/Relatorios/RelatorioFilas.aspx"
+    descricao: |
+      Relatório estático de produtividade.
+      Gerado sob demanda via SQL Server Reporting Services (SSRS).
+      Sem visualização em tempo real.
+      Exportação apenas em PDF.
+      Dados consolidados diários, sem drill-down ou filtros dinâmicos.
+    regras_implicitas:
+      - "Relatórios processados offline, com delay de horas"
+      - "Métricas calculadas via stored procedures sem validação"
+    destino: "substituido"
+    justificativa: "Substituído por dashboard em tempo real com SignalR, exportação em múltiplos formatos (PDF, Excel) e filtros dinâmicos."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-012, RN-RF056-015)"
+      uc_moderno: "UC04-Visualizar-Metricas"
+    migracao_moderna:
+      componente_angular: "filas-dashboard.component.ts"
+      rota_frontend: "/service-desk/dashboard"
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF056-004"
+    tipo: "webservice"
+    nome: "ServiceDeskService.asmx"
+    caminho: "ic1_legado/IControlIT/WebServices/ServiceDeskService.asmx"
+    metodos:
+      - nome: "ObterSolicitacoesPendentes"
+        parametros: "Nenhum"
+        retorno: "List<Solicitacao>"
+      - nome: "AtribuirSolicitacao"
+        parametros: "idSolicitacao (int), idAtendente (int)"
+        retorno: "bool"
+      - nome: "ObterMetricasGerais"
+        parametros: "Nenhum"
+        retorno: "MetricasDTO"
+    descricao: |
+      Webservice SOAP para operações básicas de fila.
+      Método ObterSolicitacoesPendentes retornava TODAS solicitações sem filtro.
+      Método AtribuirSolicitacao não validava skills nem carga do atendente.
+      Método ObterMetricasGerais tinha cache de 15 minutos (dados desatualizados).
+    destino: "substituido"
+    justificativa: "Substituído por REST API com autenticação JWT, CQRS (Commands e Queries separados) e validações obrigatórias."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-002, RN-RF056-003)"
+      endpoint_moderno: "GET /api/filas, POST /api/filas/distribuir"
+    migracao_moderna:
+      command_cqrs: "DistribuirSolicitacaoCommand"
+      handler: "DistribuirSolicitacaoCommandHandler"
+      query_cqrs: "GetFilasPorCategoriaQuery"
+
+  # ----------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF056-005"
+    tipo: "stored_procedure"
+    nome: "sp_CalcularSLA"
+    caminho: "Database/StoredProcedures/sp_CalcularSLA.sql"
+    parametros_entrada:
+      - "@IdSolicitacao INT"
+    parametros_saida:
+      - "@PercentualSLA DECIMAL(5,2) OUTPUT"
+    descricao: |
+      Calculava SLA linearmente desde abertura até fechamento.
+      Não considerava pausas (aguardando cliente, transferências).
+      Penalizava atendente por tempos de espera externos.
+      Fórmula: (DataAtual - DataAbertura) / TempoSLATotal * 100
+    destino: "substituido"
+    justificativa: "Lógica movida para Application Layer (SLA Value Object) com suporte a pausas e períodos não contabilizáveis."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-014)"
+      regra_moderna: "RN-RF056-014"
+    migracao_moderna:
+      handler: "PausarSLACommand / RetomarSLACommand"
+      value_object: "SLA (Domain/ValueObjects/SLA.cs)"
+
+  - id: "LEG-RF056-006"
+    tipo: "stored_procedure"
+    nome: "sp_RedistribuirSolicitacoes"
+    caminho: "Database/StoredProcedures/sp_RedistribuirSolicitacoes.sql"
+    parametros_entrada:
+      - "@IdAtendenteAusente INT"
+    parametros_saida:
+      - "@TotalRedistribuido INT OUTPUT"
+    descricao: |
+      Executada manualmente pelo supervisor quando atendente faltava.
+      Movia todas solicitações EM_ATENDIMENTO de volta para fila geral.
+      Sem log de auditoria formal da redistribuição.
+      Sem notificação para outros atendentes sobre novas solicitações.
+    destino: "substituido"
+    justificativa: "Substituído por processo automático acionado por Domain Event (AtendenteStatusAlterado) com auditoria completa."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-008)"
+      regra_moderna: "RN-RF056-008"
+    migracao_moderna:
+      command_cqrs: "RedistribuirSolicitacoesCommand"
+      handler: "RedistribuirSolicitacoesCommandHandler"
+      domain_event: "AtendenteStatusAlteradoEvent"
+
+  # ----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF056-007"
+    tipo: "tabela"
+    nome: "tbl_Solicitacoes"
+    caminho: "Database/dbo.tbl_Solicitacoes"
+    descricao: |
+      Tabela legada de armazenamento de solicitações sem campos modernos de priorização, SLA e auditoria.
+    schema_legado: "[dbo].[tbl_Solicitacoes]"
+    problemas_identificados:
+      - "Sem campo de prioridade automática (apenas manual)"
+      - "Sem campo de % SLA consumido (calculado sob demanda)"
+      - "Sem flag VIP formal (usado campo Observações com texto '[VIP]')"
+      - "Sem campos de auditoria (Created, Modified)"
+      - "Sem soft delete (exclusão física)"
+    destino: "substituido"
+    justificativa: "Tabela redesenhada com campos modernos: Prioridade (enum), PercentualSLA (calculado), VIP (bool), campos de auditoria, soft delete."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 4 (Entidades)"
+      md_moderno: "MD-RF056 - Tabela Solicitacao"
+    migracao_moderna:
+      tabela_moderna: "Solicitacao"
+      migration_ef_core: "20251230_CreateSolicitacaoTable.cs"
+
+  - id: "LEG-RF056-008"
+    tipo: "tabela"
+    nome: "tbl_Atendentes"
+    caminho: "Database/dbo.tbl_Atendentes"
+    descricao: |
+      Tabela legada de atendentes sem controle de status, carga de trabalho ou skills/competências.
+    schema_legado: "[dbo].[tbl_Atendentes]"
+    problemas_identificados:
+      - "Sem campo de status (DISPONIVEL, PAUSA, AUSENTE, OCUPADO)"
+      - "Sem campo de carga atual (número de solicitações abertas)"
+      - "Sem tabela de skills/competências técnicas"
+      - "Sem limite configurável de solicitações simultâneas"
+      - "Sem auditoria de mudanças de status"
+    destino: "substituido"
+    justificativa: "Tabela redesenhada com Status (enum), CargaAtual (int), LimiteSimultaneo (int), relacionamento N:N com Skills."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 4 (Entidades)"
+      md_moderno: "MD-RF056 - Tabela Atendente, AtendenteSkill"
+    migracao_moderna:
+      tabela_moderna: "Atendente, AtendenteSkill"
+      migration_ef_core: "20251230_CreateAtendenteTable.cs"
+
+  - id: "LEG-RF056-009"
+    tipo: "tabela"
+    nome: "tbl_TransferenciasSolicitacao"
+    caminho: "Database/dbo.tbl_TransferenciasSolicitacao"
+    descricao: |
+      Tabela legada de transferências de solicitações, raramente usada devido a processo manual via e-mail.
+    schema_legado: "[dbo].[tbl_TransferenciasSolicitacao]"
+    problemas_identificados:
+      - "Tabela existia mas raramente usada (processo manual via e-mail)"
+      - "Sem campo obrigatório de motivo da transferência"
+      - "Sem validação de skill do atendente destino"
+      - "Sem timestamps precisos de quando transferência ocorreu"
+    destino: "assumido"
+    justificativa: "Estrutura mantida com melhorias: Motivo obrigatório, validação de skill, auditoria completa."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-011)"
+      md_moderno: "MD-RF056 - Tabela TransferenciaSolicitacao"
+    migracao_moderna:
+      tabela_moderna: "TransferenciaSolicitacao"
+      migration_ef_core: "20251230_CreateTransferenciaSolicitacaoTable.cs"
+
+  - id: "LEG-RF056-010"
+    tipo: "tabela"
+    nome: "tbl_HistoricoAtendimento"
+    caminho: "Database/dbo.tbl_HistoricoAtendimento"
+    descricao: |
+      Tabela legada de histórico de atendimento com timestamps imprecisos e auditoria incompleta.
+    schema_legado: "[dbo].[tbl_HistoricoAtendimento]"
+    problemas_identificados:
+      - "Sem timestamps precisos (apenas data, sem hora/minuto/segundo)"
+      - "Sem auditoria de quem alterou (campo IdUsuario vazio em 40% dos registros)"
+      - "Sem distinção entre tipos de ação (criado, atualizado, transferido)"
+    destino: "substituido"
+    justificativa: "Substituído por AuditLog padrão do sistema com timestamps UTC, UserId obrigatório, ActionType (enum)."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 9 (Segurança)"
+      md_moderno: "MD-RF056 - Uso do AuditLog central"
+    migracao_moderna:
+      tabela_moderna: "AuditLog (tabela central de auditoria)"
+      migration_ef_core: "Já existente no sistema"
+
+  # ----------------------------------------------------------------------------
+  # REGRAS IMPLÍCITAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF056-011"
+    tipo: "regra_negocio"
+    nome: "Priorização Manual por Arraste no GridView"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/FilaAtendimento.aspx.vb - Linha 145"
+    descricao: |
+      Supervisor ordenava solicitações manualmente arrastando linhas do GridView.
+      Ordem era salva em campo "OrdemPrioridade" na tabela.
+      Processo trabalhoso e sujeito a erros (supervisor esquecia de reordenar).
+    destino: "substituido"
+    justificativa: "Substituído por algoritmo automático de priorização baseado em (1) Prioridade, (2) % SLA, (3) Tempo de espera."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-001)"
+      regra_moderna: "RN-RF056-001"
+    migracao_moderna:
+      handler: "OrdenarFilaQuery"
+      linha_codigo: "Ordering via LINQ: OrderByDescending(Prioridade).ThenByDescending(PercentualSLA)"
+
+  - id: "LEG-RF056-012"
+    tipo: "regra_negocio"
+    nome: "Limite Informal de 5 Solicitações"
+    caminho: "Convenção não documentada (conhecimento tácito da equipe)"
+    descricao: |
+      Atendentes "sabiam" que não deveriam pegar mais de 5 solicitações simultaneamente.
+      Não havia validação no sistema.
+      Alguns atendentes ignoravam a regra e pegavam 10+ solicitações, causando sobrecarga.
+    destino: "assumido"
+    justificativa: "Regra formalizada como RN-RF056-005 com validação hard-coded no backend."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-005)"
+      regra_moderna: "RN-RF056-005"
+    migracao_moderna:
+      validador: "DistribuirSolicitacaoCommandValidator"
+      linha_codigo: "RuleFor(x => x.CargaAtual).LessThan(5)"
+
+  - id: "LEG-RF056-013"
+    tipo: "regra_negocio"
+    nome: "Escalação Manual via E-mail"
+    caminho: "Processo organizacional (e-mails internos)"
+    descricao: |
+      Quando atendente não conseguia resolver solicitação, enviava e-mail para supervisor.
+      Supervisor reatribuía manualmente via interface.
+      Processo lento (média de 2 horas até supervisor ver o e-mail).
+    destino: "substituido"
+    justificativa: "Substituído por escalação automática após 30 minutos via Hangfire job."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-004)"
+      regra_moderna: "RN-RF056-004"
+    migracao_moderna:
+      handler: "EscalonarSolicitacoesJob (Hangfire RecurringJob)"
+      linha_codigo: "Execução a cada 10 minutos verificando DataAbertura > 30 min"
+
+  - id: "LEG-RF056-014"
+    tipo: "regra_negocio"
+    nome: "Pausa de Almoço Manual"
+    caminho: "Sistema externo de controle de ponto (não integrado)"
+    descricao: |
+      Atendentes alteravam status manualmente no sistema de presença (externo).
+      Sistema de filas não tinha ciência de pausas.
+      Atendentes recebiam notificações de novas solicitações mesmo em pausa.
+    destino: "substituido"
+    justificativa: "Substituído por pausas automáticas configuráveis por empresa no sistema moderno."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-007)"
+      regra_moderna: "RN-RF056-007"
+    migracao_moderna:
+      handler: "IniciarPausaAlmocoJob, FinalizarPausaAlmocoJob (Hangfire)"
+      linha_codigo: "Horários configuráveis em SistemaConfiguracaoGeral"
+
+  - id: "LEG-RF056-015"
+    tipo: "regra_negocio"
+    nome: "VIP Identificado por Texto '[VIP]' em Observações"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/AtendimentoSolicitacao.aspx.vb - Linha 89"
+    descricao: |
+      Campo "Observações" continha texto "[VIP]" se solicitante fosse diretor.
+      Priorização manual pelo supervisor (sem automação).
+      Sujeito a erros (supervisor esquecia de priorizar).
+    destino: "substituido"
+    justificativa: "Substituído por flag VIP booleano e priorização automática baseada em cargo do solicitante."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-010)"
+      regra_moderna: "RN-RF056-010"
+    migracao_moderna:
+      handler: "AdicionarNaFilaCommand"
+      linha_codigo: "If (solicitante.Cargo == 'CEO' || solicitante.Cargo == 'Diretor') { VIP = true }"
+
+  - id: "LEG-RF056-016"
+    tipo: "regra_negocio"
+    nome: "Redistribuição Manual por Stored Procedure"
+    caminho: "Database/StoredProcedures/sp_RedistribuirSolicitacoes.sql"
+    descricao: |
+      Supervisor executava stored procedure manualmente quando atendente faltava.
+      Sem log de auditoria formal da redistribuição.
+      Sem notificação para outros atendentes sobre novas solicitações disponíveis.
+    destino: "substituido"
+    justificativa: "Substituído por redistribuição automática acionada por Domain Event com auditoria completa."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-008)"
+      regra_moderna: "RN-RF056-008"
+    migracao_moderna:
+      domain_event: "AtendenteStatusAlteradoEvent"
+      handler: "RedistribuirSolicitacoesCommandHandler"
+
+  - id: "LEG-RF056-017"
+    tipo: "regra_negocio"
+    nome: "Follow-up Não Automático"
+    caminho: "Processo manual (sem código específico)"
+    descricao: |
+      Solicitação reaberta pelo cliente ia para fila geral, não para atendente original.
+      Atendente original perdia contexto e histórico do atendimento.
+      Cliente precisava explicar novamente o problema.
+    destino: "substituido"
+    justificativa: "Substituído por retorno automático ao atendente original (se disponível) para manter continuidade."
+    rastreabilidade:
+      rf_moderno: "RF056 - Seção 5 (RN-RF056-013)"
+      regra_moderna: "RN-RF056-013"
+    migracao_moderna:
+      handler: "ReabrirSolicitacaoCommand"
+      linha_codigo: "Verificar disponibilidade do atendente original antes de retornar à fila"
+
+# ==============================================================================
+# BANCOS LEGADOS MAPEADOS
+# ==============================================================================
+
+bancos_legados:
+  - nome: "IControlIT_Cliente01"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "tbl_Solicitacoes"
+      - "tbl_Atendentes"
+      - "tbl_TransferenciasSolicitacao"
+      - "tbl_HistoricoAtendimento"
+    observacao: "Consolidado em banco único com multi-tenancy (Row-Level Security via EmpresaId)"
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+  - nome: "IControlIT_Cliente02"
+    servidor: "SQL-LEGADO-02"
+    tabelas_relacionadas:
+      - "tbl_Solicitacoes"
+      - "tbl_Atendentes"
+    observacao: "Consolidado no mesmo banco moderno com isolamento por EmpresaId"
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF056-001"
+    nome: "Ausência de Sistema de Filas Formais"
+    severidade: "CRÍTICA"
+    descricao: |
+      Não havia gerenciamento automático de filas.
+      Atendentes escolhiam solicitações manualmente (modelo pull).
+      Sem priorização automática ou balanceamento de carga.
+      Causava sobrecarga de atendentes mais rápidos e solicitações esquecidas.
+    impacto: "Distribuição desigual de trabalho, SLAs não cumpridos, insatisfação de clientes."
+    solucao_moderna: "Sistema de filas automático com priorização inteligente, routing por skills e balanceamento de carga."
+
+  - id: "PROB-RF056-002"
+    nome: "Distribuição Manual e Ineficiente"
+    severidade: "ALTA"
+    descricao: |
+      Supervisor atribuía solicitações manualmente via interface.
+      Sem validação de skills ou carga de trabalho do atendente.
+      Processo lento e sujeito a erros humanos.
+    impacto: "Tempo perdido em atribuições manuais, solicitações atribuídas a atendentes sem competência técnica."
+    solucao_moderna: "Distribuição automática via algoritmo (CQRS Command) com validação obrigatória de skills e carga."
+
+  - id: "PROB-RF056-003"
+    nome: "Falta de Métricas em Tempo Real"
+    severidade: "ALTA"
+    descricao: |
+      Relatórios gerados apenas via SQL Server Reporting Services (offline).
+      Gestores não tinham visibilidade do estado atual das filas.
+      Identificação de gargalos era reativa, não proativa.
+    impacto: "Gestão ineficiente, problemas detectados apenas após impacto em SLA."
+    solucao_moderna: "Dashboard em tempo real com SignalR (atualização a cada 30s), métricas precisas e filtros dinâmicos."
+
+  - id: "PROB-RF056-004"
+    nome: "SLA Calculado Incorretamente"
+    severidade: "ALTA"
+    descricao: |
+      Cálculo de SLA feito por stored procedure sem considerar pausas.
+      Sem diferenciação entre tempo de atendimento e tempo de espera do cliente.
+      Penalizava atendentes por pendências externas (aguardando cliente).
+    impacto: "Métricas de performance dos atendentes injustas, desmotivação do time."
+    solucao_moderna: "SLA com suporte a pausas (AGUARDANDO_CLIENTE) via Value Object no Domain Layer."
+
+  - id: "PROB-RF056-005"
+    nome: "Status de Atendente Não Gerenciado"
+    severidade: "MÉDIA"
+    descricao: |
+      Sem controle formal de disponibilidade (DISPONÍVEL, PAUSA, AUSENTE).
+      Atendentes recebiam notificações mesmo em pausa ou ausentes.
+      Redistribuição manual em caso de ausência (via stored procedure).
+    impacto: "Notificações desnecessárias, interrupções durante pausas, atraso na redistribuição."
+    solucao_moderna: "4 estados formais de atendente com redistribuição automática via Domain Event."
+
+  - id: "PROB-RF056-006"
+    nome: "Multi-Database Complexo e Custoso"
+    severidade: "MÉDIA"
+    descricao: |
+      Cada cliente tinha banco SQL Server separado.
+      Manutenção de schemas, backups e updates era multiplicada por número de clientes.
+      Migração de dados entre clientes era impraticável.
+    impacto: "Custos elevados de infraestrutura, complexidade operacional."
+    solucao_moderna: "Banco único com multi-tenancy (Row-Level Security via EmpresaId)."
+
+# ==============================================================================
+# METADADOS (CALCULADO AUTOMATICAMENTE)
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 17
+  itens_assumidos: 2
+  itens_substituidos: 15
+  itens_descartados: 0
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+
+# ==============================================================================
+# CHANGELOG
+# ==============================================================================
+
+changelog:
+  - versao: "2.0"
+    data: "2025-12-30"
+    descricao: "Adequação para automação e rastreabilidade (campo destino obrigatório em 100% dos itens)"
+    autor: "Agência ALC - alc.dev.br"

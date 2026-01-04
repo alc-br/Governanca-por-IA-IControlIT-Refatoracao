@@ -1,0 +1,556 @@
+rf_id: RF039
+rf_title: "Gestão de Bilhetes Telefônicos"
+versao_governanca: "2.0"
+data_migracao: "2025-12-30"
+fase: "Fase 6 - Ativos, Auditoria e Integrações"
+epic: "EPIC010-AUD-Auditoria-Avancada"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-BIL-039-01"
+    titulo: "Importação Automatizada via FTP"
+    descricao: |
+      Sistema conecta automaticamente aos servidores FTP das operadoras de telecomunicações
+      através de job agendado diário (03:00 UTC), realiza download de faturas mensais e
+      processa os dados de forma assíncrona. Credenciais FTP são armazenadas criptografadas
+      no banco e arquivos originais são preservados em blob storage por 7 anos.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      job_hangfire: true
+      validacao_api: true
+    validacao:
+      tipo: "job_agendado"
+      mensagem_erro: "Falha na importação automatizada de faturas"
+      http_code: 500
+
+  - id: "RN-BIL-039-02"
+    titulo: "Parser Inteligente Multi-Formato"
+    descricao: |
+      Sistema analisa automaticamente as primeiras 10 linhas do arquivo de fatura,
+      identifica padrões de cabeçalho característicos de cada operadora (TIM, Vivo, Claro, Oi)
+      e aplica o parser específico com regras de normalização.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+    validacao:
+      tipo: "detecção_formato"
+      mensagem_erro: "Formato de arquivo não reconhecido"
+      http_code: 400
+
+  - id: "RN-BIL-039-03"
+    titulo: "Normalização de Números para E.164"
+    descricao: |
+      Todos os números telefônicos (origem e destino) são normalizados para o formato
+      internacional E.164 (+55 11 98765-4321) removendo caracteres especiais, identificando
+      código do país (assume +55 se omitido), validando DDD conforme tabela ANATEL.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+    validacao:
+      tipo: "formato_numero"
+      mensagem_erro: "Número de telefone inválido ou não normalizável"
+      http_code: 400
+
+  - id: "RN-BIL-039-04"
+    titulo: "Detecção de Ligações para Números Premium"
+    descricao: |
+      Ao importar bilhete, sistema verifica se número destino inicia com 0900 ou 0300 (números premium).
+      Se detectado, marca registro como Premium, cria alerta de compliance, envia notificação
+      para supervisor do usuário e gestor de TI via SignalR e e-mail.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "detecção_premium"
+      mensagem_erro: "Uso de número premium detectado"
+      http_code: 200
+
+  - id: "RN-BIL-039-05"
+    titulo: "Alerta de Roaming Internacional"
+    descricao: |
+      Sistema detecta roaming internacional quando código do país do número origem é diferente
+      de +55 (Brasil). Envia SMS imediato para o número em roaming alertando sobre custos elevados,
+      envia e-mail para gestor com detalhes e monitora custo acumulado.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      sms_gateway: true
+    validacao:
+      tipo: "detecção_roaming"
+      mensagem_erro: "Roaming internacional detectado"
+      http_code: 200
+
+  - id: "RN-BIL-039-06"
+    titulo: "Rateio Automático por Centro de Custo"
+    descricao: |
+      Custos de telefonia são rateados automaticamente entre centros de custo com base no vínculo
+      do usuário/ramal configurado no cadastro. Sistema identifica centro de custo do número origem,
+      totaliza custos por CC, gera lançamento contábil automático e rateia custos compartilhados.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      integracao_erp: true
+    validacao:
+      tipo: "rateio_validacao"
+      mensagem_erro: "Número sem centro de custo vinculado"
+      http_code: 400
+
+  - id: "RN-BIL-039-07"
+    titulo: "Comparação Uso Real vs Plano Contratado"
+    descricao: |
+      Sistema compara mensalmente o uso real de cada linha (minutos, SMS, dados) com a franquia
+      do plano contratado, classifica uso (sub-uso < 50%, adequado 50-90%, excesso > 100%),
+      calcula custos extras e recomenda upgrade/downgrade de plano.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+    validacao:
+      tipo: "analise_plano"
+      mensagem_erro: "Plano contratado não cadastrado"
+      http_code: 400
+
+  - id: "RN-BIL-039-08"
+    titulo: "Detecção de Padrão de Uso Suspeito"
+    descricao: |
+      Algoritmo de machine learning analisa histórico de 90 dias de cada número, identifica anomalias
+      (muitas ligações curtas < 10s, horários atípicos 00:00-06:00, aumento súbito > 300% da média),
+      calcula score de risco (0-100) e gera alerta se score > 70.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      machine_learning: true
+    validacao:
+      tipo: "detecção_anomalia"
+      mensagem_erro: "Padrão de uso suspeito detectado"
+      http_code: 200
+
+  - id: "RN-BIL-039-09"
+    titulo: "Relatório Top 10 Maiores Consumidores"
+    descricao: |
+      Relatório mensal identifica os 10 números que mais geram custo, exibe usuário/departamento,
+      total de ligações/minutos, custo total, principais destinos, comparação com mês anterior
+      e permite drill-down para detalhamento completo.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+    validacao:
+      tipo: "relatorio"
+      mensagem_erro: null
+      http_code: 200
+
+  - id: "RN-BIL-039-10"
+    titulo: "Simulador de Planos Alternativos"
+    descricao: |
+      Ferramenta que simula custos com planos alternativos de todas as operadoras com base no uso
+      real dos últimos 3 meses, calcula custo projetado com cada plano, ranqueia os 5 planos
+      mais econômicos e projeta economia anual.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+    validacao:
+      tipo: "simulacao"
+      mensagem_erro: "Dados históricos insuficientes (mínimo 3 meses)"
+      http_code: 400
+
+  - id: "RN-BIL-039-11"
+    titulo: "Exportação para ERP"
+    descricao: |
+      Sistema exporta automaticamente lançamentos de custo de telefonia para integração com ERP
+      corporativo (SAP, TOTVS, Protheus) via API REST. Geração de arquivo de integração,
+      mapeamento de centros de custo para contas contábeis e validação de lançamento.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      integracao_erp: true
+    validacao:
+      tipo: "integracao_erp"
+      mensagem_erro: "Falha na integração com ERP"
+      http_code: 500
+
+  - id: "RN-BIL-039-12"
+    titulo: "Análise de Horário de Pico"
+    descricao: |
+      Sistema agrupa ligações por dia da semana e hora, gera heatmap visual de volume de ligações
+      simultâneas, identifica top 5 horários de pico, compara capacidade atual de troncos vs
+      necessária e recomenda ajuste se taxa de congestionamento > 10%.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+    validacao:
+      tipo: "analise_pico"
+      mensagem_erro: "Dados históricos insuficientes (mínimo 30 dias)"
+      http_code: 400
+
+  - id: "RN-BIL-039-13"
+    titulo: "Processamento OCR de PDFs"
+    descricao: |
+      Sistema processa faturas em formato PDF escaneado usando OCR (Azure Cognitive Services ou Tesseract),
+      extrai texto página por página, aplica regex para identificar padrões e valida dados extraídos.
+      Solicita revisão manual se confiança < 90%.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      ocr_service: true
+    validacao:
+      tipo: "ocr_validacao"
+      mensagem_erro: "Confiança OCR abaixo do limite (< 85%)"
+      http_code: 400
+
+  - id: "RN-BIL-039-14"
+    titulo: "Dashboard de Evolução de Custos"
+    descricao: |
+      Dashboard gráfico exibe evolução dos custos de telefonia ao longo do tempo (6, 12 ou 24 meses)
+      com análise de tendências, segmentação por categoria, linha de tendência (regressão linear),
+      projeção de custo para próximos 3 meses e comparação com orçamento aprovado.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+    validacao:
+      tipo: "dashboard"
+      mensagem_erro: null
+      http_code: 200
+
+  - id: "RN-BIL-039-15"
+    titulo: "Política de Uso Aceitável e Compliance"
+    descricao: |
+      Sistema audita uso de telefonia corporativa versus política de uso aceitável configurável,
+      identifica violações, calcula score de conformidade (0-100) por usuário e gera relatório
+      de violações para RH/gestores.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+    validacao:
+      tipo: "compliance"
+      mensagem_erro: "Violação de política de uso aceitável detectada"
+      http_code: 200
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "AUD.BILHETES.VIEW"
+    descricao: "Visualizar bilhetes do próprio número"
+    roles_autorizadas:
+      - "Usuário"
+      - "Supervisor"
+      - "Gerente"
+      - "Gestor TI"
+    endpoint: "GET /api/bilhetes"
+
+  - permission_code: "AUD.BILHETES.VIEW_ALL"
+    descricao: "Visualizar bilhetes de todos os usuários"
+    roles_autorizadas:
+      - "Supervisor"
+      - "Gerente"
+      - "Gestor TI"
+      - "Financeiro"
+    endpoint: "GET /api/bilhetes/all"
+
+  - permission_code: "AUD.BILHETES.IMPORT"
+    descricao: "Importar faturas de operadoras (manual ou FTP)"
+    roles_autorizadas:
+      - "Gestor TI"
+      - "Analista TI"
+    endpoint: "POST /api/bilhetes/import"
+
+  - permission_code: "AUD.BILHETES.CONFIG"
+    descricao: "Configurar políticas de uso, alertas e parsers"
+    roles_autorizadas:
+      - "Gestor TI"
+      - "Diretor"
+    endpoint: "PUT /api/bilhetes/config"
+
+  - permission_code: "AUD.BILHETES.DASHBOARD"
+    descricao: "Acessar dashboard de custos consolidado"
+    roles_autorizadas:
+      - "Supervisor"
+      - "Gerente"
+      - "Diretor"
+      - "Financeiro"
+    endpoint: "GET /api/bilhetes/dashboard"
+
+  - permission_code: "AUD.BILHETES.REPORTS"
+    descricao: "Gerar relatórios gerenciais (Top 10, evolução, etc)"
+    roles_autorizadas:
+      - "Gerente"
+      - "Diretor"
+      - "Financeiro"
+    endpoint: "GET /api/bilhetes/reports"
+
+  - permission_code: "AUD.BILHETES.RATEIO"
+    descricao: "Gerar e aprovar rateio de custos"
+    roles_autorizadas:
+      - "Financeiro"
+      - "Controller"
+    endpoint: "POST /api/bilhetes/rateio"
+
+  - permission_code: "AUD.BILHETES.BLOCK_LINE"
+    descricao: "Bloquear linha por uso indevido"
+    roles_autorizadas:
+      - "Gestor TI"
+      - "Diretor"
+    endpoint: "PUT /api/bilhetes/{id}/block"
+
+  - permission_code: "AUD.BILHETES.DELETE"
+    descricao: "Excluir bilhete (soft delete)"
+    roles_autorizadas:
+      - "Gestor TI"
+      - "Developer"
+    endpoint: "DELETE /api/bilhetes/{id}"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  - method: "GET"
+    route: "/api/bilhetes"
+    descricao: "Listar bilhetes com filtros e paginação"
+    autenticacao: true
+    authorization_policy: "BilhetesRead"
+    request_dto: null
+    response_dto: "PaginatedListDto<BilheteDto>"
+    parametros_query:
+      - "page (int)"
+      - "pageSize (int)"
+      - "dataInicio (DateTime)"
+      - "dataFim (DateTime)"
+      - "numeroOrigem (string)"
+      - "numeroDestino (string)"
+      - "tipo (enum: Fixo, Movel, DDN, DDI, SMS, Dados)"
+
+  - method: "GET"
+    route: "/api/bilhetes/{id}"
+    descricao: "Obter bilhete por ID"
+    autenticacao: true
+    authorization_policy: "BilhetesRead"
+    request_dto: null
+    response_dto: "BilheteDto"
+
+  - method: "POST"
+    route: "/api/bilhetes/import"
+    descricao: "Importar fatura de operadora (upload manual)"
+    autenticacao: true
+    authorization_policy: "BilhetesImport"
+    request_dto: "ImportarFaturaCommand"
+    response_dto: "ImportacaoResultDto"
+
+  - method: "GET"
+    route: "/api/bilhetes/dashboard"
+    descricao: "Obter dados consolidados do dashboard"
+    autenticacao: true
+    authorization_policy: "BilhetesDashboard"
+    request_dto: null
+    response_dto: "DashboardBilhetesDto"
+
+  - method: "GET"
+    route: "/api/bilhetes/reports/top10"
+    descricao: "Relatório Top 10 maiores consumidores"
+    autenticacao: true
+    authorization_policy: "BilhetesReports"
+    request_dto: null
+    response_dto: "List<Top10ConsumidorDto>"
+
+  - method: "POST"
+    route: "/api/bilhetes/rateio"
+    descricao: "Gerar rateio de custos por centro de custo"
+    autenticacao: true
+    authorization_policy: "BilhetesRateio"
+    request_dto: "GerarRateioCommand"
+    response_dto: "RateioResultDto"
+
+  - method: "POST"
+    route: "/api/bilhetes/simulator"
+    descricao: "Simular custos com planos alternativos"
+    autenticacao: true
+    authorization_policy: "BilhetesRead"
+    request_dto: "SimularPlanosCommand"
+    response_dto: "SimulacaoResultDto"
+
+  - method: "PUT"
+    route: "/api/bilhetes/{id}/block"
+    descricao: "Bloquear linha por uso indevido"
+    autenticacao: true
+    authorization_policy: "BilhetesBlockLine"
+    request_dto: "BloquearLinhaCommand"
+    response_dto: "Guid"
+
+  - method: "DELETE"
+    route: "/api/bilhetes/{id}"
+    descricao: "Excluir bilhete (soft delete)"
+    autenticacao: true
+    authorization_policy: "BilhetesDelete"
+    request_dto: null
+    response_dto: "bool"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Taxa de Sucesso de Importação"
+    descricao: "Percentual de faturas importadas sem erros"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Processamento"
+    descricao: "Tempo médio para processar uma fatura completa"
+    meta: "<= 5 minutos"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Detecção de Anomalias"
+    descricao: "Percentual de anomalias detectadas vs total de bilhetes"
+    meta: "< 5%"
+    log_obrigatorio: true
+
+  - nome: "Precisão de Normalização"
+    descricao: "Percentual de números normalizados com sucesso"
+    meta: ">= 98%"
+    log_obrigatorio: true
+
+  - nome: "Acurácia OCR"
+    descricao: "Confiança média do processamento OCR"
+    meta: ">= 90%"
+    log_obrigatorio: true
+
+  - nome: "Economia Identificada"
+    descricao: "Valor total de economia identificada pelo simulador de planos"
+    meta: "> R$ 10.000/mês"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "Falha na Importação de Fatura"
+    threshold: "> 2 falhas consecutivas"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "signalr"
+
+  - evento: "Número Premium Detectado"
+    threshold: "Qualquer ocorrência"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "signalr"
+      - "sms"
+
+  - evento: "Roaming Internacional Ativo"
+    threshold: "Qualquer ocorrência"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "signalr"
+      - "sms"
+
+  - evento: "Anomalia de Uso Detectada"
+    threshold: "Score > 90"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "signalr"
+
+  - evento: "Custo Acumulado Roaming"
+    threshold: "> R$ 2.000"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "signalr"
+      - "sms"
+
+  - evento: "Falha na Integração ERP"
+    threshold: "> 3 tentativas falhadas"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "signalr"
+
+# ==============================================================================
+# INTEGRAÇÕES OBRIGATÓRIAS
+# ==============================================================================
+
+integracoes:
+  - nome: "Central de Funcionalidades"
+    descricao: "Registro da feature Gestão de Bilhetes"
+    codigo: "AUD.BILHETES"
+    obrigatorio: true
+
+  - nome: "Internacionalização (i18n)"
+    descricao: "Tradução de todas as mensagens (pt-BR, en-US, es-ES)"
+    obrigatorio: true
+
+  - nome: "Auditoria"
+    descricao: "Log de todas as importações, alertas, rateios (7 anos)"
+    obrigatorio: true
+
+  - nome: "Controle de Acesso (RBAC)"
+    descricao: "Permissões granulares por operação"
+    obrigatorio: true
+
+  - nome: "ERP (SAP, TOTVS, Protheus)"
+    descricao: "Exportação de lançamentos contábeis via API REST"
+    obrigatorio: false
+    condicional: "Se configurado pelo cliente"
+
+  - nome: "Gateway SMS"
+    descricao: "Envio de alertas SMS para usuários em roaming"
+    obrigatorio: false
+    condicional: "Se configurado pelo cliente"
+
+  - nome: "OCR Service (Azure Cognitive Services)"
+    descricao: "Processamento de PDFs escaneados"
+    obrigatorio: false
+    condicional: "Se fatura vier em PDF sem dados estruturados"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_regras_negocio: 15
+  total_endpoints: 9
+  total_permissoes: 9
+  total_kpis: 6
+  total_alertas: 6
+  total_integracoes: 7
+  complexidade: "ALTA"
+  estimativa_desenvolvimento: "40-60 dias (2 devs full-time)"
+  prioridade: "MÉDIA"

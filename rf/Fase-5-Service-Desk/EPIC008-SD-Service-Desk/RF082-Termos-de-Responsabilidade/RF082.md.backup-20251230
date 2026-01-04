@@ -1,0 +1,1487 @@
+# RF-082: Gestão de Documentos de Responsabilidade Corporativa
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF-079 (Gestão de Políticas), RF-080 (Termos de Aceite LGPD), RF-095 (Auditoria de Acesso), RF-096 (Auditoria de Mudanças) | **EPIC**: EPIC008-SD-Service-Desk
+**Fase**: Fase 5 - Service Desk (Operações, Governance e Conformidade)
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+Este requisito especifica o **Módulo de Gestão de Documentos de Responsabilidade Corporativa** do sistema IControlIT, responsável pela gestão centralizada, versionizada e auditada de documentos normativos críticos (Códigos de Conduta, NDAs, Contratos de Responsabilidade, Termos de Confidencialidade, Acordos de Nível de Serviço Internos, Regulamentações Internas e Compliance Corporativo).
+
+O módulo permite que administradores corporativos:
+- Criem e mantenham documentos de responsabilidade corporativa com versionamento automático
+- Configurem workflows de aprovação multinível (elaboração → revisão → aprovação → publicação)
+- Gerenciem aceites obrigatórios por perfil, cargo, departamento ou usuário individual
+- Rastreiem assinaturas digitais (ICP-Brasil, DocuSign, eIDAS)
+- Implementem notificações automáticas para novos documentos ou atualizações
+- Geram relatórios de compliance corporativo com evidências de aceites
+- Integrem com RH (admissão de novos colaboradores, desligamento)
+- Produza comprovantes digitais certificados (PDF com hash SHA-256)
+- Monitorem conformidade em tempo real com alertas de não-aceite
+
+---
+
+### 1.2 Importancia Estrategica
+
+O módulo de Gestão de Documentos de Responsabilidade Corporativa é crítico para:
+
+- **Conformidade Regulatória**: Atende requisitos LGPD (Art. 8), SOX (seções 302 e 906), ISO 27001 (A.6.1, A.7.2), ITIL v4 (Service Design), garantindo documentação e rastreabilidade completa de aceites corporativos
+- **Proteção Legal**: Documentar consentimento informado de colaboradores e parceiros com prova irrefutável (timestamp, IP, assinatura digital), minimizando exposição a contencioso
+- **Mitigação de Risco**: Detectar automaticamente colaboradores que não aceitaram documentos críticos, permitindo ação corretiva antes de incidente (ex: colaborador sem NDA assinado não pode acessar projetos confidenciais)
+- **Governança Corporativa**: Centraliza definição de normas corporativas, elimina documentos contraditórios, facilita auditoria em órgãos reguladores
+- **Rastreabilidade E2E**: Auditoria de quem leu, quando aceitou, qual versão aceitou, de qual IP, em qual dispositivo - fundamental para defesa em processos
+- **Integração com RH**: Sincronizar aceites com eventos de ciclo de vida (admissão obriga aceitar documentos, desligamento revoga aceites)
+- **Assinatura Certificada**: Suporte a assinatura digital com validade jurídica (ICP-Brasil, eIDAS), transformando documentos digitais em prova judicial
+- **Eficiência Operacional**: Automatiza coleta de aceites, elimina processos manuais de armazenamento em pastas compartilhadas (\\servidor\documentos), libera tempo de compliance para análise estratégica
+
+---
+
+### 1.3 Conceitos Fundamentais
+
+**Documento de Responsabilidade**: Documento normalizado que define direitos, obrigações e responsabilidades (ex: "Código de Conduta Corporativo", "NDA com Fornecedores", "Termo de Responsabilidade de Gestor", "Contrato de Confidencialidade")
+- Versões sequenciais (v1.0, v1.1, v2.0)
+- Estados: Elaboração → Revisão → Aprovada → Publicada → Obsoleta
+- Categorias: Códigos de Conduta, Confidencialidade, Responsabilidade, Legal, Compliance, RH
+- Armazenado em Azure Blob Storage (PDF original + metadados)
+
+**Aceite de Documento**: Ato de um colaborador, gestor ou parceiro reconhecer e concordar com documento de responsabilidade
+- Obrigatório para acesso a determinadas funcionalidades ou áreas
+- Rastreado com timestamp, IP, User-Agent, dispositivo, localização geográfica
+- Pode incluir assinatura digital (certificado A1/A3)
+- Gera evento de auditoria imutável (RF095, RF096)
+
+**Workflow de Aprovação Configurável**: Sequência de etapas que um documento percorre antes de ser publicado
+- Exemplo: Elaboração (RH) → Revisão Legal → Revisão Compliance → Aprovação Diretoria → Publicado
+- Cada etapa pode ter aproveadores específicos (por perfil, usuário nomeado, ou grupo)
+- Aprovadores recebem notificação automática (email, in-app via SignalR)
+- Cada aprovação deixa comentários auditáveis
+
+**Matriz de Responsabilidade**: Mapeamento entre documentos de responsabilidade (linhas) e públicos-alvo (colunas: Diretores, Gerentes, Técnicos, Operacional, Parceiros, Fornecedores)
+- Indica quem deve aceitar qual documento
+- Facilita identificar gaps de aceites
+- Suporta regras complexas (ex: "Gerentes de TI devem aceitar Código de Segurança", "Fornecedores devem aceitar NDA")
+
+**Comprovante de Aceite Digital**: Documento PDF certificado que prova aceite de responsabilidade
+- Contém: documento original, data/hora de aceite, dados do aceitante, assinatura digital (hash SHA-256)
+- Validade jurídica (certificado ICP-Brasil)
+- Exportável para defesa em processo judicial
+- Retenção: mínimo 5 anos (conforme SOX, LGPD, ISO 27001)
+
+**Auditoria de Aceite**: Registro imutável de todas as ações relacionadas a documentos de responsabilidade
+- Quando foi aceito/rejeitado/revogado
+- Qual versão foi aceita
+- IP, User-Agent, dispositivo, localização
+- Motivo (se rejeitado)
+- Integrado com RF095 (Auditoria de Acesso) e RF096 (Auditoria de Mudanças)
+
+**Revogação de Aceite**: Cancelamento de aceite anterior (casos excepcionais: ex: colaborador desligado, violação de confidencialidade)
+- Requer aprovador específico
+- Gera auditoria completa
+- Pode bloquear acesso a áreas restritas
+
+**Integração com RH**: Sincronização automática de eventos de ciclo de vida
+- Novo colaborador: obrigado a aceitar Código de Conduta antes de acessar sistema
+- Promovido: novo conjunto de documentos para aceitar
+- Desligado: todos os aceites são revogados automaticamente
+
+---
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Armazenamento de Documentos** | Pasta compartilhada (\\servidor\documentos), Word/PDF | Azure Blob Storage com versionamento automático, metadados em SQL Server |
+| **Aceites de Usuários** | Emails para assinar, planilhas Excel, ou assinatura em papel | Sistema integrado, obrigatório na tela de login, rastreado em AuditLog com IP/dispositivo |
+| **Workflow de Aprovação** | Ad-hoc via email entre áreas | Configurable via UI, com notificações via SignalR, email e SMS |
+| **Assinatura Digital** | Não suportado ou ad-hoc via DocuSign | Integrado com DocuSign API, suporte a certificado A1/A3 (ICP-Brasil) |
+| **Versionamento** | Manual (documento_v1, documento_v2) | Automático com histórico completo, diff visual, rollback |
+| **Rastreamento de Aceites** | Logs de email dispersos, planilhas perdidas | Tabela centralizada DocumentoAceite com índices otimizados, correlationId |
+| **Comprovantes** | Arquivo solto na pasta | PDF certificado com hash SHA-256, válido judicialmente |
+| **Notificações** | Emails manuais | SignalR (real-time), email via SendGrid, SMS via Twilio, in-app |
+| **Busca em Documentos** | LIKE %texto% em SQL Server | ElasticSearch com full-text indexing, faceted search por categoria/data |
+| **Dashboard de Compliance** | Excel manual | Dashboard interativo em tempo real (Angular + Chart.js), com KPIs |
+| **Relatórios de Auditoria** | SQL Server Reporting Services | API REST + frontend Angular, exportável em PDF/Excel |
+| **Multi-idioma** | Hardcoded (português) | i18n com 3 idiomas (pt-BR, en-US, es-ES) |
+| **Integração com RH** | Não existe | Sincronização automática com Microsoft Graph (Azure AD), eventos de contratação/desligamento |
+
+---
+
+### 1.5 Funcionalidades Principais
+
+1. **CRUD de Documentos de Responsabilidade** - Criar, ler, editar, publicar documentos com versionamento automático
+2. **Workflow de Aprovação Configurável** - Definir etapas (elaboração, revisão, aprovação, publicação) com papéis e aproveadores específicos
+3. **Aceite Obrigatório** - Bloquear acesso à funcionalidade até aceitar documento publicado
+4. **Versionamento e Histórico** - Manter histórico completo de alterações (quando, quem, o que mudou)
+5. **Assinatura Digital Integrada** - DocuSign API, certificado A1/A3, suporte a assinatura remota
+6. **Aceite em Lote** - Publicar documento obrigando múltiplos usuários, departamentos ou perfis a aceitar
+7. **Notificações Automáticas** - Email/in-app/SMS quando documento é publicado ou requer re-aceite
+8. **Dashboard de Compliance Corporativo** - Taxa de aceites por documento, departamento, usuário; visualização de gaps
+9. **Gestão de Exceções** - Autorizar usuário específico a não aceitar documento por período determinado
+10. **Comprovantes Digitais Certificados** - Exportar PDF com validade jurídica (hash SHA-256, timestamp, assinatura)
+11. **Busca Full-Text em Documentos** - ElasticSearch para buscar rápido por palavra-chave
+12. **Integração com RH** - Sincronizar com eventos de ciclo de vida (admissão, promoção, desligamento)
+13. **Matriz de Responsabilidade** - Mapeamento entre documentos e públicos-alvo com regras complexas
+14. **Relatórios de Auditoria** - Evidências de quem leu, aceitou, rejeitou, revogou cada documento
+15. **Multi-idioma** - Suporte a pt-BR, en-US, es-ES (i18n com Transloco)
+16. **Revogação de Aceite** - Cancelar aceite com justificativa (ex: desligamento do colaborador)
+17. **Integração com Segurança** - Bloquear acesso a áreas críticas até aceitar documentos de segurança
+18. **Análise de Tendências** - Identificar documentos com baixa taxa de aceite, usuários recorrentemente não-conformes
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-DOC-082-01: Versionamento Automático de Documentos
+
+**Descricao**: Cada alteração em um documento em estado "Elaboração" ou "Revisão" incrementa automaticamente o número de versão (v1.0 → v1.1 → v2.0) e cria registro histórico imutável com timestamp, usuário e campo alterado.
+
+**Justificativa**: SOX (Seção 302), LGPD (Art. 8) e ISO 27001 (A.6.1) exigem rastreabilidade completa. Sem versionamento, é impossível provar qual versão um colaborador aceitou e em que data.
+
+**Implementacao**:
+```csharp
+public class DocumentoResponsabilidade : BaseAuditableGuidEntity, IMultiTenantEntity
+{
+    public string Titulo { get; set; }
+    public string Descricao { get; set; }
+    public string Versao { get; set; } // "1.0", "1.1", "2.0"
+    public DocumentoStatus Status { get; set; } // Elaboracao, Revisao, Aprovada, Publicada, Obsoleta
+    public DateTime? DataPublicacao { get; set; }
+    public DateTime? DataObsolescencia { get; set; }
+    public DocumentoCategoria Categoria { get; set; } // Conduta, Confidencialidade, Responsabilidade, Legal, Compliance
+    public string BlobStorageUri { get; set; } // URL Azure Blob Storage
+    public List<DocumentoHistorico> Historico { get; set; } = new();
+    public List<DocumentoAceite> Aceites { get; set; } = new();
+}
+
+public class UpdateDocumentoCommandHandler : IRequestHandler<UpdateDocumentoCommand, Guid>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly IBlobStorageService _blobService;
+
+    public async Task<Guid> Handle(UpdateDocumentoCommand request, CancellationToken cancellationToken)
+    {
+        var documento = await _context.DocumentosResponsabilidade.FindAsync(
+            new object[] { request.Id },
+            cancellationToken: cancellationToken);
+
+        if (documento?.Status != DocumentoStatus.Elaboracao &&
+            documento?.Status != DocumentoStatus.Revisao)
+        {
+            throw new InvalidOperationException("Somente documentos em Elaboração ou Revisão podem ser editados.");
+        }
+
+        // Registrar mudanças no histórico
+        if (documento.Titulo != request.Titulo)
+        {
+            _context.DocumentoHistorico.Add(new DocumentoHistorico
+            {
+                DocumentoId = documento.Id,
+                Versao = documento.Versao,
+                TituloAntigo = documento.Titulo,
+                TituloNovo = request.Titulo,
+                AlteradoPor = request.UsuarioId,
+                AlteradoEm = DateTime.UtcNow
+            });
+        }
+
+        // Incrementar versão se mudança significativa
+        if (documento.Descricao != request.Descricao)
+        {
+            documento.Versao = IncrementarVersao(documento.Versao);
+        }
+
+        documento.Titulo = request.Titulo;
+        documento.Descricao = request.Descricao;
+        documento.Categoria = request.Categoria;
+        documento.AlteradoPor = request.UsuarioId;
+        documento.AlteradoEm = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return documento.Id;
+    }
+
+    private string IncrementarVersao(string versaoAtual)
+    {
+        // v1.0 → v1.1, v1.9 → v2.0
+        var partes = versaoAtual.Split('.');
+        int maior = int.Parse(partes[0]);
+        int menor = int.Parse(partes[1]);
+
+        menor++;
+        if (menor >= 10) { maior++; menor = 0; }
+
+        return $"{maior}.{menor}";
+    }
+}
+```
+
+**Exemplos**:
+- Documento criado com v1.0 em 2025-01-01
+- Alteração no conteúdo em 2025-01-05 → v1.1
+- Alteração significativa em 2025-01-15 → v2.0
+- Colaborador aceita v2.0 em 2025-01-16 → comprovante registra v2.0
+
+---
+
+### RN-DOC-082-02: Aceite Obrigatório Bloqueante
+
+**Descricao**: Usuário não pode acessar sistema completo ou funcionalidades restritas sem aceitar documentos de responsabilidade vigentes. Sistema exibe overlay bloqueante com documento integralizado em modal e opção de aceitar/rejeitar.
+
+**Justificativa**: LGPD (Art. 8) exige consentimento livre, informado e inequívoco. Documentar que usuário foi explicitamente informado e concordou, com prova de IP, data/hora e dispositivo.
+
+**Implementacao**:
+```csharp
+public class DocumentoAceiteMiddleware
+{
+    private readonly RequestDelegate _next;
+
+    public DocumentoAceiteMiddleware(RequestDelegate next)
+    {
+        _next = next;
+    }
+
+    public async Task InvokeAsync(HttpContext context, IDocumentoAceiteService aceiteService)
+    {
+        var usuario = context.User;
+        if (usuario?.Identity?.IsAuthenticated != true)
+        {
+            await _next(context);
+            return;
+        }
+
+        // Exceção: rotas de login, logout, aceitar documento
+        if (IsExemptRoute(context.Request.Path))
+        {
+            await _next(context);
+            return;
+        }
+
+        var documentosPendentes = await aceiteService.ObterDocumentosPendentesAsync(
+            usuario.FindFirst(ClaimTypes.NameIdentifier)?.Value,
+            context.User.FindFirst("ClienteId")?.Value);
+
+        if (documentosPendentes.Any())
+        {
+            context.Response.StatusCode = 403;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                erro = "DocumentoPendente",
+                mensagem = "Você deve aceitar documentos de responsabilidade para continuar",
+                documentosPendentes = documentosPendentes.Select(d => new
+                {
+                    id = d.Id,
+                    titulo = d.Titulo,
+                    versao = d.Versao,
+                    dataPublicacao = d.DataPublicacao,
+                    conteudo = d.Conteudo
+                })
+            });
+            return;
+        }
+
+        await _next(context);
+    }
+
+    private bool IsExemptRoute(PathString path)
+    {
+        var exemptPaths = new[] { "/api/aceites", "/api/logout", "/api/usuarios/perfil" };
+        return exemptPaths.Any(p => path.Value?.StartsWith(p, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+}
+```
+
+**Validacao**:
+```sql
+-- Constraint: Usuário não pode acessar área restrita sem aceitar documento
+ALTER TABLE [dbo].[DocumentoAceite] ADD CONSTRAINT [CK_AceiteObrigatorio]
+CHECK ([DataAceite] IS NOT NULL OR [FlRejeitado] = 1);
+
+-- Índice: Buscar documentos pendentes rapidamente
+CREATE NONCLUSTERED INDEX [IX_DocumentoAceite_Pendentes]
+ON [dbo].[DocumentoAceite] ([ClienteId], [UsuarioId], [DataAceite])
+WHERE [DataAceite] IS NULL AND [FlRejeitado] = 0;
+```
+
+---
+
+### RN-DOC-082-03: Workflow de Aprovação Multinível Configurável
+
+**Descricao**: Documento publicado deve percorrer workflow de aprovação com etapas configurable (elaboração → revisão → aprovação → publicação). Cada etapa requer aprovação de um ou mais usuários com perfil específico.
+
+**Justificativa**: Governança corporativa exige revisão por múltiplas áreas (Legal, Compliance, Diretoria) antes de publicar documento que afete colaboradores.
+
+**Implementacao**:
+```csharp
+public class DocumentoAprovacao : BaseAuditableGuidEntity
+{
+    public Guid DocumentoId { get; set; }
+    public DocumentoResponsabilidade Documento { get; set; }
+
+    public int Ordem { get; set; } // 1, 2, 3, ... ordem de execução
+    public string NomeEtapa { get; set; } // "Revisão Legal", "Aprovação Compliance"
+    public string AprovadorPerfil { get; set; } // Perfil que pode aprovar (ex: "Compliance")
+    public string AprovadorUsuario { get; set; } // Usuário específico (opcional)
+
+    public DateTime? DataAprovacao { get; set; }
+    public string AprovadoPor { get; set; }
+    public string Comentarios { get; set; }
+    public bool FlAprovado { get; set; }
+}
+
+public class AprovarDocumentoCommandHandler : IRequestHandler<AprovarDocumentoCommand, Guid>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
+
+    public async Task<Guid> Handle(AprovarDocumentoCommand request, CancellationToken cancellationToken)
+    {
+        var documento = await _context.DocumentosResponsabilidade
+            .Include(d => d.Aprovacoes)
+            .FirstOrDefaultAsync(d => d.Id == request.DocumentoId, cancellationToken);
+
+        var etapaAtual = documento.Aprovacoes
+            .OrderBy(a => a.Ordem)
+            .FirstOrDefault(a => a.DataAprovacao == null);
+
+        if (etapaAtual == null)
+            throw new InvalidOperationException("Todas as etapas foram aprovadas.");
+
+        // Validar que usuário tem permissão de aprovar
+        if (!TemPermissaoAprovar(request.UsuarioId, etapaAtual.AprovadorPerfil))
+            throw new UnauthorizedAccessException("Usuário não tem permissão para aprovar nesta etapa.");
+
+        etapaAtual.FlAprovado = true;
+        etapaAtual.DataAprovacao = DateTime.UtcNow;
+        etapaAtual.AprovadoPor = request.UsuarioId;
+        etapaAtual.Comentarios = request.Comentarios;
+
+        // Se última etapa, publicar documento
+        if (etapaAtual.Ordem == documento.Aprovacoes.Count)
+        {
+            documento.Status = DocumentoStatus.Publicada;
+            documento.DataPublicacao = DateTime.UtcNow;
+
+            // Notificar usuários que devem aceitar
+            await _notificationService.NotificarDocumentoPublicadoAsync(documento);
+        }
+        else
+        {
+            // Notificar próximo aprovador
+            var proximaEtapa = documento.Aprovacoes.OrderBy(a => a.Ordem)
+                .FirstOrDefault(a => a.Ordem == etapaAtual.Ordem + 1);
+
+            if (proximaEtapa != null)
+                await _notificationService.NotificarProximoAprovadorAsync(documento, proximaEtapa);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return documento.Id;
+    }
+
+    private bool TemPermissaoAprovar(string usuarioId, string perfilRequerido)
+    {
+        // Validar contra RBAC (RF012, RF013)
+        // Simplificado:
+        return true; // Implementar com IAuthorizationService
+    }
+}
+```
+
+---
+
+### RN-DOC-082-04: Assinatura Digital com Validade Jurídica
+
+**Descricao**: Aceite pode ser assinado digitalmente utilizando certificado ICP-Brasil (A1/A3) ou via DocuSign API, gerando PDF com hash SHA-256 que possui validade jurídica para defesa em processo.
+
+**Justificativa**: Lei 14.063/2020 (assinatura eletrônica) e Lei 13.709/2018 (LGPD) exigem comprovação irrefutável de consentimento. Assinatura digital certificada transforma documento em prova judicial admissível.
+
+**Implementacao**:
+```csharp
+public class AssinaturaDigitalService : IAssinaturaDigitalService
+{
+    private readonly DocuSignClient _docuSignClient;
+    private readonly IBlobStorageService _blobService;
+
+    public async Task<string> CriarDocumentoAssinaturaAsync(
+        Guid documentoId,
+        Guid usuarioId,
+        string emailUsuario,
+        CancellationToken cancellationToken)
+    {
+        var documento = await _context.DocumentosResponsabilidade
+            .FirstOrDefaultAsync(d => d.Id == documentoId, cancellationToken);
+
+        // Preparar PDF para assinatura
+        var pdfBytes = await PrepararPdfAssinaturaAsync(documento);
+
+        // Enviar para DocuSign
+        var response = await _docuSignClient.SendEnvelopeAsync(new
+        {
+            emailSubject = $"Assinatura Digital - {documento.Titulo}",
+            emailBlurb = $"Você está sendo solicitado a assinar: {documento.Titulo}",
+            documents = new[] { new { name = $"{documento.Titulo}_v{documento.Versao}.pdf", data = Convert.ToBase64String(pdfBytes) } },
+            recipients = new { signers = new[] { new { email = emailUsuario, name = usuarioId.ToString(), recipientId = "1" } } },
+            status = "sent"
+        });
+
+        // Armazenar referência DocuSign
+        var aceite = new DocumentoAceite
+        {
+            DocumentoId = documentoId,
+            UsuarioId = usuarioId,
+            DocuSignEnvelopeId = response.EnvelopeId,
+            FlAssinaturaPendente = true
+        };
+
+        _context.DocumentoAceites.Add(aceite);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return response.EnvelopeId;
+    }
+
+    public async Task<byte[]> GerarComprovanteCertificadoAsync(
+        Guid aceiteId,
+        CancellationToken cancellationToken)
+    {
+        var aceite = await _context.DocumentoAceites
+            .Include(a => a.Documento)
+            .FirstOrDefaultAsync(a => a.Id == aceiteId, cancellationToken);
+
+        // Gerar PDF certificado
+        var pdfDocument = new PdfDocument();
+        var page = pdfDocument.AddPage();
+        var gfx = XGraphics.FromPdfPage(page);
+        var font = new XFont("Arial", 11);
+
+        // Adicionar conteúdo
+        gfx.DrawString($"COMPROVANTE DE ACEITE - {aceite.Documento.Titulo}", font, XBrushes.Black, new XRect(20, 20, 500, 30));
+        gfx.DrawString($"Versão: {aceite.Documento.Versao}", font, XBrushes.Black, new XRect(20, 60, 500, 30));
+        gfx.DrawString($"Data: {aceite.DataAceite:dd/MM/yyyy HH:mm:ss}", font, XBrushes.Black, new XRect(20, 90, 500, 30));
+        gfx.DrawString($"Hash SHA-256: {ComputarSHA256(aceite)}", new XFont("Courier", 9), XBrushes.DarkGray, new XRect(20, 120, 500, 60));
+
+        using (var ms = new MemoryStream())
+        {
+            pdfDocument.Save(ms, false);
+            return ms.ToArray();
+        }
+    }
+
+    private string ComputarSHA256(DocumentoAceite aceite)
+    {
+        using (var sha = System.Security.Cryptography.SHA256.Create())
+        {
+            var dados = Encoding.UTF8.GetBytes($"{aceite.DocumentoId}{aceite.UsuarioId}{aceite.DataAceite}");
+            var hash = sha.ComputeHash(dados);
+            return Convert.ToHexString(hash);
+        }
+    }
+}
+```
+
+---
+
+### RN-DOC-082-05: Integração com RH - Ciclo de Vida de Colaboradores
+
+**Descricao**: Sistema sincroniza automaticamente com RH (Microsoft Graph, Azure AD) para obrigar aceites em eventos de ciclo de vida: novo colaborador deve aceitar Código de Conduta no primeiro login; promovido deve aceitar documentos do novo cargo; desligado tem todos os aceites revogados.
+
+**Justificativa**: Eficiência operacional: evita processos manuais de enviar emails para aceitar. Compliance: garante que nenhum colaborador acessa sistema sem ter aceito documentos obrigatórios.
+
+**Implementacao**:
+```csharp
+public class CicloVidaColaboradorService : ICicloVidaColaboradorService
+{
+    private readonly IApplicationDbContext _context;
+    private readonly IGraphServiceClient _graphClient;
+    private readonly IDocumentoAceiteService _aceiteService;
+
+    public async Task ProcessarNovoColaboradorAsync(string usuarioId, string cargo, CancellationToken cancellationToken)
+    {
+        // Obter documentos obrigatórios para novo colaborador
+        var documentosObrigatorios = await _context.DocumentosResponsabilidade
+            .Where(d => d.Status == DocumentoStatus.Publicada && d.FlNovoColaborador == true)
+            .ToListAsync(cancellationToken);
+
+        foreach (var documento in documentosObrigatorios)
+        {
+            var aceite = new DocumentoAceite
+            {
+                DocumentoId = documento.Id,
+                UsuarioId = usuarioId,
+                FlObrigatorio = true,
+                FlPendente = true
+            };
+
+            _context.DocumentoAceites.Add(aceite);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ProcessarPromocaoAsync(string usuarioId, string cargoAnterior, string cargoNovo, CancellationToken cancellationToken)
+    {
+        // Obter novos documentos para cargo novo
+        var novosCargos = await _context.CargoDocumento
+            .Where(cd => cd.Cargo == cargoNovo)
+            .Select(cd => cd.DocumentoId)
+            .ToListAsync(cancellationToken);
+
+        var documentosAntigosObrigatorios = await _context.CargoDocumento
+            .Where(cd => cd.Cargo == cargoAnterior)
+            .Select(cd => cd.DocumentoId)
+            .ToListAsync(cancellationToken);
+
+        var novosCargosNaoObrigatorios = novosCargos
+            .Except(documentosAntigosObrigatorios)
+            .ToList();
+
+        foreach (var docId in novosCargosNaoObrigatorios)
+        {
+            var aceite = new DocumentoAceite
+            {
+                DocumentoId = docId,
+                UsuarioId = usuarioId,
+                FlObrigatorio = true,
+                FlPendente = true
+            };
+
+            _context.DocumentoAceites.Add(aceite);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ProcessarDesligamentoAsync(string usuarioId, CancellationToken cancellationToken)
+    {
+        // Revogar todos os aceites do colaborador desligado
+        var aceites = await _context.DocumentoAceites
+            .Where(a => a.UsuarioId == usuarioId && a.DataAceite != null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var aceite in aceites)
+        {
+            aceite.DataRevogacao = DateTime.UtcNow;
+            aceite.FlRevogado = true;
+            aceite.MotivoRevogacao = "Desligamento do colaborador";
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+}
+```
+
+---
+
+### RN-DOC-082-06: Notificação Automática Multicanal
+
+**Descricao**: Quando documento é publicado, sistema notifica automaticamente usuários/departamentos que devem aceitar via email, SMS e in-app (SignalR). Notificações incluem link direto para documento e prazo de aceite.
+
+**Justificativa**: Eficiência: evita coordenação manual de avisos. Compliance: documenta que notificação foi enviada (evidência em auditoria). Engajamento: múltiplos canais aumentam taxa de aceite.
+
+**Implementacao**:
+```csharp
+public class PublicarDocumentoCommandHandler : IRequestHandler<PublicarDocumentoCommand, Guid>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly IEmailService _emailService;
+    private readonly ISmsService _smsService;
+    private readonly IHubContext<NotificacaoHub> _notificationHub;
+
+    public async Task<Guid> Handle(PublicarDocumentoCommand request, CancellationToken cancellationToken)
+    {
+        var documento = await _context.DocumentosResponsabilidade
+            .FirstOrDefaultAsync(d => d.Id == request.DocumentoId, cancellationToken);
+
+        documento.Status = DocumentoStatus.Publicada;
+        documento.DataPublicacao = DateTime.UtcNow;
+
+        // Identificar usuários que devem aceitar
+        var usuariosParaNotificar = await IdentificarUsuariosAsync(documento, cancellationToken);
+
+        foreach (var usuario in usuariosParaNotificar)
+        {
+            // Criar aceite pendente
+            var aceite = new DocumentoAceite
+            {
+                DocumentoId = documento.Id,
+                UsuarioId = usuario.Id,
+                FlObrigatorio = true,
+                DataPrazoAceite = DateTime.UtcNow.AddDays(10)
+            };
+
+            _context.DocumentoAceites.Add(aceite);
+
+            // Email
+            await _emailService.EnviarAsync(new EmailMessage
+            {
+                Para = usuario.Email,
+                Assunto = $"Você deve aceitar: {documento.Titulo}",
+                Corpo = $"<p>Você deve aceitar o documento <strong>{documento.Titulo}</strong> (v{documento.Versao})</p>" +
+                        $"<p><a href='https://icontrol.com/documentos/{documento.Id}/aceitar'>Clique aqui para aceitar</a></p>" +
+                        $"<p>Prazo: {aceite.DataPrazoAceite:dd/MM/yyyy}</p>",
+                Template = "DocumentoPublicado"
+            });
+
+            // SMS (se telefone disponível)
+            if (!string.IsNullOrEmpty(usuario.Telefone))
+            {
+                await _smsService.EnviarAsync(new SmsMessage
+                {
+                    Para = usuario.Telefone,
+                    Texto = $"IControl: Você deve aceitar '{documento.Titulo}' v{documento.Versao}. Acesse: https://icontrol.com/doc/{documento.Id}"
+                });
+            }
+
+            // In-app (SignalR)
+            await _notificationHub.Clients.User(usuario.Id)
+                .SendAsync("DocumentoPublicado", new
+                {
+                    documentoId = documento.Id,
+                    titulo = documento.Titulo,
+                    versao = documento.Versao,
+                    dataPublicacao = documento.DataPublicacao,
+                    dataLimite = aceite.DataPrazoAceite
+                }, cancellationToken);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return documento.Id;
+    }
+
+    private async Task<List<Usuario>> IdentificarUsuariosAsync(DocumentoResponsabilidade documento, CancellationToken cancellationToken)
+    {
+        // Identificar públicos-alvo: todos, por perfil, por cargo, por departamento, por empresa
+        var usuarios = new List<Usuario>();
+
+        // Se "todos": todos os usuários ativos
+        if (documento.FlTodos == true)
+        {
+            usuarios = await _context.Usuarios
+                .Where(u => u.FlAtivo == true && u.FlExcluido == false)
+                .ToListAsync(cancellationToken);
+        }
+
+        // Se por perfil
+        else if (documento.PerfilId.HasValue)
+        {
+            usuarios = await _context.Usuarios
+                .Where(u => u.PerfilId == documento.PerfilId && u.FlAtivo == true)
+                .ToListAsync(cancellationToken);
+        }
+
+        // Se por cargo
+        else if (!string.IsNullOrEmpty(documento.Cargo))
+        {
+            usuarios = await _context.Usuarios
+                .Where(u => u.Cargo == documento.Cargo && u.FlAtivo == true)
+                .ToListAsync(cancellationToken);
+        }
+
+        // Se por departamento
+        else if (documento.DepartamentoId.HasValue)
+        {
+            usuarios = await _context.Usuarios
+                .Where(u => u.DepartamentoId == documento.DepartamentoId && u.FlAtivo == true)
+                .ToListAsync(cancellationToken);
+        }
+
+        return usuarios;
+    }
+}
+```
+
+---
+
+### RN-DOC-082-07: Comprovante Digital Certificado com Retenção Obrigatória
+
+**Descricao**: Cada aceite gera comprovante PDF certificado (hash SHA-256, timestamp, assinatura) válido judicialmente. Retenção mínima de 5 anos conforme SOX, LGPD, ISO 27001.
+
+**Justificativa**: Defesa legal: comprovante com hash SHA-256 não pode ser falsificado. Conformidade: SOX Seção 302 exige retenção de documentação. LGPD Art. 8 exige comprovação de consentimento.
+
+**Implementacao**:
+```csharp
+public class ComprovanteCertificadoService : IComprovanteCertificadoService
+{
+    private readonly IBlobStorageService _blobService;
+    private readonly IApplicationDbContext _context;
+
+    public async Task<string> GerarEArmazenarComprovanteAsync(
+        Guid aceiteId,
+        CancellationToken cancellationToken)
+    {
+        var aceite = await _context.DocumentoAceites
+            .Include(a => a.Documento)
+            .Include(a => a.Usuario)
+            .FirstOrDefaultAsync(a => a.Id == aceiteId, cancellationToken);
+
+        if (aceite == null)
+            throw new ArgumentException("Aceite não encontrado");
+
+        // Obter PDF original do documento
+        var pdfOriginal = await _blobService.BaixarAsync(aceite.Documento.BlobStorageUri);
+
+        // Criar PDF comprovante
+        var doc = PdfReader.Open(new MemoryStream(pdfOriginal), PdfDocumentOpenMode.Import);
+        var novoDoc = new PdfDocument();
+
+        // Copiar páginas
+        foreach (var page in doc.Pages)
+            novoDoc.AddPage(page);
+
+        // Adicionar página de assinatura
+        var pageAssinatura = novoDoc.AddPage(PageSize.A4);
+        var gfx = XGraphics.FromPdfPage(pageAssinatura);
+        var fontTitulo = new XFont("Arial", 14, XFontStyle.Bold);
+        var fontNormal = new XFont("Arial", 10);
+        var fontMono = new XFont("Courier New", 8);
+
+        gfx.DrawString("CERTIFICADO DE ACEITE", fontTitulo, XBrushes.DarkBlue, new XRect(20, 20, 500, 30));
+
+        gfx.DrawString($"Documento: {aceite.Documento.Titulo}", fontNormal, XBrushes.Black, new XRect(20, 70, 500, 20));
+        gfx.DrawString($"Versão: {aceite.Documento.Versao}", fontNormal, XBrushes.Black, new XRect(20, 95, 500, 20));
+        gfx.DrawString($"Aceito por: {aceite.Usuario.Nome}", fontNormal, XBrushes.Black, new XRect(20, 120, 500, 20));
+        gfx.DrawString($"Data/Hora: {aceite.DataAceite:dd/MM/yyyy HH:mm:ss}", fontNormal, XBrushes.Black, new XRect(20, 145, 500, 20));
+        gfx.DrawString($"IP: {aceite.IpAddress}", fontNormal, XBrushes.Black, new XRect(20, 170, 500, 20));
+        gfx.DrawString($"Dispositivo: {aceite.Dispositivo}", fontNormal, XBrushes.Black, new XRect(20, 195, 500, 20));
+
+        // Hash SHA-256
+        var hashSha256 = ComputarHashAceite(aceite);
+        gfx.DrawString("Hash SHA-256 (Integridade):", fontNormal, XBrushes.Black, new XRect(20, 230, 500, 20));
+        gfx.DrawString(hashSha256, fontMono, XBrushes.DarkGray, new XRect(20, 250, 550, 40));
+
+        gfx.DrawString("Este documento foi gerado automaticamente pelo sistema IControlIT e possui validade jurídica conforme Lei 14.063/2020.",
+            new XFont("Arial", 8, XFontStyle.Italic), XBrushes.Gray, new XRect(20, 310, 550, 60));
+
+        // Salvar em Blob Storage
+        var nomeArquivo = $"comprovantes/{aceite.DocumentoId}/{aceite.Id}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
+
+        using (var ms = new MemoryStream())
+        {
+            novoDoc.Save(ms, false);
+            ms.Position = 0;
+            var uri = await _blobService.ArmazenarAsync(ms, nomeArquivo, "application/pdf");
+
+            // Registrar URI no banco
+            aceite.ComprovanteBlobUri = uri;
+            aceite.ComprovanteSha256 = hashSha256;
+            aceite.DataGeracaoComprovante = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            return uri;
+        }
+    }
+
+    private string ComputarHashAceite(DocumentoAceite aceite)
+    {
+        using (var sha = System.Security.Cryptography.SHA256.Create())
+        {
+            var dados = $"{aceite.DocumentoId}|{aceite.UsuarioId}|{aceite.DataAceite:O}|{aceite.IpAddress}";
+            var hash = sha.ComputeHash(Encoding.UTF8.GetBytes(dados));
+            return Convert.ToHexString(hash);
+        }
+    }
+}
+
+public class PolíticaRetencaoDocumentos
+{
+    // Configuração de retenção conforme SOX, LGPD, ISO 27001
+    public const int AnosRetencao = 5;
+
+    public static bool DeveApenasArquivar(DocumentoAceite aceite)
+    {
+        var idadeAceite = DateTime.UtcNow.Subtract(aceite.DataAceite).TotalDays;
+        return idadeAceite > (AnosRetencao * 365);
+    }
+}
+```
+
+---
+
+### RN-DOC-082-08: Busca Full-Text com ElasticSearch
+
+**Descricao**: Documentos são indexados automaticamente no ElasticSearch para busca rápida por palavra-chave, categoria, data, versão. Suporta busca facetada (filtros combinados).
+
+**Justificativa**: Performance: LIKE %texto% em SQL Server é lento com grandes volumes. ElasticSearch indexa full-text, oferecendo relevância e faceted search. Usabilidade: colaboradores encontram rapidamente documentos que precisam aceitar.
+
+**Implementacao**:
+```csharp
+public class DocumentoElasticSearchService : IDocumentoSearchService
+{
+    private readonly IElasticClient _elasticClient;
+    private readonly IApplicationDbContext _context;
+
+    public async Task<IEnumerable<DocumentoSearchResult>> BuscarAsync(
+        string termo,
+        string categoria,
+        DateTime? dataPublicacaoInicio,
+        DateTime? dataPublicacaoFim,
+        int skip = 0,
+        int take = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var searchRequest = new SearchRequest<DocumentoResponsabilidade>
+        {
+            From = skip,
+            Size = take,
+            Query = new BoolQuery
+            {
+                Must = new QueryContainer[]
+                {
+                    new MultiMatchQuery
+                    {
+                        Query = termo,
+                        Fields = new[] { "titulo", "descricao", "conteudo" },
+                        Fuzziness = Fuzziness.Auto
+                    }
+                },
+                Filter = new QueryContainer[]
+                {
+                    !string.IsNullOrEmpty(categoria)
+                        ? new TermQuery { Field = "categoria.keyword", Value = categoria }
+                        : new MatchAllQuery(),
+
+                    dataPublicacaoInicio.HasValue
+                        ? new DateRangeQuery { Field = "dataPublicacao", GreaterThanOrEqualTo = dataPublicacaoInicio }
+                        : new MatchAllQuery(),
+
+                    dataPublicacaoFim.HasValue
+                        ? new DateRangeQuery { Field = "dataPublicacao", LessThanOrEqualTo = dataPublicacaoFim }
+                        : new MatchAllQuery()
+                }
+            },
+            Aggregations = new AggregationDictionary
+            {
+                { "categorias", new TermsAggregation { Field = "categoria.keyword" } }
+            }
+        };
+
+        var response = await _elasticClient.SearchAsync<DocumentoResponsabilidade>(searchRequest, cancellationToken);
+
+        return response.Documents.Select(d => new DocumentoSearchResult
+        {
+            Id = d.Id,
+            Titulo = d.Titulo,
+            Versao = d.Versao,
+            DataPublicacao = d.DataPublicacao,
+            Categoria = d.Categoria.ToString()
+        });
+    }
+
+    public async Task IndexarDocumentoAsync(Guid documentoId, CancellationToken cancellationToken)
+    {
+        var documento = await _context.DocumentosResponsabilidade
+            .FirstOrDefaultAsync(d => d.Id == documentoId, cancellationToken);
+
+        if (documento != null)
+        {
+            await _elasticClient.IndexAsync(documento, idx => idx.Index("documentos-responsabilidade"), cancellationToken);
+        }
+    }
+}
+```
+
+---
+
+### RN-DOC-082-09: Dashboard de Compliance em Tempo Real
+
+**Descricao**: Dashboard interativo mostra taxa de aceites por documento, departamento e usuário. Identifica gaps de conformidade, usuários recorrentemente não-conformes, documentos com baixa taxa de aceite.
+
+**Justificativa**: Governança: executivos visualizam saúde de compliance corporativo. Ação corretiva: identificar rapidamente departamentos que não estão aceitando documentos.
+
+**Endpoints**:
+```csharp
+[HttpGet("/api/documentos/dashboard/compliance")]
+public async Task<ComplianceDashboardDto> ObterDashboardComplianceAsync(CancellationToken cancellationToken)
+{
+    var documentosPublicados = await _context.DocumentosResponsabilidade
+        .Where(d => d.Status == DocumentoStatus.Publicada)
+        .ToListAsync(cancellationToken);
+
+    var dashboard = new ComplianceDashboardDto
+    {
+        TaxaComplianceGeral = CalcularTaxaComplianceGeral(documentosPublicados),
+
+        CompliancePorDocumento = documentosPublicados.Select(d => new
+        {
+            DocumentoId = d.Id,
+            Titulo = d.Titulo,
+            Versao = d.Versao,
+            TaxaAceite = CalcularTaxaAceite(d.Id),
+            QuantidadeAceites = ContarAceites(d.Id),
+            QuantidadePendentes = ContarAceitesPendentes(d.Id)
+        }),
+
+        CompliancePorDepartamento = CalcularCompliancePorDepartamento(),
+
+        UsuariosNaoConformes = IdentificarUsuariosNaoConformes(),
+
+        Alertas = new[]
+        {
+            "Documento 'Código de Conduta' tem apenas 45% de aceite",
+            "Departamento 'TI' tem 12 usuários não-conformes",
+            "Usuário João Silva não aceitou 5 documentos obrigatórios"
+        }
+    };
+
+    return dashboard;
+}
+```
+
+---
+
+### RN-DOC-082-10: Auditoria Completa com Retenção
+
+**Descricao**: Todas as ações relacionadas a documentos e aceites são registradas em tabela Auditoria: criar documento, editar, publicar, aceitar, rejeitar, revogar. Cada registro inclui usuário, data/hora, IP, dispositivo, mudanças (before/after).
+
+**Justificativa**: Conformidade regulatória (LGPD Art. 8, SOX Seção 302, ISO 27001 A.12.4.1). Investigação de incidentes: rastrear quem fez o quê quando.
+
+**Tabelas**:
+```sql
+CREATE TABLE [dbo].[Auditoria] (
+    [Id] UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID(),
+    [ClienteId] UNIQUEIDENTIFIER NOT NULL,
+    [EntityType] NVARCHAR(100) NOT NULL, -- 'Documento', 'DocumentoAceite'
+    [EntityId] UNIQUEIDENTIFIER NOT NULL,
+    [Acao] VARCHAR(50) NOT NULL, -- CREATE, UPDATE, DELETE, ACEITAR, REJEITAR, REVOGAR, PUBLICAR
+    [UsuarioId] NVARCHAR(450) NOT NULL,
+    [IpAddress] VARCHAR(45) NOT NULL,
+    [UserAgent] NVARCHAR(500) NOT NULL,
+    [Dispositivo] NVARCHAR(100) NOT NULL,
+    [ValoresAntigos] NVARCHAR(MAX) NOT NULL, -- JSON
+    [ValoresNovos] NVARCHAR(MAX) NOT NULL, -- JSON
+    [CriadoEm] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+
+    CONSTRAINT [PK_Auditoria] PRIMARY KEY CLUSTERED ([Id]),
+    CONSTRAINT [FK_Auditoria_Cliente] FOREIGN KEY ([ClienteId]) REFERENCES [dbo].[Cliente]([Id])
+);
+
+CREATE NONCLUSTERED INDEX [IX_Auditoria_ClienteId_CriadoEm]
+ON [dbo].[Auditoria] ([ClienteId], [CriadoEm])
+WHERE [CriadoEm] >= DATEADD(YEAR, -5, GETUTCDATE()); -- Apenas últimos 5 anos
+
+-- Política de retenção: manter por 5 anos conforme SOX, LGPD
+ALTER TABLE [dbo].[Auditoria] ADD CONSTRAINT [CK_Auditoria_Retencao]
+CHECK ([CriadoEm] >= DATEADD(YEAR, -5, GETUTCDATE()));
+```
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `ic1_legado` (VB.NET + SQL Server)
+
+**Tabelas Principais**:
+
+1. **Si_Texto_Termo** - Armazena texto de termos/documentos
+```sql
+CREATE TABLE [dbo].[Si_Texto_Termo](
+    [Id_Texto_Termo] [int] IDENTITY(1,1) NOT NULL,
+    [Nm_Termo] [varchar](200) NOT NULL,
+    [Ds_Termo] [nvarchar](max) NOT NULL,
+    [Dt_Criacao] [datetime] NOT NULL,
+    [Dt_Modificacao] [datetime] NULL,
+    [Fl_Ativo] [bit] NOT NULL DEFAULT 1,
+    CONSTRAINT [PK_Si_Texto_Termo] PRIMARY KEY CLUSTERED ([Id_Texto_Termo])
+)
+```
+
+2. **Usuario_Envio_TermoResponsabilidade** - Rastreia aceites de usuários
+```sql
+CREATE TABLE [dbo].[Usuario_Envio_TermoResponsabilidade](
+    [Id_Usuario_Envio] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Usuario] [int] NOT NULL,
+    [Id_Texto_Termo] [int] NOT NULL,
+    [Dt_Aceito] [datetime] NULL,
+    [Dt_Envio] [datetime] NOT NULL,
+    [Fl_Lido] [bit] NOT NULL DEFAULT 0,
+    CONSTRAINT [PK_Usuario_Envio] PRIMARY KEY CLUSTERED ([Id_Usuario_Envio]),
+    CONSTRAINT [FK_Usuario_Envio_Usuario] FOREIGN KEY ([Id_Usuario]) REFERENCES [Usuario]([Id_Usuario]),
+    CONSTRAINT [FK_Usuario_Envio_Termo] FOREIGN KEY ([Id_Texto_Termo]) REFERENCES [Si_Texto_Termo]([Id_Texto_Termo])
+)
+```
+
+3. **Audit_Log** - Logs de auditoria (dispersos, difíceis de consultar)
+```sql
+CREATE TABLE [dbo].[Audit_Log](
+    [Id_Audit] [int] IDENTITY(1,1) NOT NULL,
+    [Tabela] [varchar](100) NOT NULL,
+    [Operacao] [char](1) NOT NULL, -- I=Insert, U=Update, D=Delete
+    [Id_Registro] [int] NOT NULL,
+    [Id_Usuario] [int] NOT NULL,
+    [Dt_Operacao] [datetime] NOT NULL,
+    [Valores_Antigos] [nvarchar](max) NULL,
+    [Valores_Novos] [nvarchar](max) NULL,
+    CONSTRAINT [PK_Audit_Log] PRIMARY KEY CLUSTERED ([Id_Audit])
+)
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descricao | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `[Nm_Termo]` | Nome do termo | → DocumentoResponsabilidade.Titulo |
+| `[Ds_Termo]` | Conteúdo completo | → Armazenar em Azure Blob Storage |
+| `[Dt_Criacao]` | Data de criação | → DocumentoResponsabilidade.CriadoEm |
+| `[Fl_Ativo]` | Se está ativo | → Migrar para DocumentoStatus enum |
+| `[Dt_Aceito]` | Quando usuário aceitou | → DocumentoAceite.DataAceite |
+| `[Id_Usuario]` | Usuário que aceitou | → DocumentoAceite.UsuarioId (GUID) |
+
+---
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descricao | Migracao |
+|-----------|-----------|----------|
+| `pa_InsertTermoResponsabilidade` | Insere novo termo | Usar EF Core DbContext.DocumentosResponsabilidade.AddAsync() |
+| `pa_AtualizarAceiteTermoUsuario` | Registra aceite de usuário | Usar DocumentoAceiteCommandHandler (CQRS) |
+| `pa_ListarTermosPendentes` | Lista termos que usuário não aceitou | Query LINQ: `context.DocumentoAceites.Where(a => a.DataAceite == null)` |
+| `pa_RelatorioAuditoriaTermos` | Gera relatório de auditorias | API `/api/documentos/{id}/auditoria` + UI em Angular |
+
+---
+
+### 3.3 Telas ASPX Legado
+
+| Pagina | Descricao | Tela Moderna |
+|--------|-----------|--------------|
+| `GestaoTermosResponsabilidade.aspx` | CRUD de termos (admin) | `/admin/documentos/gerenciar` (Angular) |
+| `AceiteTermoResponsabilidade.aspx` | Overlay para aceitar termo (usuário) | Modal em Angular: `<app-documento-aceitar>` |
+| `RelatorioTermoResponsabilidade.aspx` | Relatório de aceites | `/admin/documentos/relatorios` (Angular com Chart.js) |
+| `HistoricoTermoResponsabilidade.aspx` | Histórico de versões | `/admin/documentos/{id}/historico` (Angular) |
+
+---
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSTermoResponsabilidade.asmx.vb`
+
+| Metodo | Descricao | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `GetTodosTermos()` | Listar todos os termos | `GET /api/documentos` |
+| `GetTermoPorId(id)` | Obter termo por ID | `GET /api/documentos/{id}` |
+| `InsertTermo(nome, descricao)` | Criar novo termo | `POST /api/documentos` |
+| `UpdateTermo(id, nome, descricao)` | Atualizar termo | `PUT /api/documentos/{id}` |
+| `DeleteTermo(id)` | Deletar termo | `DELETE /api/documentos/{id}` |
+| `RegistrarAceiteUsuario(idUsuario, idTermo)` | Registrar aceite | `POST /api/documentos/{id}/aceitar` |
+| `GetTermosPendentesUsuario(idUsuario)` | Listar termos pendentes | `GET /api/documentos/pendentes` |
+| `GerarRelatorioAuditoria(dataInicio, dataFim)` | Gerar relatório | `GET /api/documentos/auditoria?dataInicio&dataFim` |
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `DOC_RESPONSABILIDADE_[FUNCAO]`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "DOC_RESPONSABILIDADE_ACEITES",
+    "nome": "Gestão de Documentos de Responsabilidade - Aceites",
+    "descricao": "Permitir criação e aceite de documentos de responsabilidade corporativa",
+    "habilitado": true,
+    "isSystemFeature": false
+},
+{
+    "featureKey": "DOC_RESPONSABILIDADE_ASSINATURA_DIGITAL",
+    "nome": "Assinatura Digital Certificada",
+    "descricao": "Integração com DocuSign para assinaturas juridicamente válidas",
+    "habilitado": true,
+    "isSystemFeature": false
+},
+{
+    "featureKey": "DOC_RESPONSABILIDADE_RH_SYNC",
+    "nome": "Sincronização com RH",
+    "descricao": "Sincronizar aceites com eventos de ciclo de vida (admissão, desligamento)",
+    "habilitado": true,
+    "isSystemFeature": false
+}
+```
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao**:
+
+```json
+{
+    "documentos": {
+        "titulo": "Documentos de Responsabilidade",
+        "gerenciar": "Gerenciar Documentos",
+        "criar": "Criar Documento",
+        "editar": "Editar Documento",
+        "aceitar": "Aceitar Documento",
+        "rejeitar": "Rejeitar Documento",
+        "publicar": "Publicar Documento",
+        "versao": "Versão",
+        "categoria": "Categoria",
+        "status": "Status",
+        "dataPublicacao": "Data de Publicação",
+
+        "categorias": {
+            "conduta": "Código de Conduta",
+            "confidencialidade": "Confidencialidade / NDA",
+            "responsabilidade": "Termo de Responsabilidade",
+            "legal": "Documento Legal",
+            "compliance": "Compliance / Regulamentação",
+            "rh": "RH / Política de Pessoal"
+        },
+
+        "status": {
+            "elaboracao": "Em Elaboração",
+            "revisao": "Em Revisão",
+            "aprovada": "Aprovada",
+            "publicada": "Publicada",
+            "obsoleta": "Obsoleta"
+        },
+
+        "aceites": {
+            "titulo": "Meus Aceites",
+            "pendentes": "Documentos Pendentes",
+            "aceito": "Documentos Aceitos",
+            "rejeitado": "Documentos Rejeitados",
+            "dataAceite": "Data de Aceite",
+            "dataLimite": "Prazo",
+            "comprovante": "Baixar Comprovante",
+            "assinarDigitalmente": "Assinar Digitalmente"
+        },
+
+        "workflow": {
+            "aprovar": "Aprovar",
+            "rejeitar": "Rejeitar",
+            "comentarios": "Comentários",
+            "proximoAprovador": "Próximo Aprovador",
+            "historicoAprovacoes": "Histórico de Aprovações"
+        },
+
+        "dashboard": {
+            "titulo": "Dashboard de Compliance",
+            "taxaComplianceGeral": "Taxa de Compliance Geral",
+            "compliancePorDocumento": "Compliance por Documento",
+            "compliancePorDepartamento": "Compliance por Departamento",
+            "usuariosNaoConformes": "Usuários Não-Conformes",
+            "alertas": "Alertas"
+        },
+
+        "mensagens": {
+            "documentoCriado": "Documento criado com sucesso",
+            "documentoAtualizado": "Documento atualizado com sucesso",
+            "documentoPublicado": "Documento publicado com sucesso",
+            "aceiteRegistrado": "Seu aceite foi registrado com sucesso",
+            "comprovanteGerado": "Comprovante gerado com sucesso",
+            "documentoNaoEncontrado": "Documento não encontrado"
+        },
+
+        "validacao": {
+            "tituloObrigatorio": "Título é obrigatório",
+            "conteudoObrigatorio": "Conteúdo é obrigatório",
+            "categoriaProposta": "Categoria é obrigatória",
+            "naoPoqueEditarPublicado": "Não é possível editar documento publicado"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Criar documento | `DOC_RESPONSABILIDADE_CREATE` | DocumentoId, Titulo, Versao, CriadoPor |
+| Atualizar documento | `DOC_RESPONSABILIDADE_UPDATE` | DocumentoId, CamposAlterados (before/after), AlteradoPor |
+| Publicar documento | `DOC_RESPONSABILIDADE_PUBLICAR` | DocumentoId, DataPublicacao, PublicadoPor |
+| Aceitar documento | `DOC_RESPONSABILIDADE_ACEITAR` | DocumentoId, UsuarioId, DataAceite, IpAddress, Dispositivo |
+| Rejeitar documento | `DOC_RESPONSABILIDADE_REJEITAR` | DocumentoId, UsuarioId, Motivo |
+| Revogar aceite | `DOC_RESPONSABILIDADE_REVOGAR` | DocumentoId, UsuarioId, Motivo, RevogadoPor |
+| Gerar comprovante | `DOC_RESPONSABILIDADE_COMPROVANTE` | DocumentoId, AceiteId, ComprovanteUri, ShaHash |
+| Deletar documento | `DOC_RESPONSABILIDADE_DELETE` | DocumentoId, DeletadoPor |
+
+**Retencao**: 5 anos (conforme SOX Seção 302, LGPD, ISO 27001)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `doc:responsabilidade:create` | Criar documentos | Compliance, RH Manager, Administrador |
+| `doc:responsabilidade:read` | Visualizar documentos | Todos (com filtros por acesso) |
+| `doc:responsabilidade:update` | Editar documentos em elaboração | Compliance, RH Manager, Autor |
+| `doc:responsabilidade:delete` | Excluir documentos | Compliance, Administrador |
+| `doc:responsabilidade:publicar` | Publicar documento | Compliance, Diretoria |
+| `doc:responsabilidade:aceitar` | Aceitar documento | Todos |
+| `doc:responsabilidade:rejeitar` | Rejeitar documento | Todos |
+| `doc:responsabilidade:revogar` | Revogar aceites | Compliance, RH Manager, Administrador |
+| `doc:responsabilidade:assinatura_digital` | Usar assinatura digital | Todos (após autenticação) |
+| `doc:responsabilidade:dashboard` | Visualizar dashboard de compliance | Compliance, Diretoria, Administrador |
+| `doc:responsabilidade:relatorios` | Gerar relatórios de auditoria | Compliance, Auditoria Interna, Administrador |
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao | Status |
+|--------|----------|-----------|-----------|--------|
+| GET | `/api/documentos` | Listar documentos (com paginação, filtros) | `doc:responsabilidade:read` | 200 OK |
+| GET | `/api/documentos/{id}` | Obter documento por ID | `doc:responsabilidade:read` | 200 OK |
+| POST | `/api/documentos` | Criar novo documento | `doc:responsabilidade:create` | 201 Created |
+| PUT | `/api/documentos/{id}` | Atualizar documento | `doc:responsabilidade:update` | 200 OK |
+| DELETE | `/api/documentos/{id}` | Excluir documento | `doc:responsabilidade:delete` | 204 No Content |
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao | Status |
+|--------|----------|-----------|-----------|--------|
+| POST | `/api/documentos/{id}/publicar` | Publicar documento | `doc:responsabilidade:publicar` | 200 OK |
+| POST | `/api/documentos/{id}/aprovar` | Aprovar na etapa do workflow | `[conforme workflow]` | 200 OK |
+| POST | `/api/documentos/{id}/rejeitar` | Rejeitar na etapa do workflow | `[conforme workflow]` | 200 OK |
+| GET | `/api/documentos/{id}/historico` | Obter histórico de versões | `doc:responsabilidade:read` | 200 OK |
+| GET | `/api/documentos/{id}/aceites` | Listar aceites do documento | `doc:responsabilidade:read` | 200 OK |
+| POST | `/api/documentos/{id}/aceitar` | Registrar aceite de usuário | `doc:responsabilidade:aceitar` | 201 Created |
+| POST | `/api/documentos/{id}/rejeitar-aceite` | Rejeitar documento | `doc:responsabilidade:rejeitar` | 200 OK |
+| POST | `/api/documentos/{aceiteId}/revogar` | Revogar aceite | `doc:responsabilidade:revogar` | 200 OK |
+| GET | `/api/documentos/{aceiteId}/comprovante` | Baixar comprovante certificado | `doc:responsabilidade:read` | 200 OK (PDF) |
+| POST | `/api/documentos/{id}/assinatura-digital` | Iniciar assinatura digital (DocuSign) | `doc:responsabilidade:assinatura_digital` | 200 OK |
+| GET | `/api/documentos/pendentes` | Listar documentos pendentes do usuário | `doc:responsabilidade:read` | 200 OK |
+| GET | `/api/documentos/dashboard/compliance` | Dashboard de compliance corporativo | `doc:responsabilidade:dashboard` | 200 OK |
+| GET | `/api/documentos/search` | Busca full-text (ElasticSearch) | `doc:responsabilidade:read` | 200 OK |
+| GET | `/api/documentos/{id}/auditoria` | Auditoria completa de operações | `doc:responsabilidade:relatorios` | 200 OK |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Publicação e Aceite de Documento
+
+```
+Administrator acessa /admin/documentos
+    |
+    v
+Seleciona "Criar Documento"
+    |
+    v
+Preenche: Titulo, Conteudo, Categoria, Publico-alvo
+    |
+    v
+Clica "Enviar para Revisão"
+    |
+    v (Sistema incrementa para v1.0, estado = Elaboracao)
+Notificação enviada para aprovadores (email + in-app SignalR)
+    |
+    v
+Compliance Manager recebe notificação
+    |
+    v
+Lê documento, deixa comentários, clica "Aprovado"
+    |
+    v (Se etapa final, publica. Senao, proxima etapa)
+Se multi-etapa: encaminha para Legal (proxima etapa)
+    |
+    v
+Legal Manager aprova
+    |
+    v
+Sistema publica documento (estado = Publicada, DataPublicacao = now)
+    |
+    v
+Notificações enviadas a todos usuários (email, SMS, in-app)
+    |
+    v
+Usuario (em qualquer lugar) recebe notificação "Documento pendente"
+    |
+    v
+Clica no link da notificação ou acessa /documentos/pendentes
+    |
+    v
+Sistema exibe modal bloqueante com documento integralizado
+    |
+    v
+Usuario lê documento
+    |
+    +---- [Rejeita] ---> Registra DataRejeicao, FlRejeitado = 1, nao bloqueia (admin precisa reagir)
+    |
+    v [Aceita]
+Usuario clica "Li e concordo" (checkbox)
+    |
+    v
+Clica "Aceitar"
+    |
+    v
+Sistema registra:
+   - DocumentoAceite.DataAceite = now
+   - DocumentoAceite.IpAddress = request.HttpContext.Connection.RemoteIpAddress
+   - DocumentoAceite.UserAgent = request.Headers["User-Agent"]
+   - DocumentoAceite.Dispositivo = "iPhone 15 Pro" (detectado via navegador)
+   |
+   v
+Gera comprovante PDF certificado (hash SHA-256)
+   |
+   v
+Armazena em Azure Blob Storage
+   |
+   v
+Registra em Auditoria (DOC_RESPONSABILIDADE_ACEITAR)
+   |
+   v
+Usuario recebe confirmação "Documento aceito com sucesso"
+   |
+   v
+Usuario pode baixar comprovante em /documentos/{id}/comprovante
+   |
+   v
+Compliance Manager acessa dashboard → vê taxa de aceite aumentar em tempo real
+```
+
+### 6.2 Fluxo de Revogação de Aceite (Desligamento)
+
+```
+RH Manager registra desligamento do colaborador João Silva
+    |
+    v (Sincronização via Microsoft Graph / Azure AD)
+Sistema detecta evento de desligamento
+    |
+    v
+Chama CicloVidaColaboradorService.ProcessarDesligamentoAsync(joao.id)
+    |
+    v
+Percorre todos os DocumentoAceites onde UsuarioId = joao.id
+    |
+    v
+Para cada aceite ativo:
+    - DataRevogacao = now
+    - FlRevogado = true
+    - MotivoRevogacao = "Desligamento do colaborador"
+    |
+    v
+Registra em Auditoria (DOC_RESPONSABILIDADE_REVOGAR)
+    |
+    v
+Compliance Manager acessa dashboard → vê aceites de João como revogados
+```
+
+### 6.3 Fluxo de Busca Full-Text
+
+```
+Usuario acessa /documentos/buscar
+    |
+    v
+Digita "Confidencialidade"
+    |
+    v
+Sistema chama DocumentoElasticSearchService.BuscarAsync("Confidencialidade")
+    |
+    v
+ElasticSearch retorna hits com relevância:
+   1. Documento "NDA - Confidencialidade" (score: 0.95)
+   2. Documento "Politica de Dados Confidenciais" (score: 0.78)
+    |
+    v
+Usuario seleciona facetas: Categoria="Confidencialidade", DataPublicacao="Últimos 30 dias"
+    |
+    v
+Busca refinada retorna resultados filtrados
+    |
+    v
+Usuario clica em documento → abre modal com aceite/rejeição
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| **HTTPS/TLS 1.3** | Todas as comunicações criptografadas |
+| **Autenticacao OAuth 2.0 + OIDC** | Azure AD, suporte a MFA |
+| **Rate Limiting** | Máximo 100 requisições/min por usuário |
+| **SQL Injection Prevention** | EF Core LINQ (parametrized queries) |
+| **XSS Protection** | Angular sanitizer, Content Security Policy headers |
+| **CSRF Protection** | Anti-forgery tokens em formulários POST |
+| **Row-Level Security (RLS)** | Query filters EF Core: `modelBuilder.Entity<DocumentoResponsabilidade>().HasQueryFilter(...)` |
+| **Hash SHA-256** | Comprovantes não podem ser falsificados |
+| **Versionamento Imutável** | Histórico não pode ser alterado (insert-only) |
+| **Assinatura Digital** | Certificado ICP-Brasil (A1/A3), validade jurídica |
+| **Audit Log** | Imutável, retenção 5 anos |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [ ] SQL Injection em campos de entrada (titulo, descricao, conteudo)
+- [ ] XSS em campos de texto (aceite com <script> tags)
+- [ ] CSRF Protection em aceite de documento
+- [ ] Validacao de permissoes (usuário sem `doc:responsabilidade:aceitar` nao pode aceitar)
+- [ ] RLS: Usuario de Cliente A nao consegue ver documentos de Cliente B
+- [ ] Hash integrity: comprovante com hash falsificado é detectado
+- [ ] Replay attack: mesmo aceite nao pode ser registrado 2x
+- [ ] Authorization: usuario sem `doc:responsabilidade:delete` nao consegue deletar
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao | Frequencia |
+|-----|------|---------|-----------|
+| Taxa de Compliance Geral | > 95% | (Total de aceites / Total de usuários-documento) * 100 | Diária |
+| Taxa de Aceite por Documento | > 90% | Aceites recebidos / Aceites esperados | Diária |
+| Tempo Médio para Aceitar | < 24 horas | Média de DataAceite - DataPublicacao | Semanal |
+| Taxa de Compliance por Departamento | > 85% | Aceites por departamento | Semanal |
+| Documentos em Atraso | 0 | Documentos sem ser publicados após 30 dias em elaboração | Semanal |
+| Taxa de Sucesso de Assinatura Digital | > 98% | Sucessos / Total de tentativas DocuSign | Diária |
+| Tempo de Processamento Médio (Workflow) | < 3 dias | Tempo de DataPublicacao - DataCriacao | Semanal |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| Taxa de aceite baixa | Taxa < 50% em 7 dias | Enviar email para Compliance + dashboard alert |
+| Documento em atraso | Documento > 30 dias sem publicar | Notificar owner + escalate para Compliance |
+| Usuario nao-conforme | Usuario > 5 documentos pendentes | Notificar Gestor do usuario |
+| Prazo aceite próximo | Usuário tem < 1 dia para aceitar | Enviar lembrete email + SMS |
+| Assinatura digital falha | Falha em DocuSign envelope | Registrar em erro log, notificar usuario |
+| Divergência de RLS | Usuario vê documento de outro Cliente | Security alert, bloquear sessao |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF082](./MD-RF082-Gestao-Documentos-Responsabilidade.md)
+2. **Casos de Uso**: Criar [UC-RF082](./UC-RF082-Gestao-Documentos-Responsabilidade.md)
+3. **Workflows**: Criar [WF-RF082](./WF-RF082-Telas-Componentes-Estados.md)
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml) com mínimo 2 User Stories
+5. **Implementacao Backend**: Commands, Queries, Handlers (CQRS pattern)
+6. **Implementacao Frontend**: Telas Angular para CRUD, aceites, dashboard
+7. **Testes Unitarios**: Services, Handlers, Controllers
+8. **Testes E2E**: Playwright para fluxos principais
+9. **Deploy**: HOM → validação → PRD
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial - RF082 completo conforme template | Claude Code |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code
+**Revisao**: Pendente

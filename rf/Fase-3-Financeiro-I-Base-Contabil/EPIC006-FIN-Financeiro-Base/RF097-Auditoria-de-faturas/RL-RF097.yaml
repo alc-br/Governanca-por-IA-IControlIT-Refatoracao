@@ -1,0 +1,699 @@
+# RL-RF097.yaml — Referência ao Legado (Auditoria de Faturas)
+# Versão: 1.0
+# Data: 2025-12-31
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF097
+titulo: "Auditoria de Faturas (NF-e e Documentos Fiscais)"
+
+legado:
+  sistema: "IControlIT v1.0 (VB.NET + ASP.NET Web Forms 4.8)"
+  versao: "1.0.0"
+  arquitetura: "Monolítica WebForms + SQL Server + SOAP WebServices"
+  banco_dados: "SQL Server 2012"
+  multi_tenant: true  # Via campo ClienteId (sem Row-Level Security)
+  auditoria: "partial"  # Campos DataCriacao, UsuarioCriacao (sem log automático)
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+# 100% dos itens possuem campo "destino" preenchido
+referencias:
+  # ========== TELAS ASPX ==========
+  - id: "LEG-RF097-001"
+    tipo: "tela"
+    nome: "AuditoriaFatura.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/AuditoriaFatura.aspx"
+    descricao: |
+      Tela principal de consulta de auditorias de NF-e. Exibe GridView com auditorias realizadas,
+      status (Pendente/Auditado/Erro), validações executadas, alertas gerados.
+      Botões: "Detalhar", "Consultar SEFAZ", "Gerar Relatório".
+      PROBLEMA: Sem paginação (carrega todas as auditorias do cliente), sem async (trava na consulta SEFAZ),
+      validação ClienteId não checa se usuário tem acesso (data leakage), mensagens hardcoded em português.
+    destino: "substituido"
+    justificativa: |
+      Substituído por componente Angular 19 standalone (auditoria-faturas-list.component.ts)
+      com API REST assíncrona (GET /api/auditoria-faturas), paginação server-side,
+      i18n (Transloco), Row-Level Security automático (Global Query Filter).
+      IMPACTO: Alto (usuários acostumados com interface legada).
+      MITIGAÇÃO: Tutorial in-app + feedback de UX antes do deploy.
+    rf_item_relacionado: "F01"  # Listar auditorias de NF-e
+    uc_relacionado: "UC00"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF097-002"
+    tipo: "tela"
+    nome: "ConsultaSEFAZ.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/ConsultaSEFAZ.aspx"
+    descricao: |
+      Tela de consulta manual de status NF-e no WebService SEFAZ.
+      Campos: ChaveAcesso (44 dígitos), CNPJEmitente, botão "Consultar".
+      Retorna status: 100 (Autorizado), 101 (Cancelado), 102 (Denegado).
+      PROBLEMA: Timeout 120s sem retry, certificado A1 hardcoded no Web.config (inseguro),
+      sem cache (duplica consultas SEFAZ), log manual (INSERT INTO ConsultaSEFAZ).
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST: POST /api/auditoria-faturas/{id}/consultar-sefaz
+      com SefazService (.NET 10), retry exponencial (Polly: 5s, 30s, 120s),
+      certificado A1/A3 via Azure Key Vault, cache Redis (30min TTL), log automático (AuditInterceptor).
+      IMPACTO: Médio (integração com SEFAZ precisa ser testada exaustivamente).
+      MITIGAÇÃO: Testes com ambiente homologação SEFAZ + fallback para validação local se SEFAZ indisponível.
+    rf_item_relacionado: "RN-AUF-097-002"  # Consulta obrigatória de status SEFAZ
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF097-003"
+    tipo: "tela"
+    nome: "RelatorioFiscal.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/RelatorioFiscal.aspx"
+    descricao: |
+      Tela de geração de relatórios fiscais: Livro Fiscal, Apuração ICMS, SPED Fiscal.
+      Campos: TipoRelatorio (DropDown), DataInicio, DataFim, botão "Gerar".
+      Geração via RDLC (Report Viewer), processamento síncrono (trava interface).
+      PROBLEMA: Sem validação de período (aceita > 1 ano, trava banco), hardcoded RDLC (sem customização),
+      sem exportação CSV/Excel, geração síncrona (5 minutos de espera).
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoints REST:
+      - GET /api/auditoria-faturas/relatorios/livro-fiscal
+      - GET /api/auditoria-faturas/relatorios/apuracao-icms
+      Geração assíncrona via Hangfire (background job) + notificação push quando pronto.
+      Angular: download assíncrono (usuário continua trabalhando).
+      IMPACTO: Alto (usuários acostumados com PDF instantâneo).
+      MITIGAÇÃO: Fallback para geração síncrona em relatórios pequenos (< 1000 registros).
+    rf_item_relacionado: "F09"  # Gerar relatórios fiscais
+    uc_relacionado: "UC04"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF097-004"
+    tipo: "tela"
+    nome: "AlertasFatura.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/AlertasFatura.aspx"
+    descricao: |
+      Tela de exibição de alertas críticos de auditoria (NF-e cancelada, duplicatas, impostos divergentes).
+      GridView com colunas: Tipo, Severidade, Descrição, Data, botão "Resolver".
+      PROBLEMA: Alertas gerados em batch (SQL Server Job 1x/dia às 23h, não é tempo real),
+      sem notificação push (usuário abre tela manualmente), resolução sem auditoria (não registra quem resolveu).
+    destino: "substituido"
+    justificativa: |
+      Substituído por:
+      - GET /api/auditoria-faturas/{id}/alertas (listar alertas)
+      - POST /api/auditoria-faturas/alertas/{alertaId}/resolver (resolver alerta com auditoria)
+      Alertas gerados em tempo real (SignalR), notificação push + email,
+      resolução com auditoria completa (usuário, timestamp, justificativa).
+      IMPACTO: Médio (usuários precisarão se acostumar com notificações push).
+      MITIGAÇÃO: Filtro por severidade (apenas críticos por padrão) + opção de desabilitar notificações.
+    rf_item_relacionado: "ALERT-AUF-01"  # Alertas críticos
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF097-005"
+    tipo: "tela"
+    nome: "DashboardFiscal.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/DashboardFiscal.aspx"
+    descricao: |
+      Dashboard com KPIs fiscais: Taxa de conformidade, Tempo médio de auditoria, gráfico de alertas por tipo.
+      Usa MS Chart Controls (gráficos estáticos), KPIs calculados via stored procedures (queries lentas).
+      PROBLEMA: Sem cache (recalcula KPIs a cada refresh), gráficos não atualizam em tempo real, full table scan.
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/auditoria-faturas/dashboard com Angular + ApexCharts.
+      KPIs cacheados em Redis (atualização a cada 5min), gráficos dinâmicos,
+      atualização em tempo real via SignalR (quando nova auditoria é concluída).
+      IMPACTO: Baixo (melhoria de UX).
+      MITIGAÇÃO: Documentar novas funcionalidades (zoom, export, filtros).
+    rf_item_relacionado: "KPI-AUF-01"  # KPIs fiscais
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # ========== WEBSERVICES (SOAP) ==========
+  - id: "LEG-RF097-006"
+    tipo: "webservice"
+    nome: "ConsultarStatusSEFAZ"
+    caminho: "ic1_legado/IControlIT/WebService/WSAuditoriaFatura.asmx.vb"
+    descricao: |
+      WebService SOAP para consultar status NF-e no SEFAZ.
+      Parâmetros: chaveAcesso (string), cnpj (string). Retorna: status (string).
+      PROBLEMA: Sem validação de formato, sem retry (falha imediata), timeout 120s fixo (bloqueia thread),
+      sem log de auditoria, sem cache (duplica consultas SEFAZ).
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST: POST /api/auditoria-faturas/{id}/consultar-sefaz
+      com SefazService (.NET 10), retry exponencial (Polly), timeout async (não bloqueia thread),
+      log automático (AuditInterceptor), cache Redis (30min TTL).
+      IMPACTO: Alto (integrações externas que consomem SOAP quebrarão).
+      MITIGAÇÃO: Manter endpoint SOAP legado temporário (6 meses) + documentar migração para REST.
+    rf_item_relacionado: "RN-AUF-097-002"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF097-007"
+    tipo: "webservice"
+    nome: "ValidarNFe"
+    caminho: "ic1_legado/IControlIT/WebService/WSAuditoriaFatura.asmx.vb"
+    descricao: |
+      WebService SOAP para validar XML NF-e (assinatura digital, chave de acesso, impostos).
+      Parâmetros: xmlContent (string), clienteId (int). Retorna: resultado (JSON string).
+      PROBLEMA: Validação de assinatura opcional (checkbox), sem validação de certificado expirado,
+      sem recálculo de base de impostos.
+    destino: "substituido"
+    justificativa: |
+      Substituído por POST /api/auditoria-faturas (criar auditoria) + validações automáticas:
+      - RN-AUF-097-001 (chave de acesso)
+      - RN-AUF-097-005 (assinatura digital obrigatória)
+      - RN-AUF-097-006 (base de cálculo recalculada)
+      IMPACTO: Alto (validações agora obrigatórias, pode rejeitar NF-e legítimas se certificado expirado).
+      MITIGAÇÃO: Alert se certificado expira em < 30 dias + documentação clara sobre renovação.
+    rf_item_relacionado: "RN-AUF-097-005"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF097-008"
+    tipo: "webservice"
+    nome: "GerarRelatorioFiscal"
+    caminho: "ic1_legado/IControlIT/WebService/WSAuditoriaFatura.asmx.vb"
+    descricao: |
+      WebService SOAP para gerar relatórios fiscais (Livro Fiscal, Apuração ICMS).
+      Parâmetros: dataInicio (DateTime), dataFim (DateTime). Retorna: PDF (base64).
+      PROBLEMA: Geração síncrona (trava thread por minutos), sem validação de período (aceita > 1 ano),
+      hardcoded RDLC (sem customização).
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/auditoria-faturas/relatorios/livro-fiscal (assíncrono via Hangfire).
+      Geração em background job + notificação push quando pronto.
+      IMPACTO: Médio (integrações externas precisarão migrar para async polling).
+      MITIGAÇÃO: Endpoint síncrono temporário (fallback) para relatórios pequenos (< 1000 registros).
+    rf_item_relacionado: "F09"
+    uc_relacionado: "UC04"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF097-009"
+    tipo: "webservice"
+    nome: "ListarAlertas"
+    caminho: "ic1_legado/IControlIT/WebService/WSAuditoriaFatura.asmx.vb"
+    descricao: |
+      WebService SOAP para listar alertas críticos de auditoria.
+      Parâmetros: clienteId (int). Retorna: lista de alertas (XML).
+      PROBLEMA: Alertas gerados em batch (1x/dia), sem paginação (retorna todos os alertas),
+      sem filtro por severidade.
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/auditoria-faturas/{id}/alertas (REST JSON) com paginação server-side,
+      filtros por severidade, alertas em tempo real (SignalR).
+      IMPACTO: Baixo (melhoria de performance e UX).
+      MITIGAÇÃO: Documentar novos parâmetros de paginação e filtros.
+    rf_item_relacionado: "ALERT-AUF-01"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # ========== STORED PROCEDURES ==========
+  - id: "LEG-RF097-010"
+    tipo: "stored_procedure"
+    nome: "sp_ConsultarStatusSEFAZ"
+    caminho: "Database/dbo/sp_ConsultarStatusSEFAZ.sql"
+    descricao: |
+      Stored procedure para consultar status NF-e no SEFAZ via SOAP.
+      PROBLEMA CRÍTICO: SQL Injection (concatena @ChaveAcesso diretamente na query),
+      data leakage (não valida se usuário tem acesso ao ClienteId), timeout 120s sem retry.
+      Exemplo de SQL Injection: SET @SQL = 'SELECT * FROM NotaFiscal WHERE ChaveAcesso = ''' + @ChaveAcesso + ''''
+    destino: "substituido"
+    justificativa: |
+      Substituído por SefazService.ConsultarStatusAsync() (.NET 10) com:
+      - Parâmetros EF Core (sem SQL Injection)
+      - Row-Level Security (Global Query Filter)
+      - Retry exponencial (Polly: 5s, 30s, 120s)
+      IMPACTO: Crítico (risco de SQL Injection no legado).
+      MITIGAÇÃO: Deploy urgente + testes de segurança (TC-UC02-seguranca).
+    rf_item_relacionado: "RN-AUF-097-002"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF097-011"
+    tipo: "stored_procedure"
+    nome: "sp_ValidarAliquotaICMS"
+    caminho: "Database/dbo/sp_ValidarAliquotaICMS.sql"
+    descricao: |
+      Stored procedure para validar alíquota ICMS conforme CFOP.
+      PROBLEMA: Alíquotas hardcoded no código (IF @CFOP = '5.102' SET @Aliquota = 18.00),
+      sem range de tolerância (±2%), default genérico 18% (pode estar errado).
+      Mudanças de legislação exigem deploy de código.
+    destino: "substituido"
+    justificativa: |
+      Substituído por ValidarAliquotaICMSHandler (CQRS Command) com:
+      - Tabela ParametroFiscal (RF001) para alíquotas por CFOP
+      - Range de tolerância (±2%)
+      - Sem default genérico (rejeita se CFOP desconhecido)
+      IMPACTO: Médio (mudanças de alíquotas agora via parâmetros, sem deploy).
+      MITIGAÇÃO: Documentar processo de atualização de parâmetros fiscais.
+    rf_item_relacionado: "RN-AUF-097-003"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF097-012"
+    tipo: "stored_procedure"
+    nome: "sp_VerificarDuplicatas"
+    caminho: "Database/dbo/sp_VerificarDuplicatas.sql"
+    descricao: |
+      Stored procedure para buscar NF-e com mesma chave de acesso.
+      PROBLEMA: Full table scan (sem índice em ChaveAcesso), lento para > 100k registros,
+      não detecta CNPJ duplicado (mesma numeração + série no mês).
+    destino: "substituido"
+    justificativa: |
+      Substituído por ValidarDuplicataHandler (CQRS Query) com:
+      - Índice composto: (ChaveAcesso, ClienteId)
+      - Validação adicional: (CNPJ, Numero, Serie, MesEmissao)
+      - Cache Redis (evitar queries repetidas)
+      IMPACTO: Baixo (melhoria de performance).
+      MITIGAÇÃO: Criar índices em produção fora do horário de pico.
+    rf_item_relacionado: "RN-AUF-097-007"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF097-013"
+    tipo: "stored_procedure"
+    nome: "sp_GerarRelatorioFiscal"
+    caminho: "Database/dbo/sp_GerarRelatorioFiscal.sql"
+    descricao: |
+      Stored procedure para gerar relatório Livro Fiscal / Apuração ICMS.
+      PROBLEMA: Processamento síncrono (trava banco por minutos), full table scan em NotaFiscal,
+      sem validação de período (aceita > 1 ano), hardcoded query (sem customização).
+    destino: "substituido"
+    justificativa: |
+      Substituído por GerarRelatorioHandler (CQRS Command) + Hangfire (background job).
+      Query otimizada com índices, paginação interna, validação de período (máx 1 ano).
+      IMPACTO: Alto (banco não trava mais durante geração).
+      MITIGAÇÃO: Criar índices otimizados antes do deploy.
+    rf_item_relacionado: "F09"
+    uc_relacionado: "UC04"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF097-014"
+    tipo: "stored_procedure"
+    nome: "sp_AlertarInconsistencias"
+    caminho: "Database/dbo/sp_AlertarInconsistencias.sql"
+    descricao: |
+      Stored procedure para disparar alertas de inconsistências (SQL Server Job 1x/dia às 23h).
+      PROBLEMA: Alertas gerados em batch (não é tempo real), email hardcoded no código,
+      sem notificação push, sem auditoria de envio.
+    destino: "substituido"
+    justificativa: |
+      Substituído por AlertaService + SignalR (notificação em tempo real) + Hangfire (envio de email).
+      Alertas gerados imediatamente após auditoria concluir.
+      IMPACTO: Médio (usuários receberão notificações em tempo real).
+      MITIGAÇÃO: Filtro por severidade (apenas críticos por padrão) + opção de desabilitar.
+    rf_item_relacionado: "ALERT-AUF-01"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ========== TABELAS LEGADAS ==========
+  - id: "LEG-RF097-015"
+    tipo: "tabela"
+    nome: "NotaFiscal"
+    caminho: "Database/dbo/NotaFiscal"
+    descricao: |
+      Tabela que armazena dados de NF-e importadas.
+      Campos principais: ChaveAcesso, StatusSEFAZ, XmlContent, CNPJ, ValorTotal, ClienteId.
+      PROBLEMA: Sem auditoria automática (apenas DataCriacao manual), ClienteId sem índice (lento),
+      XmlContent em ntext (tipo obsoleto), sem soft delete.
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO com melhorias:
+      - Auditoria automática (AuditInterceptor: CriadoPor, DataCriacao, AlteradoPor, DataAlteracao)
+      - Índice composto: (ClienteId, ChaveAcesso)
+      - XmlContent migrado para nvarchar(MAX)
+      - Soft delete (campo DeletedAt)
+      IMPACTO: Médio (estrutura similar, mas com campos adicionais).
+      MITIGAÇÃO: Migração de dados via script SQL (ntext → nvarchar(MAX)) + adicionar índices.
+    rf_item_relacionado: null
+    uc_relacionado: "UC00"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF097-016"
+    tipo: "tabela"
+    nome: "NotaFiscalItem"
+    caminho: "Database/dbo/NotaFiscalItem"
+    descricao: |
+      Tabela de itens de NF-e (produtos, serviços).
+      Campos: NCM, Quantidade, ValorUnitario, AliquotaICMS, ValorICMS, AliquotaIPI, ValorIPI.
+      PROBLEMA: Sem validação de NCM (aceita NCM inválido), alíquotas sem validação por CFOP.
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO com melhorias:
+      - Validação de NCM (FluentValidation: 8 dígitos numéricos)
+      - Validação de alíquotas por CFOP (RN-AUF-097-003)
+      - Auditoria automática
+      IMPACTO: Baixo (estrutura similar).
+      MITIGAÇÃO: Validação de dados existentes antes do deploy (TC-UC01-validacao-ncm).
+    rf_item_relacionado: "RN-AUF-097-003"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF097-017"
+    tipo: "tabela"
+    nome: "AuditoriaFatura"
+    caminho: "Database/dbo/AuditoriaFatura"
+    descricao: |
+      Tabela de histórico de auditorias realizadas.
+      Campos: ChaveAcesso, StatusAuditoria, ValidacoesExecutadas, ValidacoesFalhadas, Alertas, ResultadoJSON.
+      PROBLEMA: ResultadoJSON em ntext (problema de performance), sem soft delete, StatusAuditoria em varchar (sem ENUM).
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por nova tabela AuditoriaFatura com:
+      - Estados (ENUM): pending, in_progress, completed_success, completed_with_warnings, completed_with_errors, failed, cancelled
+      - ResultadoJson em nvarchar(MAX) com JSON Schema validado
+      - Soft delete (DeletedAt)
+      - Auditoria automática
+      IMPACTO: Alto (mudança de estrutura).
+      MITIGAÇÃO: Migração de dados legado → novo schema via script SQL.
+    rf_item_relacionado: null
+    uc_relacionado: "UC00"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF097-018"
+    tipo: "tabela"
+    nome: "AlertaFatura"
+    caminho: "Database/dbo/AlertaFatura"
+    descricao: |
+      Tabela de alertas críticos gerados durante auditoria.
+      Campos: ChaveAcesso, TipoAlerta, NivelSeveridade, Descricao, Resolvido, DataResolucao.
+      PROBLEMA: Sem auditoria de resolução (não registra quem resolveu), NivelSeveridade em varchar (sem ENUM).
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por nova tabela AlertaFiscal com:
+      - Severidade (ENUM): CRITICA, IMPORTANTE, INFORMACAO
+      - Auditoria de resolução: UsuarioResolucao, DataResolucao, Justificativa
+      - Soft delete
+      - Auditoria automática
+      IMPACTO: Médio (mudança de estrutura).
+      MITIGAÇÃO: Migração de dados legado → novo schema.
+    rf_item_relacionado: "ALERT-AUF-01"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF097-019"
+    tipo: "tabela"
+    nome: "ConsultaSEFAZ"
+    caminho: "Database/dbo/ConsultaSEFAZ"
+    descricao: |
+      Tabela de histórico de consultas ao SEFAZ.
+      Campos: ChaveAcesso, StatusSEFAZ, Protocolo, Mensagem, DataConsulta, TempoResposta.
+      PROBLEMA: Sem TTL (tabela cresce indefinidamente), sem índice em ChaveAcesso (lento).
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO com melhorias:
+      - TTL automático (30 dias) via Hangfire job (limpeza diária)
+      - Índice composto: (ChaveAcesso, DataConsulta DESC)
+      - Cache Redis (30min TTL) para evitar consultas duplicadas
+      IMPACTO: Baixo (estrutura similar).
+      MITIGAÇÃO: Script de limpeza de dados antigos (> 30 dias) antes do deploy.
+    rf_item_relacionado: "RN-AUF-097-002"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # ========== REGRAS DE NEGÓCIO IMPLÍCITAS ==========
+  - id: "LEG-RF097-020"
+    tipo: "regra_negocio"
+    nome: "Validação Manual de Chave de Acesso NF-e (Frontend JavaScript)"
+    caminho: "ic1_legado/IControlIT/Financeiro/AuditoriaFatura.aspx (JavaScript)"
+    descricao: |
+      Validação de chave de acesso (44 dígitos, módulo 11) era feita manualmente em JavaScript no frontend.
+      Backend não validava. NF-e com chave inválida era salva no banco de dados.
+      Código (resumido): if (chave.length != 44) { alert("Chave inválida"); return false; }
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por validação server-side obrigatória (RN-AUF-097-001).
+      Backend valida chave via FluentValidation + rejeição HTTP 400.
+      IMPACTO: Alto (backend agora rejeita chaves inválidas que antes eram aceitas).
+      MITIGAÇÃO: Testes exaustivos com chaves válidas e inválidas (TC-UC01-validacao-chave).
+    rf_item_relacionado: "RN-AUF-097-001"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF097-021"
+    tipo: "regra_negocio"
+    nome: "Consulta SEFAZ Opcional (Clique Manual do Usuário)"
+    caminho: "ic1_legado/IControlIT/Financeiro/ConsultaSEFAZ.aspx.vb"
+    descricao: |
+      Consulta ao SEFAZ não era automática. Usuário precisava clicar em botão "Consultar SEFAZ" manualmente.
+      NF-e canceladas no SEFAZ permaneciam como "Autorizadas" no sistema por meses.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por consulta SEFAZ automática (RN-AUF-097-002).
+      Hangfire job diário (madrugada) + sob demanda.
+      IMPACTO: Médio (aumento de chamadas ao SEFAZ).
+      MITIGAÇÃO: Job 1x/dia (madrugada) + cache Redis (evitar consultas duplicadas).
+    rf_item_relacionado: "RN-AUF-097-002"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF097-022"
+    tipo: "regra_negocio"
+    nome: "Alíquota ICMS Hardcoded no Código VB.NET"
+    caminho: "ic1_legado/IControlIT/Financeiro/ValidarAliquota.vb"
+    descricao: |
+      Alíquotas de ICMS por CFOP estavam hardcoded no código VB.NET.
+      Exemplo: If CFOP = "5.102" Then AliquotaICMS = 18
+      Mudanças de legislação exigiam deploy de código.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por alíquotas parametrizadas (RF001) + RN-AUF-097-003.
+      Tabela ParametroFiscal contém alíquotas por CFOP + UF.
+      IMPACTO: Médio (mudanças agora via parâmetros, sem deploy).
+      MITIGAÇÃO: Documentar processo de atualização de parâmetros fiscais.
+    rf_item_relacionado: "RN-AUF-097-003"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF097-023"
+    tipo: "regra_negocio"
+    nome: "Detecção Manual de Duplicatas (Relatório Semanal)"
+    caminho: "ic1_legado/IControlIT/Financeiro/RelatorioFiscal.aspx.vb"
+    descricao: |
+      Duplicatas eram detectadas apenas se usuário rodasse relatório específico "Relatório de Duplicatas" (semanalmente).
+      Duplicatas passavam despercebidas por meses.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por detecção automática (RN-AUF-097-007).
+      Alerta crítico em tempo real (SignalR) quando duplicata detectada.
+      IMPACTO: Alto (duplicatas agora bloqueadas imediatamente).
+      MITIGAÇÃO: Validação de dados históricos antes do deploy (TC-UC01-deteccao-duplicatas).
+    rf_item_relacionado: "RN-AUF-097-007"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF097-024"
+    tipo: "regra_negocio"
+    nome: "Assinatura Digital Opcional (Checkbox)"
+    caminho: "ic1_legado/IControlIT/Financeiro/AuditoriaFatura.aspx.vb"
+    descricao: |
+      Validação de assinatura digital XML era opcional (checkbox "Validar Assinatura?").
+      NF-e com assinatura inválida eram aceitas.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por validação OBRIGATÓRIA (RN-AUF-097-005).
+      Rejeição HTTP 400 se assinatura inválida.
+      IMPACTO: Alto (pode rejeitar NF-e legítimas se certificado expirado).
+      MITIGAÇÃO: Alert se certificado expira em < 30 dias + documentação clara sobre renovação.
+    rf_item_relacionado: "RN-AUF-097-005"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF097-025"
+    tipo: "regra_negocio"
+    nome: "Base de Cálculo Não Validada (Aceita Valores da NF-e Sem Recalcular)"
+    caminho: "ic1_legado/IControlIT/Financeiro/ImportarNFe.vb"
+    descricao: |
+      Sistema não recalculava base de cálculo de ICMS/IPI. Apenas salvava o valor da NF-e.
+      Valores divergentes passavam sem alerta.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por recálculo automático (RN-AUF-097-006).
+      Alerta se divergência > R$ 0,10.
+      IMPACTO: Médio (pode gerar muitos alertas inicialmente).
+      MITIGAÇÃO: Threshold ajustável (configurável via RF001).
+    rf_item_relacionado: "RN-AUF-097-006"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF097-026"
+    tipo: "regra_negocio"
+    nome: "Sem Validação SPED Fiscal (Escrituração Não Validada)"
+    caminho: null  # Regra ausente no legado
+    descricao: |
+      Sistema não validava se NF-e estava escriturada no SPED Fiscal (EFD-ICMS/IPI).
+      NF-e não escrituradas resultavam em autuações fiscais.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por validação SPED automática (RN-AUF-097-008).
+      Alerta crítico se NF-e não possui registro correspondente no SPED Fiscal.
+      IMPACTO: Alto (pode gerar muitos alertas inicialmente).
+      MITIGAÇÃO: Feature Flag (habilitar gradualmente por cliente).
+    rf_item_relacionado: "RN-AUF-097-008"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF097-027"
+    tipo: "regra_negocio"
+    nome: "Retenções Não Validadas (IRRF, CSLL, ISS, INSS)"
+    caminho: null  # Regra ausente no legado
+    descricao: |
+      Sistema não validava retenções obrigatórias (IRRF, CSLL, ISS, INSS) para NF-e de serviços (CFOP 5.933, 6.933).
+      Retenções ausentes geravam multas.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por validação automática (RN-AUF-097-009).
+      Alerta se retenção obrigatória ausente.
+      IMPACTO: Médio (pode gerar alertas para NF-e antigas).
+      MITIGAÇÃO: Validação aplicada apenas a NF-e novas (data emissão > deploy).
+    rf_item_relacionado: "RN-AUF-097-009"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF097-028"
+    tipo: "regra_negocio"
+    nome: "Sem Detecção de Fraudes (Machine Learning Inexistente)"
+    caminho: null  # Funcionalidade inexistente no legado
+    descricao: |
+      Sistema não detectava operações anômalas (valores fora do padrão do fornecedor, horários incomuns de emissão, NCM incompatível).
+      Fraudes eram detectadas apenas em auditoria manual (meses depois).
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por Azure ML (RN-AUF-097-010).
+      Score de anomalia > 0.75 gera alerta de possível fraude.
+      IMPACTO: Médio (custo Azure ML + falsos positivos).
+      MITIGAÇÃO: Feature Flag (habilitar apenas para clientes que solicitarem) + threshold ajustável.
+    rf_item_relacionado: "RN-AUF-097-010"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 3
+
+  - id: "LEG-RF097-029"
+    tipo: "regra_negocio"
+    nome: "NF-e Cancelada com Movimentação Posterior Não Detectada"
+    caminho: null  # Regra ausente no legado
+    descricao: |
+      Sistema não verificava se NF-e cancelada tinha movimentações financeiras/estoque/contábil posteriores à data de cancelamento.
+      NF-e canceladas eram pagas/estocadas normalmente.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por detecção automática (RN-AUF-097-004).
+      Alerta crítico + bloqueio de movimentação se NF-e cancelada.
+      IMPACTO: Alto (pode bloquear operações legítimas se data de cancelamento estiver errada).
+      MITIGAÇÃO: Validação manual obrigatória antes de bloquear.
+    rf_item_relacionado: "RN-AUF-097-004"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "AuditoriaFatura.aspx"
+    referencia_rf: "F01"  # Listar auditorias
+    referencia_uc: "UC00"
+    status: "migrado"
+
+  - elemento_legado: "ConsultaSEFAZ.aspx"
+    referencia_rf: "RN-AUF-097-002"  # Consulta SEFAZ
+    referencia_uc: "UC01"
+    status: "migrado"
+
+  - elemento_legado: "RelatorioFiscal.aspx"
+    referencia_rf: "F09"  # Gerar relatórios
+    referencia_uc: "UC04"
+    status: "migrado"
+
+  - elemento_legado: "AlertasFatura.aspx"
+    referencia_rf: "ALERT-AUF-01"
+    referencia_uc: "UC03"
+    status: "migrado"
+
+  - elemento_legado: "DashboardFiscal.aspx"
+    referencia_rf: "KPI-AUF-01"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "sp_ConsultarStatusSEFAZ"
+    referencia_rf: "RN-AUF-097-002"
+    referencia_uc: "UC01"
+    status: "migrado"
+
+  - elemento_legado: "sp_ValidarAliquotaICMS"
+    referencia_rf: "RN-AUF-097-003"
+    referencia_uc: "UC01"
+    status: "migrado"
+
+  - elemento_legado: "sp_VerificarDuplicatas"
+    referencia_rf: "RN-AUF-097-007"
+    referencia_uc: "UC01"
+    status: "migrado"
+
+  - elemento_legado: "Tabela NotaFiscal"
+    referencia_rf: null
+    referencia_uc: "UC00"
+    status: "migrado"
+
+  - elemento_legado: "Tabela AuditoriaFatura"
+    referencia_rf: null
+    referencia_uc: "UC00"
+    status: "migrado"
+
+# Changelog
+changelog:
+  - versao: "1.0"
+    data: "2025-12-31"
+    descricao: "Versão inicial de RL-RF097.yaml - Referência ao Legado com 100% dos itens tendo campo destino preenchido (assumido/substituido/descartado/a_revisar). Total de 29 itens legados documentados: 5 telas ASPX, 4 WebServices SOAP, 5 stored procedures, 5 tabelas, 10 regras de negócio implícitas."
+    autor: "Agência ALC - alc.dev.br"

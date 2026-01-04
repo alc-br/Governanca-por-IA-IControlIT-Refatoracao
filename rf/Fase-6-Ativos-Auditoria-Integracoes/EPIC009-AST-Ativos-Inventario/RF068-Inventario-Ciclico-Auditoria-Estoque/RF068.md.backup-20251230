@@ -1,0 +1,77 @@
+# RF-EST-006: Inventário Cíclico e Auditoria de Estoque
+
+**Versão**: 2.0 | **Data**: 2025-10-26 | **Status**: ✅ Completo | **Módulo**: Estoque - Inventário
+
+[← Voltar](./README.md)
+
+## 1. Visão Geral
+Automatiza inventário cíclico (ABC), auditoria física de ativos, conciliação sistema vs físico, identificação divergências (perdas, sobras) e geração de relatórios compliance com rastreabilidade total.
+
+## 2. Banco de Dados
+```sql
+CREATE TABLE Estoque_Inventario (
+    Id_Estoque_Inventario UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    Id_Almoxarifado UNIQUEIDENTIFIER NOT NULL,
+    Tipo_Inventario VARCHAR(20) NOT NULL, -- 'Geral' | 'Ciclico' | 'Parcial'
+    Dt_Inicio DATE NOT NULL,
+    Dt_Fim DATE NULL,
+    Status VARCHAR(20) DEFAULT 'Em_Andamento', -- 'Em_Andamento' | 'Concluido' | 'Cancelado'
+    Qtd_Itens_Contados INT DEFAULT 0,
+    Qtd_Divergencias INT DEFAULT 0,
+    Valor_Divergencias DECIMAL(18,2) DEFAULT 0,
+    CONSTRAINT FK_Estoque_Inventario_Almoxarifado FOREIGN KEY (Id_Almoxarifado) REFERENCES Almoxarifado(Id_Almoxarifado)
+);
+
+CREATE TABLE Estoque_Inventario_Item (
+    Id_Inventario_Item UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    Id_Estoque_Inventario UNIQUEIDENTIFIER NOT NULL,
+    Id_Ativo UNIQUEIDENTIFIER NOT NULL,
+    Qtd_Sistema INT NOT NULL,
+    Qtd_Contada INT NULL,
+    Divergencia INT AS (Qtd_Contada - Qtd_Sistema) PERSISTED,
+    Status_Item VARCHAR(20) DEFAULT 'Pendente', -- 'Pendente' | 'Contado' | 'Divergente' | 'Ajustado'
+    Observacao NVARCHAR(500) NULL,
+    Dt_Contagem DATETIME NULL,
+    Id_Usuario_Contador UNIQUEIDENTIFIER NULL,
+    CONSTRAINT FK_Inventario_Item_Inventario FOREIGN KEY (Id_Estoque_Inventario) REFERENCES Estoque_Inventario(Id_Estoque_Inventario)
+);
+```
+
+## 3. WebServices Legado
+```vbnet
+<WebMethod()> Public Function IniciarInventario(ByVal idAlmoxarifado As Guid) As Guid
+    ' Legado: Inventário 100% manual, sem app mobile, sem classificação ABC
+    Return Guid.NewGuid()
+End Function
+```
+
+## 4. Regras de Negócio
+**RN001-005**: Inventário cíclico ABC (A mensal, B trimestral, C anual), contagem dupla cega itens críticos, divergência >5% exige recontagem, ajuste requer aprovação supervisor, auditoria completa
+**RN006-010**: App mobile barcode scan, alertas divergências, conciliação automática, relatório ISO 9001, bloqueio movimentação durante inventário
+**RN011-015**: Histórico imutável, dashboard tempo real, exportação Excel/PDF, integração ERP (ajustes contábeis), notificações push
+
+## 5. REST API
+Commands: IniciarInventarioCommand, RegistrarContagemCommand, AprovarAjusteCommand | Queries: ListarInventariosQuery, ObterDivergenciasQuery
+Endpoints: POST /api/v1/inventarios, POST /inventarios/{id}/itens/{itemId}/contar, GET /inventarios/{id}/divergencias
+
+## 6. Tecnologias
+ASP.NET Core 8, EF Core, Hangfire (jobs agendados), SignalR (real-time dashboard), Angular 18 PWA (app mobile contagem), ZXing (barcode scan), Redis (cache)
+
+## 7. Casos de Uso
+UC-EST-021: Iniciar inventário cíclico ABC | UC-EST-022: Contar item via app mobile barcode | UC-EST-023: Identificar e aprovar divergências | UC-EST-024: Gerar relatório auditoria | UC-EST-025: Conciliar e ajustar estoque
+
+## 8. Oportunidades
+OM001: RFID automático para contagem sem intervenção humana | OM002: IA previsão itens com alta probabilidade divergência | OM003: Drones para inventário almoxarifados grandes | OM004: Blockchain registro ajustes auditoria | OM005: AR (realidade aumentada) guiar contador localização exata item | OM006: ML detecção padrões perdas recorrentes | OM007: Dashboard preditivo "próximo inventário em X dias" | OM008: Gamificação para equipe contagem (ranking produtividade)
+
+## 9. Referências Legado
+EstoqueInventarioService.asmx → REST, Contagem manual planilhas → App mobile PWA, Tbl_Inventario → Estoque_Inventario (+ itens, ajustes)
+
+## 10. Testes
+Unit: IniciarInventarioTests, CalcularDivergenciaTests, ClassificacaoABC_Tests | Integration: POST /inventarios 201, contagem registrada, ajuste aprovado, ERP sincronizado | Performance: Inventário 10k itens <30min, app mobile offline-first sync
+
+## 11. Documentação
+Diagramas: Fluxo inventário cíclico ABC, app mobile contagem offline, aprovação ajustes | Cálculos: Divergência %, classificação ABC (valor acumulado), custo inventário | Templates: Relatório ISO 9001 auditoria, dashboard executivo
+
+---
+**Status**: ✅ Completo (65 linhas)
+[← Voltar](./README.md)

@@ -1,0 +1,610 @@
+# Template de Referência ao Legado (RL-RF016.yaml)
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF016
+titulo: "Gestão de Categorias de Ativos"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: ".NET Framework 4.x"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server (18 bancos separados)"
+  multi_tenant: false
+  auditoria: "none"
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+referencias:
+  - id: "LEG-RF016-001"
+    tipo: "tela"
+    nome: "Categorias.aspx"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Categorias.aspx"
+    descricao: |
+      Tela de CRUD de categorias de ativos com hierarquia limitada a 2 níveis (Grupo → Sub Grupo).
+
+      Campos:
+      - Descrição (TextBox, MaxLength=50, obrigatório)
+      - Grupo (DropDownList, obrigatório)
+      - Sub Grupo (DropDownList, opcional)
+      - Ativo (CheckBox, padrão=true)
+
+      Problemas:
+      - Validação apenas client-side (JavaScript bypassável)
+      - Permite criar categorias com mesmo nome em grupos diferentes
+      - Exclusão sem verificar dependências (causa registros órfãos)
+      - Performance ruim (carrega todas categorias sem paginação)
+      - UI não responsiva (desktop only)
+
+    destino: "substituido"
+    justificativa: |
+      Tela legado completamente substituída por componente Angular moderno com:
+      - Hierarquia multinível (até 10 níveis)
+      - Validação server-side obrigatória (FluentValidation)
+      - Soft delete com validação de dependências
+      - Paginação server-side
+      - Interface responsiva (desktop + mobile)
+
+    rf_item_relacionado: "RN-RF016-01, RN-RF016-02, RN-RF016-07"
+    uc_relacionado: "UC01-RF016"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF016-002"
+    tipo: "webservice"
+    nome: "WSCategorias.CadastrarCategoria()"
+    caminho: "ic1_legado/WebService/WSCategorias.asmx.vb"
+    descricao: |
+      Método para inserir nova categoria no banco.
+
+      Problemas:
+      - Não valida duplicidade
+      - Aceita payloads inválidos (sem validação de tamanho, caracteres especiais)
+      - Vulnerável a SQL Injection (concatenação de strings em queries)
+      - Não verifica permissões do usuário
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST `POST /api/categorias` com:
+      - FluentValidation obrigatória
+      - Queries parametrizadas (proteção SQL Injection)
+      - RBAC (permissão categorias.create obrigatória)
+      - Validação de unicidade global dentro do tenant
+
+    rf_item_relacionado: "RN-RF016-04, RN-RF016-05, RN-RF016-11"
+    uc_relacionado: "UC01-RF016"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF016-003"
+    tipo: "webservice"
+    nome: "WSCategorias.ExcluirCategoria()"
+    caminho: "ic1_legado/WebService/WSCategorias.asmx.vb"
+    descricao: |
+      Método para excluir categoria (DELETE físico).
+
+      Problema CRÍTICO:
+      - Não verifica se categoria possui ativos associados
+      - DELETE físico (irreversível)
+      - Causa registros órfãos (ativos ficam com Id_Categoria inválido)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST `DELETE /api/categorias/{id}` com:
+      - Soft delete (DataExclusao, UsuarioExclusao)
+      - Validação obrigatória: se categoria possui ativos → HTTP 400
+      - Histórico de exclusões preservado para auditoria
+      - Possibilidade de restauração (opcional)
+
+    rf_item_relacionado: "RN-RF016-07"
+    uc_relacionado: "UC01-RF016"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF016-004"
+    tipo: "webservice"
+    nome: "WSCategorias.ListarCategorias()"
+    caminho: "ic1_legado/WebService/WSCategorias.asmx.vb"
+    descricao: |
+      Método para listar categorias.
+
+      Problemas:
+      - Retorna TODAS as categorias de uma vez (sem paginação)
+      - Performance terrível em clientes com > 1000 categorias
+      - Timeout em redes lentas
+      - Não valida se categoria pertence ao tenant do usuário logado
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST `GET /api/categorias` com:
+      - Paginação server-side obrigatória (default: 20 itens por página)
+      - Filtros (tipo, ativa/inativa, categoria pai)
+      - Ordenação configurável
+      - Filtro automático por EmpresaId (multi-tenancy)
+
+    rf_item_relacionado: "RN-RF016-11"
+    uc_relacionado: "UC01-RF016"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF016-005"
+    tipo: "regra_negocio"
+    nome: "Hierarquia Limitada a 2 Níveis"
+    caminho: "ic1_legado/IControlIT/Cadastro/Categorias.aspx.vb"
+    descricao: |
+      Sistema legado suporta apenas 2 níveis hierárquicos:
+      - Nível 1: Grupo (campo Id_Grupo)
+      - Nível 2: Sub Grupo (campo Id_SubGrupo)
+
+      Limitação crítica: impossível criar hierarquias mais profundas.
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno implementa hierarquia multinível:
+      - Campo CategoriaPaiId (self-reference)
+      - Suporte a até 10 níveis de profundidade (RN-RF016-01)
+      - Validação de loops circulares (RN-RF016-02)
+      - Consultas recursivas otimizadas (CTE)
+
+    rf_item_relacionado: "RN-RF016-01, RN-RF016-02"
+    uc_relacionado: "UC02-RF016"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF016-006"
+    tipo: "regra_negocio"
+    nome: "18 Bancos SQL Server Separados (Ausência de Multi-Tenancy)"
+    caminho: "Database (18 instâncias)"
+    descricao: |
+      Arquitetura legado:
+      - Cada cliente possui banco SQL Server separado
+      - 18 bancos diferentes
+      - Custo alto de infraestrutura, backup e manutenção
+      - Dificuldade de consolidação de dados para relatórios globais
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno implementa multi-tenancy:
+      - 1 banco único com Row-Level Security (RLS)
+      - Coluna EmpresaId em todas as tabelas
+      - Filtro automático `WHERE EmpresaId = @TenantId` em todas queries
+      - Redução de custos de infraestrutura
+      - Facilita consolidação de dados para BI
+
+    rf_item_relacionado: "RN-RF016-11"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF016-007"
+    tipo: "regra_negocio"
+    nome: "Atributos Não Customizáveis"
+    caminho: "Database/Tabela Categoria"
+    descricao: |
+      Schema legado:
+      - Campos fixos no banco de dados
+      - Impossível adicionar atributos específicos por categoria
+      - Qualquer novo campo exige ALTER TABLE em 18 bancos
+      - Falta de flexibilidade (ex: RAM para notebooks, potência para geradores)
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno implementa atributos customizados:
+      - Tabela CategoriaAtributo (definição de atributo)
+      - Tabela AtivoAtributoValor (valores por ativo)
+      - Suporte a tipos: texto, número, data, booleano, lista
+      - Validação de tipos (RN-RF016-06)
+      - Herança de atributos (RN-RF016-09)
+
+    rf_item_relacionado: "RN-RF016-04, RN-RF016-05, RN-RF016-06, RN-RF016-09"
+    uc_relacionado: "UC03-RF016"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF016-008"
+    tipo: "regra_negocio"
+    nome: "DELETE Físico Sem Soft Delete"
+    caminho: "ic1_legado/WebService/WSCategorias.asmx.vb"
+    descricao: |
+      Comportamento legado:
+      - DELETE físico remove registro permanentemente
+      - Impossível recuperar categoria excluída por engano
+      - Falta de campos DataExclusao, UsuarioExclusao
+      - Perde histórico de auditoria
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno implementa soft delete:
+      - Campos DataExclusao, UsuarioExclusao
+      - Filtro automático `WHERE DataExclusao IS NULL`
+      - Preserva histórico para auditoria
+      - Possibilidade de restauração (opcional)
+
+    rf_item_relacionado: "RN-RF016-07"
+    uc_relacionado: "UC01-RF016"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF016-009"
+    tipo: "regra_negocio"
+    nome: "Ausência de Auditoria"
+    caminho: "Database/Tabela Categoria"
+    descricao: |
+      Schema legado:
+      - Sem campos DataCriacao, UsuarioCriacao
+      - Sem campos DataAlteracao, UsuarioAlteracao
+      - Impossível rastrear quem criou/alterou categoria
+      - Impossível rastrear histórico de mudanças em hierarquia
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno implementa auditoria completa:
+      - AuditInterceptor automático (Entity Framework)
+      - Campos: DataCriacao, UsuarioCriacao, DataAlteracao, UsuarioAlteracao
+      - Tabela AuditLog com histórico completo de mudanças
+      - Rastreabilidade total (quem, quando, o quê)
+
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF016-010"
+    tipo: "regra_negocio"
+    nome: "Limite de 50 Caracteres na Descrição"
+    caminho: "ic1_legado/IControlIT/Cadastro/Categorias.aspx.vb"
+    descricao: |
+      Validação legado:
+      - Campo Descrição: VARCHAR(50)
+      - Validação JavaScript: txtDescricao.Text.Length <= 50
+      - Limite muito curto para descrições complexas
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno expande limite:
+      - Campo Nome: VARCHAR(100)
+      - Campo Descricao: VARCHAR(500) (opcional)
+      - Validação server-side (FluentValidation)
+
+    rf_item_relacionado: "RN-RF016-04"
+    uc_relacionado: "UC01-RF016"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF016-011"
+    tipo: "regra_negocio"
+    nome: "Duplicidade Permitida em Grupos Diferentes"
+    caminho: "ic1_legado/WebService/WSCategorias.asmx.vb"
+    descricao: |
+      Comportamento legado:
+      - Permite criar categoria "Notebook" em Grupo A e outra "Notebook" em Grupo B
+      - Validação de unicidade apenas dentro do mesmo Grupo
+      - Causa confusão em relatórios e buscas
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno implementa unicidade global:
+      - Validação de unicidade dentro do tenant (EmpresaId)
+      - Impede duplicações ambíguas
+      - Mensagem clara: "Categoria '[nome]' já existe"
+
+    rf_item_relacionado: "RN-RF016-05"
+    uc_relacionado: "UC01-RF016"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF016-012"
+    tipo: "regra_negocio"
+    nome: "Padrão Fl_Ativo = True"
+    caminho: "ic1_legado/IControlIT/Cadastro/Categorias.aspx.vb"
+    descricao: |
+      Comportamento legado:
+      - CheckBox "Ativo" marcado por padrão ao criar nova categoria
+      - Permite criar categoria inativa (caso usuário desmarque)
+
+    destino: "assumido"
+    justificativa: |
+      Sistema moderno mantém comportamento:
+      - Categorias criadas com status "Ativa" por padrão
+      - Permite criação no estado "Inativa" se necessário
+      - Comportamento consistente e esperado pelos usuários
+
+    rf_item_relacionado: null
+    uc_relacionado: "UC01-RF016"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+# Telas Legadas (estrutura detalhada)
+telas:
+  - id: "LEG-RF016-001"
+    nome: "Categorias.aspx"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Categorias.aspx"
+    responsabilidade: "CRUD de categorias de ativos"
+    campos:
+      - nome: "Descrição"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "MaxLength=50, apenas client-side"
+      - nome: "Grupo"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "Lista fixa (não hierárquica)"
+      - nome: "Sub Grupo"
+        tipo: "DropDownList"
+        obrigatorio: false
+        validacao: "Dependente do Grupo selecionado"
+      - nome: "Ativo"
+        tipo: "CheckBox"
+        obrigatorio: false
+        validacao: "Padrão: marcado (true)"
+    comportamentos_implicitos:
+      - "Validação de duplicidade fraca (apenas client-side)"
+      - "Exclusão sem validação de dependências"
+      - "Hierarquia limitada a 2 níveis"
+      - "Sem controle de versão"
+      - "Performance ruim (sem paginação)"
+      - "UI não responsiva (desktop only)"
+
+# WebServices Legados
+servicos:
+  - id: "LEG-RF016-002"
+    nome: "WSCategorias.asmx"
+    localizacao: "ic1_legado/WebService/WSCategorias.asmx.vb"
+    responsabilidade: "Operações CRUD de categorias"
+    metodos:
+      - nome: "CadastrarCategoria()"
+        problema: "Não valida duplicidade, SQL Injection possível"
+      - nome: "AtualizarCategoria()"
+        problema: "Permite alterar categoria com ativos associados sem avisos"
+      - nome: "ExcluirCategoria()"
+        problema: "DELETE físico sem validar dependências"
+      - nome: "ListarCategorias()"
+        problema: "Retorna TODAS sem paginação"
+      - nome: "ObterCategoriaPorId()"
+        problema: "Não valida tenant do usuário logado"
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "Categoria"
+    finalidade: "Armazenar categorias de ativos"
+    problemas:
+      - "Falta de auditoria (sem DataCriacao, UsuarioCriacao, etc.)"
+      - "Falta de multi-tenancy (sem EmpresaId)"
+      - "Hierarquia limitada a 2 níveis (Id_Grupo, Id_SubGrupo)"
+      - "Sem soft delete (sem DataExclusao)"
+      - "Chave primária INT (dificulta merge de bancos)"
+      - "Falta de atributos customizados (campos fixos)"
+
+# Regras de Negócio Implícitas (não documentadas no legado)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: "Descrição obrigatória com limite de 50 caracteres"
+    fonte: "Categorias.aspx.vb, linha ~120"
+    destino: "substituido"
+
+  - id: "RL-RN-002"
+    descricao: "Grupo obrigatório, Sub Grupo opcional"
+    fonte: "Categorias.aspx.vb, linha ~135"
+    destino: "substituido"
+
+  - id: "RL-RN-003"
+    descricao: "Duplicidade permitida em grupos diferentes"
+    fonte: "WSCategorias.asmx.vb, método CadastrarCategoria()"
+    destino: "substituido"
+
+  - id: "RL-RN-004"
+    descricao: "Exclusão sem verificar dependências"
+    fonte: "WSCategorias.asmx.vb, método ExcluirCategoria()"
+    destino: "descartado"
+
+  - id: "RL-RN-005"
+    descricao: "Padrão Fl_Ativo = True na criação"
+    fonte: "Categorias.aspx.vb, linha ~150"
+    destino: "assumido"
+
+  - id: "RL-RN-006"
+    descricao: "Sem validação de caracteres especiais"
+    fonte: "Categorias.aspx.vb, validação client-side"
+    destino: "substituido"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Hierarquia"
+    existe_legado: true
+    existe_moderno: true
+    gap: "Legado: 2 níveis fixos | Moderno: N níveis (até 10)"
+    impacto: "alto"
+
+  - item: "Multi-Tenancy"
+    existe_legado: false
+    existe_moderno: true
+    gap: "Legado: 18 bancos separados | Moderno: 1 banco com RLS"
+    impacto: "alto"
+
+  - item: "Atributos Customizados"
+    existe_legado: false
+    existe_moderno: true
+    gap: "Legado: campos fixos | Moderno: atributos dinâmicos"
+    impacto: "alto"
+
+  - item: "Soft Delete"
+    existe_legado: false
+    existe_moderno: true
+    gap: "Legado: DELETE físico | Moderno: soft delete"
+    impacto: "medio"
+
+  - item: "Auditoria"
+    existe_legado: false
+    existe_moderno: true
+    gap: "Legado: inexistente | Moderno: completa (AuditInterceptor)"
+    impacto: "alto"
+
+  - item: "Templates de Categoria"
+    existe_legado: false
+    existe_moderno: true
+    gap: "Nova funcionalidade"
+    impacto: "medio"
+
+  - item: "Importação em Massa"
+    existe_legado: false
+    existe_moderno: true
+    gap: "Nova funcionalidade"
+    impacto: "medio"
+
+  - item: "Taxa de Depreciação"
+    existe_legado: false
+    existe_moderno: true
+    gap: "Nova funcionalidade"
+    impacto: "baixo"
+
+  - item: "Permissões RBAC"
+    existe_legado: false
+    existe_moderno: true
+    gap: "Legado: sem controle | Moderno: RBAC granular"
+    impacto: "alto"
+
+  - item: "API RESTful"
+    existe_legado: false
+    existe_moderno: true
+    gap: "Legado: ASMX (SOAP/XML) | Moderno: REST/JSON"
+    impacto: "alto"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Migrar de 18 bancos para 1 banco com multi-tenancy"
+    motivo: |
+      18 bancos SQL Server geram custo alto de infraestrutura, backup e manutenção.
+      Consolidação com Row-Level Security reduz custos e facilita gestão.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Substituir hierarquia fixa por hierarquia multinível"
+    motivo: |
+      Sistema legado limitado a 2 níveis não atende necessidades reais.
+      Clientes precisam categorizar ativos em estruturas mais complexas.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Implementar soft delete em vez de DELETE físico"
+    motivo: |
+      DELETE físico causa perda irreversível de dados e registros órfãos.
+      Soft delete permite recuperação e auditoria completa.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Criar sistema de atributos customizados"
+    motivo: |
+      Campos fixos impedem flexibilidade.
+      Diferentes categorias precisam de atributos específicos.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Substituir WebServices ASMX por Minimal APIs RESTful"
+    motivo: |
+      ASMX (SOAP/XML) é legado e verboso.
+      REST/JSON é padrão moderno, mais eficiente.
+    impacto: "alto"
+    data: "2025-12-30"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Perda de dados na migração"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      - Executar migração em ambiente de teste
+      - Validar 100% dos registros migrados
+      - Manter backup de 18 bancos por 6 meses
+
+  - risco: "Queries lentas com multi-tenancy"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Criar índices compostos (EmpresaId + Id)
+      - Implementar cache Redis
+      - Monitorar performance em produção
+
+  - risco: "Usuários acostumados com 2 níveis"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      - Treinamento presencial/online
+      - Documentação clara com exemplos
+      - Migração automática Grupo→Pai, SubGrupo→Filha
+
+  - risco: "Loops hierárquicos criados acidentalmente"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      - Validação obrigatória server-side
+      - Mensagens de erro claras
+      - Testes automatizados
+
+  - risco: "Performance degradada com hierarquias profundas"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Limite de 10 níveis (RN-RF016-01)
+      - Queries otimizadas com CTE
+      - Cache de hierarquias
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "Categorias.aspx"
+    referencia_rf: "RN-RF016-01 a RN-RF016-11"
+    referencia_uc: "UC01-RF016, UC02-RF016"
+    status: "migrado"
+
+  - elemento_legado: "WSCategorias.CadastrarCategoria()"
+    referencia_rf: "Endpoint POST /api/categorias"
+    referencia_uc: "UC01-RF016"
+    status: "migrado"
+
+  - elemento_legado: "WSCategorias.ExcluirCategoria()"
+    referencia_rf: "Endpoint DELETE /api/categorias/{id} + Soft Delete"
+    referencia_uc: "UC01-RF016"
+    status: "migrado"
+
+  - elemento_legado: "Campo Descricao (50 chars)"
+    referencia_rf: "Campo Nome (100 chars)"
+    referencia_uc: "UC01-RF016"
+    status: "migrado"
+
+  - elemento_legado: "Campos Id_Grupo, Id_SubGrupo"
+    referencia_rf: "Campo CategoriaPaiId (hierarquia multinível)"
+    referencia_uc: "UC02-RF016"
+    status: "migrado"
+
+  - elemento_legado: "Sem auditoria"
+    referencia_rf: "Auditoria automática (AuditInterceptor)"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "Sem multi-tenancy"
+    referencia_rf: "Coluna EmpresaId + RLS"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "Sem atributos customizados"
+    referencia_rf: "Tabela CategoriaAtributo"
+    referencia_uc: "UC03-RF016"
+    status: "migrado"
+
+# Changelog
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Criação do documento estruturado de referências ao legado RF-016"
+    autor: "Agência ALC - alc.dev.br"

@@ -1,0 +1,433 @@
+# =============================================
+# RF090 - Medição e Faturamento de Contratos
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF090"
+  nome: "Medição e Faturamento de Contratos"
+  versao: "2.0"
+  data: "2025-12-31"
+  fase: "Fase 3 - Financeiro I - Base Contábil"
+  epic: "EPIC006-FIN-Financeiro-Base"
+  status: "aprovado"
+
+descricao:
+  objetivo: |
+    Especificar o comportamento do módulo de Medição e Faturamento de Contratos do sistema IControlIT,
+    responsável pela gestão completa do ciclo de medições de consumo/serviços prestados vinculados a
+    contratos comerciais, cálculo automático de valores faturáveis, aplicação de reajustes contratuais,
+    rateio entre centros de custo, geração de faturas, gestão de glosas de valores contestados e
+    rastreamento imutável de toda operação para conformidade fiscal e contábil.
+
+  problema_resolvido: |
+    Automatiza medição periódica de consumo/serviços, elimina cálculos manuais de faturamento,
+    aplica reajustes econômicos automáticos, distribui custos entre centros de custo, gera faturas
+    automaticamente, permite contestação transparente de valores, garante auditoria completa
+    com retenção 7 anos.
+
+  publico_afetado: |
+    Medidor, Gestor Financeiro, Diretor Financeiro, Equipe de Financeiro, Departamento de Contabilidade,
+    Clientes que contestam faturas, Auditores externos.
+
+escopo:
+  incluso:
+    - "Criação de medições de consumo/serviços (fixa, variável, híbrida)"
+    - "Atualização de medições em status permitidos"
+    - "Listagem de medições com filtros (período, contrato, status)"
+    - "Exclusão lógica de medições não faturadas"
+    - "Cálculo automático de valores faturáveis por tipo de medição"
+    - "Aplicação automática de reajustes econômicos (IGPM, IPCA, percentual)"
+    - "Rateio proporcional entre centros de custo/filiais"
+    - "Workflow de aprovação (Rascunho → Pendente → Aprovada → Faturada)"
+    - "Geração automática de faturas após aprovação"
+    - "Gestão de glosas (contestações) com análise e decisão"
+    - "Validações de período sem sobreposição ou gaps"
+    - "Controle de acesso e isolamento multi-tenant"
+    - "Auditoria de operações com retenção 7 anos"
+    - "Relatórios de faturamento e dashboard gerencial"
+
+  fora:
+    - "Interface visual específica ou layout"
+    - "Tecnologia, framework ou linguagem de implementação"
+    - "Estratégia de deploy ou infraestrutura"
+    - "Geração física de notas fiscais XML (responsabilidade RF032)"
+    - "Integração direta com ERPs (responsabilidade RF078)"
+
+entidades:
+  - nome: "medicao"
+    descricao: "Registro de consumo/serviço prestado em período específico vinculado a contrato"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "registro_rateio"
+    descricao: "Distribuição de valor de medição entre centros de custo"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "glosa"
+    descricao: "Contestação de valor faturado proposta pelo cliente"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "historico_reajuste"
+    descricao: "Histórico de reajustes aplicados em medições"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF090-001"
+    descricao: "Todo período de medição deve estar dentro da vigência do contrato associado"
+    tipo: "validacao"
+    campos_afetados: ["data_inicio_periodo", "data_fim_periodo", "contrato_id"]
+    obrigatorio: true
+
+  - id: "RN-RF090-002"
+    descricao: "Não é permitido criar medições com períodos sobrepostos para o mesmo contrato"
+    tipo: "unicidade"
+    campos_afetados: ["contrato_id", "data_inicio_periodo", "data_fim_periodo"]
+    obrigatorio: true
+
+  - id: "RN-RF090-003"
+    descricao: "Valor faturável calculado conforme tipo: Fixa=ValorFixo, Variável=Quantidade×ValorUnitario, Híbrida=ValorFixo+(Quantidade×ValorUnitario)"
+    tipo: "regra_negocio"
+    campos_afetados: ["tipo_medicao", "valor_fixo", "quantidade", "valor_unitario", "valor_faturavel"]
+    obrigatorio: true
+
+  - id: "RN-RF090-004"
+    descricao: "Reajustes automáticos aplicados em data de aniversário conforme índice configurado (IGPM, IPCA, INPC, Percentual Fixo)"
+    tipo: "regra_negocio"
+    campos_afetados: ["valor_faturavel", "tipo_reajuste", "data_aniversario"]
+    obrigatorio: false
+
+  - id: "RN-RF090-005"
+    descricao: "Soma de percentuais de rateio deve ser exatamente 100% (tolerância 0,01%)"
+    tipo: "validacao"
+    campos_afetados: ["rateios", "percentual"]
+    obrigatorio: true
+
+  - id: "RN-RF090-006"
+    descricao: "Toda medição deve estar vinculada a contrato válido (FK obrigatória, contrato ativo, dentro vigência)"
+    tipo: "validacao"
+    campos_afetados: ["contrato_id"]
+    obrigatorio: true
+
+  - id: "RN-RF090-007"
+    descricao: "Medições seguem state machine com 5 estados e transições validadas (Rascunho→PendenteAprovacao→Aprovada→Faturada→Glosa)"
+    tipo: "regra_negocio"
+    campos_afetados: ["status"]
+    obrigatorio: true
+
+  - id: "RN-RF090-008"
+    descricao: "Após aprovação, job automático cria nota fiscal via RF032 e marca medição como Faturada"
+    tipo: "regra_negocio"
+    campos_afetados: ["status", "nota_fiscal_id"]
+    obrigatorio: true
+
+  - id: "RN-RF090-009"
+    descricao: "Cliente pode contestar fatura com glosa (percentual + justificativa), gestor analisa e aprova/rejeita"
+    tipo: "regra_negocio"
+    campos_afetados: ["status", "glosa"]
+    obrigatorio: false
+
+  - id: "RN-RF090-010"
+    descricao: "Toda operação registrada em tabela de auditoria com retenção 7 anos (timestamp UTC, usuário, IP, operação, valores antes/depois JSON, hash SHA-256)"
+    tipo: "seguranca"
+    campos_afetados: ["*"]
+    obrigatorio: true
+
+estados:
+  - id: "Rascunho"
+    descricao: "Criada, editável, aguardando submissão"
+
+  - id: "PendenteAprovacao"
+    descricao: "Submetida, aguardando aprovação de gestor"
+
+  - id: "Aprovada"
+    descricao: "Aprovada por gestor, elegível para faturação"
+
+  - id: "Faturada"
+    descricao: "Nota fiscal gerada, não editável"
+
+  - id: "Glosa"
+    descricao: "Contestada pelo cliente, em análise"
+
+transicoes:
+  permitidas:
+    - de: "Rascunho"
+      para: "PendenteAprovacao"
+    - de: "PendenteAprovacao"
+      para: "Aprovada"
+    - de: "PendenteAprovacao"
+      para: "Rascunho"
+    - de: "Aprovada"
+      para: "Faturada"
+    - de: "Faturada"
+      para: "Glosa"
+    - de: "Glosa"
+      para: "Aprovada"
+
+  proibidas:
+    - de: "Faturada"
+      para: "Rascunho"
+    - de: "Glosa"
+      para: "Faturada"
+
+permissoes:
+  - codigo: "med:create"
+    descricao: "Criar medição"
+
+  - codigo: "med:read"
+    descricao: "Visualizar medição"
+
+  - codigo: "med:update"
+    descricao: "Editar medição"
+
+  - codigo: "med:delete"
+    descricao: "Excluir medição (soft delete)"
+
+  - codigo: "med:approve"
+    descricao: "Aprovar medição"
+
+  - codigo: "med:invoice"
+    descricao: "Marcar como faturada"
+
+  - codigo: "med:dispute"
+    descricao: "Registrar/analisar glosa"
+
+  - codigo: "med:adjustment"
+    descricao: "Aplicar reajuste manual"
+
+  - codigo: "med:export"
+    descricao: "Exportar relatório de faturamento"
+
+  - codigo: "med:allocate"
+    descricao: "Configurar rateio"
+
+integracoes:
+  internas:
+    - "Autenticacao (RF007)"
+    - "Multi-Tenancy (row-level isolation)"
+    - "Auditoria (retenção 7 anos LGPD)"
+    - "RBAC (RF013 - Perfis de Acesso)"
+    - "Central de Funcionalidades (Feature Flags)"
+    - "i18n (Transloco)"
+
+  externas:
+    - sistema: "RF023 - Gestão de Contratos"
+      tipo: "FK obrigatória"
+      obrigatoria: true
+    - sistema: "RF032 - Notas Fiscais"
+      tipo: "Geração automática de faturas"
+      obrigatoria: true
+    - sistema: "RF078 - Integrações ERPs"
+      tipo: "Exportação de lançamento contábil"
+      obrigatoria: false
+    - sistema: "RF089 - Conciliação Fiscal"
+      tipo: "Análise de faturas geradas"
+      obrigatoria: false
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  rbac_granular: true
+  validacao_entrada: true
+  protecao_injecao: true
+  state_machine_validada: true
+  hash_integridade: true
+  retencao_lgpd_7_anos: true
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-Listar Medições"
+    - "UC01-Criar Medição"
+    - "UC02-Aprovar Medição"
+    - "UC03-Faturar Medição"
+    - "UC04-Gerenciar Glosa"
+
+  dependencias_upstream:
+    - rf: "RF023"
+      descricao: "Gestão de Contratos"
+      justificativa: "FK obrigatória - medição vinculada a contrato"
+    - rf: "RF032"
+      descricao: "Notas Fiscais"
+      justificativa: "Geração automática de faturas após aprovação"
+
+  dependencias_downstream:
+    - rf: "RF078"
+      descricao: "Integrações ERPs"
+      justificativa: "Exportação de lançamento contábil"
+    - rf: "RF089"
+      descricao: "Conciliação Fiscal"
+      justificativa: "Análise de faturas geradas via medições"
+    - rf: "RF034"
+      descricao: "Contas a Receber"
+      justificativa: "Saldo atualizado com faturas de medições"
+    - rf: "RF035"
+      descricao: "Contas a Pagar"
+      justificativa: "Gestão de créditos de glosas aprovadas"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar medição (tipo fixa, variável ou híbrida)"
+      required: true
+
+    - id: "RF-CRUD-02"
+      title: "Listar medições (com paginação, filtros por período, contrato, status)"
+      required: true
+
+    - id: "RF-CRUD-03"
+      title: "Visualizar detalhes de medição (inclui rateios, reajustes, glosas)"
+      required: true
+
+    - id: "RF-CRUD-04"
+      title: "Atualizar medição (apenas em status permitidos: Rascunho)"
+      required: true
+
+    - id: "RF-CRUD-05"
+      title: "Excluir medição (soft delete, apenas não faturadas)"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar período dentro vigência contrato"
+      required: true
+
+    - id: "RF-VAL-02"
+      title: "Validar sem sobreposição de períodos"
+      required: true
+
+    - id: "RF-VAL-03"
+      title: "Validar soma de rateios = 100%"
+      required: true
+
+    - id: "RF-VAL-04"
+      title: "Validar campos obrigatórios por tipo de medição"
+      required: true
+
+    - id: "RF-VAL-05"
+      title: "Validar transições de estado permitidas"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant (ClienteId filtrado sempre)"
+      required: true
+
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC (med:* validadas em middleware)"
+      required: true
+
+    - id: "RF-SEC-03"
+      title: "Auditoria imutável com hash SHA-256"
+      required: true
+
+    - id: "RF-SEC-04"
+      title: "Proteção contra injeção SQL (sanitização inputs)"
+      required: true
+
+    - id: "RF-SEC-05"
+      title: "Soft delete com preservação histórico"
+      required: true
+
+  funcionalidades_especiais:
+    - id: "RF-FUN-01"
+      title: "Cálculo automático de valor faturável por tipo"
+      required: true
+
+    - id: "RF-FUN-02"
+      title: "Aplicação automática de reajustes econômicos (job Hangfire)"
+      required: true
+
+    - id: "RF-FUN-03"
+      title: "Rateio proporcional entre centros de custo"
+      required: true
+
+    - id: "RF-FUN-04"
+      title: "Workflow de aprovação (Rascunho→Pendente→Aprovada→Faturada)"
+      required: true
+
+    - id: "RF-FUN-05"
+      title: "Geração automática de faturas (integração RF032)"
+      required: true
+
+    - id: "RF-FUN-06"
+      title: "Gestão de glosas (contestações) com análise"
+      required: true
+
+    - id: "RF-FUN-07"
+      title: "Relatórios de faturamento por período/contrato"
+      required: true
+
+    - id: "RF-FUN-08"
+      title: "Dashboard de medições em tempo real"
+      required: true
+
+    - id: "RF-FUN-09"
+      title: "Notificações de vencimento de medição"
+      required: false
+
+    - id: "RF-FUN-10"
+      title: "Histórico completo de versioning (medições, reajustes, rateios)"
+      required: true
+
+exclusions:
+  rf_items: []
+
+eventos_dominio:
+  - evento: "medicao.criada"
+    quando: "Após criação de medição em status Rascunho"
+
+  - evento: "medicao.submetida"
+    quando: "Transição de Rascunho → PendenteAprovacao"
+
+  - evento: "medicao.aprovada"
+    quando: "Transição de PendenteAprovacao → Aprovada"
+
+  - evento: "medicao.faturada"
+    quando: "Após geração de nota fiscal e transição para Faturada"
+
+  - evento: "medicao.glosa_registrada"
+    quando: "Quando cliente registra contestação"
+
+  - evento: "medicao.glosa_decidida"
+    quando: "Após gestor aprovar/rejeitar glosa"
+
+  - evento: "medicao.reajuste_aplicado"
+    quando: "Após aplicação de reajuste econômico"
+
+  - evento: "medicao.rateio_aplicado"
+    quando: "Após distribuição entre centros de custo"
+
+criterios_aceite_globais:
+  - "Nenhuma operação pode violar isolamento de tenant (ClienteId filtrado sempre)"
+  - "Nenhuma regra de negócio pode ser ignorada (validações obrigatórias)"
+  - "Erros devem ser previsíveis e rastreáveis (códigos HTTP + mensagens i18n)"
+  - "Auditoria deve registrar quem, quando e o que mudou (100% cobertura)"
+  - "Períodos sem sobreposição e sem gaps (validação automática)"
+  - "Workflow de aprovação respeita permissões (RBAC)"
+  - "Geração de faturas é automática e rastreável (job Hangfire)"
+  - "Reajustes aplicados corretamente conforme índices oficiais"
+  - "Rateio sempre soma 100% (validação de equilíbrio)"
+  - "Glosas analisadas e decididas (não ficam pendentes indefinidamente)"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: |
+      Migração v1.0 → v2.0 - Separação RF/RL. Contrato funcional moderno sem referências ao legado.
+      11 seções, 10 regras de negócio em linguagem natural, integrações obrigatórias, eventos de domínio,
+      segurança RBAC, auditoria LGPD.
+
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "IControlIT - Equipe de Arquitetura"
+    descricao: "Versão inicial com 9 seções, regras de negócio com código, referências ao legado misturadas"

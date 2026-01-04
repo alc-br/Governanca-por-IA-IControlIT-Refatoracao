@@ -1,0 +1,386 @@
+uc:
+  rf: "RF060"
+  titulo: "Gestão de Tipos de Chamado"
+  epic: "EPIC003-CAD"
+  fase: "Fase-2-Cadastros-e-Servicos-Transversais"
+  versao: "2.0"
+  data: "2025-12-31"
+  autor: "Sistema"
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Sistema"
+    descricao: "Migração para template v2.0 com 5 UCs canônicos (UC00-UC04)"
+
+casos_de_uso:
+  - id: "UC00"
+    nome: "Listar Tipos de Chamado"
+    ator_principal: "Usuário Autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      rf_items:
+        - "RF060-CRUD-02"
+        - "RF060-SEC-01"
+        - "RF060-SEC-02"
+        - "RN-RF060-001"
+        - "RN-RF060-015"
+        - "F01"
+        - "F02"
+      funcionalidades:
+        - "F01: Grid responsivo com filtros avançados"
+        - "F02: Classificação ITIL v4 visível"
+      permissoes:
+        - "GES.TIPOS_CHAMADO.LIST"
+    precondicoes:
+      - "Usuário autenticado no sistema"
+      - "Permissão GES.TIPOS_CHAMADO.LIST concedida"
+      - "Tenant (EmpresaId) identificado no contexto"
+    fluxo_principal:
+      - "Sistema exibe grid de Tipos de Chamado"
+      - "Aplica filtro automático por EmpresaId (multi-tenancy)"
+      - "Exibe: Nome, Categoria ITIL v4, SLA Padrão, Fila Padrão, Qtd Chamados, Status"
+      - "Disponibiliza filtros: Nome, Categoria, Status, Fila"
+      - "Permite ordenação por todas as colunas"
+    fluxos_alternativos:
+      - id: "FA-UC00-01"
+        descricao: "Nenhum tipo encontrado"
+        passos:
+          - "Sistema exibe mensagem: 'Nenhum tipo de chamado cadastrado'"
+          - "Oferece botão para criar primeiro tipo"
+    fluxos_excecao:
+      - id: "FE-UC00-01"
+        descricao: "Erro ao carregar lista"
+        passos:
+          - "Sistema exibe mensagem de erro"
+          - "Registra exceção no log de auditoria"
+          - "Oferece opção de tentar novamente"
+    regras_aplicadas:
+      - "RN-RF060-001: Classificação ITIL v4 obrigatória"
+      - "RN-RF060-015: Multi-tenancy por EmpresaId"
+
+  - id: "UC01"
+    nome: "Criar Tipo de Chamado"
+    ator_principal: "Usuário Autenticado"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "RF060-CRUD-01"
+        - "RF060-SEC-01"
+        - "RN-RF060-001"
+        - "RN-RF060-002"
+        - "RN-RF060-003"
+        - "RN-RF060-004"
+        - "RN-RF060-005"
+        - "RN-RF060-006"
+        - "RN-RF060-010"
+        - "F03"
+        - "F04"
+        - "F05"
+        - "F06"
+        - "F07"
+      funcionalidades:
+        - "F03: Formulário de criação com campos obrigatórios"
+        - "F04: Seleção de Categoria ITIL v4"
+        - "F05: Configuração de SLA padrão"
+        - "F06: Campos dinâmicos customizáveis"
+        - "F07: Templates de resolução"
+      permissoes:
+        - "GES.TIPOS_CHAMADO.CREATE"
+    precondicoes:
+      - "Usuário autenticado no sistema"
+      - "Permissão GES.TIPOS_CHAMADO.CREATE concedida"
+      - "Tenant (EmpresaId) identificado no contexto"
+    fluxo_principal:
+      - "Usuário clica em 'Novo Tipo de Chamado'"
+      - "Sistema exibe formulário de criação"
+      - "Usuário preenche campos obrigatórios: Nome, Categoria ITIL v4, SLA Padrão (horas), Fila de Atendimento"
+      - "Usuário configura opcionalmente: Descrição, Requer Aprovação (Sim/Não), Ícone, Cor, Prioridade Padrão"
+      - "Usuário define matriz SLA por prioridade (Urgente/Alta/Média/Baixa)"
+      - "Usuário configura campos dinâmicos (JSON schema)"
+      - "Usuário seleciona templates de resolução (knowledge base)"
+      - "Usuário configura regras de escalonamento automático"
+      - "Sistema valida campos obrigatórios"
+      - "Sistema valida unicidade do Nome no tenant"
+      - "Sistema injeta EmpresaId automaticamente"
+      - "Sistema injeta campos de auditoria (CreatedBy, CreatedAt)"
+      - "Sistema salva e exibe mensagem de sucesso"
+    fluxos_alternativos:
+      - id: "FA-UC01-01"
+        descricao: "SLA personalizado por prioridade"
+        passos:
+          - "Usuário acessa aba 'Configuração de SLA'"
+          - "Define tempos específicos: Urgente (2h), Alta (4h), Média (24h), Baixa (72h)"
+          - "Sistema valida que tempos são crescentes"
+      - id: "FA-UC01-02"
+        descricao: "Campos dinâmicos por tipo"
+        passos:
+          - "Usuário acessa aba 'Campos Personalizados'"
+          - "Define schema JSON de campos adicionais"
+          - "Exemplo: Tipo 'Acesso' adiciona campo 'Sistema Alvo'"
+          - "Sistema valida JSON schema"
+      - id: "FA-UC01-03"
+        descricao: "Templates de resolução"
+        passos:
+          - "Usuário acessa aba 'Knowledge Base'"
+          - "Seleciona templates pré-existentes ou cria novos"
+          - "Templates incluem: título, categoria, solução passo-a-passo, anexos"
+    fluxos_excecao:
+      - id: "FE-UC01-01"
+        descricao: "Nome já existe no tenant"
+        passos:
+          - "Sistema exibe: 'Já existe um tipo com este nome'"
+          - "Usuário corrige o nome"
+      - id: "FE-UC01-02"
+        descricao: "SLA Padrão inválido"
+        passos:
+          - "Sistema exibe: 'SLA deve ser maior que 0 horas'"
+          - "Usuário corrige o valor"
+      - id: "FE-UC01-03"
+        descricao: "Fila de Atendimento inexistente"
+        passos:
+          - "Sistema exibe: 'Fila selecionada não existe'"
+          - "Usuário seleciona fila válida"
+      - id: "FE-UC01-04"
+        descricao: "JSON schema inválido"
+        passos:
+          - "Sistema exibe: 'Schema JSON de campos dinâmicos inválido'"
+          - "Exibe detalhes do erro de validação"
+          - "Usuário corrige o schema"
+    regras_aplicadas:
+      - "RN-RF060-001: Categoria ITIL v4 obrigatória (Incidente/Requisição/Mudança/Problema)"
+      - "RN-RF060-002: Nome único por tenant (EmpresaId)"
+      - "RN-RF060-003: SLA padrão obrigatório (horas > 0)"
+      - "RN-RF060-004: Fila de atendimento obrigatória"
+      - "RN-RF060-005: Matriz SLA personalizável por prioridade"
+      - "RN-RF060-006: Campos dinâmicos via JSON schema"
+      - "RN-RF060-010: Templates de resolução (knowledge base)"
+
+  - id: "UC02"
+    nome: "Visualizar Tipo de Chamado"
+    ator_principal: "Usuário Autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      rf_items:
+        - "RF060-CRUD-03"
+        - "RF060-SEC-01"
+        - "RF060-SEC-02"
+        - "RN-RF060-015"
+        - "F08"
+        - "F09"
+        - "F10"
+      funcionalidades:
+        - "F08: Detalhes completos do tipo"
+        - "F09: Histórico de chamados deste tipo"
+        - "F10: Métricas ITIL (MTTR, MTBF, FCR)"
+      permissoes:
+        - "GES.TIPOS_CHAMADO.VIEW"
+    precondicoes:
+      - "Usuário autenticado no sistema"
+      - "Permissão GES.TIPOS_CHAMADO.VIEW concedida"
+      - "Tipo de Chamado existe no tenant do usuário"
+    fluxo_principal:
+      - "Usuário clica em visualizar tipo na lista"
+      - "Sistema valida permissão e multi-tenancy (EmpresaId)"
+      - "Sistema exibe tela de detalhes com abas:"
+      - "Aba 1: Dados Gerais (Nome, Categoria, Descrição, SLA, Fila, Ícone, Cor)"
+      - "Aba 2: Matriz SLA (tempos por prioridade)"
+      - "Aba 3: Campos Dinâmicos (schema JSON)"
+      - "Aba 4: Templates de Resolução"
+      - "Aba 5: Regras de Escalonamento"
+      - "Aba 6: Histórico de Chamados (últimos 30 dias)"
+      - "Aba 7: Métricas ITIL (MTTR, MTBF, FCR, taxa de resolução)"
+      - "Aba 8: Auditoria (criação, modificações, quem/quando)"
+    fluxos_alternativos:
+      - id: "FA-UC02-01"
+        descricao: "Visualizar métricas ITIL"
+        passos:
+          - "Usuário acessa aba 'Métricas'"
+          - "Sistema exibe: MTTR (tempo médio resolução), MTBF (tempo médio entre falhas), FCR (taxa primeira chamada)"
+          - "Gráficos de tendência (últimos 90 dias)"
+      - id: "FA-UC02-02"
+        descricao: "Exportar histórico de chamados"
+        passos:
+          - "Usuário clica em 'Exportar' na aba Histórico"
+          - "Sistema gera CSV com chamados deste tipo"
+    fluxos_excecao:
+      - id: "FE-UC02-01"
+        descricao: "Tipo não encontrado"
+        passos:
+          - "Sistema exibe: 'Tipo de chamado não encontrado'"
+          - "Redireciona para lista"
+      - id: "FE-UC02-02"
+        descricao: "Acesso negado (outro tenant)"
+        passos:
+          - "Sistema exibe: 'Acesso negado'"
+          - "Registra tentativa de acesso indevido na auditoria"
+    regras_aplicadas:
+      - "RN-RF060-015: Isolamento multi-tenancy por EmpresaId"
+
+  - id: "UC03"
+    nome: "Editar Tipo de Chamado"
+    ator_principal: "Usuário Autenticado"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "RF060-CRUD-04"
+        - "RF060-SEC-01"
+        - "RN-RF060-001"
+        - "RN-RF060-002"
+        - "RN-RF060-003"
+        - "RN-RF060-007"
+        - "RN-RF060-008"
+        - "RN-RF060-011"
+        - "F11"
+        - "F12"
+      funcionalidades:
+        - "F11: Edição de campos configuráveis"
+        - "F12: Alteração de SLA com impacto em chamados futuros"
+      permissoes:
+        - "GES.TIPOS_CHAMADO.UPDATE"
+    precondicoes:
+      - "Usuário autenticado no sistema"
+      - "Permissão GES.TIPOS_CHAMADO.UPDATE concedida"
+      - "Tipo de Chamado existe no tenant do usuário"
+      - "Tipo está ativo (FlExcluido = FALSE)"
+    fluxo_principal:
+      - "Usuário clica em editar tipo na lista ou detalhes"
+      - "Sistema carrega formulário com dados atuais"
+      - "Sistema valida permissão e multi-tenancy (EmpresaId)"
+      - "Usuário modifica campos permitidos: Nome, Descrição, SLA Padrão, Fila, Ícone, Cor, Prioridade Padrão"
+      - "Usuário ajusta matriz SLA por prioridade"
+      - "Usuário modifica campos dinâmicos (JSON schema)"
+      - "Usuário atualiza templates de resolução"
+      - "Usuário ajusta regras de escalonamento"
+      - "Sistema valida alterações"
+      - "Sistema atualiza campos de auditoria (LastModifiedBy, LastModifiedAt)"
+      - "Sistema salva e exibe mensagem de sucesso"
+    fluxos_alternativos:
+      - id: "FA-UC03-01"
+        descricao: "Alteração de SLA não retroativa"
+        passos:
+          - "Usuário altera SLA padrão de 24h para 48h"
+          - "Sistema exibe aviso: 'Alteração aplicada apenas a novos chamados'"
+          - "Chamados existentes mantêm SLA original"
+      - id: "FA-UC03-02"
+        descricao: "Adicionar novo campo dinâmico"
+        passos:
+          - "Usuário acessa aba 'Campos Personalizados'"
+          - "Adiciona novo campo ao schema JSON"
+          - "Sistema valida schema e salva"
+          - "Novos chamados exibem campo adicional"
+    fluxos_excecao:
+      - id: "FE-UC03-01"
+        descricao: "Nome já existe (outro tipo no tenant)"
+        passos:
+          - "Sistema exibe: 'Nome já utilizado por outro tipo'"
+          - "Usuário corrige o nome"
+      - id: "FE-UC03-02"
+        descricao: "Tipo inativo (soft deleted)"
+        passos:
+          - "Sistema exibe: 'Tipo inativo não pode ser editado'"
+          - "Sugere reativação primeiro"
+      - id: "FE-UC03-03"
+        descricao: "Fila de atendimento alterada com chamados abertos"
+        passos:
+          - "Sistema exibe aviso: 'Existem X chamados abertos com fila atual'"
+          - "Pergunta: 'Deseja migrar chamados abertos para nova fila?'"
+          - "Usuário confirma ou cancela"
+      - id: "FE-UC03-04"
+        descricao: "Alteração de categoria ITIL v4 com chamados abertos"
+        passos:
+          - "Sistema exibe aviso: 'Categoria ITIL v4 não pode ser alterada com chamados abertos'"
+          - "Bloqueia alteração"
+          - "Sugere criar novo tipo com categoria desejada"
+    regras_aplicadas:
+      - "RN-RF060-007: Alteração de SLA não retroativa"
+      - "RN-RF060-008: Categoria ITIL v4 não pode ser alterada com chamados abertos"
+      - "RN-RF060-011: Migração de fila opcional ao editar"
+
+  - id: "UC04"
+    nome: "Inativar Tipo de Chamado"
+    ator_principal: "Usuário Autenticado"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "RF060-CRUD-05"
+        - "RF060-SEC-01"
+        - "RN-RF060-009"
+        - "RN-RF060-012"
+        - "RN-RF060-013"
+        - "RN-RF060-014"
+        - "F13"
+        - "F14"
+        - "F15"
+      funcionalidades:
+        - "F13: Inativação lógica (soft delete)"
+        - "F14: Migração de chamados abertos para tipo 'Genérico'"
+        - "F15: Validação de dependências (SLA, Fila, Templates)"
+      permissoes:
+        - "GES.TIPOS_CHAMADO.DELETE"
+    precondicoes:
+      - "Usuário autenticado no sistema"
+      - "Permissão GES.TIPOS_CHAMADO.DELETE concedida"
+      - "Tipo de Chamado existe no tenant do usuário"
+      - "Tipo está ativo (FlExcluido = FALSE)"
+    fluxo_principal:
+      - "Usuário clica em inativar tipo na lista ou detalhes"
+      - "Sistema valida permissão e multi-tenancy (EmpresaId)"
+      - "Sistema verifica se existem chamados abertos deste tipo"
+      - "Se houver chamados abertos: Sistema exibe aviso com quantidade"
+      - "Sistema pergunta: 'Chamados abertos serão migrados para tipo Genérico. Confirma?'"
+      - "Usuário confirma inativação"
+      - "Sistema migra chamados abertos para tipo 'Genérico' (RN-RF060-009)"
+      - "Sistema registra histórico de migração em cada chamado"
+      - "Sistema marca tipo como inativo (FlExcluido = TRUE)"
+      - "Sistema registra auditoria (DeletedBy, DeletedAt)"
+      - "Sistema exibe mensagem de sucesso"
+    fluxos_alternativos:
+      - id: "FA-UC04-01"
+        descricao: "Inativação sem chamados abertos"
+        passos:
+          - "Sistema verifica: nenhum chamado aberto"
+          - "Inativa imediatamente sem migração"
+      - id: "FA-UC04-02"
+        descricao: "Reativar tipo inativo"
+        passos:
+          - "Usuário acessa tipo inativo (filtro 'Inativos')"
+          - "Clica em 'Reativar'"
+          - "Sistema marca FlExcluido = FALSE"
+          - "Tipo volta a estar disponível para novos chamados"
+    fluxos_excecao:
+      - id: "FE-UC04-01"
+        descricao: "Tipo já inativo"
+        passos:
+          - "Sistema exibe: 'Tipo já está inativo'"
+          - "Oferece opção de reativar"
+      - id: "FE-UC04-02"
+        descricao: "Tipo 'Genérico' não pode ser inativado"
+        passos:
+          - "Sistema exibe: 'Tipo Genérico é reservado e não pode ser inativado'"
+          - "Bloqueia operação"
+      - id: "FE-UC04-03"
+        descricao: "Tipo vinculado a templates de mudança CAB"
+        passos:
+          - "Sistema exibe: 'Tipo vinculado a templates CAB ativos'"
+          - "Lista templates afetados"
+          - "Bloqueia inativação ou solicita desvinculação primeiro"
+      - id: "FE-UC04-04"
+        descricao: "Tipo vinculado a regras de escalonamento automático"
+        passos:
+          - "Sistema exibe: 'Tipo vinculado a regras de escalonamento'"
+          - "Lista regras afetadas"
+          - "Pergunta se deve desativar regras ou cancelar inativação"
+    regras_aplicadas:
+      - "RN-RF060-009: Chamados abertos migram para tipo Genérico ao inativar"
+      - "RN-RF060-012: Tipo Genérico não pode ser inativado"
+      - "RN-RF060-013: Validar dependências antes de inativar (templates CAB, regras escalonamento)"
+      - "RN-RF060-014: Soft delete (FlExcluido = TRUE)"

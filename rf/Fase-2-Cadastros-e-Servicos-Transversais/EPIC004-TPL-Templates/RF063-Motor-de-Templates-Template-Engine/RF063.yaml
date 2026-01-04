@@ -1,0 +1,289 @@
+# =============================================
+# RF063 - Motor de Templates (Template Engine)
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF063"
+  nome: "Motor de Templates (Template Engine)"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase-2-Cadastros-e-Servicos-Transversais"
+  epic: "EPIC004-TPL-Templates"
+  status: "em_desenvolvimento"
+
+descricao:
+  objetivo: "Prover um motor de processamento de templates dinâmicos com sintaxe Liquid/Handlebars para geração de e-mails, relatórios, documentos e notificações"
+  problema_resolvido: "Eliminar código hardcoded de templates, permitir customização por cliente, versionamento, preview antes de enviar e suporte multi-idioma"
+  publico_afetado: "Usuários que criam e-mails, relatórios e documentos dinâmicos; administradores que customizam conteúdo por tenant"
+
+escopo:
+  incluso:
+    - "Parser de sintaxe Liquid (variáveis, condicionais, loops)"
+    - "Contexto de dados tipado para renderização"
+    - "Filtros customizados (currency, formatarData, truncar)"
+    - "Preview em tempo real com dados de teste"
+    - "Versionamento de templates com rollback"
+    - "Validação de sintaxe Liquid"
+    - "Testes A/B de templates"
+    - "Herança de templates (layout base + template filho)"
+    - "Parciais reutilizáveis (header, footer, assinatura)"
+    - "Internacionalização (helper {{ 't' }})"
+    - "Sanitização HTML contra XSS"
+    - "Cache de templates compilados (Redis)"
+    - "Documentação automática de variáveis disponíveis"
+    - "Auditoria de uso de templates"
+    - "Controle de acesso por tenant"
+  fora:
+    - "Interface visual específica (editor de templates)"
+    - "Tecnologia de renderização (Liquid.NET, Handlebars.NET)"
+    - "Infraestrutura de e-mail (SMTP, SendGrid)"
+    - "Armazenamento de arquivos gerados (PDF, DOCX)"
+    - "Integração com sistemas externos de documentos"
+
+entidades:
+  - nome: "Template"
+    descricao: "Documento com marcações dinâmicas (variáveis, condicionais, loops)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "VersaoTemplate"
+    descricao: "Snapshot do conteúdo do template em um momento específico"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "TemplateContexto"
+    descricao: "Objeto com dados disponíveis para renderização no template"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+
+regras_negocio:
+  - id: "RN-RF063-001"
+    descricao: "Sintaxe Liquid Obrigatória - Todo template deve utilizar sintaxe Liquid (Shopify) para marcações dinâmicas"
+    tipo: "validacao"
+    campos_afetados: ["Conteudo"]
+    obrigatorio: true
+
+  - id: "RN-RF063-002"
+    descricao: "Contexto de Dados Tipado - O contexto de renderização deve ser um objeto tipado com propriedades bem definidas"
+    tipo: "regra_negocio"
+    campos_afetados: ["Contexto"]
+    obrigatorio: true
+
+  - id: "RN-RF063-003"
+    descricao: "Filtros Customizados Obrigatórios - O sistema deve fornecer filtros: currency, formatarData, truncar"
+    tipo: "regra_negocio"
+    campos_afetados: ["Filtros"]
+    obrigatorio: true
+
+  - id: "RN-RF063-004"
+    descricao: "Preview em Tempo Real - Gerar preview do template com dados de teste antes de salvar"
+    tipo: "regra_negocio"
+    campos_afetados: ["Preview"]
+    obrigatorio: true
+
+  - id: "RN-RF063-005"
+    descricao: "Versionamento Obrigatório - Toda alteração em template deve criar nova versão, preservando histórico"
+    tipo: "regra_negocio"
+    campos_afetados: ["Versao"]
+    obrigatorio: true
+
+  - id: "RN-RF063-006"
+    descricao: "Validação de Sintaxe Bloqueante - Templates com sintaxe Liquid inválida não podem ser salvos"
+    tipo: "validacao"
+    campos_afetados: ["Conteudo"]
+    obrigatorio: true
+
+  - id: "RN-RF063-007"
+    descricao: "Testes A/B de Templates - Permitir criar variações de um template para testes A/B"
+    tipo: "regra_negocio"
+    campos_afetados: ["VariacaoTemplate"]
+    obrigatorio: false
+
+  - id: "RN-RF063-008"
+    descricao: "Herança de Templates (Layout Base) - Templates filhos podem herdar estrutura de um layout base"
+    tipo: "regra_negocio"
+    campos_afetados: ["LayoutBase"]
+    obrigatorio: false
+
+  - id: "RN-RF063-009"
+    descricao: "Parciais Reutilizáveis - Suportar inclusão de parciais (header, footer, assinatura)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Parciais"]
+    obrigatorio: false
+
+  - id: "RN-RF063-010"
+    descricao: "Internacionalização (Helper 't') - Templates devem suportar traduções via helper {{ 't' }}"
+    tipo: "regra_negocio"
+    campos_afetados: ["I18n"]
+    obrigatorio: true
+
+  - id: "RN-RF063-011"
+    descricao: "Sanitização HTML Contra XSS - Variáveis renderizadas devem ser sanitizadas automaticamente"
+    tipo: "seguranca"
+    campos_afetados: ["Renderizacao"]
+    obrigatorio: true
+
+  - id: "RN-RF063-012"
+    descricao: "Cache de Templates Compilados (Redis) - Templates compilados devem ser armazenados em cache distribuído"
+    tipo: "regra_negocio"
+    campos_afetados: ["Cache"]
+    obrigatorio: true
+
+  - id: "RN-RF063-013"
+    descricao: "Documentação Automática de Variáveis - Listar automaticamente todas as variáveis disponíveis no contexto"
+    tipo: "regra_negocio"
+    campos_afetados: ["Documentacao"]
+    obrigatorio: false
+
+  - id: "RN-RF063-014"
+    descricao: "Auditoria de Uso de Templates - Rastrear quando e onde cada template foi utilizado"
+    tipo: "seguranca"
+    campos_afetados: ["AuditLog"]
+    obrigatorio: true
+
+  - id: "RN-RF063-015"
+    descricao: "Isolamento Multi-Tenant - Cada tenant deve ter acesso apenas aos seus próprios templates"
+    tipo: "seguranca"
+    campos_afetados: ["EmpresaId"]
+    obrigatorio: true
+
+estados:
+  - id: "draft"
+    descricao: "Template criado, não publicado"
+  - id: "active"
+    descricao: "Template ativo, pode ser usado em produção"
+  - id: "archived"
+    descricao: "Template arquivado, não disponível para uso"
+  - id: "testing"
+    descricao: "Template em fase de testes A/B"
+
+transicoes:
+  permitidas:
+    - de: "draft"
+      para: "active"
+    - de: "draft"
+      para: "archived"
+    - de: "active"
+      para: "archived"
+    - de: "active"
+      para: "testing"
+    - de: "testing"
+      para: "active"
+    - de: "testing"
+      para: "archived"
+  proibidas:
+    - de: "archived"
+      para: "active"
+    - de: "archived"
+      para: "testing"
+
+permissoes:
+  - codigo: "TPL.ENGINE.VIEW_ANY"
+    descricao: "Listar templates"
+  - codigo: "TPL.ENGINE.VIEW"
+    descricao: "Visualizar template"
+  - codigo: "TPL.ENGINE.CREATE"
+    descricao: "Criar template"
+  - codigo: "TPL.ENGINE.EDIT"
+    descricao: "Editar template"
+  - codigo: "TPL.ENGINE.PUBLISH"
+    descricao: "Publicar template (draft → active)"
+  - codigo: "TPL.ENGINE.VERSION"
+    descricao: "Criar nova versão de template"
+  - codigo: "TPL.ENGINE.ROLLBACK"
+    descricao: "Fazer rollback para versão anterior"
+  - codigo: "TPL.ENGINE.ARCHIVE"
+    descricao: "Arquivar template"
+  - codigo: "TPL.ENGINE.RENDER"
+    descricao: "Renderizar template com contexto"
+
+integracoes:
+  internas:
+    - "Autenticacao"
+    - "Multi-Tenancy"
+    - "Auditoria"
+    - "Internacionalizacao (i18n)"
+  externas:
+    - sistema: "Redis"
+      tipo: "Cache"
+      obrigatoria: true
+    - sistema: "Liquid.NET"
+      tipo: "Parser"
+      obrigatoria: true
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  sanitizacao_xss: true
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00"  # Listar templates
+    - "UC01"  # Criar template
+    - "UC02"  # Visualizar template
+    - "UC03"  # Editar template
+    - "UC04"  # Arquivar template
+    - "UC05"  # Renderizar template
+    - "UC06"  # Preview de template
+    - "UC07"  # Versionamento
+    - "UC08"  # Rollback de versão
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar template"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar templates"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar template"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Editar template"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Arquivar template"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar sintaxe Liquid"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar contexto de dados"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Sanitizar HTML contra XSS"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria de uso"
+      required: true
+
+exclusions:
+  rf_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0 - Separação RF/RL completa, estrutura YAML sincronizada"
+  - versao: "1.0"
+    data: "2025-01-14"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial com 15 regras de negócio"

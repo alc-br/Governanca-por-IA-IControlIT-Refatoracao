@@ -1,0 +1,545 @@
+# =============================================
+# RL-RF033 — Referência ao Legado (Gestão de Chamados)
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF033
+titulo: "Gestão de Chamados (Service Desk)"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "K2A - Sistema Legado IControlIT"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server"
+  multi_tenant: false
+  auditoria: "none"
+
+# =============================================
+# SEÇÃO CRÍTICA: Referências ao Legado
+# TODOS os itens DEVEM ter campo "destino" preenchido
+# =============================================
+
+referencias:
+  # TABELA PRINCIPAL: Solicitacao
+  - id: "LEG-RF033-001"
+    tipo: "tabela"
+    nome: "Solicitacao"
+    caminho: "ic1_legado/IControlIT/BancoDados/Interno/K2A.sql:8358"
+    descricao: |
+      Tabela principal de chamados com 14 campos.
+      Campos obrigatórios: Id_Solicitacao (PK int IDENTITY), Nm_Solicitacao (varchar 300),
+      Dt_Solicitacao (datetime), Id_Usuario (FK), Id_Ativo_Tipo (FK),
+      Id_Solicitacao_Tipo (FK), Dt_Vencimento (datetime), Fl_Status (int).
+
+      PROBLEMAS CRÍTICOS:
+      - Sem campo Id_Conglomerado (multi-tenancy ausente)
+      - Sem campos de auditoria (criação, alteração)
+      - Sem soft delete (FlExcluido)
+      - Campo Excedente_SLA varchar(8000) → controle manual de SLA (texto livre!)
+      - Campos Id_Mail_Caixa_Saida_* → notificações manuais
+      - Enum Fl_Status não documentado
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica assumida com MELHORIAS OBRIGATÓRIAS:
+      - Adicionado ConglomeradoId (multi-tenancy)
+      - Adicionado campos auditoria (UsuarioCriacaoId, DataCriacao, etc)
+      - Adicionado FlExcluido (soft delete)
+      - Campo Excedente_SLA REMOVIDO (substituído por cálculo automático)
+      - Campos Id_Mail_Caixa_Saida_* REMOVIDOS (substituído por Domain Events)
+      - Fl_Status migrado para enum ChamadoStatus (Aberto, EmAtendimento, etc)
+    rf_item_relacionado: "RN-RF033-01"
+    uc_relacionado: "UC00, UC01, UC02, UC03, UC04"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # CAMPO CRÍTICO: Excedente_SLA
+  - id: "LEG-RF033-002"
+    tipo: "regra_negocio"
+    nome: "SLA Manual em Campo Texto (Excedente_SLA)"
+    caminho: "Solicitacao.Excedente_SLA varchar(8000)"
+    descricao: |
+      Controle de excedente de SLA era feito manualmente, armazenado em campo texto
+      livre sem estrutura. Usuário digitava informações de forma inconsistente.
+      Não havia cálculo automático de prazo baseado em dias úteis.
+    destino: "substituido"
+    justificativa: |
+      Campo texto é anti-pattern para cálculo de SLA. Sistema moderno implementa
+      CalcularSLAService com lógica de dias úteis (excluindo finais de semana) +
+      exclusão de datas de parada (feriados/manutenções cadastradas).
+      Campo Excedente_SLA NÃO SERÁ MIGRADO.
+    rf_item_relacionado: "RN-RF033-02"
+    uc_relacionado: "UC01, UC02"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # CAMPO: Fl_Status (int) sem validação
+  - id: "LEG-RF033-003"
+    tipo: "regra_negocio"
+    nome: "Status Sem Validação de Transições (Fl_Status)"
+    caminho: "Solicitacao.Fl_Status int NOT NULL"
+    descricao: |
+      Status do chamado era um campo int sem documentação ou validação de
+      transições válidas. Qualquer mudança de status era permitida, causando
+      inconsistências (ex: pular de Aberto direto para Encerrado).
+    destino: "substituido"
+    justificativa: |
+      Falta de controle de workflow causava estados inválidos. Sistema moderno
+      implementa enum ChamadoStatus (Aberto, EmAtendimento, AguardandoUsuario,
+      AguardandoFornecedor, Resolvido, Encerrado, Cancelado) com validação
+      rigorosa de transições permitidas no UpdateChamadoStatusCommandValidator.
+    rf_item_relacionado: "RN-RF033-03"
+    uc_relacionado: "UC03, UC04"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  # CAMPOS: Id_Mail_Caixa_Saida_*
+  - id: "LEG-RF033-004"
+    tipo: "regra_negocio"
+    nome: "Notificações Manuais (Id_Mail_Caixa_Saida_*)"
+    caminho: "Solicitacao.Id_Mail_Caixa_Saida_Usuario, Id_Mail_Caixa_Saida_Operadora"
+    descricao: |
+      Sistema de notificações era manual. Usuário atualizava campos que
+      referenciavam caixas de saída de e-mail. Não havia disparo automático
+      em eventos-chave (abertura, atribuição, encerramento).
+    destino: "substituido"
+    justificativa: |
+      Sistema manual não é escalável e propenso a falhas humanas. Moderno
+      implementa Domain Events (ChamadoCriado, ChamadoAtribuido, ChamadoEncerrado)
+      com handlers automáticos de notificação multi-canal (e-mail, push, SMS).
+      Campos Id_Mail_Caixa_Saida_* NÃO SERÃO MIGRADOS.
+    rf_item_relacionado: "RN-RF033-10"
+    uc_relacionado: "UC01, UC03, UC04"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # TABELA: Solicitacao_Item
+  - id: "LEG-RF033-005"
+    tipo: "tabela"
+    nome: "Solicitacao_Item"
+    caminho: "ic1_legado/IControlIT/BancoDados/Interno/K2A.sql:8429"
+    descricao: |
+      Tabela de interações do chamado. Campos: Id_Solicitacao_Item (PK int IDENTITY),
+      Id_Solicitacao (FK), Nm_Solicitacao_Item (varchar 8000), Id_Usuario (FK),
+      Dt_Hr_Solicitacao_Item (datetime), Fl_Publicado (int).
+
+      Campo Fl_Publicado: 0 = privado (apenas equipe), 1 = público (visível ao solicitante).
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica assumida com MELHORIAS:
+      - Renomeado para ChamadoItem
+      - PK migrado para Guid
+      - Campo Fl_Publicado renomeado para FlPublico (bool)
+      - Adicionado multi-tenancy (ConglomeradoId)
+      - Adicionado auditoria e soft delete
+    rf_item_relacionado: "RN-RF033-07"
+    uc_relacionado: "UC02, UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # TABELA: Solicitacao_Avaliacao
+  - id: "LEG-RF033-006"
+    tipo: "tabela"
+    nome: "Solicitacao_Avaliacao"
+    caminho: "ic1_legado/IControlIT/BancoDados/Interno/K2A.sql:8384"
+    descricao: |
+      Tabela de avaliações de satisfação. Campos: Id_Solicitacao_Avaliacao (PK int IDENTITY),
+      Id_Solicitacao (FK), Dt_Avaliacao (datetime), Avaliacao (int), Descricao (varchar 100).
+
+      PROBLEMAS:
+      - Sem validação de range de nota (permite valores fora de 1-5)
+      - Sem validação de unicidade (permite múltiplas avaliações)
+      - Descricao limitada a 100 caracteres (insuficiente)
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica assumida com MELHORIAS OBRIGATÓRIAS:
+      - Renomeado para ChamadoAvaliacao
+      - PK migrado para Guid
+      - Validação de range (1-5) no AvaliarChamadoCommandValidator
+      - Validação de unicidade (apenas 1 avaliação por chamado)
+      - Campo Descricao → Comentario (varchar 500)
+      - Adicionado multi-tenancy, auditoria, soft delete
+    rf_item_relacionado: "RN-RF033-06, RN-RF033-17"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # TABELA: Solicitacao_Tipo
+  - id: "LEG-RF033-007"
+    tipo: "tabela"
+    nome: "Solicitacao_Tipo"
+    caminho: "ic1_legado/IControlIT/BancoDados/Interno/K2A.sql:4710"
+    descricao: |
+      Tabela de tipos de solicitação (Incidente, Requisição, Dúvida, etc).
+      Sem multi-tenancy, sem auditoria.
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica assumida com adição de multi-tenancy, auditoria e soft delete.
+      Renomeado para TipoSolicitacao (PascalCase).
+    rf_item_relacionado: "RN-RF033-02"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # TABELA: Solicitacao_SLA
+  - id: "LEG-RF033-008"
+    tipo: "tabela"
+    nome: "Solicitacao_SLA"
+    caminho: "ic1_legado/IControlIT/BancoDados/Interno/K2A.sql:4604"
+    descricao: |
+      Tabela de definições de SLA (prazo em dias por tipo de solicitação).
+      Sem multi-tenancy, sem auditoria.
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica assumida com adição de multi-tenancy, auditoria e soft delete.
+      Renomeado para SolicitacaoSLA (PascalCase).
+    rf_item_relacionado: "RN-RF033-02"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # TABELA: Solicitacao_Fila_Atendimento
+  - id: "LEG-RF033-009"
+    tipo: "tabela"
+    nome: "Solicitacao_Fila_Atendimento"
+    caminho: "ic1_legado/IControlIT/BancoDados/Interno/K2A.sql:4455"
+    descricao: |
+      Tabela de filas de atendimento (grupos especializados).
+      Sem multi-tenancy, sem auditoria.
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica assumida com adição de multi-tenancy, auditoria e soft delete.
+      Renomeado para FilaAtendimento (PascalCase).
+    rf_item_relacionado: "RN-RF033-08"
+    uc_relacionado: "UC01, UC03"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # TABELA: Solicitacao_Solucao
+  - id: "LEG-RF033-010"
+    tipo: "tabela"
+    nome: "Solicitacao_Solucao"
+    caminho: "ic1_legado/IControlIT/BancoDados/Interno/K2A.sql:6605"
+    descricao: |
+      Tabela de soluções aplicadas aos chamados.
+      Sem flag de base de conhecimento para reutilização.
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica assumida com MELHORIAS:
+      - Adicionado campo FlBaseConhecimento (bool)
+      - Adicionado campos QtdUtilizacoes, NotaMedia (para ranking)
+      - Adicionado multi-tenancy, auditoria, soft delete
+      - Renomeado para SolicitacaoSolucao (PascalCase)
+    rf_item_relacionado: "RN-RF033-04, RN-RF033-15"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # TABELA: Solicitacao_Data_Parada
+  - id: "LEG-RF033-011"
+    tipo: "tabela"
+    nome: "Solicitacao_Data_Parada"
+    caminho: "ic1_legado/IControlIT/BancoDados/Interno/K2A.sql:8414"
+    descricao: |
+      Tabela de feriados e datas de manutenção que pausam contagem de SLA.
+      Sem multi-tenancy, sem auditoria.
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica assumida com adição de multi-tenancy, auditoria e soft delete.
+      Renomeado para DataParada (PascalCase).
+      CRÍTICO para funcionamento do CalcularSLAService.
+    rf_item_relacionado: "RN-RF033-02"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  # TABELA: Rl_Solicitacao_Ativo (N:N)
+  - id: "LEG-RF033-012"
+    tipo: "tabela"
+    nome: "Rl_Solicitacao_Ativo"
+    caminho: "ic1_legado/IControlIT/BancoDados/Interno/K2A.sql:8051"
+    descricao: |
+      Tabela de relacionamento N:N entre chamados e ativos.
+      Sem multi-tenancy, sem auditoria.
+    destino: "substituido"
+    justificativa: |
+      Relacionamento N:N desnecessário. Sistema moderno implementa relacionamento
+      direto 1:N (Chamado.AtivoId → Ativo.Id). Cada chamado vinculado a apenas 1 ativo.
+      Tabela Rl_Solicitacao_Ativo NÃO SERÁ MIGRADA.
+    rf_item_relacionado: "RN-RF033-09"
+    uc_relacionado: "UC01, UC02"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # TABELA: Solicitacao_Permissao (customizada)
+  - id: "LEG-RF033-013"
+    tipo: "componente"
+    nome: "Solicitacao_Permissao"
+    caminho: "Sistema de permissões customizado"
+    descricao: |
+      Sistema customizado de permissões não seguindo padrão RBAC.
+      Dificulta manutenção e integração.
+    destino: "substituido"
+    justificativa: |
+      Sistema customizado substituído por RBAC centralizado padrão.
+      Permissões migradas para matriz unificada (GES.CHAMADOS.*).
+      Tabela Solicitacao_Permissao NÃO SERÁ MIGRADA.
+    rf_item_relacionado: "Seção 10.4 do RF033"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # AUSÊNCIA CRÍTICA: Multi-Tenancy
+  - id: "LEG-RF033-014"
+    tipo: "regra_negocio"
+    nome: "Ausência de Multi-Tenancy (Id_Conglomerado)"
+    caminho: "TODAS as tabelas (ausência de campo)"
+    descricao: |
+      NENHUMA tabela do legado possui campo Id_Conglomerado.
+      Todos os dados são compartilhados sem isolamento por conglomerado.
+      VIOLAÇÃO CRÍTICA de segurança e conformidade LGPD.
+    destino: "substituido"
+    justificativa: |
+      Multi-tenancy é OBRIGATÓRIO no sistema moderno.
+      TODAS as entidades possuem campo ConglomeradoId.
+      Row-Level Security automático em todas as queries.
+
+      IMPACTO CRÍTICO: Migração de dados históricos requer associação
+      a conglomerado padrão ou análise manual de pertencimento.
+    rf_item_relacionado: "RN-RF033-16"
+    uc_relacionado: "UC00, UC01, UC02, UC03, UC04"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # AUSÊNCIA CRÍTICA: Auditoria
+  - id: "LEG-RF033-015"
+    tipo: "regra_negocio"
+    nome: "Ausência de Auditoria (Campos de Criação/Alteração)"
+    caminho: "TODAS as tabelas (ausência de campos)"
+    descricao: |
+      NENHUMA tabela possui campos de auditoria (quem criou, quando, quem alterou).
+      Não há rastreabilidade de operações.
+      VIOLAÇÃO de conformidade LGPD (retenção 7 anos).
+    destino: "substituido"
+    justificativa: |
+      Auditoria é OBRIGATÓRIA no sistema moderno.
+      TODAS as entidades possuem: UsuarioCriacaoId, DataCriacao,
+      UsuarioAlteracaoId, DataAlteracao.
+      AuditInterceptor do EF Core preenche automaticamente.
+      Retenção de 7 anos conforme LGPD.
+    rf_item_relacionado: "Seção 10.3 do RF033"
+    uc_relacionado: "UC00, UC01, UC02, UC03, UC04"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # AUSÊNCIA CRÍTICA: Soft Delete
+  - id: "LEG-RF033-016"
+    tipo: "regra_negocio"
+    nome: "Ausência de Soft Delete (FlExcluido)"
+    caminho: "TODAS as tabelas (ausência de campo)"
+    descricao: |
+      NENHUMA tabela possui campo FlExcluido.
+      Exclusões são físicas, causando perda de dados e violação de auditoria.
+    destino: "substituido"
+    justificativa: |
+      Soft Delete é OBRIGATÓRIO no sistema moderno.
+      TODAS as entidades possuem campo FlExcluido (bool).
+      Global Query Filter do EF Core filtra automaticamente registros excluídos.
+      Permite recuperação e mantém auditoria.
+    rf_item_relacionado: "RN-RF033-16"
+    uc_relacionado: "UC04"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # NOVA FUNCIONALIDADE: Reabertura Controlada
+  - id: "LEG-RF033-017"
+    tipo: "regra_negocio"
+    nome: "Ausência de Controle de Reabertura"
+    caminho: "Sistema legado (funcionalidade ausente)"
+    descricao: |
+      Não havia controle de reabertura de chamados encerrados.
+      Usuários tinham que criar novo chamado para problema recorrente.
+    destino: "substituido"
+    justificativa: |
+      Nova funcionalidade implementada no sistema moderno.
+      Permite reabertura controlada (até 7 dias após encerramento).
+      Requer justificativa obrigatória.
+      Apenas 1 reabertura por chamado.
+      Melhora experiência do usuário.
+    rf_item_relacionado: "RN-RF033-11"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # NOVA FUNCIONALIDADE: Pausa de SLA
+  - id: "LEG-RF033-018"
+    tipo: "regra_negocio"
+    nome: "SLA Não Pausava em Status 'Aguardando'"
+    caminho: "Sistema legado (funcionalidade ausente)"
+    descricao: |
+      SLA continuava contando mesmo quando chamado estava aguardando
+      resposta de terceiros (usuário ou fornecedor).
+      Causava penalização injusta da equipe de suporte.
+    destino: "substituido"
+    justificativa: |
+      Nova funcionalidade implementada no sistema moderno.
+      SLA pausa ao entrar em status AguardandoUsuario ou AguardandoFornecedor.
+      Campos adicionados: DataInicioAguardando, TotalHorasAguardando.
+      Cálculo de DataVencimentoEfetiva considera tempo pausado.
+      Evita penalização por atrasos de terceiros.
+    rf_item_relacionado: "RN-RF033-12"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # NOVA FUNCIONALIDADE: Escalação Automática
+  - id: "LEG-RF033-019"
+    tipo: "regra_negocio"
+    nome: "Ausência de Escalação Automática"
+    caminho: "Sistema legado (funcionalidade ausente)"
+    descricao: |
+      Chamados vencidos não eram escalados automaticamente.
+      Dependia de supervisão manual, causando perda de SLA.
+    destino: "substituido"
+    justificativa: |
+      Nova funcionalidade implementada no sistema moderno.
+      Job recorrente EscalarChamadosVencidosJob verifica SLA a cada 15 minutos.
+      Chamado vencido → marcar FlEscalado = true + notificar supervisor.
+      Criar interação privada registrando escalação automática.
+      Escalação ocorre apenas 1 vez por chamado.
+      Garante atenção gerencial a chamados críticos.
+    rf_item_relacionado: "RN-RF033-14"
+    uc_relacionado: "UC02, UC03"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # NOVA FUNCIONALIDADE: Controle de Anexos
+  - id: "LEG-RF033-020"
+    tipo: "regra_negocio"
+    nome: "Anexos Sem Controle de Tamanho"
+    caminho: "Sistema legado (funcionalidade parcial)"
+    descricao: |
+      Anexos provavelmente armazenados em filesystem sem controle.
+      Sem validação de tamanho, tipo de arquivo ou limite por chamado.
+    destino: "substituido"
+    justificativa: |
+      Nova funcionalidade implementada no sistema moderno.
+      Entidade ChamadoAnexo com campos: NomeArquivo, TamanhoBytes, TipoMime, CaminhoArquivo.
+      Validação: máximo 10 MB por arquivo, 50 MB total por chamado.
+      Extensões permitidas: .jpg, .jpeg, .png, .pdf, .txt, .log, .zip.
+      Previne uploads abusivos e controla espaço de armazenamento.
+    rf_item_relacionado: "RN-RF033-13"
+    uc_relacionado: "UC02, UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # NOVA FUNCIONALIDADE: Dashboard Tempo Real
+  - id: "LEG-RF033-021"
+    tipo: "componente"
+    nome: "Ausência de Dashboard em Tempo Real"
+    caminho: "Sistema legado (funcionalidade ausente)"
+    descricao: |
+      Não havia dashboard de métricas visuais.
+      Relatórios eram estáticos e gerados manualmente.
+    destino: "substituido"
+    justificativa: |
+      Nova funcionalidade implementada no sistema moderno.
+      Dashboard Angular com SignalR para atualização em tempo real.
+      Métricas: chamados por status, SLA atendidos vs vencidos,
+      ranking de satisfação, tempo médio de resolução (MTTR).
+      Charts: Pie (status), Bar (satisfação), Line (evolução).
+      Atualização automática sem refresh de página.
+    rf_item_relacionado: "Seção 4 do RF033 (Funcionalidade #12)"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # NOVA FUNCIONALIDADE: Internacionalização
+  - id: "LEG-RF033-022"
+    tipo: "componente"
+    nome: "Ausência de Internacionalização (i18n)"
+    caminho: "Sistema legado (funcionalidade ausente)"
+    descricao: |
+      Sistema legado apenas em português (pt-BR).
+      Não havia suporte a múltiplos idiomas.
+    destino: "substituido"
+    justificativa: |
+      Nova funcionalidade implementada no sistema moderno.
+      Suporte a pt-BR, en-US, es-ES via Transloco.
+      Chaves de tradução para: títulos, labels, status, ações, mensagens, validações.
+      Fallback automático (pt-BR → en → es).
+      Permite expansão internacional.
+    rf_item_relacionado: "Seção 10.2 do RF033"
+    uc_relacionado: "UC00, UC01, UC02, UC03, UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+# =============================================
+# METADADOS CALCULADOS
+# =============================================
+
+metadados:
+  total_referencias: 22
+  referencias_assumidas: 8
+  referencias_substituidas: 11
+  referencias_descartadas: 0
+  referencias_a_revisar: 0
+  referencias_novas_funcionalidades: 3
+  cobertura_destinos: "100%"  # 22/22 = 100%
+
+  # Distribuição por tipo
+  tipos:
+    tabela: 10
+    regra_negocio: 10
+    componente: 2
+
+  # Distribuição por complexidade
+  complexidade:
+    baixa: 8
+    media: 9
+    alta: 5
+
+  # Distribuição por risco
+  risco_migracao:
+    baixo: 12
+    medio: 8
+    alto: 2
+
+  # Distribuição por prioridade
+  prioridade:
+    critica_1: 10
+    alta_2: 9
+    media_3: 3
+
+# =============================================
+# CHANGELOG
+# =============================================
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Documentação completa de referência ao legado. 22 itens com destino obrigatório (100% cobertura). Extração de regras implícitas, análise de tabelas legadas, gap analysis e rastreabilidade completa."
+    autor: "Agência ALC - alc.dev.br"

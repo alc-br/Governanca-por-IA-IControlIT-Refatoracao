@@ -1,0 +1,850 @@
+# Casos de Uso - RF052
+
+**Versão:** 1.0
+**Data:** 2025-12-17
+**RF Relacionado:** [RF052 - Gestao-de-Consumidores](./RF052.md)
+
+---
+
+## Índice de Casos de Uso
+
+| UC | Nome | Descrição |
+|----|------|-----------|
+| UC00 | UC00 - Listar Consumidores com Busca Avançada | Caso de uso |
+| UC01 | UC01 - Cadastrar Novo Consumidor | Caso de uso |
+| UC02 | UC02 - Editar Dados de Consumidor | Caso de uso |
+| UC07 | UC07 - Dashboard Gestor e Import/Export | Caso de uso |
+
+---
+
+# UC00 - Listar Consumidores com Busca Avançada
+
+**RF**: RF-029 - Gestão de Consumidores
+**Complexidade**: Média
+**Estimativa**: 5h Backend + 6h Frontend
+
+---
+
+## 📋 Objetivo
+
+Listar consumidores (colaboradores/terceiros) com busca full-text usando Elasticsearch, filtros avançados por status/tipo/filial/cargo, paginação para alta performance e ações em lote (exportar, enviar email, aplicar política). Interface responsiva com busca rápida, autocomplete e destaque de termos encontrados.
+
+---
+
+## 📝 Fluxo Principal
+
+1. Usuário acessa "Gestão de Pessoas → Consumidores"
+2. Sistema exibe grid paginado (50 por página):
+   - Avatar (foto ou iniciais)
+   - Nome Completo
+   - Matrícula
+   - Email
+   - Cargo
+   - Filial
+   - Departamento
+   - Status (badge colorido: 🟢 Ativo, 🟡 Férias, 🔴 Desligado)
+   - Ações ([👁️][✏️][📋])
+3. **Busca Rápida** (Elasticsearch):
+   - Campo único: [🔍 Buscar por nome, matrícula, email, CPF...]
+   - Typo tolerance: "joa silv" encontra "João Silva"
+   - Sugestões automáticas (autocomplete)
+   - Destaque de termos encontrados (highlight)
+4. **Filtros Avançados** (sidebar):
+   - Status: [Todos ▼] ou Ativo, Férias, Afastado, Licença, Desligado
+   - Tipo: [Todos ▼] ou Colaborador CLT, Terceiro, Estagiário, PJ
+   - Filial: [Todas ▼] (autocomplete)
+   - Centro Custo: [Todos ▼] (depende de Filial)
+   - Departamento: [Todos ▼]
+   - Cargo: [Todos ▼]
+   - Com ativos alocados: ☐ Sim ☐ Não ☐ Tanto faz
+   - Data admissão: De [____] até [____]
+5. **Ordenação**: Clica cabeçalho para ordenar (Nome, Matrícula, Data Admissão)
+6. **Ações em Lote**:
+   - Checkbox multi-seleção
+   - [📤 Exportar Excel] - Exporta filtros aplicados
+   - [📧 Enviar Email em Lote] - Notificação múltiplos consumidores
+   - [🏷️ Aplicar Política] - Atribuir cota em lote
+
+---
+
+## ✅ Validações
+
+| Campo | Regra |
+|-------|-------|
+| Busca | Min 2 caracteres para Elasticsearch |
+| Paginação | Max 50 registros por página |
+| Exportação | Max 10.000 registros por vez |
+| Filtros | Multi-tenancy (Id_Conglomerado) |
+
+---
+
+## 📐 Regras de Negócio
+
+- **RN-UC00-001**: Busca Elasticsearch com typo tolerance (Levenshtein distance ≤2)
+- **RN-UC00-002**: Multi-tenancy (WHERE Id_Conglomerado = @Id)
+- **RN-UC00-003**: Paginação obrigatória (performance com 100k+ consumidores)
+- **RN-UC00-004**: Cache Redis (5min) para listas de filtros (Filiais, Cargos)
+- **RN-UC00-005**: Exportação limitada a 10.000 registros por vez
+
+---
+
+## 🎨 Interface UI
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Consumidores                    [+ Novo] [📤 Exportar]   │
+├──────────────────────────────────────────────────────────┤
+│ 🔍 [Buscar por nome, matrícula, email, CPF............] │
+├──────────────────────────────────────────────────────────┤
+│ Filtros: Status: [Ativo ▼] Filial: [SP ▼] Cargo: [Todos]│
+├───┬────────────┬──────┬───────────────┬──────┬──────────┤
+│[☐]│Avatar Nome │Matríc│ Email         │Cargo │ Ações    │
+├───┼────────────┼──────┼───────────────┼──────┼──────────┤
+│[☐]│🧑 João Silv│12345 │joao@empresa..│Dev Sr│[👁️][✏️]│
+│[☐]│👩 Maria San│12346 │maria@empresa.│Analist│[👁️][✏️]│
+│[☐]│🧑 Pedro Cos│12347 │pedro@empresa.│Gestor│[👁️][✏️]│
+└───┴────────────┴──────┴───────────────┴──────┴──────────┘
+[Selecionar Todos] [📧 Email Lote] [🏷️ Política Lote]
+Pág 1 de 7 (342 consumidores) [◀ 1 2 3 ... 7 ▶]
+```
+
+---
+
+## 🔍 Observações Técnicas
+
+### Busca Elasticsearch
+
+**Request**:
+```typescript
+POST /api/v1/consumidores/buscar
+{
+  "query": "joão silva",
+  "filtros": {
+    "status": ["Ativo"],
+    "id_filial": ["uuid-filial-sp"],
+    "possui_ativos": true
+  },
+  "ordenacao": "nome_asc",
+  "pagina": 1,
+  "tamanho": 50
+}
+```
+
+**Response**:
+```json
+{
+  "total": 342,
+  "pagina_atual": 1,
+  "total_paginas": 7,
+  "consumidores": [
+    {
+      "id": "uuid-consumidor",
+      "nome": "João da Silva Junior",
+      "matricula": "12345",
+      "email": "joao.silva@empresa.com",
+      "cargo": "Desenvolvedor Sênior",
+      "filial": "São Paulo - Matriz",
+      "departamento": "TI - Desenvolvimento",
+      "status": "Ativo",
+      "avatar_url": "https://storage.com/avatar.jpg",
+      "total_ativos": 3,
+      "valor_ativos": 15000.00
+    }
+  ],
+  "sugestoes": ["João Silva", "João Silveira", "Joaquim Silva"],
+  "highlight": { "nome": ["<em>João</em> da <em>Silva</em> Junior"] }
+}
+```
+
+---
+
+---
+
+# UC01 - Cadastrar Novo Consumidor
+
+**RF**: RF-029 - Gestão de Consumidores
+**Complexidade**: Alta
+**Estimativa**: 10h Backend + 12h Frontend
+
+---
+
+## 📋 Objetivo
+
+Cadastrar consumidor completo (colaborador/terceiro) com validação de duplicatas usando Levenshtein, validação CPF (opcional Serpro API), hierarquia corporativa completa, opção de criar usuário de sistema automaticamente, e envio de email de boas-vindas com template Handlebars. Wizard de 4 etapas com validações progressivas e preview final antes de confirmar.
+
+---
+
+## 📝 Fluxo Principal (Wizard 4 Etapas)
+
+### Etapa 1 - Dados Pessoais
+
+1. Usuário clica "+ Novo Consumidor"
+2. Sistema exibe formulário Etapa 1:
+   - **Nome Completo***: `João da Silva Junior` (min 3 chars)
+   - **Nome Social**: `João Silva` (opcional, LGPD)
+   - **CPF***: `123.456.789-00` (máscara, validação dígito + duplicata)
+   - **RG**: `12.345.678-9` | Órgão: `SSP` | UF: `SP`
+   - **Email***: `joao.silva@empresa.com` (validação formato + unicidade)
+   - **Email Cópia**: `gestor@empresa.com` (opcional)
+   - **Telefone Celular***: `(11) 98765-4321` (máscara)
+   - **Telefone Fixo**: `(11) 3456-7890` | Ramal: `2234`
+   - **Data Nascimento**: `15/03/1990` (validação ≥18 anos ou ≥16 se estagiário)
+   - **Gênero**: [Masculino ▼] (M/F/Outro/Prefiro não informar)
+   - **Estado Civil**: [Solteiro ▼]
+   - **Foto**: [📷 Upload Avatar] (max 2MB, JPG/PNG, crop circular)
+
+### Etapa 2 - Dados Organizacionais
+
+3. Usuário preenche dados corporativos:
+   - **Matrícula***: `12345` (única por Conglomerado, alfanumérico max 20)
+   - **Tipo Consumidor***: [Colaborador CLT ▼] (CLT/PJ/Estagiário/Terceiro/Trainee)
+   - **Se Terceiro** → **Empresa Contratada***: [Empresa X ▼] (obrigatório)
+   - **Cargo**: [Desenvolvedor Sênior ▼] (autocomplete)
+   - **Status***: [Ativo ▼] (Ativo/Férias/Afastado/Licença/Suspenso/Desligado)
+   - **Data Admissão***: `20/01/2024`
+   - **Data Demissão**: `____` (desabilitado se status ≠ Desligado)
+   - **Tipo Contrato**: [CLT ▼] (CLT/PJ/Estágio/Temporário)
+   - **Jornada**: [44h semanais ▼]
+   - **Regime Trabalho**: [Híbrido ▼] (Presencial/Remoto/Híbrido)
+
+4. **Hierarquia Corporativa** (cascata dependente):
+   - **Filial***: [São Paulo - Matriz ▼] (AutoPostBack virtual)
+     - Ao mudar: Recarrega Centros de Custo vinculados
+   - **Centro Custo***: [TI - Tecnologia ▼]
+     - Ao mudar: Recarrega Departamentos
+   - **Departamento**: [TI - Desenvolvimento ▼]
+     - Ao mudar: Recarrega Setores
+   - **Setor**: [Backend .NET ▼]
+     - Ao mudar: Recarrega Seções
+   - **Seção**: `____` (opcional)
+
+5. **Gestor Direto**:
+   - **Matricula Chefia**: `10001` ou
+   - **Gestor Direto**: [🔍 Buscar gestor...] (autocomplete nome/matrícula)
+     - Mostra: Maria Santos (Gerente TI) - Mat. 10001
+     - Validação circular: Não permitir que A seja chefia de B e B de A
+
+### Etapa 3 - Endereço
+
+6. Usuário preenche endereço (opcional):
+   - **CEP**: `01310-100` (integração ViaCEP)
+   - **Logradouro**: `Av Paulista` | Nº: `1000` | Compl: `Apto 501`
+   - **Bairro**: `Bela Vista` | Cidade: `São Paulo` | UF: `SP`
+   - ☐ **Mesmo endereço da Filial** (checkbox copia dados)
+
+### Etapa 4 - Configurações Sistema
+
+7. Usuário configura opções de sistema:
+   - ☐ **Criar usuário de sistema automaticamente**
+     - Login sugerido: `joao.silva` (editável)
+     - Senha temporária: [Gerar Aleatória] → Envia por email
+     - Perfis de acesso: [☐ Usuário Padrão] [☐ Gestor] [☐ Administrador]
+     - ☐ Forçar troca senha no primeiro login
+     - ☐ Habilitar 2FA obrigatório
+   - ☐ **Não enviar emails automáticos** (Fl_Nao_Envia_EMail = 1)
+   - **Observações**:
+     ```
+     Colaborador transferido da filial RJ. Horário flexível 09:00-18:00.
+     ```
+
+### Revisão e Confirmação
+
+8. Sistema exibe preview de TODOS os dados preenchidos
+9. Se detectou consumidor similar, exibe alerta:
+   ```
+   ⚠️ Atenção: Encontramos consumidor similar:
+   Nome: João da Silva (sem "Junior")
+   Matrícula: 12344 (diferença de 1 dígito)
+   CPF: Diferente
+   [É a mesma pessoa?] [Não, continuar cadastro]
+   ```
+10. Clica "Finalizar Cadastro"
+11. Sistema valida:
+    - CPF único (409 Conflict se duplicado)
+    - Matrícula única no Conglomerado
+    - Email único global
+    - Hierarquia válida (Filial → CC → Depto do mesmo Conglomerado)
+    - Gestor existe e não cria ciclo
+12. Cria `Consumidor`:
+    ```sql
+    INSERT INTO Consumidor (
+      Id_Consumidor, Nm_Consumidor, Nm_Social,
+      CPF, RG, Email, EMail_Copia,
+      Telefone_Celular, Telefone_Fixo, Ramal,
+      Dt_Nascimento, Genero, Estado_Civil,
+      Matricula, Matricula_Chefia,
+      Id_Consumidor_Tipo, Id_Consumidor_Status,
+      Id_Cargo, Id_Filial, Id_Centro_Custo,
+      Id_Departamento, Id_Setor, Id_Secao,
+      Dt_Admissao, Tipo_Contrato, Jornada_Trabalho,
+      Regime_Trabalho, Avatar_URL,
+      Fl_Nao_Envia_EMail, Observacoes,
+      Id_Conglomerado, Id_Empresa, Created, CreatedBy
+    ) VALUES (...)
+    ```
+13. Se "Criar usuário":
+    - Cria registro em `Usuario` (RF-005)
+    - Envia email com credenciais temporárias
+14. Indexa em Elasticsearch (job assíncrono)
+15. Envia notificação ao gestor: "Novo colaborador João Silva no seu time"
+16. Mensagem: "Consumidor cadastrado! Email de boas-vindas enviado."
+
+---
+
+## ✅ Validações
+
+| Campo | Regra |
+|-------|-------|
+| Nome | Min 3 chars, max 120 |
+| CPF | Dígito verificador + único global |
+| Matrícula | Única por Conglomerado |
+| Email | Formato válido + único global |
+| Data Nascimento | ≥18 anos (ou ≥16 se estagiário) |
+| Filial | FK válido do Conglomerado |
+| Gestor | Não criar ciclo (A→B→A) |
+
+---
+
+## 📐 Regras de Negócio
+
+- **RN-UC01-001**: Validação duplicatas com Levenshtein (score ≥80% alerta)
+- **RN-UC01-002**: CPF validado com dígito verificador (opcional Serpro API)
+- **RN-UC01-003**: Hierarquia mínima obrigatória: Filial + Centro Custo
+- **RN-UC01-004**: Matricula_Chefia valida se consumidor existe (FK)
+- **RN-UC01-005**: Criar usuário opcional (checkbox)
+- **RN-UC01-006**: Email boas-vindas com template Handlebars
+
+---
+
+## 🎨 Interface UI (Etapa 1)
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Novo Consumidor          Etapa 1 de 4: Dados Pessoais   │
+├──────────────────────────────────────────────────────────┤
+│ ┌────────┐                                               │
+│ │ Avatar │ [📷 Upload Foto] (max 2MB, crop circular)     │
+│ │  🧑   │                                               │
+│ └────────┘                                               │
+│                                                          │
+│ Nome Completo*: [João da Silva Junior____________]      │
+│ Nome Social: [João Silva_________________] (LGPD)       │
+│                                                          │
+│ CPF*: [123.456.789-00] ✅ Válido                         │
+│ RG: [12.345.678-9] Órgão: [SSP] UF: [SP ▼]              │
+│                                                          │
+│ Email*: [joao.silva@empresa.com____________] ✅ Válido   │
+│ Email Cópia: [gestor@empresa.com___________] (opcional) │
+│                                                          │
+│ Telefone Celular*: [(11) 98765-4321]                    │
+│ Telefone Fixo: [(11) 3456-7890] Ramal: [2234]           │
+│                                                          │
+│ Data Nascimento: [15/03/1990] (34 anos) ✅               │
+│ Gênero: [Masculino ▼] Estado Civil: [Solteiro ▼]       │
+│                                                          │
+│                  [Cancelar] [Próxima Etapa ▶]            │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔍 Observações Técnicas
+
+### Validação CPF com Receita Federal
+
+```typescript
+// Consulta API Serpro (opcional, se habilitado)
+validarCPF(cpf: string): Observable<boolean> {
+  return this.http.get(`https://api.serpro.gov.br/consulta-cpf/${cpf}`, {
+    headers: { Authorization: `Bearer ${this.serproToken}` }
+  }).pipe(
+    map(response => response.status === 'REGULAR'),
+    catchError(() => of(true)) // Se API falhar, aceita (validação local apenas)
+  );
+}
+```
+
+---
+
+---
+
+# UC02 - Editar Dados de Consumidor
+
+**RF**: RF-029 - Gestão de Consumidores
+**Complexidade**: Média
+**Estimativa**: 6h Backend + 7h Frontend
+
+---
+
+## 📋 Objetivo
+
+Atualizar dados cadastrais de consumidor com auditoria completa (event sourcing) registrando TODAS as mudanças com justificativa obrigatória para campos críticos. Interface em abas para organizar dados pessoais, organizacionais, endereço, ativos alocados e histórico de auditoria. Permite desfazer mudanças recentes (últimas 24h).
+
+---
+
+## 📝 Fluxo Principal
+
+1. Usuário clica "Editar" (✏️) em consumidor
+2. Sistema exibe formulário preenchido (abas)
+
+### Aba 1 - Dados Pessoais
+3. Permite editar:
+   - Nome, CPF (readonly se já preenchido), RG, Email, Telefones
+   - Data Nascimento, Gênero, Estado Civil
+   - Avatar (upload nova foto)
+
+### Aba 2 - Organizacional
+4. Permite editar:
+   - Matrícula (readonly após criação)
+   - Tipo, Cargo, Status
+   - Data Admissão/Demissão
+   - Hierarquia (Filial, CC, Depto, Setor, Seção)
+   - Gestor Direto
+
+### Aba 3 - Endereço
+5. Permite editar:
+   - CEP, Logradouro, Número, Complemento
+   - Bairro, Cidade, UF
+
+### Aba 4 - Ativos Alocados (readonly)
+6. Exibe grid com ativos em posse
+7. [Ver Histórico] → UC03
+
+### Aba 5 - Histórico Auditoria (readonly)
+8. Timeline de mudanças:
+   ```
+   20/01/2025 14:32 - João Admin
+   Email: joao@empresa.com → joao.silva@empresa.com
+   Motivo: Padronização email corporativo
+
+   15/01/2025 09:15 - Maria RH
+   Status: Ativo → Férias
+   Motivo: Férias janeiro 2025
+
+   10/01/2025 16:20 - João Admin
+   Departamento: TI - Suporte → TI - Desenvolvimento
+   Motivo: Promoção para time de desenvolvimento
+   ```
+
+### Modificação e Justificativa
+
+9. Usuário modifica:
+   - Email: joao@empresa.com → joao.silva@empresa.com
+   - Departamento: TI - Suporte → TI - Desenvolvimento
+   - Status: Ativo → Férias
+
+10. Modal "Justificar Alteração":
+    ```
+    ┌──────────────────────────────────────────┐
+    │ Justifique as alterações                │
+    ├──────────────────────────────────────────┤
+    │ Campos alterados:                        │
+    │ • Email                                  │
+    │ • Departamento                           │
+    │ • Status                                 │
+    │                                          │
+    │ Justificativa* (min 20 chars):          │
+    │ ┌──────────────────────────────────────┐ │
+    │ │Promoção para desenvolvedor sênior.   │ │
+    │ │Mudou de departamento e entra em      │ │
+    │ │férias dia 22/01.                     │ │
+    │ └──────────────────────────────────────┘ │
+    │                                          │
+    │      [Cancelar] [Confirmar Alterações]  │
+    └──────────────────────────────────────────┘
+    ```
+
+11. Clica "Confirmar Alterações"
+
+12. Sistema:
+    - Atualiza `Consumidor` (campos modificados)
+    - Para CADA campo alterado, cria registro `Consumidor_Auditoria`:
+      ```sql
+      INSERT INTO Consumidor_Auditoria (
+        Id_Consumidor, Campo_Alterado,
+        Valor_Anterior, Valor_Novo,
+        Justificativa, Dt_Alteracao,
+        Id_Usuario_Alteracao, IP_Address, User_Agent
+      ) VALUES (
+        @IdConsumidor, 'Email',
+        'joao@empresa.com', 'joao.silva@empresa.com',
+        @Justificativa, GETDATE(),
+        @IdUsuario, @IpAddress, @UserAgent
+      );
+      ```
+    - Reindexaem Elasticsearch (job assíncrono)
+    - Notifica consumidor: "Seus dados foram atualizados. [Ver Mudanças]"
+
+13. Mensagem: "Dados atualizados! 3 campos alterados (Email, Departamento, Status)."
+
+---
+
+## ✅ Validações
+
+| Campo | Regra |
+|-------|-------|
+| CPF | Imutável após preenchimento (apenas admin) |
+| Matrícula | Imutável após criação (apenas admin) |
+| Data Admissão | Apenas RH pode alterar |
+| Justificativa | Min 20 chars se campo crítico |
+| Status Desligado | Requer Data Demissão |
+
+---
+
+## 📐 Regras de Negócio
+
+- **RN-UC02-001**: Auditoria obrigatória (event sourcing) para TODA mudança
+- **RN-UC02-002**: Justificativa obrigatória (min 20 chars) se alterar campo crítico
+- **RN-UC02-003**: CPF/Matrícula imutáveis (apenas admin com permissão específica)
+- **RN-UC02-004**: Mudança status para "Desligado" exige Data Demissão
+- **RN-UC02-005**: Desfazer mudanças recentes (últimas 24h) via histórico
+
+---
+
+## 🎨 Interface UI (Aba Auditoria)
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Editar: João da Silva Junior              [Salvar] [x]  │
+├──────────────────────────────────────────────────────────┤
+│ [Dados Pessoais] [Organizacional] [Endereço] [Ativos]   │
+│ [📜 Histórico de Auditoria]                              │
+├──────────────────────────────────────────────────────────┤
+│ Timeline de Alterações (últimos 90 dias):               │
+│                                                          │
+│ 🕒 20/01/2025 14:32 - João Admin                         │
+│ ┌────────────────────────────────────────────────────┐  │
+│ │ Campo: Email                                       │  │
+│ │ De: joao@empresa.com                               │  │
+│ │ Para: joao.silva@empresa.com                       │  │
+│ │ Motivo: Padronização email corporativo             │  │
+│ │ IP: 192.168.1.50                                   │  │
+│ └────────────────────────────────────────────────────┘  │
+│                                                          │
+│ 🕒 15/01/2025 09:15 - Maria RH                           │
+│ ┌────────────────────────────────────────────────────┐  │
+│ │ Campo: Status                                      │  │
+│ │ De: Ativo → Para: Férias                           │  │
+│ │ Motivo: Férias programadas janeiro 2025            │  │
+│ └────────────────────────────────────────────────────┘  │
+│                                                          │
+│ 🕒 10/01/2025 16:20 - João Admin                         │
+│ ┌────────────────────────────────────────────────────┐  │
+│ │ Campo: Departamento                                │  │
+│ │ De: TI - Suporte                                   │  │
+│ │ Para: TI - Desenvolvimento                         │  │
+│ │ Motivo: Promoção desenvolvedor sênior              │  │
+│ │ [⏪ Desfazer] (disponível 24h)                     │  │
+│ └────────────────────────────────────────────────────┘  │
+│                                                          │
+│ [📥 Exportar Auditoria Completa PDF]                     │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔍 Observações Técnicas
+
+### Campos NÃO Editáveis
+
+- **CPF** (após preenchimento inicial, apenas admin pode alterar)
+- **Matrícula** (imutável, apenas admin pode alterar)
+- **Data Admissão** (apenas RH pode alterar)
+
+### Event Sourcing
+
+Todas as mudanças são registradas em `Consumidor_Auditoria` com:
+- Campo alterado
+- Valor anterior e novo
+- Justificativa
+- Usuário, IP, User-Agent
+- Timestamp
+
+---
+
+---
+
+# UC07 - Dashboard Gestor e Import/Export
+
+**RF**: RF-029 - Gestão de Consumidores
+**Complexidade**: Média
+**Estimativa**: 10h Backend + 12h Frontend
+
+---
+
+## 📋 Objetivo
+
+Visualização hierárquica de subordinados com consulta recursiva SQL (até 5 níveis), organograma visual, resumo de ativos alocados/consumo mensal por subordinado, importação em lote de consumidores via CSV/Excel com validação de duplicatas e preview de erros, e exportação Excel com filtros aplicados (limite 10.000 registros).
+
+---
+
+## 📝 Fluxo Principal - Dashboard Hierárquico do Gestor
+
+1. Gestor "Maria Santos" acessa "Minha Equipe"
+
+2. Sistema consulta hierarquia recursiva:
+   ```sql
+   WITH RECURSIVE Subordinados AS (
+     -- Base: Subordinados diretos
+     SELECT Id_Consumidor, Nm_Consumidor, Matricula, Matricula_Chefia, 1 AS Nivel
+     FROM Consumidor
+     WHERE Matricula_Chefia = (SELECT Matricula FROM Consumidor WHERE Id_Consumidor = @IdGestor)
+       AND Fl_Desativado = 2
+
+     UNION ALL
+
+     -- Recursão: Subordinados dos subordinados
+     SELECT c.Id_Consumidor, c.Nm_Consumidor, c.Matricula, c.Matricula_Chefia, s.Nivel + 1
+     FROM Consumidor c
+     JOIN Subordinados s ON c.Matricula_Chefia = s.Matricula
+     WHERE c.Fl_Desativado = 2 AND s.Nivel < 5  -- Limite 5 níveis
+   )
+   SELECT * FROM Subordinados;
+   ```
+
+3. Para cada subordinado, calcula:
+   - Total de ativos alocados
+   - Valor total dos ativos
+   - Consumo mensal (se houver política)
+   - Status da cota (OK/Alerta/Crítico)
+
+4. Exibe:
+   ```
+   ┌──────────────────────────────────────────────────────────┐
+   │ Minha Equipe - Maria Santos (Gerente TI)                 │
+   ├──────────────────────────────────────────────────────────┤
+   │ 📊 Resumo:                                               │
+   │ Total Subordinados: 15 (diretos) + 42 (indiretos) = 57  │
+   │ Ativos Alocados: 128 ativos (R$ 542.000)                │
+   │ Consumo Mensal: R$ 12.340 / R$ 15.000 (82%)             │
+   │                                                          │
+   │ 🌳 Organograma:                                          │
+   │ Maria Santos (Gerente TI)                                │
+   │ ├─ João Silva (Desenvolvedor Sr) - 3 ativos, R$ 280/mês │
+   │ │  └─ Pedro Costa (Dev Jr) - 2 ativos, R$ 150/mês       │
+   │ ├─ Ana Oliveira (Analista) - 2 ativos, R$ 210/mês       │
+   │ └─ Carlos Lima (Coord. Suporte) - 4 ativos, R$ 320/mês  │
+   │    ├─ Lucas Moura (Analista) - 1 ativo, R$ 120/mês      │
+   │    └─ Juliana Rocha (Analista) - 1 ativo, R$ 130/mês    │
+   │                                                          │
+   │ 📋 Lista Subordinados (view tabular):                    │
+   │ ┌──────────────┬───────┬────────┬────────┬────────────┐ │
+   │ │ Nome         │ Ativos│ Valor  │ Consumo│ Status Cota│ │
+   │ ├──────────────┼───────┼────────┼────────┼────────────┤ │
+   │ │ João Silva   │ 3     │R$ 15k  │R$ 280  │ OK ✅      │ │
+   │ │ Ana Oliveira │ 2     │R$ 8k   │R$ 210  │ OK ✅      │ │
+   │ │ Carlos Lima  │ 4     │R$ 22k  │R$ 320  │ Alerta ⚠️  │ │
+   │ └──────────────┴───────┴────────┴────────┴────────────┘ │
+   │                                                          │
+   │ [📥 Exportar Excel] [📊 Gráficos Detalhados]             │
+   └──────────────────────────────────────────────────────────┘
+   ```
+
+5. Clicar em subordinado abre modal com detalhes:
+   - Ativos alocados (lista completa)
+   - Histórico de consumo (gráfico 12 meses)
+   - Políticas ativas
+   - Termos assinados
+
+---
+
+## 📝 Fluxo Secundário - Import CSV/Excel (Cadastro em Lote)
+
+1. Admin acessa "Consumidores → Importar"
+
+2. Faz upload de arquivo CSV/Excel:
+   ```csv
+   Nome,Matricula,Email,CPF,Cargo,Filial,CentroCusto,Status
+   "João Silva","12345","joao@empresa.com","123.456.789-00","Desenvolvedor","SP-Matriz","TI","Ativo"
+   "Maria Santos","12346","maria@empresa.com","987.654.321-00","Analista","SP-Matriz","TI","Ativo"
+   ```
+
+3. Sistema valida arquivo:
+   - **Formato**: CSV (UTF-8) ou Excel (.xlsx)
+   - **Colunas obrigatórias**: Nome, Matricula, Email
+   - **Max 5.000 registros** por arquivo
+   - **Tamanho**: Max 10MB
+
+4. Preview com validações:
+   ```
+   ┌──────────────────────────────────────────────────────────┐
+   │ Preview Importação - 2.500 linhas                        │
+   ├──────────────────────────────────────────────────────────┤
+   │ ✅ Validado: 2.450 (98%)                                 │
+   │ ⚠️  Avisos: 40 (2%) - Email duplicado, CPF inválido      │
+   │ ❌ Erros: 10 (<1%) - Nome vazio, Filial não existe       │
+   │                                                          │
+   │ Linhas com Erro (não serão importadas):                 │
+   │ ┌──────┬─────────────────┬────────────────────────────┐ │
+   │ │ Linha│ Nome            │ Erro                       │ │
+   │ ├──────┼─────────────────┼────────────────────────────┤ │
+   │ │ 23   │ (vazio)         │ Nome obrigatório           │ │
+   │ │ 145  │ Pedro Costa     │ Filial "RJ-Centro" não ex. │ │
+   │ │ 782  │ Ana Oliveira    │ Email inválido (sem @)     │ │
+   │ └──────┴─────────────────┴────────────────────────────┘ │
+   │                                                          │
+   │ Linhas com Aviso (importar com atenção):                │
+   │ ┌──────┬─────────────────┬────────────────────────────┐ │
+   │ │ Linha│ Nome            │ Aviso                      │ │
+   │ ├──────┼─────────────────┼────────────────────────────┤ │
+   │ │ 45   │ João Silva      │ Email já existe (atualizar)│ │
+   │ │ 67   │ Maria Santos    │ CPF inválido (dígito errad)│ │
+   │ └──────┴─────────────────┴────────────────────────────┘ │
+   │                                                          │
+   │ Opções:                                                  │
+   │ ⚪ Ignorar duplicatas (criar apenas novos)              │
+   │ ⚫ Atualizar existentes (merge por matrícula/email)     │
+   │ ⚪ Cancelar se houver qualquer erro                     │
+   │                                                          │
+   │ [📥 Baixar Relatório Erros] [Cancelar] [Importar 2.450] │
+   └──────────────────────────────────────────────────────────┘
+   ```
+
+5. Clica "Importar 2.450"
+
+6. Sistema processa em background (Hangfire):
+   ```csharp
+   [Queue("imports")]
+   public async Task ProcessarImportacao(string fileId) {
+       var rows = await _excelReader.Read(fileId);
+
+       foreach (var row in rows.Where(r => r.IsValid)) {
+           var consumidor = _mapper.Map<Consumidor>(row);
+
+           var existing = await _repo.FindByMatricula(consumidor.Matricula);
+
+           if (existing != null && _importMode == "Atualizar") {
+               await _repo.Update(existing.Id, consumidor);
+           } else if (existing == null) {
+               await _repo.Create(consumidor);
+           }
+       }
+
+       await _notificationService.Notify(adminUserId, $"Importação concluída! {rows.Count} consumidores processados.");
+   }
+   ```
+
+7. Notificação: "Importação concluída! 2.450 consumidores criados/atualizados. [Ver Relatório]"
+
+---
+
+## 📝 Fluxo Terciário - Export Excel
+
+1. Usuário aplica filtros na listagem (ex: Filial = SP, Status = Ativo)
+2. Clica "Exportar Excel"
+3. Sistema gera Excel com colunas:
+   - Nome, Matrícula, Email, CPF, Cargo
+   - Filial, Centro Custo, Departamento
+   - Status, Data Admissão
+   - Total Ativos, Valor Ativos
+   - Consumo Mensal, Limite Cota
+4. Download automático: `Consumidores_SP_Ativos_20250120.xlsx`
+5. Limite: 10.000 registros por exportação (se mais, sugerir filtros)
+
+---
+
+## ✅ Validações
+
+| Campo | Regra |
+|-------|-------|
+| Hierarquia | Max 5 níveis recursivos (performance) |
+| Import | Max 5.000 registros por arquivo |
+| Export | Max 10.000 registros por exportação |
+| Colunas CSV | Nome, Matricula, Email obrigatórios |
+
+---
+
+## 📐 Regras de Negócio
+
+- **RN-UC07-001**: Hierarquia recursiva até 5 níveis (performance)
+- **RN-UC07-002**: Import limitado a 5.000 registros por arquivo
+- **RN-UC07-003**: Validação duplicatas em import (matrícula/email)
+- **RN-UC07-004**: Export limitado a 10.000 registros
+- **RN-UC07-005**: Processamento import assíncrono (Hangfire queue)
+
+---
+
+## 🎨 Interface UI - Import
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Importar Consumidores                                    │
+├──────────────────────────────────────────────────────────┤
+│ 📤 Upload de Arquivo:                                    │
+│ [📁 Selecionar CSV ou Excel...]                          │
+│                                                          │
+│ Formato suportado:                                       │
+│ • CSV (UTF-8, separador vírgula ou ponto-e-vírgula)     │
+│ • Excel (.xlsx)                                          │
+│                                                          │
+│ Colunas obrigatórias:                                    │
+│ • Nome                                                   │
+│ • Matricula                                              │
+│ • Email                                                  │
+│                                                          │
+│ Colunas opcionais:                                       │
+│ • CPF, Telefone_Celular, Cargo                          │
+│ • Filial, Centro_Custo, Departamento                    │
+│ • Status, Data_Admissao                                  │
+│                                                          │
+│ [📥 Baixar Template CSV] [📥 Baixar Template Excel]      │
+│                                                          │
+│ Limites:                                                 │
+│ • Máximo 5.000 registros por arquivo                     │
+│ • Tamanho máximo 10MB                                    │
+│                                                          │
+│                      [Cancelar] [Próximo]                │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔍 Observações Técnicas
+
+### Consulta Hierárquica Recursiva
+
+A query usa **Common Table Expression (CTE)** recursiva para buscar subordinados em múltiplos níveis:
+
+```sql
+WITH RECURSIVE Subordinados AS (
+  -- Âncora: Subordinados diretos (nível 1)
+  SELECT Id_Consumidor, Nm_Consumidor, Matricula, Matricula_Chefia, 1 AS Nivel
+  FROM Consumidor
+  WHERE Matricula_Chefia = @MatriculaGestor
+    AND Fl_Desativado = 2
+
+  UNION ALL
+
+  -- Recursão: Subordinados dos subordinados (nível 2+)
+  SELECT c.Id_Consumidor, c.Nm_Consumidor, c.Matricula, c.Matricula_Chefia, s.Nivel + 1
+  FROM Consumidor c
+  JOIN Subordinados s ON c.Matricula_Chefia = s.Matricula
+  WHERE c.Fl_Desativado = 2 AND s.Nivel < 5
+)
+SELECT * FROM Subordinados ORDER BY Nivel, Nm_Consumidor;
+```
+
+**Limite de 5 níveis**: Evita loops infinitos e garante performance.
+
+### Processamento Assíncrono (Hangfire)
+
+Import de 5.000 registros pode levar 1-2 minutos. Hangfire processa em background:
+
+```csharp
+[Queue("imports")]
+public async Task ProcessarImportacao(string fileId) {
+    // Processa em lote de 100 registros
+    var batchSize = 100;
+    // ...
+}
+```
+
+---
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-12-17 | Sistema | Consolidação de 4 casos de uso |

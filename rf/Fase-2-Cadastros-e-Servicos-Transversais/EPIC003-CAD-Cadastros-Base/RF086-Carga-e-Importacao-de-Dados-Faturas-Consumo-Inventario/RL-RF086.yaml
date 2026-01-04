@@ -1,0 +1,979 @@
+# Referência ao Legado - RF086 - Carga e Importação de Dados
+# Versão: 2.0 (Governança com separação RF/RL)
+# Data: 2025-12-31
+
+rf_id: RF086
+titulo: "Carga e Importação de Dados - Faturas, Consumo e Inventário"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "IControlIT v3.5 (2015-2018)"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2012"
+  multi_tenant: false
+  auditoria: "partial"  # Apenas DataInclusao/DataAlteracao
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+# Cada item DEVE ter campo "destino" preenchido
+referencias:
+  # TABELAS LEGADAS
+  - id: "LEG-RF086-TAB-001"
+    tipo: "tabela"
+    nome: "FaturaOperadora"
+    caminho: "Database/dbo.FaturaOperadora"
+    descricao: |
+      Tabela principal de faturas importadas. Armazena metadados da fatura
+      (arquivo, operadora, valor total, data) e status de processamento.
+      Não possui hash SHA256 do arquivo, multi-tenancy completo nem auditoria robusta.
+
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada como ImportacaoEntity com:
+      - Multi-tenancy completo (IdConglomerado)
+      - Auditoria completa (Created/Modified/By/IP)
+      - Hash SHA256 do arquivo
+      - Enum tipado para Status
+      - Soft Delete (FlExcluido)
+      - Integração com Hangfire para processamento assíncrono
+
+    rf_item_relacionado: "RN-CRG-086-008"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF086-TAB-002"
+    tipo: "tabela"
+    nome: "FaturaOperadoraDetalhe"
+    caminho: "Database/dbo.FaturaOperadoraDetalhe"
+    descricao: |
+      Tabela de linhas individuais da fatura (chamadas, serviços).
+      Armazena tipo de linha, número chamado, duração, valor.
+      Não possui normalização adequada nem separação entre chamadas e serviços.
+
+    destino: "substituido"
+    justificativa: |
+      Tabela substituída por LinhaFaturaEntity com:
+      - Separação clara entre chamadas e serviços (Tipo enum)
+      - Campos normalizados (duração em segundos, valores decimais)
+      - Relacionamento com ImportacaoEntity
+      - Auditoria completa
+
+    rf_item_relacionado: "RN-CRG-086-009"
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF086-TAB-003"
+    tipo: "tabela"
+    nome: "ConfiguracaoOperadora"
+    caminho: "Database/dbo.ConfiguracaoOperadora"
+    descricao: |
+      Tabela de configuração de operadoras (formato esperado, extensão de arquivo).
+      Armazena configurações em campos separados ao invés de estrutura JSON.
+
+    destino: "substituido"
+    justificativa: |
+      Tabela substituída por ConfiguracaoOperadoraEntity com:
+      - Configuração em JSON tipado (ValidacaoConfigDto)
+      - Padrão Strategy para parsers específicos de operadora
+      - Validação de schema no backend
+      - Versionamento de configurações
+
+    rf_item_relacionado: "RN-CRG-086-001"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # STORED PROCEDURES LEGADAS
+  - id: "LEG-RF086-SP-001"
+    tipo: "stored_procedure"
+    nome: "sp_ProcessarFaturaOperadora"
+    caminho: "Database/dbo.sp_ProcessarFaturaOperadora"
+    descricao: |
+      Stored procedure principal de processamento de fatura.
+
+      LÓGICA (Linguagem Natural):
+      1. Recebe @Id_Fatura como parâmetro
+      2. Valida se fatura existe e está em status "Aguardando Processamento"
+      3. Busca linhas do arquivo na tabela FaturaOperadoraDetalhe
+      4. Para cada linha:
+         - Extrai tipo (Chamada/Serviço)
+         - Calcula valor total
+         - Aplica glosa se valor > limite configurado
+      5. Atualiza status da fatura para "Processado" ou "Erro"
+      6. Registra log de processamento
+
+      PROBLEMAS:
+      - Lógica de negócio no banco de dados (dificulta testes)
+      - Sem transação explícita (risco de inconsistência)
+      - Sem rollback automático em caso de erro
+      - Não registra usuário que disparou processamento
+
+    destino: "substituido"
+    justificativa: |
+      Lógica migrada para ProcessarImportacaoCommandHandler com:
+      - CQRS pattern (separação de comando e lógica)
+      - Transação EF Core (rollback automático)
+      - Hangfire para processamento assíncrono
+      - Auditoria de usuário e IP
+      - Strategy pattern para parsers de operadora
+      - Testes unitários e de integração
+
+    rf_item_relacionado: "RN-CRG-086-004"
+    uc_relacionado: "UC02"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF086-SP-002"
+    tipo: "stored_procedure"
+    nome: "sp_ValidarArquivoFatura"
+    caminho: "Database/dbo.sp_ValidarArquivoFatura"
+    descricao: |
+      Stored procedure de validação de arquivo.
+
+      LÓGICA (Linguagem Natural):
+      1. Recebe @Id_Fatura e @Cd_Operadora
+      2. Busca configuração de validação da operadora
+      3. Valida extensão de arquivo
+      4. Valida tamanho do arquivo
+      5. Valida encoding (UTF-8, ISO-8859-1)
+      6. Valida estrutura básica (XML bem formado, TXT com headers)
+      7. Retorna código de erro (0 = OK, > 0 = Erro específico)
+
+      PROBLEMAS:
+      - Validação limitada (não valida schema XSD completo)
+      - Mensagens de erro genéricas (código numérico)
+      - Não valida duplicidade de arquivo (hash)
+
+    destino: "substituido"
+    justificativa: |
+      Validação migrada para FileValidator com:
+      - Validação de schema XSD/EDI completa
+      - Hash SHA256 para detectar duplicidade
+      - Mensagens de erro descritivas
+      - Validação assíncrona com feedback em tempo real
+      - Validação de tamanho antes de upload (frontend)
+
+    rf_item_relacionado: "RN-CRG-086-001"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF086-SP-003"
+    tipo: "stored_procedure"
+    nome: "sp_AplicarGlosaAutomatica"
+    caminho: "Database/dbo.sp_AplicarGlosaAutomatica"
+    descricao: |
+      Stored procedure de glosa automática.
+
+      LÓGICA (Linguagem Natural):
+      1. Recebe @Id_Fatura
+      2. Busca linhas da fatura com valor > limite configurado
+      3. Para cada linha:
+         - Calcula percentual de glosa
+         - Aplica glosa (reduz valor)
+         - Registra motivo da glosa
+      4. Atualiza valor total da fatura
+      5. Registra log de glosas aplicadas
+
+      PROBLEMAS:
+      - Regras de glosa hardcoded (dificulta alteração)
+      - Não permite revisão manual antes de aplicar
+      - Não notifica gestor sobre glosas aplicadas
+
+    destino: "substituido"
+    justificativa: |
+      Glosa migrada para GlosaService com:
+      - Regras configuráveis via Central de Funcionalidades
+      - Workflow de aprovação para glosas > threshold
+      - Notificações via SignalR para gestor
+      - Histórico de glosas (rastreabilidade)
+      - Regras de glosa por operadora/tipo de serviço
+
+    rf_item_relacionado: "RN-CRG-086-005"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF086-SP-004"
+    tipo: "stored_procedure"
+    nome: "sp_ConciliarLinhasFatura"
+    caminho: "Database/dbo.sp_ConciliarLinhasFatura"
+    descricao: |
+      Stored procedure de conciliação com inventário.
+
+      LÓGICA (Linguagem Natural):
+      1. Recebe @Id_Fatura
+      2. Busca linhas da fatura (chamadas/serviços)
+      3. Para cada linha, tenta encontrar ativo no inventário:
+         - Busca por número (telefone, chip)
+         - Se encontrado: marca como conciliado
+         - Se não encontrado: marca como não-conciliado
+      4. Gera relatório de conciliação
+      5. Notifica divergências > threshold
+
+      PROBLEMAS:
+      - Match exato apenas (não fuzzy match)
+      - Não sugere ativos similares
+      - Conciliação síncrona (trava interface)
+      - Não permite conciliação manual assistida
+
+    destino: "substituido"
+    justificativa: |
+      Conciliação migrada para ConciliacaoService com:
+      - Algoritmo de similaridade (Levenshtein)
+      - Sugestões de match manual
+      - Processamento assíncrono via Hangfire
+      - Dashboard de divergências
+      - Integração com RF032 (Notas Fiscais)
+
+    rf_item_relacionado: "RN-CRG-086-006"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # TELAS ASPX LEGADAS
+  - id: "LEG-RF086-ASPX-001"
+    tipo: "tela"
+    nome: "ImportarFatura.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/ImportarFatura.aspx"
+    descricao: |
+      Tela de upload de arquivo de fatura.
+
+      COMPONENTES:
+      - DropDownList de operadora (ddlOperadora)
+      - FileUpload (fuArquivo)
+      - Button de upload (btnUpload)
+      - Label de erro (lblErro)
+      - GridView de arquivos enviados (gvArquivos)
+
+      COMPORTAMENTOS IMPLÍCITOS:
+      1. Ao selecionar operadora, valida extensão de arquivo permitida
+      2. Ao fazer upload, valida tamanho < 50MB
+      3. Ao fazer upload, exibe barra de progresso (JavaScript)
+      4. Após upload, dispara processamento automático (sp_ProcessarFaturaOperadora)
+      5. Atualiza GridView a cada 5 segundos via AJAX (UpdatePanel)
+
+      PROBLEMAS:
+      - Validação apenas no servidor (sem validação no cliente)
+      - Não permite cancelar upload
+      - Não mostra preview do arquivo
+      - Não valida duplicidade antes de fazer upload
+      - Interface antiga (WebForms ViewState)
+
+    destino: "substituido"
+    justificativa: |
+      Tela substituída por componente Angular com:
+      - Upload drag-and-drop
+      - Validação em tempo real (tamanho, extensão, duplicidade)
+      - Preview de arquivo antes de enviar
+      - Barra de progresso com taxa de upload
+      - Cancelamento de upload
+      - Notificações em tempo real (SignalR)
+      - Interface moderna (Angular Material)
+
+    rf_item_relacionado: "F01"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF086-ASPX-002"
+    tipo: "tela"
+    nome: "ProcessamentoFaturas.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/ProcessamentoFaturas.aspx"
+    descricao: |
+      Tela de acompanhamento de processamento.
+
+      COMPONENTES:
+      - GridView de faturas (gvFaturas)
+      - DropDownList de status (ddlStatus)
+      - DatePicker de período (dtInicio, dtFim)
+      - Button de filtrar (btnFiltrar)
+      - Button de reprocessar (btnReprocessar)
+
+      COMPORTAMENTOS IMPLÍCITOS:
+      1. GridView atualiza a cada 10 segundos (AJAX)
+      2. Ao clicar em "Reprocessar", chama sp_ProcessarFaturaOperadora novamente
+      3. Ao clicar na linha, abre modal com detalhes
+      4. Modal mostra log de processamento
+      5. Modal permite corrigir erro e reprocessar
+
+      PROBLEMAS:
+      - Atualização AJAX consome muito recurso (polling)
+      - Não mostra progresso em tempo real
+      - Não permite pausar processamento
+      - Modal não mostra preview das linhas da fatura
+
+    destino: "substituido"
+    justificativa: |
+      Tela substituída por dashboard Angular com:
+      - Atualização via SignalR (push, não polling)
+      - Barra de progresso em tempo real
+      - Filtros avançados (multi-select, autocomplete)
+      - Modal com preview de linhas da fatura
+      - Ações em lote (reprocessar múltiplas faturas)
+      - Exportação de relatório (Excel, PDF)
+
+    rf_item_relacionado: "F02"
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF086-ASPX-003"
+    tipo: "tela"
+    nome: "ConfiguracaoOperadoras.aspx"
+    caminho: "ic1_legado/IControlIT/Configuracoes/ConfiguracaoOperadoras.aspx"
+    descricao: |
+      Tela de configuração de validação por operadora.
+
+      COMPONENTES:
+      - DropDownList de operadora (ddlOperadora)
+      - TextBox de extensões permitidas (txtExtensoes)
+      - TextBox de tamanho máximo (txtTamanhoMax)
+      - CheckBoxList de validações ativas (cblValidacoes)
+      - Button de salvar (btnSalvar)
+
+      COMPORTAMENTOS IMPLÍCITOS:
+      1. Ao selecionar operadora, carrega configuração atual
+      2. Ao salvar, valida formato de extensões (csv)
+      3. Ao salvar, valida tamanho máximo > 0 e < 1GB
+      4. Ao salvar, atualiza cache de configurações (Application["Config"])
+
+      PROBLEMAS:
+      - Configurações não versionadas (sem histórico)
+      - Cache Application não é distribuído (problemas em multi-servidor)
+      - Não valida schema JSON/XSD
+      - Não permite testar configuração antes de salvar
+
+    destino: "substituido"
+    justificativa: |
+      Tela substituída por módulo Angular de configuração com:
+      - Configuração em JSON tipado (schema validation)
+      - Versionamento de configurações (histórico)
+      - Preview de validação antes de salvar
+      - Cache distribuído (Redis)
+      - Teste de configuração (upload de arquivo de teste)
+      - Rollback para versão anterior
+
+    rf_item_relacionado: "F04"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # WEBSERVICES LEGADOS
+  - id: "LEG-RF086-WS-001"
+    tipo: "webservice"
+    nome: "FaturaService.asmx"
+    caminho: "ic1_legado/IControlIT/Services/FaturaService.asmx"
+    descricao: |
+      WebService SOAP de integração externa.
+
+      MÉTODOS:
+      1. EnviarFatura(byte[] arquivo, string operadora, string nomeArquivo)
+         - Recebe arquivo em Base64
+         - Valida arquivo
+         - Salva em disco
+         - Dispara processamento
+         - Retorna ID da fatura
+
+      2. ConsultarStatusFatura(int idFatura)
+         - Retorna status de processamento
+         - Retorna log de erros (se houver)
+
+      3. ListarFaturasPendentes(string operadora, DateTime dataInicio, DateTime dataFim)
+         - Retorna lista de faturas aguardando processamento
+
+      PROBLEMAS:
+      - SOAP (protocolo antigo, verboso)
+      - Autenticação Basic (insegura)
+      - Não retorna erros estruturados (apenas string)
+      - Timeout fixo de 30 segundos (inadequado para arquivos grandes)
+      - Não suporta streaming (arquivo completo em memória)
+
+    destino: "substituido"
+    justificativa: |
+      WebService substituído por REST API (.NET 10) com:
+      - Endpoints RESTful (JSON)
+      - Autenticação JWT Bearer
+      - Erros estruturados (ProblemDetails)
+      - Upload com streaming (IFormFile)
+      - Timeout configurável
+      - Rate limiting
+      - Swagger/OpenAPI documentation
+
+    rf_item_relacionado: "F01"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  # REGRAS IMPLÍCITAS EXTRAÍDAS DO CÓDIGO
+  - id: "LEG-RF086-RN-001"
+    tipo: "regra_negocio"
+    nome: "Extensão de Arquivo Conforme Operadora"
+    caminho: "ic1_legado/IControlIT/Financeiro/ImportarFatura.aspx.vb"
+    descricao: |
+      Regra extraída do código VB.NET (linhas 45-60):
+
+      REGRA (Linguagem Natural):
+      - Vivo: Somente arquivos .xml
+      - Claro: Somente arquivos .txt ou .edi
+      - TIM: Somente arquivos .pdf
+      - Oi: Somente arquivos .txt ou .edi
+
+      Se operadora não reconhecida, permite qualquer extensão (RISCO).
+
+    destino: "assumido"
+    justificativa: |
+      Regra mantida e documentada formalmente no sistema moderno.
+      Mapeamento de extensões movido para tabela ConfiguracaoOperadoraEntity.
+      Adicionada validação de schema XSD/EDI para XML/EDI.
+      Removida permissão de "qualquer extensão" para operadora desconhecida.
+
+    rf_item_relacionado: "RN-CRG-086-001"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF086-RN-002"
+    tipo: "regra_negocio"
+    nome: "Tamanho Máximo de Arquivo"
+    caminho: "ic1_legado/IControlIT/Financeiro/ImportarFatura.aspx.vb"
+    descricao: |
+      Regra extraída do código VB.NET (linhas 75-80):
+
+      REGRA (Linguagem Natural):
+      - Tamanho máximo: 50MB
+      - Se arquivo > 50MB, rejeita com erro "Arquivo muito grande"
+      - Não permite split de arquivo
+
+    destino: "assumido"
+    justificativa: |
+      Regra mantida no sistema moderno.
+      Validação movida para frontend (antes de upload) E backend (segurança).
+      Adicionado suporte a upload chunked para arquivos > 50MB (feature opcional).
+
+    rf_item_relacionado: "RN-CRG-086-001"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF086-RN-003"
+    tipo: "regra_negocio"
+    nome: "Processamento Automático Após Upload"
+    caminho: "ic1_legado/IControlIT/Financeiro/ImportarFatura.aspx.vb"
+    descricao: |
+      Regra extraída do código VB.NET (linhas 120-135):
+
+      REGRA (Linguagem Natural):
+      - Após upload bem-sucedido, dispara processamento IMEDIATAMENTE
+      - Não permite agendar processamento
+      - Não permite pausar processamento
+      - Se processamento falha, status fica "Erro" (sem retry automático)
+
+    destino: "substituido"
+    justificativa: |
+      Regra substituída por workflow mais flexível:
+      - Upload NÃO dispara processamento automático (status: EmAguardoProcessamento)
+      - Usuário pode disparar processamento manualmente (UC02)
+      - Suporte a agendamento de processamento (feature flag)
+      - Retry automático configurável (3 tentativas com backoff exponencial)
+      - Hangfire gerencia fila de processamento
+
+    rf_item_relacionado: "RN-CRG-086-004"
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF086-RN-004"
+    tipo: "regra_negocio"
+    nome: "Glosa Automática Baseada em Valor"
+    caminho: "ic1_legado/IControlIT/Database/sp_AplicarGlosaAutomatica.sql"
+    descricao: |
+      Regra extraída da stored procedure (linhas 15-30):
+
+      REGRA (Linguagem Natural):
+      - Se linha de fatura tem valor > R$ 1.000,00, aplica glosa de 10%
+      - Se linha de fatura tem valor > R$ 5.000,00, aplica glosa de 20%
+      - Glosa aplicada AUTOMATICAMENTE sem aprovação
+      - Não diferencia tipo de serviço (chamada, dados, roaming)
+
+    destino: "substituido"
+    justificativa: |
+      Regra substituída por engine de glosa configurável:
+      - Regras de glosa por operadora, tipo de serviço, threshold
+      - Glosa > R$ 1.000,00 requer aprovação de gestor
+      - Notificações em tempo real (SignalR)
+      - Histórico de glosas para auditoria
+      - Dashboard de glosas aplicadas
+
+    rf_item_relacionado: "RN-CRG-086-005"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF086-RN-005"
+    tipo: "regra_negocio"
+    nome: "Conciliação Exata por Número"
+    caminho: "ic1_legado/IControlIT/Database/sp_ConciliarLinhasFatura.sql"
+    descricao: |
+      Regra extraída da stored procedure (linhas 20-40):
+
+      REGRA (Linguagem Natural):
+      - Conciliação busca ativo por match EXATO de número
+      - Não tenta match por similaridade
+      - Se múltiplos ativos têm mesmo número, pega o primeiro (ORDER BY Id)
+      - Não sugere match manual para números não encontrados
+      - Não considera período de vigência do ativo
+
+    destino: "substituido"
+    justificativa: |
+      Regra substituída por engine de conciliação avançada:
+      - Match exato + similaridade (Levenshtein distance)
+      - Sugestões de match manual com score de confiança
+      - Considera período de vigência do ativo
+      - Dashboard de divergências para revisão manual
+      - Integração com RF032 (Notas Fiscais) para cross-check
+
+    rf_item_relacionado: "RN-CRG-086-006"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+# Telas Legadas (estrutura detalhada)
+telas:
+  - id: "LEG-RF086-ASPX-001"
+    nome: "ImportarFatura.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/ImportarFatura.aspx"
+    responsabilidade: "Upload de arquivo de fatura da operadora"
+    campos:
+      - nome: "ddlOperadora"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "Operadora deve estar cadastrada"
+      - nome: "fuArquivo"
+        tipo: "FileUpload"
+        obrigatorio: true
+        validacao: "Tamanho < 50MB, extensão conforme operadora"
+    comportamentos_implicitos:
+      - "Validação de extensão ao selecionar operadora"
+      - "Upload com barra de progresso (JavaScript)"
+      - "Disparo automático de processamento após upload"
+      - "Atualização de GridView via AJAX a cada 5 segundos"
+
+  - id: "LEG-RF086-ASPX-002"
+    nome: "ProcessamentoFaturas.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/ProcessamentoFaturas.aspx"
+    responsabilidade: "Acompanhamento de processamento de faturas"
+    campos:
+      - nome: "gvFaturas"
+        tipo: "GridView"
+        obrigatorio: false
+        validacao: "Nenhuma"
+      - nome: "ddlStatus"
+        tipo: "DropDownList"
+        obrigatorio: false
+        validacao: "Valores: Todos, Aguardando, Processando, Concluído, Erro"
+    comportamentos_implicitos:
+      - "Atualização AJAX a cada 10 segundos"
+      - "Reprocessamento ao clicar em botão (chama sp_ProcessarFaturaOperadora)"
+      - "Modal de detalhes ao clicar na linha"
+
+  - id: "LEG-RF086-ASPX-003"
+    nome: "ConfiguracaoOperadoras.aspx"
+    caminho: "ic1_legado/IControlIT/Configuracoes/ConfiguracaoOperadoras.aspx"
+    responsabilidade: "Configuração de validação por operadora"
+    campos:
+      - nome: "ddlOperadora"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "Operadora deve estar cadastrada"
+      - nome: "txtExtensoes"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Formato CSV (ex: .xml,.txt)"
+      - nome: "txtTamanhoMax"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Valor numérico > 0 e < 1GB"
+    comportamentos_implicitos:
+      - "Carregamento de configuração ao selecionar operadora"
+      - "Validação de formato ao salvar"
+      - "Atualização de cache Application ao salvar"
+
+# WebServices Legados
+servicos:
+  - id: "LEG-RF086-WS-001"
+    nome: "FaturaService.asmx"
+    localizacao: "ic1_legado/IControlIT/Services/FaturaService.asmx"
+    responsabilidade: "WebService SOAP para integração externa"
+    notas: |
+      MÉTODOS:
+      - EnviarFatura: Recebe arquivo em Base64, valida e processa
+      - ConsultarStatusFatura: Retorna status de processamento
+      - ListarFaturasPendentes: Lista faturas aguardando processamento
+
+      PROBLEMAS:
+      - SOAP (protocolo antigo)
+      - Autenticação Basic (insegura)
+      - Timeout fixo (30s)
+      - Sem streaming (arquivo em memória)
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "FaturaOperadora"
+    finalidade: "Armazenar metadados de faturas importadas"
+    problemas:
+      - "Ausência de hash SHA256 do arquivo"
+      - "Multi-tenancy parcial (IdConglomerado existe mas sem Row-Level Security)"
+      - "Auditoria incompleta (apenas DataInclusao/DataAlteracao)"
+      - "Status como string (ao invés de enum)"
+      - "Sem soft delete (DELETE físico)"
+
+  - nome: "FaturaOperadoraDetalhe"
+    finalidade: "Armazenar linhas individuais da fatura"
+    problemas:
+      - "Não separa chamadas de serviços (campo Tipo é string genérico)"
+      - "Campos não normalizados (duração em formato HH:MM:SS string)"
+      - "Sem auditoria"
+      - "Sem relacionamento com inventário (conciliação manual)"
+
+  - nome: "ConfiguracaoOperadora"
+    finalidade: "Configuração de validação por operadora"
+    problemas:
+      - "Configurações em campos separados (não JSON)"
+      - "Sem versionamento (não guarda histórico)"
+      - "Cache Application (não distribuído)"
+      - "Sem validação de schema JSON/XSD"
+
+# Regras de Negócio Implícitas (não documentadas no legado)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      Extensão de arquivo conforme operadora:
+      - Vivo: .xml
+      - Claro: .txt ou .edi
+      - TIM: .pdf
+      - Oi: .txt ou .edi
+    fonte: "ImportarFatura.aspx.vb - Linhas 45-60"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Tamanho máximo de arquivo: 50MB.
+      Rejeita upload se tamanho > 50MB.
+    fonte: "ImportarFatura.aspx.vb - Linhas 75-80"
+
+  - id: "RL-RN-003"
+    descricao: |
+      Processamento automático após upload.
+      Dispara sp_ProcessarFaturaOperadora imediatamente após salvar arquivo.
+    fonte: "ImportarFatura.aspx.vb - Linhas 120-135"
+
+  - id: "RL-RN-004"
+    descricao: |
+      Glosa automática baseada em valor:
+      - Valor > R$ 1.000,00: glosa 10%
+      - Valor > R$ 5.000,00: glosa 20%
+      Aplicada sem aprovação.
+    fonte: "sp_AplicarGlosaAutomatica.sql - Linhas 15-30"
+
+  - id: "RL-RN-005"
+    descricao: |
+      Conciliação exata por número.
+      Match apenas se número da fatura = número do ativo (case-sensitive).
+      Não tenta similaridade.
+    fonte: "sp_ConciliarLinhasFatura.sql - Linhas 20-40"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Hash SHA256 do arquivo"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado permite duplicidade de arquivo. Moderno detecta via hash."
+
+  - item: "Multi-tenancy completo"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado tem IdConglomerado mas sem Row-Level Security. Moderno tem RLS completo."
+
+  - item: "Auditoria completa (usuário, IP, timestamp)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado registra apenas DataInclusao/DataAlteracao. Moderno registra Created/Modified/By/IP."
+
+  - item: "Processamento assíncrono (Hangfire)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado processa síncronamente (trava interface). Moderno usa Hangfire."
+
+  - item: "Notificações em tempo real (SignalR)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado usa polling AJAX (5-10s). Moderno usa SignalR (push)."
+
+  - item: "Validação de schema XSD/EDI"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado valida apenas extensão e tamanho. Moderno valida schema completo."
+
+  - item: "Workflow de aprovação de glosa"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado aplica glosa automaticamente. Moderno requer aprovação para glosa > threshold."
+
+  - item: "Match por similaridade (conciliação)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado faz match exato apenas. Moderno usa Levenshtein + sugestões."
+
+  - item: "Upload drag-and-drop"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado usa FileUpload tradicional. Moderno tem drag-and-drop."
+
+  - item: "Cancelamento de upload"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não permite cancelar. Moderno permite cancelamento."
+
+  - item: "Retry automático em caso de erro"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado marca como Erro e para. moderno faz 3 tentativas com backoff exponencial."
+
+  - item: "Versionamento de configurações"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado sobrescreve configuração. Moderno guarda histórico."
+
+  - item: "REST API (ao invés de SOAP)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado usa SOAP. Moderno usa REST com JWT."
+
+  - item: "Soft Delete"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado faz DELETE físico. Moderno marca FlExcluido = true."
+
+  - item: "i18n (Transloco)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado hardcoded em português. Moderno suporta pt/en/es."
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Substituir SOAP por REST API"
+    motivo: |
+      SOAP é protocolo legado, verboso, difícil de consumir.
+      REST com JSON é padrão moderno, leve, fácil integração.
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Processar assincronamente com Hangfire"
+    motivo: |
+      Processamento síncrono trava interface e não escala.
+      Hangfire permite fila, retry, monitoramento.
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Implementar workflow de aprovação de glosa"
+    motivo: |
+      Glosa automática sem aprovação é risco de negócio.
+      Workflow de aprovação aumenta governança.
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Usar SignalR para notificações em tempo real"
+    motivo: |
+      Polling AJAX consome recursos desnecessariamente.
+      SignalR é push-based, eficiente, escalável.
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "Implementar match por similaridade na conciliação"
+    motivo: |
+      Match exato falha para pequenas variações (typo, formatação).
+      Similaridade + sugestões aumenta taxa de conciliação.
+    impacto: "medio"
+    data: "2025-12-31"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Comportamento implícito não documentado"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      Revisar TODO o código legado (VB.NET, SQL).
+      Documentar TODAS as regras implícitas em RL-RF086.md.
+      Criar testes de regressão baseados em comportamento legado.
+
+  - risco: "Incompatibilidade de formato de arquivo entre versões"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      Validar schema XSD/EDI de TODAS as operadoras.
+      Criar parsers retrocompatíveis (Strategy pattern).
+      Testar com arquivos reais de TODAS as operadoras.
+
+  - risco: "Perda de dados durante migração de tabelas"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      Criar script de migração de dados (ETL).
+      Executar migração em ambiente de teste ANTES de PRD.
+      Manter backup de dados legados por 6 meses.
+
+  - risco: "Mudança de comportamento de glosa afeta financeiro"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      Implementar feature flag para glosa antiga/nova.
+      Executar glosa em paralelo (legado + moderno) por 1 mês.
+      Comparar resultados antes de desligar legado.
+
+  - risco: "Timeout de processamento para arquivos grandes"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Processar assincronamente (Hangfire).
+      Implementar chunking de arquivo.
+      Configurar timeout flexível por operadora.
+
+  - risco: "Integrações externas (SOAP) quebradas após migração"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Manter SOAP endpoint legado por 3 meses (modo compatibilidade).
+      Notificar clientes externos com 30 dias de antecedência.
+      Fornecer documentação de migração SOAP → REST.
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  # Tabelas
+  - elemento_legado: "FaturaOperadora"
+    referencia_rf: "RN-CRG-086-008"
+    referencia_uc: "UC01"
+    referencia_md: "ImportacaoEntity"
+    status: "substituido"
+
+  - elemento_legado: "FaturaOperadoraDetalhe"
+    referencia_rf: "RN-CRG-086-009"
+    referencia_uc: "UC02"
+    referencia_md: "LinhaFaturaEntity"
+    status: "substituido"
+
+  - elemento_legado: "ConfiguracaoOperadora"
+    referencia_rf: "RN-CRG-086-001"
+    referencia_uc: "UC04"
+    referencia_md: "ConfiguracaoOperadoraEntity"
+    status: "substituido"
+
+  # Stored Procedures
+  - elemento_legado: "sp_ProcessarFaturaOperadora"
+    referencia_rf: "RN-CRG-086-004"
+    referencia_uc: "UC02"
+    referencia_md: "ProcessarImportacaoCommandHandler"
+    status: "substituido"
+
+  - elemento_legado: "sp_ValidarArquivoFatura"
+    referencia_rf: "RN-CRG-086-001"
+    referencia_uc: "UC01"
+    referencia_md: "FileValidator"
+    status: "substituido"
+
+  - elemento_legado: "sp_AplicarGlosaAutomatica"
+    referencia_rf: "RN-CRG-086-005"
+    referencia_uc: "UC03"
+    referencia_md: "GlosaService"
+    status: "substituido"
+
+  - elemento_legado: "sp_ConciliarLinhasFatura"
+    referencia_rf: "RN-CRG-086-006"
+    referencia_uc: "UC03"
+    referencia_md: "ConciliacaoService"
+    status: "substituido"
+
+  # Telas
+  - elemento_legado: "ImportarFatura.aspx"
+    referencia_rf: "F01"
+    referencia_uc: "UC01"
+    referencia_md: "importacoes-upload.component.ts"
+    status: "substituido"
+
+  - elemento_legado: "ProcessamentoFaturas.aspx"
+    referencia_rf: "F02"
+    referencia_uc: "UC02"
+    referencia_md: "importacoes-dashboard.component.ts"
+    status: "substituido"
+
+  - elemento_legado: "ConfiguracaoOperadoras.aspx"
+    referencia_rf: "F04"
+    referencia_uc: "UC04"
+    referencia_md: "configuracoes-operadoras.component.ts"
+    status: "substituido"
+
+  # WebServices
+  - elemento_legado: "FaturaService.asmx"
+    referencia_rf: "F01"
+    referencia_uc: "UC01"
+    referencia_md: "ImportacoesEndpoints.cs"
+    status: "substituido"
+
+  # Regras Implícitas
+  - elemento_legado: "Extensão de arquivo conforme operadora"
+    referencia_rf: "RN-CRG-086-001"
+    referencia_uc: "UC01"
+    referencia_md: "FileValidator"
+    status: "assumido"
+
+  - elemento_legado: "Tamanho máximo 50MB"
+    referencia_rf: "RN-CRG-086-001"
+    referencia_uc: "UC01"
+    referencia_md: "FileValidator"
+    status: "assumido"
+
+  - elemento_legado: "Processamento automático após upload"
+    referencia_rf: "RN-CRG-086-004"
+    referencia_uc: "UC02"
+    referencia_md: "ProcessarImportacaoCommandHandler"
+    status: "substituido"
+
+  - elemento_legado: "Glosa automática baseada em valor"
+    referencia_rf: "RN-CRG-086-005"
+    referencia_uc: "UC03"
+    referencia_md: "GlosaService"
+    status: "substituido"
+
+  - elemento_legado: "Conciliação exata por número"
+    referencia_rf: "RN-CRG-086-006"
+    referencia_uc: "UC03"
+    referencia_md: "ConciliacaoService"
+    status: "substituido"
+
+# Changelog
+changelog:
+  - versao: "2.0"
+    data: "2025-12-31"
+    descricao: "Migração de RF086 v1.0 para v2.0 com separação estrita RF/RL"
+    autor: "Claude Code - Agência ALC"
+
+  - versao: "1.0"
+    data: "2025-12-31"
+    descricao: "Criação inicial do arquivo RL-RF086.yaml"
+    autor: "Claude Code - Agência ALC"

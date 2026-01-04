@@ -1,0 +1,700 @@
+# =============================================
+# RF051 - Gestão de Marcas e Modelos de Ativos
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF051"
+  nome: "Gestão de Marcas e Modelos de Ativos"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 2 - Cadastros e Serviços Transversais"
+  epic: "EPIC003-CAD-Cadastros-Base"
+  status: "em_desenvolvimento"  # draft | aprovado | em_desenvolvimento | concluido
+
+descricao:
+  objetivo: "Implementar sistema completo de catalogação de Fabricantes, Marcas e Modelos de equipamentos e ativos de TI/Telecom"
+  problema_resolvido: "Padronização de catálogo de produtos, rastreamento de especificações técnicas, gerenciamento de ciclo de vida de ativos e base para gestão de compras/inventário"
+  publico_afetado: "Gestores de TI, Compradores, Técnicos de Manutenção, Gestores de Ativos"
+
+escopo:
+  incluso:
+    - "Cadastro completo de Fabricantes com logo, website, contato"
+    - "Cadastro de Marcas vinculadas a Fabricantes"
+    - "Cadastro de Modelos com especificações técnicas detalhadas"
+    - "Gerenciamento de SKUs e Part Numbers únicos"
+    - "Importação em massa de catálogos (CSV/Excel)"
+    - "Especificações técnicas customizadas (JSON dinâmico)"
+    - "Homologação de modelos para uso corporativo"
+    - "Controle de ciclo de vida (EOL - End of Life)"
+    - "Histórico imutável de preços por modelo"
+    - "Integração com APIs externas para busca de especificações"
+    - "Relacionamento com Tipos de Ativos (RF049)"
+    - "Auditoria completa de operações"
+    - "Controle de acesso RBAC"
+    - "Isolamento multi-tenant"
+
+  fora:
+    - "Interface visual específica (responsabilidade frontend)"
+    - "Tecnologia de implementação"
+    - "Gestão de contratos com fabricantes"
+    - "Integração direta com e-commerce"
+    - "Sistema de cotação automática"
+
+entidades:
+  - nome: "fabricante"
+    descricao: "Empresa que produz equipamentos/ativos"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+    estados:
+      - "active"
+      - "inactive"
+
+  - nome: "marca"
+    descricao: "Linha de produtos de um Fabricante"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+    estados:
+      - "active"
+      - "inactive"
+
+  - nome: "modelo"
+    descricao: "Versão específica de um produto com especificações técnicas"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+    estados:
+      - "active"
+      - "eol"
+      - "inactive"
+
+  - nome: "modelo_preco"
+    descricao: "Histórico imutável de preços de modelos"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "modelo_imagem"
+    descricao: "Imagens de modelos (máximo 10 por modelo)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF051-001"
+    titulo: "Nome de Fabricante Único"
+    descricao: "O nome do fabricante deve ser único dentro do sistema (por tenant). Validação case-insensitive."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "unicidade"
+      mensagem_erro: "Já existe um fabricante com este nome cadastrado"
+      http_code: 400
+
+  - id: "RN-RF051-002"
+    titulo: "Part Number Único por Fabricante"
+    descricao: "Part Number único dentro do mesmo fabricante, pode repetir entre fabricantes diferentes. Validação case-insensitive."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "unicidade_composta"
+      campos: ["FabricanteId", "PartNumber"]
+      mensagem_erro: "Este fabricante já possui um modelo com este Part Number"
+      http_code: 400
+
+  - id: "RN-RF051-003"
+    titulo: "Desomologação Automática ao Marcar EOL"
+    descricao: "Modelo marcado como EOL deve ser automaticamente desomologado. Alertar sobre ativos existentes. Permitir override com justificativa."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "regra_negocio_condicional"
+      mensagem_erro: "Modelo EOL não pode estar homologado. Existem X ativos cadastrados com este modelo."
+      http_code: 200
+
+  - id: "RN-RF051-004"
+    titulo: "Especificações Técnicas em JSON Válido"
+    descricao: "Especificações armazenadas em JSON válido. Estrutura dinâmica permitida. Suporte a nested objects."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "formato_estrutura"
+      mensagem_erro: "Especificações técnicas devem estar em formato JSON válido"
+      http_code: 400
+
+  - id: "RN-RF051-005"
+    titulo: "Histórico de Preços Imutável"
+    descricao: "Registros de preço não podem ser alterados/excluídos. Novo preço = novo registro. Histórico completo mantido."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "seguranca_integridade"
+      mensagem_erro: "Histórico de preços é imutável. Crie um novo registro para atualizar o preço."
+      http_code: 403
+
+  - id: "RN-RF051-006"
+    titulo: "Modelo Pertence a Marca do Mesmo Fabricante"
+    descricao: "Modelo só pode ser vinculado a marca que pertença ao mesmo fabricante. Validação de integridade referencial."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "integridade_referencial"
+      mensagem_erro: "A marca selecionada não pertence ao fabricante deste modelo"
+      http_code: 400
+
+  - id: "RN-RF051-007"
+    titulo: "Fabricante Inativo Não Permite Novos Modelos"
+    descricao: "Fabricantes inativos não aceitam novos modelos. Modelos existentes mantidos para histórico. Permitir edição de modelos existentes."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "regra_negocio"
+      mensagem_erro: "Não é possível cadastrar modelos para fabricantes inativos. Reative o fabricante primeiro."
+      http_code: 400
+
+  - id: "RN-RF051-008"
+    titulo: "Marca Inativa Não Permite Novos Modelos"
+    descricao: "Marcas inativas não aceitam novos modelos. Modelos existentes mantidos para histórico. Permitir edição de modelos existentes."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "regra_negocio"
+      mensagem_erro: "Não é possível cadastrar modelos para marcas inativas. Reative a marca primeiro."
+      http_code: 400
+
+  - id: "RN-RF051-009"
+    titulo: "SKU Único no Sistema (Global)"
+    descricao: "SKU único em todo o sistema (não apenas por tenant). SKU opcional, mas se preenchido deve ser único globalmente."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "unicidade_global"
+      mensagem_erro: "Este SKU já está em uso no sistema"
+      http_code: 400
+
+  - id: "RN-RF051-010"
+    titulo: "Homologação Requer Justificativa"
+    descricao: "Homologação requer justificativa obrigatória (20-500 caracteres). Armazenar usuário, data e justificativa."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "campo_obrigatorio_condicional"
+      mensagem_erro: "Informe a justificativa para homologação do modelo (mínimo 20 caracteres)"
+      http_code: 400
+
+  - id: "RN-RF051-011"
+    titulo: "Importação em Massa Valida Todos os Registros"
+    descricao: "Importação CSV/Excel é transacional (tudo ou nada). 1 erro = rollback completo. Relatório detalhado de erros."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "transacao_atomica"
+      mensagem_erro: "Importação falhou. Corrija os erros e tente novamente"
+      http_code: 400
+
+  - id: "RN-RF051-012"
+    titulo: "Máximo 10 Imagens por Modelo"
+    descricao: "Máximo 10 imagens por modelo. Formatos: JPG, PNG, WEBP. Tamanho máximo: 5MB. Resolução: 800x600 até 4096x4096."
+    criticidade: "BAIXA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "limite_quantidade_tamanho"
+      mensagem_erro: "Máximo de 10 imagens por modelo. Exclua imagens existentes antes de adicionar novas."
+      http_code: 400
+
+# ==============================================================================
+# ESTADOS E TRANSIÇÕES
+# ==============================================================================
+
+estados:
+  fabricante:
+    - id: "active"
+      descricao: "Fabricante ativo, aceita novos modelos/marcas"
+    - id: "inactive"
+      descricao: "Fabricante inativo, não aceita novos modelos (mantém existentes)"
+
+  marca:
+    - id: "active"
+      descricao: "Marca ativa, aceita novos modelos"
+    - id: "inactive"
+      descricao: "Marca inativa, não aceita novos modelos (mantém existentes)"
+
+  modelo:
+    - id: "active"
+      descricao: "Modelo ativo, disponível para uso"
+    - id: "eol"
+      descricao: "End of Life - descontinuado pelo fabricante"
+    - id: "inactive"
+      descricao: "Modelo inativo (decisão interna)"
+
+transicoes:
+  permitidas:
+    - entidade: "fabricante"
+      de: "active"
+      para: "inactive"
+      descricao: "Inativar fabricante"
+
+    - entidade: "fabricante"
+      de: "inactive"
+      para: "active"
+      descricao: "Reativar fabricante"
+
+    - entidade: "marca"
+      de: "active"
+      para: "inactive"
+      descricao: "Inativar marca"
+
+    - entidade: "marca"
+      de: "inactive"
+      para: "active"
+      descricao: "Reativar marca"
+
+    - entidade: "modelo"
+      de: "active"
+      para: "eol"
+      descricao: "Marcar como EOL (desomologa automaticamente)"
+
+    - entidade: "modelo"
+      de: "active"
+      para: "inactive"
+      descricao: "Inativar modelo"
+
+    - entidade: "modelo"
+      de: "inactive"
+      para: "active"
+      descricao: "Reativar modelo"
+
+    - entidade: "modelo"
+      de: "eol"
+      para: "active"
+      descricao: "Reativar modelo EOL (requer justificativa)"
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "CAD.MARCAS_MODELOS.FABRICANTES.CREATE"
+    descricao: "Criar novo fabricante"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor de Ativos"
+    endpoint: "POST /api/fabricantes"
+
+  - permission_code: "CAD.MARCAS_MODELOS.FABRICANTES.UPDATE"
+    descricao: "Editar fabricante existente"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor de Ativos"
+    endpoint: "PUT /api/fabricantes/{id}"
+
+  - permission_code: "CAD.MARCAS_MODELOS.FABRICANTES.DELETE"
+    descricao: "Inativar fabricante"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "DELETE /api/fabricantes/{id}"
+
+  - permission_code: "CAD.MARCAS_MODELOS.MARCAS.CREATE"
+    descricao: "Criar nova marca"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor de Ativos"
+    endpoint: "POST /api/marcas"
+
+  - permission_code: "CAD.MARCAS_MODELOS.MARCAS.UPDATE"
+    descricao: "Editar marca existente"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor de Ativos"
+    endpoint: "PUT /api/marcas/{id}"
+
+  - permission_code: "CAD.MARCAS_MODELOS.MARCAS.DELETE"
+    descricao: "Inativar marca"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "DELETE /api/marcas/{id}"
+
+  - permission_code: "CAD.MARCAS_MODELOS.MODELOS.CREATE"
+    descricao: "Criar novo modelo"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor de Ativos"
+    endpoint: "POST /api/modelos"
+
+  - permission_code: "CAD.MARCAS_MODELOS.MODELOS.UPDATE"
+    descricao: "Editar modelo existente"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor de Ativos"
+    endpoint: "PUT /api/modelos/{id}"
+
+  - permission_code: "CAD.MARCAS_MODELOS.MODELOS.EOL"
+    descricao: "Marcar modelo como EOL"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor de Ativos"
+    endpoint: "PUT /api/modelos/{id}/eol"
+
+  - permission_code: "CAD.MARCAS_MODELOS.MODELOS.HOMOLOGAR"
+    descricao: "Homologar/desomologar modelo"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor de Ativos"
+    endpoint: "PUT /api/modelos/{id}/homologacao"
+
+  - permission_code: "CAD.MARCAS_MODELOS.MODELOS.IMPORT"
+    descricao: "Importar catálogo de modelos"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "POST /api/modelos/import"
+
+  - permission_code: "CAD.MARCAS_MODELOS.PRECOS.VIEW"
+    descricao: "Visualizar histórico de preços"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor de Ativos"
+      - "Gestor Financeiro"
+    endpoint: "GET /api/modelos/{id}/precos"
+
+  - permission_code: "CAD.MARCAS_MODELOS.PRECOS.CREATE"
+    descricao: "Registrar novo preço no histórico"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor Financeiro"
+    endpoint: "POST /api/modelos/{id}/precos"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  # Fabricantes
+  - method: "GET"
+    route: "/api/fabricantes"
+    descricao: "Listar fabricantes com paginação e filtros"
+    autenticacao: true
+    authorization_policy: "FabricantesRead"
+    request_dto: null
+    response_dto: "PaginatedListDto<FabricanteDto>"
+
+  - method: "GET"
+    route: "/api/fabricantes/{id}"
+    descricao: "Obter fabricante por ID"
+    autenticacao: true
+    authorization_policy: "FabricantesRead"
+    request_dto: null
+    response_dto: "FabricanteDto"
+
+  - method: "POST"
+    route: "/api/fabricantes"
+    descricao: "Criar novo fabricante"
+    autenticacao: true
+    authorization_policy: "FabricantesCreate"
+    request_dto: "CreateFabricanteCommand"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/fabricantes/{id}"
+    descricao: "Atualizar fabricante existente"
+    autenticacao: true
+    authorization_policy: "FabricantesUpdate"
+    request_dto: "UpdateFabricanteCommand"
+    response_dto: "void"
+
+  - method: "DELETE"
+    route: "/api/fabricantes/{id}"
+    descricao: "Inativar fabricante"
+    autenticacao: true
+    authorization_policy: "FabricantesDelete"
+    request_dto: null
+    response_dto: "void"
+
+  # Marcas
+  - method: "GET"
+    route: "/api/marcas"
+    descricao: "Listar marcas com paginação e filtros"
+    autenticacao: true
+    authorization_policy: "MarcasRead"
+    request_dto: null
+    response_dto: "PaginatedListDto<MarcaDto>"
+
+  - method: "POST"
+    route: "/api/marcas"
+    descricao: "Criar nova marca"
+    autenticacao: true
+    authorization_policy: "MarcasCreate"
+    request_dto: "CreateMarcaCommand"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/marcas/{id}"
+    descricao: "Atualizar marca existente"
+    autenticacao: true
+    authorization_policy: "MarcasUpdate"
+    request_dto: "UpdateMarcaCommand"
+    response_dto: "void"
+
+  - method: "DELETE"
+    route: "/api/marcas/{id}"
+    descricao: "Inativar marca"
+    autenticacao: true
+    authorization_policy: "MarcasDelete"
+    request_dto: null
+    response_dto: "void"
+
+  # Modelos
+  - method: "GET"
+    route: "/api/modelos"
+    descricao: "Listar modelos com paginação e filtros"
+    autenticacao: true
+    authorization_policy: "ModelosRead"
+    request_dto: null
+    response_dto: "PaginatedListDto<ModeloDto>"
+
+  - method: "GET"
+    route: "/api/modelos/{id}"
+    descricao: "Obter modelo por ID com especificações"
+    autenticacao: true
+    authorization_policy: "ModelosRead"
+    request_dto: null
+    response_dto: "ModeloDetalhadoDto"
+
+  - method: "POST"
+    route: "/api/modelos"
+    descricao: "Criar novo modelo"
+    autenticacao: true
+    authorization_policy: "ModelosCreate"
+    request_dto: "CreateModeloCommand"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/modelos/{id}"
+    descricao: "Atualizar modelo existente"
+    autenticacao: true
+    authorization_policy: "ModelosUpdate"
+    request_dto: "UpdateModeloCommand"
+    response_dto: "void"
+
+  - method: "PUT"
+    route: "/api/modelos/{id}/eol"
+    descricao: "Marcar modelo como EOL"
+    autenticacao: true
+    authorization_policy: "ModelosEOL"
+    request_dto: "MarkModeloEOLCommand"
+    response_dto: "void"
+
+  - method: "PUT"
+    route: "/api/modelos/{id}/homologacao"
+    descricao: "Homologar/desomologar modelo"
+    autenticacao: true
+    authorization_policy: "ModelosHomologar"
+    request_dto: "HomologarModeloCommand"
+    response_dto: "void"
+
+  - method: "POST"
+    route: "/api/modelos/import"
+    descricao: "Importar catálogo de modelos (CSV/Excel)"
+    autenticacao: true
+    authorization_policy: "ModelosImport"
+    request_dto: "ImportModelosCommand"
+    response_dto: "ImportResultDto"
+
+  # Preços
+  - method: "GET"
+    route: "/api/modelos/{id}/precos"
+    descricao: "Obter histórico de preços do modelo"
+    autenticacao: true
+    authorization_policy: "PrecosRead"
+    request_dto: null
+    response_dto: "List<ModeloPrecoDto>"
+
+  - method: "POST"
+    route: "/api/modelos/{id}/precos"
+    descricao: "Registrar novo preço no histórico"
+    autenticacao: true
+    authorization_policy: "PrecosCreate"
+    request_dto: "CreateModeloPrecoCommand"
+    response_dto: "Guid"
+
+# ==============================================================================
+# INTEGRAÇÕES OBRIGATÓRIAS
+# ==============================================================================
+
+integracoes:
+  internas:
+    - "Autenticacao JWT"
+    - "Multi-Tenancy (EmpresaId)"
+    - "Auditoria (Created/Modified tracking)"
+    - "RBAC (Permissões)"
+    - "i18n (Transloco)"
+    - "RF049 - Gestão de Tipos de Ativos"
+
+  externas:
+    - sistema: "APIs de Fabricantes (Dell, HP, Lenovo)"
+      tipo: "REST API"
+      obrigatoria: false
+      descricao: "Busca automática de especificações técnicas"
+
+# ==============================================================================
+# EVENTOS DE DOMÍNIO
+# ==============================================================================
+
+eventos_dominio:
+  - evento: "fabricante.criado"
+    descricao: "Após criação de fabricante"
+    payload:
+      - "FabricanteId"
+      - "Nome"
+      - "Tenant"
+
+  - evento: "fabricante.atualizado"
+    descricao: "Após atualização de fabricante"
+    payload:
+      - "FabricanteId"
+      - "Campos alterados"
+
+  - evento: "fabricante.inativado"
+    descricao: "Ao marcar como inativo"
+    payload:
+      - "FabricanteId"
+      - "Motivo"
+
+  - evento: "modelo.marcado_eol"
+    descricao: "Ao marcar modelo como EOL"
+    payload:
+      - "ModeloId"
+      - "QuantidadeAtivosImpactados"
+
+  - evento: "modelo.homologado"
+    descricao: "Ao homologar modelo"
+    payload:
+      - "ModeloId"
+      - "Justificativa"
+      - "UsuarioId"
+
+  - evento: "preco.registrado"
+    descricao: "Ao adicionar preço ao histórico"
+    payload:
+      - "ModeloId"
+      - "Valor"
+      - "Moeda"
+      - "DataReferencia"
+
+# ==============================================================================
+# SEGURANÇA
+# ==============================================================================
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_entrada:
+    - "Campos obrigatórios"
+    - "Formato JSON"
+    - "Tamanho/formato de imagens"
+    - "SQL Injection prevention (ORM parametrization)"
+    - "XSS prevention (input sanitization)"
+
+# ==============================================================================
+# RASTREABILIDADE
+# ==============================================================================
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-listar-fabricantes"
+    - "UC01-criar-fabricante"
+    - "UC02-visualizar-fabricante"
+    - "UC03-editar-fabricante"
+    - "UC04-inativar-fabricante"
+    - "UC05-listar-marcas"
+    - "UC06-criar-marca"
+    - "UC07-listar-modelos"
+    - "UC08-criar-modelo"
+    - "UC09-homologar-modelo"
+    - "UC10-marcar-modelo-eol"
+    - "UC11-importar-catalogo"
+    - "UC12-gerenciar-historico-precos"
+
+# ==============================================================================
+# HISTÓRICO
+# ==============================================================================
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração para Governança v2.0 - Separação RF/RL completa, 12 regras de negócio, sincronização MD↔YAML"
+
+  - versao: "1.0"
+    data: "2025-11-03"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial simplificada (5 seções)"

@@ -1,0 +1,789 @@
+# =============================================
+# RL-RF025: Referência ao Legado - Gestão de Ativos
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF025
+titulo: "Gestão Completa de Ativos de TI e Telecom"
+versao_governanca: "2.0"
+data_migracao: "2025-12-30"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms (IControlIT v1)"
+  versao: "1.0"
+  arquitetura: "Monolítica WebForms hospedada em IIS"
+  banco_dados: "SQL Server (múltiplos bancos por cliente - SEM multi-tenancy)"
+  multi_tenant: false
+  auditoria: "none"
+  autenticacao: "Windows Authentication (NTLM/Kerberos)"
+  web_services: "SOAP 1.1 (.asmx)"
+
+# ==============================================================================
+# REFERENCIAS AO LEGADO COM DESTINO OBRIGATÓRIO
+# ==============================================================================
+
+referencias:
+  # ----------------------------------------------------------------------------
+  # TELAS ASPX
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF025-001"
+    tipo: "tela"
+    nome: "Ativo.aspx - Cadastro de Ativos"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Ativo.aspx"
+    descricao: |
+      Tela de cadastro/edição de ativos (equipamentos, linhas telefônicas, chips).
+      Campos principais: Número do ativo, Tipo, Fornecedor, Modelo, Status, Data ativação.
+      Grid de consumidores para atribuições históricas.
+      Grid de dados complementares dinâmicos conforme tipo de ativo.
+    regras_implicitas:
+      - "Número patrimônio manual (sem geração automática - duplicatas possíveis)"
+      - "Status binário (Ativo/Inativo) sem workflow"
+      - "Localização texto livre (sem estrutura hierárquica)"
+      - "Grid consumidores permitia atribuição múltipla simultânea (sem validação)"
+    destino: "substituido"
+    justificativa: |
+      Tela substituída por Angular 19 com PrimeNG e validação completa.
+      Número patrimônio gerado automaticamente (PAT-{TipoAbrev}-{Ano}-{Sequencial}).
+      Status com Enum 6 estados e grafo de transições válidas.
+      Localização hierárquica (Edificio → Andar → Sala) + GPS.
+      Atribuições via API REST com validação e histórico imutável.
+    rastreabilidade:
+      rf_moderno: "RF-025 - Seção 4 (Funcionalidades 1-4)"
+      uc_moderno: "UC01-RF025-criar-ativo"
+    migracao_moderna:
+      componente_angular: "ativos-create.component.ts"
+      rota_frontend: "/financeiro/ativos/create"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF025-002"
+    tipo: "modal"
+    nome: "pnlConfirmacao - Modal Lixeira"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Ativo.aspx (modal)"
+    descricao: |
+      Modal para restaurar ativo desativado.
+      Mensagem: "Este Ativo está desativado. Deseja restaurar antes de continuar?"
+      Botões: Não (btContinuar), Sim (btRestaurar).
+    destino: "substituido"
+    justificativa: |
+      Soft delete moderno com reativação via endpoint API POST /api/ativos/{id}/reativar.
+      Apenas administradores podem reativar ativos com justificativa obrigatória.
+    rastreabilidade:
+      rf_moderno: "RN-RF025-013 (Soft Delete Obrigatório)"
+      endpoint_moderno: "POST /api/ativos/{id}/reativar"
+    migracao_moderna:
+      command_cqrs: "ReativarAtivoCommand"
+      handler: "ReativarAtivoCommandHandler"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF025-003"
+    tipo: "modal"
+    nome: "pnlObservacao - Modal Observação Obrigatória"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Ativo.aspx (modal)"
+    descricao: |
+      Modal de observação obrigatória com TextBox MultiLine (MaxLength=300).
+      Usado para justificativas de operações (baixa, perda, transferência).
+    destino: "assumido"
+    justificativa: |
+      Funcionalidade mantida e expandida.
+      Justificativa obrigatória para baixas e perdidos (mínimo 50 caracteres).
+      Campo Justificativa em tabela Ativo_Movimentacao (chain of custody).
+    rastreabilidade:
+      rf_moderno: "RN-RF025-005 (Histórico Chain of Custody) + RN-RF025-010 (Baixa Requer Aprovação)"
+      regra_moderna: "RN-RF025-010"
+    migracao_moderna:
+      validador: "BaixarAtivoCommandValidator"
+      linha_codigo: "RuleFor(x => x.Justificativa).MinLength(50)"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF025-004"
+    tipo: "campo"
+    nome: "txtNumeroAtivo - Número do Ativo Manual"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Ativo.aspx"
+    descricao: |
+      Campo TextBox para entrada manual de número de ativo.
+      Sem validação de unicidade - duplicatas possíveis.
+      Sem geração automática - usuário digitava livremente.
+    destino: "substituido"
+    justificativa: |
+      Número patrimônio gerado automaticamente no formato PAT-{TipoAbrev}-{Ano}-{Sequencial}.
+      Constraint UNIQUE INDEX no banco previne duplicatas.
+      Geração sequencial por tipo de ativo e ano (reinicia contador anualmente).
+    rastreabilidade:
+      rf_moderno: "RN-RF025-001 (Número de Patrimônio Único Global)"
+      regra_moderna: "RN-RF025-001"
+    migracao_moderna:
+      geracao_automatica: true
+      formato: "PAT-{TipoAbrev}-{Ano}-{Sequencial}"
+      exemplo: "PAT-NB-2025-0001"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF025-005"
+    tipo: "campo"
+    nome: "cboAtivoStatus - Status Binário"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Ativo.aspx"
+    descricao: |
+      DropDownList com status binário: Ativo ou Inativo.
+      Não diferenciava "em manutenção", "reservado", "perdido", "baixado".
+      Causava confusão: ativo "inativo" poderia estar em manutenção (temporário) ou baixado (permanente).
+    destino: "substituido"
+    justificativa: |
+      Enum moderno com 6 estados: Disponivel, Alocado, Manutencao, Reservado, Perdido, Baixado.
+      Grafo de transições válidas definido (RN-RF025-003).
+      Validação de transição antes de salvar (HTTP 400 se inválida).
+      Estado "Baixado" é irreversível (exceto para admin com justificativa).
+    rastreabilidade:
+      rf_moderno: "RN-RF025-003 (Status de Ativo com Transições Válidas)"
+      regra_moderna: "RN-RF025-003"
+    migracao_moderna:
+      enum: "StatusAtivo"
+      valores: ["Disponivel", "Alocado", "Manutencao", "Reservado", "Perdido", "Baixado"]
+      validacao: "ValidarTransicaoStatus()"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF025-006"
+    tipo: "campo"
+    nome: "txtEndereco - Localização Texto Livre"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Ativo.aspx"
+    descricao: |
+      Campo TextBox aceitando texto livre para localização.
+      Exemplos: "sala do João", "depósito do 2º andar", "filial SP".
+      Impossível gerar relatórios geográficos ou mapas.
+    destino: "substituido"
+    justificativa: |
+      Tabela Localizacao hierárquica (Edificio → Andar → Sala → Estacao) com coordenadas GPS.
+      Geolocalização GPS (Latitude, Longitude) capturada via mobile app.
+      Validação obrigatória de GPS para inventário mobile (precisão ≤ 20m).
+    rastreabilidade:
+      rf_moderno: "RN-RF025-009 (Geolocalização Obrigatória para Inventário Mobile)"
+      regra_moderna: "RN-RF025-009"
+    migracao_moderna:
+      tabela: "Localizacao"
+      campos: ["Latitude", "Longitude", "Id_Localizacao"]
+      app_mobile: true
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF025-007"
+    tipo: "grid"
+    nome: "dtgUsuario - Grid de Consumidores"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Ativo.aspx"
+    descricao: |
+      DataGrid para vincular ativo a múltiplos consumidores.
+      Colunas: Colaborador, Ativação, Termo Ativação, Devolução, Termo Devolução.
+      Permitia criar múltiplas linhas sem validar se ativo já estava alocado.
+      Resultado: mesmo ativo aparecia como "em uso" por 2 pessoas simultaneamente.
+    destino: "substituido"
+    justificativa: |
+      Tabela Ativo_Movimentacao (chain of custody) imutável.
+      Validação de transições de status impede alocação dupla.
+      Status "Alocado" impede nova alocação até devolução.
+      Termo de responsabilidade digital via DocuSign/Clicksign API.
+      Notificação automática ao usuário responsável (email/push).
+    rastreabilidade:
+      rf_moderno: "RN-RF025-004 (Alocação Requer Usuário Responsável) + RN-RF025-005 (Chain of Custody)"
+      regra_moderna: "RN-RF025-005"
+    migracao_moderna:
+      tabela: "Ativo_Movimentacao"
+      imutavel: true
+      termo_digital: "DocuSign API"
+      notificacao: "Email + Push"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF025-008"
+    tipo: "grid"
+    nome: "dtgDadosComplemento - Dados Complementares Dinâmicos"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Ativo.aspx"
+    descricao: |
+      DataGrid dinâmico sem cabeçalho (ShowHeader=False).
+      Exibia campos customizados conforme tipo de ativo.
+      Exemplo: Para computadores (RAM, HD, Processador), para linhas (DDD, Ramal).
+    destino: "substituido"
+    justificativa: |
+      Validação condicional FluentValidation baseada em Tipo_Ativo.
+      Campos obrigatórios variam: TI (Numero_Serie, Marca, Modelo), Telecom (Numero_Linha, Operadora).
+      Atributos técnicos: Sistema_Operacional, Processador, Memoria_RAM_GB, MAC_Address, Hostname.
+    rastreabilidade:
+      rf_moderno: "RN-RF025-008 (Validação de Campos Obrigatórios por Tipo)"
+      regra_moderna: "RN-RF025-008"
+    migracao_moderna:
+      validacao: "FluentValidation condicional"
+      classe: "CreateAtivoCommandValidator"
+      linha_codigo: "When(x => x.Tipo_Ativo == TipoAtivo.Notebook, () => RuleFor(x => x.Numero_Serie).NotEmpty())"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICES SOAP
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF025-009"
+    tipo: "webservice"
+    nome: "CadastrarAtivo() - SOAP"
+    caminho: "ic1_legado/IControlIT/WebServices/Ativo.asmx"
+    metodos:
+      - nome: "CadastrarAtivo"
+        parametros: "TipoAtivo, NumeroSerie, IdMarca, IdModelo, ValorAquisicao, DataAquisicao"
+        retorno: "IdAtivo (INT) ou Exception"
+    descricao: |
+      INSERT na tabela Ativo com validação básica (campos obrigatórios).
+      Não gerava QR Code nem registrava movimentação inicial.
+      Sem validação de número patrimônio único - duplicatas possíveis.
+    destino: "substituido"
+    justificativa: |
+      REST API POST /api/ativos com geração automática de QR Code.
+      Validação FluentValidation completa (campos obrigatórios por tipo).
+      Constraint UNIQUE INDEX previne duplicatas.
+      Registro automático de movimentação inicial em Ativo_Movimentacao.
+    rastreabilidade:
+      rf_moderno: "RN-RF025-001 + RN-RF025-002 + RN-RF025-005"
+      endpoint_moderno: "POST /api/ativos"
+    migracao_moderna:
+      command_cqrs: "CreateAtivoCommand"
+      handler: "CreateAtivoCommandHandler"
+      validacao: "CreateAtivoCommandValidator"
+      qr_code_automatico: true
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF025-010"
+    tipo: "webservice"
+    nome: "AlocarAtivo() - SOAP"
+    caminho: "ic1_legado/IControlIT/WebServices/Ativo.asmx"
+    metodos:
+      - nome: "AlocarAtivo"
+        parametros: "IdAtivo, IdUsuario, Observacao"
+        retorno: "Boolean (sucesso) ou Exception"
+    descricao: |
+      UPDATE Ativo SET Usuario_Atual = @IdUsuario.
+      Não validava se ativo estava disponível.
+      Não enviava notificação ao usuário.
+      Sem registro de histórico - impossível saber quem usou antes.
+    destino: "substituido"
+    justificativa: |
+      REST API POST /api/ativos/{id}/alocar com validação completa.
+      Validação de transição de status (só aloca se Disponivel ou Reservado).
+      Termo de responsabilidade digital enviado automaticamente (DocuSign).
+      Notificação email + push ao usuário responsável.
+      Registro imutável em Ativo_Movimentacao (chain of custody).
+    rastreabilidade:
+      rf_moderno: "RN-RF025-003 + RN-RF025-004 + RN-RF025-005"
+      endpoint_moderno: "POST /api/ativos/{id}/alocar"
+    migracao_moderna:
+      command_cqrs: "AlocarAtivoCommand"
+      handler: "AlocarAtivoCommandHandler"
+      validacao: "ValidarTransicaoStatus() + NotificacaoService"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF025-011"
+    tipo: "webservice"
+    nome: "ConsultarAtivos() - SOAP"
+    caminho: "ic1_legado/IControlIT/WebServices/Ativo.asmx"
+    metodos:
+      - nome: "ConsultarAtivos"
+        parametros: "Filtros opcionais (TipoAtivo, Status, IdMarca)"
+        retorno: "Array de AtivoDto"
+    descricao: |
+      SELECT com filtros dinâmicos.
+      Query sem paginação - retornava TODOS os registros.
+      Performance horrível com >500 ativos (timeout frequente).
+    destino: "substituido"
+    justificativa: |
+      REST API GET /api/ativos?page=1&size=50 com paginação cursor-based.
+      Cache Redis 5min para queries frequentes.
+      Filtros avançados (tipo, status, localização, responsável, valor min/max).
+      Compressão Gzip/Brotli reduz payload 70%.
+    rastreabilidade:
+      rf_moderno: "RF-025 - Seção 4 (Funcionalidade 4: Listar Ativos)"
+      endpoint_moderno: "GET /api/ativos"
+    migracao_moderna:
+      query_cqrs: "GetAtivosQuery"
+      handler: "GetAtivosQueryHandler"
+      paginacao: "cursor-based (page, size)"
+      cache: "Redis 5min"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF025-012"
+    tipo: "webservice"
+    nome: "BaixarAtivo() - SOAP"
+    caminho: "ic1_legado/IControlIT/WebServices/Ativo.asmx"
+    metodos:
+      - nome: "BaixarAtivo"
+        parametros: "IdAtivo, Motivo"
+        retorno: "Boolean (sucesso)"
+    descricao: |
+      UPDATE Ativo SET Status = 'Inativo', MotivoInativacao = @Motivo.
+      Sem workflow de aprovação - qualquer usuário podia baixar patrimônio de R$10k+.
+      Sem registro de histórico completo.
+    destino: "substituido"
+    justificativa: |
+      REST API POST /api/ativos/{id}/baixar com workflow de aprovação 2 níveis.
+      Nível 1: Gestor imediato do responsável.
+      Nível 2: Controller/Gerente Financeiro.
+      Justificativa obrigatória (mínimo 50 caracteres).
+      Anexos obrigatórios (BO para roubo, laudo técnico, NF venda).
+      Registro imutável em Ativo_Movimentacao.
+    rastreabilidade:
+      rf_moderno: "RN-RF025-010 (Baixa de Ativo Requer Aprovação)"
+      endpoint_moderno: "POST /api/ativos/{id}/baixar"
+    migracao_moderna:
+      command_cqrs: "BaixarAtivoCommand"
+      handler: "BaixarAtivoCommandHandler"
+      workflow: "2 níveis (Gestor + Controller)"
+      validacao: "MinLength(50) justificativa + anexos obrigatórios"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF025-013"
+    tipo: "webservice"
+    nome: "GerarRelatorioInventario() - SOAP XML"
+    caminho: "ic1_legado/IControlIT/WebServices/Ativo.asmx"
+    metodos:
+      - nome: "GerarRelatorioInventario"
+        parametros: "DataInicio, DataFim"
+        retorno: "XML com lista de ativos"
+    descricao: |
+      Gerava XML com lista de ativos e movimentações (se existissem).
+      XML malformado frequentemente (encoding UTF-8 quebrado).
+      Frontend tinha que parsear XML manualmente - erros frequentes.
+    destino: "substituido"
+    justificativa: |
+      REST API GET /api/ativos/inventario/relatorio retorna JSON estruturado.
+      Export PDF com gráficos Chart.js.
+      Paginação e filtros avançados.
+      Cache Redis para relatórios frequentes.
+    rastreabilidade:
+      rf_moderno: "RF-025 - Seção 4 (Funcionalidade 15: Dashboard Executivo)"
+      endpoint_moderno: "GET /api/ativos/inventario/relatorio"
+    migracao_moderna:
+      query_cqrs: "GetRelatorioInventarioQuery"
+      handler: "GetRelatorioInventarioQueryHandler"
+      formato: "JSON + PDF export"
+      graficos: "Chart.js"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF025-014"
+    tipo: "tela"
+    nome: "Ativo - Tabela Principal Legado"
+    caminho: "ic1_legado/Database/dbo.Ativo"
+    descricao: "Tabela principal de ativos com campos básicos"
+    schema_legado: "[dbo].[Ativo]"
+    campos_principais:
+      - "Id_Ativo (INT, PK)"
+      - "Tipo (VARCHAR(50))"
+      - "Numero_Patrimonio (VARCHAR(50))"
+      - "Numero_Serie (VARCHAR(100))"
+      - "Marca (VARCHAR(100)) - SEM FK"
+      - "Modelo (VARCHAR(100)) - SEM FK"
+      - "Valor_Aquisicao (DECIMAL(18,2))"
+      - "Dt_Aquisicao (DATETIME)"
+      - "Status (VARCHAR(20)) - Apenas Ativo/Inativo"
+      - "Usuario_Atual (VARCHAR(100)) - SEM FK"
+    problemas_identificados:
+      - "Sem campos de garantia (Dt_Garantia_Fim, Tipo_Garantia)"
+      - "Sem campos GPS (Latitude, Longitude)"
+      - "Sem QR Code (QR_Code_URL, QR_Code_Base64)"
+      - "Sem campos de depreciação (Metodo, Valor_Atual, Dt_Ultima)"
+      - "Sem multi-tenancy (Id_Conglomerado ausente)"
+      - "Sem auditoria (Created, CreatedBy ausentes)"
+      - "DELETE físico permitido (sem Fl_Ativo)"
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com 30+ campos novos:
+      - QR Code: QR_Code_URL, QR_Code_Base64
+      - GPS: Latitude, Longitude, Id_Localizacao
+      - Garantia: Dt_Garantia_Inicio, Dt_Garantia_Fim, Tipo_Garantia, Numero_Tag_Service
+      - Depreciação: Metodo_Depreciacao, Taxa_Depreciacao_Anual, Valor_Residual, Valor_Atual_Depreciado, Dt_Ultima_Depreciacao
+      - Multi-tenancy: Id_Conglomerado
+      - Auditoria: Created, CreatedBy, LastModified, LastModifiedBy
+      - Soft delete: Fl_Ativo
+    rastreabilidade:
+      rf_moderno: "RF-025 - Seção 7 (Modelo de Dados)"
+      md_moderno: "MD-RF025.md - Tabela Ativo"
+    migracao_moderna:
+      tabela_moderna: "Ativo"
+      migration_ef_core: "20251230_CreateAtivoTable.cs"
+      campos_adicionados: 30
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF025-015"
+    tipo: "tela"
+    nome: "Marca - Normalização de Marcas"
+    caminho: "ic1_legado/Database/dbo.Marca"
+    descricao: "Tabela de normalização de marcas (Dell, HP, Lenovo)"
+    schema_legado: "[dbo].[Marca]"
+    campos_principais:
+      - "Id_Marca (INT, PK)"
+      - "Nm_Marca (VARCHAR(100))"
+    problemas_identificados:
+      - "Sem multi-tenancy (Id_Conglomerado ausente)"
+      - "Sem auditoria (Created, CreatedBy ausentes)"
+      - "DELETE físico permitido (sem Fl_Ativo)"
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica mantida com melhorias:
+      - Adição de Id_Conglomerado (multi-tenancy)
+      - Adição de auditoria (Created, CreatedBy, LastModified, LastModifiedBy)
+      - Soft delete (Fl_Ativo)
+    rastreabilidade:
+      rf_moderno: "RF-025 - Entidade Marca"
+      md_moderno: "MD-RF025.md - Tabela Marca"
+    migracao_moderna:
+      tabela_moderna: "Marca"
+      migration_ef_core: "20251230_UpdateMarcaTable.cs"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF025-016"
+    tipo: "tela"
+    nome: "Modelo - Normalização de Modelos"
+    caminho: "ic1_legado/Database/dbo.Modelo"
+    descricao: "Tabela de normalização de modelos (Latitude 5420, ProBook 450)"
+    schema_legado: "[dbo].[Modelo]"
+    campos_principais:
+      - "Id_Modelo (INT, PK)"
+      - "Id_Marca (INT, FK)"
+      - "Nm_Modelo (VARCHAR(100))"
+    problemas_identificados:
+      - "Sem multi-tenancy (Id_Conglomerado ausente)"
+      - "Sem auditoria (Created, CreatedBy ausentes)"
+      - "DELETE físico permitido (sem Fl_Ativo)"
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica mantida com melhorias:
+      - Adição de Id_Conglomerado (multi-tenancy)
+      - Adição de auditoria (Created, CreatedBy, LastModified, LastModifiedBy)
+      - Soft delete (Fl_Ativo)
+    rastreabilidade:
+      rf_moderno: "RF-025 - Entidade Modelo"
+      md_moderno: "MD-RF025.md - Tabela Modelo"
+    migracao_moderna:
+      tabela_moderna: "Modelo"
+      migration_ef_core: "20251230_UpdateModeloTable.cs"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF025-017"
+    tipo: "regra_negocio"
+    nome: "Validação de Número de Série Opcional"
+    caminho: "ic1_legado/IControlIT/Cadastro/Ativo.aspx.vb"
+    descricao: |
+      Código legado em btnSalvar_Click.
+      Campo Numero_Serie era opcional no legado, mas recomendado.
+      Sistema permitia salvar ativo sem número de série, gerando duplicatas e dificuldade de rastreamento.
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno: Numero_Serie obrigatório para ativos TI (RN-RF025-008).
+      Validação FluentValidation condicional baseada em Tipo_Ativo.
+    rastreabilidade:
+      rf_moderno: "RN-RF025-008"
+      regra_moderna: "RN-RF025-008"
+    migracao_moderna:
+      validador: "CreateAtivoCommandValidator"
+      linha_codigo: "When(x => x.Tipo_Ativo.IsTI(), () => RuleFor(x => x.Numero_Serie).NotEmpty())"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF025-018"
+    tipo: "regra_negocio"
+    nome: "Atribuição Múltipla Permitida"
+    caminho: "ic1_legado/IControlIT/Cadastro/Ativo.aspx.vb"
+    descricao: |
+      Código legado em Grid dtgUsuario.
+      Grid de consumidores permitia criar múltiplas linhas SEM validar se ativo já estava alocado.
+      Resultado: mesmo ativo aparecia como "em uso" por 2 pessoas simultaneamente.
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno: Validação de transições de status (RN-RF025-003).
+      Status "Alocado" impede nova alocação até devolução.
+      Histórico imutável em Ativo_Movimentacao garante chain of custody.
+    rastreabilidade:
+      rf_moderno: "RN-RF025-003 + RN-RF025-005"
+      regra_moderna: "RN-RF025-003"
+    migracao_moderna:
+      validacao: "ValidarTransicaoStatus()"
+      tabela: "Ativo_Movimentacao (imutável)"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF025-019"
+    tipo: "regra_negocio"
+    nome: "Depreciação Manual em Excel"
+    caminho: "Processo manual offline (fora do sistema)"
+    descricao: |
+      Processo manual fora do sistema legado.
+      Controlador exportava CSV mensal com ativos, abria planilha Excel com fórmulas de depreciação linear.
+      Erros frequentes: fórmula copiada errada, ativo esquecido, taxa desatualizada.
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno: Hangfire job automático mensal (dia 1 às 02:00 UTC).
+      3 métodos de depreciação (Linear, Acelerada, Soma Dígitos).
+      Integração automática com ERP (SAP, TOTVS) via API REST.
+      Log de cálculos em Ativo_Depreciacao para auditoria.
+    rastreabilidade:
+      rf_moderno: "RN-RF025-006 (Depreciação Automática Mensal)"
+      regra_moderna: "RN-RF025-006"
+    migracao_moderna:
+      job_hangfire: true
+      cron: "0 2 1 * *"
+      metodos: ["Linear", "Acelerada", "Soma_Digitos"]
+      integracao_erp: true
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF025-020"
+    tipo: "regra_negocio"
+    nome: "Inventário Físico Manual com Checklist Papel"
+    caminho: "Processo manual offline (fora do sistema)"
+    descricao: |
+      Processo manual fora do sistema legado.
+      2 colaboradores levavam 2 semanas para inventariar 800 ativos.
+      Checklist impresso, conferência física, digitação manual no sistema.
+      Taxa de erro: ~5% (ativos não encontrados mas marcados como OK).
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno: App mobile MAUI (Android/iOS) com scan QR Code.
+      Captura GPS obrigatória (precisão ≤ 20m) para prevenir fraude.
+      Foto do ativo no momento do inventário.
+      Sincronização automática online/offline.
+      Redução de tempo: 2 semanas → 2 dias (80%).
+    rastreabilidade:
+      rf_moderno: "RN-RF025-009 + RN-RF025-015"
+      regra_moderna: "RN-RF025-009"
+    migracao_moderna:
+      app_mobile: ".NET MAUI"
+      plataformas: ["Android", "iOS"]
+      funcionalidades: ["Scan QR Code", "Captura GPS", "Foto", "Offline mode"]
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF025-021"
+    tipo: "regra_negocio"
+    nome: "IMEI Sem Validação"
+    caminho: "ic1_legado/IControlIT/Cadastro/Ativo.aspx"
+    descricao: |
+      Código legado em campo txtSimCard.
+      Campo aceitava qualquer texto.
+      IMEIs inválidos ou duplicados eram cadastrados.
+      Sem validação de checksum (Luhn) ou consulta Anatel.
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno: Validação IMEI obrigatória para smartphones.
+      - 15 dígitos numéricos
+      - Algoritmo de Luhn (checksum)
+      - Consulta API Anatel para verificar blacklist
+      - Salvar IMEI_Status (Ativo, Bloqueado, Irregular)
+    rastreabilidade:
+      rf_moderno: "RN-RF025-011 (IMEI Validation para Smartphones)"
+      regra_moderna: "RN-RF025-011"
+    migracao_moderna:
+      validacao: "FluentValidation"
+      algoritmo_checksum: "Luhn"
+      api_externa: "Anatel"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF025-001"
+    nome: "Sem Histórico de Movimentações"
+    severidade: "CRÍTICA"
+    descricao: |
+      Tabela Ativo tinha apenas snapshot do estado atual.
+      Impossível rastrear quem usou ativo antes ou quando foi transferido.
+      Sem chain of custody para auditorias.
+    impacto: |
+      Perda de rastreabilidade completa.
+      Impossível auditar movimentações passadas.
+      Risco legal em casos de extravio ou roubo.
+    solucao_moderna: |
+      Tabela Ativo_Movimentacao imutável (RN-RF025-005).
+      Registra TODA alteração de status/responsável/localização.
+      Timeline visual acessível via API.
+
+  - id: "PROB-RF025-002"
+    nome: "Etiquetas Papel Ineficientes"
+    severidade: "ALTA"
+    descricao: |
+      Etiquetas impressas descolavam ou ficavam ilegíveis.
+      Taxa de falha 30% após 6 meses.
+      Necessidade de reimpressão constante (custo e tempo).
+    impacto: |
+      Ativos não identificáveis fisicamente.
+      Inventário físico demorado e propenso a erros.
+      Custo alto de reimpressão.
+    solucao_moderna: |
+      QR Code gerado automaticamente (RN-RF025-002).
+      300x300px com correção erro nível High (30% danificado ainda funciona).
+      Impressão em material durável (etiquetas adesivas resistentes).
+
+  - id: "PROB-RF025-003"
+    nome: "Depreciação Manual em Excel com Erros Frequentes"
+    severidade: "ALTA"
+    descricao: |
+      Controlador baixava dados mensalmente e calculava depreciação em planilha.
+      Erros frequentes: fórmula copiada errada, ativo esquecido, taxa desatualizada.
+      Sem integração automática com ERP - descompasso contábil.
+    impacto: |
+      Erros de cálculo contábil.
+      Descompasso entre sistema e ERP.
+      Tempo gasto: 8h/mês do controlador.
+    solucao_moderna: |
+      Hangfire job automático mensal (RN-RF025-006).
+      3 métodos de depreciação (Linear, Acelerada, Soma Dígitos).
+      Integração automática com ERP via API REST.
+
+  - id: "PROB-RF025-004"
+    nome: "Sem Alertas de Garantia"
+    severidade: "ALTA"
+    descricao: |
+      Descobriam garantia vencida apenas quando precisavam acionar suporte técnico.
+      Perda estimada: ~R$80k/ano em reparos fora garantia.
+    impacto: |
+      Custo alto de reparos desnecessários.
+      Perda de oportunidade de acionar garantia.
+      Imagem negativa com fabricantes (acionamento tardio).
+    solucao_moderna: |
+      Hangfire job diário verificando garantias vencendo (RN-RF025-007).
+      Notificações automáticas 30/60/90 dias antes vencimento.
+      Email + Push + In-App + Dashboard.
+
+  - id: "PROB-RF025-005"
+    nome: "Inventário Manual Doloroso"
+    severidade: "MÉDIA"
+    descricao: |
+      2 colaboradores levavam 2 semanas para inventariar 800 ativos.
+      Checklist papel, conferência física, digitação manual.
+      Taxa de erro: ~5% (ativos não encontrados mas marcados como OK).
+    impacto: |
+      Tempo gasto: 80h/pessoa por inventário.
+      Custo de mão de obra: ~R$3.200 por inventário.
+      Erros de conferência (ativos fantasmas).
+    solucao_moderna: |
+      App mobile MAUI com scan QR Code (RN-RF025-009).
+      GPS obrigatório (precisão ≤ 20m).
+      Redução de tempo: 2 semanas → 2 dias (80%).
+
+  - id: "PROB-RF025-006"
+    nome: "Localização Texto Livre Sem Estrutura"
+    severidade: "MÉDIA"
+    descricao: |
+      Campo aceitava texto livre ("sala do João", "depósito do 2º andar").
+      Impossível gerar mapas ou relatórios confiáveis.
+      Buscas por localização eram manuais (LIKE '%sala%').
+    impacto: |
+      Relatórios geográficos imprecisos.
+      Busca de ativos por localização ineficiente.
+      Impossível rastrear movimentações entre locais.
+    solucao_moderna: |
+      Tabela Localizacao hierárquica (Edificio → Andar → Sala).
+      Geolocalização GPS (Latitude, Longitude).
+      Mapas interativos com ativos plotados.
+
+  - id: "PROB-RF025-007"
+    nome: "Status Binário Sem Workflow"
+    severidade: "MÉDIA"
+    descricao: |
+      Status era apenas "Ativo" ou "Inativo".
+      Não diferenciava "em manutenção", "reservado", "perdido", "baixado".
+      Confusão: ativo "inativo" poderia estar em manutenção (temporário) ou baixado (permanente).
+    impacto: |
+      Perda de precisão no rastreamento.
+      Relatórios imprecisos (não diferencia manutenção de baixa).
+      Dificuldade em identificar ativos disponíveis para reuso.
+    solucao_moderna: |
+      Enum com 6 estados (RN-RF025-003).
+      Grafo de transições válidas.
+      Estado "Baixado" é irreversível (exceto admin).
+
+  - id: "PROB-RF025-008"
+    nome: "Integração Manual com ERP"
+    severidade: "MÉDIA"
+    descricao: |
+      Controlador exportava CSV mensalmente e importava no SAP manualmente.
+      Esquecimento causava descompasso contábil.
+      Processo demorado e propenso a erros.
+    impacto: |
+      Descompasso entre sistema de ativos e ERP.
+      Tempo gasto: 4h/mês.
+      Risco de erros de importação (CSV malformado).
+    solucao_moderna: |
+      Integração bidirecional via API REST + Webhooks (RN-RF025-014).
+      Sincronização automática tempo real.
+      Retry com backoff exponencial + DLQ (RabbitMQ).
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 21
+  itens_assumidos: 5
+  itens_substituidos: 15
+  itens_descartados: 1
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+
+estatisticas_migracao:
+  ativos_migrados: 800
+  qr_codes_gerados: 800
+  custo_impressao_qr: "R$ 2.500"
+  tempo_inventario_antes: "2 semanas (80h)"
+  tempo_inventario_depois: "2 dias (16h)"
+  reducao_tempo_inventario: "80%"
+  economia_anual_estimada: "R$ 500.000"
+  roi_meses: 6
+
+# ==============================================================================
+# HISTORICO
+# ==============================================================================
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: |
+      Criação RL-RF025.yaml com 21 itens legado rastreados.
+      100% dos itens com campo destino definido (ASSUMIDO/SUBSTITUÍDO/DESCARTADO).
+      8 problemas legado documentados com soluções modernas.
+      Metadados calculados automaticamente.
+    autor: "Agência ALC - alc.dev.br"

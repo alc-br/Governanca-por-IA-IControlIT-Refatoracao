@@ -1,0 +1,492 @@
+﻿# RF-021: Gestão de Departamentos e Estrutura Organizacional
+
+**Versão**: 3.0
+**Última Atualização**: 2025-11-03
+**Status**: ✅ Estrutura Simplificada (5 seções)
+**Complexidade**: ALTA
+**Fase**: Fase 2 - Serviços Essenciais
+
+---
+
+[← Voltar ao Índice](./README.md)
+
+---
+
+## 📋 1. RESUMO EXECUTIVO
+
+### Visão Geral
+O RF-021 fornece CRUD completo de departamentos organizacionais do IControlIT v2 com hierarquia multinível ilimitada (Diretorias → Gerências → Coordenações → Equipes), gestão de líderes, lotação de colaboradores com estrutura matricial (dotted-line), organograma visual interativo (D3.js/GoJS), sincronização automática com Active Directory/Azure AD, workflow de movimentações interdepartamentais com aprovações multinível, e analytics avançados de força de trabalho (headcount, turnover, span of control).
+
+### Objetivos
+- Gerenciar hierarquia organizacional recursiva ilimitada com self-referencing (Id_Departamento_Pai)
+- Criar organograma visual interativo com zoom, pan, collapse/expand, busca e export PNG/PDF (D3.js)
+- Suportar estrutura matricial dotted-line (colaborador em múltiplos departamentos com % alocação)
+- Sincronizar automaticamente grupos segurança Azure AD via Microsoft Graph API (job Hangfire diário)
+- Controlar movimentações interdepartamentais com workflow aprovação (líder origem → líder destino → RH)
+- Validar referências circulares hierarquia (algoritmo detecção loops A → B → C → A)
+- Calcular métricas workforce analytics (headcount, turnover, span of control 5-10 ideal)
+- Gerenciar metas departamentais (OKRs trimestrais com % atingimento)
+- Atualizar headcount tempo real via SignalR quando movimentação aprovada
+- Manter versionamento completo estrutura organizacional (change tracking auditoria)
+
+### Escopo
+**Incluído**: CRUD departamentos com hierarquia recursiva, tabela Usuario_Departamento para lotações (principal 100% + dotted-line múltiplas), tabela Departamento_Movimentacao com workflow aprovação multinível, organograma interativo D3.js (collapse/expand, busca, export), sincronização Azure AD bidirecional (criar grupos, atualizar membros), validação loops hierarquia, trigger atualizar Qtd_Colaboradores automaticamente, trigger validar soma alocações ≤100%, dashboard headcount SignalR tempo real, analytics turnover departamental, span of control KPI, integração ponto eletrônico validar presença física, versionamento estrutura organizacional.
+
+**Excluído**: Gestão folha pagamento (RF-FIN-002), avaliações de desempenho (RF-RH-001), gestão férias (RF-RH-002), ponto eletrônico detalhado (RF-RH-003).
+
+### Módulos Relacionados
+- **RF-CAD-005**: Gestão de Usuários (colaboradores)
+- **RF-CAD-006**: Gestão de Perfis de Acesso (permissões líderes)
+- **RF-NOT-001**: Notificações (movimentações, aprovações, alertas)
+- **RF-AUD-001**: Auditoria (change tracking estrutura organizacional)
+- **RF-FIN-002**: Folha Pagamento (integração custos departamentais)
+- **RF-RH-001**: Avaliações Desempenho (span of control, analytics)
+
+---
+
+## 📜 2. REGRAS DE NEGÓCIO
+
+### RN-CAD-024-01: Código Departamento Único Alfanumérico
+
+**Descrição**: Código departamento DEVE ser único por conglomerado, formato alfanumérico [TIPO]-[NOME] 3-30 caracteres (ex: "DIR-TI", "GER-DEV", "COORD-BACKEND").
+
+**Validação**: Regex `^[A-Z]{3,5}-[A-Z0-9]{2,20}$`. Backend valida unicidade: `SELECT COUNT(*) FROM Departamento WHERE Codigo_Departamento = @Codigo AND Id_Conglomerado = @Conglomerado`. Se COUNT > 0, retornar erro 409 Conflict "Código departamento já existe".
+
+**Constraint**: UNIQUE (Codigo_Departamento, Id_Conglomerado) em banco. FluentValidation: `RuleFor(x => x.CodigoDepartamento).Matches(@"^[A-Z]{3,5}-[A-Z0-9]{2,20}$").WithMessage("Formato inválido")`.
+
+### RN-CAD-024-02: Hierarquia Multinível Ilimitada Self-Referencing
+
+**Descrição**: Sistema suporta hierarquia recursiva ilimitada através de self-referencing FK `Id_Departamento_Pai`. Níveis típicos: Nível 1 = Diretoria (CEO, CFO, CTO), Nível 2 = Gerência, Nível 3 = Coordenação, Nível 4+ = Equipes especializadas.
+
+**Implementação**: Campo `Id_Departamento_Pai` nullable (NULL = raiz). EF Core: `modelBuilder.Entity<Departamento>().HasOne(d => d.DepartamentoPai).WithMany(d => d.DepartamentosFilhos).HasForeignKey(d => d.IdDepartamentoPai)`.
+
+**Caminho Hierárquico**: Trigger `trg_Departamento_AtualizarCaminhoHierarquico` After INSERT/UPDATE executa CTE recursivo para atualizar `Caminho_Hierarquico` (ex: "/DIR-TI/GER-DEV/COORD-BACKEND") e `Nivel_Hierarquia` (INT depth). View `VW_Departamento_Hierarquia_Completa` usa CTE recursivo para retornar árvore completa para organograma.
+
+### RN-CAD-024-03: Validação Referências Circulares Hierarquia
+
+**Descrição**: Sistema DEVE detectar e bloquear loops infinitos hierarquia (ex: A → B → C → A). Algoritmo usa HashSet visitados: percorre Id_Departamento_Pai recursivamente adicionando IDs visitados, se encontrar mesmo ID novamente = loop detectado.
+
+**Implementação**:
+```csharp
+bool DetectarLoopHierarquia(Guid idDepartamento, Guid? idDepartamentoPai)
+{
+    var visitados = new HashSet<Guid>();
+    var atual = idDepartamentoPai;
+    while (atual.HasValue)
+    {
+        if (!visitados.Add(atual.Value)) return true; // Loop detectado
+        if (atual.Value == idDepartamento) return true; // Referência circular direta
+        atual = _context.Departamento.Find(atual.Value)?.Id_Departamento_Pai;
+    }
+    return false; // Hierarquia válida
+}
+```
+
+**Validação**: Executada em Command Handler `CriarDepartamentoCommand` e `AtualizarDepartamentoCommand` ANTES de salvar. Se loop detectado, retornar erro 422 Unprocessable Entity "Referência circular detectada na hierarquia".
+
+### RN-CAD-024-04: Líder Obrigatório Usuário Válido FK
+
+**Descrição**: Departamento ativo DEVE ter líder válido (FK Usuario). Campo `Id_Usuario_Lider` NOT NULL (exceto departamentos tipo "Equipe" que podem herdar líder do coordenador pai).
+
+**Validação**: Backend verifica `IF EXISTS (SELECT 1 FROM Usuario WHERE Id_Usuario = @IdLider AND Fl_Ativo = 1)`. Se líder não existe ou inativo, retornar erro 422 "Líder inválido ou inativo".
+
+**Permissões**: Ao designar líder, sistema automaticamente concede permissão "Gestor" sobre subordinados diretos. Ao remover líder, revoga permissão. Notificação enviada via email + push + SignalR ao líder designado.
+
+### RN-CAD-024-05: Sincronização Automática Azure AD Grupos Segurança
+
+**Descrição**: Sistema sincroniza UNIDIRECIONAL IControlIT → Azure AD. Ao criar departamento, sistema cria grupo Azure AD via Microsoft Graph API. Ao alocar colaborador em departamento, adiciona membro ao grupo.
+
+**Frequência**: Job Hangfire `SincronizarAzureADJob` executa diário 03:00 BRT (Cron "0 3 * * *") + sincronização sob demanda via endpoint POST `/api/v1/departamentos/{id}/sincronizar-azuread`.
+
+**Ações**:
+- Criar grupo: `POST /groups` com `displayName`, `description`, `mailNickname`, `securityEnabled=true`
+- Adicionar membro: `POST /groups/{id}/members/$ref` com `@odata.id` do usuário
+- Atualizar: `PATCH /groups/{id}` com `displayName`, `description`, `managedBy` (líder)
+- Armazenar: Campos `Azure_AD_Object_Id`, `AD_Distinguished_Name`, `Dt_Ultima_Sincronizacao_AD` atualizados após sucesso
+
+**API**: Microsoft Graph SDK .NET, autenticação Client Credentials Flow (app registration Azure AD), permissões `Group.ReadWrite.All`, `User.Read.All`.
+
+### RN-CAD-024-06: Movimentações Interdepartamentais Workflow Aprovação Multinível
+
+**Descrição**: Transferências colaboradores exigem aprovação multinível sequencial: (1) Líder Origem aprova liberação, (2) Líder Destino aprova aceite, (3) RH finaliza homologação.
+
+**Workflow**:
+1. Colaborador/Líder cria `Departamento_Movimentacao` com `Status_Aprovacao = 'Pendente'`
+2. Notificação enviada líder origem via email + push
+3. Líder origem aprova/rejeita via endpoint PUT `/api/v1/departamentos/movimentacoes/{id}/aprovar-origem`
+4. Se aprovado, muda `Status_Aprovacao = 'Aprovado_Origem'`, notifica líder destino
+5. Líder destino aprova/rejeita via endpoint PUT `/api/v1/departamentos/movimentacoes/{id}/aprovar-destino`
+6. Se aprovado, muda `Status_Aprovacao = 'Aprovado_Destino'`, notifica RH
+7. RH finaliza via endpoint PUT `/api/v1/departamentos/movimentacoes/{id}/aprovar-rh`
+8. Sistema atualiza `Usuario_Departamento` (desativa lotação antiga, cria nova), atualiza `Qtd_Colaboradores`, sincroniza Azure AD
+
+**Campos**: `Id_Usuario_Aprovador_Origem`, `Id_Usuario_Aprovador_Destino`, `Id_Usuario_Aprovador_RH`, `Status_Aprovacao` enum, `Motivo` NVARCHAR(1000) obrigatório, `Tipo_Movimentacao` enum 'Transferencia/Promocao/Realocacao/Temporaria/Retorno'.
+
+### RN-CAD-024-07: Dotted-Line Múltiplos Departamentos Soma ≤100%
+
+**Descrição**: Colaborador pode ter lotação em múltiplos departamentos (estrutura matricial): (1) **Principal** = 100% alocação obrigatória, (2) **Dotted-Line** = alocação parcial opcional (ex: 30% GER-PROJETOS), (3) **Temporária** = projeto temporário com `Dt_Fim` obrigatória.
+
+**Validação**: Trigger `trg_Usuario_Departamento_ValidarAlocacao` After INSERT/UPDATE valida `SUM(Percentual_Alocacao) WHERE Id_Usuario = @Id AND Fl_Ativo = 1 <= 100`. Se soma > 100%, ROLLBACK com erro "Soma de alocações do usuário excede 100%".
+
+**Constraint**: UNIQUE (Id_Usuario, Tipo_Lotacao, Fl_Ativo) WHERE Tipo_Lotacao='Principal' AND Fl_Ativo=1 garante apenas uma lotação principal ativa por colaborador.
+
+**Campos**: `Tipo_Lotacao` VARCHAR(30) enum, `Percentual_Alocacao` DECIMAL(5,2) CHECK (>0 AND <=100), `Dt_Inicio` DATE obrigatório, `Dt_Fim` DATE nullable (NULL = vigente).
+
+### RN-CAD-024-08: Atualização Automática Qtd_Colaboradores Trigger
+
+**Descrição**: Campo `Qtd_Colaboradores` INT em `Departamento` atualizado automaticamente por trigger After INSERT/UPDATE/DELETE em `Usuario_Departamento`.
+
+**Cálculo**: `COUNT(*) FROM Usuario_Departamento WHERE Id_Departamento = @Id AND Tipo_Lotacao = 'Principal' AND Fl_Ativo = 1` (conta apenas lotações principais ativas, ignora dotted-line).
+
+**Trigger**:
+```sql
+CREATE TRIGGER trg_Usuario_Departamento_AtualizarQtdColaboradores
+ON dbo.Usuario_Departamento AFTER INSERT, UPDATE, DELETE
+AS BEGIN
+    UPDATE d SET Qtd_Colaboradores = (SELECT COUNT(*) FROM Usuario_Departamento ud
+        WHERE ud.Id_Departamento = d.Id_Departamento AND ud.Tipo_Lotacao = 'Principal' AND ud.Fl_Ativo = 1)
+    FROM dbo.Departamento d
+    WHERE d.Id_Departamento IN (SELECT Id_Departamento FROM inserted UNION SELECT Id_Departamento FROM deleted);
+END;
+```
+
+**Span of Control**: Campo calculado `Span_Of_Control` AS (Qtd_Colaboradores) PERSISTED usado para KPI (ideal 5-10 subordinados diretos por líder segundo Harvard Business Review).
+
+### RN-CAD-024-09: Organograma Visual D3.js Interativo
+
+**Descrição**: Frontend Angular 18 renderiza organograma interativo usando D3.js v7 (force-directed graph) ou GoJS (layout hierárquico comercial).
+
+**Funcionalidades**:
+- **Zoom**: Mouse wheel / pinch mobile (transform scale 0.1x - 10x)
+- **Pan**: Drag & drop canvas (translate)
+- **Collapse/Expand**: Click nó departamento colapsa/expande subárvore filhos
+- **Busca**: Input busca colaborador/departamento destaca caminho hierárquico completo
+- **Filtro**: Dropdown filtrar por `Tipo_Departamento` (Diretoria, Gerencia, Coordenacao, Equipe)
+- **Export**: Botão export PNG (canvas.toDataURL), PDF (jsPDF), SVG (d3.serialize)
+
+**Backend**: Endpoint GET `/api/v1/departamentos/organograma` retorna DTO aninhado recursivo:
+```csharp
+public class NodeDto {
+    public Guid Id { get; set; }
+    public string Nome { get; set; }
+    public string Tipo { get; set; }
+    public string? Lider { get; set; }
+    public int QtdColaboradores { get; set; }
+    public List<NodeDto> Children { get; set; } = new();
+}
+```
+
+**Cache**: Redis cache hierarquia organograma TTL 1h, invalidar ao criar/editar departamento. Query Parameters: `idRaiz` (NULL = toda empresa), `nivelMax` (NULL = ilimitado), `incluirColaboradores` (bool lista colaboradores em cada nó).
+
+### RN-CAD-024-10: Notificação Líder Nova Lotação Multicanal
+
+**Descrição**: Líder recebe notificação quando colaborador alocado em seu departamento através de 3 canais: (1) E-mail, (2) Push notification mobile, (3) Inbox in-app sistema.
+
+**Conteúdo**: "João Silva foi alocado em seu departamento (TI > Desenvolvimento > Backend) em 01/11/2025 com 100% alocação (lotação principal)".
+
+**SignalR**: Hub `DepartamentoHub` broadcast evento `OnColaboradorAlocado(idDepartamento, idUsuario)` para todos clientes conectados. Dashboard líder atualiza contador headcount tempo real.
+
+**Implementação**: Domain event `ColaboradorAlocadoEvent` publicado via MediatR após INSERT `Usuario_Departamento`. Handler `NotificarLiderColaboradorAlocadoHandler` obtém líder, envia notificação via `INotificationService` multicanal.
+
+### RN-CAD-024-11: Dashboard Headcount Tempo Real SignalR
+
+**Descrição**: Dashboard KPIs headcount por departamento atualizado tempo real via SignalR sem refresh página.
+
+**Métricas**:
+- **Headcount Atual**: COUNT `Usuario_Departamento` WHERE `Tipo_Lotacao='Principal' AND Fl_Ativo=1`
+- **Headcount Orçado**: Campo `Headcount_Orcado` INT em tabela `Departamento_Meta` para trimestre atual
+- **Taxa Ocupação**: (Headcount Atual / Headcount Orçado) * 100
+- **Variação Mês Anterior**: Headcount Atual - Headcount Mês Anterior (calculado histórico `Departamento_Movimentacao`)
+- **Projeção Próximo Trimestre**: ML modelo preditivo baseado histórico movimentações + sazonalidade
+
+**Refresh**: SignalR Hub `DepartamentoHub.OnHeadcountAtualizado(idDepartamento, novoHeadcount)` disparado após INSERT/UPDATE `Usuario_Departamento` ou aprovação `Departamento_Movimentacao`.
+
+**Frontend**: Chart.js line chart últimos 12 meses (mensal), gauge chart taxa ocupação com cores: Verde ≥90%, Amarelo 75-89%, Vermelho <75%.
+
+### RN-CAD-024-12: Analytics Turnover Departamental
+
+**Descrição**: Cálculo turnover (rotatividade) por departamento baseado em movimentações últimos 12 meses. Fórmula: `Turnover = (Saídas_Período / Headcount_Médio_Período) * 100`.
+
+**Cálculo**:
+```sql
+-- Saídas últimos 12 meses
+SELECT COUNT(*) FROM Departamento_Movimentacao
+WHERE Id_Departamento_Origem = @IdDept
+  AND Tipo_Movimentacao IN ('Transferencia', 'Desligamento')
+  AND Dt_Efetivacao >= DATEADD(MONTH, -12, GETDATE())
+
+-- Headcount médio últimos 12 meses
+SELECT AVG(Qtd_Colaboradores) FROM Departamento_Snapshot_Mensal
+WHERE Id_Departamento = @IdDept
+  AND Dt_Snapshot >= DATEADD(MONTH, -12, GETDATE())
+```
+
+**Benchmark**: Turnover saudável <10% ao ano (< 0.83% ao mês). Se turnover departamento >15% em trimestre, job Hangfire `AlertarTurnoverAltoJob` envia notificação para RH + Diretor responsável.
+
+**Dashboard**: Chart.js bar chart comparativo turnover todos departamentos, line chart evolução turnover 12 meses, alertas destacados.
+
+### RN-CAD-024-13: Relatório Movimentações Mensal RH Compliance
+
+**Descrição**: Relatório consolidado movimentações interdepartamentais para RH compliance fiscal/trabalhista (eSocial, RAIS).
+
+**Conteúdo**: Transferências, promoções, realocações, movimentações temporárias por departamento origem/destino, colaborador, data efetivação, motivo, aprovadores.
+
+**Formato**: Excel (EPPlus) com 4 abas: (1) Transferências, (2) Promoções, (3) Realocações, (4) Temporárias. Cada aba com colunas: Colaborador, Matrícula, Origem, Destino, Data, Cargo Anterior, Cargo Novo, Motivo, Aprovadores.
+
+**Agendamento**: Job Hangfire `RelatorioMovimentacoesRHJob` recorrente Cron "0 8 1 * *" (1º dia útil mês às 08:00) processa movimentações mês anterior, gera Excel, envia email RH com anexo.
+
+**Storage**: Relatórios arquivados Azure Blob Storage container `relatorios-rh` path `{ano}/{mes}/movimentacoes-{ano}-{mes}.xlsx` (retenção 7 anos compliance).
+
+### RN-CAD-024-14: Integração Ponto Eletrônico Validar Presença Física
+
+**Descrição**: Integração com sistema ponto eletrônico (REP-A, Dimep, Secullum) para validar presença física colaborador no local físico do departamento.
+
+**Validação**: Colaborador bate ponto em local diferente campo `Localizacao_Fisica` do departamento = gera alerta. Ex: Colaborador lotado "Prédio A / 3º Andar" bate ponto "Prédio B / 1º Andar" → alerta RH + Gestor.
+
+**Uso**: Identificar trabalho remoto não autorizado, alocação física incorreta, necessidade atualização cadastro.
+
+**Implementação**: Webhook ponto eletrônico POST `/api/v1/departamentos/validar-presenca` com payload `{idUsuario, localBatida, dtHora}`. Backend busca departamento colaborador via `Usuario_Departamento`, compara `localBatida` com `Localizacao_Fisica`, se diferente cria registro `Alerta_Ponto` e notifica.
+
+**Exceções**: Colaboradores com flag `Fl_Trabalho_Remoto = 1` ou `Tipo_Lotacao = 'Temporaria'` não geram alerta.
+
+### RN-CAD-024-15: Versionamento Estrutura Organizacional Change Tracking
+
+**Descrição**: Tabela `Departamento_Historico` append-only (sem UPDATE/DELETE) registra TODOS os eventos estrutura organizacional para auditoria e rollback.
+
+**Campos**: `Id_Historico` GUID PK, `Id_Departamento` GUID FK, `Tipo_Evento` VARCHAR(50) enum 'Criacao/Alteracao/Exclusao/Movimentacao_Hierarquia/Mudanca_Lider', `Dt_Evento` DATETIME, `Id_Usuario_Responsavel` GUID FK, `Valores_JSON_Antes` NVARCHAR(MAX) JSON snapshot, `Valores_JSON_Depois` NVARCHAR(MAX) JSON snapshot, `Descricao` NVARCHAR(1000) texto livre.
+
+**Captura**: Interceptor EF Core `SaveChangesInterceptor` detecta alterações em `Departamento`, serializa valores antigos/novos para JSON via `System.Text.Json`, INSERT `Departamento_Historico` na mesma transação.
+
+**Retenção**: Histórico mantido 7 anos compliance LGPD/auditoria fiscal. Após 7 anos, job Hangfire `ArquivarHistoricoDepartamentoJob` move registros antigos para Azure Blob Storage (cold storage) e DELETE banco.
+
+**Uso**: Auditoria quem/quando alterou estrutura, rollback para versão anterior (reconstruir estado), relatórios históricos timeline mudanças organizacionais.
+
+---
+
+## 🗄️ 3. BANCO DE DADOS LEGADO
+
+O sistema legado VB.NET tinha **estrutura flat sem hierarquia** (lista simples departamentos), sem organograma visual, sem lotações múltiplas dotted-line, sem sincronização Azure AD.
+
+**Tabela Legado: `Departamento`** (estrutura flat) armazena apenas dados básicos (Id_Departamento GUID PK, Nome VARCHAR(200), Sigla VARCHAR(10), Id_Usuario_Lider GUID FK nullable tratado como texto livre sem validação, Status VARCHAR(20) enum 'Ativo/Inativo', Dt_Cadastro, Dt_Atualizacao). **SEM campos hierarquia** (Id_Departamento_Pai, Nivel_Hierarquia, Caminho_Hierarquico, Tipo_Departamento). **SEM campos Azure AD** (Azure_AD_Object_Id, AD_Distinguished_Name, Dt_Ultima_Sincronizacao_AD). **SEM campo Qtd_Colaboradores** (cálculo manual queries ad-hoc). **Índice**: PK clustered `IX_Departamento_Id`. **Problemas**: (1) Estrutura flat impede hierarquia multinível, (2) Sem organograma visual, (3) Sem validação referências circulares, (4) Campo líder texto livre sem FK, (5) Sem sincronização AD.
+
+**Lotação Legado: Campo único `Usuario.Id_Departamento`** (single FK, não tabela intermediária) armazena apenas lotação principal 100%. **SEM suporte estrutura matricial** dotted-line (colaborador em múltiplos departamentos), **SEM campo Percentual_Alocacao**, **SEM campos vigência** (Dt_Inicio, Dt_Fim), **SEM flag Tipo_Lotacao** ('Principal/Dotted_Line/Temporaria'). **Problema crítico**: Ao mudar lotação, UPDATE `Usuario.Id_Departamento` SEM histórico (perde origem), impossível rastrear movimentações.
+
+**Movimentações Legado: INEXISTENTE** - Sistema legado NÃO tem tabela `Departamento_Movimentacao`. Transferências executadas via UPDATE direto `Usuario.Id_Departamento` **SEM workflow aprovação**, **SEM histórico** (origem/destino/motivo/data), **SEM notificações** líderes, **SEM auditoria**. Impossível gerar relatórios movimentações, calcular turnover, rastrear compliance eSocial.
+
+**Organograma Legado: INEXISTENTE** - Sistema legado retorna erro `NotImplementedException("Organograma não disponível no sistema legado")` ao chamar `WebMethod ObterOrganograma()`. Frontend exibe lista flat departamentos ordenada alfabeticamente (DataGridView VB.NET) sem visualização hierárquica.
+
+**Sincronização AD Legado: INEXISTENTE** - Sistema legado retorna erro `NotImplementedException("Sincronização AD não disponível")` ao chamar `WebMethod SincronizarActiveDirectory()`. Criação grupos AD manual via console AD/PowerShell, membros adicionados manualmente, SEM sincronização automática.
+
+**WebService SOAP Legado `DepartamentoService.asmx.vb`**:
+- **`CadastrarDepartamento(nome, sigla)`**: INSERT flat sem `Id_Departamento_Pai`, sem validação código único, sem criar grupo Azure AD
+- **`AlocarUsuarioDepartamento(idUsuario, idDepartamento)`**: UPDATE `Usuario.Id_Departamento` único, sem dotted-line, sem validar soma alocações
+- **`ListarDepartamentos()`**: SELECT flat sem hierarquia recursiva, sem caminho hierárquico, sem qtd_colaboradores, ORDER BY Nome
+- **`ObterOrganograma()`**: Throw `NotImplementedException("Organograma não disponível")`
+- **`TransferirColaborador(idUsuario, idDepartamentoDestino)`**: UPDATE direto sem workflow aprovação, sem histórico, sem notificações
+- **`SincronizarActiveDirectory()`**: Throw `NotImplementedException("Sincronização AD não disponível")`
+
+**17 Problemas Críticos Legado**:
+1. ❌ Estrutura flat sem hierarquia multinível recursiva
+2. ❌ Sem organograma visual interativo
+3. ❌ Sem estrutura matricial dotted-line
+4. ❌ Sem percentual alocação colaboradores
+5. ❌ Sem validação soma alocações ≤100%
+6. ❌ Sem validação referências circulares hierarquia
+7. ❌ Sem sincronização Azure AD/LDAP automática
+8. ❌ Sem workflow aprovação movimentações
+9. ❌ Sem histórico temporal movimentações (origem/destino/motivo)
+10. ❌ Sem notificações líderes mudanças lotação
+11. ❌ Sem dashboard headcount tempo real SignalR
+12. ❌ Sem KPIs span of control
+13. ❌ Sem analytics turnover departamental
+14. ❌ Sem gestão metas departamentais (OKRs)
+15. ❌ Sem versionamento estrutura organizacional (change tracking)
+16. ❌ Sem caminho hierárquico completo (breadcrumb)
+17. ❌ Sem export organograma PNG/PDF
+
+---
+
+## 🌐 4. WEBSERVICES LEGADO (VB.NET)
+
+O sistema legado expõe **webservice SOAP** através do arquivo **`DepartamentoService.asmx.vb`** (ASP.NET Web Forms VB.NET) com estrutura flat SEM hierarquia.
+
+**Método SOAP Legado: `CadastrarDepartamento`**
+```vbnet
+<WebMethod()> Public Function CadastrarDepartamento(ByVal nome As String, ByVal sigla As String) As Guid
+    ' ❌ PROBLEMA: Flat structure - sem suporte hierarquia pai/filho
+    ' ❌ PROBLEMA: Sem validação código único por conglomerado
+    ' ❌ PROBLEMA: Sem campo Id_Usuario_Lider validado (líder texto livre)
+    Dim idDepartamento As Guid = Guid.NewGuid()
+    Dim sql As String = "INSERT INTO Departamento (Id_Departamento, Nome, Sigla) VALUES (@Id, @Nome, @Sigla)"
+    ExecutarSQL(sql) ' ❌ SQL inline sem EF Core
+    Return idDepartamento
+End Function
+```
+
+**Método SOAP Legado: `AlocarUsuarioDepartamento`**
+```vbnet
+<WebMethod()> Public Function AlocarUsuarioDepartamento(ByVal idUsuario As Guid, ByVal idDepartamento As Guid) As Boolean
+    ' ❌ PROBLEMA: Sem suporte dotted-line (estrutura matricial)
+    ' ❌ PROBLEMA: Sem percentual alocação
+    ' ❌ PROBLEMA: Sem validação soma alocações ≤100%
+    ' ❌ PROBLEMA: Sem histórico temporal (dt_inicio/dt_fim)
+    Dim sql As String = "UPDATE Usuario SET Id_Departamento = @IdDept WHERE Id_Usuario = @IdUsr"
+    ExecutarSQL(sql) ' ❌ Campo único, não suporta múltiplos departamentos
+    Return True
+End Function
+```
+
+**Método SOAP Legado: `ListarDepartamentos`**
+```vbnet
+<WebMethod()> Public Function ListarDepartamentos() As DataSet
+    ' ❌ PROBLEMA: Sem hierarquia recursiva
+    ' ❌ PROBLEMA: Sem caminho hierárquico completo
+    ' ❌ PROBLEMA: Sem qtd_colaboradores calculada
+    Dim sql As String = "SELECT Id_Departamento, Nome, Sigla FROM Departamento ORDER BY Nome"
+    Return ExecutarQuery(sql) ' ❌ Lista flat, sem relacionamento pai/filho
+End Function
+```
+
+**Método SOAP Legado: `ObterOrganograma`**
+```vbnet
+<WebMethod()> Public Function ObterOrganograma() As String
+    ' ❌ PROBLEMA: Organograma inexistente - retorna erro
+    Throw New NotImplementedException("Organograma não disponível no sistema legado")
+End Function
+```
+
+**Método SOAP Legado: `TransferirColaborador`**
+```vbnet
+<WebMethod()> Public Function TransferirColaborador(ByVal idUsuario As Guid, ByVal idDepartamentoDestino As Guid) As Boolean
+    ' ❌ PROBLEMA: Sem workflow aprovação líder origem
+    ' ❌ PROBLEMA: Sem histórico movimentação (origem/destino/motivo)
+    ' ❌ PROBLEMA: Sem notificação líderes envolvidos
+    Dim sql As String = "UPDATE Usuario SET Id_Departamento = @IdDept WHERE Id_Usuario = @IdUsr"
+    ExecutarSQL(sql) ' ❌ Update direto sem auditoria
+    Return True
+End Function
+```
+
+**Método SOAP Legado: `SincronizarActiveDirectory`**
+```vbnet
+<WebMethod()> Public Function SincronizarActiveDirectory() As Boolean
+    ' ❌ PROBLEMA: Sincronização AD inexistente
+    ' ❌ PROBLEMA: Sem Microsoft Graph API
+    ' ❌ PROBLEMA: Sem LDAP integration
+    Throw New NotImplementedException("Sincronização AD não disponível")
+End Function
+```
+
+**Estratégia Migração Legado → Moderno (3 fases)**:
+
+**Fase 1 - Criar Hierarquia Recursiva**: Script ETL identifica níveis hierarquia via padrões código legado (departamentos com código iniciando "DIR-" = raiz nível 1, "GER-" = filhos diretorias nível 2, "COORD-" = filhos gerências nível 3). Popula `Id_Departamento_Pai` via heurística nome (ex: "GER-DEV-BACKEND" filho de "GER-DEV"). Trigger atualiza `Caminho_Hierarquico` e `Nivel_Hierarquia`.
+
+**Fase 2 - Migrar Lotações Únicas para Usuario_Departamento**: Script ETL `INSERT INTO Usuario_Departamento (Id_Usuario, Id_Departamento, Tipo_Lotacao='Principal', Percentual_Alocacao=100, Dt_Inicio=GETDATE(), Fl_Ativo=1) SELECT Id_Usuario, Id_Departamento FROM Usuario WHERE Id_Departamento IS NOT NULL`. Remove campo `Usuario.Id_Departamento` após migração completa.
+
+**Fase 3 - Sincronização Inicial Azure AD**: Job Hangfire `SincronizarAzureADInicialJob` executa uma vez para criar grupos Azure AD para TODOS departamentos ativos existentes via Microsoft Graph API `POST /groups`. Armazena `Azure_AD_Object_Id` retornado. Sincronização incremental diária via job recorrente.
+
+---
+
+## 🔗 5. REFERÊNCIAS AO LEGADO
+
+| **Entidade Legado** | **Tabela Legado** | **Campo Legado** | **Entidade Nova (.NET 10)** | **Propriedade Nova** | **Observações Migração** |
+|---------------------|-------------------|------------------|----------------------------|----------------------|--------------------------|
+| Departamento | `Departamento` | `Id_Departamento` (GUID PK) | `Departamento` | `Id` (Guid) | Manter GUID compatibilidade, EF Core `[Column("Id_Departamento")]` |
+| Departamento | `Departamento` | `Nome` (VARCHAR(200)) | `Departamento` | `NomeDepartamento` (string) | Required, MaxLength(200), Full-text index busca |
+| Departamento | `Departamento` | `Sigla` (VARCHAR(10)) | `Departamento` | `Sigla` (string) | Optional, MaxLength(10), exibir organograma compacto |
+| Departamento | **SEM CAMPO** | **Id_Departamento_Pai** | `Departamento` | `IdDepartamentoPai` (Guid?) | **NOVO campo** para hierarquia recursiva, nullable (NULL = raiz), self-referencing FK, migração via heurística nome |
+| Departamento | **SEM CAMPO** | **Tipo_Departamento** | `Departamento` | `TipoDepartamento` (enum TipoDepartamentoEnum) | **NOVO campo** enum {Diretoria=1, Gerencia=2, Coordenacao=3, Equipe=4, Outro=5}, inferir via código legado (DIR-, GER-, COORD-) |
+| Departamento | **SEM CAMPO** | **Nivel_Hierarquia** | `Departamento` | `NivelHierarquia` (int) | **NOVO campo** calculado via trigger CTE recursivo, 1=Raiz, 2=Filho, 3=Neto, etc. |
+| Departamento | **SEM CAMPO** | **Caminho_Hierarquico** | `Departamento` | `CaminhoHierarquico` (string) | **NOVO campo** VARCHAR(500) calculado trigger, ex: "/DIR-TI/GER-DEV/COORD-BACKEND", usado breadcrumb frontend |
+| Departamento | `Departamento` | `Id_Usuario_Lider` (GUID nullable texto livre) | `Departamento` | `IdUsuarioLider` (Guid) | Validar FK Usuario, NOT NULL (exceto tipo="Equipe"), migração verificar usuários válidos |
+| Departamento | **SEM CAMPO** | **Qtd_Colaboradores** | `Departamento` | `QtdColaboradores` (int) | **NOVO campo** INT DEFAULT 0 atualizado trigger, COUNT Usuario_Departamento WHERE Tipo_Lotacao='Principal' AND Fl_Ativo=1 |
+| Departamento | **SEM CAMPO** | **Azure_AD_Object_Id** | `Departamento` | `AzureADObjectId` (string) | **NOVO campo** NVARCHAR(100) armazena Azure AD Group Object ID, populado após sincronização inicial |
+| Departamento | **SEM CAMPO** | **AD_Distinguished_Name** | `Departamento` | `ADDistinguishedName` (string) | **NOVO campo** NVARCHAR(500) LDAP DN para ambientes on-premises, opcional se usar apenas Azure AD |
+| Departamento | **SEM CAMPO** | **Dt_Ultima_Sincronizacao_AD** | `Departamento` | `DataUltimaSincronizacaoAD` (DateTime?) | **NOVO campo** nullable, atualizado após job Hangfire sincronizar Azure AD com sucesso |
+| Usuario | `Usuario.Id_Departamento` (FK único) | **Campo único FK** | **Tabela intermediária** | `Usuario_Departamento` (tabela 1:N) | **MIGRAÇÃO BREAKING**: Substituir FK único por tabela intermediária permitir lotações múltiplas, migrar INSERT Usuario_Departamento com Tipo_Lotacao='Principal' Percentual=100% |
+| Usuario_Departamento | **TABELA INEXISTENTE** | **N/A** | `UsuarioDepartamento` | Entidade completa nova | **TABELA NOVA** relacionamento N:N Usuario ↔ Departamento, campos: Id_Usuario, Id_Departamento, Tipo_Lotacao enum, Percentual_Alocacao DECIMAL(5,2), Dt_Inicio, Dt_Fim, Fl_Ativo |
+| Usuario_Departamento | **SEM CAMPO** | **Tipo_Lotacao** | `UsuarioDepartamento` | `TipoLotacao` (enum TipoLotacaoEnum) | **NOVO campo** enum {Principal=1, DottedLine=2, Temporaria=3}, constraint UNIQUE (Id_Usuario, Tipo_Lotacao, Fl_Ativo) WHERE Principal |
+| Usuario_Departamento | **SEM CAMPO** | **Percentual_Alocacao** | `UsuarioDepartamento` | `PercentualAlocacao` (decimal) | **NOVO campo** DECIMAL(5,2) CHECK (>0 AND <=100), trigger valida SUM(Percentual) WHERE Fl_Ativo <= 100 |
+| Departamento_Movimentacao | **TABELA INEXISTENTE** | **N/A** | `DepartamentoMovimentacao` | Entidade completa nova | **TABELA NOVA** histórico movimentações, campos: Id_Usuario, Id_Departamento_Origem, Id_Departamento_Destino, Tipo_Movimentacao enum, Dt_Efetivacao, Motivo, Status_Aprovacao enum, aprovadores (3 FK), Cargo_Anterior, Cargo_Novo |
+| Departamento_Meta | **TABELA INEXISTENTE** | **N/A** | `DepartamentoMeta` | Entidade completa nova | **TABELA NOVA** metas OKRs trimestrais, campos: Id_Departamento, Ano, Trimestre, Descricao_Meta, Tipo_Meta enum, Valor_Meta, Valor_Realizado, Percentual_Atingimento computed, Status_Meta enum |
+| Departamento_Historico | **TABELA INEXISTENTE** | **N/A** | `DepartamentoHistorico` | Entidade completa nova | **TABELA NOVA** versionamento change tracking append-only, campos: Id_Departamento, Tipo_Evento enum, Dt_Evento, Id_Usuario_Responsavel, Valores_JSON_Antes, Valores_JSON_Depois, Descricao |
+| View Hierarquia | **VIEW INEXISTENTE** | **N/A** | `VW_Departamento_Hierarquia_Completa` | View CTE recursivo | **VIEW NOVA** CTE recursivo retorna árvore completa hierarquia com caminho completo ("Diretoria > Gerência > Coordenação"), usado organograma frontend |
+| WebService SOAP | `DepartamentoService.asmx` | Métodos SOAP | REST API | `DepartamentosController` | **Migração SOAP → REST**: CadastrarDepartamento → POST /api/v1/departamentos, ListarDepartamentos → GET /api/v1/departamentos, TransferirColaborador → POST /api/v1/departamentos/transferir, ObterOrganograma → GET /api/v1/departamentos/organograma (NOVO endpoint) |
+| Organograma | **FUNCIONALIDADE INEXISTENTE** | **N/A** | Frontend Angular + D3.js | Componente organograma-visual | **FUNCIONALIDADE NOVA** implementar do zero organograma interativo D3.js v7 com zoom, pan, collapse/expand, busca, export PNG/PDF, sem migração dados (gerar runtime) |
+| Sincronização AD | **FUNCIONALIDADE INEXISTENTE** | **N/A** | Microsoft Graph API + Hangfire | Job SincronizarAzureADJob | **FUNCIONALIDADE NOVA** integração Microsoft Graph SDK .NET, job diário criar/atualizar grupos AD, adicionar/remover membros, autenticação Client Credentials Flow |
+| Trigger Caminho Hierárquico | **TRIGGER INEXISTENTE** | **N/A** | `trg_Departamento_AtualizarCaminhoHierarquico` | Trigger T-SQL CTE | **TRIGGER NOVO** After INSERT/UPDATE executa CTE recursivo atualizar Caminho_Hierarquico e Nivel_Hierarquia automaticamente |
+| Trigger Qtd Colaboradores | **TRIGGER INEXISTENTE** | **N/A** | `trg_Usuario_Departamento_AtualizarQtdColaboradores` | Trigger T-SQL | **TRIGGER NOVO** After INSERT/UPDATE/DELETE Usuario_Departamento atualiza Departamento.Qtd_Colaboradores automaticamente |
+| Trigger Validar Alocação | **TRIGGER INEXISTENTE** | **N/A** | `trg_Usuario_Departamento_ValidarAlocacao` | Trigger T-SQL | **TRIGGER NOVO** After INSERT/UPDATE valida SUM(Percentual_Alocacao) WHERE Fl_Ativo <= 100, ROLLBACK se exceder |
+| Dashboard Headcount | **FUNCIONALIDADE INEXISTENTE** | **N/A** | Frontend Angular + SignalR + Chart.js | Componente dashboard-headcount | **FUNCIONALIDADE NOVA** dashboard tempo real via SignalR Hub, métricas headcount atual vs orçado, taxa ocupação, variação mês anterior, projeção trimestre |
+| Analytics Turnover | **FUNCIONALIDADE INEXISTENTE** | **N/A** | Backend .NET 10 + Chart.js | Query ObterAnalyticsTurnoverQuery | **FUNCIONALIDADE NOVA** calcular turnover departamental (Saídas / Headcount Médio) * 100, benchmark <10% ao ano, alertas >15%, gráficos comparativos |
+
+**Observações Gerais Migração**: (1) **Hierarquia Recursiva**: Migração mais complexa, usar script ETL heurístico para inferir `Id_Departamento_Pai` via padrões código/nome, validar manualmente após migração automática, ajustar erros via interface admin. (2) **Lotações Múltiplas**: Breaking change significativo - campo único `Usuario.Id_Departamento` substituído por tabela `Usuario_Departamento` N:N, todas queries legado precisam JOIN nova tabela. (3) **Azure AD Sync**: Funcionalidade 100% nova sem equivalente legado, executar sincronização inicial manual para criar grupos AD todos departamentos existentes antes habilitar sincronização automática. (4) **Organograma Visual**: Feature completamente nova, implementar frontend Angular do zero usando D3.js, backend retorna DTO recursivo via CTE, sem necessidade migração dados (gerado runtime). (5) **Triggers**: 3 triggers novos cruciais para integridade dados - caminho hierárquico, qtd colaboradores, validação alocação - testar extensivamente em homologação antes produção. (6) **Performance**: Hierarquia recursiva pode impactar performance queries grandes (>1000 departamentos), implementar cache Redis TTL 1h para organograma, invalidar cache ao criar/editar departamento. (7) **Movimentações**: Workflow aprovação multinível novo conceito, treinar usuários RH + líderes antes go-live, considerar período transição permitir movimentações diretas emergenciais. (8) **Testes**: Criar suite testes integração completa validar: (a) Detecção loops hierarquia, (b) Validação soma alocações ≤100%, (c) Sincronização Azure AD mock, (d) Organograma rendering performance >500 nós, (e) SignalR broadcast headcount tempo real <500ms latência.
+
+---
+
+## 📚 REFERÊNCIAS
+
+### Documentação Técnica
+- [ROADMAP-BASE.md](../../../ROADMAP-BASE.md) - Arquitetura geral IControlIT v2
+- [MANUAL-DE-DOCUMENTACAO.md](../../../MANUAL-DE-DOCUMENTACAO.md) - Padrões de documentação
+- [RF-CAD-005](../../EPIC-CAD-Cadastros-Basicos/RF-CAD-005-Gestao-de-Usuarios/RF-CAD-005-Gestao-de-Usuarios.md) - Gestão de Usuários (colaboradores)
+- [RF-CAD-006](../../EPIC-CAD-Cadastros-Basicos/RF-CAD-006-Gestao-de-Perfis-de-Acesso/RF-CAD-006-Gestao-de-Perfis-de-Acesso.md) - Perfis de Acesso (permissões líderes)
+
+### Tecnologias Backend
+- **.NET 10**: Framework principal, minimal APIs, performance improvements
+- **EF Core 8**: ORM com CTE recursivo suporte hierarquia, self-referencing FK
+- **MediatR**: CQRS pattern (Commands/Queries), domain events workflow movimentações
+- **FluentValidation**: Validação comandos (código único, formato regex, referências circulares)
+- **Microsoft Graph SDK**: Integração Azure AD criar/atualizar grupos, adicionar membros
+- **Hangfire**: Jobs recorrentes sincronização AD diária, relatório movimentações RH mensal, alertas turnover alto
+
+### Tecnologias Frontend
+- **Angular 18**: Framework SPA, standalone components, signals, SSR
+- **D3.js v7**: Biblioteca JavaScript visualizações hierárquicas (force-directed graph, tree layout)
+- **GoJS** (alternativa comercial): Layouts avançados (fishbone, circular), licença US$ 1.990/dev
+- **Chart.js**: Gráficos interativos (line chart headcount, bar chart turnover, gauge taxa ocupação)
+- **SignalR Client**: WebSocket bidirecional atualizar dashboard tempo real (Hub DepartamentoHub)
+
+### Integrações
+- **Microsoft Graph API**: POST /groups criar grupo AD, PATCH /groups/{id}/members adicionar membro
+- **Azure AD App Registration**: Client Credentials Flow, permissões Group.ReadWrite.All + User.Read.All
+- **LDAP / Novell.Directory.Ldap**: Ambientes on-premises sem Azure AD (opcional)
+- **Ponto Eletrônico**: Webhook POST validar presença física (REP-A, Dimep, Secullum)
+
+### Bibliotecas .NET
+- **Azure.Identity**: Autenticação Azure AD (DefaultAzureCredential, ClientSecretCredential)
+- **Microsoft.Graph**: SDK oficial Microsoft Graph API grupos/usuários
+- **EPPlus**: Geração relatórios Excel movimentações RH (4 abas: Transferências, Promoções, Realocações, Temporárias)
+- **System.Text.Json**: Serialização JSON campos Valores_JSON_Antes/Depois histórico
+- **FluentValidation**: Regras complexas validação (formato código, loops hierarquia, soma alocações)
+
+### Padrões Implementados
+- **Clean Architecture**: Separação Domain/Application/Infrastructure/API
+- **CQRS**: Commands (CriarDepartamentoCommand, TransferirColaboradorCommand) + Queries (ObterOrganogramaQuery, ObterDashboardHeadcountQuery)
+- **Repository Pattern**: IRepository<Departamento> abstração acesso dados
+- **Domain Events**: ColaboradorAlocadoEvent, MovimentacaoAprovadaEvent, EstruturaDepartamentoAlteradaEvent via MediatR
+- **Self-Referencing Hierarchy**: Departamento.IdDepartamentoPai FK recursivo
+- **Soft Delete Pattern**: Fl_Ativo flag + Global Query Filter EF Core
+- **Multi-Tenancy Pattern**: Id_Conglomerado isolamento dados via middleware
+- **Change Tracking Pattern**: Departamento_Historico append-only auditoria
+- **Workflow Pattern**: Status_Aprovacao enum sequencial (Pendente → Aprovado_Origem → Aprovado_Destino → Aprovado_RH)
+
+---
+
+**Próximas Etapas**: (1) Implementar agregado Departamento com self-referencing FK e validação loops hierarquia, (2) Criar tabela Usuario_Departamento para lotações múltiplas com triggers validação, (3) Implementar Commands/Queries MediatR (CriarDepartamento, TransferirColaborador, ObterOrganograma), (4) Desenvolver frontend Angular organograma visual D3.js com zoom, pan, collapse/expand, busca, export, (5) Configurar integração Microsoft Graph API Client Credentials Flow (app registration Azure AD), (6) Implementar job Hangfire sincronização AD diário (criar grupos, atualizar membros, armazenar Object ID), (7) Criar SignalR Hub DepartamentoHub broadcast eventos headcount tempo real, (8) Implementar dashboard headcount Chart.js com métricas (atual vs orçado, taxa ocupação, variação, projeção), (9) Desenvolver workflow movimentações aprovação multinível com notificações multicanal, (10) Criar suite testes validação loops hierarquia, soma alocações ≤100%, sincronização AD mock, organograma performance >500 nós.
+
+---
+
+[← Voltar ao Índice](./README.md)
+
+
+## TELAS DO LEGADO
+
+### Referência ao RF-CAD-003
+
+As telas relacionadas à **Gestão de Departamentos** já foram documentadas no **RF-CAD-003 (Hierarquia Corporativa)** da Fase 1, pois Departamento faz parte da estrutura hierárquica fundamental do sistema.
+
+**Tela documentada em RF-CAD-003**:
+- **Departamento.aspx** - 3 campos, 7 categorias de modernização
+
+**Consulte**: `D:\IC2\docs\Fases\Fase-1-Fundacao-e-Cadastros-Base\EPIC-CAD-Cadastros-Base\RF-CAD-003-Hierarquia-Corporativa\RF-CAD-003-Hierarquia-Corporativa.md`

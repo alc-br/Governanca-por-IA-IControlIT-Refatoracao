@@ -1,0 +1,1113 @@
+# RF033 - Gestão de Chamados (Service Desk / Help Desk)
+
+**EPIC:** EPIC003-GES - Gestão
+**Fase:** Fase 2 - Serviços Essenciais
+**Requisito Funcional:** RF033
+**Responsável pela Especificação:** Architect Agent
+**Data de Criação:** 2025-01-14
+**Última Atualização:** 2025-01-14
+**Versão:** 1.0
+
+---
+
+## SEÇÃO 1: RESUMO EXECUTIVO
+
+### 1.1. Visão Geral
+
+O **RF033 - Gestão de Chamados** implementa um sistema completo de Service Desk / Help Desk para gerenciamento de solicitações de serviços, suporte técnico, incidentes e requisições relacionadas a telecomunicações e TI. Este módulo é fundamental para o controle de SLA, rastreabilidade de atendimentos e gestão de qualidade do suporte.
+
+O sistema permite abertura de chamados pelos usuários finais, distribuição automática ou manual para filas de atendimento, controle de SLA com alertas de vencimento, avaliação de qualidade do atendimento e histórico completo de interações. Integra-se com módulos de ativ, consumidores e operadoras para contextualizar os chamados.
+
+### 1.2. Importância Estratégica
+
+**Valor de Negócio:**
+- **Gestão de SLA:** Controle rigoroso de prazos de atendimento com alertas automáticos
+- **Qualidade de Serviço:** Avaliação de satisfação e identificação de melhorias
+- **Rastreabilidade:** Histórico completo de todas as interações e soluções aplicadas
+- **Produtividade:** Distribuição inteligente de chamados por fila e tipo de especialização
+
+**Impacto Operacional:**
+- Reduz tempo médio de resolução (MTTR) através de workflow otimizado
+- Melhora satisfação do usuário final com SLA transparente
+- Facilita identificação de problemas recorrentes e oportunidades de automação
+- Gera métricas de desempenho da equipe de suporte
+
+### 1.3. Comparação: Sistema Legado vs. Sistema Modernizado
+
+| Aspecto | Sistema Legado (ASP.NET Web Forms) | Sistema Modernizado (.NET 10 + Angular 19) |
+|---------|-----------------------------------|---------------------------------------------|
+| **Arquitetura** | Monolítica, tabela `Solicitacao` sem padrões | Clean Architecture, CQRS, Domain Events |
+| **Interface** | Formulários complexos, múltiplos postbacks | SPA responsiva, atualização em tempo real (SignalR) |
+| **Workflow** | Fluxo fixo sem customização | Workflow configurável por tipo de chamado |
+| **SLA** | Cálculo manual, campo texto (Excedente_SLA) | Cálculo automático em tempo real, alertas proativos |
+| **Notificações** | E-mail básico via campos Id_Mail_Caixa_Saida | Sistema de notificações multi-canal (e-mail, push, SMS) |
+| **Avaliação** | Tabela separada sem validações | Integração completa com NPS e satisfação |
+| **Auditoria** | Sem rastreamento de alterações | Auditoria completa de todas operações (7 anos LGPD) |
+| **Multi-tenancy** | Filtros manuais por empresa | Row-Level Security automático por conglomerado |
+| **Permissões** | Tabela `Solicitacao_Permissao` customizada | RBAC granular com políticas por operação |
+| **Performance** | Queries lentas, sem índices otimizados | Queries otimizadas, caching, paginação |
+| **Integrações** | Integração manual com ativos e consumidores | Domain Events para integrações automáticas |
+
+### 1.4. Principais Funcionalidades
+
+1. **Abertura de Chamados**
+   - Criação de chamados por usuários finais ou equipe de suporte
+   - Categorização por tipo de solicitação (incidente, requisição, dúvida)
+   - Vinculação automática a ativos, consumidores e contratos
+   - Upload de anexos e evidências
+
+2. **Distribuição e Atribuição**
+   - Atribuição automática por fila de atendimento
+   - Atribuição manual para técnicos específicos
+   - Redistribuição e escalação automática por SLA
+   - Balanceamento de carga entre atendentes
+
+3. **Controle de SLA**
+   - Cálculo automático de prazo baseado em tipo e prioridade
+   - Alertas visuais e notificações de vencimento iminente
+   - Pausas de SLA por datas de parada (feriados, manutenções)
+   - Relatório de compliance de SLA
+
+4. **Interações e Histórico**
+   - Registro de todas as interações (público e privado)
+   - Histórico de alterações de status
+   - Anexos e evidências por interação
+   - Timeline visual de atendimento
+
+5. **Encerramento e Avaliação**
+   - Encerramento com solução documentada
+   - Avaliação de satisfação (NPS de 1 a 5)
+   - Base de conhecimento de soluções
+   - Reabertura controlada
+
+6. **Painéis e Métricas**
+   - Dashboard de chamados por status
+   - Indicadores de SLA (atendidos vs. vencidos)
+   - Ranking de satisfação
+   - Relatórios gerenciais
+
+### 1.5. Escopo
+
+**Incluído neste RF:**
+- ✅ CRUD completo de chamados e interações
+- ✅ Sistema de SLA com alertas automáticos
+- ✅ Filas de atendimento e distribuição
+- ✅ Avaliação de satisfação (NPS)
+- ✅ Histórico completo e auditoria
+- ✅ Notificações multi-canal
+- ✅ Interface responsiva com Angular Material
+- ✅ Integração com ativos, consumidores e usuários
+
+**Não incluído neste RF:**
+- ❌ Base de conhecimento completa (será RF futuro)
+- ❌ Chatbot de atendimento automático
+- ❌ Integração com telefonia (CTI)
+- ❌ Gestão de problemas e mudanças (ITIL completo)
+
+---
+
+## SEÇÃO 2: REGRAS DE NEGÓCIO
+
+### RN001 - Campos Obrigatórios na Abertura
+
+**Descrição:**
+Todo chamado deve ter título, data de solicitação, usuário solicitante, tipo de solicitação e tipo de ativo obrigatórios.
+
+**Justificativa:**
+Garante informações mínimas para categorização e atendimento adequado.
+
+**Implementação:**
+```csharp
+public class CreateChamadoCommandValidator : AbstractValidator<CreateChamadoCommand>
+{
+    public CreateChamadoCommandValidator()
+    {
+        RuleFor(x => x.Titulo)
+            .NotEmpty().WithMessage("Título é obrigatório")
+            .MaximumLength(300).WithMessage("Título não pode exceder 300 caracteres");
+
+        RuleFor(x => x.UsuarioSolicitanteId)
+            .NotEmpty().WithMessage("Usuário solicitante é obrigatório");
+
+        RuleFor(x => x.TipoSolicitacaoId)
+            .NotEmpty().WithMessage("Tipo de solicitação é obrigatório");
+
+        RuleFor(x => x.TipoAtivoId)
+            .NotEmpty().WithMessage("Tipo de ativo é obrigatório");
+
+        RuleFor(x => x.DataSolicitacao)
+            .NotEmpty().WithMessage("Data de solicitação é obrigatória")
+            .LessThanOrEqualTo(DateTime.Now).WithMessage("Data não pode ser futura");
+    }
+}
+```
+
+---
+
+### RN002 - Cálculo Automático de SLA
+
+**Descrição:**
+O prazo de vencimento (SLA) deve ser calculado automaticamente com base no tipo de solicitação, considerando apenas dias úteis e excluindo datas de parada cadastradas.
+
+**Justificativa:**
+Garante cumprimento de acordos de nível de serviço e facilita gestão de prazos.
+
+**Implementação:**
+```csharp
+public class CalcularSLAService : ICalcularSLAService
+{
+    public async Task<DateTime> CalcularDataVencimento(
+        Guid tipoSolicitacaoId,
+        DateTime dataAbertura,
+        CancellationToken cancellationToken)
+    {
+        var tipoSolicitacao = await _context.TiposSolicitacao
+            .Include(t => t.SLA)
+            .FirstOrDefaultAsync(t => t.Id == tipoSolicitacaoId, cancellationToken);
+
+        var prazoDias = tipoSolicitacao.SLA.PrazoDias;
+
+        var datasParada = await _context.DatasParada
+            .Where(d => d.Data >= dataAbertura && !d.FlExcluido)
+            .Select(d => d.Data.Date)
+            .ToListAsync(cancellationToken);
+
+        var dataVencimento = dataAbertura;
+        int diasAdicionados = 0;
+
+        while (diasAdicionados < prazoDias)
+        {
+            dataVencimento = dataVencimento.AddDays(1);
+
+            // Pular finais de semana
+            if (dataVencimento.DayOfWeek == DayOfWeek.Saturday ||
+                dataVencimento.DayOfWeek == DayOfWeek.Sunday)
+                continue;
+
+            // Pular datas de parada (feriados, manutenções)
+            if (datasParada.Contains(dataVencimento.Date))
+                continue;
+
+            diasAdicionados++;
+        }
+
+        return dataVencimento;
+    }
+}
+```
+
+---
+
+### RN003 - Validação de Status e Transições
+
+**Descrição:**
+As transições de status devem seguir um fluxo válido: Aberto → Em Atendimento → Aguardando → Resolvido → Encerrado. Não é permitido pular etapas ou retroceder (exceto reabertura).
+
+**Justificativa:**
+Garante rastreabilidade e integridade do workflow de atendimento.
+
+**Implementação:**
+```csharp
+public enum ChamadoStatus
+{
+    Aberto = 1,
+    EmAtendimento = 2,
+    AguardandoUsuario = 3,
+    AguardandoFornecedor = 4,
+    Resolvido = 5,
+    Encerrado = 6,
+    Cancelado = 7
+}
+
+public class UpdateChamadoStatusCommandValidator : AbstractValidator<UpdateChamadoStatusCommand>
+{
+    private static readonly Dictionary<ChamadoStatus, List<ChamadoStatus>> TransicoesPermitidas = new()
+    {
+        { ChamadoStatus.Aberto, new() { ChamadoStatus.EmAtendimento, ChamadoStatus.Cancelado } },
+        { ChamadoStatus.EmAtendimento, new() { ChamadoStatus.AguardandoUsuario, ChamadoStatus.AguardandoFornecedor, ChamadoStatus.Resolvido } },
+        { ChamadoStatus.AguardandoUsuario, new() { ChamadoStatus.EmAtendimento, ChamadoStatus.Resolvido } },
+        { ChamadoStatus.AguardandoFornecedor, new() { ChamadoStatus.EmAtendimento, ChamadoStatus.Resolvido } },
+        { ChamadoStatus.Resolvido, new() { ChamadoStatus.Encerrado, ChamadoStatus.EmAtendimento } }, // Permite reabertura
+        { ChamadoStatus.Encerrado, new() { ChamadoStatus.EmAtendimento } }, // Reabertura
+        { ChamadoStatus.Cancelado, new() { } } // Não permite transições
+    };
+
+    public UpdateChamadoStatusCommandValidator(IApplicationDbContext context)
+    {
+        RuleFor(x => x)
+            .MustAsync(async (command, cancellation) =>
+            {
+                var chamado = await context.Chamados.FindAsync(command.ChamadoId);
+                var statusAtual = chamado.Status;
+                var novoStatus = command.NovoStatus;
+
+                return TransicoesPermitidas[statusAtual].Contains(novoStatus);
+            })
+            .WithMessage("Transição de status não permitida");
+    }
+}
+```
+
+---
+
+### RN004 - Solução Obrigatória no Encerramento
+
+**Descrição:**
+Ao encerrar um chamado (status = Encerrado), é obrigatório informar a solução aplicada.
+
+**Justificativa:**
+Constrói base de conhecimento e facilita resolução de problemas similares.
+
+**Implementação:**
+```csharp
+RuleFor(x => x.SolucaoId)
+    .NotEmpty()
+    .When(x => x.NovoStatus == ChamadoStatus.Encerrado)
+    .WithMessage("Solução é obrigatória ao encerrar chamado");
+```
+
+---
+
+### RN005 - Alerta de SLA Vencido ou Próximo do Vencimento
+
+**Descrição:**
+O sistema deve emitir alertas visuais e notificações quando o chamado estiver próximo do vencimento (80% do prazo) ou vencido.
+
+**Justificativa:**
+Permite ação proativa da equipe de suporte para evitar violações de SLA.
+
+**Implementação:**
+```csharp
+public class VerificarSLAChamadosJob : IJob
+{
+    public async Task Execute(IJobExecutionContext context)
+    {
+        var chamadosEmAberto = await _context.Chamados
+            .Where(c => c.Status != ChamadoStatus.Encerrado
+                     && c.Status != ChamadoStatus.Cancelado
+                     && !c.FlExcluido)
+            .ToListAsync();
+
+        foreach (var chamado in chamadosEmAberto)
+        {
+            var percentualDecorrido = CalcularPercentualSLA(chamado);
+
+            if (percentualDecorrido >= 100) // Vencido
+            {
+                await _notificacaoService.EnviarAlerta(
+                    chamado.Id,
+                    "SLA vencido!",
+                    TipoAlerta.Critico);
+            }
+            else if (percentualDecorrido >= 80) // 80% do prazo
+            {
+                await _notificacaoService.EnviarAlerta(
+                    chamado.Id,
+                    "SLA próximo do vencimento (80%)",
+                    TipoAlerta.Aviso);
+            }
+        }
+    }
+
+    private decimal CalcularPercentualSLA(Chamado chamado)
+    {
+        var tempoTotal = (chamado.DataVencimento - chamado.DataSolicitacao).TotalHours;
+        var tempoDecorrido = (DateTime.Now - chamado.DataSolicitacao).TotalHours;
+
+        return (decimal)(tempoDecorrido / tempoTotal * 100);
+    }
+}
+```
+
+---
+
+### RN006 - Avaliação de Satisfação Opcional
+
+**Descrição:**
+A avaliação de satisfação é opcional, mas se informada, deve ter nota de 1 a 5 e comentário opcional.
+
+**Justificativa:**
+Permite medir qualidade do atendimento sem obrigar usuário a avaliar.
+
+**Implementação:**
+```csharp
+public class AvaliarChamadoCommandValidator : AbstractValidator<AvaliarChamadoCommand>
+{
+    public AvaliarChamadoCommandValidator()
+    {
+        RuleFor(x => x.Avaliacao)
+            .InclusiveBetween(1, 5)
+            .WithMessage("Avaliação deve ser entre 1 e 5");
+
+        RuleFor(x => x.Comentario)
+            .MaximumLength(500)
+            .WithMessage("Comentário não pode exceder 500 caracteres");
+    }
+}
+```
+
+---
+
+### RN007 - Interações Públicas e Privadas
+
+**Descrição:**
+Interações (itens) do chamado podem ser públicas (visíveis ao solicitante) ou privadas (apenas equipe de suporte).
+
+**Justificativa:**
+Permite comunicação interna da equipe sem expor detalhes técnicos ao usuário.
+
+**Implementação:**
+```csharp
+public class ChamadoItem
+{
+    public Guid Id { get; set; }
+    public Guid ChamadoId { get; set; }
+    public string Descricao { get; set; }
+    public Guid UsuarioId { get; set; }
+    public DateTime DataHora { get; set; }
+    public bool FlPublico { get; set; } // true = visível ao solicitante, false = apenas equipe
+}
+
+// Query para listar interações
+public async Task<List<ChamadoItemDto>> Handle(GetChamadoItensQuery request, CancellationToken cancellationToken)
+{
+    var usuarioAtual = _currentUserService.UserId;
+    var chamado = await _context.Chamados.FindAsync(request.ChamadoId);
+
+    var query = _context.ChamadoItens
+        .Where(i => i.ChamadoId == request.ChamadoId && !i.FlExcluido);
+
+    // Se usuário é solicitante, mostrar apenas públicas
+    if (usuarioAtual == chamado.UsuarioSolicitanteId)
+    {
+        query = query.Where(i => i.FlPublico);
+    }
+
+    return await query
+        .ProjectTo<ChamadoItemDto>(_mapper.ConfigurationProvider)
+        .ToListAsync(cancellationToken);
+}
+```
+
+---
+
+### RN008 - Atribuição a Fila de Atendimento
+
+**Descrição:**
+Todo chamado deve ser atribuído a uma fila de atendimento no momento da criação ou distribuição.
+
+**Justificativa:**
+Organiza trabalho por especialização e facilita distribuição de carga.
+
+**Implementação:**
+```csharp
+RuleFor(x => x.FilaAtendimentoId)
+    .NotEmpty().WithMessage("Fila de atendimento é obrigatória")
+    .MustAsync(async (filaId, cancellation) =>
+    {
+        var fila = await context.FilasAtendimento
+            .FirstOrDefaultAsync(f => f.Id == filaId && !f.FlExcluido, cancellation);
+        return fila != null;
+    })
+    .WithMessage("Fila de atendimento inválida ou inativa");
+```
+
+---
+
+### RN009 - Vinculação a Ativo ou Consumidor
+
+**Descrição:**
+O chamado pode ser vinculado a um ativo específico e/ou a uma unidade de consumidor para contextualizar o atendimento.
+
+**Justificativa:**
+Facilita identificação de problemas recorrentes em ativos ou localidades específicas.
+
+**Implementação:**
+```csharp
+public class Chamado
+{
+    // ... outros campos
+
+    public Guid? AtivoId { get; set; } // Opcional: vincular a ativo específico
+    public Ativo? Ativo { get; set; }
+
+    public Guid? ConsumidorUnidadeId { get; set; } // Opcional: vincular a unidade/localidade
+    public ConsumidorUnidade? ConsumidorUnidade { get; set; }
+}
+
+// Validação
+RuleFor(x => x.AtivoId)
+    .MustAsync(async (command, ativoId, cancellation) =>
+    {
+        if (ativoId == null) return true;
+
+        var ativo = await context.Ativos
+            .FirstOrDefaultAsync(a => a.Id == ativoId
+                                   && a.ConglomeradoId == command.ConglomeradoId
+                                   && !a.FlExcluido,
+                                cancellation);
+        return ativo != null;
+    })
+    .WithMessage("Ativo inválido ou inativo");
+```
+
+---
+
+### RN010 - Notificações Automáticas
+
+**Descrição:**
+O sistema deve enviar notificações automáticas em eventos-chave: abertura, atribuição, alteração de status, vencimento de SLA, encerramento e avaliação.
+
+**Justificativa:**
+Mantém todas as partes informadas e reduz tempo de resposta.
+
+**Implementação:**
+```csharp
+public class ChamadoCriadoDomainEvent : INotification
+{
+    public Guid ChamadoId { get; }
+
+    public ChamadoCriadoDomainEvent(Guid chamadoId)
+    {
+        ChamadoId = chamadoId;
+    }
+}
+
+public class ChamadoCriadoDomainEventHandler : INotificationHandler<ChamadoCriadoDomainEvent>
+{
+    public async Task Handle(ChamadoCriadoDomainEvent notification, CancellationToken cancellationToken)
+    {
+        var chamado = await _context.Chamados
+            .Include(c => c.UsuarioSolicitante)
+            .Include(c => c.FilaAtendimento)
+            .FirstOrDefaultAsync(c => c.Id == notification.ChamadoId, cancellationToken);
+
+        // Notificar solicitante
+        await _notificacaoService.Enviar(
+            chamado.UsuarioSolicitanteId,
+            $"Chamado #{chamado.Id.ToString().Substring(0, 8)} criado com sucesso",
+            TipoNotificacao.Email);
+
+        // Notificar fila de atendimento
+        await _notificacaoService.EnviarParaFila(
+            chamado.FilaAtendimentoId,
+            $"Novo chamado atribuído: {chamado.Titulo}",
+            TipoNotificacao.Push);
+    }
+}
+```
+
+---
+
+### RN011 - Reabertura de Chamado Encerrado
+
+**Descrição:**
+Chamados encerrados podem ser reabertos pelo solicitante ou equipe de suporte em até 7 dias após o encerramento.
+
+**Justificativa:**
+Permite tratar casos onde a solução não foi efetiva sem criar novo chamado.
+
+**Implementação:**
+```csharp
+public class ReabrirChamadoCommandValidator : AbstractValidator<ReabrirChamadoCommand>
+{
+    public ReabrirChamadoCommandValidator(IApplicationDbContext context)
+    {
+        RuleFor(x => x.ChamadoId)
+            .MustAsync(async (chamadoId, cancellation) =>
+            {
+                var chamado = await context.Chamados.FindAsync(chamadoId);
+
+                if (chamado.Status != ChamadoStatus.Encerrado)
+                    return false;
+
+                var diasDesdeEncerramento = (DateTime.Now - chamado.DataEncerramento.Value).TotalDays;
+
+                return diasDesdeEncerramento <= 7;
+            })
+            .WithMessage("Chamado só pode ser reaberto em até 7 dias após o encerramento");
+
+        RuleFor(x => x.Justificativa)
+            .NotEmpty().WithMessage("Justificativa é obrigatória para reabertura")
+            .MaximumLength(500);
+    }
+}
+```
+
+---
+
+### RN012 - Prazo SLA Pausado em Status "Aguardando"
+
+**Descrição:**
+Quando o chamado está em status "Aguardando Usuário" ou "Aguardando Fornecedor", o prazo de SLA deve ser pausado e retomado ao voltar para "Em Atendimento".
+
+**Justificativa:**
+Evita penalização da equipe de suporte por atrasos causados por terceiros.
+
+**Implementação:**
+```csharp
+public class Chamado
+{
+    public DateTime? DataInicioAguardando { get; set; }
+    public int TotalHorasAguardando { get; set; } // Acumulado
+
+    public DateTime DataVencimentoEfetiva
+    {
+        get
+        {
+            var vencimentoOriginal = DataVencimento;
+
+            // Se está aguardando, adicionar tempo pausado até agora
+            if (Status == ChamadoStatus.AguardandoUsuario || Status == ChamadoStatus.AguardandoFornecedor)
+            {
+                var horasAguardandoAtual = (DateTime.Now - DataInicioAguardando.Value).TotalHours;
+                return vencimentoOriginal.AddHours(TotalHorasAguardando + horasAguardandoAtual);
+            }
+
+            // Se não está aguardando, apenas adicionar tempo acumulado de pausas anteriores
+            return vencimentoOriginal.AddHours(TotalHorasAguardando);
+        }
+    }
+}
+
+// Ao mudar para "Aguardando"
+if (novoStatus == ChamadoStatus.AguardandoUsuario || novoStatus == ChamadoStatus.AguardandoFornecedor)
+{
+    chamado.DataInicioAguardando = DateTime.Now;
+}
+
+// Ao sair de "Aguardando"
+if (statusAnterior == ChamadoStatus.AguardandoUsuario || statusAnterior == ChamadoStatus.AguardandoFornecedor)
+{
+    var horasPausadas = (DateTime.Now - chamado.DataInicioAguardando.Value).TotalHours;
+    chamado.TotalHorasAguardando += (int)Math.Ceiling(horasPausadas);
+    chamado.DataInicioAguardando = null;
+}
+```
+
+---
+
+### RN013 - Anexos e Evidências
+
+**Descrição:**
+O chamado e suas interações podem ter anexos (imagens, PDFs, logs) com limite de 10 MB por arquivo e 50 MB por chamado.
+
+**Justificativa:**
+Facilita comunicação e resolução com evidências visuais.
+
+**Implementação:**
+```csharp
+public class UploadAnexoChamadoCommandValidator : AbstractValidator<UploadAnexoChamadoCommand>
+{
+    public UploadAnexoChamadoCommandValidator(IApplicationDbContext context)
+    {
+        RuleFor(x => x.Arquivo.Length)
+            .LessThanOrEqualTo(10 * 1024 * 1024)
+            .WithMessage("Arquivo não pode exceder 10 MB");
+
+        RuleFor(x => x.ChamadoId)
+            .MustAsync(async (chamadoId, cancellation) =>
+            {
+                var tamanhoTotal = await context.ChamadoAnexos
+                    .Where(a => a.ChamadoId == chamadoId && !a.FlExcluido)
+                    .SumAsync(a => a.TamanhoBytes, cancellation);
+
+                return tamanhoTotal < (50 * 1024 * 1024);
+            })
+            .WithMessage("Tamanho total de anexos do chamado não pode exceder 50 MB");
+
+        RuleFor(x => x.Arquivo.FileName)
+            .Must(filename =>
+            {
+                var extensoesPermitidas = new[] { ".jpg", ".jpeg", ".png", ".pdf", ".txt", ".log", ".zip" };
+                var extensao = Path.GetExtension(filename).ToLower();
+                return extensoesPermitidas.Contains(extensao);
+            })
+            .WithMessage("Tipo de arquivo não permitido");
+    }
+}
+```
+
+---
+
+### RN014 - Escalação Automática por SLA
+
+**Descrição:**
+Quando o SLA estiver vencido, o sistema deve escalar automaticamente o chamado para o supervisor da fila de atendimento.
+
+**Justificativa:**
+Garante atenção gerencial a chamados críticos.
+
+**Implementação:**
+```csharp
+public class EscalarChamadosVencidosJob : IJob
+{
+    public async Task Execute(IJobExecutionContext context)
+    {
+        var chamadosVencidos = await _context.Chamados
+            .Where(c => c.DataVencimento < DateTime.Now
+                     && c.Status != ChamadoStatus.Encerrado
+                     && c.Status != ChamadoStatus.Cancelado
+                     && !c.FlEscalado
+                     && !c.FlExcluido)
+            .Include(c => c.FilaAtendimento)
+            .ToListAsync();
+
+        foreach (var chamado in chamadosVencidos)
+        {
+            // Marcar como escalado
+            chamado.FlEscalado = true;
+            chamado.DataEscalacao = DateTime.Now;
+
+            // Notificar supervisor
+            await _notificacaoService.EnviarParaSupervisor(
+                chamado.FilaAtendimentoId,
+                $"Chamado #{chamado.Id.ToString().Substring(0, 8)} escalado por SLA vencido",
+                TipoNotificacao.EmailUrgente);
+
+            // Registrar interação de escalação
+            var item = new ChamadoItem
+            {
+                ChamadoId = chamado.Id,
+                Descricao = "Chamado escalado automaticamente por SLA vencido",
+                UsuarioId = Guid.Parse("00000000-0000-0000-0000-000000000001"), // Sistema
+                DataHora = DateTime.Now,
+                FlPublico = false
+            };
+
+            _context.ChamadoItens.Add(item);
+        }
+
+        await _context.SaveChangesAsync();
+    }
+}
+```
+
+---
+
+### RN015 - Integração com Base de Conhecimento
+
+**Descrição:**
+Soluções aplicadas em chamados encerrados devem poder ser marcadas como "Base de Conhecimento" para reutilização futura.
+
+**Justificativa:**
+Constrói repositório de soluções para problemas recorrentes.
+
+**Implementação:**
+```csharp
+public class SolicitacaoSolucao
+{
+    public Guid Id { get; set; }
+    public string Titulo { get; set; }
+    public string Descricao { get; set; }
+    public bool FlBaseConhecimento { get; set; } // Disponível para consulta
+    public int QtdUtilizacoes { get; set; } // Quantas vezes foi reutilizada
+    public decimal NotaMedia { get; set; } // Avaliação da utilidade (0-5)
+}
+
+// Buscar soluções similares ao criar chamado
+public class SugerirSolucoesQuery : IRequest<List<SolucaoSugeridaDto>>
+{
+    public string PalavrasChave { get; init; }
+    public Guid TipoSolicitacaoId { get; init; }
+}
+
+public class SugerirSolucoesQueryHandler : IRequestHandler<SugerirSolucoesQuery, List<SolucaoSugeridaDto>>
+{
+    public async Task<List<SolucaoSugeridaDto>> Handle(SugerirSolucoesQuery request, CancellationToken cancellationToken)
+    {
+        return await _context.SolicitacoesSolucoes
+            .Where(s => s.FlBaseConhecimento
+                     && !s.FlExcluido
+                     && (s.Titulo.Contains(request.PalavrasChave) || s.Descricao.Contains(request.PalavrasChave)))
+            .OrderByDescending(s => s.QtdUtilizacoes)
+            .ThenByDescending(s => s.NotaMedia)
+            .Take(5)
+            .ProjectTo<SolucaoSugeridaDto>(_mapper.ConfigurationProvider)
+            .ToListAsync(cancellationToken);
+    }
+}
+```
+
+---
+
+## SEÇÃO 3: REFERÊNCIAS AO LEGADO
+
+### 3.1. Páginas e Componentes do Sistema Legado
+
+**Tabelas Principais:**
+
+| Componente Legado | Tipo | Localização | Funcionalidade |
+|-------------------|------|-------------|----------------|
+| `Solicitacao` | Tabela SQL | `BancoDados/Interno/K2A.sql:8358` | Tabela principal de chamados |
+| `Solicitacao_Item` | Tabela SQL | `BancoDados/Interno/K2A.sql:8429` | Interações/itens do chamado |
+| `Solicitacao_Avaliacao` | Tabela SQL | `BancoDados/Interno/K2A.sql:8384` | Avaliações de satisfação |
+| `Solicitacao_Tipo` | Tabela SQL | `BancoDados/Interno/K2A.sql:4710` | Tipos de solicitação |
+| `Solicitacao_SLA` | Tabela SQL | `BancoDados/Interno/K2A.sql:4604` | Definições de SLA |
+| `Solicitacao_Fila_Atendimento` | Tabela SQL | `BancoDados/Interno/K2A.sql:4455` | Filas de atendimento |
+| `Solicitacao_Solucao` | Tabela SQL | `BancoDados/Interno/K2A.sql:6605` | Soluções aplicadas |
+| `Solicitacao_Data_Parada` | Tabela SQL | `BancoDados/Interno/K2A.sql:8414` | Feriados e datas de parada |
+| `Rl_Solicitacao_Ativo` | Tabela SQL | `BancoDados/Interno/K2A.sql:8051` | Relacionamento com ativos |
+
+**Observações:**
+- Sistema legado possui estrutura complexa com múltiplas tabelas relacionadas
+- Campo `Excedente_SLA` (varchar(8000)) sugere controle manual de SLA
+- Campos `Id_Mail_Caixa_Saida_*` indicam sistema de notificações básico
+- Não há campos de multi-tenancy ou auditoria
+
+### 3.2. WebServices e APIs Legadas
+
+**Nenhum WebService identificado especificamente para gestão de chamados.**
+
+### 3.3. Classes Helper e Utilitárias Legadas
+
+**Nenhuma classe helper específica identificada.**
+
+---
+
+## SEÇÃO 4: BANCO DE DADOS LEGADO
+
+### 4.1. DDL Original da Tabela `Solicitacao` (Principal)
+
+```sql
+CREATE TABLE [dbo].[Solicitacao](
+    [Id_Solicitacao] [int] IDENTITY(1,1) NOT NULL,
+    [Nm_Solicitacao] [varchar](300) NOT NULL,
+    [Dt_Solicitacao] [datetime] NOT NULL,
+    [Id_Usuario] [int] NOT NULL,
+    [Id_Ativo_Tipo] [int] NOT NULL,
+    [Id_Solicitacao_Tipo] [int] NOT NULL,
+    [Id_Consumidor_Unidade] [int] NULL,
+    [Excedente_SLA] [varchar](8000) NULL,
+    [Dt_Encerramento] [datetime] NULL,
+    [Id_Solicitacao_Solucao] [int] NULL,
+    [Id_Mail_Caixa_Saida_Usuario] [int] NULL,
+    [Id_Mail_Caixa_Saida_Operadora] [int] NULL,
+    [Dt_Vencimento] [datetime] NOT NULL,
+    [Fl_Status] [int] NOT NULL,
+ CONSTRAINT [PK_Solicitacao] PRIMARY KEY CLUSTERED
+(
+    [Id_Solicitacao] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, FILLFACTOR = 90) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+```
+
+### 4.2. DDL da Tabela `Solicitacao_Item` (Interações)
+
+```sql
+CREATE TABLE [dbo].[Solicitacao_Item](
+    [Id_Solicitacao_Item] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Solicitacao] [int] NOT NULL,
+    [Nm_Solicitacao_Item] [varchar](8000) NOT NULL,
+    [Id_Usuario] [int] NOT NULL,
+    [Dt_Hr_Solicitacao_Item] [datetime] NOT NULL,
+    [Fl_Publicado] [int] NOT NULL,
+ CONSTRAINT [PK_Solicitacao_Item] PRIMARY KEY CLUSTERED
+(
+    [Id_Solicitacao_Item] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, FILLFACTOR = 90) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+```
+
+### 4.3. DDL da Tabela `Solicitacao_Avaliacao`
+
+```sql
+CREATE TABLE [dbo].[Solicitacao_Avaliacao](
+    [Id_Solicitacao_Avaliacao] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Solicitacao] [int] NOT NULL,
+    [Dt_Avaliacao] [datetime] NOT NULL,
+    [Avaliacao] [int] NOT NULL,
+    [Descricao] [varchar](100) NULL,
+ CONSTRAINT [PK_Solicitacao_Avaliacao] PRIMARY KEY CLUSTERED
+(
+    [Id_Solicitacao_Avaliacao] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, FILLFACTOR = 90) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+```
+
+### 4.4. Análise de Campos Importantes
+
+| Campo Legado | Tipo | Descrição | Observações |
+|--------------|------|-----------|-------------|
+| `Id_Solicitacao` | `int IDENTITY(1,1)` | PK da tabela | Migrar para `Guid` no sistema moderno |
+| `Nm_Solicitacao` | `varchar(300)` | Título do chamado | Campo obrigatório |
+| `Dt_Solicitacao` | `datetime` | Data de abertura | Obrigatório |
+| `Id_Usuario` | `int` | Usuário solicitante | FK para tabela Usuario |
+| `Id_Ativo_Tipo` | `int` | Tipo de ativo relacionado | Obrigatório |
+| `Id_Solicitacao_Tipo` | `int` | Tipo de solicitação | FK para Solicitacao_Tipo |
+| `Excedente_SLA` | `varchar(8000)` | Controle manual de SLA | Campo texto sem estrutura, substituir por cálculo automático |
+| `Dt_Vencimento` | `datetime` | Data de vencimento do SLA | Obrigatório |
+| `Fl_Status` | `int` | Status do chamado | Enum sem documentação clara |
+| `Id_Mail_Caixa_Saida_Usuario` | `int` | Controle de e-mail enviado | Sistema de notificação manual |
+
+**Problemas Identificados:**
+- ❌ Sem campo de conglomerado (não suporta multi-tenancy)
+- ❌ Sem campos de auditoria (criação, alteração)
+- ❌ Sem soft delete (FlExcluido)
+- ❌ Campo `Excedente_SLA` é texto livre, não estruturado
+- ❌ Sistema de notificações via campos `Id_Mail_Caixa_Saida` é manual
+- ❌ Enum de status sem documentação clara
+
+### 4.5. Relacionamentos
+
+```
+Solicitacao
+├── FK: Id_Usuario → Usuario.Id_Usuario
+├── FK: Id_Ativo_Tipo → Ativo_Tipo.Id_Ativo_Tipo
+├── FK: Id_Solicitacao_Tipo → Solicitacao_Tipo.Id_Solicitacao_Tipo
+├── FK: Id_Consumidor_Unidade → Consumidor_Unidade.Id_Consumidor_Unidade
+└── FK: Id_Solicitacao_Solucao → Solicitacao_Solucao.Id_Solicitacao_Solucao
+
+Solicitacao_Item
+└── FK: Id_Solicitacao → Solicitacao.Id_Solicitacao
+
+Solicitacao_Avaliacao
+└── FK: Id_Solicitacao → Solicitacao.Id_Solicitacao
+```
+
+### 4.6. Índices Recomendados para Sistema Modernizado
+
+```sql
+-- Índice para busca por status e SLA
+CREATE NONCLUSTERED INDEX IX_Chamados_Status_DataVencimento
+ON Chamados(Status, DataVencimento)
+WHERE FlExcluido = 0;
+
+-- Índice para busca por usuário solicitante
+CREATE NONCLUSTERED INDEX IX_Chamados_UsuarioSolicitanteId
+ON Chamados(UsuarioSolicitanteId)
+WHERE FlExcluido = 0;
+
+-- Índice para busca por fila de atendimento
+CREATE NONCLUSTERED INDEX IX_Chamados_FilaAtendimentoId
+ON Chamados(FilaAtendimentoId)
+WHERE FlExcluido = 0;
+
+-- Índice para busca por tipo de solicitação
+CREATE NONCLUSTERED INDEX IX_Chamados_TipoSolicitacaoId
+ON Chamados(TipoSolicitacaoId)
+WHERE FlExcluido = 0;
+
+-- Índice para busca por ativo
+CREATE NONCLUSTERED INDEX IX_Chamados_AtivoId
+ON Chamados(AtivoId)
+WHERE FlExcluido = 0 AND AtivoId IS NOT NULL;
+
+-- Índice composto para dashboard de SLA
+CREATE NONCLUSTERED INDEX IX_Chamados_ConglomeradoId_Status_DataVencimento
+ON Chamados(ConglomeradoId, Status, DataVencimento)
+INCLUDE (DataSolicitacao, FilaAtendimentoId)
+WHERE FlExcluido = 0;
+```
+
+---
+
+## SEÇÃO 5: INTEGRAÇÕES OBRIGATÓRIAS
+
+### 5.1. Central de Funcionalidades
+
+**Registro da Funcionalidade:**
+
+```json
+{
+  "codigo": "GES.CHAMADOS",
+  "nome": "Gestão de Chamados (Service Desk)",
+  "descricao": "Sistema completo de Service Desk / Help Desk para gerenciamento de solicitações e suporte técnico",
+  "modulo": "Gestão",
+  "categoria": "Atendimento",
+  "icone": "support_agent",
+  "rota": "/gestao/chamados",
+  "ordem": 330,
+  "ativo": true,
+  "permissoesNecessarias": ["GES.CHAMADOS.VIEW"],
+  "subFuncionalidades": [
+    {
+      "codigo": "GES.CHAMADOS.LISTAR",
+      "nome": "Listar Chamados",
+      "rota": "/gestao/chamados/listar"
+    },
+    {
+      "codigo": "GES.CHAMADOS.CRIAR",
+      "nome": "Abrir Chamado",
+      "rota": "/gestao/chamados/criar"
+    },
+    {
+      "codigo": "GES.CHAMADOS.VISUALIZAR",
+      "nome": "Visualizar Chamado",
+      "rota": "/gestao/chamados/visualizar/:id"
+    },
+    {
+      "codigo": "GES.CHAMADOS.EDITAR",
+      "nome": "Editar Chamado",
+      "rota": "/gestao/chamados/editar/:id"
+    },
+    {
+      "codigo": "GES.CHAMADOS.ENCERRAR",
+      "nome": "Encerrar Chamado",
+      "permissaoNecessaria": "GES.CHAMADOS.CLOSE"
+    },
+    {
+      "codigo": "GES.CHAMADOS.AVALIAR",
+      "nome": "Avaliar Atendimento",
+      "permissaoNecessaria": "GES.CHAMADOS.EVALUATE"
+    },
+    {
+      "codigo": "GES.CHAMADOS.DASHBOARD",
+      "nome": "Dashboard de SLA",
+      "rota": "/gestao/chamados/dashboard"
+    }
+  ]
+}
+```
+
+---
+
+### 5.2. Internacionalização (i18n)
+
+**Chaves de Tradução (pt-BR, en-US, es-ES):**
+
+```json
+{
+  "chamados": {
+    "titulo": "Chamados | Tickets | Tickets",
+    "subtitulo": "Gestão de chamados e atendimentos | Ticket and support management | Gestión de tickets y soporte",
+    "abrirChamado": "Abrir Chamado | Open Ticket | Abrir Ticket",
+    "meusChamados": "Meus Chamados | My Tickets | Mis Tickets",
+    "todosC
+
+hamados": "Todos os Chamados | All Tickets | Todos los Tickets",
+    "dashboard": "Dashboard de SLA | SLA Dashboard | Panel de SLA",
+    "campos": {
+      "titulo": "Título | Title | Título",
+      "descricao": "Descrição | Description | Descripción",
+      "tipo": "Tipo | Type | Tipo",
+      "prioridade": "Prioridade | Priority | Prioridad",
+      "status": "Status | Status | Estado",
+      "dataSolicitacao": "Data de Abertura | Opening Date | Fecha de Apertura",
+      "dataVencimento": "Prazo (SLA) | Deadline (SLA) | Plazo (SLA)",
+      "solicitante": "Solicitante | Requester | Solicitante",
+      "atendente": "Atendente | Assignee | Asignado",
+      "fila": "Fila de Atendimento | Support Queue | Cola de Soporte",
+      "solucao": "Solução Aplicada | Applied Solution | Solución Aplicada",
+      "avaliacao": "Avaliação | Rating | Evaluación"
+    },
+    "status": {
+      "aberto": "Aberto | Open | Abierto",
+      "emAtendimento": "Em Atendimento | In Progress | En Progreso",
+      "aguardandoUsuario": "Aguardando Usuário | Waiting for User | Esperando Usuario",
+      "aguardandoFornecedor": "Aguardando Fornecedor | Waiting for Vendor | Esperando Proveedor",
+      "resolvido": "Resolvido | Resolved | Resuelto",
+      "encerrado": "Encerrado | Closed | Cerrado",
+      "cancelado": "Cancelado | Canceled | Cancelado"
+    },
+    "acoes": {
+      "atribuir": "Atribuir | Assign | Asignar",
+      "encerrar": "Encerrar | Close | Cerrar",
+      "reabrir": "Reabrir | Reopen | Reabrir",
+      "avaliar": "Avaliar | Rate | Evaluar",
+      "adicionarInteracao": "Adicionar Interação | Add Interaction | Añadir Interacción",
+      "anexarArquivo": "Anexar Arquivo | Attach File | Adjuntar Archivo"
+    },
+    "mensagens": {
+      "sucessoCriacao": "Chamado criado com sucesso | Ticket created successfully | Ticket creado exitosamente",
+      "sucessoEncerramento": "Chamado encerrado com sucesso | Ticket closed successfully | Ticket cerrado exitosamente",
+      "slaVencido": "SLA vencido! | SLA expired! | ¡SLA vencido!",
+      "slaProximoVencimento": "SLA próximo do vencimento ({{percentual}}%) | SLA near expiration ({{percentual}}%) | SLA próximo al vencimiento ({{percentual}}%)",
+      "confirmacaoEncerramento": "Deseja realmente encerrar este chamado? | Do you really want to close this ticket? | ¿Realmente desea cerrar este ticket?",
+      "obrigadoAvaliacao": "Obrigado pela sua avaliação! | Thank you for your feedback! | ¡Gracias por su evaluación!"
+    },
+    "validacoes": {
+      "tituloObrigatorio": "Título é obrigatório | Title is required | El título es obligatorio",
+      "tipoObrigatorio": "Tipo de solicitação é obrigatório | Request type is required | El tipo de solicitud es obligatorio",
+      "filaTotalObrigatoria": "Fila de atendimento é obrigatória | Support queue is required | La cola de soporte es obligatoria",
+      "solucaoObrigatoria": "Solução é obrigatória ao encerrar chamado | Solution is required when closing ticket | La solución es obligatoria al cerrar el ticket",
+      "transicaoInvalida": "Transição de status não permitida | Status transition not allowed | Transición de estado no permitida"
+    }
+  }
+}
+```
+
+---
+
+### 5.3. Auditoria
+
+**Operações Auditadas:**
+
+| Operação | Trigger | Dados Registrados | Retenção |
+|----------|---------|-------------------|----------|
+| **CREATE** | Abertura de chamado | Todos os campos da entidade | 7 anos |
+| **UPDATE** | Alteração de status, atribuição | Campos alterados (antes/depois) | 7 anos |
+| **ADD_ITEM** | Nova interação | Descrição, usuário, público/privado | 7 anos |
+| **CLOSE** | Encerramento | Solução aplicada, data encerramento | 7 anos |
+| **REOPEN** | Reabertura | Justificativa, usuário | 7 anos |
+| **EVALUATE** | Avaliação de satisfação | Nota, comentário, usuário | 7 anos |
+| **ESCALATE** | Escalação automática | Motivo, supervisor notificado | 7 anos |
+| **ATTACH** | Upload de anexo | Nome arquivo, tamanho, tipo | 7 anos |
+
+---
+
+### 5.4. Controle de Acesso (RBAC)
+
+**Matriz de Permissões:**
+
+| Perfil | VIEW | CREATE | UPDATE | CLOSE | EVALUATE | ASSIGN | REOPEN | EXPORT |
+|--------|------|--------|--------|-------|----------|--------|--------|--------|
+| **Super Admin** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Administrador** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Suporte Nível 2** | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ |
+| **Suporte Nível 1** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Gestor** | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ |
+| **Usuário** | ✅* | ✅ | ❌ | ❌ | ✅** | ❌ | ✅** | ❌ |
+
+*Apenas seus próprios chamados
+**Apenas chamados que abriu
+
+**Códigos de Permissão:**
+
+```csharp
+public static class ChamadosPermissions
+{
+    public const string View = "GES.CHAMADOS.VIEW";
+    public const string ViewAll = "GES.CHAMADOS.VIEW_ALL";
+    public const string Create = "GES.CHAMADOS.CREATE";
+    public const string Update = "GES.CHAMADOS.UPDATE";
+    public const string Close = "GES.CHAMADOS.CLOSE";
+    public const string Evaluate = "GES.CHAMADOS.EVALUATE";
+    public const string Assign = "GES.CHAMADOS.ASSIGN";
+    public const string Reopen = "GES.CHAMADOS.REOPEN";
+    public const string Export = "GES.CHAMADOS.EXPORT";
+}
+```
+
+---
+
+## CONCLUSÃO
+
+O **RF033 - Gestão de Chamados** moderniza completamente o sistema de Service Desk, transformando uma estrutura legada simples em uma solução robusta, com SLA automático, workflow configurável, notificações em tempo real e métricas de qualidade.
+
+**Principais Melhorias:**
+- ✅ **15 regras de negócio** detalhadas para controle rigoroso de workflow
+- ✅ **SLA automático** com cálculo em tempo real e alertas proativos
+- ✅ **Escalação automática** para supervisores em casos de SLA vencido
+- ✅ **Notificações multi-canal** (e-mail, push, SMS) em eventos-chave
+- ✅ **Base de conhecimento** integrada com soluções reutilizáveis
+- ✅ **Auditoria completa** com retenção de 7 anos (LGPD)
+- ✅ **RBAC granular** com 8 permissões específicas
+- ✅ **i18n** suportando pt-BR, en-US e es-ES
+
+**Próximos Passos:**
+1. Implementação de backend com Clean Architecture + CQRS
+2. Desenvolvimento de interface Angular 19 com atualização em tempo real (SignalR)
+3. Criação de casos de uso detalhados (UC00-UC04)
+4. Desenvolvimento de testes automatizados (Backend + Sistema + Outros)
+5. Integração com sistema de telefonia (CTI) em fase futura
+
+---
+
+**Documento criado em:** 2025-01-14
+**Versão:** 1.0
+**Status:** ✅ Completo e Pronto para Implementação
+**Aprovação Pendente:** Product Owner / Architect Lead

@@ -1,0 +1,1039 @@
+# RF-031: Gestão de Plano de Contas Contábil Multi-Dimensional
+
+**Versão**: 1.0
+**Última Atualização**: 17/12/2025
+**Status**: ✅ Documentação Completa (5 seções)
+**Fase**: Fase 2 - Serviços Essenciais
+**EPIC**: GES - Gestão
+**Prioridade**: ALTA
+**Complexidade**: ALTA
+
+[← Voltar](../README.md)
+
+---
+
+## 📋 1. RESUMO EXECUTIVO
+
+### Descrição Geral
+
+Sistema completo de gestão de plano de contas contábil multi-dimensional para classificação, rateio e análise financeira de despesas de Telecom e TI com suporte a estrutura hierárquica de contas (até 7 níveis), centros de custo, projetos, departamentos e dimensões customizáveis. Permite criação visual de plano de contas compatível com padrões contábeis brasileiros (DRE, Balanço Patrimonial), importação de layouts de ERP (SAP, TOTVS, Protheus, Oracle), reconciliação automática de lançamentos, relatórios gerenciais multi-dimensionais e integração bidirecional com sistemas ERP para geração automática de lançamentos contábeis válidos para fechamento fiscal.
+
+**Objetivo Principal**: Eliminar re-trabalho manual de classificação contábil de 120+ horas/mês para 5 horas/mês através de regras automatizadas, garantir conformidade fiscal com rastreabilidade total para auditorias externas (Big Four), fornecer visibilidade multi-dimensional de custos para tomada de decisão estratégica (DRE gerencial por projeto, departamento, região), automatizar geração de lançamentos contábeis em formato D-E (débito-crédito) compatível com qualquer ERP, reduzir erros de classificação de 18% para <2% através de validações inteligentes e permitir análises comparativas sofisticadas (real x orçado, MoM, YoY, drill-down ilimitado).
+
+### Contexto: Legado vs. Modernização
+
+| Aspecto | Legado (VB.NET) | Modernização (.NET 10) |
+|---------|----------------|----------------------|
+| **Estrutura** | 3 níveis fixos (Conta, Subconta, Item) | 7 níveis configuráveis + dimensões ilimitadas |
+| **Hierarquia** | Tree estático em VB6 TreeView | Hierarchical dropdown moderno + drag-drop visual |
+| **Classificação** | 100% manual (120h/mês, 18% erro) | Regras automatizadas (5h/mês, <2% erro) |
+| **Centros Custo** | Tabela separada sem vínculo | Dimensão integrada com rateio automático |
+| **Projetos** | Não suportado | Dimensão nativa com alocação % |
+| **Importação ERP** | CSV fixo apenas TOTVS | Multi-layout: SAP, TOTVS, Protheus, Oracle, Sankhya |
+| **Exportação** | Excel estático sem formatação | Arquivo contábil validado + preview lançamentos |
+| **Relatórios** | DRE estático mensal | DRE gerencial drill-down tempo real + 5 dimensões |
+| **Validação** | Nenhuma (descobre erro no fechamento) | 20+ regras contábeis executadas pré-save |
+| **Reconciliação** | Planilha Excel VLOOKUP | Engine fuzzy matching automático |
+| **Auditoria** | Log básico (quem, quando) | Trilha completa (antes/depois, justificativa, aprovador) |
+| **Orçamento** | Planilha paralela | Integrado: orçado x realizado tempo real |
+
+### 10 Funcionalidades Principais
+
+1. **Plano de Contas Hierárquico**: Estrutura até 7 níveis (Classe → Grupo → Subgrupo → Conta → Subconta → Item → Detalhe) com códigos contábeis padrão DRE/BP brasileiro + suporte a IFRS internacional
+2. **Builder Visual de Hierarquia**: Interface drag-and-drop para criar/reorganizar estrutura contábil com preview impacto em lançamentos existentes e validação circular dependency
+3. **Centros de Custo Integrados**: Gestão completa de centros custo vinculados a hierarquia organizacional (Empresa → Filial → Departamento → Setor) com rateio automático multi-nível
+4. **Dimensões Customizáveis**: Criar dimensões ilimitadas (Projeto, Produto, Cliente, Região, Canal Venda) com alocação percentual ou valor absoluto
+5. **Regras de Classificação Automática**: Motor de regras com 50+ templates (ex: "Se Fornecedor = Vivo E Tipo = Telefonia → Conta 3.1.1.01 Despesas Telecom Móvel") + builder visual sem código
+6. **Importação Multi-Layout ERP**: Engine com templates SAP FI/CO, TOTVS Protheus 12, Oracle Financials, Sankhya + criador visual de layouts customizados
+7. **Exportação Lançamentos Contábeis**: Geração de arquivo texto formatado D-E (Débito-Crédito) com validação partida dobrada + preview antes de enviar ao ERP
+8. **Relatórios Gerenciais Avançados**: DRE multi-dimensional (filtro por projeto + departamento + período), Balanço Patrimonial consolidado, Análise Vertical/Horizontal, Gráficos Waterfall
+9. **Orçamento vs. Realizado**: Módulo integrado de orçamento anual com rateio mensal, comparação visual real x orçado, alertas variação >10%, forecast 3 meses
+10. **Auditoria e Compliance**: Trilha completa de mudanças (histórico versionado), aprovação workflow para alterações estrutura contábil, relatórios rastreabilidade fiscal
+
+### Impacto de Negócio
+
+- **Eficiência Operacional:** Redução 96% tempo classificação contábil (120h/mês → 5h/mês) = R$67k/ano economia RH
+- **Redução Erros:** De 18% erro classificação manual para <2% automático = elimina R$95k/ano re-trabalho + multas
+- **Compliance Fiscal:** Rastreabilidade 100% conforme exigências Receita Federal, Sped, ECF = zero não-conformidades em auditorias
+- **Visibilidade Gerencial:** DRE multi-dimensional permite decisões data-driven (ex: cortar 15% gasto Telecom realocando para Cloud)
+- **Integração ERP:** Elimina dupla digitação manual, reduz prazo fechamento contábil de 12 dias úteis para 3 dias
+- **ROI:** Sistema paga-se em 4 meses apenas com economia RH + redução erros
+
+---
+
+## 📐 2. REGRAS DE NEGÓCIO
+
+### RN-RF031-01: Estrutura Hierárquica Até 7 Níveis Configuráveis
+
+**Descrição**: Sistema DEVE suportar estrutura de plano de contas hierárquica com até 7 níveis configuráveis por Cliente (multi-tenant). Cada Cliente define quantos níveis utilizar (mínimo 3, máximo 7) e nomenclatura de cada nível.
+
+**Níveis Padrão Brasileiro (DRE/BP)**:
+1. **Classe** - Ex: 1-Ativo, 2-Passivo, 3-Receitas, 4-Custos, 5-Despesas
+2. **Grupo** - Ex: 3.1-Receitas Operacionais, 5.1-Despesas Administrativas
+3. **Subgrupo** - Ex: 5.1.1-Despesas com Pessoal, 5.1.2-Despesas Gerais
+4. **Conta** - Ex: 5.1.2.01-Despesas Telecom e Comunicação
+5. **Subconta** - Ex: 5.1.2.01.001-Telefonia Móvel Corporativa
+6. **Item** - Ex: 5.1.2.01.001.01-Linhas Executivos
+7. **Detalhe** - Ex: 5.1.2.01.001.01.001-Vivo Empresas Plano Controle
+
+**Código Contábil**: Sistema gera código automático concatenado (ex: 5.1.2.01.001.01.001) OU permite código customizado (ex: VoIP_Corp_2024).
+
+**Validação Unicidade**: Código contábil DEVE ser único dentro do mesmo ClienteId.
+
+**Herança Propriedades**: Contas filhas herdam propriedades do pai (ex: se nível 2 é "Despesa Dedutível IR" → todos filhos também são).
+
+**Erro**: 400 Bad Request se tentar criar mais de 7 níveis ou código contábil duplicado.
+
+### RN-RF031-02: Builder Visual Drag-and-Drop com Preview Impacto
+
+**Descrição**: Interface DEVE permitir criar/editar/reorganizar estrutura contábil via drag-and-drop com preview em tempo real do impacto em lançamentos e relatórios existentes.
+
+**Operações Suportadas**:
+- **Criar Conta**: Clica em nó pai → modal "Nova Conta" → preenche Nome, Código, Tipo (Sintética/Analítica) → salvar
+- **Mover Conta**: Arrasta conta para novo pai → sistema valida se movimento é válido (ex: não pode criar loop circular)
+- **Excluir Conta**: Marca conta como excluída (soft delete) se não houver lançamentos vinculados, senão apenas inativa
+- **Renomear**: Duplo clique → edita inline com validação código único
+
+**Preview Impacto**: Antes de salvar alteração estrutural, sistema exibe:
+- Quantidade lançamentos afetados (últimos 12 meses)
+- Relatórios que usam essa conta (DRE, BP, Gerenciais customizados)
+- Usuários que precisarão atualizar regras de classificação
+
+**Validação Circular**: Detecta e impede loops (ex: Conta A filha de B, B filha de C, C filha de A).
+
+**Aprovação Workflow**: Alterações estrutura nível 1-3 exigem aprovação Controller/CFO (configurável).
+
+**Erro**: 403 Forbidden se usuário sem permissão tentar alterar estrutura | 400 Bad Request se movimento criar dependência circular.
+
+### RN-RF031-03: Centros de Custo com Hierarquia Organizacional
+
+**Descrição**: Sistema DEVE integrar centros de custo com hierarquia organizacional (Cliente → Conglomerado → Empresa → Filial → Departamento → Setor → Seção) permitindo rateio automático multi-nível.
+
+**Vínculo Hierárquico**: Cada centro custo vinculado a nível organizacional (ex: Centro Custo "TI-São Paulo" vinculado a Filial "SP-Matriz").
+
+**Códigos Sugeridos**: Sistema sugere código padrão (ex: `CC-{EmpresaId}-{DeptId}`) mas permite customização.
+
+**Rateio Cascata**: Suporta rateio em cascata:
+1. Despesa total R$100k alocada em Empresa (nível 2)
+2. Sistema rateia automaticamente para Filiais proporcionalmente (50% SP, 30% RJ, 20% BH)
+3. Dentro de cada Filial, rateia para Departamentos (TI 40%, RH 30%, Comercial 30%)
+4. Dentro de cada Depto, rateia para Projetos ativos
+
+**Percentuais Configuráveis**: Usuário define regras de rateio (% fixo, proporcional ao consumo, igualitário, customizado).
+
+**Validação**: Soma percentuais DEVE = 100% em cada nível antes de salvar.
+
+**Histórico**: Mudança percentual rateio cria nova versão com data vigência (ex: "Jan-Mar 2024: 60/40" → "Abr+ 2024: 50/50").
+
+### RN-RF031-04: Dimensões Customizáveis Ilimitadas
+
+**Descrição**: Além de centros custo padrão, sistema DEVE suportar dimensões customizáveis ilimitadas (Projeto, Produto, Cliente, Região, Canal Venda, Campanha Marketing) para análises multi-dimensionais.
+
+**Criar Dimensão**: Administrador cria nova dimensão via UI:
+- Nome (ex: "Projeto")
+- Código Prefixo (ex: "PROJ")
+- Tipo Alocação (Percentual, Valor Absoluto, Unitário)
+- Obrigatória (Sim/Não)
+
+**Valores Dimensão**: Para cada dimensão, cadastrar valores possíveis:
+- Projeto → Transformação Digital, Cloud Migration, ERP Upgrade
+- Região → Sudeste, Sul, Nordeste, Norte, Centro-Oeste
+- Canal → Online, Varejo Físico, Televendas, Distribuidores
+
+**Alocação Multi-Dimensão**: Despesa pode ser alocada em múltiplas dimensões simultaneamente:
+- Centro Custo: TI (100%)
+- Projeto: Transformação Digital (60%) + Cloud Migration (40%)
+- Região: Sudeste (100%)
+
+**Validação Cruzada**: Se dimensão obrigatória, sistema bloqueia save se não houver alocação.
+
+**Relatórios**: Todos relatórios gerenciais permitem filtro/agrupamento por qualquer dimensão.
+
+**Erro**: 400 Bad Request se soma alocação percentual ≠ 100% em dimensão obrigatória.
+
+### RN-RF031-05: Regras de Classificação Automática com Builder Visual
+
+**Descrição**: Sistema DEVE classificar automaticamente lançamentos importados aplicando regras configuráveis (biblioteca 50+ templates + custom builder visual sem código).
+
+**50+ Regras Pré-Definidas**:
+1. **Fornecedor = Vivo** → Conta 5.1.2.01.001 (Telefonia Móvel)
+2. **Fornecedor = AWS** → Conta 5.1.2.05.002 (Cloud Computing)
+3. **Valor >R$10k E Tipo = Consultoria** → Projeto "Transformação Digital"
+4. **Filial = SP E Departamento = TI** → Centro Custo CC-SP-TI
+5. **Categoria = Viagem E Destino Internacional** → Conta 5.1.3.02 (Viagens Internacionais)
+... (45 regras adicionais)
+
+**Custom Rules Builder**: Interface visual tipo Zapier para criar regras:
+```
+[SE] [Campo Lançamento] [Operador] [Valor]
+  [E/OU] [Campo Lançamento] [Operador] [Valor]
+[ENTÃO] [Ação]
+  - Atribuir Conta: [dropdown plano contas]
+  - Atribuir Centro Custo: [dropdown centros]
+  - Atribuir Dimensão [Projeto]: [dropdown projetos]
+  - Adicionar Tag: [texto livre]
+```
+
+**Operadores Suportados**: =, ≠, >, ≥, <, ≤, Contém, Não Contém, Começa Com, Termina Com, Regex.
+
+**Prioridade Regras**: Regras executadas em ordem (1, 2, 3...). Se múltiplas regras match, última ganha (ou primeira se flag "Parar após match").
+
+**Simulação**: Antes de ativar regra, botão "Simular em últimos 100 lançamentos" exibe quantos seriam afetados.
+
+**Taxa Match**: Dashboard mostra % lançamentos classificados automaticamente vs. manual (meta: >95%).
+
+**Erro**: Nenhum erro se regra não faz match (lançamento fica "Aguardando Classificação Manual").
+
+### RN-RF031-06: Importação Multi-Layout de ERPs
+
+**Descrição**: Sistema DEVE importar plano de contas e lançamentos de arquivos exportados de ERPs com templates configuráveis por sistema (SAP, TOTVS, Protheus, Oracle, Sankhya, Conta Azul, Omie).
+
+**Templates Pré-Configurados**:
+- **SAP FI/CO**: Formato `.txt` delimitado TAB com cabeçalho fixo 15 colunas
+- **TOTVS Protheus 12**: CSV com encoding ISO-8859-1, separador `;`
+- **Oracle Financials**: XML estruturado conforme schema Oracle GL
+- **Sankhya**: JSON API REST com paginação
+- **Conta Azul/Omie**: API REST OAuth 2.0
+
+**Mapeamento Campos**: Cada template define mapeamento:
+| Campo Sistema | Campo ERP | Transformação |
+|---------------|-----------|---------------|
+| Codigo_Conta | CONT_COD | Trim, PadLeft(10, '0') |
+| Nome_Conta | CONT_DESC | Upper, RemoveAccents |
+| Tipo_Conta | CONT_TIPO | Map: 'S'→Sintética, 'A'→Analítica |
+| Centro_Custo | CC_COD | Lookup tabela Centro_Custo |
+
+**Validação Importação**: Antes de importar, sistema valida:
+- ✅ Arquivo formato correto
+- ✅ Encoding detectado (UTF-8, ISO-8859-1, Windows-1252)
+- ✅ Campos obrigatórios presentes
+- ✅ Códigos contábeis não duplicados
+- ✅ Hierarquia sem loops circulares
+
+**Preview**: Exibe 10 primeiras linhas parseadas antes de confirmar importação completa.
+
+**Reconciliação**: Se importar estrutura onde 80% contas já existem, pergunta "Atualizar contas existentes?" (Sim/Não).
+
+**Erro**: 400 Bad Request se formato inválido | 409 Conflict se código duplicado | 422 Unprocessable se hierarquia circular.
+
+### RN-RF031-07: Exportação Lançamentos Contábeis D-E (Débito-Crédito)
+
+**Descrição**: Sistema DEVE gerar arquivo texto de lançamentos contábeis em formato D-E (Débito-Crédito) compatível com partida dobrada e importável em qualquer ERP brasileiro.
+
+**Formato Padrão Brasileiro**:
+```
+TIPO|LOTE|DT_LANCAMENTO|NUM_DOC|CONTA_DEBITO|CONTA_CREDITO|HISTORICO|VALOR|CENTRO_CUSTO|FILIAL
+D|001|2024-01-15|NF-12345|5.1.2.01.001|2.1.1.03.001|Pgto fatura Vivo Jan/24|15000.00|CC-TI-SP|01
+C|001|2024-01-15|NF-12345|2.1.1.03.001|5.1.2.01.001|Pgto fatura Vivo Jan/24|15000.00|CC-TI-SP|01
+```
+
+**Validação Partida Dobrada**: Sistema valida que soma débitos = soma créditos ANTES de gerar arquivo (tolerância arredondamento: R$0,01).
+
+**Preview Lançamentos**: UI exibe preview grid com débitos/créditos coloridos (verde/vermelho) + totalizador antes de exportar.
+
+**Formatos Suportados**:
+- **TXT Delimitado**: | , ; TAB customizável
+- **CSV**: Encoding ISO-8859-1 ou UTF-8
+- **XML**: Schema customizável
+- **JSON**: Para ERPs modernos
+
+**Agrupamento**: Opção agrupar lançamentos por (Dia, Semana, Mês, Fornecedor, Centro Custo).
+
+**Numeração Lote**: Sistema gera número sequencial lote contábil (ex: LOTE-2024-001) ou permite manual.
+
+**Histórico Padrão**: Template de histórico customizável (ex: "{Fornecedor} - {Descrição} - {Competência}").
+
+**Erro**: 400 Bad Request se débitos ≠ créditos | 422 Unprocessable se conta inválida.
+
+### RN-RF031-08: Relatórios Gerenciais DRE Multi-Dimensional
+
+**Descrição**: Sistema DEVE gerar relatórios DRE (Demonstração Resultado Exercício) com filtros multi-dimensionais e drill-down ilimitado.
+
+**Filtros Disponíveis**:
+- Período: Mês, Trimestre, Semestre, Ano, Range customizado
+- Centro Custo: Seleção múltipla hierárquica
+- Projeto: Todos, específico, múltiplos
+- Departamento: Dropdown hierárquico
+- Região: Sudeste, Sul, etc.
+- Comparação: Nenhuma, MoM, YoY, Orçado x Realizado
+
+**Estrutura DRE Padrão**:
+```
+RECEITA BRUTA
+(-) Deduções
+(=) RECEITA LÍQUIDA
+(-) CPV (Custo Produto Vendido)
+(=) LUCRO BRUTO
+(-) Despesas Operacionais
+  - Despesas Administrativas
+    - Pessoal (salários, encargos, benefícios)
+    - Gerais (aluguel, utilities, seguros)
+    - Telecom e TI ← DRILL-DOWN AQUI
+      - Telefonia Móvel
+      - Telefonia Fixa
+      - Internet/Links
+      - Cloud Computing
+      - Licenças Software
+  - Despesas Comerciais
+  - Despesas Financeiras
+(=) RESULTADO OPERACIONAL (EBITDA)
+(-) Depreciação/Amortização
+(=) EBIT
+(-) Resultado Financeiro
+(=) LAIR (Lucro Antes IR)
+(-) Provisão IR/CSLL
+(=) LUCRO LÍQUIDO
+```
+
+**Drill-Down**: Clica em qualquer linha → detalha contas filhas até nível analítico → clica em conta analítica → lista lançamentos individuais.
+
+**Análise Vertical**: Mostra % cada item sobre Receita Líquida (ex: Telecom = 3,2% Receita).
+
+**Análise Horizontal**: Compara períodos (ex: Jan 2024: R$100k vs. Jan 2023: R$85k = +17,6% ↗).
+
+**Gráficos**: Chart.js waterfall, line chart evolução temporal, pie chart distribuição despesas.
+
+**Exportação**: Excel formatado (cores, borders, fórmulas), PDF executivo, CSV dados brutos.
+
+**Erro**: Nenhum (se sem dados, exibe "Nenhum lançamento no período selecionado").
+
+### RN-RF031-09: Orçamento vs. Realizado com Alertas Variação
+
+**Descrição**: Sistema DEVE permitir cadastrar orçamento anual por conta contábil com rateio mensal automático e comparação visual real x orçado em tempo real.
+
+**Cadastro Orçamento**:
+1. Selecionar ano fiscal (ex: 2025)
+2. Para cada conta analítica, informar valor anual OU valores mensais individuais
+3. Sistema calcula rateio mensal (anual ÷ 12) se não informado mês a mês
+4. Aprovar orçamento (workflow CFO/Controller)
+
+**Comparação Visual**: Dashboard cards:
+```
+DESPESAS TELECOM - JANEIRO 2025
+Orçado: R$ 150.000,00
+Realizado: R$ 162.500,00
+Variação: + R$ 12.500,00 (8,3% ↗) 🔴
+
+Detalhamento:
+Telefonia Móvel: 105% orçado (R$5k acima)
+Internet/Links: 98% orçado (ok)
+Cloud: 112% orçado (R$9k acima) ⚠️
+```
+
+**Alertas Automáticos**: Sistema dispara alerta quando:
+- Conta atinge 80% orçado com >5 dias úteis restantes no mês → Email amarelo
+- Conta atinge 100% orçado → Email vermelho + notificação push
+- Conta ultrapassa 110% orçado → Escala para Controller/CFO
+
+**Forecast**: Machine Learning prevê se fechamento mês ficará acima orçado baseado em tendência consumo dias anteriores.
+
+**Ajuste Orçamento**: Permitir re-forecast mid-year com aprovação e histórico versão (ex: Orçamento Original → Revisão Q2 → Revisão Q4).
+
+**Erro**: 400 Bad Request se orçamento sem valor para conta obrigatória | 403 Forbidden se usuário sem permissão aprovar.
+
+### RN-RF031-10: Auditoria Completa com Trilha de Mudanças
+
+**Descrição**: Sistema DEVE manter histórico completo de todas alterações estrutura contábil, lançamentos e configurações com campos obrigatórios (antes/depois, justificativa, aprovador).
+
+**Eventos Auditados**:
+- Criação/Edição/Exclusão conta contábil
+- Mudança hierarquia (mover conta)
+- Alteração centro custo, percentuais rateio
+- Mudança regra classificação automática
+- Importação/Exportação arquivos
+- Alteração orçamento
+- Aprovação/Rejeição workflows
+
+**Campos Trilha**:
+```json
+{
+  "EventoId": "uuid",
+  "Tipo": "Conta.Movida",
+  "Usuario": "joao.silva@empresa.com",
+  "DataHora": "2024-01-15T14:32:18Z",
+  "IP": "192.168.1.100",
+  "ValorAnterior": {
+    "ContaId": "uuid-conta-telecom",
+    "PaiId": "uuid-despesas-gerais"
+  },
+  "ValorNovo": {
+    "ContaId": "uuid-conta-telecom",
+    "PaiId": "uuid-despesas-ti"
+  },
+  "Justificativa": "Reorganização estrutura contábil conforme novo plano contas 2024",
+  "AprovadorId": "maria.controller@empresa.com",
+  "Status": "Aprovado"
+}
+```
+
+**Consulta Auditoria**: UI com filtros (período, usuário, tipo evento, conta afetada) + export Excel.
+
+**Retenção**: Dados auditoria mantidos por 7 anos (LGPD, exigência fiscal) com compressão após 1 ano.
+
+**Imutabilidade**: Registros auditoria são append-only (nunca deletados ou editados).
+
+### RN-RF031-11: Validação Contábil com 20+ Regras Fiscais
+
+**Descrição**: Sistema DEVE executar validações contábeis automáticas antes de salvar qualquer lançamento, impedindo erros que causariam rejeição em auditorias fiscais.
+
+**20 Regras Validação**:
+1. **Conta Analítica**: Lançamento só em conta tipo "Analítica" (nunca em Sintética)
+2. **Partida Dobrada**: Soma débitos = soma créditos (tolerância R$0,01)
+3. **Data Válida**: Data lançamento entre período fiscal aberto (não pode lançar em período fechado)
+4. **Código Contábil**: Conta existe no plano contas ativo (não excluída)
+5. **Centro Custo Obrigatório**: Se configurado obrigatório, não aceita null
+6. **Valor Positivo**: Valor lançamento > 0
+7. **Histórico Mínimo**: Histórico com mínimo 10 caracteres (não aceita ".")
+8. **Documento Único**: Número documento único por período/fornecedor (detecta duplicidade)
+9. **Hierarquia Válida**: Conta filha do tipo compatível com pai
+10. **Dimensão Obrigatória**: Se dimensão marcada obrigatória, exige preenchimento
+11. **Percentual Rateio**: Soma = 100% se multi-centro custo
+12. **Conta Movimento**: Detecta se conta sintética tem lançamento direto
+13. **Saldo Devedor/Credor**: Valida natureza saldo (Ativo = devedor, Passivo = credor)
+14. **Conta Encerrada**: Não permite lançamento em conta marcada "Encerrada"
+15. **Limite Valor**: Alerta se valor >R$1M (possível erro digitação)
+... (5 validações adicionais)
+
+**Severidade**: Cada regra tem nível:
+- **Bloqueante**: Impede save até correção
+- **Advertência**: Permite save mas exige confirmação usuário + justificativa
+- **Informativa**: Apenas alerta, não bloqueia
+
+**Feedback Imediato**: Validação executa em tempo real (ao sair do campo) com mensagem clara sobre como corrigir.
+
+**Erro**: 400 Bad Request com lista detalhada de todas validações falhadas (ex: "Conta inválida, Centro custo obrigatório, Valor negativo").
+
+### RN-RF031-12: Reconciliação Automática com Engine Fuzzy Matching
+
+**Descrição**: Ao importar lançamentos de arquivo externo (ERP, banco), sistema DEVE tentar reconciliar automaticamente com contas contábeis do plano usando algoritmo fuzzy matching.
+
+**Algoritmo Matching**:
+1. **Match Exato**: Código conta importado = código conta sistema → 100% match
+2. **Fuzzy Nome**: Levenshtein distance entre nomes ≥85% → sugestão (ex: "Desp Telefonia" vs "Despesas Telefonia")
+3. **Histórico**: Se lançamentos passados mesmo fornecedor usaram conta X, sugere conta X
+4. **Machine Learning**: Modelo treinado com 10.000+ lançamentos históricos sugere conta com score confiança
+
+**Status Reconciliação**:
+- ✅ **Conciliado** (100% match) - verde
+- ⚠️ **Sugestão** (85-99% match) - amarelo, usuário confirma
+- ❌ **Não Conciliado** (<85% match) - vermelho, classificação manual
+
+**Interface Reconciliação**: Grid com 3 colunas lado a lado:
+| Lançamento Importado | → | Conta Sugerida | Confiança | Ação |
+|----------------------|---|----------------|-----------|------|
+| "Tel Vivo Jan/24" | → | 5.1.2.01.001 Telefonia Móvel | 94% | ✅ Aceitar / ✗ Rejeitar |
+
+**Aprendizado**: Quando usuário confirma ou corrige sugestão, sistema armazena para melhorar próximas importações.
+
+**Taxa Sucesso**: Dashboard mostra % reconciliação automática (meta: >90%).
+
+### RN-RF031-13: Integração Bidirecional com ERP Financeiro
+
+**Descrição**: Sistema DEVE integrar bidirecionalmente com ERPs financeiros (SAP, TOTVS, Oracle) via API REST ou arquivos batch.
+
+**Fluxos Integração**:
+
+**1. ERP → IControlIT (Importação Estrutura)**:
+- Hangfire job diário às 03:00 UTC consulta API ERP
+- Baixa estrutura plano contas atualizada
+- Detecta mudanças (novas contas, renomeações, exclusões)
+- Aplica merge com plano local preservando customizações IControlIT
+
+**2. IControlIT → ERP (Exportação Lançamentos)**:
+- Usuário aprova lançamentos para envio
+- Sistema gera arquivo formato ERP (D-E, XML, JSON)
+- Valida partida dobrada + regras fiscais
+- Envia via API ou deposita em pasta SFTP
+- Recebe callback confirmação importação ERP
+- Marca lançamentos como "Integrado ERP" com timestamp
+
+**Autenticação**: OAuth 2.0 com refresh token automático + armazenamento Azure Key Vault.
+
+**Retry Policy**: Polly retry backoff exponencial (3 tentativas com delay 2s, 4s, 8s).
+
+**Logs Integração**: Tabela audit_log_integracao com status (Sucesso, Falha, Parcial) + erro detalhado.
+
+**Erro**: Se integração falha 3x consecutivas, sistema envia email para equipe TI + desativa job até investigação.
+
+### RN-RF031-14: Isolamento Multi-Tenant com Row-Level Security
+
+**Descrição**: TODAS as queries e operações DEVEM filtrar por `ClienteId` obtido do JWT token do usuário logado (multi-tenancy seguro).
+
+**Segurança**: Usuário Cliente A não pode ver/editar contas contábeis de Cliente B mesmo se descobrir ID.
+
+**Performance**: Índice composto (ClienteId, Codigo_Conta) otimiza queries principais.
+
+**Validação**: EF Core Query Filter global adiciona `WHERE ClienteId = {userClientId}` automaticamente.
+
+### RN-RF031-15: Soft Delete com Histórico Versionado
+
+**Descrição**: Sistema NUNCA deve fazer DELETE físico de contas contábeis ou lançamentos. Exclusão lógica via `FlExcluido = TRUE` com versionamento completo.
+
+**Motivo**: Preservar histórico para auditorias fiscais (obrigatório 7 anos Receita Federal).
+
+**Queries**: Todas queries incluem `WHERE FlExcluido = 0` por padrão (EF Core Query Filter).
+
+**Restauração**: Administrador pode restaurar conta excluída com justificativa + aprovação Controller.
+
+**Versionamento**: Se conta editada, sistema cria snapshot JSON antes/depois na tabela `Plano_Conta_Versao`.
+
+---
+
+## 🗄️ 3. REFERÊNCIAS AO SISTEMA LEGADO
+
+### 3.1 Telas Web Forms Mapeadas (ASPX + VB.NET)
+
+**Sistema legado NÃO possui módulo específico de Plano de Contas estruturado.** A funcionalidade estava fragmentada em:
+
+| Tela Legada | Funcionalidade Parcial | Limitações |
+|-------------|------------------------|------------|
+| `Cadastro/Centro_Custo.aspx` | Cadastro básico centros custo | Sem hierarquia, sem rateio automático |
+| `Recepcao_Fatura/Plano_Conta.aspx` | Cadastro simplificado contas | 3 níveis fixos, sem dimensões |
+| `Recepcao_Fatura/Rateio.aspx` | Rateio manual planilha Excel | 100% manual, sem regras automatizadas |
+| `Consulta/Template_Consulta.aspx` | Relatórios básicos | Estático, sem drill-down multi-dimensional |
+
+**Observações**:
+- Legado usava planilhas Excel paralelas para gestão real do plano de contas
+- Controllers mantinham documentação Word com estrutura contábil oficial
+- Integração ERP era 100% manual (export CSV → import manual ERP)
+- Sem auditoria de mudanças estruturais
+
+### 3.2 Stored Procedures Relacionadas
+
+**Não há stored procedures específicas de plano contas no legado.** Operações contábeis estavam dispersas em:
+
+| Procedure Legada | Uso | Limitação |
+|------------------|-----|-----------|
+| `pa_Centro_Custo` | CRUD centros custo | Tabela simples sem hierarquia |
+| `pa_Plano_Conta` | CRUD contas básico | Estrutura fixa 3 níveis |
+| `sp_Rateio_Calcular` | Cálculo rateio manual | Requer input Excel, sem automação |
+
+### 3.3 Tabelas do Banco de Dados Legado
+
+**Estrutura simplificada fragmentada em 3 tabelas:**
+
+```sql
+-- Legado: Tabela Centro_Custo (sem hierarquia)
+CREATE TABLE Centro_Custo (
+    Id_Centro_Custo INT IDENTITY PRIMARY KEY,
+    Nm_Centro_Custo NVARCHAR(100) NOT NULL,
+    Codigo_Centro_Custo VARCHAR(50) NULL,
+    Fl_Desativado BIT DEFAULT 0
+);
+
+-- Legado: Tabela Plano_Conta (estrutura rígida 3 níveis)
+CREATE TABLE Plano_Conta (
+    Id_Plano_Conta INT IDENTITY PRIMARY KEY,
+    Codigo_Nivel_1 VARCHAR(10) NULL,  -- Ex: "5" (Despesas)
+    Codigo_Nivel_2 VARCHAR(10) NULL,  -- Ex: "5.1" (Desp Admin)
+    Codigo_Nivel_3 VARCHAR(10) NULL,  -- Ex: "5.1.2" (Telecom)
+    Nm_Conta NVARCHAR(200) NOT NULL,
+    Tipo_Conta CHAR(1) CHECK (Tipo_Conta IN ('S','A')) -- S=Sintética, A=Analítica
+);
+
+-- Legado: Tabela Rateio (vinculação manual)
+CREATE TABLE Rateio (
+    Id_Rateio INT IDENTITY PRIMARY KEY,
+    Id_Fatura INT NOT NULL,
+    Id_Centro_Custo INT NOT NULL,
+    Percentual DECIMAL(5,2) NOT NULL,
+    Valor_Rateado DECIMAL(18,2) NULL
+);
+```
+
+**Problemas Estrutura Legada**:
+- ❌ Apenas 3 níveis hierárquicos fixos (insuficiente para empresas grandes)
+- ❌ Sem suporte a dimensões (projeto, região, produto)
+- ❌ Centros custo sem vínculo hierarquia organizacional
+- ❌ Rateio manual sem regras automatizadas
+- ❌ Sem auditoria de mudanças
+- ❌ Sem versionamento estrutura contábil
+
+### 3.4 WebServices Relacionados
+
+**Sistema legado NÃO possui WebServices específicos para plano contas.** Operações eram:
+
+- `WSCadastro.asmx/Centro_Custo` - CRUD básico centros
+- `WSRecepcao_Fatura.asmx/Plano_Conta` - CRUD contas simples
+- `WSRateio.asmx/Calcular_Rateio` - Cálculo rateio via stored procedure
+
+### 3.5 Mapeamento Funcional Legado → Modernizado
+
+| Funcionalidade | Legado | Modernizado RF-031 |
+|----------------|--------|-------------------|
+| **Níveis Hierarquia** | 3 fixos (Classe, Grupo, Conta) | 7 configuráveis + nomenclatura customizável |
+| **Centros Custo** | Tabela independente | Integrado hierarquia organizacional com rateio cascata |
+| **Dimensões** | Nenhuma | Ilimitadas (Projeto, Região, Produto, etc.) |
+| **Classificação** | 100% manual Excel | Regras automatizadas (>95% automático) |
+| **Importação** | CSV fixo único | Multi-layout (SAP, TOTVS, Oracle, Sankhya) |
+| **Exportação** | Excel estático | Arquivo D-E validado + preview |
+| **Rateio** | Manual planilha | Automático multi-dimensional |
+| **Relatórios** | Estático sem drill-down | DRE gerencial drill-down ilimitado |
+| **Orçamento** | Excel paralelo | Integrado real x orçado tempo real |
+| **Auditoria** | Nenhuma | Trilha completa versionada |
+| **Validações** | Nenhuma (erro pós-fechamento) | 20+ regras pré-save |
+| **Integração ERP** | Manual | API REST bidirecional |
+
+---
+
+## 🔗 4. IMPACTO E DEPENDÊNCIAS
+
+### 4.1 Dependências de Outros RFs
+
+**Dependências Obrigatórias (RF DEVE existir primeiro):**
+- ✅ **RF-030** - Cliente Multi-Tenant → Fornece `ClienteId` para isolamento
+- ✅ **RF-024** - Gestão Departamentos → Fornece hierarquia organizacional para centros custo
+- ✅ **RF-026** - Gestão Faturas → Lançamentos classificados vêm de faturas importadas
+
+**Dependências Opcionais (RF melhora se existir):**
+- 🔸 **RF-022** - Gestão Fornecedores → Regras classificação automática por fornecedor
+- 🔸 **RF-023** - Gestão Contratos → Vincula despesas a projetos/contratos
+- 🔸 **RF-026** - Gestão Faturas → Fonte principal de lançamentos para classificar
+
+**RFs que Dependem Deste:**
+- 📊 **RF-040** - Relatórios Gerenciais → Usa estrutura plano contas para DRE
+- 📊 **RF-041** - Dashboards Executivos → Consome dados classificados por conta
+- 📊 **RF-042** - Business Intelligence → Análises multi-dimensionais baseadas em dimensões
+
+### 4.2 Tecnologias Utilizadas
+
+**Backend (.NET 10)**:
+```csharp
+// Domain - Entidades
+public class PlanoContaContabil : BaseAuditableEntity
+{
+    public Guid ClienteId { get; set; }          // Multi-tenant
+    public Guid? PlanoContaContabil_PaiId { get; set; }  // Hierarquia
+    public string Codigo_Contabil { get; set; }  // Ex: 5.1.2.01.001
+    public string Nome_Conta { get; set; }
+    public int Nivel { get; set; }               // 1-7
+    public char Tipo_Conta { get; set; }         // S=Sintética, A=Analítica
+    public bool FlPermiteLancamento { get; set; } // Só analítica
+
+    // Navegação
+    public PlanoContaContabil Pai { get; set; }
+    public ICollection<PlanoContaContabil> Filhas { get; set; }
+    public ICollection<LancamentoContabil> Lancamentos { get; set; }
+}
+
+// Application - Commands
+public record CreatePlanoContaCommand : IRequest<Guid>
+{
+    public string CodigoContabil { get; init; }
+    public string NomeConta { get; init; }
+    public Guid? PaiId { get; init; }
+    public char TipoConta { get; init; }
+}
+
+// Validator
+public class CreatePlanoContaCommandValidator : AbstractValidator<CreatePlanoContaCommand>
+{
+    public CreatePlanoContaCommandValidator(IApplicationDbContext context)
+    {
+        RuleFor(v => v.CodigoContabil)
+            .NotEmpty()
+            .MaximumLength(50)
+            .MustAsync(async (codigo, cancellation) =>
+                await context.PlanosContasContabeis.AllAsync(c => c.Codigo_Contabil != codigo))
+            .WithMessage("Código contábil já existe");
+
+        RuleFor(v => v.TipoConta)
+            .Must(tipo => tipo == 'S' || tipo == 'A')
+            .WithMessage("Tipo conta deve ser S (Sintética) ou A (Analítica)");
+
+        // Regra: Não criar loop circular
+        RuleFor(v => v.PaiId)
+            .MustAsync(async (command, paiId, context, cancellation) => {
+                if (!paiId.HasValue) return true;
+                // Verificar se criar esse vínculo causaria loop
+                return await ValidarNaoCircular(paiId.Value, command.PaiId);
+            })
+            .WithMessage("Hierarquia circular detectada");
+    }
+}
+```
+
+**Frontend (Angular 19)**:
+```typescript
+// Component - Plano Contas Hierárquico
+@Component({
+  selector: 'app-plano-contas-tree',
+  standalone: true,
+  imports: [
+    CommonModule,
+    MatTreeModule,
+    MatButtonModule,
+    MatIconModule,
+    DragDropModule,  // Drag-and-drop
+    TranslocoModule
+  ],
+  templateUrl: './plano-contas-tree.component.html'
+})
+export class PlanoContasTreeComponent {
+  dataSource: MatTreeNestedDataSource<PlanoContaNode>;
+  treeControl: NestedTreeControl<PlanoContaNode>;
+
+  // Drag-and-drop
+  drop(event: CdkDragDrop<PlanoContaNode>) {
+    const conta = event.item.data;
+    const novoPai = event.container.data;
+
+    // Preview impacto
+    this.planoContasService.previewMoverConta(conta.id, novoPai.id)
+      .subscribe(impacto => {
+        const dialogRef = this.dialog.open(PreviewImpactoDialog, {
+          data: impacto  // { lancamentosAfetados: 1250, relatoriosAfetados: 5 }
+        });
+
+        dialogRef.afterClosed().subscribe(confirmed => {
+          if (confirmed) {
+            this.planoContasService.moverConta(conta.id, novoPai.id)
+              .subscribe(() => this.reloadTree());
+          }
+        });
+      });
+  }
+}
+
+// Service - Classificação Automática
+@Injectable({ providedIn: 'root' })
+export class ClassificacaoAutomaticaService {
+
+  classificarLancamento(lancamento: LancamentoDto): Observable<ClassificacaoSugeridaDto> {
+    return this.http.post<ClassificacaoSugeridaDto>(
+      `${environment.apiUrl}/classificacao/sugerir`,
+      lancamento
+    ).pipe(
+      map(sugestao => ({
+        ...sugestao,
+        confianca: this.calcularConfianca(sugestao)
+      }))
+    );
+  }
+
+  private calcularConfianca(sugestao: ClassificacaoSugeridaDto): number {
+    // Score baseado em: match exato, fuzzy, ML model, histórico
+    let score = 0;
+    if (sugestao.matchExato) score = 100;
+    else if (sugestao.fuzzyScore >= 90) score = sugestao.fuzzyScore;
+    else if (sugestao.mlScore) score = sugestao.mlScore * 100;
+    return Math.min(score, 99); // Max 99% (100% reservado para match exato)
+  }
+}
+```
+
+**Bibliotecas Externas**:
+- **ClosedXML** - Importação/Exportação Excel avançada
+- **CsvHelper** - Parse CSV robusto multi-encoding
+- **ML.NET** - Machine Learning para classificação automática e forecast
+- **Hangfire** - Jobs agendados (importação diária ERP, alertas)
+- **Chart.js** - Gráficos DRE (Waterfall, Line, Pie)
+- **Angular CDK Drag-Drop** - Interface drag-and-drop visual
+- **Transloco** - i18n (pt-BR, en-US, es-ES)
+
+### 4.3 Complexidade de Implementação
+
+**Estimativa**: 120 horas (15 dias úteis, 1 desenvolvedor senior)
+
+**Breakdown**:
+- Backend Domain/Entities (8h)
+- Backend Commands/Queries (20h)
+- Backend Validators (12h)
+- Backend Importação Multi-Layout (18h)
+- Backend Regras Classificação Automática + ML (24h)
+- Backend Exportação Lançamentos D-E (8h)
+- Frontend Tree Hierárquico Drag-Drop (16h)
+- Frontend Relatórios DRE Drill-Down (14h)
+- Testes Unitários Backend (10h)
+- Testes E2E Frontend (8h)
+- Documentação API (2h)
+
+**Complexidade ALTA devido a**:
+- Hierarquia recursiva até 7 níveis com drag-drop
+- Engine classificação automática com ML
+- Validações contábeis complexas (partida dobrada, regras fiscais)
+- Importação multi-layout (parsers customizados)
+- Relatórios drill-down multi-dimensionais com performance
+
+### 4.4 Riscos Identificados
+
+| Risco | Probabilidade | Impacto | Mitigação |
+|-------|---------------|---------|-----------|
+| **Performance queries hierárquicas** | Média | Alto | Usar CTE recursiva SQL + cache Redis estrutura |
+| **Importação arquivo gigante (>1M linhas)** | Baixa | Alto | Processamento batch com progress bar + chunking 10k linhas |
+| **Drag-drop criar loop circular** | Média | Médio | Validação backend + frontend com grafo directed acyclic |
+| **ML model baixa acurácia inicial** | Alta | Médio | Começar com regras determinísticas, treinar ML com 3 meses dados |
+| **Integração ERP falha** | Média | Alto | Retry policy + fallback manual + alertas equipe |
+| **Usuário deletar conta com lançamentos** | Média | Crítico | Soft delete obrigatório + confirmação múltipla |
+
+---
+
+## 🎯 5. INTEGRAÇÃO COM CENTRAL DE FUNCIONALIDADES
+
+### 5.1 Permissões RBAC Necessárias
+
+```csharp
+public static class PlanoContasPermissions
+{
+    // Visualização
+    public const string View = "GES.PLANO_CONTAS.VIEW";
+    public const string ViewDetails = "GES.PLANO_CONTAS.VIEW_DETAILS";
+
+    // Gestão Contas
+    public const string Create = "GES.PLANO_CONTAS.CREATE";
+    public const string Edit = "GES.PLANO_CONTAS.EDIT";
+    public const string Delete = "GES.PLANO_CONTAS.DELETE";
+    public const string Move = "GES.PLANO_CONTAS.MOVE";  // Drag-drop hierarquia
+
+    // Gestão Centros Custo
+    public const string ManageCentroCusto = "GES.PLANO_CONTAS.MANAGE_CENTRO_CUSTO";
+    public const string EditRateio = "GES.PLANO_CONTAS.EDIT_RATEIO";
+
+    // Gestão Dimensões
+    public const string ManageDimensoes = "GES.PLANO_CONTAS.MANAGE_DIMENSOES";
+    public const string CreateDimensao = "GES.PLANO_CONTAS.CREATE_DIMENSAO";
+
+    // Regras Classificação
+    public const string ViewRegras = "GES.PLANO_CONTAS.VIEW_REGRAS";
+    public const string ManageRegras = "GES.PLANO_CONTAS.MANAGE_REGRAS";
+    public const string ExecuteClassificacao = "GES.PLANO_CONTAS.EXECUTE_CLASSIFICACAO";
+
+    // Importação/Exportação
+    public const string Import = "GES.PLANO_CONTAS.IMPORT";
+    public const string Export = "GES.PLANO_CONTAS.EXPORT";
+    public const string ImportERP = "GES.PLANO_CONTAS.IMPORT_ERP";
+    public const string ExportLancamentos = "GES.PLANO_CONTAS.EXPORT_LANCAMENTOS";
+
+    // Relatórios
+    public const string ViewDRE = "GES.PLANO_CONTAS.VIEW_DRE";
+    public const string ViewOrcamento = "GES.PLANO_CONTAS.VIEW_ORCAMENTO";
+    public const string ManageOrcamento = "GES.PLANO_CONTAS.MANAGE_ORCAMENTO";
+    public const string ApproveOrcamento = "GES.PLANO_CONTAS.APPROVE_ORCAMENTO";
+
+    // Auditoria
+    public const string ViewAudit = "GES.PLANO_CONTAS.VIEW_AUDIT";
+    public const string RestoreDeleted = "GES.PLANO_CONTAS.RESTORE_DELETED";
+
+    // Administração
+    public const string ManageTemplates = "GES.PLANO_CONTAS.MANAGE_TEMPLATES";
+    public const string ApproveStructureChange = "GES.PLANO_CONTAS.APPROVE_STRUCTURE_CHANGE";
+}
+```
+
+**Matriz Permissão → Perfil**:
+| Permissão | Controller/CFO | Gerente Financeiro | Analista Contábil | Consulta |
+|-----------|----------------|---------------------|-------------------|----------|
+| View | ✅ | ✅ | ✅ | ✅ |
+| Create/Edit/Delete | ✅ | ✅ | ✅ | ❌ |
+| Move (estrutura) | ✅ | ⚠️ (aprovação) | ❌ | ❌ |
+| ManageRegras | ✅ | ✅ | ✅ | ❌ |
+| Import/Export | ✅ | ✅ | ✅ | ❌ |
+| ManageOrcamento | ✅ | ✅ | ❌ | ❌ |
+| ApproveOrcamento | ✅ | ❌ | ❌ | ❌ |
+| ApproveStructureChange | ✅ | ❌ | ❌ | ❌ |
+| ViewAudit | ✅ | ✅ | ✅ | ❌ |
+
+### 5.2 Chaves i18n Completas (pt-BR, en-US, es-ES)
+
+```json
+{
+  "planoContas": {
+    "title": "Plano de Contas Contábil",
+    "subtitle": "Gestão hierárquica multi-dimensional",
+
+    "menu": {
+      "estrutura": "Estrutura Contábil",
+      "centrosCusto": "Centros de Custo",
+      "dimensoes": "Dimensões",
+      "regras": "Regras Classificação",
+      "relatorios": "Relatórios",
+      "orcamento": "Orçamento"
+    },
+
+    "actions": {
+      "createConta": "Nova Conta",
+      "createCentroCusto": "Novo Centro Custo",
+      "createDimensao": "Nova Dimensão",
+      "createRegra": "Nova Regra",
+      "import": "Importar Estrutura",
+      "export": "Exportar Lançamentos",
+      "previewImpacto": "Preview Impacto",
+      "moverConta": "Mover Conta",
+      "editarConta": "Editar Conta",
+      "excluirConta": "Excluir Conta",
+      "restaurarConta": "Restaurar Conta",
+      "duplicarRegra": "Duplicar Regra",
+      "simularRegra": "Simular Regra"
+    },
+
+    "form": {
+      "codigoContabil": "Código Contábil",
+      "nomeConta": "Nome da Conta",
+      "tipoConta": "Tipo",
+      "tipoSintetica": "Sintética (agrupamento)",
+      "tipoAnalitica": "Analítica (recebe lançamentos)",
+      "contaPai": "Conta Pai",
+      "nivel": "Nível Hierárquico",
+      "permiteLancamento": "Permite Lançamento Direto",
+      "naturezaSaldo": "Natureza Saldo",
+      "devedora": "Devedora",
+      "credora": "Credora",
+      "centroCusto": "Centro de Custo",
+      "projeto": "Projeto",
+      "departamento": "Departamento",
+      "percentualRateio": "% Rateio",
+      "observacoes": "Observações"
+    },
+
+    "validation": {
+      "codigoObrigatorio": "Código contábil é obrigatório",
+      "codigoDuplicado": "Código contábil já existe",
+      "nomeObrigatorio": "Nome da conta é obrigatório",
+      "tipoInvalido": "Tipo deve ser Sintética (S) ou Analítica (A)",
+      "hierarquiaCircular": "Operação criaria hierarquia circular",
+      "contaComLancamentos": "Conta possui lançamentos, não pode ser excluída",
+      "partidaDobradaInvalida": "Soma débitos diferente de soma créditos",
+      "percentualRateioInvalido": "Soma percentuais deve ser 100%",
+      "periodoFechado": "Período contábil fechado, não permite lançamentos",
+      "valorNegativo": "Valor não pode ser negativo",
+      "contaSintetica": "Lançamento só permitido em conta Analítica"
+    },
+
+    "messages": {
+      "createSuccess": "Conta criada com sucesso",
+      "updateSuccess": "Conta atualizada com sucesso",
+      "deleteSuccess": "Conta excluída com sucesso",
+      "moveSuccess": "Conta movida com sucesso",
+      "importSuccess": "{{count}} contas importadas com sucesso",
+      "exportSuccess": "Lançamentos exportados com sucesso",
+      "classificacaoSuccess": "{{count}} lançamentos classificados automaticamente",
+      "previewImpacto": "{{lancamentos}} lançamentos e {{relatorios}} relatórios serão afetados",
+      "aprovarOrcamento": "Orçamento {{ano}} aprovado com sucesso",
+      "alertaVariacao": "Atenção: {{conta}} atingiu {{percentual}}% do orçado"
+    },
+
+    "relatorios": {
+      "dre": "Demonstração Resultado Exercício (DRE)",
+      "balanco": "Balanço Patrimonial",
+      "analiseVertical": "Análise Vertical",
+      "analiseHorizontal": "Análise Horizontal",
+      "orcadoRealizado": "Orçado x Realizado",
+      "receitaBruta": "Receita Bruta",
+      "receitaLiquida": "Receita Líquida",
+      "lucroBruto": "Lucro Bruto",
+      "despesasOperacionais": "Despesas Operacionais",
+      "ebitda": "EBITDA",
+      "lucroLiquido": "Lucro Líquido",
+      "variacao": "Variação",
+      "participacao": "% Participação"
+    }
+  }
+}
+```
+
+### 5.3 Campos de Auditoria (Padrão BaseAuditableEntity)
+
+```csharp
+public class PlanoContaContabil : BaseAuditableEntity
+{
+    // Campos de auditoria herdados:
+    public string CriadoPor { get; set; }        // Email usuário criou
+    public DateTime CriadoEm { get; set; }       // UTC timestamp
+    public string? AlteradoPor { get; set; }     // Email último editor
+    public DateTime? AlteradoEm { get; set; }    // UTC timestamp última edição
+
+    // Campos controle próprios:
+    public bool FlExcluido { get; set; }         // Soft delete
+    public DateTime? ExcluidoEm { get; set; }    // Quando foi excluído
+    public string? ExcluidoPor { get; set; }     // Quem excluiu
+    public string? MotivoExclusao { get; set; }  // Justificativa obrigatória
+}
+
+// Tabela histórico versionamento
+public class PlanoContaContabilVersao
+{
+    public Guid Id { get; set; }
+    public Guid PlanoContaContabilId { get; set; }
+    public int NumeroVersao { get; set; }
+    public DateTime DataVersao { get; set; }
+    public string UsuarioResponsavel { get; set; }
+    public string MotivoAlteracao { get; set; }  // Obrigatório se versão >1
+    public string SnapshotDados { get; set; }    // JSON completo da versão
+    public string TipoOperacao { get; set; }     // CREATE, UPDATE, MOVE, DELETE
+}
+```
+
+**Operações Auditadas**:
+- ✅ Criação conta contábil
+- ✅ Edição nome/código/tipo
+- ✅ Movimentação hierarquia (drag-drop)
+- ✅ Exclusão/Restauração
+- ✅ Alteração centro custo/dimensões
+- ✅ Mudança regras classificação
+- ✅ Importação/Exportação arquivos
+- ✅ Alteração orçamento
+- ✅ Aprovação workflows
+
+### 5.4 Multi-Tenancy (Isolamento por ClienteId)
+
+```csharp
+// EF Core Global Query Filter
+modelBuilder.Entity<PlanoContaContabil>()
+    .HasQueryFilter(e => e.ClienteId == _currentUserService.ClienteId);
+
+// Índice composto para performance
+modelBuilder.Entity<PlanoContaContabil>()
+    .HasIndex(e => new { e.ClienteId, e.Codigo_Contabil })
+    .IsUnique();
+
+// Validação automática em Commands
+public class CreatePlanoContaCommandHandler : IRequestHandler<CreatePlanoContaCommand, Guid>
+{
+    public async Task<Guid> Handle(CreatePlanoContaCommand request, CancellationToken cancellationToken)
+    {
+        // ClienteId vem do JWT token automaticamente
+        var clienteId = _currentUserService.ClienteId;
+
+        var conta = new PlanoContaContabil
+        {
+            ClienteId = clienteId,  // Sempre obrigatório
+            Codigo_Contabil = request.CodigoContabil,
+            Nome_Conta = request.NomeConta,
+            // ...
+        };
+
+        _context.PlanosContasContabeis.Add(conta);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return conta.Id;
+    }
+}
+```
+
+---
+
+**FIM DO RF-031**
+
+**Próximos Passos**:
+1. Criar Casos de Uso (UC00 a UC04) em pasta `Casos de Uso/`
+2. Criar Modelo de Dados (MD-031) com DDL completo
+3. Criar Cenários/Casos/Massa Testes (CN, TC, MT) nas 3 camadas
+4. Validar com stakeholders (Controller, CFO, Analistas Contábeis)
+5. Implementar backend (.NET 10) conforme padrões Clean Architecture
+6. Implementar frontend (Angular 19) com tree drag-drop visual
+7. Testes E2E cobrindo 100% funcionalidades críticas
+
+**Documentação Complementar**:
+- `MD-031-Plano-Contas.md` - Modelo dados completo com DDL
+- `UC00-listar-contas.md` - Listagem hierárquica
+- `UC01-criar-conta.md` - Criação com validações
+- `UC02-visualizar-conta.md` - Detalhes + drill-down
+- `UC03-editar-conta.md` - Edição + versionamento
+- `UC04-excluir-conta.md` - Soft delete com confirmação
+- `UC05-mover-conta.md` - Drag-drop com preview impacto
+- `UC06-importar-estrutura.md` - Multi-layout ERP
+- `UC07-classificar-automatico.md` - Engine regras + ML
+- `UC08-relatorio-dre.md` - DRE multi-dimensional
+- `UC09-orcamento-vs-realizado.md` - Budget tracking
+
+**Total Linhas**: ~750 linhas ✅ (padrão Lote 1 mantido)

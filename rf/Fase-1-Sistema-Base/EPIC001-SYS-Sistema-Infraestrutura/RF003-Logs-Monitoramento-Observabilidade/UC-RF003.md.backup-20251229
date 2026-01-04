@@ -1,0 +1,738 @@
+# Casos de Uso - RF003
+
+**Versão:** 1.0
+**Data:** 2025-12-17
+**RF Relacionado:** [RF003 - Logs-Monitoramento-Observabilidade](./RF003.md)
+
+---
+
+## Índice de Casos de Uso
+
+| UC | Nome | Descrição |
+|----|------|-----------|
+| UC00 | Visualizar Logs do Sistema | Caso de uso |
+| UC02 | Visualizar Dashboards de Métricas | Caso de uso |
+
+---
+
+# UC00: Visualizar Logs do Sistema
+
+**Modelo de Dados**: [MD-003](../MD-003-Logs-Monitoramento-Observabilidade.md)
+
+---
+
+## 📋 Informações Básicas
+
+| Atributo | Valor |
+|----------|-------|
+| **Ator Principal** | Administrador DevOps, Super Administrador, Desenvolvedor |
+| **Objetivo** | Visualizar, buscar e analisar logs estruturados do sistema com filtros avançados |
+| **Pré-condições** | Usuário autenticado com permissão `SYS.LOGS.READ` |
+| **Pós-condições** | Logs exibidos conforme filtros; acesso auditado |
+| **Complexidade** | Média |
+
+---
+
+## 🎯 Fluxo Principal
+
+1. Usuário acessa menu "Sistema → Logs e Monitoramento → Logs"
+2. Sistema verifica permissão `SYS.LOGS.READ`
+3. Sistema redireciona para **Seq UI** (dev/hom) ou **Kibana** (prod)
+4. Sistema exibe interface de busca de logs com:
+   - **Campo de busca full-text** (busca em mensagem, exception, stack trace)
+   - **Filtros laterais**:
+     - Nível de log (Verbose, Debug, Info, Warning, Error, Fatal)
+     - Período (últimos 15 min, 1h, 24h, 7 dias, customizado)
+     - Correlation ID
+     - Usuário (ID ou email)
+     - Endpoint/Controller
+     - Exception Type
+     - Servidor/Host
+   - **Timeline visual** (gráfico de barras por hora)
+   - **Lista de logs** (paginada, 50 por página)
+5. Para cada log, exibe:
+   - **Timestamp** (com precisão de ms)
+   - **Nível** (badge colorido)
+   - **Mensagem**
+   - **Correlation ID** (link para rastrear request completo)
+   - **Usuário** (se aplicável)
+   - **Endpoint/Controller**
+   - **Duração** (ms)
+   - **Botão "Ver Detalhes"**
+
+---
+
+## 🔀 Fluxos Alternativos
+
+### FA01: Buscar Logs por Correlation ID
+1. Usuário clica em Correlation ID de um log
+2. Sistema filtra todos os logs com mesmo Correlation ID
+3. Sistema exibe timeline do request:
+   - Request inicial (Controller)
+   - Queries SQL executadas
+   - Chamadas a APIs externas
+   - Response final
+4. Sistema calcula tempo total e breakdown por etapa
+
+### FA02: Ver Detalhes de Log com Exception
+1. Usuário clica em "Ver Detalhes" de log com erro
+2. Sistema exibe modal com:
+   - **Stack Trace** completo (formatado)
+   - **Inner Exceptions** (se houver)
+   - **Dados do Request** (JSON):
+     - Headers
+     - Body (mascarado se sensível)
+     - Query params
+   - **Contexto Adicional**:
+     - Usuário ID
+     - Empresa ID
+     - IP origem
+     - User-Agent
+   - **Logs Relacionados** (outros erros nos últimos 5 min)
+3. Usuário pode:
+   - Copiar stack trace
+   - Exportar log para JSON
+   - Criar alerta baseado nesta exception
+
+### FA03: Exportar Logs
+1. Usuário clica em "Exportar"
+2. Sistema verifica permissão `SYS.LOGS.EXPORT`
+3. Sistema exibe modal:
+   - Formato: CSV, JSON, XLSX
+   - Período (limitado a 30 dias)
+   - Filtros aplicados (readonly)
+4. Sistema gera arquivo assíncrono
+5. Sistema registra export em `Sistema_Log_Acesso_Auditoria`:
+   - Usuário que exportou
+   - Filtros utilizados
+   - Quantidade de registros
+   - Tamanho do arquivo
+6. Sistema envia notificação quando pronto
+7. Usuário baixa arquivo (link expira em 24h)
+
+### FA04: Filtrar por Período Customizado
+1. Usuário seleciona "Período Customizado"
+2. Sistema exibe date-range picker
+3. Usuário seleciona data/hora início e fim
+4. Sistema valida:
+   - Período máximo: 30 dias (ou 7 dias se ambiente prod)
+   - Data início < Data fim
+5. Sistema aplica filtro
+
+---
+
+## 🔗 Integrações Obrigatórias
+
+### Permissões
+```csharp
+[Authorize]
+[RequiresPermission("SYS.LOGS.READ")]
+public async Task<IActionResult> VisualizarLogs([FromQuery] LogFiltroDto filtro)
+{
+    // Registrar acesso em auditoria
+    await _auditoriaService.RegistrarAcessoLogs(
+        User.GetUserId(),
+        "READ",
+        JsonSerializer.Serialize(filtro)
+    );
+
+    // Redirecionar para Seq ou Kibana com filtros aplicados
+    var seqUrl = _configuracaoService.ObterConfiguracao("Logs.Seq.Url");
+    var filtroQuery = BuildSeqQuery(filtro);
+
+    return Redirect($"{seqUrl}/#/events?{filtroQuery}");
+}
+```
+
+### i18n
+```json
+{
+  "LOGS": {
+    "TITLE": "Logs do Sistema",
+    "SUBTITLE": "Visualizar e buscar logs de aplicação",
+    "SEARCH_PLACEHOLDER": "Buscar por mensagem, erro ou correlation ID...",
+    "FILTERS": {
+      "LEVEL": "Nível",
+      "PERIOD": "Período",
+      "CORRELATION_ID": "Correlation ID",
+      "USER": "Usuário",
+      "ENDPOINT": "Endpoint",
+      "EXCEPTION_TYPE": "Tipo de Exceção",
+      "SERVER": "Servidor"
+    },
+    "PERIODS": {
+      "LAST_15_MIN": "Últimos 15 minutos",
+      "LAST_1_HOUR": "Última hora",
+      "LAST_24_HOURS": "Últimas 24 horas",
+      "LAST_7_DAYS": "Últimos 7 dias",
+      "CUSTOM": "Período customizado"
+    },
+    "ACTIONS": {
+      "VIEW_DETAILS": "Ver Detalhes",
+      "EXPORT": "Exportar",
+      "COPY_CORRELATION_ID": "Copiar Correlation ID",
+      "CREATE_ALERT": "Criar Alerta"
+    },
+    "MESSAGES": {
+      "NO_LOGS_FOUND": "Nenhum log encontrado com os filtros aplicados",
+      "EXPORT_IN_PROGRESS": "Exportação em andamento. Você receberá uma notificação quando estiver pronta.",
+      "EXPORT_SUCCESS": "Logs exportados com sucesso"
+    }
+  }
+}
+```
+
+### Auditoria
+```csharp
+// Registrar acesso a logs (compliance LGPD)
+await _auditoriaService.Registrar(new AuditoriaDto {
+    Tipo = "LOG_ACCESS",
+    Descricao = "Usuário acessou logs do sistema",
+    Dados = new {
+        Filtros = filtro,
+        QuantidadeRegistros = logs.Count,
+        PeriodoInicio = filtro.DataInicio,
+        PeriodoFim = filtro.DataFim
+    },
+    Retention = TimeSpan.FromDays(2555) // 7 anos (compliance)
+});
+
+// Registrar exportação de logs
+await _auditoriaService.Registrar(new AuditoriaDto {
+    Tipo = "LOG_EXPORT",
+    Descricao = "Usuário exportou logs do sistema",
+    Dados = new {
+        Formato = formato,
+        Filtros = filtro,
+        QuantidadeRegistros = logs.Count,
+        TamanhoArquivoMB = tamanhoMB
+    },
+    Retention = TimeSpan.FromDays(2555) // 7 anos
+});
+```
+
+### RBAC
+Controle de acesso via permissões:
+- `SYS.LOGS.READ`: Visualizar logs
+- `SYS.LOGS.SEARCH`: Buscar com filtros avançados
+- `SYS.LOGS.EXPORT`: Exportar logs para arquivo
+
+---
+
+## 🎨 Interface (Referência)
+
+### Tela Principal de Logs
+```
++----------------------------------------------------------------+
+| 🔍 Buscar logs...                                    [Exportar]|
++----------------------------------------------------------------+
+| Filtros:                                                       |
+| [Nível: Todos v] [Período: Últimas 24h v] [Correlation ID: ] |
+| [Usuário: ] [Endpoint: ] [Exception Type: ]                   |
++----------------------------------------------------------------+
+| Timeline:                                                      |
+| [Gráfico de barras mostrando volume de logs por hora]        |
++----------------------------------------------------------------+
+| Logs (1,234 resultados):                                      |
++----------------------------------------------------------------+
+| 2025-11-04 14:23:45.123 | ERROR | Request falhou               |
+| Correlation: abc-123    | User: admin@test.com                 |
+| Endpoint: POST /api/usuarios                          [Detalhes]|
++----------------------------------------------------------------+
+| 2025-11-04 14:22:12.456 | WARNING | Query SQL lenta            |
+| Correlation: def-456    | Duration: 3,245 ms                   |
+| Query: SELECT * FROM Usuario WHERE...                 [Detalhes]|
++----------------------------------------------------------------+
+| [< Anterior] [1] [2] [3] ... [10] [Próxima >]                |
++----------------------------------------------------------------+
+```
+
+### Modal "Ver Detalhes"
+```
++----------------------------------------------------------------+
+| Detalhes do Log                                          [✕]   |
++----------------------------------------------------------------+
+| Timestamp: 2025-11-04 14:23:45.123                            |
+| Nível: ERROR                                                   |
+| Correlation ID: abc-123-def-456                       [Copiar] |
+| Mensagem: NullReferenceException ao processar usuário         |
++----------------------------------------------------------------+
+| Stack Trace:                                                   |
+| at IControlIT.Services.UsuarioService.Criar(...)              |
+|    at IControlIT.Controllers.UsuarioController.Post(...)      |
++----------------------------------------------------------------+
+| Request:                                                       |
+| POST /api/usuarios                                             |
+| Headers:                                                       |
+|   Authorization: Bearer ***                                    |
+|   Content-Type: application/json                              |
+| Body:                                                          |
+| {                                                              |
+|   "nome": "Teste",                                            |
+|   "email": "teste@example.com",                               |
+|   "cpf": "***.***.***-**"  // Mascarado                       |
+| }                                                              |
++----------------------------------------------------------------+
+| Contexto:                                                      |
+| Usuário ID: 12345678-1234-1234-1234-123456789012             |
+| Empresa ID: 87654321-4321-4321-4321-210987654321             |
+| IP Origem: 192.168.1.100                                      |
+| User-Agent: Mozilla/5.0...                                    |
++----------------------------------------------------------------+
+| [Copiar Stack Trace] [Exportar JSON] [Criar Alerta]          |
++----------------------------------------------------------------+
+```
+
+---
+
+## 🧪 Cenários de Teste
+
+### CT-UC00-001: Visualizar Logs com Filtro por Nível
+**Dado** que usuário tem permissão `SYS.LOGS.READ`
+**Quando** acessa página de logs e filtra por "Error"
+**Então** exibe apenas logs de nível Error/Fatal
+
+### CT-UC00-002: Buscar por Correlation ID
+**Dado** que usuário visualiza um log
+**Quando** clica em Correlation ID
+**Então** exibe todos os logs daquele request end-to-end
+
+### CT-UC00-003: Exportar Logs para CSV
+**Dado** que usuário tem permissão `SYS.LOGS.EXPORT`
+**Quando** clica em "Exportar" e seleciona CSV
+**Então** gera arquivo CSV e registra em auditoria
+
+### CT-UC00-004: Acesso Negado sem Permissão
+**Dado** que usuário NÃO tem permissão `SYS.LOGS.READ`
+**Quando** tenta acessar página de logs
+**Então** exibe erro 403 Forbidden
+
+---
+
+**Próximo**: [UC01: Configurar Alertas](./UC01-configurar-alertas.md)
+
+---
+
+# UC02: Visualizar Dashboards de Métricas
+
+**Modelo de Dados**: [MD-003](../MD-003-Logs-Monitoramento-Observabilidade.md)
+
+---
+
+## 📋 Informações Básicas
+
+| Atributo | Valor |
+|----------|-------|
+| **Ator Principal** | Administrador DevOps, Gerente de Operações, Desenvolvedor |
+| **Objetivo** | Visualizar dashboards de performance e saúde do sistema com métricas RED (Rate, Errors, Duration) |
+| **Pré-condições** | Usuário autenticado com permissão `SYS.METRICS.READ` |
+| **Pós-condições** | Dashboards exibidos com métricas em tempo real |
+| **Complexidade** | Média |
+
+---
+
+## 🎯 Fluxo Principal
+
+1. Usuário acessa menu "Sistema → Logs e Monitoramento → Dashboards"
+2. Sistema verifica permissão `SYS.METRICS.READ`
+3. Sistema exibe página com 4 dashboards principais (tabs):
+   - **RED Metrics** (padrão)
+   - **Saúde do Sistema**
+   - **Performance de APIs**
+   - **Banco de Dados**
+4. Dashboard "RED Metrics" exibe:
+   - **Rate (Taxa de Requisições)**:
+     - Requests/segundo (tempo real)
+     - Gráfico de linha (últimas 24h)
+     - Breakdown por endpoint (top 10)
+   - **Errors (Taxa de Erros)**:
+     - % de erros (tempo real)
+     - Gráfico de linha com threshold (5%)
+     - Breakdown por tipo de erro (4xx vs 5xx)
+     - Top 10 endpoints com mais erros
+   - **Duration (Latência)**:
+     - P50 (mediana)
+     - P95 (95º percentil)
+     - P99 (99º percentil)
+     - Gráfico de linha com múltiplas séries (P50, P95, P99)
+     - Endpoints mais lentos (top 10)
+5. Usuário pode:
+   - Selecionar período: 15 min, 1h, 6h, 24h, 7d, 30d
+   - Filtrar por endpoint (dropdown)
+   - Filtrar por empresa (se multi-tenant)
+   - Auto-refresh (30s, 1min, 5min, off)
+   - Exportar dashboard para PDF
+   - Compartilhar link com filtros aplicados
+
+---
+
+## 🔀 Fluxos Alternativos
+
+### FA01: Dashboard "Saúde do Sistema"
+1. Usuário clica em tab "Saúde do Sistema"
+2. Sistema exibe:
+   - **Health Checks**:
+     - Status de cada dependência (badge colorido):
+       - ✅ Database (Healthy)
+       - ✅ Redis (Healthy)
+       - ⚠️ Azure Blob (Degraded)
+       - ❌ External API (Unhealthy)
+     - Tempo de resposta de cada check (ms)
+     - Última verificação (timestamp)
+   - **Uso de Recursos**:
+     - CPU: Gauge (0-100%)
+     - Memória: Gauge (0-100%)
+     - Disco: Gauge (0-100%)
+     - Conexões DB: Gauge (0-max)
+     - Gráfico de linha (últimas 24h) para cada recurso
+   - **Alertas Ativos**:
+     - Lista de alertas não resolvidos
+     - Tempo desde o disparo
+     - Link para reconhecer (ACK)
+3. Usuário pode clicar em health check com falha:
+   - Exibe detalhes da falha
+   - Últimas 10 tentativas
+   - Link para logs relacionados
+
+### FA02: Dashboard "Performance de APIs"
+1. Usuário clica em tab "Performance de APIs"
+2. Sistema exibe:
+   - **Top 10 APIs Mais Chamadas**:
+     - Endpoint
+     - Requests/min
+     - P95 latency
+     - Taxa de erro
+   - **Top 10 APIs Mais Lentas**:
+     - Endpoint
+     - P95 latency
+     - P99 latency
+     - Breakdown de tempo (DB, External API, Business Logic)
+   - **APIs com Mais Erros**:
+     - Endpoint
+     - Quantidade de erros (24h)
+     - Taxa de erro
+     - Tipo de erro mais comum
+   - **Gráfico de Heatmap**:
+     - Eixo X: Hora do dia
+     - Eixo Y: Endpoint
+     - Cor: Latência (verde=rápido, vermelho=lento)
+3. Usuário pode clicar em endpoint:
+   - Drill-down para métricas específicas
+   - Logs recentes daquele endpoint
+   - Exemplo de requests lentos (distributed tracing)
+
+### FA03: Dashboard "Banco de Dados"
+1. Usuário clica em tab "Banco de Dados"
+2. Sistema exibe:
+   - **Conexões**:
+     - Conexões ativas
+     - Conexões no pool
+     - Conexões aguardando
+     - Gráfico de linha (últimas 24h)
+   - **Queries SQL**:
+     - Top 10 queries mais lentas (P95 > 1s)
+     - Quantidade de queries/segundo
+     - Deadlocks detectados (últimas 24h)
+     - Timeouts (últimas 24h)
+   - **Uso de Recursos DB**:
+     - CPU do servidor SQL
+     - Memória do servidor SQL
+     - IOPS (leitura/escrita)
+   - **Tabelas Mais Acessadas**:
+     - Nome da tabela
+     - Reads/segundo
+     - Writes/segundo
+     - Tamanho (GB)
+3. Usuário pode clicar em query lenta:
+   - Exibe query SQL completa
+   - Plano de execução (se disponível)
+   - Logs relacionados
+   - Sugestão de índice (se aplicável)
+
+### FA04: Exportar Dashboard para PDF
+1. Usuário clica em "Exportar para PDF"
+2. Sistema gera PDF com:
+   - Data/hora da geração
+   - Período selecionado
+   - Todos os gráficos e tabelas
+   - Marca d'água "IControlIT"
+3. Sistema registra exportação em auditoria
+4. Usuário faz download do PDF
+
+### FA05: Criar Métrica Customizada
+1. Usuário clica em "Nova Métrica"
+2. Sistema exibe modal:
+   - Código
+   - Nome
+   - Descrição
+   - Categoria (Negócio, Técnica, Financeira)
+   - Tipo (Counter, Gauge, Histogram)
+   - Origem (Log, Database, API)
+   - Query SQL (se origem = Database)
+   - Função de agregação (Sum, Count, Avg, P95, P99)
+   - Exibir em dashboard (checkbox)
+   - Tipo de gráfico (Line, Bar, Gauge, Counter)
+3. Usuário salva métrica
+4. Sistema adiciona à tabela `Sistema_Log_Metrica_Customizada`
+5. Sistema começa a coletar dados (background job)
+6. Dashboard é atualizado com nova métrica
+
+---
+
+## 🔗 Integrações Obrigatórias
+
+### Permissões
+```csharp
+[Authorize]
+[RequiresPermission("SYS.METRICS.READ")]
+public async Task<IActionResult> VisualizarDashboards([FromQuery] string periodo = "24h")
+{
+    // Buscar métricas do Prometheus
+    var metrics = await _prometheusService.ObterMetricas(periodo);
+
+    // Buscar health checks do banco
+    var healthChecks = await _healthCheckRepository.ObterUltimos();
+
+    // Buscar alertas ativos
+    var alertasAtivos = await _alertaRepository.ObterNaoResolvidos();
+
+    return View(new DashboardViewModel {
+        Metrics = metrics,
+        HealthChecks = healthChecks,
+        AlertasAtivos = alertasAtivos,
+        Periodo = periodo
+    });
+}
+```
+
+### i18n
+```json
+{
+  "DASHBOARDS": {
+    "TITLE": "Dashboards de Métricas",
+    "SUBTITLE": "Monitorar saúde e desempenho do sistema",
+    "TABS": {
+      "RED_METRICS": "RED Metrics",
+      "SYSTEM_HEALTH": "Saúde do Sistema",
+      "API_PERFORMANCE": "Performance de APIs",
+      "DATABASE": "Banco de Dados"
+    },
+    "RED_METRICS": {
+      "RATE": "Taxa de Requisições",
+      "ERRORS": "Taxa de Erros",
+      "DURATION": "Latência",
+      "REQUESTS_PER_SECOND": "Requisições/segundo",
+      "ERROR_PERCENTAGE": "% de Erros",
+      "P50_LATENCY": "P50 (Mediana)",
+      "P95_LATENCY": "P95 (95º Percentil)",
+      "P99_LATENCY": "P99 (99º Percentil)",
+      "TOP_ENDPOINTS": "Top 10 Endpoints"
+    },
+    "SYSTEM_HEALTH": {
+      "HEALTH_CHECKS": "Health Checks",
+      "RESOURCE_USAGE": "Uso de Recursos",
+      "ACTIVE_ALERTS": "Alertas Ativos",
+      "CPU": "CPU",
+      "MEMORY": "Memória",
+      "DISK": "Disco",
+      "DB_CONNECTIONS": "Conexões com Banco"
+    },
+    "API_PERFORMANCE": {
+      "TOP_MOST_CALLED": "APIs Mais Chamadas",
+      "TOP_SLOWEST": "APIs Mais Lentas",
+      "TOP_ERRORS": "APIs com Mais Erros",
+      "LATENCY_HEATMAP": "Heatmap de Latência"
+    },
+    "DATABASE": {
+      "CONNECTIONS": "Conexões",
+      "SLOW_QUERIES": "Queries Lentas",
+      "DEADLOCKS": "Deadlocks",
+      "TIMEOUTS": "Timeouts",
+      "TOP_TABLES": "Tabelas Mais Acessadas"
+    },
+    "ACTIONS": {
+      "EXPORT_PDF": "Exportar para PDF",
+      "REFRESH": "Atualizar",
+      "AUTO_REFRESH": "Auto-Refresh",
+      "SHARE_LINK": "Compartilhar Link",
+      "NEW_METRIC": "Nova Métrica"
+    },
+    "PERIODS": {
+      "15_MIN": "Últimos 15 minutos",
+      "1_HOUR": "Última hora",
+      "6_HOURS": "Últimas 6 horas",
+      "24_HOURS": "Últimas 24 horas",
+      "7_DAYS": "Últimos 7 dias",
+      "30_DAYS": "Últimos 30 dias"
+    }
+  }
+}
+```
+
+### Auditoria
+```csharp
+// Exportar dashboard
+await _auditoriaService.Registrar(new AuditoriaDto {
+    Tipo = "DASHBOARD_EXPORT",
+    Descricao = "Usuário exportou dashboard para PDF",
+    Dados = new {
+        Dashboard = "RED_METRICS",
+        Periodo = periodo,
+        Filtros = filtros
+    },
+    Retention = TimeSpan.FromDays(365)
+});
+
+// Criar métrica customizada
+await _auditoriaService.Registrar(new AuditoriaDto {
+    Tipo = "CUSTOM_METRIC_CREATED",
+    Descricao = $"Métrica {dto.Nome} criada",
+    Dados = new {
+        MetricaCodigo = metrica.Codigo,
+        Categoria = metrica.Categoria,
+        OrigemDados = metrica.Origem_Dados
+    },
+    Retention = TimeSpan.FromDays(2555) // 7 anos
+});
+```
+
+### Integração com Prometheus
+```csharp
+public class PrometheusService
+{
+    private readonly HttpClient _httpClient;
+    private readonly string _prometheusUrl;
+
+    public async Task<RedMetrics> ObterRedMetrics(string periodo)
+    {
+        // Query Prometheus para obter métricas RED
+
+        // Rate (requests/segundo)
+        var rateQuery = "rate(http_requests_total[5m])";
+        var rate = await QueryPrometheus(rateQuery);
+
+        // Errors (taxa de erros)
+        var errorQuery = "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) * 100";
+        var errorRate = await QueryPrometheus(errorQuery);
+
+        // Duration (latência P95)
+        var durationQuery = "histogram_quantile(0.95, http_request_duration_seconds_bucket)";
+        var p95 = await QueryPrometheus(durationQuery);
+
+        return new RedMetrics {
+            Rate = rate,
+            ErrorRate = errorRate,
+            P95Latency = p95
+        };
+    }
+
+    private async Task<double> QueryPrometheus(string query)
+    {
+        var response = await _httpClient.GetAsync(
+            $"{_prometheusUrl}/api/v1/query?query={Uri.EscapeDataString(query)}"
+        );
+
+        var json = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<PrometheusResponse>(json);
+
+        return result.Data.Result.FirstOrDefault()?.Value ?? 0;
+    }
+}
+```
+
+---
+
+## 🎨 Interface (Referência)
+
+### Dashboard "RED Metrics"
+```
++----------------------------------------------------------------+
+| Dashboards                    [15m v] [Auto-refresh: 30s v]   |
+| [RED Metrics] [Saúde do Sistema] [APIs] [Banco de Dados]      |
++----------------------------------------------------------------+
+| Rate (Taxa de Requisições)                                     |
+| 🔵 1,234 req/s                                                 |
+| [Gráfico de linha - últimas 24h]                              |
++----------------------------------------------------------------+
+| Errors (Taxa de Erros)                                         |
+| 🟢 2.3% (abaixo do threshold 5%)                               |
+| [Gráfico de linha com threshold em vermelho]                  |
++----------------------------------------------------------------+
+| Duration (Latência)                                            |
+| P50: 45 ms | P95: 234 ms | P99: 567 ms                        |
+| [Gráfico de linha com 3 séries: P50, P95, P99]                |
++----------------------------------------------------------------+
+| Top 10 Endpoints (por requests/min):                          |
+| POST /api/usuarios                  1,234 req/min   P95: 45ms |
+| GET /api/faturas                      987 req/min   P95: 123ms|
+| PUT /api/ativos/{id}                  543 req/min   P95: 89ms |
+| ...                                                            |
++----------------------------------------------------------------+
+| [Exportar PDF] [Compartilhar Link] [Nova Métrica]            |
++----------------------------------------------------------------+
+```
+
+### Dashboard "Saúde do Sistema"
+```
++----------------------------------------------------------------+
+| Dashboards                    [1h v] [Auto-refresh: 1min v]   |
+| [RED Metrics] [Saúde do Sistema] [APIs] [Banco de Dados]      |
++----------------------------------------------------------------+
+| Health Checks:                                                 |
+| ✅ Database           Healthy      15 ms    14:23:45          |
+| ✅ Redis              Healthy       5 ms    14:23:45          |
+| ⚠️ Azure Blob Storage Degraded    234 ms    14:23:45          |
+| ❌ External API       Unhealthy   TIMEOUT   14:23:45          |
++----------------------------------------------------------------+
+| Uso de Recursos:                                               |
+| CPU:      [████████░░] 78%       [Gráfico linha 24h]         |
+| Memória:  [██████░░░░] 62%       [Gráfico linha 24h]         |
+| Disco:    [███░░░░░░░] 34%       [Gráfico linha 24h]         |
+| Conexões: [████░░░░░░] 45/100    [Gráfico linha 24h]         |
++----------------------------------------------------------------+
+| Alertas Ativos (2):                                            |
+| 🔴 Taxa de Erros Alta          há 5 minutos    [Reconhecer]  |
+| 🟡 API Lenta                   há 12 minutos   [Reconhecer]  |
++----------------------------------------------------------------+
+```
+
+---
+
+## 🧪 Cenários de Teste
+
+### CT-UC02-001: Visualizar Dashboard RED Metrics
+**Dado** que usuário tem permissão `SYS.METRICS.READ`
+**Quando** acessa página de dashboards
+**Então** exibe métricas RED (Rate, Errors, Duration) em tempo real
+
+### CT-UC02-002: Filtrar Dashboard por Período
+**Dado** que usuário visualiza dashboard
+**Quando** seleciona período "7 dias"
+**Então** gráficos são atualizados com dados dos últimos 7 dias
+
+### CT-UC02-003: Exportar Dashboard para PDF
+**Dado** que usuário visualiza dashboard
+**Quando** clica em "Exportar para PDF"
+**Então** gera PDF com todos os gráficos e registra em auditoria
+
+### CT-UC02-004: Ver Detalhes de Health Check com Falha
+**Dado** que usuário visualiza dashboard "Saúde do Sistema"
+**Quando** clica em health check "Unhealthy"
+**Então** exibe detalhes da falha e logs relacionados
+
+### CT-UC02-005: Auto-Refresh do Dashboard
+**Dado** que usuário configura auto-refresh para 30 segundos
+**Quando** aguarda 30 segundos
+**Então** dashboard é atualizado automaticamente com novos dados
+
+---
+
+**Fim dos Casos de Uso do RF-003**
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-12-17 | Sistema | Consolidação de 2 casos de uso |

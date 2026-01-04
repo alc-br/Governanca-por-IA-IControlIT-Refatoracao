@@ -1,0 +1,612 @@
+# RL-RF101: Referência ao Legado - Dashboards Executivos Operacionais
+# Versão: 1.0
+# Data: 2025-12-31
+
+rf_id: RF101
+titulo: "Dashboards Executivos Operacionais"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms + Crystal Reports"
+  versao: "IControlIT v1.0 (2010-2025)"
+  arquitetura: "Monolítica WebForms com Crystal Reports"
+  banco_dados: "SQL Server 2008 R2"
+  multi_tenant: false
+  auditoria: "none"
+
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+referencias:
+  - id: "LEG-RF101-001"
+    tipo: "tela"
+    nome: "Dashboard.aspx"
+    caminho: "ic1_legado/IControlIT/Relatorios/Dashboard.aspx"
+    descricao: |
+      Tela principal de visualização de dashboards executivos com filtros de período e tipo.
+      Permitia seleção entre "Custos", "SLA" e "Compliance" (sem "C-Level" ou "Performance").
+      Carregava Crystal Reports dinamicamente baseado no tipo selecionado.
+
+      Comportamentos implícitos:
+      - Período default: mês atual (primeiro dia até dia atual)
+      - Filtro ClienteId aplicado manualmente no code-behind (inseguro)
+      - Timeout 60s configurado (insuficiente para volumes grandes)
+      - Sem auditoria: nenhum log de acesso
+      - Sem validação de permissão: qualquer usuário logado podia acessar
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por componentes Angular com roteamento moderno:
+      - /dashboards/executivo/clevel (novo, não existia)
+      - /dashboards/executivo/custos
+      - /dashboards/executivo/compliance
+      - /dashboards/executivo/performance (novo, não existia)
+
+      Gráficos Crystal Reports substituídos por D3.js/Highcharts interativos.
+      Auditoria obrigatória em RF004. RBAC com permissões granulares.
+
+    rf_item_relacionado: "RN-DSH-101-01"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF101-002"
+    tipo: "tela"
+    nome: "RelatorioExec.aspx"
+    caminho: "ic1_legado/IControlIT/Relatorios/RelatorioExec.aspx"
+    descricao: |
+      Geração de relatório executivo consolidado mensal em PDF via Crystal Reports.
+      Processo lento (30-60s) com gráficos de baixa resolução (72 dpi).
+      Arquivos temporários acumulavam em D:\Temp\Relatorios\ sem limpeza automática.
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint POST /api/dashboards/executivo/export/pptx.
+      PowerPoint gerado via Open XML SDK com gráficos PNG em alta resolução (1920x1080).
+      Armazenamento em Azure Blob Storage com expiração automática de 7 dias.
+      PDF mantido como opção secundária (usando iText).
+
+    rf_item_relacionado: "RN-DSH-101-09"
+    uc_relacionado: "UC05"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF101-003"
+    tipo: "tela"
+    nome: "GraficosCustos.aspx"
+    caminho: "ic1_legado/IControlIT/Relatorios/GraficosCustos.aspx"
+    descricao: |
+      Visualização de gráficos de custos por filial/centro de custo.
+      Gráficos gerados server-side via System.Drawing.Graphics em PNG de baixa qualidade.
+      Salvos como temporários em D:\Temp\Graficos\ sem limpeza.
+      Sem interatividade: usuário não podia fazer drill-down.
+      Cores hardcoded (verde/vermelho) sem escala de intensidade.
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por componente Angular com D3.js/Highcharts:
+      - Gráficos interativos client-side (zoom, drill-down, tooltips)
+      - Heatmap bidimensional (filial × centro de custo) com escala de cores WCAG AA
+      - Trending com regressão linear e múltiplas granularidades (diária, semanal, mensal)
+      - Sem arquivos temporários: renderização 100% client-side
+
+    rf_item_relacionado: "RN-DSH-101-05"
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF101-004"
+    tipo: "tela"
+    nome: "SLAStatus.aspx"
+    caminho: "ic1_legado/IControlIT/SLA/SLAStatus.aspx"
+    descricao: |
+      Visualização de status de SLA contratual vs realizado.
+      Grid sem paginação: todas as linhas carregadas de uma vez (lento para >12 meses).
+      Status calculado client-side via JavaScript (inseguro).
+      Cores de status não WCAG AA compliant.
+      Sem trending ou alertas automáticos.
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por componente Angular com dados consolidados via Hangfire:
+      - Cálculo server-side seguro em FatoDashboard_SLA
+      - Trending histórico com evolução mês-a-mês
+      - Alertas automáticos (verde >= meta, amarelo 95-99%, vermelho < 95%)
+      - Cores WCAG AA (#4CAF50, #FFC107, #F44336)
+      - Paginação e virtualização para performance
+
+    rf_item_relacionado: "RN-DSH-101-07"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF101-005"
+    tipo: "webservice"
+    nome: "WSDashboard.asmx"
+    caminho: "ic1_legado/IControlIT/WebServices/WSDashboard.asmx"
+    descricao: |
+      Web Service SOAP com métodos:
+      - GetCustosConsolidados(DataInicio, DataFim, ClienteId)
+      - GetTrendingCustos(ContratoId, Meses)
+      - ExportarRelatorioPDF(TipoDashboard, Periodo)
+
+      Problemas críticos:
+      - ClienteId não validado com token (vazamento de dados)
+      - Query sem índices: SELECT direto em transacionais (lento)
+      - Timeout hardcoded 30s (insuficiente)
+      - Exportação síncrona: request bloqueia 30-60s
+      - Retorna array de bytes (payload grande, sem URL)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por API REST com Minimal APIs (.NET 10):
+      - GET /api/dashboards/executivo/custos (JWT obrigatório, ClienteId em claims)
+      - GET /api/dashboards/executivo/trending (queries otimizadas em fact tables)
+      - POST /api/dashboards/executivo/export/pptx (assíncrono com URL de download)
+
+      Validações:
+      - JWT Bearer Token com claims ClienteId validado
+      - Queries em FatoDashboard_Custos (índices otimizados)
+      - Exportação assíncrona com Azure Blob Storage
+
+    rf_item_relacionado: "RN-DSH-101-02"
+    uc_relacionado: "UC02"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF101-006"
+    tipo: "stored_procedure"
+    nome: "pa_DashboardCustos"
+    caminho: "Database/dbo/pa_DashboardCustos.sql"
+    descricao: |
+      Stored Procedure de 1200 linhas que consolida custos por contrato/filial/centro de custo.
+
+      Lógica:
+      1. Criar tabela temporária #Custos
+      2. INSERT agregando tblFatura + tblConsumo + tblChavado
+      3. JOIN com tblFilial, tblCentroCusto, tblContrato
+      4. GROUP BY FilialId, CentroCustoId, ContratoId
+      5. Retornar SELECT final
+
+      Problemas:
+      - Lógica duplicada em 3 procedures diferentes
+      - Sem índices: queries sem NOLOCK causam bloqueios
+      - Tabela temporária sem índice (lento para >100k registros)
+      - Sem paginação: retorna TODOS os registros
+      - Hardcoded ISNULL defaults (deveria ser NULL)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por Hangfire job + Entity Framework LINQ:
+      - Job idempotente executado às 06:00 AM UTC
+      - INSERT/UPSERT em FatoDashboard_Custos (fact table com índices)
+      - Queries parametrizadas via EF Core (sem SQL injection)
+      - Paginação automática via IQueryable
+      - Lógica testável: testes unitários com InMemory database
+
+    rf_item_relacionado: "RN-DSH-101-02"
+    uc_relacionado: null
+    complexidade: "muito_alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF101-007"
+    tipo: "stored_procedure"
+    nome: "pa_DashboardSLA"
+    caminho: "Database/dbo/pa_DashboardSLA.sql"
+    descricao: |
+      Consolida SLA contratual vs performance realizada por contrato (600 linhas).
+
+      Lógica:
+      1. SELECT meta contratual de tblContratoSLA
+      2. COUNT chamados atendidos dentro SLA (DentroSLA = 1)
+      3. COUNT total esperado de tblExpectativaDemanda
+      4. Calcular percentual: (Atendido / Esperado) * 100
+      5. Classificar status: >= 95% "CONFORME", < 95% "NÃO CONFORME"
+
+      Problemas:
+      - Threshold hardcoded (95%): deveria vir de MetaPercentual
+      - Sem trending: apenas mês atual
+      - Sem alertas: apenas retorna dados
+      - Campo DentroSLA calculado errado (não considera feriados)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por Hangfire job + Entity Framework:
+      - Meta vem de RF023 (Contratos.SLAs.MetaPercentual)
+      - Cálculo correto de DentroSLA considerando feriados (RF028/RF029)
+      - Trending histórico em FatoDashboard_SLA
+      - Alertas automáticos baseados em meta dinâmica
+
+    rf_item_relacionado: "RN-DSH-101-07"
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF101-008"
+    tipo: "stored_procedure"
+    nome: "pa_ConsolidacaoDiaria"
+    caminho: "Database/dbo/pa_ConsolidacaoDiaria.sql"
+    descricao: |
+      Job master que executa consolidação diária de todos os dashboards (2500 linhas).
+      Executado por SQL Agent às 02:00 AM.
+
+      Lógica:
+      1. EXEC pa_ConsolidaCustosDiarios
+      2. EXEC pa_ConsolidaSLADiarios
+      3. EXEC pa_ConsolidaComplianceDiarios
+      4. EXEC pa_LimpaTemporariosDashboard
+      5. Registrar sucesso/falha em tblLogConsolidacao
+
+      Problemas CRÍTICOS:
+      - Execução sequencial: 2h30min de duração total
+      - Falha de uma procedure cancela todo job (sem retry)
+      - Sem idempotência: re-executar duplica registros
+      - Limpeza de temporários falha silenciosamente
+      - Log cresce infinitamente (>5M registros após 15 anos)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por Hangfire RecurringJob às 06:00 AM UTC:
+      - Execução idempotente: UPSERT em vez de INSERT
+      - Retry automático: 3 tentativas com exponential backoff
+      - Execução paralela: jobs independentes para Custos/SLA/Compliance
+      - Hangfire Dashboard: monitoramento visual em tempo real
+      - Log estruturado em Dashboard_Consolidacao com retenção de 2 anos
+
+    rf_item_relacionado: "RN-DSH-101-02"
+    uc_relacionado: null
+    complexidade: "muito_alta"
+    risco_migracao: "critico"
+    prioridade: 1
+
+  - id: "LEG-RF101-009"
+    tipo: "regra_negocio"
+    nome: "Filtro Manual de ClienteId"
+    caminho: "ic1_legado/IControlIT/Relatorios/Dashboard.aspx.vb"
+    descricao: |
+      No code-behind, ClienteId era extraído da sessão e aplicado manualmente em queries.
+      Código VB.NET:
+
+      Dim clienteId As Integer = CInt(Session("ClienteId"))
+      Dim query As String = "SELECT * FROM tblConsolidadoCustos WHERE ClienteId = " & clienteId
+
+      VULNERABILIDADE CRÍTICA:
+      - SQL concatenado (SQL Injection)
+      - Session("ClienteId") manipulável via cookie
+      - Sem validação com token autenticado
+      - Trocar ClienteId na query string vazava dados de outros clientes
+
+    destino: "descartado"
+    justificativa: |
+      Substituído por Global Query Filters do Entity Framework Core:
+      - ClienteId extraído de JWT Claims (imutável, assinado)
+      - Filtro aplicado automaticamente em TODAS as queries
+      - Impossível desabilitar ou bypassar (enforçado no DbContext)
+      - Auditoria completa: toda query logada com ClienteId
+
+      Código moderno:
+      modelBuilder.Entity<FatoDashboard_Custos>()
+          .HasQueryFilter(x => x.ClienteId == _currentUser.ClienteId);
+
+    rf_item_relacionado: "Segurança - Isolamento Multi-Tenant"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "critico"
+    prioridade: 1
+
+  - id: "LEG-RF101-010"
+    tipo: "regra_negocio"
+    nome: "Forecast Manual via Excel"
+    caminho: "Processo manual (não implementado no sistema)"
+    descricao: |
+      No legado, forecast de custos era feito MANUALMENTE:
+      1. Analista exportava dados históricos para Excel
+      2. Criava gráfico de linha com trending manual
+      3. Aplicava linha de tendência (regressão linear do Excel)
+      4. Projetava valores futuros "no olho"
+      5. Compartilhava planilha Excel com executivos
+
+      Problemas:
+      - Propenso a erros humanos
+      - Sem validação estatística (R²)
+      - Não escalável: 1 analista para todos os contratos
+      - Dados desatualizados: forecast feito 1x por trimestre
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por forecast automático com Machine Learning:
+      - Azure ML SDK ou ML.NET (ARIMA / Regressão Linear)
+      - Execução mensal automática via Hangfire
+      - Validação estatística: R² >= 0.85 para validade
+      - Intervalo de confiança 95% para previsões
+      - Histórico mínimo 12 meses obrigatório
+      - Forecast invalidado automaticamente se R² < 0.85
+
+    rf_item_relacionado: "RN-DSH-101-03"
+    uc_relacionado: "UC02"
+    complexidade: "muito_alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF101-011"
+    tipo: "componente"
+    nome: "Crystal Reports SDK"
+    caminho: "Componente externo (SAP Crystal Reports)"
+    descricao: |
+      Sistema legado usava Crystal Reports SDK para:
+      - Carregar templates .rpt
+      - Renderizar gráficos server-side
+      - Gerar PDF/Excel
+
+      Limitações:
+      - Licença cara (SAP Crystal Reports Server)
+      - Não escala: crash com >5 usuários simultâneos
+      - Gráficos estáticos de baixa qualidade (72 dpi)
+      - Sem interatividade: drill-down impossível
+      - Impossível integrar com D3.js/Highcharts
+
+    destino: "descartado"
+    justificativa: |
+      Descartado completamente. Substituído por:
+      - D3.js + Highcharts (gráficos interativos client-side)
+      - Open XML SDK (PowerPoint)
+      - iText (PDF)
+      - Power BI Embedded (opcional para clientes Microsoft)
+
+      Benefícios:
+      - Sem licença: bibliotecas open-source
+      - Escalável: renderização client-side
+      - Interativo: drill-down, zoom, tooltips
+      - Alta qualidade: gráficos SVG em 1920x1080
+
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "muito_alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+# Telas Legadas (estrutura detalhada)
+telas:
+  - id: "LEG-RF101-001"
+    nome: "Dashboard.aspx"
+    caminho: "ic1_legado/IControlIT/Relatorios/Dashboard.aspx"
+    responsabilidade: "Visualização principal de dashboards executivos"
+    campos:
+      - nome: "ddlTipoDashboard"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "Valores: Custos, SLA, Compliance (sem C-Level)"
+      - nome: "txtDataInicio"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Formato: dd/MM/yyyy"
+      - nome: "txtDataFim"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Formato: dd/MM/yyyy, deve ser >= DataInicio"
+      - nome: "btnGerar"
+        tipo: "Button"
+        obrigatorio: false
+        validacao: "Dispara carregamento Crystal Report"
+    comportamentos_implicitos:
+      - "Período default: primeiro dia mês atual até hoje"
+      - "Timeout 60s hardcoded (insuficiente para volumes grandes)"
+      - "Filtro ClienteId aplicado manualmente (inseguro)"
+      - "Sem auditoria de acesso"
+
+# WebServices Legados
+servicos:
+  - id: "LEG-RF101-005"
+    nome: "WSDashboard.asmx"
+    localizacao: "ic1_legado/IControlIT/WebServices/WSDashboard.asmx"
+    responsabilidade: "API SOAP para dashboards executivos"
+    notas: "Substituído por API REST .NET 10 com JWT Bearer Token"
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "tblConsolidadoCustos"
+    finalidade: "Armazenar custos agregados"
+    problemas:
+      - "Sem FK: integridade referencial não garantida"
+      - "Sem campos de auditoria (criado_por, criado_em)"
+      - "Sem soft delete"
+      - "Sem índice composto (ClienteId, DataConsolidacao)"
+
+  - nome: "tblConsolidadoSLA"
+    finalidade: "Armazenar SLA consolidado"
+    problemas:
+      - "Sem ClienteId: multi-tenancy quebrado"
+      - "Status como string livre (permite valores inválidos)"
+      - "MetaPercentual nullable (registros órfãos)"
+
+  - nome: "tblLogConsolidacao"
+    finalidade: "Log de execuções de consolidação"
+    problemas:
+      - "Sem retenção: cresce infinitamente (>5M registros)"
+      - "Sem ClienteId: não sabe qual cliente teve falha"
+      - "Campo Sucesso nullable (deveria ser NOT NULL)"
+      - "Sem RegistrosProcessados"
+
+# Regras de Negócio Implícitas (não documentadas)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      Threshold de SLA hardcoded como 95%. No código VB.NET:
+      If percentualAtendimento >= 95 Then status = "CONFORME"
+
+      Problema: deveria vir de tblContratoSLA.MetaPercentual (dinâmico)
+    fonte: "Dashboard.aspx.vb, linha 245"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Cores de status hardcoded: Verde = #00FF00, Vermelho = #FF0000
+      Não WCAG AA compliant (contraste insuficiente)
+    fonte: "GraficosCustos.aspx.vb, linha 180"
+
+  - id: "RL-RN-003"
+    descricao: |
+      Período default: primeiro dia do mês atual até data de hoje
+      Session("PeriodoDefault") = New Date(Now.Year, Now.Month, 1)
+    fonte: "Dashboard.aspx.vb, Page_Load"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Dashboard C-Level"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade: 4 KPIs estratégicos (Receita, Custos, Compliance, SLA)"
+
+  - item: "Forecast com Machine Learning"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade: ARIMA/Regressão Linear com R² >= 0.85"
+
+  - item: "Heatmap Bidimensional"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade: matriz filial × centro de custo com escala de cores"
+
+  - item: "Export PowerPoint"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade: Open XML SDK com gráficos PNG embutidos"
+
+  - item: "Trending Multi-Granularidade"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade: diária (30d), semanal (13s), mensal (12m) com regressão linear"
+
+  - item: "Crystal Reports"
+    existe_legado: true
+    existe_moderno: false
+    notas: "Descartado: substituído por D3.js/Highcharts/Power BI Embedded"
+
+  - item: "Stored Procedures SSIS"
+    existe_legado: true
+    existe_moderno: false
+    notas: "Descartado: substituído por Hangfire + Entity Framework LINQ"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Migrar de Crystal Reports para D3.js + Highcharts"
+    motivo: |
+      Crystal Reports não escala, gráficos estáticos de baixa qualidade,
+      licenciamento caro, impossível integrar interatividade
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Migrar de Stored Procedures para Hangfire + EF Core"
+    motivo: |
+      Stored procedures de 1000+ linhas impossíveis de manter,
+      lógica presa no banco dificulta testes, sem retry automático
+    impacto: "muito_alto"
+    data: "2025-12-31"
+
+  - decisao: "Adicionar Forecast com Machine Learning (não existia)"
+    motivo: |
+      Executivos solicitam previsão para planejamento orçamentário,
+      competidores oferecem forecast como diferencial
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Substituir PDF por PowerPoint via Open XML SDK"
+    motivo: |
+      Executivos preferem PowerPoint para reuniões,
+      PDF Crystal Reports de baixa qualidade, não editável
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "Enforçar Multi-Tenancy via Global Query Filters"
+    motivo: |
+      Legado filtrava ClienteId manualmente (inseguro),
+      vulnerabilidade permitia vazamento entre clientes,
+      conformidade LGPD exige isolamento garantido
+    impacto: "critico"
+    data: "2025-12-31"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Resultados de consolidação divergentes entre legado e moderno"
+    impacto: "critico"
+    probabilidade: "media"
+    mitigacao: |
+      - Executar consolidações em paralelo por 1 mês
+      - Comparar resultados automaticamente (script Python)
+      - Tolerar divergência < 0.01% (arredondamento)
+      - Manter stored procedures por 6 meses como fallback
+
+  - risco: "Forecast ML com baixa acurácia (R² < 0.85)"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      - Validar com dados históricos conhecidos
+      - Marcar forecast como "beta" inicialmente
+      - Permitir usuário desabilitar forecast se preferir
+      - Treinamento contínuo com novos dados mensais
+
+  - risco: "Performance de Hangfire jobs insuficiente (>10min)"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Consolidar apenas dados D-1 (não reprocessar histórico completo)
+      - Indexes otimizados em fact tables
+      - Execução paralela de jobs independentes
+      - Monitoramento via Hangfire Dashboard
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "Dashboard.aspx"
+    referencia_rf: "RN-DSH-101-01"
+    referencia_uc: "UC01"
+    status: "migrado"
+
+  - elemento_legado: "RelatorioExec.aspx"
+    referencia_rf: "RN-DSH-101-09"
+    referencia_uc: "UC05"
+    status: "migrado"
+
+  - elemento_legado: "GraficosCustos.aspx"
+    referencia_rf: "RN-DSH-101-05"
+    referencia_uc: "UC02"
+    status: "migrado"
+
+  - elemento_legado: "SLAStatus.aspx"
+    referencia_rf: "RN-DSH-101-07"
+    referencia_uc: "UC04"
+    status: "migrado"
+
+  - elemento_legado: "WSDashboard.asmx"
+    referencia_rf: "RN-DSH-101-02"
+    referencia_uc: "UC02"
+    status: "migrado"
+
+  - elemento_legado: "pa_DashboardCustos"
+    referencia_rf: "RN-DSH-101-02"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "pa_DashboardSLA"
+    referencia_rf: "RN-DSH-101-07"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "pa_ConsolidacaoDiaria"
+    referencia_rf: "RN-DSH-101-02"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "Crystal Reports SDK"
+    referencia_rf: null
+    referencia_uc: null
+    status: "descartado"
+
+# Changelog
+changelog:
+  - versao: "1.0"
+    data: "2025-12-31"
+    descricao: "Criação inicial do documento de referência ao legado com 11 itens mapeados, destinos obrigatórios preenchidos"
+    autor: "Claude Code (Agente Architect)"

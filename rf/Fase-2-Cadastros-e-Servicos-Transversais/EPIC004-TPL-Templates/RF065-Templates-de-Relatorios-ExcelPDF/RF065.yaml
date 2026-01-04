@@ -1,0 +1,563 @@
+# =============================================
+# RF065 - Templates de Relatórios (Excel/PDF)
+# Versão: 2.0 (Governança - Separação RF/RL)
+# Data: 2025-12-30
+# =============================================
+
+rf:
+  id: "RF065"
+  nome: "Templates de Relatórios (Excel/PDF)"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase-2-Cadastros-e-Servicos-Transversais"
+  epic: "EPIC004-TPL-Templates"
+  status: "skeleton"  # draft | aprovado | em_desenvolvimento | concluido
+
+descricao:
+  objetivo: |
+    Implementar sistema de geração de relatórios customizáveis em múltiplos formatos (Excel .xlsx, PDF, CSV)
+    com templates reutilizáveis, gráficos dinâmicos, agrupamentos, totalizações automáticas, formatação condicional,
+    múltiplas abas, agendamento de exportações automáticas via Hangfire e envio por e-mail.
+  problema_resolvido: |
+    Eliminação de hardcoding de relatórios, permitindo que usuários criem templates customizados sem envolvimento de TI.
+    Automação de relatórios recorrentes via agendamento (diário, semanal, mensal).
+  publico_afetado: |
+    - Gestores de TI (dashboards gerenciais e relatórios estratégicos)
+    - Analistas de BI (criação de templates e cubos OLAP)
+    - Usuários Finais (geração de relatórios operacionais)
+    - Auditoria (rastreabilidade de exportações)
+
+escopo:
+  incluso:
+    - "CRUD de templates de relatórios"
+    - "Geração em Excel (.xlsx), PDF, CSV"
+    - "Gráficos Chart.js (linha, barra, pizza, área)"
+    - "Agrupamentos e subtotais automáticos"
+    - "Formatação condicional (cores, negrito)"
+    - "Múltiplas abas em Excel"
+    - "Parâmetros dinâmicos (filtros de período, centro custo, etc.)"
+    - "Agendamento de exportações (Hangfire)"
+    - "Envio por e-mail automático"
+    - "Cabeçalho e rodapé customizados"
+    - "Proteção de planilhas (somente leitura)"
+    - "Assinatura digital PDF"
+    - "Marca d'água em PDFs"
+    - "Integração com cubos OLAP (BI)"
+    - "Cache de relatórios pesados (15 min)"
+    - "Compactação ZIP de múltiplos relatórios"
+    - "Métricas de uso (relatórios mais gerados)"
+  fora:
+    - "Dashboards interativos em tempo real (RF separado)"
+    - "Data warehouse/ETL (RF separado)"
+    - "Relatórios analíticos complexos (Power BI/Tableau - ferramentas externas)"
+
+entidades:
+  - nome: "RelatorioTemplate"
+    descricao: "Template de relatório customizável"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "RelatorioAgendamento"
+    descricao: "Agendamento de geração automática de relatórios"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "RelatorioExecucao"
+    descricao: "Histórico de execuções de relatórios"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+# =============================================
+# REGRAS DE NEGÓCIO (15 regras)
+# =============================================
+
+regras_negocio:
+  - id: "RN-RF065-001"
+    descricao: "Sistema DEVE suportar geração de relatórios em 3 formatos: Excel (.xlsx), PDF e CSV"
+    tipo: "validacao"
+    campos_afetados: ["FormatoRelatorio"]
+    obrigatorio: true
+    justificativa: "Atender diferentes necessidades de consumo de relatórios"
+    criterio_aceite: |
+      - Enum FormatoRelatorio com 3 valores (Excel, PDF, CSV)
+      - Usuário seleciona formato antes de gerar
+      - Cada formato tem gerador específico (EPPlus, QuestPDF, CsvHelper)
+    validacao:
+      tipo: "enum"
+      valores_permitidos: ["Excel", "PDF", "CSV"]
+      mensagem_erro: "Formato deve ser Excel, PDF ou CSV"
+      http_code: 400
+
+  - id: "RN-RF065-002"
+    descricao: "Sistema DEVE suportar 4 tipos de gráficos Chart.js: Linha, Barra, Pizza, Área"
+    tipo: "funcional"
+    campos_afetados: ["TipoGrafico", "ConfiguracaoGrafico"]
+    obrigatorio: false
+    justificativa: "Permitir visualização de dados em diferentes formatos gráficos"
+    criterio_aceite: |
+      - Template possui lista de gráficos configuráveis
+      - Cada gráfico tem: tipo, campo X, campo Y, título, cores
+      - Frontend renderiza gráficos usando Chart.js
+      - Excel exporta gráficos como imagens PNG embedadas
+    validacao:
+      tipo: "enum"
+      valores_permitidos: ["Linha", "Barra", "Pizza", "Area"]
+      mensagem_erro: "Tipo de gráfico deve ser Linha, Barra, Pizza ou Área"
+      http_code: 400
+
+  - id: "RN-RF065-003"
+    descricao: "Sistema DEVE permitir agrupar dados por 1 ou mais campos e calcular subtotais automáticos (soma, média)"
+    tipo: "funcional"
+    campos_afetados: ["CamposAgrupamento", "CamposSomatorio"]
+    obrigatorio: false
+    justificativa: "Facilitar análise de dados consolidados por categorias"
+    criterio_aceite: |
+      - Template possui configuração de agrupamento
+      - Campos de agrupamento ordenam resultado
+      - Subtotais calculados a cada mudança de grupo
+      - Total geral ao final do relatório
+    validacao:
+      tipo: "campo_existente"
+      mensagem_erro: "Campos de agrupamento devem existir no resultado da consulta"
+      http_code: 400
+
+  - id: "RN-RF065-004"
+    descricao: "Sistema DEVE aplicar formatação condicional (cores, negrito) baseado em regras configuráveis"
+    tipo: "funcional"
+    campos_afetados: ["RegrasFormatacao"]
+    obrigatorio: false
+    justificativa: "Destacar visualmente valores importantes ou críticos"
+    criterio_aceite: |
+      - Template possui lista de regras de formatação
+      - Cada regra: campo, operador (>, <, =, BETWEEN), valor, formatação
+      - Formatação aplicada em Excel e PDF
+      - Múltiplas regras podem se aplicar (ordem de prioridade)
+    validacao:
+      tipo: "regra_formatacao"
+      mensagem_erro: "Operador deve ser >, <, =, !=, BETWEEN"
+      http_code: 400
+
+  - id: "RN-RF065-005"
+    descricao: "Sistema DEVE permitir criar Excel com múltiplas abas (worksheets), cada uma com consulta SQL independente"
+    tipo: "funcional"
+    campos_afetados: ["AbasExcel"]
+    obrigatorio: false
+    justificativa: "Consolidar múltiplos conjuntos de dados em um único arquivo Excel"
+    criterio_aceite: |
+      - Template possui lista de abas configuráveis
+      - Cada aba: nome, consulta SQL, gráficos, agrupamento
+      - Excel gerado contém todas as abas
+      - Navegação entre abas funcional
+    validacao:
+      tipo: "nome_aba_excel"
+      mensagem_erro: "Nome da aba deve ter máx 31 caracteres e ser único"
+      http_code: 400
+
+  - id: "RN-RF065-006"
+    descricao: "Relatórios PODEM ter parâmetros dinâmicos (filtros) que DEVEM ser preenchidos antes de gerar"
+    tipo: "validacao"
+    campos_afetados: ["Parametros"]
+    obrigatorio: true
+    justificativa: "Permitir filtragem customizada de dados antes da geração"
+    criterio_aceite: |
+      - Template possui lista de parâmetros configuráveis
+      - Tipos: DATE, TEXT, NUMBER, SELECT (dropdown)
+      - Parâmetros obrigatórios bloqueiam geração se não preenchidos
+      - Valor padrão aplicado automaticamente
+    validacao:
+      tipo: "parametros_obrigatorios"
+      mensagem_erro: "Parâmetros obrigatórios devem ser preenchidos"
+      http_code: 400
+
+  - id: "RN-RF065-007"
+    descricao: "Sistema DEVE permitir agendar geração automática de relatórios em frequência diária, semanal ou mensal"
+    tipo: "funcional"
+    campos_afetados: ["FrequenciaAgendamento", "DiaSemana", "DiaMes", "Horario"]
+    obrigatorio: false
+    justificativa: "Automatizar geração de relatórios recorrentes sem intervenção manual"
+    criterio_aceite: |
+      - Agendamento possui: template, frequência, dia/horário, destinatários, formato
+      - Job Hangfire executa geração no horário configurado
+      - Relatório gerado é enviado por e-mail aos destinatários
+      - Log de execuções bem-sucedidas/falhadas
+    validacao:
+      tipo: "enum"
+      valores_permitidos: ["DIARIO", "SEMANAL", "MENSAL"]
+      mensagem_erro: "Frequência deve ser DIARIO, SEMANAL ou MENSAL"
+      http_code: 400
+
+  - id: "RN-RF065-008"
+    descricao: "Relatórios PDF e Excel DEVEM ter cabeçalho e rodapé configuráveis"
+    tipo: "funcional"
+    campos_afetados: ["ConfiguracaoHeader", "ConfiguracaoFooter"]
+    obrigatorio: false
+    justificativa: "Padronizar apresentação de relatórios com identidade visual da empresa"
+    criterio_aceite: |
+      - Template possui configuração de header/footer
+      - Header: Logo empresa, título relatório, data geração
+      - Footer: Página X de Y, usuário que gerou, timestamp
+      - Suporta variáveis dinâmicas ({NomeSistema}, {DataGeracao}, {Usuario})
+    validacao:
+      tipo: "tamanho_arquivo"
+      mensagem_erro: "Logo deve ser imagem válida (PNG, JPG) com máx 500KB"
+      http_code: 400
+
+  - id: "RN-RF065-009"
+    descricao: "Excel gerado DEVE ter proteção contra edição (somente leitura)"
+    tipo: "seguranca"
+    campos_afetados: ["ProtecaoExcel"]
+    obrigatorio: true
+    justificativa: "Garantir integridade dos dados exportados"
+    criterio_aceite: |
+      - Planilha bloqueada por padrão (usuário não pode editar células)
+      - Usuário pode filtrar, ordenar, mas não alterar dados
+      - Senha opcional para casos sensíveis
+    validacao:
+      tipo: "senha_protecao"
+      mensagem_erro: "Senha de proteção deve ter mínimo 6 caracteres"
+      http_code: 400
+
+  - id: "RN-RF065-010"
+    descricao: "PDFs sensíveis DEVEM ter assinatura digital para garantir autenticidade"
+    tipo: "seguranca"
+    campos_afetados: ["RequerAssinaturaDigital"]
+    obrigatorio: false
+    justificativa: "Garantir autenticidade e integridade de documentos PDF sensíveis"
+    criterio_aceite: |
+      - Template possui flag "Requerer Assinatura Digital"
+      - Sistema usa certificado X.509 configurado
+      - PDF possui timestamp de geração
+      - Hash SHA-256 do documento
+    validacao:
+      tipo: "certificado_digital"
+      mensagem_erro: "Certificado digital deve estar válido (não expirado)"
+      http_code: 400
+
+  - id: "RN-RF065-011"
+    descricao: "PDFs PODEM ter marca d'água configurável (ex: Confidencial, Interno)"
+    tipo: "funcional"
+    campos_afetados: ["MarcaDaguaTexto", "MarcaDaguaPosicao", "MarcaDaguaOpacidade"]
+    obrigatorio: false
+    justificativa: "Identificar nível de confidencialidade do documento"
+    criterio_aceite: |
+      - Template possui configuração de marca d'água
+      - Texto, posição (diagonal, horizontal), opacidade, cor
+      - Marca d'água aplicada em todas as páginas
+      - Não obstrui leitura do conteúdo
+    validacao:
+      tipo: "tamanho_texto"
+      mensagem_erro: "Texto da marca d'água deve ter máx 30 caracteres"
+      http_code: 400
+
+  - id: "RN-RF065-012"
+    descricao: "Templates PODEM consultar cubos OLAP (SQL Server Analysis Services) para relatórios analíticos"
+    tipo: "funcional"
+    campos_afetados: ["UsarOLAP", "QueryMDX"]
+    obrigatorio: false
+    justificativa: "Suportar relatórios analíticos complexos com drill-down e slice/dice"
+    criterio_aceite: |
+      - Template possui flag "Usar OLAP"
+      - Consulta MDX (Multidimensional Expressions) em vez de SQL
+      - Dimensões e medidas configuráveis
+      - Drill-down e slice/dice suportados
+    validacao:
+      tipo: "query_mdx"
+      mensagem_erro: "Query MDX deve ser sintática válida"
+      http_code: 400
+
+  - id: "RN-RF065-013"
+    descricao: "Relatórios pesados (>1000 linhas ou >5s de execução) DEVEM ser cacheados por 15 minutos"
+    tipo: "performance"
+    campos_afetados: ["CacheHabilitado", "CacheTTL"]
+    obrigatorio: true
+    justificativa: "Melhorar performance evitando re-execução de queries pesadas"
+    criterio_aceite: |
+      - Sistema detecta relatórios pesados automaticamente
+      - Cache Redis com key: TemplateId + Hash(Parâmetros)
+      - TTL 15 minutos
+      - Indicador para usuário: "Gerado às HH:MM (cache)"
+      - Botão "Regenerar" para forçar atualização
+    validacao:
+      tipo: "cache_ttl"
+      mensagem_erro: "Cache TTL deve ser > 0 minutos"
+      http_code: 400
+
+  - id: "RN-RF065-014"
+    descricao: "Sistema DEVE permitir gerar múltiplos relatórios em arquivo ZIP único"
+    tipo: "funcional"
+    campos_afetados: ["TemplatesParaZIP"]
+    obrigatorio: false
+    justificativa: "Facilitar download de múltiplos relatórios de uma só vez"
+    criterio_aceite: |
+      - Usuário seleciona N templates
+      - Sistema gera todos em paralelo (tasks assíncronas)
+      - Compacta em arquivo .zip
+      - Nome do ZIP: "Relatorios-YYYYMMDD-HHMMSS.zip"
+      - Limite máximo: 10 relatórios por ZIP
+    validacao:
+      tipo: "quantidade_relatorios"
+      mensagem_erro: "Máximo 10 relatórios por ZIP"
+      http_code: 400
+
+  - id: "RN-RF065-015"
+    descricao: "Sistema DEVE rastrear métricas de uso de cada template"
+    tipo: "auditoria"
+    campos_afetados: ["QuantidadeGeracoes", "TempoMedioGeracao"]
+    obrigatorio: true
+    justificativa: "Identificar templates mais populares e otimizar performance"
+    criterio_aceite: |
+      - Quantidade de vezes gerado (contador)
+      - Top 10 usuários que mais usam
+      - Horário de pico (hora do dia com mais gerações)
+      - Formato mais popular (Excel vs PDF vs CSV)
+      - Tempo médio de geração (em segundos)
+    validacao:
+      tipo: "metricas_uso"
+      mensagem_erro: "Métricas devem ser calculadas apenas para gerações bem-sucedidas"
+      http_code: 400
+
+# =============================================
+# ESTADOS DA ENTIDADE
+# =============================================
+
+estados:
+  - id: "draft"
+    descricao: "Template criado, em edição (não disponível para uso)"
+  - id: "active"
+    descricao: "Template ativo e disponível para geração"
+  - id: "inactive"
+    descricao: "Template inativo (não aparece em listagens)"
+  - id: "archived"
+    descricao: "Template arquivado (mantido para histórico)"
+
+transicoes:
+  permitidas:
+    - de: "draft"
+      para: "active"
+    - de: "active"
+      para: "inactive"
+    - de: "inactive"
+      para: "active"
+    - de: "active"
+      para: "archived"
+  proibidas:
+    - de: "archived"
+      para: "active"
+      motivo: "Templates arquivados não podem ser reativados (criar novo template)"
+
+# =============================================
+# PERMISSÕES RBAC
+# =============================================
+
+permissoes:
+  - codigo: "TPL.RELATORIOS.VIEW"
+    descricao: "Visualizar templates de relatórios"
+  - codigo: "TPL.RELATORIOS.CREATE"
+    descricao: "Criar novos templates"
+  - codigo: "TPL.RELATORIOS.UPDATE"
+    descricao: "Editar templates existentes"
+  - codigo: "TPL.RELATORIOS.DELETE"
+    descricao: "Excluir templates"
+  - codigo: "TPL.RELATORIOS.GENERATE"
+    descricao: "Gerar relatórios a partir de templates"
+  - codigo: "TPL.RELATORIOS.SCHEDULE"
+    descricao: "Criar agendamentos de relatórios"
+  - codigo: "TPL.RELATORIOS.VIEW_METRICS"
+    descricao: "Visualizar métricas de uso"
+
+# =============================================
+# INTEGRAÇÕES OBRIGATÓRIAS
+# =============================================
+
+integracoes:
+  internas:
+    - "Autenticação (JWT Bearer)"
+    - "Multi-Tenancy (Row-Level Security)"
+    - "Auditoria (todas operações CRUD + gerações)"
+    - "i18n (Transloco - pt-BR/en/es)"
+    - "Central de Funcionalidades (registro TPL.RELATORIOS)"
+  externas:
+    - sistema: "Hangfire"
+      tipo: "Job Scheduler"
+      obrigatoria: true
+      descricao: "Agendamento de exportações automáticas"
+    - sistema: "Redis"
+      tipo: "Cache"
+      obrigatoria: true
+      descricao: "Cache de relatórios pesados (TTL 15min)"
+    - sistema: "Azure Blob Storage"
+      tipo: "Storage"
+      obrigatoria: true
+      descricao: "Armazenamento de relatórios gerados"
+    - sistema: "SQL Server Analysis Services (SSAS)"
+      tipo: "OLAP Cube"
+      obrigatoria: false
+      descricao: "Consultas analíticas via MDX"
+
+# =============================================
+# SEGURANÇA
+# =============================================
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacoes:
+    - "Sanitização de SQL para prevenir injection"
+    - "Whitelist de tabelas permitidas em consultas"
+    - "RBAC por template (quem pode gerar)"
+    - "Certificado X.509 para assinatura PDF"
+
+# =============================================
+# RASTREABILIDADE
+# =============================================
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-listar-templates"
+    - "UC01-criar-template"
+    - "UC02-visualizar-template"
+    - "UC03-editar-template"
+    - "UC04-excluir-template"
+    - "UC05-gerar-relatorio"
+    - "UC06-agendar-relatorio"
+    - "UC07-visualizar-metricas"
+
+# =============================================
+# CATÁLOGO DE FUNCIONALIDADES
+# =============================================
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar template de relatório"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar templates disponíveis"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar detalhes do template"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar template existente"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Excluir template (soft delete)"
+      required: true
+
+  funcionalidades:
+    - id: "RF-FUNC-01"
+      title: "Gerar relatório em Excel (.xlsx)"
+      required: true
+    - id: "RF-FUNC-02"
+      title: "Gerar relatório em PDF"
+      required: true
+    - id: "RF-FUNC-03"
+      title: "Gerar relatório em CSV"
+      required: true
+    - id: "RF-FUNC-04"
+      title: "Adicionar gráficos Chart.js (linha/barra/pizza/área)"
+      required: true
+    - id: "RF-FUNC-05"
+      title: "Configurar agrupamentos e subtotais"
+      required: true
+    - id: "RF-FUNC-06"
+      title: "Aplicar formatação condicional"
+      required: true
+    - id: "RF-FUNC-07"
+      title: "Criar múltiplas abas em Excel"
+      required: false
+    - id: "RF-FUNC-08"
+      title: "Definir parâmetros dinâmicos"
+      required: true
+    - id: "RF-FUNC-09"
+      title: "Agendar geração automática (diário/semanal/mensal)"
+      required: true
+    - id: "RF-FUNC-10"
+      title: "Enviar relatório por e-mail"
+      required: true
+    - id: "RF-FUNC-11"
+      title: "Customizar cabeçalho e rodapé"
+      required: false
+    - id: "RF-FUNC-12"
+      title: "Proteger planilhas Excel (somente leitura)"
+      required: true
+    - id: "RF-FUNC-13"
+      title: "Assinar digitalmente PDFs"
+      required: false
+    - id: "RF-FUNC-14"
+      title: "Adicionar marca d'água em PDFs"
+      required: false
+    - id: "RF-FUNC-15"
+      title: "Integrar com cubos OLAP (MDX)"
+      required: false
+    - id: "RF-FUNC-16"
+      title: "Cachear relatórios pesados (Redis)"
+      required: true
+    - id: "RF-FUNC-17"
+      title: "Compactar múltiplos relatórios em ZIP"
+      required: false
+    - id: "RF-FUNC-18"
+      title: "Visualizar métricas de uso"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar formato de relatório (Excel/PDF/CSV)"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar tipo de gráfico (Linha/Barra/Pizza/Área)"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar parâmetros obrigatórios antes de gerar"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar query SQL/MDX (sintaxe e whitelist de tabelas)"
+      required: true
+    - id: "RF-VAL-05"
+      title: "Validar certificado digital (para assinatura PDF)"
+      required: false
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant (multi-tenancy)"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC por operação"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Sanitização de SQL (prevenir injection)"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Auditoria de todas as gerações"
+      required: true
+
+# =============================================
+# EXCLUSÕES (Itens do RF que NÃO serão implementados)
+# =============================================
+
+exclusions:
+  rf_items:
+    - item: "Dashboards interativos em tempo real"
+      motivo: "Será implementado em RF separado (RF066)"
+    - item: "Data warehouse/ETL"
+      motivo: "Será implementado em RF separado (RF067)"
+    - item: "Relatórios analíticos complexos (Power BI/Tableau)"
+      motivo: "Ferramentas externas já disponíveis"
+
+# =============================================
+# HISTÓRICO
+# =============================================
+
+historico:
+  - versao: "1.0"
+    data: "2025-01-14"
+    autor: "Equipe IControlIT"
+    descricao: "Versão inicial aprovada (RF.md com código C# misturado)"
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Claude Code (Agente Migração)"
+    descricao: "Migração v1.0 → v2.0 - Separação RF/RL, sincronização MD↔YAML, 15 RNs em linguagem natural"

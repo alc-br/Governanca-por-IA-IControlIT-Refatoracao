@@ -1,0 +1,420 @@
+rf:
+  id: RF095
+  nome: Auditoria de Acesso e Segurança
+  versao: '2.0'
+  data: '2025-12-31'
+  fase: Fase 6 - Ativos, Auditoria e Integrações
+  epic: EPIC010-AUD-Auditoria-Avancada
+  status: aprovado
+descricao:
+  objetivo: Implementar sistema completo de auditoria de acesso e segurança para garantir conformidade com LGPD, ISO 27001,
+    SOX 404 e PCI-DSS
+  problema_resolvido: Rastrear, analisar e detectar comportamentos de acesso, permitir investigação forense, certificação
+    de permissões e detecção de anomalias
+  publico_afetado: Auditores, Gerentes de Segurança, SOC, Compliance Officers, Investigadores, todos os usuários do sistema
+escopo:
+  incluso:
+  - Registro de tentativas de login (sucesso/falha)
+  - Rastreamento de ações de usuário (CRUD, operações críticas)
+  - Detecção de comportamentos anômalos (UEBA)
+  - Validação de segregação de funções (SOD)
+  - Monitoramento de acessos privilegiados (JIT)
+  - Certificação trimestral de permissões
+  - Dashboard de segurança em tempo real
+  - Alertas automáticos de incidentes
+  - Investigação forense com correlação de eventos
+  - Integração com SIEM (Azure Sentinel/Splunk)
+  - Retenção de logs por 10 anos
+  - Aplicação de políticas de segurança
+  fora:
+  - Interface visual específica (definida no WF)
+  - Tecnologias de machine learning específicas
+  - Configuração de infraestrutura SIEM
+  - Layout e UX (definido separadamente)
+  - Estratégia de deploy ou backup (infraestrutura)
+entidades:
+- nome: LogAcesso
+  descricao: Registro de tentativas de login
+  multi_tenant: true
+  soft_delete: false
+  auditoria: false
+- nome: LogOperacao
+  descricao: Registro de ações de usuário (CRUD)
+  multi_tenant: true
+  soft_delete: false
+  auditoria: false
+- nome: AlertaSeguranca
+  descricao: Alertas de segurança gerados
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: ElevacaoPrivilegio
+  descricao: Solicitações de privilégio JIT
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: CertificacaoTrimestral
+  descricao: Workflow de certificação de acessos
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: PoliticaSeguranca
+  descricao: Políticas aplicadas em runtime
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: AnomaliaDeteccao
+  descricao: Comportamentos anômalos detectados
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+regras_negocio:
+- id: RN-RF095-001
+  descricao: Toda tentativa de login deve ser registrada com timestamp UTC, email, IP, dispositivo, navegador, geolocalização
+    e resultado
+  tipo: validacao
+  campos_afetados:
+  - timestamp
+  - email
+  - IP
+  - resultado
+  obrigatorio: true
+  conformidade:
+  - LGPD Art. 46
+  - ISO 27001 A.12.4
+- id: RN-RF095-002
+  descricao: 'Detectar força bruta: 5 falhas gera alerta, 10 falhas bloqueia IP por 60 min'
+  tipo: seguranca
+  campos_afetados:
+  - IP
+  - timestamp
+  obrigatorio: true
+  conformidade:
+  - PCI-DSS 8.5.5
+- id: RN-RF095-003
+  descricao: Toda operação CRUD deve ser auditada com usuário, timestamp, entidade, ação, dados antes/depois
+  tipo: validacao
+  campos_afetados:
+  - usuario
+  - timestamp
+  - entidade
+  - acao
+  - dados_antes
+  - dados_depois
+  obrigatorio: true
+  conformidade:
+  - ISO 27001 A.12.4.1
+  - SOX 404
+  - LGPD Art. 46
+- id: RN-RF095-004
+  descricao: Validar segregação de funções em tempo real bloqueando permissões conflitantes
+  tipo: seguranca
+  campos_afetados:
+  - permissoes
+  obrigatorio: true
+  conformidade:
+  - ISO 27001 A.6.1.3
+  - SOX 404
+- id: RN-RF095-005
+  descricao: Acessos privilegiados temporários (máximo 4h) com aprovação dual-control
+  tipo: seguranca
+  campos_afetados:
+  - duracao
+  - aprovador
+  - solicitante
+  obrigatorio: true
+  conformidade:
+  - LGPD
+  - ISO 27001 A.9.2.1
+  - PCI-DSS 8.2.4
+- id: RN-RF095-006
+  descricao: Certificação trimestral de permissões com revogação em 72h se rejeitado
+  tipo: regra_negocio
+  campos_afetados:
+  - trimestre
+  - decisao
+  - prazo_revogacao
+  obrigatorio: true
+  conformidade:
+  - ISO 27001 A.6.2.1
+  - LGPD Art. 6
+  - SOX 404
+- id: RN-RF095-007
+  descricao: Detecção de anomalias com score 0.0-1.0, alerta se >0.7
+  tipo: regra_negocio
+  campos_afetados:
+  - score_anomalia
+  - padrao_historico
+  obrigatorio: true
+  conformidade:
+  - PCI-DSS 12.3.10
+- id: RN-RF095-008
+  descricao: Aplicar políticas de segurança em tempo real (IP, MFA, horário, localização)
+  tipo: seguranca
+  campos_afetados:
+  - IP
+  - MFA_obrigatorio
+  - horario_permitido
+  - pais_permitido
+  obrigatorio: true
+  conformidade:
+  - PCI-DSS
+  - ISO 27001 A.9.4.2
+- id: RN-RF095-009
+  descricao: Correlação de eventos por CorrelationId para investigação forense
+  tipo: regra_negocio
+  campos_afetados:
+  - CorrelationId
+  - timestamp
+  - usuario
+  - IP
+  obrigatorio: true
+  conformidade:
+  - LGPD Art. 46
+  - ISO 27001 A.12.4.3
+  - SOX 404
+- id: RN-RF095-010
+  descricao: Alertas automáticos em <1 min com score de risco e canal apropriado
+  tipo: regra_negocio
+  campos_afetados:
+  - timestamp
+  - score_risco
+  - canal_notificacao
+  obrigatorio: true
+  conformidade:
+  - PCI-DSS 10.6
+  - ISO 27001 A.12.4.5
+- id: RN-RF095-011
+  descricao: Retenção de logs em camadas (hot/warm/cold) por 10 anos com criptografia AES-256
+  tipo: validacao
+  campos_afetados:
+  - camada_armazenamento
+  - data_criacao
+  - data_expiracao
+  obrigatorio: true
+  conformidade:
+  - LGPD Art. 16
+  - ISO 27001 A.12.3.1
+  - SOX 404
+- id: RN-RF095-012
+  descricao: Dashboard atualizado a cada 5 min com filtros e acesso restrito
+  tipo: regra_negocio
+  campos_afetados:
+  - data_atualizacao
+  - filtros
+  obrigatorio: true
+  conformidade: []
+estados:
+- id: sucesso
+  descricao: Login/operação bem-sucedida
+- id: falha
+  descricao: Login/operação falhada
+- id: bloqueado
+  descricao: IP bloqueado por força bruta
+- id: novo
+  descricao: Alerta gerado, aguardando análise
+- id: em_investigacao
+  descricao: Alerta em análise pelo SOC
+- id: resolvido
+  descricao: Alerta resolvido
+- id: falso_positivo
+  descricao: Alerta descartado
+- id: pendente
+  descricao: Solicitação JIT aguardando aprovação
+- id: aprovado
+  descricao: JIT aprovado e ativo
+- id: rejeitado
+  descricao: JIT rejeitado
+- id: expirado
+  descricao: JIT expirado por tempo
+- id: revogado
+  descricao: JIT revogado manualmente
+transicoes:
+  permitidas:
+  - de: novo
+    para: em_investigacao
+  - de: em_investigacao
+    para: resolvido
+  - de: em_investigacao
+    para: falso_positivo
+  - de: pendente
+    para: aprovado
+  - de: pendente
+    para: rejeitado
+  - de: aprovado
+    para: expirado
+  - de: aprovado
+    para: revogado
+  proibidas:
+  - de: resolvido
+    para: novo
+  - de: expirado
+    para: aprovado
+permissoes:
+- codigo: audit:security:view
+  descricao: Visualizar logs de segurança
+- codigo: audit:security:export
+  descricao: Exportar logs para análise
+- codigo: audit:security:alert_manage
+  descricao: Gerenciar alertas de segurança
+- codigo: audit:permission:review
+  descricao: Revisar e certificar permissões
+- codigo: audit:permission:manage
+  descricao: Atribuir/remover permissões
+- codigo: audit:privilege:request_elevation
+  descricao: Solicitar elevação de privilégio
+- codigo: audit:privilege:approve_elevation
+  descricao: Aprovar elevação de privilégio
+- codigo: audit:policy:manage
+  descricao: Gerenciar políticas de segurança
+- codigo: audit:anomaly:view
+  descricao: Visualizar anomalias detectadas
+- codigo: audit:compliance:report
+  descricao: Gerar relatórios de compliance
+integracoes:
+  internas:
+  - Autenticacao (login/logout)
+  - Multi-Tenancy (isolamento por ClienteId)
+  - Auditoria (própria entidade)
+  - RBAC (validação de permissões)
+  - Feature Flags (AUDIT_SECURITY)
+  - i18n (pt-BR, en-US, es-ES)
+  externas:
+  - sistema: Azure Sentinel
+    tipo: SIEM
+    obrigatoria: false
+  - sistema: Splunk
+    tipo: SIEM
+    obrigatoria: false
+  - sistema: Azure ML
+    tipo: Machine Learning (UEBA)
+    obrigatoria: false
+  - sistema: Azure Blob Storage
+    tipo: Cold Storage
+    obrigatoria: true
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: false
+  criptografia_repouso: true
+  criptografia_transito: true
+  retencao_anos: 10
+rastreabilidade:
+  ucs_esperados:
+  - UC00-listar-logs-acesso
+  - UC01-registrar-tentativa-login
+  - UC02-detectar-forca-bruta
+  - UC03-analisar-anomalias
+  - UC04-validar-sod
+  - UC05-solicitar-jit
+  - UC06-aprovar-jit
+  - UC07-iniciar-certificacao
+  - UC08-certificar-permissoes
+  - UC09-gerar-alerta
+  - UC10-investigar-incidente
+  - UC11-exportar-forense
+  - UC12-visualizar-dashboard
+catalog:
+  funcionalidades:
+  - id: RF095-FUNC-01
+    title: Logging de tentativas de acesso
+    required: true
+  - id: RF095-FUNC-02
+    title: Rastreamento de ações de usuário
+    required: true
+  - id: RF095-FUNC-03
+    title: Detecção de força bruta
+    required: true
+  - id: RF095-FUNC-04
+    title: Análise de comportamento (UEBA)
+    required: true
+  - id: RF095-FUNC-05
+    title: Validação de segregação de funções
+    required: true
+  - id: RF095-FUNC-06
+    title: Acessos privilegiados com JIT
+    required: true
+  - id: RF095-FUNC-07
+    title: Certificação trimestral de acessos
+    required: true
+  - id: RF095-FUNC-08
+    title: Dashboard de segurança
+    required: true
+  - id: RF095-FUNC-09
+    title: Alertas automáticos
+    required: true
+  - id: RF095-FUNC-10
+    title: Investigação forense
+    required: true
+  - id: RF095-FUNC-11
+    title: Integração com SIEM
+    required: false
+  - id: RF095-FUNC-12
+    title: Aplicação de políticas de segurança
+    required: true
+  - id: RF095-FUNC-13
+    title: Retenção governada (10 anos)
+    required: true
+  validacoes:
+  - id: RF095-VAL-01
+    title: Validar campos obrigatórios de log
+    required: true
+  - id: RF095-VAL-02
+    title: Validar formato de timestamp UTC
+    required: true
+  - id: RF095-VAL-03
+    title: Validar IP válido (IPv4/IPv6)
+    required: true
+  - id: RF095-VAL-04
+    title: Validar score de anomalia (0.0-1.0)
+    required: true
+  - id: RF095-VAL-05
+    title: Validar duração JIT (máximo 4h)
+    required: true
+  - id: RF095-VAL-06
+    title: Validar aprovador diferente de solicitante
+    required: true
+  seguranca:
+  - id: RF095-SEC-01
+    title: Isolamento de tenant em logs
+    required: true
+  - id: RF095-SEC-02
+    title: Permissões RBAC em endpoints
+    required: true
+  - id: RF095-SEC-03
+    title: Criptografia AES-256 em repouso
+    required: true
+  - id: RF095-SEC-04
+    title: TLS 1.3 em trânsito
+    required: true
+  - id: RF095-SEC-05
+    title: Rate limiting (10 req/min)
+    required: true
+  - id: RF095-SEC-06
+    title: Proteção contra SQL Injection
+    required: true
+  - id: RF095-SEC-07
+    title: Proteção contra XSS
+    required: true
+  - id: RF095-SEC-08
+    title: CSRF protection
+    required: true
+exclusions:
+  rf_items:
+  - id: EX-RF095-01
+    justificativa: Interface visual (WF-RF095)
+  - id: EX-RF095-02
+    justificativa: Tecnologia ML específica
+  - id: EX-RF095-03
+    justificativa: Configuração SIEM
+  - id: EX-RF095-04
+    justificativa: Layout e UX
+historico:
+- versao: '2.0'
+  data: '2025-12-31'
+  autor: IControlIT Architect Agent
+  descricao: Migração para v2.0 (separação RF/RL) - Contrato funcional moderno
+- versao: '1.0'
+  data: '2025-12-28'
+  autor: Claude Code
+  descricao: Versão inicial completa

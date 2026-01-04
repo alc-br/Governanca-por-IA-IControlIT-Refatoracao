@@ -1,0 +1,476 @@
+rf_id: RF088
+rf_title: "Aprovações e Workflows"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+
+# ==============================================================================
+# ITENS LEGADO RASTREADOS
+# ==============================================================================
+
+itens_legado:
+  # ------------------------------------------------------------------------------
+  # TELAS ASPX
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF088-001"
+    tipo: "tela"
+    titulo: "AprovacaoListar.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Aprovacoes/AprovacaoListar.aspx"
+    descricao: |
+      Lista aprovações pendentes do usuário logado com GridView hardcoded,
+      sem paginação server-side, sem indicador de SLA.
+    regras_implicitas:
+      - "Grid mostra apenas 50 registros por vez (limitação hardcoded)"
+      - "Não atualiza automaticamente quando delegação é criada (precisa F5)"
+      - "Não separa aprovações próprias vs delegadas visualmente"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tela ASPX substituída por componente Angular 19 standalone com paginação server-side, filtros dinâmicos e real-time updates via SignalR"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 4 (Funcionalidades - Dashboard de Pendências)"
+      uc_moderno: "UC07-RF088 (Visualizar Pendências)"
+    migracao_moderna:
+      componente_angular: "approvals-list.component.ts"
+      rota_frontend: "/workflows/approvals"
+
+  - id: "LEG-RF088-002"
+    tipo: "tela"
+    titulo: "AprovacaoDetalhe.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Aprovacoes/AprovacaoDetalhe.aspx"
+    descricao: |
+      Mostra detalhes de uma aprovação específica com botões aprovar/rejeitar.
+      Não há confirmação ao aprovar, motivo de rejeição é opcional.
+    regras_implicitas:
+      - "Ao aprovar, não há modal de confirmação (ação irreversível sem warning)"
+      - "Motivo de rejeição é opcional (deveria ser obrigatório)"
+      - "Não mostra histórico de aprovações anteriores"
+      - "Não mostra SLA ou deadline com countdown"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tela ASPX substituída por tela Angular com modal de confirmação obrigatório, motivo de rejeição obrigatório, histórico visível e indicador de deadline"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 4 (Funcionalidades - Executar Aprovação)"
+      uc_moderno: "UC05-RF088 (Executar Aprovação)"
+    migracao_moderna:
+      componente_angular: "approval-detail.component.ts"
+      rota_frontend: "/workflows/approvals/:id"
+
+  - id: "LEG-RF088-003"
+    tipo: "tela"
+    titulo: "DelegacaoGerenciar.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Aprovacoes/DelegacaoGerenciar.aspx"
+    descricao: |
+      Gerencia delegações de aprovador com campos data início/fim e motivo.
+      Permite criar delegação com data fim no passado (bug).
+    regras_implicitas:
+      - "Permite criar delegação com data fim no passado (bug de validação)"
+      - "Não valida se aprovador já tem delegação ativa"
+      - "Não envia notificação ao delegado"
+      - "Delegação não expira automaticamente (precisa revogar manualmente)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tela ASPX substituída por tela Angular com validações corretas de datas, validação de delegação duplicada, notificação automática ao delegado e expiração automática"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-004)"
+      uc_moderno: "UC06-RF088 (Criar Delegação)"
+    migracao_moderna:
+      componente_angular: "delegation-manage.component.ts"
+      rota_frontend: "/workflows/delegations"
+
+  # ------------------------------------------------------------------------------
+  # WEBSERVICES
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF088-004"
+    tipo: "webservice"
+    titulo: "WSAprovacoes.asmx.vb"
+    caminho_legado: "ic1_legado/IControlIT/WebService/WSAprovacoes.asmx.vb"
+    metodos:
+      - nome: "ListarPendentes"
+        parametros: "idUsuario As Integer"
+        retorno: "DataTable (XML serializado)"
+      - nome: "Aprovar"
+        parametros: "idAprovacao As Integer, comentario As String"
+        retorno: "Boolean"
+      - nome: "Rejeitar"
+        parametros: "idAprovacao As Integer, motivo As String"
+        retorno: "Boolean"
+      - nome: "CriarDelegacao"
+        parametros: "idAprovador As Integer, idDelegado As Integer, dataFim As DateTime"
+        retorno: "Integer (ID delegação)"
+    descricao: |
+      WebService SOAP que expõe métodos para aprovações.
+      Retorna DataTable serializado em XML (verboso), sem paginação.
+    destino: "SUBSTITUÍDO"
+    justificativa: "SOAP substituído por REST API com JSON. Sem validação RBAC no legado, adicionada Policy dinâmica no moderno. Auditoria completa de 7 anos LGPD adicionada."
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 9 (Integrações - API Endpoints)"
+      endpoints_modernos:
+        - "GET /api/approvals?status=pending"
+        - "POST /api/approvals/{id}/approve"
+        - "POST /api/approvals/{id}/reject"
+        - "POST /api/delegations"
+    migracao_moderna:
+      arquitetura: "CQRS + MediatR + REST API"
+      commands:
+        - "CreateApprovalCommand"
+        - "ApproveCommand"
+        - "RejectCommand"
+        - "CreateDelegationCommand"
+
+  # ------------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF088-005"
+    tipo: "stored_procedure"
+    titulo: "pa_AprovacaoInserir"
+    caminho_legado: "Banco de Dados SQL Server"
+    parametros_entrada:
+      - "@IdDocumento INT"
+      - "@TipoDocumento VARCHAR(50)"
+      - "@IdAprovadorPrincipal INT"
+      - "@IdAprovadorSecundario INT = NULL"
+    parametros_saida:
+      - "@IdAprovacao INT OUTPUT"
+    descricao: |
+      Cria nova aprovação validando se documento e aprovador existem.
+      NÃO valida permissão RBAC. NÃO calcula SLA automaticamente.
+      NÃO envia notificação automática.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Lógica movida para Application Layer (CQRS Handler) com validação RBAC completa, cálculo automático de SLA e notificação multi-canal"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-005)"
+      handler: "CreateApprovalCommandHandler.cs"
+      validador: "CreateApprovalCommandValidator.cs (FluentValidation)"
+    migracao_moderna:
+      handler: "CreateApprovalCommandHandler"
+      validacao: "CreateApprovalCommandValidator (FluentValidation)"
+      notificacao: "NotificationService.SendApprovalCreated()"
+
+  - id: "LEG-RF088-006"
+    tipo: "stored_procedure"
+    titulo: "pa_AprovacaoAtualizar"
+    caminho_legado: "Banco de Dados SQL Server"
+    parametros_entrada:
+      - "@IdAprovacao INT"
+      - "@StatusAprovacao VARCHAR(20)"
+      - "@MotivoRejeicao VARCHAR(500) = NULL"
+    parametros_saida: []
+    descricao: |
+      Atualiza status de aprovação (Pendente → Aprovado ou Rejeitado).
+      PROBLEMA: Permite atualizar aprovação já finalizada.
+      PROBLEMA: Sobrescreve DataAprovacao anterior (perde histórico).
+    destino: "SUBSTITUÍDO"
+    justificativa: "Lógica movida para Commands separados (ApproveCommand, RejectCommand) com validação de estado final (RN-RF088-007) e auditoria imutável (RN-RF088-010)"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-007, RN-RF088-009, RN-RF088-010)"
+      handlers:
+        - "ApproveCommandHandler.cs"
+        - "RejectCommandHandler.cs"
+      auditoria: "AuditAprovacao (tabela imutável, 7 anos retenção)"
+    migracao_moderna:
+      handlers:
+        - "ApproveCommandHandler"
+        - "RejectCommandHandler"
+      validacao_estado: "Bloqueia transição de estados finais"
+      auditoria: "AuditAprovacao.LogApprovalAction()"
+
+  - id: "LEG-RF088-007"
+    tipo: "stored_procedure"
+    titulo: "pa_DelegacaoInserir"
+    caminho_legado: "Banco de Dados SQL Server"
+    parametros_entrada:
+      - "@IdAprovador INT"
+      - "@IdDelegado INT"
+      - "@DataInicio DATETIME"
+      - "@DataFim DATETIME"
+      - "@Motivo VARCHAR(255) = NULL"
+    parametros_saida:
+      - "@IdDelegacao INT OUTPUT"
+    descricao: |
+      Cria delegação validando se aprovador e delegado existem e se DataFim > DataInicio.
+      PROBLEMA: Não valida se DataFim é no futuro (permite datas no passado).
+      PROBLEMA: Permite criar delegação duplicada.
+      PROBLEMA: Não envia notificação ao delegado.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Lógica movida para CreateDelegationCommand com validações completas (data futura, duplicidade), auditoria completa e notificação automática ao delegado"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-004)"
+      handler: "CreateDelegationCommandHandler.cs"
+      validador: "CreateDelegationCommandValidator.cs"
+    migracao_moderna:
+      handler: "CreateDelegationCommandHandler"
+      validacao: "CreateDelegationCommandValidator (validações completas)"
+      notificacao: "NotificationService.SendDelegationCreated(delegateUserId)"
+
+  - id: "LEG-RF088-008"
+    tipo: "stored_procedure"
+    titulo: "pa_ListarPendentes"
+    caminho_legado: "Banco de Dados SQL Server"
+    parametros_entrada:
+      - "@IdUsuario INT"
+    parametros_saida: []
+    descricao: |
+      Lista aprovações pendentes de um usuário sem paginação (retorna todas).
+      Query não otimizada, sem índices específicos.
+      Não considera delegações ativas (apenas aprovador original).
+    destino: "SUBSTITUÍDO"
+    justificativa: "Lógica movida para GetPendingApprovalsQuery com paginação server-side, projection otimizada e consideração de delegações ativas"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 4 (Funcionalidades - Dashboard de Pendências)"
+      query: "GetPendingApprovalsQueryHandler.cs"
+    migracao_moderna:
+      query: "GetPendingApprovalsQuery"
+      handler: "GetPendingApprovalsQueryHandler"
+      paginacao: "PaginatedList<ApprovalInstanceDto>"
+      consideracao_delegacao: "GetEffectiveApprover(originalApproverId, checkDate)"
+
+  # ------------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF088-009"
+    tipo: "tabela"
+    titulo: "tblAprovacoes"
+    schema_legado: "[dbo].[tblAprovacoes]"
+    problemas_identificados:
+      - "Falta FK para validar IdDocumento (dados órfãos possíveis)"
+      - "Não tem campos de auditoria completos (CreatedBy, LastModifiedBy ausentes)"
+      - "IpAddress VARCHAR(15) não suporta IPv6"
+      - "Observacoes como TEXT (deveria ser NVARCHAR(MAX))"
+      - "Fl_Excluido é soft delete simples (não tem DeletedBy ou DeletedAt)"
+      - "StatusAprovacao é VARCHAR (deveria ser INT com enum)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tabela redesenhada como ApprovalInstance com FKs obrigatórias, auditoria completa, IpAddress VARCHAR(45) para IPv6, Comments NVARCHAR(MAX), soft delete completo e Status como INT enum"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 6 (Estados da Entidade - ApprovalInstance)"
+      md_moderno: "MD-RF088.md - Tabela ApprovalInstance"
+    migracao_moderna:
+      tabela_moderna: "ApprovalInstance"
+      migration_ef_core: "20251231_CreateApprovalInstanceTable.cs"
+      melhorias:
+        - "FKs obrigatórias: WorkflowId, DocumentId, ApproverId"
+        - "Auditoria completa: CreatedBy, CreatedAt, LastModifiedBy, LastModifiedAt"
+        - "IpAddress VARCHAR(45) para IPv6"
+        - "Comments NVARCHAR(MAX)"
+        - "Soft delete completo: DeletedBy, DeletedAt, DeletedReason"
+        - "Status INT enum (Pending=1, Approved=2, Rejected=3, Delegated=4, Escalated=5, Expired=6)"
+
+  - id: "LEG-RF088-010"
+    tipo: "tabela"
+    titulo: "tblDelegacoes"
+    schema_legado: "[dbo].[tblDelegacoes]"
+    problemas_identificados:
+      - "Não tem auditoria (quem criou, quando criou, IP)"
+      - "StatusDelegacao é VARCHAR (deveria ser INT enum)"
+      - "Falta campo para indicar se delegação foi revogada manualmente"
+      - "Não tem ExpiresAt automático (precisa job para checar DataFim)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tabela redesenhada como ApprovalDelegation com auditoria obrigatória, Status INT enum (Active=1, Expired=2, Revoked=3), campos de revogação e expiração automática via background service"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-004)"
+      md_moderno: "MD-RF088.md - Tabela ApprovalDelegation"
+    migracao_moderna:
+      tabela_moderna: "ApprovalDelegation"
+      migration_ef_core: "20251231_CreateApprovalDelegationTable.cs"
+      melhorias:
+        - "Auditoria obrigatória: CreatedBy, CreatedAt, IpAddress"
+        - "Status INT enum (Active, Expired, Revoked)"
+        - "Campos de revogação: RevokedAt, RevokedBy, RevocationReason"
+        - "Expiração automática: Background service executa a cada hora"
+
+  # ------------------------------------------------------------------------------
+  # REGRAS IMPLÍCITAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF088-011"
+    tipo: "regra_negocio"
+    titulo: "Aprovador secundário só entra em ação se aprovador principal não responder em 48h"
+    localizacao_codigo: "ic1_legado/IControlIT/Aprovacoes/AprovacaoDetalhe.aspx.vb - Linha 142"
+    descricao: |
+      SLA hardcoded de 48 horas. Se aprovador principal não responder,
+      aprovação é atribuída ao aprovador secundário (sem escalação automática).
+    destino: "SUBSTITUÍDO"
+    justificativa: "SLA agora é configurável por workflow (não hardcoded). Escalação automática implementada via background service com alerta T-24h e escalação T+0 (RN-RF088-005)"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-005)"
+      implementacao: "SlaEscalationService (Background Service)"
+    migracao_moderna:
+      service: "SlaEscalationService"
+      configuracao: "SlaConfiguration (tabela)"
+      alerta: "T-24h (email + SMS + in-app)"
+      escalacao: "T+0 (criar nova aprovação para supervisor)"
+
+  - id: "LEG-RF088-012"
+    tipo: "regra_negocio"
+    titulo: "Rejeição permite comentários opcionais, mas motivo não é obrigatório"
+    localizacao_codigo: "pa_AprovacaoAtualizar - Stored Procedure"
+    descricao: |
+      Ao rejeitar, o campo MotivoRejeicao é opcional (NULL permitido).
+      Isso dificulta rastreabilidade de por que documento foi rejeitado.
+    destino: "CORRIGIDO"
+    justificativa: "Motivo de rejeição agora é obrigatório no RejectCommand. Validação de FluentValidation bloqueia rejeição sem motivo (RN-RF088-009)"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-009)"
+      validador: "RejectCommandValidator.cs"
+    migracao_moderna:
+      validador: "RejectCommandValidator"
+      regra: "RuleFor(x => x.RejectionReason).NotEmpty().MinimumLength(10)"
+
+  - id: "LEG-RF088-013"
+    tipo: "regra_negocio"
+    titulo: "Delegação não expira automaticamente; precisa job SQL noturno"
+    localizacao_codigo: "Job SQL Server 'JobDelegacaoExpiracao'"
+    descricao: |
+      Job SQL executa apenas 1x por dia (à noite). Se delegação expira às 10h,
+      só será marcada como expirada às 23h quando job rodar novamente.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Background service .NET executa a cada hora, marcando delegações expiradas em tempo próximo ao real (max delay 1h em vez de 24h)"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-004)"
+      service: "DelegationExpirationService (Background Service)"
+    migracao_moderna:
+      service: "DelegationExpirationService"
+      frequencia: "Executa a cada 1 hora"
+      acao: "Marca delegações expiradas e notifica aprovador original"
+
+  - id: "LEG-RF088-014"
+    tipo: "regra_negocio"
+    titulo: "Aprovador pode aprovar qualquer documento, mesmo de outro conglomerado (falha multi-tenant)"
+    localizacao_codigo: "ic1_legado/WebService/WSAprovacoes.asmx.vb - Método Aprovar() - Linha 89"
+    descricao: |
+      Validação apenas verifica se usuário é o aprovador designado,
+      mas não valida se aprovação pertence ao mesmo conglomerado (EmpresaId) do usuário.
+      Isso permite vazamento de dados entre tenants.
+    destino: "CORRIGIDO"
+    justificativa: "Validação de EmpresaId obrigatória implementada. ApproveCommandHandler valida se approval.EmpresaId == currentUser.EmpresaId antes de permitir aprovação (RN-RF088-006)"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-006)"
+      handler: "ApproveCommandHandler.cs"
+    migracao_moderna:
+      handler: "ApproveCommandHandler"
+      validacao: "ValidateTenantIsolation(approval.EmpresaId, currentUser.EmpresaId)"
+      http_code: "403 Forbidden se EmpresaId diferente"
+
+  - id: "LEG-RF088-015"
+    tipo: "regra_negocio"
+    titulo: "Histórico de aprovação é sobrescrito a cada mudança de status"
+    localizacao_codigo: "pa_AprovacaoAtualizar - UPDATE direto"
+    descricao: |
+      Ao atualizar status de aprovação, stored procedure faz UPDATE direto
+      na tabela tblAprovacoes, sobrescrevendo DataAprovacao anterior.
+      Não há tabela de histórico separada. Perde rastreabilidade.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tabela AuditAprovacao imutável criada. Toda aprovação/rejeição cria registro novo com before/after em JSON. Retenção de 7 anos LGPD (RN-RF088-010)"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-010)"
+      tabela: "AuditAprovacao (imutável)"
+    migracao_moderna:
+      tabela: "AuditAprovacao"
+      imutabilidade: "Sem UPDATE ou DELETE permitido"
+      retencao: "7 anos (LGPD Lei 13.709/2018)"
+      auditoria: "BeforeData (JSON), AfterData (JSON), UserId, IpAddress, UserAgent, ActionDateTime"
+
+  - id: "LEG-RF088-016"
+    tipo: "regra_negocio"
+    titulo: "Notificações de e-mail não incluem link direto para aprovação"
+    localizacao_codigo: "ic1_legado/IControlIT/Common/EmailService.vb - Método EnviarNotificacao()"
+    descricao: |
+      E-mail de notificação apenas informa que há aprovação pendente,
+      mas não inclui link direto. Usuário precisa navegar manualmente até tela de aprovações.
+    destino: "CORRIGIDO"
+    justificativa: "Notificações agora incluem contexto completo (Who, What, When, Why, How) com link direto para tela de aprovação. Template Handlebars com CTA button (RN-RF088-008)"
+    rastreabilidade:
+      rf_moderno: "RF-088 - Seção 5 (Regras de Negócio - RN-RF088-008)"
+      service: "NotificationComposer.ComposeApprovalNotification()"
+    migracao_moderna:
+      service: "NotificationComposer"
+      template: "Handlebars template com link direto"
+      cta: "GetApprovalLink(approval) → /workflows/approvals/:id"
+
+# ==============================================================================
+# BANCOS LEGADOS MAPEADOS
+# ==============================================================================
+
+bancos_legados:
+  - nome: "IControlIT_Cliente01"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "tblAprovacoes"
+      - "tblDelegacoes"
+    destino: "CONSOLIDADO"
+    justificativa: "Migrado para banco único com multi-tenancy (Row-Level Security). EmpresaId adicionado a todas as tabelas."
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+  - nome: "IControlIT_Cliente02"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "tblAprovacoes"
+      - "tblDelegacoes"
+    destino: "CONSOLIDADO"
+    justificativa: "Migrado para banco único com multi-tenancy (Row-Level Security). EmpresaId adicionado a todas as tabelas."
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF088-001"
+    titulo: "Workflows Hardcoded (Enums C#/VB.NET)"
+    severidade: "CRÍTICA"
+    descricao: |
+      Estados e transições de workflow são codificados em enums na aplicação.
+      Qualquer mudança requer redeployment. Não há designer visual para admin criar workflows.
+    impacto: "Falta de flexibilidade. Dependência de dev para qualquer mudança de processo."
+    solucao_moderna: "Designer visual drag-and-drop no Angular. Estados e transições armazenados em banco de dados (tabelas State, Transition). Admin pode criar workflows sem tocar em código."
+
+  - id: "PROB-RF088-002"
+    titulo: "SLA Manual (Job SQL Noturno)"
+    severidade: "ALTA"
+    descricao: |
+      Alertas de SLA dependem de job SQL que executa 1x por dia (à noite).
+      Aprovação pode vencer às 10h, mas só será detectado às 23h. Escalação é manual.
+    impacto: "Perda de SLA. Aprovações travadas sem alerta em tempo real."
+    solucao_moderna: "Background service .NET executa a cada hora. Alerta automático T-24h. Escalação automática T+0 quando SLA vence. Dashboard de SLA compliance em tempo real."
+
+  - id: "PROB-RF088-003"
+    titulo: "Falha Multi-Tenant (Vazamento de Dados)"
+    severidade: "CRÍTICA"
+    descricao: |
+      Aprovador pode aprovar documento de qualquer conglomerado.
+      Validação apenas verifica se é o aprovador designado, mas não valida EmpresaId.
+    impacto: "Vazamento de dados entre tenants. Não conforme LGPD."
+    solucao_moderna: "Validação obrigatória de EmpresaId em todas as operações. Policy dinâmica valida tenant isolation. Tentativa de acesso cruzado → HTTP 403 + auditoria."
+
+  - id: "PROB-RF088-004"
+    titulo: "Auditoria Incompleta (Sem Before/After)"
+    severidade: "ALTA"
+    descricao: |
+      Logs de aprovação são básicos (texto simples em tabela TEXT).
+      Não há before/after estruturado. Não há retenção de 7 anos.
+    impacto: "Não conforme LGPD. Rastreabilidade insuficiente."
+    solucao_moderna: "Tabela AuditAprovacao imutável com BeforeData/AfterData em JSON. Retenção de 7 anos. Sem UPDATE/DELETE permitido."
+
+  - id: "PROB-RF088-005"
+    titulo: "Performance Lenta (Queries Não Otimizadas)"
+    severidade: "MÉDIA"
+    descricao: |
+      Queries com múltiplos JOINs sem índices específicos.
+      Sem paginação server-side. Sem cache distribuído.
+    impacto: "Lentidão em produção. Dashboard pode demorar >10s para carregar."
+    solucao_moderna: "Queries otimizadas com índices. Paginação server-side. Cache distribuído (Redis). Materialização de histórico. Dashboard < 2s garantido."
+
+  - id: "PROB-RF088-006"
+    titulo: "i18n Inexistente (Textos Hardcoded)"
+    severidade: "MÉDIA"
+    descricao: |
+      Textos hardcoded em português no código VB.NET.
+      Não é possível traduzir sem recompilar.
+    impacto: "Não escalável internacionalmente."
+    solucao_moderna: "Transloco (i18n) com pt-BR, en-US, es-ES. 100% das labels e mensagens traduzíveis. Chaves em JSON separado."
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 16
+  itens_assumidos: 0
+  itens_substituidos: 15
+  itens_descartados: 0
+  itens_a_revisar: 1
+  cobertura_destinos: "100%"

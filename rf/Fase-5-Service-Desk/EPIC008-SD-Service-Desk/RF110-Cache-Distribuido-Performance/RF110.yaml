@@ -1,0 +1,669 @@
+# ==============================================================================
+# RF110 - Cache Distribuído e Otimização de Performance
+# ==============================================================================
+
+rf_id: "RF110"
+versao: "2.0"
+data: "2025-12-31"
+fase: "Fase-5-Service-Desk"
+epic: "EPIC008-SD-Service-Desk"
+titulo: "Cache Distribuído e Otimização de Performance"
+contrato_migracao: "CONTRATO-RF-PARA-RL"
+
+# ==============================================================================
+# VISÃO GERAL
+# ==============================================================================
+
+visao_geral:
+  objetivo: |
+    Implementar sistema de cache distribuído com Redis para otimizar performance
+    da aplicação IControlIT, reduzindo latência de consultas recorrentes, minimizando
+    carga no banco de dados e garantindo escalabilidade horizontal com invalidação
+    inteligente de cache.
+
+  escopo:
+    - "Cache distribuído com Redis (StackExchange.Redis)"
+    - "Serialização eficiente com System.Text.Json Source Generators"
+    - "Compressão automática de payloads grandes com Gzip"
+    - "Estratégias de cache (Cache-Aside, Write-Through, Cache-Behind)"
+    - "Invalidação inteligente (por chave, por padrão, por tag)"
+    - "Multi-tenancy com isolamento por ClienteId"
+    - "Monitoramento de hit rate, latência e uso de memória"
+    - "Gestão de TTL (Time-To-Live) configurável por entidade"
+    - "Fallback automático para banco em caso de falha do Redis"
+
+  beneficios:
+    - "Redução de 70% no tempo de resposta de consultas frequentes"
+    - "Diminuição de 60% na carga do banco de dados"
+    - "Suporte a 10.000+ requisições simultâneas"
+    - "Economia de custos de infraestrutura de banco"
+    - "Melhoria na experiência do usuário (latência < 100ms)"
+
+# ==============================================================================
+# FUNCIONALIDADES
+# ==============================================================================
+
+funcionalidades:
+  - id: "FUNC-110-01"
+    titulo: "Cache de Entidades Principais"
+    descricao: |
+      Cachear automaticamente entidades de leitura frequente: Empresas, Filiais,
+      Centros de Custo, Usuários, Perfis, Permissões, Configurações do sistema,
+      Domínios configuráveis e Feature Flags ativos.
+
+  - id: "FUNC-110-02"
+    titulo: "Estratégias de Cache"
+    descricao: |
+      Implementar três estratégias de cache:
+      - Cache-Aside: Consulta cache primeiro, banco em caso de miss
+      - Write-Through: Escrita simultânea em cache e banco
+      - Cache-Behind: Escrita assíncrona no banco após atualizar cache
+
+  - id: "FUNC-110-03"
+    titulo: "Invalidação Inteligente"
+    descricao: |
+      Invalidação por chave exata, por padrão (pattern matching) e por tags.
+      Invalidar automaticamente após UPDATE/DELETE de entidades.
+
+  - id: "FUNC-110-04"
+    titulo: "Compressão Automática"
+    descricao: |
+      Detectar payloads > 1KB, comprimir com Gzip, descomprimir automaticamente.
+      Economia de 60-80% de memória Redis.
+
+  - id: "FUNC-110-05"
+    titulo: "Monitoramento e Alertas"
+    descricao: |
+      Coletar métricas de Hit Rate, Miss Rate, latência, uso de memória.
+      Disparar alertas automáticos para Hit Rate < 70%, latência > 200ms,
+      memória > 80%.
+
+  - id: "FUNC-110-06"
+    titulo: "Fallback e Resiliência"
+    descricao: |
+      Consultar banco diretamente se Redis estiver indisponível.
+      Reconectar automaticamente quando Redis voltar.
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-PER-110-01"
+    titulo: "Isolamento Multi-Tenancy"
+    descricao: |
+      Toda chave de cache DEVE incluir o ClienteId como prefixo.
+      Formato obrigatório: cliente:{ClienteId}:{entidade}:{id}
+    criticidade: "ALTA"
+    exemplos:
+      - "cliente:10:empresa:5 (Empresa ID=5 do Cliente ID=10)"
+      - "Rejeitar operações sem ClienteId válido"
+
+  - id: "RN-PER-110-02"
+    titulo: "TTL Configurável por Entidade"
+    descricao: |
+      Cada tipo de entidade possui TTL específico configurável via appsettings.json.
+      TTLs padrão: Empresas/Filiais (24h), Usuários/Perfis (1h), Permissões (30min),
+      Feature Flags (5min), Domínios (12h).
+    criticidade: "MÉDIA"
+
+  - id: "RN-PER-110-03"
+    titulo: "Invalidação Automática em Writes"
+    descricao: |
+      Toda operação de CREATE, UPDATE ou DELETE DEVE invalidar o cache relacionado
+      imediatamente.
+    criticidade: "ALTA"
+    exemplos:
+      - "UPDATE Empresa ID=5 → Invalidar cliente:X:empresa:5"
+      - "DELETE Filial ID=20 → Invalidar cliente:X:filial:20"
+
+  - id: "RN-PER-110-04"
+    titulo: "Compressão Condicional"
+    descricao: |
+      Payloads > 1KB DEVEM ser comprimidos com Gzip antes de armazenar no Redis.
+      Armazenar flag compressed:true na chave de metadados.
+    criticidade: "MÉDIA"
+
+  - id: "RN-PER-110-05"
+    titulo: "Limite de Tamanho de Payload"
+    descricao: |
+      Payloads > 5MB NÃO DEVEM ser cacheados, mesmo após compressão.
+      Logar warning e buscar direto do banco.
+    criticidade: "MÉDIA"
+
+  - id: "RN-PER-110-06"
+    titulo: "Hit Rate Mínimo Esperado de 80%"
+    descricao: |
+      Calcular e monitorar Hit Rate a cada 5 minutos.
+      Fórmula: (Total Hits / (Total Hits + Total Misses)) * 100
+      Se < 70% por 30min, acionar alerta.
+    criticidade: "ALTA"
+    meta: "≥ 80%"
+
+  - id: "RN-PER-110-07"
+    titulo: "Fallback Transparente"
+    descricao: |
+      Se Redis indisponível, aplicação DEVE continuar funcionando consultando
+      banco diretamente. Logar evento de fallback.
+    criticidade: "ALTA"
+
+  - id: "RN-PER-110-08"
+    titulo: "Invalidação por Relacionamento"
+    descricao: |
+      Ao alterar entidade pai, invalidar cache de entidades filhas relacionadas.
+    criticidade: "MÉDIA"
+    exemplos:
+      - "UPDATE Empresa → Invalidar cache de Filiais, Centros de Custo, Usuários"
+
+  - id: "RN-PER-110-09"
+    titulo: "Cache de Listas Paginadas"
+    descricao: |
+      Listas paginadas DEVEM ter cache separado por página e filtros.
+      Formato: cliente:{ClienteId}:{entidade}:lista:page={page}&size={size}&filter={hash}
+    criticidade: "MÉDIA"
+
+  - id: "RN-PER-110-10"
+    titulo: "Auditoria de Cache"
+    descricao: |
+      Operações de cache (hit, miss) NÃO são auditadas em banco.
+      Exceção: Eventos críticos (fallback, erro, timeout) DEVEM ser logados.
+    criticidade: "BAIXA"
+
+# ==============================================================================
+# CENTRAL DE FUNCIONALIDADES
+# ==============================================================================
+
+central_funcionalidades:
+  codigo: "PER.CACHE"
+  nome: "Cache Distribuído e Performance"
+  modulo: "Performance"
+  tipo: "Sistema"
+
+  funcionalidades_filhas:
+    - codigo: "PER.CACHE.VIEW"
+      nome: "Visualizar Métricas de Cache"
+      permissao: "PER.CACHE.VIEW_METRICS"
+
+    - codigo: "PER.CACHE.CLEAR"
+      nome: "Limpar Cache Manualmente"
+      permissao: "PER.CACHE.CLEAR_CACHE"
+
+    - codigo: "PER.CACHE.CONFIG"
+      nome: "Configurar TTLs"
+      permissao: "PER.CACHE.CONFIGURE_TTL"
+
+    - codigo: "PER.CACHE.MONITOR"
+      nome: "Monitorar Health"
+      permissao: "PER.CACHE.VIEW_HEALTH"
+
+# ==============================================================================
+# ENDPOINTS DA API
+# ==============================================================================
+
+endpoints:
+  - id: "API-110-01"
+    metodo: "GET"
+    rota: "/api/performance/cache/metrics"
+    descricao: "Visualizar métricas de cache"
+    autenticacao: true
+    permissao: "PER.CACHE.VIEW_METRICS"
+    parametros_query:
+      - nome: "period"
+        tipo: "string"
+        obrigatorio: false
+        valores: ["1h", "24h", "7d", "30d"]
+    resposta_sucesso:
+      codigo: 200
+      exemplo: |
+        {
+          "hitRate": 85.7,
+          "missRate": 14.3,
+          "totalHits": 152340,
+          "totalMisses": 25890,
+          "avgLatencyMs": 12.5,
+          "memoryUsageMB": 450.2,
+          "totalKeys": 8952,
+          "period": "24h"
+        }
+
+  - id: "API-110-02"
+    metodo: "DELETE"
+    rota: "/api/performance/cache"
+    descricao: "Limpar cache"
+    autenticacao: true
+    permissao: "PER.CACHE.CLEAR_CACHE"
+    corpo_requisicao:
+      exemplo: |
+        {
+          "scope": "all|client|entity|key",
+          "clienteId": 10,
+          "entity": "empresa",
+          "key": "cliente:10:empresa:5"
+        }
+    resposta_sucesso:
+      codigo: 200
+      exemplo: |
+        {
+          "message": "Cache limpo com sucesso",
+          "keysRemoved": 245,
+          "scope": "client",
+          "clienteId": 10
+        }
+
+  - id: "API-110-03"
+    metodo: "PUT"
+    rota: "/api/performance/cache/ttl"
+    descricao: "Configurar TTL"
+    autenticacao: true
+    permissao: "PER.CACHE.CONFIGURE_TTL"
+    corpo_requisicao:
+      exemplo: |
+        {
+          "entity": "empresa",
+          "ttlSeconds": 86400
+        }
+    resposta_sucesso:
+      codigo: 200
+      exemplo: |
+        {
+          "message": "TTL atualizado com sucesso",
+          "entity": "empresa",
+          "previousTtl": 3600,
+          "newTtl": 86400
+        }
+
+  - id: "API-110-04"
+    metodo: "GET"
+    rota: "/api/performance/cache/health"
+    descricao: "Verificar health do Redis"
+    autenticacao: true
+    permissao: "PER.CACHE.VIEW_HEALTH"
+    resposta_sucesso:
+      codigo: 200
+      exemplo: |
+        {
+          "status": "healthy",
+          "connected": true,
+          "latencyMs": 8.3,
+          "memoryUsedMB": 450.2,
+          "memoryMaxMB": 2048,
+          "uptime": "15d 8h 23m"
+        }
+
+# ==============================================================================
+# RBAC - MATRIZ DE PERMISSÕES
+# ==============================================================================
+
+rbac:
+  permissoes:
+    - codigo: "PER.CACHE.VIEW_METRICS"
+      descricao: "Visualizar métricas de cache"
+      perfis: ["Developer", "Super Admin", "Admin", "Suporte"]
+
+    - codigo: "PER.CACHE.CLEAR_CACHE"
+      descricao: "Limpar cache manualmente"
+      perfis: ["Developer", "Super Admin", "Admin"]
+
+    - codigo: "PER.CACHE.CONFIGURE_TTL"
+      descricao: "Configurar TTLs"
+      perfis: ["Developer", "Super Admin"]
+
+    - codigo: "PER.CACHE.VIEW_HEALTH"
+      descricao: "Monitorar health do Redis"
+      perfis: ["Developer", "Super Admin", "Admin", "Suporte"]
+
+# ==============================================================================
+# INTERNACIONALIZAÇÃO (i18n)
+# ==============================================================================
+
+i18n:
+  namespace: "performance.cache"
+
+  chaves:
+    - chave: "title"
+      pt-BR: "Cache Distribuído"
+      en: "Distributed Cache"
+      es: "Caché Distribuido"
+
+    - chave: "metrics.hitRate"
+      pt-BR: "Taxa de Acerto"
+      en: "Hit Rate"
+      es: "Tasa de Acierto"
+
+    - chave: "metrics.missRate"
+      pt-BR: "Taxa de Erro"
+      en: "Miss Rate"
+      es: "Tasa de Error"
+
+    - chave: "metrics.avgLatency"
+      pt-BR: "Latência Média"
+      en: "Average Latency"
+      es: "Latencia Promedio"
+
+    - chave: "actions.clearCache"
+      pt-BR: "Limpar Cache"
+      en: "Clear Cache"
+      es: "Limpiar Caché"
+
+    - chave: "actions.configureTtl"
+      pt-BR: "Configurar TTL"
+      en: "Configure TTL"
+      es: "Configurar TTL"
+
+    - chave: "alerts.lowHitRate"
+      pt-BR: "Taxa de acerto baixa detectada"
+      en: "Low hit rate detected"
+      es: "Tasa de acierto baja detectada"
+
+    - chave: "alerts.highMemory"
+      pt-BR: "Uso de memória acima de 80%"
+      en: "Memory usage above 80%"
+      es: "Uso de memoria superior al 80%"
+
+    - chave: "errors.redisFailed"
+      pt-BR: "Falha ao conectar com Redis"
+      en: "Failed to connect to Redis"
+      es: "Error al conectar con Redis"
+
+# ==============================================================================
+# MODELO DE DADOS
+# ==============================================================================
+
+modelo_dados:
+  redis_keys:
+    formato_padrao: "cliente:{ClienteId}:{entidade}:{id}"
+    exemplos:
+      - "cliente:10:empresa:5"
+      - "cliente:10:usuario:123"
+      - "cliente:10:filial:lista:page=1&size=20"
+
+  metadados_cache:
+    chave_metadados: "{chave}:meta"
+    campos:
+      - nome: "compressed"
+        tipo: "boolean"
+        descricao: "Indica se payload está comprimido"
+
+      - nome: "createdAt"
+        tipo: "timestamp"
+        descricao: "Data/hora de criação"
+
+      - nome: "expiresAt"
+        tipo: "timestamp"
+        descricao: "Data/hora de expiração"
+
+      - nome: "size"
+        tipo: "integer"
+        descricao: "Tamanho em bytes"
+
+      - nome: "version"
+        tipo: "string"
+        descricao: "Versão do payload"
+
+  tabela_auditoria:
+    nome: "CacheInvalidationAudits"
+    campos:
+      - nome: "Id"
+        tipo: "GUID"
+        pk: true
+
+      - nome: "ClienteId"
+        tipo: "GUID"
+        fk: "Cliente"
+
+      - nome: "Pattern"
+        tipo: "STRING"
+        descricao: "Padrão de chave invalidada"
+
+      - nome: "KeysInvalidated"
+        tipo: "INT"
+        descricao: "Quantidade de chaves removidas"
+
+      - nome: "Reason"
+        tipo: "STRING"
+        descricao: "Motivo (RN ou evento)"
+
+      - nome: "TriggeredBy"
+        tipo: "STRING"
+        descricao: "UserId ou SYSTEM"
+
+      - nome: "Timestamp"
+        tipo: "DATETIME"
+        descricao: "Data/hora da invalidação"
+
+      - nome: "MemoryFreedBytes"
+        tipo: "LONG"
+        descricao: "Memória liberada (estimativa)"
+
+# ==============================================================================
+# CONFIGURAÇÕES DO SISTEMA
+# ==============================================================================
+
+configuracoes:
+  redis:
+    connection_string: "localhost:6379"
+    instance_name: "IControlIT:"
+    default_ttl: 3600
+    enable_compression: true
+    compression_threshold_bytes: 1024
+    max_payload_size_mb: 5
+
+  entity_ttls:
+    empresa: 86400    # 24 horas
+    filial: 86400     # 24 horas
+    usuario: 3600     # 1 hora
+    perfil: 3600      # 1 hora
+    permissao: 1800   # 30 minutos
+    feature_flag: 300 # 5 minutos
+    dominio: 43200    # 12 horas
+
+  monitoring:
+    enabled: true
+    metrics_interval_seconds: 300
+    min_hit_rate: 70
+    alert_on_low_hit_rate: true
+    alert_on_high_memory: true
+    memory_threshold_percent: 80
+
+# ==============================================================================
+# DEPENDÊNCIAS TÉCNICAS
+# ==============================================================================
+
+dependencias:
+  backend:
+    pacotes_nuget:
+      - nome: "StackExchange.Redis"
+        versao_minima: "2.8.0"
+
+      - nome: "Microsoft.Extensions.Caching.StackExchangeRedis"
+        versao_minima: "10.0.0"
+
+      - nome: "System.Text.Json"
+        versao_minima: "10.0.0"
+
+  infraestrutura:
+    - nome: "Redis Server"
+      versao_minima: "7.0"
+      requisito: "Servidor Redis dedicado com mínimo 2GB RAM"
+
+    - nome: "Rede"
+      requisito: "Baixa latência entre aplicação e Redis (< 5ms)"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - metrica: "Hit Rate"
+    meta: "≥ 80%"
+    medicao: "% de requisições atendidas pelo cache"
+
+  - metrica: "Latência Média"
+    meta: "≤ 50ms"
+    medicao: "Tempo médio de leitura do cache"
+
+  - metrica: "Uso de Memória"
+    meta: "≤ 70%"
+    medicao: "% da memória Redis utilizada"
+
+  - metrica: "Disponibilidade"
+    meta: "≥ 99.9%"
+    medicao: "Uptime do Redis"
+
+  - metrica: "Taxa de Compressão"
+    meta: "≥ 60%"
+    medicao: "Redução de tamanho após Gzip"
+
+# ==============================================================================
+# ALERTAS AUTOMÁTICOS
+# ==============================================================================
+
+alertas:
+  - nome: "Hit Rate Baixo"
+    condicao: "< 70% por 30min"
+    acao: "Revisar TTLs e padrões de acesso"
+
+  - nome: "Memória Alta"
+    condicao: "> 80%"
+    acao: "Expandir capacidade ou limpar chaves antigas"
+
+  - nome: "Redis Indisponível"
+    condicao: "Falha de conexão"
+    acao: "Acionar fallback e notificar DevOps"
+
+  - nome: "Latência Alta"
+    condicao: "> 200ms"
+    acao: "Verificar rede e carga do Redis"
+
+# ==============================================================================
+# CASOS DE USO RELACIONADOS
+# ==============================================================================
+
+casos_uso_relacionados:
+  - "UC00-RF110: Configurar Cache Distribuído"
+  - "UC01-RF110: Visualizar Métricas de Performance"
+  - "UC02-RF110: Limpar Cache Manualmente"
+  - "UC03-RF110: Configurar TTLs por Entidade"
+  - "UC04-RF110: Monitorar Health do Redis"
+
+# ==============================================================================
+# TESTES E VALIDAÇÃO
+# ==============================================================================
+
+testes:
+  performance:
+    - "Carga de 10.000 requisições simultâneas"
+    - "Hit Rate ≥ 80%"
+    - "Latência média ≤ 50ms"
+    - "Uso de memória estável"
+
+  resiliencia:
+    - "Simular queda do Redis → Fallback para banco"
+    - "Reconexão automática após Redis voltar"
+    - "Validar que operações críticas não são bloqueadas"
+
+  seguranca:
+    - "Tentar acessar cache de outro ClienteId → Bloqueado"
+    - "Injetar payload malicioso → Rejeitado na deserialização"
+    - "Tentar alterar TTL sem permissão → HTTP 403"
+
+# ==============================================================================
+# IMPACTO E DEPENDÊNCIAS
+# ==============================================================================
+
+impacto:
+  rfs_beneficiados:
+    - "RF104: Gestão de Domínios (cache de tipos e status)"
+    - "RF043: Gestão de Empresas (cache de empresas e filiais)"
+    - "RF046: Gestão de Usuários (cache de permissões)"
+    - "RF048: Feature Flags (cache de flags ativos)"
+
+  infraestrutura:
+    positivo:
+      - "Redução de carga no banco de dados (60%)"
+      - "Melhoria na latência de resposta (70%)"
+      - "Suporte a maior número de usuários simultâneos"
+
+    requisitos:
+      - "Servidor Redis dedicado (mínimo 2GB RAM)"
+      - "Rede de baixa latência entre app e Redis"
+
+# ==============================================================================
+# SEGURANÇA
+# ==============================================================================
+
+seguranca:
+  isolamento_multi_tenancy:
+    - "Todo acesso ao cache valida ClienteId"
+    - "Chaves sempre prefixadas com cliente:{ClienteId}"
+    - "Tentativas de acesso cruzado são logadas e bloqueadas"
+
+  protecao_dados_sensiveis:
+    - "Dados sensíveis (senhas, tokens) NÃO são cacheados"
+    - "Payloads em cache são criptografados em trânsito (TLS)"
+    - "Redis protegido por autenticação (requirepass)"
+
+# ==============================================================================
+# OBSERVABILIDADE
+# ==============================================================================
+
+observabilidade:
+  logs_estruturados:
+    - nivel: "Debug"
+      eventos: ["Cache hit/miss"]
+
+    - nivel: "Information"
+      eventos: ["Invalidação de chaves"]
+
+    - nivel: "Warning"
+      eventos: ["Fallback para banco"]
+
+    - nivel: "Error"
+      eventos: ["Erro de conexão Redis"]
+
+  metricas_monitoramento:
+    destino: "Application Insights"
+    metricas:
+      - "Hit Rate"
+      - "Miss Rate"
+      - "Latência de leitura/escrita"
+      - "Uso de memória"
+      - "Número de chaves ativas"
+
+# ==============================================================================
+# ROADMAP
+# ==============================================================================
+
+roadmap:
+  versao_1_0:
+    status: "Atual"
+    funcionalidades:
+      - "Cache básico com Redis"
+      - "Compressão Gzip"
+      - "Invalidação por chave exata"
+      - "Fallback para banco"
+
+  versao_1_1:
+    status: "Próximo Release"
+    funcionalidades:
+      - "Cache distribuído em cluster Redis"
+      - "Invalidação por tags"
+      - "Warm-up automático de cache após deploy"
+
+  versao_2_0:
+    status: "Futuro"
+    funcionalidades:
+      - "Cache híbrido (Redis + memória local)"
+      - "Machine Learning para prever padrões de acesso"
+      - "Cache proativo (pré-carregar dados antes da requisição)"
+
+# ==============================================================================
+# METADADOS DO DOCUMENTO
+# ==============================================================================
+
+metadados:
+  documento_gerado: "Conforme governança v2.0"
+  contrato_aplicado: "CONTRATO-RF-PARA-RL"
+  data_migracao: "2025-12-31"
+  linhas_rf_md: 617
+  linhas_rf_yaml: 650  # Estimativa

@@ -1,0 +1,650 @@
+# Casos de Uso - RF030
+
+**Versão:** 1.0
+**Data:** 17/12/2025
+**RF Relacionado:** [RF030 - Gestão de Parâmetros Faturamento](./RF030.md)
+
+---
+
+## Índice de Casos de Uso
+
+| UC | Nome | Descrição |
+|----|------|-----------|
+| UC01 | Listar Layouts Importação | Exibir listagem de layouts configurados para importação |
+| UC02 | Criar Layout Importação | Criar novo layout usando builder visual drag-and-drop |
+| UC03 | Visualizar Layout Importação | Exibir detalhes completos de um layout |
+| UC04 | Editar Layout Importação | Alterar mapeamento de colunas e validações |
+| UC05 | Inativar Layout Importação | Inativar layout logicamente |
+| UC06 | Testar Layout em Sandbox | Testar layout com dados fictícios antes de produção |
+| UC07 | Gerenciar Regras Auditoria | Criar e configurar regras de auditoria de faturas |
+| UC08 | Gerenciar Templates Rateio | Criar templates reutilizáveis para rateio de custos |
+
+---
+
+## UC01 - Listar Layouts Importação
+
+### Descrição
+Exibir listagem paginada de layouts de importação configurados com filtros por operadora/fornecedor e formato.
+
+### Atores
+- Usuário autenticado com permissão de visualização
+- Administrador de sistema
+- Analista de importação
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `PARAMETROS_FAT.LISTAR_LAYOUTS`
+- Multi-tenancy: Usuário vinculado a conglomerado
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Acessa menu "Parâmetros Faturamento" → "Layouts Importação" | - |
+| 2 | - | Carrega lista paginada (20 registros/página) |
+| 3 | - | Exibe colunas: Nome Layout, Operadora/Fornecedor, Formato, Versão, Última Atualização, Status, Ações |
+| 4 | Aplica filtros (operadora, formato) | Recarrega lista com filtros aplicados |
+| 5 | Pode ordenar por coluna | Reordena resultados |
+
+### Filtros Disponíveis
+
+| Filtro | Tipo | Descrição |
+|--------|------|-----------|
+| Operadora/Fornecedor | Select | Vivo, Claro, TIM, AWS, Azure, etc. |
+| Formato | Select Multiple | CSV, Excel, XML, JSON, PDF, EDI |
+| Status | Select | Ativo, Inativo, Em Teste |
+
+### Fluxos Alternativos
+
+**FA01 - Lista Vazia**
+- **Condição:** Não existem layouts cadastrados
+- **Ação:** Sistema exibe mensagem "Nenhum layout encontrado" + botão "Criar Novo Layout"
+
+**FA02 - Filtrar por Layouts Pré-Configurados**
+- **Condição:** Usuário marca checkbox "Apenas Pré-Configurados"
+- **Ação:** Sistema exibe apenas 15+ layouts que vêm com o sistema
+
+### Exceções
+
+**EX01 - Erro de Conexão**
+- **Condição:** Falha na comunicação com servidor
+- **Ação:** Sistema exibe mensagem de erro e botão "Tentar novamente"
+
+### Pós-condições
+- Lista exibida com dados atualizados
+- Filtros persistidos na sessão do usuário
+
+### Regras de Negócio Aplicáveis
+- RN-PAR-030-15: Isolamento multi-tenancy
+- RN-PAR-030-16: Auditoria de acesso
+
+---
+
+## UC02 - Criar Layout Importação
+
+### Descrição
+Criar novo layout de importação usando builder visual drag-and-drop para mapear colunas de arquivo para campos do sistema.
+
+### Atores
+- Usuário autenticado com permissão de criação
+- Administrador de sistema
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `PARAMETROS_FAT.CRIAR_LAYOUT`
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Clica em "Novo Layout" | - |
+| 2 | - | Exibe wizard multi-step (Passo 1/5: Upload Arquivo Exemplo) |
+| 3 | Faz upload arquivo exemplo (CSV/Excel/XML) | Sistema detecta formato e estrutura automaticamente |
+| 4 | - | Passo 2/5: Sistema exibe preview das primeiras 10 linhas |
+| 5 | Marca linha de cabeçalho | Sistema identifica nomes das colunas |
+| 6 | - | Passo 3/5: Interface drag-and-drop para mapeamento |
+| 7 | Arrasta colunas arquivo → campos sistema | Sistema valida compatibilidade de tipos |
+| 8 | Define transformações (upper, trim, regex) | - |
+| 9 | - | Passo 4/5: Define regras de validação |
+| 10 | Configura validações por coluna | - |
+| 11 | - | Passo 5/5: Testa com 10 linhas amostra |
+| 12 | Revisa resultados do teste | - |
+| 13 | Clica em "Salvar Layout" | Sistema salva layout reutilizável |
+
+### Campos do Formulário
+
+**Passo 1: Informações Básicas**
+
+| Campo | Tipo | Obrigatório | Validação |
+|-------|------|-------------|-----------|
+| Nome Layout | Text | Sim | Max 200 caracteres, único |
+| Descrição | Textarea | Sim | Min 50 caracteres |
+| Operadora/Fornecedor | Select | Sim | - |
+| Formato Arquivo | Radio | Sim | CSV, Excel, XML, JSON, PDF, EDI |
+
+**Passo 2: Detecção Automática**
+- Encoding: UTF-8, ISO-8859-1, Windows-1252
+- Delimitador (CSV): `,`, `;`, `\t`, `|`
+- Linha Cabeçalho: Número da linha
+
+**Passo 3: Mapeamento Drag-and-Drop**
+
+Interface dividida em 2 painéis:
+- **Painel Esquerdo:** Colunas do arquivo exemplo
+- **Painel Direito:** Campos do sistema (Número Fatura, Data Emissão, Valor, etc.)
+
+Usuário arrasta coluna → campo para criar mapeamento.
+
+**Transformações Disponíveis por Coluna:**
+- Texto: UPPER, LOWER, TRIM, REGEX
+- Número: Remover "R$", trocar vírgula por ponto
+- Data: Converter formato (DD/MM/AAAA → ISO)
+
+**Passo 4: Validações por Coluna**
+
+| Validação | Tipo | Exemplo |
+|-----------|------|---------|
+| Tipo de Dado | Select | Texto, Número, Data, Email, CNPJ |
+| Obrigatório | Checkbox | Campo não pode ser vazio |
+| Regex | Text | ^[0-9]{14}$ (para CNPJ) |
+| Range | Number | Min 0, Max 999999.99 |
+
+**Passo 5: Teste com Amostra**
+- Sistema processa 10 primeiras linhas
+- Exibe tabela com resultado: ✅ Sucesso ou ❌ Erro + motivo
+
+### Fluxos Alternativos
+
+**FA01 - Duplicar Layout Existente**
+- **Condição:** Usuário clica em "Duplicar" em layout existente
+- **Ação:** Sistema cria cópia e abre no editor
+
+**FA02 - Usar Template Pré-Configurado**
+- **Condição:** Usuário clica em "Usar Template"
+- **Ação:** Sistema lista 15+ templates (Vivo, Claro, AWS) e carrega no editor
+
+**FA03 - Salvar Rascunho**
+- **Condição:** Usuário clica em "Salvar Rascunho" durante wizard
+- **Ação:** Sistema salva com status "Em Construção"
+
+### Exceções
+
+**EX01 - Arquivo Incompatível**
+- **Condição:** Arquivo não corresponde ao formato declarado
+- **Ação:** Sistema exibe "Arquivo incompatível com formato selecionado"
+
+**EX02 - Mapeamento Incompleto**
+- **Condição:** Campos obrigatórios não foram mapeados
+- **Ação:** Sistema bloqueia salvamento e destaca campos faltantes
+
+**EX03 - Teste Falhou >50% Linhas**
+- **Condição:** Mais de 5 linhas (de 10) falharam no teste
+- **Ação:** Sistema alerta "Revise mapeamento. >50% erros detectados."
+
+### Pós-condições
+- Layout criado com status "Ativo"
+- Versão 1.0 registrada
+- Log de auditoria registrado
+- Notificação enviada para analistas de importação
+
+### Regras de Negócio Aplicáveis
+- RN-PAR-030-01: Gerenciamento layouts flexíveis
+- RN-PAR-030-02: Builder visual drag-and-drop
+- RN-PAR-030-03: Detecção automática encoding/delimitador
+
+---
+
+## UC03 - Visualizar Layout Importação
+
+### Descrição
+Exibir detalhes completos de um layout de importação incluindo mapeamentos, transformações e histórico de uso.
+
+### Atores
+- Usuário autenticado com permissão de visualização
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `PARAMETROS_FAT.VISUALIZAR_LAYOUT`
+- Layout existe no sistema
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Clica em layout na listagem | - |
+| 2 | - | Carrega dados completos do layout |
+| 3 | - | Exibe tela com abas: Resumo, Mapeamentos, Validações, Histórico Uso |
+| 4 | Navega entre abas | Carrega conteúdo da aba selecionada |
+
+### Informações Exibidas
+
+**Aba Resumo:**
+
+| Campo | Descrição |
+|-------|-----------|
+| Nome Layout | Nome do layout |
+| Operadora/Fornecedor | Operadora vinculada |
+| Formato | CSV, Excel, XML, etc. |
+| Versão | Versão atual (ex: 2.1) |
+| Status | Ativo, Inativo, Em Teste |
+| Criado Por | Usuário que criou |
+| Última Atualização | Data última modificação |
+| Total Importações | Quantas vezes foi usado |
+
+**Aba Mapeamentos:**
+- Tabela com mapeamento coluna → campo
+- Colunas: Coluna Arquivo, Campo Sistema, Transformações Aplicadas
+
+**Aba Validações:**
+- Lista de validações por coluna
+- Colunas: Campo, Tipo Validação, Regra, Severidade
+
+**Aba Histórico Uso:**
+- Timeline de importações que usaram este layout
+- Data, Usuário, Total Linhas, % Sucesso
+
+### Fluxos Alternativos
+
+**FA01 - Editar Layout**
+- **Condição:** Usuário com permissão `PARAMETROS_FAT.EDITAR_LAYOUT` clica em "Editar"
+- **Ação:** Sistema redireciona para UC04
+
+**FA02 - Testar em Sandbox**
+- **Condição:** Usuário clica em "Testar em Sandbox"
+- **Ação:** Sistema redireciona para UC06
+
+**FA03 - Download Arquivo Exemplo**
+- **Condição:** Usuário clica em "Download Arquivo Exemplo"
+- **Ação:** Sistema gera template CSV/Excel conforme layout
+
+### Exceções
+
+**EX01 - Layout Não Encontrado**
+- **Condição:** Layout foi excluído por outro usuário
+- **Ação:** Sistema exibe mensagem e redireciona para listagem
+
+### Pós-condições
+- Acesso ao layout registrado em log de auditoria
+- Nenhuma alteração no sistema
+
+### Regras de Negócio Aplicáveis
+- RN-PAR-030-15: Multi-tenancy
+- RN-PAR-030-16: Auditoria de acesso
+
+---
+
+## UC04 - Editar Layout Importação
+
+### Descrição
+Alterar mapeamento de colunas, transformações e validações de layout. Edição gera nova versão do layout.
+
+### Atores
+- Usuário autenticado com permissão de edição
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `PARAMETROS_FAT.EDITAR_LAYOUT`
+- Layout existe no sistema
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Clica em "Editar" no layout | - |
+| 2 | - | Carrega wizard com dados preenchidos |
+| 3 | Altera mapeamentos/validações desejados | Sistema valida em tempo real |
+| 4 | Clica em "Testar Alterações" (Passo 5) | Sistema executa teste com amostra |
+| 5 | Revisa resultados do teste | - |
+| 6 | Clica em "Salvar Alterações" | - |
+| 7 | - | Incrementa versão (ex: 1.0 → 1.1) |
+| 8 | - | Salva nova versão |
+| 9 | - | Exibe mensagem de sucesso |
+
+### Fluxos Alternativos
+
+**FA01 - Cancelar Edição**
+- **Condição:** Usuário clica em "Cancelar"
+- **Ação:** Sistema descarta alterações e retorna à visualização
+
+**FA02 - Alterar Formato Arquivo**
+- **Condição:** Usuário tenta alterar formato
+- **Ação:** Sistema alerta "Alteração de formato requer criar novo layout" e bloqueia campo
+
+**FA03 - Major Version (Breaking Change)**
+- **Condição:** Alteração remove mapeamento obrigatório
+- **Ação:** Sistema incrementa major version (ex: 1.9 → 2.0)
+
+### Exceções
+
+**EX01 - Layout em Uso**
+- **Condição:** Layout está sendo usado em importação ativa
+- **Ação:** Sistema alerta "Layout em uso. Alterações entram em vigor após conclusão."
+
+**EX02 - Conflito de Edição**
+- **Condição:** Outro usuário está editando simultaneamente
+- **Ação:** Sistema exibe mensagem de bloqueio
+
+### Pós-condições
+- Layout atualizado
+- Nova versão criada
+- Versão anterior preservada (histórico completo)
+- Log de auditoria registrado
+
+### Regras de Negócio Aplicáveis
+- RN-PAR-030-04: Versionamento completo de layouts
+- RN-PAR-030-15: Multi-tenancy
+
+---
+
+## UC05 - Inativar Layout Importação
+
+### Descrição
+Inativar layout logicamente (soft delete). Layout inativado não pode ser usado em novas importações mas histórico é preservado.
+
+### Atores
+- Usuário autenticado com permissão de exclusão
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `PARAMETROS_FAT.INATIVAR_LAYOUT`
+- Layout existe e não está em uso
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Clica em "Inativar" no layout | - |
+| 2 | - | Exibe diálogo "Deseja realmente inativar este layout? Ele não poderá ser usado em novas importações." |
+| 3 | Confirma inativação | - |
+| 4 | - | Marca layout como inativo (Fl_Excluido = true) |
+| 5 | - | Exibe mensagem de sucesso |
+
+### Fluxos Alternativos
+
+**FA01 - Cancelar Inativação**
+- **Condição:** Usuário cancela no diálogo
+- **Ação:** Sistema fecha diálogo e mantém layout ativo
+
+### Exceções
+
+**EX01 - Layout em Uso**
+- **Condição:** Layout está sendo usado em importação ativa
+- **Ação:** Sistema bloqueia inativação e exibe "Aguarde conclusão de importações ativas"
+
+**EX02 - Layout Já Inativo**
+- **Condição:** Layout já foi inativado
+- **Ação:** Sistema exibe mensagem informativa
+
+### Pós-condições
+- Layout inativado (soft delete)
+- Histórico de importações preservado
+- Log de auditoria registrado
+
+### Regras de Negócio Aplicáveis
+- RN-PAR-030-14: Soft delete com retenção histórico
+- RN-PAR-030-16: Auditoria
+
+---
+
+## UC06 - Testar Layout em Sandbox
+
+### Descrição
+Testar layout com dados fictícios em ambiente seguro ANTES de usar em produção.
+
+### Atores
+- Usuário autenticado
+- Administrador de sistema
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `PARAMETROS_FAT.TESTAR_LAYOUT`
+- Layout existe no sistema
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Clica em "Testar em Sandbox" no layout | - |
+| 2 | - | Exibe formulário de teste |
+| 3 | Faz upload arquivo teste | Sistema valida formato |
+| 4 | Clica em "Executar Teste (Dry-Run)" | - |
+| 5 | - | Processa arquivo em memória (não grava banco) |
+| 6 | - | Exibe resultados: X linhas processadas, Y sucesso, Z erros |
+| 7 | - | Exibe preview de dados que seriam importados |
+| 8 | - | Exibe log detalhado de erros de validação |
+| 9 | Analisa resultados | - |
+| 10 | Pode ajustar layout e testar novamente | Sistema repete processo |
+
+### Resultados do Teste
+
+**Resumo:**
+- Total Linhas Processadas
+- Total Linhas Válidas
+- Total Linhas com Erros
+- % Taxa Sucesso
+
+**Preview Dados:**
+- Tabela com 10 primeiras linhas válidas
+- Exibe como dados aparecerão após importação
+
+**Log de Erros:**
+- Lista de erros por linha
+- Colunas: Linha, Campo, Erro, Valor Recebido, Valor Esperado
+
+### Fluxos Alternativos
+
+**FA01 - Download Log Erros**
+- **Condição:** Usuário clica em "Download Log Erros"
+- **Ação:** Sistema gera Excel com todas as linhas com erro + detalhes
+
+**FA02 - Editar Layout Após Teste**
+- **Condição:** Teste identifica erros de mapeamento
+- **Ação:** Usuário clica em "Ajustar Layout" e sistema abre UC04
+
+### Exceções
+
+**EX01 - Arquivo Muito Grande**
+- **Condição:** Arquivo >50MB
+- **Ação:** Sistema limita teste às primeiras 1.000 linhas
+
+**EX02 - Erro Crítico**
+- **Condição:** Layout possui erro estrutural (ex: fórmula inválida)
+- **Ação:** Sistema interrompe teste e exibe erro
+
+### Pós-condições
+- Teste executado sem alterar banco de dados
+- Resultados disponíveis para revisão
+- Log de teste registrado em auditoria
+
+### Regras de Negócio Aplicáveis
+- RN-PAR-030-05: Simulador de importação (sandbox)
+- RN-PAR-030-06: In-Memory Database para testes
+
+---
+
+## UC07 - Gerenciar Regras Auditoria
+
+### Descrição
+Criar e configurar regras de auditoria que são executadas automaticamente em faturas importadas.
+
+### Atores
+- Usuário autenticado
+- Auditor financeiro
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `PARAMETROS_FAT.GERENCIAR_REGRAS`
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Acessa "Parâmetros Faturamento" → "Regras Auditoria" | - |
+| 2 | - | Lista 50+ regras (25+ pré-configuradas + customizadas) |
+| 3 | Clica em "Nova Regra" | - |
+| 4 | - | Exibe formulário de criação |
+| 5 | Preenche campos da regra | Sistema valida expressão |
+| 6 | Testa regra com dados exemplo | Sistema executa teste |
+| 7 | Clica em "Salvar Regra" | Sistema salva e ativa |
+
+### Campos do Formulário
+
+| Campo | Tipo | Obrigatório | Validação |
+|-------|------|-------------|-----------|
+| Nome Regra | Text | Sim | Max 200 caracteres, único |
+| Descrição | Textarea | Sim | Min 50 caracteres |
+| Categoria | Select | Sim | Glosa, Duplicidade, Irregularidade, Alerta |
+| Severidade | Select | Sim | Informativa, Alerta, Bloqueante |
+| Condição (Expressão) | Textarea | Sim | Sintaxe NCalc (ex: "ValorFatura > 10000 AND SemAnexo") |
+| Mensagem Alerta | Text | Sim | Mensagem exibida quando regra viola |
+| Aplicar a Operadoras | Multi-select | Não | Se vazio, aplica a todas |
+
+### Regras Pré-Configuradas (Exemplos)
+
+| Nome Regra | Condição | Severidade |
+|------------|----------|-----------|
+| Linha sem contrato | LinhaId NOT IN ContratoLinhas | Bloqueante |
+| Valor >15% média | ValorFatura > (MediaHistorica * 1.15) | Alerta |
+| Serviço cancelado | ServicoId IN ServicosCancelados | Bloqueante |
+| Roaming não autorizado | RoamingInternacional AND NOT Autorizado | Alerta |
+| Duplicidade | COUNT(NumeroFatura, Operadora) > 1 | Bloqueante |
+
+### Fluxos Alternativos
+
+**FA01 - Usar Regra Pré-Configurada**
+- **Condição:** Usuário clica em "Ativar" em regra pré-configurada
+- **Ação:** Sistema ativa regra imediatamente
+
+**FA02 - Desativar Regra**
+- **Condição:** Usuário clica em "Desativar" em regra ativa
+- **Ação:** Sistema desativa regra (não exclui, apenas para de executar)
+
+**FA03 - Testar Regra**
+- **Condição:** Usuário clica em "Testar Regra"
+- **Ação:** Sistema executa regra contra faturas existentes e exibe quantas seriam afetadas
+
+### Exceções
+
+**EX01 - Expressão Inválida**
+- **Condição:** Sintaxe NCalc incorreta
+- **Ação:** Sistema exibe "Erro de sintaxe" + exemplo correto
+
+**EX02 - Regra Conflitante**
+- **Condição:** Nova regra contradiz regra existente
+- **Ação:** Sistema alerta mas permite salvar
+
+### Pós-condições
+- Regra criada/atualizada
+- Regra executada automaticamente em próximas importações
+- Log de auditoria registrado
+
+### Regras de Negócio Aplicáveis
+- RN-PAR-030-07: Biblioteca 50+ regras configuráveis
+- RN-PAR-030-08: Expression Engine (NCalc)
+- RN-PAR-030-09: Severidades (Informativa, Alerta, Bloqueante)
+
+---
+
+## UC08 - Gerenciar Templates Rateio
+
+### Descrição
+Criar templates reutilizáveis para distribuição automática de custos de faturas.
+
+### Atores
+- Usuário autenticado
+- Controller financeiro
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `PARAMETROS_FAT.GERENCIAR_TEMPLATES_RATEIO`
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Acessa "Parâmetros Faturamento" → "Templates Rateio" | - |
+| 2 | - | Lista templates existentes |
+| 3 | Clica em "Novo Template" | - |
+| 4 | - | Exibe formulário de criação |
+| 5 | Preenche informações básicas | - |
+| 6 | Define dimensões rateio (Centro Custo, Depto, Projeto) | - |
+| 7 | Configura tipo rateio (Fixo, Variável, Misto) | - |
+| 8 | Define percentuais/regras | Sistema valida soma = 100% |
+| 9 | Testa template com fatura exemplo | Sistema calcula rateio simulado |
+| 10 | Clica em "Salvar Template" | Sistema salva para reutilizar |
+
+### Campos do Formulário
+
+**Seção 1: Informações Básicas**
+
+| Campo | Tipo | Obrigatório | Validação |
+|-------|------|-------------|-----------|
+| Nome Template | Text | Sim | Max 200 caracteres, único |
+| Descrição | Textarea | Sim | Min 50 caracteres |
+| Categoria | Select | Sim | Centro Custo, Departamento, Projeto, Geolocalização, Misto |
+
+**Seção 2: Dimensões de Rateio**
+
+| Campo | Tipo | Obrigatório | Validação |
+|-------|------|-------------|-----------|
+| Dimensão 1 | Select | Sim | Centro Custo, Departamento, Projeto, etc. |
+| Dimensão 2 | Select | Não | Diferente de Dimensão 1 |
+| Dimensão 3 | Select | Não | Diferente de 1 e 2 |
+
+**Seção 3: Tipo Rateio**
+
+| Tipo | Descrição | Exemplo |
+|------|-----------|---------|
+| Fixo (%) | Percentuais fixos pré-definidos | CC1=40%, CC2=35%, CC3=25% |
+| Variável (Proporcional) | Distribui proporcionalmente a métrica | Proporcional ao consumo de cada CC |
+| Escalonado | Faixas de valor com % diferentes | Até R$10k=50/50, Acima=60/40 |
+| Misto | Combina fixo + variável | 50% fixo + 50% proporcional consumo |
+
+**Seção 4: Configuração por Dimensão**
+
+Para cada dimensão, tabela com:
+- Item (ex: Centro Custo "Marketing")
+- % Fixo (se tipo Fixo/Misto)
+- Métrica (se tipo Variável) - ex: "Consumo Linhas"
+
+### Fluxos Alternativos
+
+**FA01 - Usar Template Pré-Configurado**
+- **Condição:** Usuário clica em "Templates Padrão"
+- **Ação:** Sistema lista templates comuns (ex: "Rateio Igualitário 3 CCs") e carrega no editor
+
+**FA02 - Duplicar Template Existente**
+- **Condição:** Usuário clica em "Duplicar" em template
+- **Ação:** Sistema cria cópia e abre no editor
+
+**FA03 - Simular Rateio**
+- **Condição:** Usuário clica em "Simular" durante criação
+- **Ação:** Sistema permite escolher fatura exemplo e exibe preview do rateio calculado
+
+### Exceções
+
+**EX01 - Soma Percentuais ≠ 100%**
+- **Condição:** Tipo Fixo e soma ≠ 100%
+- **Ação:** Sistema bloqueia salvamento e exibe erro
+
+**EX02 - Dimensão Sem Itens**
+- **Condição:** Usuário não definiu itens para rateio
+- **Ação:** Sistema bloqueia salvamento e solicita definir itens
+
+### Pós-condições
+- Template criado e disponível para reutilizar
+- Template pode ser usado em RF026-UC06 (Ratear Fatura)
+- Log de auditoria registrado
+
+### Regras de Negócio Aplicáveis
+- RN-PAR-030-10: Templates de rateio configuráveis
+- RN-PAR-030-11: 4 tipos de rateio (Fixo, Variável, Escalonado, Misto)
+- RN-PAR-030-12: Motor multi-dimensional (até 5 dimensões)
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 17/12/2025 | Architect Agent | Versão inicial com 8 casos de uso completos |

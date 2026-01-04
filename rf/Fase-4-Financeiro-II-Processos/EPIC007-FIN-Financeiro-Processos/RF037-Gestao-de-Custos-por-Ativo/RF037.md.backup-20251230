@@ -1,0 +1,1100 @@
+# RF037 - Gestão de Custos por Ativo (TCO - Total Cost of Ownership)
+
+**EPIC:** EPIC003-GES - Gestão
+**Fase:** Fase 2 - Serviços Essenciais
+**Requisito Funcional:** RF037
+**Responsável pela Especificação:** Architect Agent
+**Data de Criação:** 2025-12-17
+**Última Atualização:** 2025-12-17
+**Versão:** 1.0
+
+---
+
+## SEÇÃO 1: RESUMO EXECUTIVO
+
+### 1.1. Visão Geral
+
+O **RF037 - Gestão de Custos por Ativo** implementa um sistema completo de TCO (Total Cost of Ownership) para rastreamento, análise e otimização de todos os custos associados a ativos específicos ao longo de seu ciclo de vida. Este módulo é essencial para decisões estratégicas de aquisição, manutenção, renovação ou descarte de ativos.
+
+O sistema gerencia custos de aquisição, licenciamento, manutenção preventiva e corretiva, depreciação, consumo (energia, papel, toner), suporte técnico e treinamento. Permite análise de ROI (Return on Investment), comparação de TCO entre ativos similares e identificação de ativos com custos acima da média.
+
+### 1.2. Importância Estratégica
+
+**Valor de Negócio:**
+- **TCO Completo:** Visão 360° de todos os custos diretos e indiretos de cada ativo
+- **Decisões Baseadas em Dados:** Substituir ou manter? Alugar ou comprar? ROI positivo ou negativo?
+- **Otimização de Gastos:** Identificação de ativos com custos elevados e oportunidades de economia
+- **Planejamento Orçamentário:** Previsão de custos futuros baseada em histórico e tendências
+
+**Impacto Operacional:**
+- Reduz custos totais através de decisões informadas sobre ciclo de vida de ativos
+- Facilita negociações com fornecedores usando dados históricos de TCO
+- Melhora planejamento de substituição de ativos (refresh cycles)
+- Identifica ativos "problem children" que geram custos excessivos
+
+### 1.3. Comparação: Sistema Legado vs. Sistema Modernizado
+
+| Aspecto | Sistema Legado (ASP.NET Web Forms) | Sistema Modernizado (.NET 10 + Angular 19) |
+|---------|-----------------------------------|---------------------------------------------|
+| **Arquitetura** | Monolítica, custos dispersos em múltiplas tabelas | Clean Architecture, CQRS, agregação automática de custos |
+| **Interface** | Formulários básicos sem visão consolidada | Dashboard interativo com gráficos de TCO e ROI |
+| **Cálculo de TCO** | Manual, sem automação | Cálculo automático em tempo real com Domain Events |
+| **Depreciação** | Sem controle de depreciação | Cálculo automático por método linear ou acelerado |
+| **ROI** | Sem análise de ROI | Cálculo automático de ROI com projeções |
+| **Comparações** | Sem comparação entre ativos | Benchmarking automático entre ativos similares |
+| **Alertas** | Sem sistema de alertas | Alertas de custos acima da média ou ROI negativo |
+| **Auditoria** | Sem rastreamento de alterações | Auditoria completa de todas operações (7 anos LGPD) |
+| **Multi-tenancy** | Filtros manuais por empresa | Row-Level Security automático por conglomerado |
+| **Permissões** | Controle básico por perfil | RBAC granular com políticas por operação |
+| **Performance** | Queries lentas, sem agregação | Materialized views, caching, agregação otimizada |
+
+### 1.4. Principais Funcionalidades
+
+1. **Registro de Custos por Categoria**
+   - Custo de aquisição (CAPEX)
+   - Custos operacionais (OPEX): licenças, manutenção, suporte
+   - Consumíveis (toner, papel, peças)
+   - Energia elétrica
+   - Depreciação
+
+2. **Cálculo Automático de TCO**
+   - Soma de todos os custos diretos e indiretos
+   - Atualização em tempo real ao adicionar novos custos
+   - TCO por período (mensal, anual, total)
+   - TCO unitário (por usuário, por página, por hora)
+
+3. **Análise de ROI**
+   - Comparação custo total vs. benefício gerado
+   - Payback period (tempo para recuperar investimento)
+   - Projeção de ROI futuro
+   - Recomendação de substituição se ROI < 0
+
+4. **Depreciação Automática**
+   - Cálculo mensal por método linear ou acelerado
+   - Vida útil configurável por tipo de ativo
+   - Valor residual ao fim da vida útil
+   - Relatório de depreciação para contabilidade
+
+5. **Comparação entre Ativos**
+   - Benchmarking de TCO entre ativos do mesmo tipo
+   - Ranking de ativos mais e menos custosos
+   - Identificação de outliers (custos anormais)
+   - Análise de eficiência de custo
+
+6. **Dashboard de TCO**
+   - Gráfico de evolução de custos ao longo do tempo
+   - Breakdown de custos por categoria (pizza chart)
+   - Top 10 ativos com maior TCO
+   - Indicadores de ROI positivo/negativo
+
+### 1.5. Escopo
+
+**Incluído neste RF:**
+- ✅ CRUD completo de custos associados a ativos
+- ✅ Cálculo automático de TCO em tempo real
+- ✅ Sistema de depreciação com métodos linear e acelerado
+- ✅ Análise de ROI e payback period
+- ✅ Dashboard de TCO com gráficos interativos
+- ✅ Comparação e benchmarking entre ativos
+- ✅ Interface responsiva com Angular Material
+- ✅ Integração com ativos, fornecedores e contratos
+
+**Não incluído neste RF:**
+- ❌ Integração com sistema de contabilidade externo (será RF futuro)
+- ❌ Cálculo de impostos sobre ativos
+- ❌ Gestão de garantias (módulo específico)
+- ❌ Análise preditiva de falhas (IA/ML - fase futura)
+
+---
+
+## SEÇÃO 2: REGRAS DE NEGÓCIO
+
+### RN001 - Campos Obrigatórios no Registro de Custo
+
+**Descrição:**
+Todo custo associado a ativo deve ter ativo, tipo de custo, valor, data de ocorrência e categoria obrigatórios.
+
+**Justificativa:**
+Garante informações mínimas para cálculo preciso de TCO e análises.
+
+**Implementação:**
+```csharp
+public class CreateCustoAtivoCommandValidator : AbstractValidator<CreateCustoAtivoCommand>
+{
+    public CreateCustoAtivoCommandValidator(IApplicationDbContext context)
+    {
+        RuleFor(x => x.AtivoId)
+            .NotEmpty().WithMessage("Ativo é obrigatório")
+            .MustAsync(async (ativoId, cancellation) =>
+            {
+                var ativo = await context.Ativos
+                    .FirstOrDefaultAsync(a => a.Id == ativoId && !a.FlExcluido, cancellation);
+                return ativo != null;
+            })
+            .WithMessage("Ativo inválido ou inativo");
+
+        RuleFor(x => x.TipoCustoAtivoId)
+            .NotEmpty().WithMessage("Tipo de custo é obrigatório");
+
+        RuleFor(x => x.Valor)
+            .GreaterThan(0).WithMessage("Valor deve ser maior que zero");
+
+        RuleFor(x => x.DataOcorrencia)
+            .NotEmpty().WithMessage("Data de ocorrência é obrigatória")
+            .LessThanOrEqualTo(DateTime.Now).WithMessage("Data não pode ser futura");
+
+        RuleFor(x => x.Categoria)
+            .IsInEnum().WithMessage("Categoria de custo inválida");
+    }
+}
+```
+
+---
+
+### RN002 - Cálculo Automático de TCO ao Adicionar Custo
+
+**Descrição:**
+Sempre que um custo é adicionado, editado ou removido, o TCO total do ativo deve ser recalculado automaticamente.
+
+**Justificativa:**
+Mantém TCO sempre atualizado em tempo real para análises precisas.
+
+**Implementação:**
+```csharp
+public class CustoAtivoCriadoDomainEvent : INotification
+{
+    public Guid AtivoId { get; }
+    public decimal ValorAdicionado { get; }
+
+    public CustoAtivoCriadoDomainEvent(Guid ativoId, decimal valorAdicionado)
+    {
+        AtivoId = ativoId;
+        ValorAdicionado = valorAdicionado;
+    }
+}
+
+public class RecalcularTCOEventHandler : INotificationHandler<CustoAtivoCriadoDomainEvent>
+{
+    public async Task Handle(CustoAtivoCriadoDomainEvent notification, CancellationToken cancellationToken)
+    {
+        var ativo = await _context.Ativos
+            .Include(a => a.CustosAtivo)
+            .FirstOrDefaultAsync(a => a.Id == notification.AtivoId, cancellationToken);
+
+        // Calcular TCO total
+        var tcoTotal = ativo.CustosAtivo
+            .Where(c => !c.FlExcluido)
+            .Sum(c => c.Valor);
+
+        // Calcular TCO por categoria
+        var tcoPorCategoria = ativo.CustosAtivo
+            .Where(c => !c.FlExcluido)
+            .GroupBy(c => c.Categoria)
+            .ToDictionary(g => g.Key, g => g.Sum(c => c.Valor));
+
+        // Atualizar ativo
+        ativo.TCOTotal = tcoTotal;
+        ativo.TCOAquisicao = tcoPorCategoria.GetValueOrDefault(CustoCategoriaEnum.Aquisicao, 0);
+        ativo.TCOManutencao = tcoPorCategoria.GetValueOrDefault(CustoCategoriaEnum.Manutencao, 0);
+        ativo.TCOLicencas = tcoPorCategoria.GetValueOrDefault(CustoCategoriaEnum.Licencas, 0);
+        ativo.TCOConsumiveis = tcoPorCategoria.GetValueOrDefault(CustoCategoriaEnum.Consumiveis, 0);
+        ativo.TCODepreciacao = tcoPorCategoria.GetValueOrDefault(CustoCategoriaEnum.Depreciacao, 0);
+        ativo.DataUltimaAtualizacaoTCO = DateTime.Now;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("TCO recalculado para ativo {AtivoId}: R$ {TCO}", ativo.Id, tcoTotal);
+    }
+}
+```
+
+---
+
+### RN003 - Depreciação Automática Mensal
+
+**Descrição:**
+No primeiro dia de cada mês, o sistema deve calcular e registrar a depreciação de todos os ativos depreciáveis.
+
+**Justificativa:**
+Mantém valor contábil atualizado e custos de depreciação no TCO.
+
+**Implementação:**
+```csharp
+public class CalcularDepreciacaoAtivosJob : IJob
+{
+    public async Task Execute(IJobExecutionContext context)
+    {
+        var ativosDepreciaveis = await _context.Ativos
+            .Where(a => a.FlDepreciavel
+                     && !a.FlDepreciadoTotalmente
+                     && a.DataAquisicao.HasValue
+                     && !a.FlExcluido)
+            .Include(a => a.TipoAtivo)
+            .ToListAsync();
+
+        foreach (var ativo in ativosDepreciaveis)
+        {
+            var mesAtual = DateTime.Now;
+
+            // Verificar se já foi depreciado neste mês
+            var jaDepreciadoNesteMes = await _context.CustosAtivo
+                .AnyAsync(c => c.AtivoId == ativo.Id
+                            && c.Categoria == CustoCategoriaEnum.Depreciacao
+                            && c.DataOcorrencia.Year == mesAtual.Year
+                            && c.DataOcorrencia.Month == mesAtual.Month
+                            && !c.FlExcluido);
+
+            if (jaDepreciadoNesteMes) continue;
+
+            // Calcular depreciação mensal
+            var vidaUtilMeses = ativo.TipoAtivo.VidaUtilAnos * 12;
+            var valorDepreciavelTotal = ativo.ValorAquisicao - ativo.ValorResidual;
+            var depreciacaoMensal = valorDepreciavelTotal / vidaUtilMeses;
+
+            // Verificar se atingiu valor residual
+            var depreciacaoAcumulada = ativo.TCODepreciacao;
+            if (depreciacaoAcumulada + depreciacaoMensal > valorDepreciavelTotal)
+            {
+                depreciacaoMensal = valorDepreciavelTotal - depreciacaoAcumulada;
+                ativo.FlDepreciadoTotalmente = true;
+            }
+
+            // Criar lançamento de depreciação
+            var custoDepreciacao = new CustoAtivo
+            {
+                AtivoId = ativo.Id,
+                TipoCustoAtivoId = Guid.Parse("00000000-0000-0000-0000-000000000001"), // Tipo "Depreciação"
+                Categoria = CustoCategoriaEnum.Depreciacao,
+                Valor = depreciacaoMensal,
+                DataOcorrencia = mesAtual,
+                Descricao = $"Depreciação mensal - {mesAtual:MM/yyyy}",
+                FlDepreciacaoAutomatica = true
+            };
+
+            _context.CustosAtivo.Add(custoDepreciacao);
+
+            _logger.LogInformation("Depreciação calculada para ativo {AtivoId}: R$ {Valor}",
+                ativo.Id, depreciacaoMensal);
+        }
+
+        await _context.SaveChangesAsync();
+    }
+}
+```
+
+---
+
+### RN004 - Cálculo de ROI (Return on Investment)
+
+**Descrição:**
+O sistema deve calcular ROI do ativo comparando benefícios gerados (receita, economia) vs. custos totais (TCO).
+
+**Justificativa:**
+Permite decisões baseadas em retorno financeiro real do ativo.
+
+**Implementação:**
+```csharp
+public class CalcularROIAtivoQuery : IRequest<ROIDto>
+{
+    public Guid AtivoId { get; init; }
+}
+
+public async Task<ROIDto> Handle(CalcularROIAtivoQuery request, CancellationToken cancellationToken)
+{
+    var ativo = await _context.Ativos
+        .Include(a => a.CustosAtivo)
+        .Include(a => a.BeneficiosAtivo)
+        .FirstOrDefaultAsync(a => a.Id == request.AtivoId, cancellationToken);
+
+    // TCO total (todos os custos)
+    var tcoTotal = ativo.CustosAtivo
+        .Where(c => !c.FlExcluido)
+        .Sum(c => c.Valor);
+
+    // Benefícios totais (receita gerada, economia)
+    var beneficiosTotal = ativo.BeneficiosAtivo
+        .Where(b => !b.FlExcluido)
+        .Sum(b => b.Valor);
+
+    // ROI = ((Benefícios - Custos) / Custos) * 100
+    var roi = tcoTotal > 0
+        ? ((beneficiosTotal - tcoTotal) / tcoTotal * 100)
+        : 0;
+
+    // Payback Period (meses para recuperar investimento)
+    var idadeAtivoMeses = ativo.DataAquisicao.HasValue
+        ? (int)((DateTime.Now - ativo.DataAquisicao.Value).TotalDays / 30)
+        : 0;
+
+    var beneficioMedioMensal = idadeAtivoMeses > 0
+        ? beneficiosTotal / idadeAtivoMeses
+        : 0;
+
+    var paybackPeriodMeses = beneficioMedioMensal > 0
+        ? (int)Math.Ceiling(tcoTotal / beneficioMedioMensal)
+        : 999; // Nunca recupera
+
+    return new ROIDto
+    {
+        TCOTotal = tcoTotal,
+        BeneficiosTotal = beneficiosTotal,
+        ROIPercentual = roi,
+        PaybackPeriodMeses = paybackPeriodMeses,
+        StatusROI = roi >= 0 ? "Positivo" : "Negativo",
+        Recomendacao = roi < -20 ? "Considerar substituição do ativo" :
+                       roi < 0 ? "Monitorar desempenho" :
+                       roi < 20 ? "ROI moderado" :
+                       "Ótimo investimento"
+    };
+}
+```
+
+---
+
+### RN005 - Alertas de Custos Acima da Média
+
+**Descrição:**
+O sistema deve alertar quando o TCO de um ativo ultrapassar 30% da média de ativos do mesmo tipo.
+
+**Justificativa:**
+Identifica ativos problemáticos que podem necessitar manutenção ou substituição.
+
+**Implementação:**
+```csharp
+public class VerificarCustosAcimaDaMediaJob : IJob
+{
+    public async Task Execute(IJobExecutionContext context)
+    {
+        var tiposAtivo = await _context.TiposAtivo.ToListAsync();
+
+        foreach (var tipoAtivo in tiposAtivo)
+        {
+            var ativosMesmoTipo = await _context.Ativos
+                .Where(a => a.TipoAtivoId == tipoAtivo.Id
+                         && !a.FlExcluido
+                         && a.Status == AtivoStatus.Ativo)
+                .ToListAsync();
+
+            if (ativosMesmoTipo.Count < 3) continue; // Dados insuficientes
+
+            // Calcular média de TCO
+            var mediaTCO = ativosMesmoTipo.Average(a => a.TCOTotal);
+            var limiteAlerta = mediaTCO * 1.30m; // 30% acima da média
+
+            // Identificar ativos acima do limite
+            var ativosAcimaDaMedia = ativosMesmoTipo
+                .Where(a => a.TCOTotal > limiteAlerta)
+                .ToList();
+
+            foreach (var ativo in ativosAcimaDaMedia)
+            {
+                var percentualAcima = ((ativo.TCOTotal - mediaTCO) / mediaTCO * 100);
+
+                ativo.FlCustoAcimaDaMedia = true;
+                ativo.PercentualAcimaMedia = percentualAcima;
+
+                await _notificacaoService.EnviarAlerta(
+                    ativo.UsuarioResponsavelId,
+                    $"Ativo '{ativo.Nome}' com custo {percentualAcima:F2}% acima da média do tipo '{tipoAtivo.Nome}'",
+                    TipoAlerta.Aviso);
+
+                _logger.LogWarning("Custo acima da média: Ativo {AtivoId} - TCO: R$ {TCO} (Média: R$ {Media})",
+                    ativo.Id, ativo.TCOTotal, mediaTCO);
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+}
+```
+
+---
+
+### RN006 - Vinculação a Ordem de Serviço ou Contrato
+
+**Descrição:**
+Custos de manutenção devem ser vinculados a ordens de serviço. Custos de licenças devem ser vinculados a contratos.
+
+**Justificativa:**
+Rastreabilidade completa de origem dos custos.
+
+**Implementação:**
+```csharp
+public class CustoAtivo
+{
+    public Guid? OrdemServicoId { get; set; }
+    public OrdemServico? OrdemServico { get; set; }
+
+    public Guid? ContratoId { get; set; }
+    public Contrato? Contrato { get; set; }
+}
+
+// Validação
+RuleFor(x => x.OrdemServicoId)
+    .NotEmpty()
+    .When(x => x.Categoria == CustoCategoriaEnum.Manutencao)
+    .WithMessage("Custos de manutenção devem ser vinculados a uma ordem de serviço");
+
+RuleFor(x => x.ContratoId)
+    .NotEmpty()
+    .When(x => x.Categoria == CustoCategoriaEnum.Licencas)
+    .WithMessage("Custos de licenças devem ser vinculados a um contrato");
+```
+
+---
+
+### RN007 - Categorização de Custos (CAPEX vs. OPEX)
+
+**Descrição:**
+Custos devem ser categorizados como CAPEX (Capital Expenditure) ou OPEX (Operational Expenditure) para fins contábeis.
+
+**Justificativa:**
+Diferenciação contábil entre investimentos e despesas operacionais.
+
+**Implementação:**
+```csharp
+public enum CustoCategoriaEnum
+{
+    Aquisicao = 1,      // CAPEX
+    Manutencao = 2,     // OPEX
+    Licencas = 3,       // OPEX
+    Consumiveis = 4,    // OPEX
+    Energia = 5,        // OPEX
+    Depreciacao = 6,    // Contábil
+    Suporte = 7,        // OPEX
+    Treinamento = 8     // OPEX
+}
+
+public class CustoAtivo
+{
+    public string TipoCusto
+    {
+        get
+        {
+            return Categoria == CustoCategoriaEnum.Aquisicao ? "CAPEX" : "OPEX";
+        }
+    }
+}
+```
+
+---
+
+### RN008 - Projeção de Custos Futuros
+
+**Descrição:**
+O sistema deve projetar custos futuros baseado em média histórica dos últimos 12 meses.
+
+**Justificativa:**
+Facilita planejamento orçamentário e decisões de substituição.
+
+**Implementação:**
+```csharp
+public class ProjetarCustosFuturosQuery : IRequest<ProjecaoCustosDto>
+{
+    public Guid AtivoId { get; init; }
+    public int MesesProjecao { get; init; } = 12;
+}
+
+public async Task<ProjecaoCustosDto> Handle(ProjetarCustosFuturosQuery request, CancellationToken cancellationToken)
+{
+    var dozeMesesAtras = DateTime.Now.AddMonths(-12);
+
+    // Buscar custos dos últimos 12 meses
+    var custosHistoricos = await _context.CustosAtivo
+        .Where(c => c.AtivoId == request.AtivoId
+                 && c.DataOcorrencia >= dozeMesesAtras
+                 && !c.FlExcluido)
+        .GroupBy(c => c.Categoria)
+        .Select(g => new
+        {
+            Categoria = g.Key,
+            MediaMensal = g.Sum(c => c.Valor) / 12
+        })
+        .ToListAsync(cancellationToken);
+
+    // Projetar custos futuros
+    var projecao = new Dictionary<CustoCategoriaEnum, decimal>();
+
+    foreach (var custoHistorico in custosHistoricos)
+    {
+        var projecaoCategoria = custoHistorico.MediaMensal * request.MesesProjecao;
+        projecao.Add(custoHistorico.Categoria, projecaoCategoria);
+    }
+
+    return new ProjecaoCustosDto
+    {
+        MesesProjecao = request.MesesProjecao,
+        ProjecaoPorCategoria = projecao,
+        TCOProjetadoTotal = projecao.Values.Sum(),
+        BaseadoEmMeses = 12
+    };
+}
+```
+
+---
+
+### RN009 - Comparação entre Ativos (Benchmarking)
+
+**Descrição:**
+O sistema deve permitir comparação de TCO entre múltiplos ativos do mesmo tipo para benchmarking.
+
+**Justificativa:**
+Identifica ativos com melhor e pior custo-benefício.
+
+**Implementação:**
+```csharp
+public class CompararTCOAtivosQuery : IRequest<ComparacaoTCODto>
+{
+    public Guid TipoAtivoId { get; init; }
+}
+
+public async Task<ComparacaoTCODto> Handle(CompararTCOAtivosQuery request, CancellationToken cancellationToken)
+{
+    var ativos = await _context.Ativos
+        .Where(a => a.TipoAtivoId == request.TipoAtivoId
+                 && !a.FlExcluido
+                 && a.Status == AtivoStatus.Ativo)
+        .Select(a => new AtivoTCODto
+        {
+            AtivoId = a.Id,
+            Nome = a.Nome,
+            TCOTotal = a.TCOTotal,
+            TCOMensal = a.DataAquisicao.HasValue
+                ? a.TCOTotal / Math.Max(1, (int)((DateTime.Now - a.DataAquisicao.Value).TotalDays / 30))
+                : 0,
+            IdadeMeses = a.DataAquisicao.HasValue
+                ? (int)((DateTime.Now - a.DataAquisicao.Value).TotalDays / 30)
+                : 0
+        })
+        .ToListAsync(cancellationToken);
+
+    var mediaTCOTotal = ativos.Average(a => a.TCOTotal);
+    var mediaTCOMensal = ativos.Average(a => a.TCOMensal);
+
+    // Classificar ativos
+    foreach (var ativo in ativos)
+    {
+        ativo.VariacaoPercentualMedia = ((ativo.TCOTotal - mediaTCOTotal) / mediaTCOTotal * 100);
+        ativo.Classificacao = ativo.TCOTotal <= mediaTCOTotal * 0.8m ? "Econômico" :
+                              ativo.TCOTotal <= mediaTCOTotal * 1.2m ? "Normal" :
+                              "Custoso";
+    }
+
+    return new ComparacaoTCODto
+    {
+        MediaTCOTotal = mediaTCOTotal,
+        MediaTCOMensal = mediaTCOMensal,
+        Ativos = ativos.OrderByDescending(a => a.TCOTotal).ToList(),
+        Top3MaisCustosos = ativos.OrderByDescending(a => a.TCOTotal).Take(3).ToList(),
+        Top3MaisEconomicos = ativos.OrderBy(a => a.TCOTotal).Take(3).ToList()
+    };
+}
+```
+
+---
+
+### RN010 - Validação de Data de Ocorrência
+
+**Descrição:**
+A data de ocorrência do custo não pode ser anterior à data de aquisição do ativo.
+
+**Justificativa:**
+Evita lançamentos inválidos de custos antes do ativo existir.
+
+**Implementação:**
+```csharp
+RuleFor(x => x)
+    .MustAsync(async (command, cancellation) =>
+    {
+        var ativo = await context.Ativos.FindAsync(command.AtivoId);
+
+        if (!ativo.DataAquisicao.HasValue) return true;
+
+        return command.DataOcorrencia >= ativo.DataAquisicao.Value.Date;
+    })
+    .WithMessage("Data de ocorrência não pode ser anterior à data de aquisição do ativo");
+```
+
+---
+
+### RN011 - Soft Delete com Recalculo de TCO
+
+**Descrição:**
+Ao excluir um custo, usar soft delete e recalcular TCO automaticamente.
+
+**Justificativa:**
+Mantém histórico para auditoria e garante TCO sempre correto.
+
+**Implementação:**
+```csharp
+public async Task<Unit> Handle(DeleteCustoAtivoCommand request, CancellationToken cancellationToken)
+{
+    var custo = await _context.CustosAtivo
+        .Include(c => c.Ativo)
+        .FirstOrDefaultAsync(c => c.Id == request.Id, cancellationToken);
+
+    custo.FlExcluido = true; // Soft delete
+
+    await _context.SaveChangesAsync(cancellationToken);
+
+    // Disparar evento de recalculo de TCO
+    custo.AddDomainEvent(new TCODeveSRecalculadoDomainEvent(custo.AtivoId));
+
+    return Unit.Value;
+}
+```
+
+---
+
+### RN012 - Dashboard de TCO por Período
+
+**Descrição:**
+O sistema deve permitir visualização de TCO agregado por períodos: mensal, trimestral, anual.
+
+**Justificativa:**
+Facilita análise de evolução de custos ao longo do tempo.
+
+**Implementação:**
+```csharp
+public class GetTCOPorPeriodoQuery : IRequest<TCOPorPeriodoDto>
+{
+    public Guid AtivoId { get; init; }
+    public PeriodoAgregacao Periodo { get; init; } = PeriodoAgregacao.Mensal;
+}
+
+public async Task<TCOPorPeriodoDto> Handle(GetTCOPorPeriodoQuery request, CancellationToken cancellationToken)
+{
+    var custos = await _context.CustosAtivo
+        .Where(c => c.AtivoId == request.AtivoId && !c.FlExcluido)
+        .OrderBy(c => c.DataOcorrencia)
+        .ToListAsync(cancellationToken);
+
+    var agregado = request.Periodo switch
+    {
+        PeriodoAgregacao.Mensal => custos
+            .GroupBy(c => new { c.DataOcorrencia.Year, c.DataOcorrencia.Month })
+            .Select(g => new PeriodoValorDto
+            {
+                Periodo = new DateTime(g.Key.Year, g.Key.Month, 1),
+                Valor = g.Sum(c => c.Valor)
+            }),
+
+        PeriodoAgregacao.Trimestral => custos
+            .GroupBy(c => new { c.DataOcorrencia.Year, Trimestre = (c.DataOcorrencia.Month - 1) / 3 + 1 })
+            .Select(g => new PeriodoValorDto
+            {
+                Periodo = new DateTime(g.Key.Year, (g.Key.Trimestre - 1) * 3 + 1, 1),
+                Valor = g.Sum(c => c.Valor)
+            }),
+
+        PeriodoAgregacao.Anual => custos
+            .GroupBy(c => c.DataOcorrencia.Year)
+            .Select(g => new PeriodoValorDto
+            {
+                Periodo = new DateTime(g.Key, 1, 1),
+                Valor = g.Sum(c => c.Valor)
+            }),
+
+        _ => throw new ArgumentException("Período de agregação inválido")
+    };
+
+    return new TCOPorPeriodoDto
+    {
+        Periodo = request.Periodo,
+        Valores = agregado.ToList()
+    };
+}
+```
+
+---
+
+### RN013 - Exportação de Relatório de TCO
+
+**Descrição:**
+O sistema deve permitir exportação de relatório completo de TCO em Excel com breakdown por categoria.
+
+**Justificativa:**
+Facilita apresentações gerenciais e análises externas.
+
+**Implementação:**
+```csharp
+public class ExportRelatorioTCOQuery : IRequest<byte[]>
+{
+    public Guid AtivoId { get; init; }
+}
+
+public async Task<byte[]> Handle(ExportRelatorioTCOQuery request, CancellationToken cancellationToken)
+{
+    var ativo = await _context.Ativos
+        .Include(a => a.CustosAtivo)
+        .Include(a => a.TipoAtivo)
+        .FirstOrDefaultAsync(a => a.Id == request.AtivoId, cancellationToken);
+
+    var dados = new
+    {
+        DadosAtivo = new
+        {
+            ativo.Nome,
+            Tipo = ativo.TipoAtivo.Nome,
+            DataAquisicao = ativo.DataAquisicao,
+            ValorAquisicao = ativo.ValorAquisicao,
+            TCOTotal = ativo.TCOTotal
+        },
+        CustosPorCategoria = ativo.CustosAtivo
+            .Where(c => !c.FlExcluido)
+            .GroupBy(c => c.Categoria)
+            .Select(g => new
+            {
+                Categoria = g.Key.ToString(),
+                Total = g.Sum(c => c.Valor),
+                Quantidade = g.Count()
+            }),
+        DetalhamentoCustos = ativo.CustosAtivo
+            .Where(c => !c.FlExcluido)
+            .Select(c => new
+            {
+                c.DataOcorrencia,
+                Categoria = c.Categoria.ToString(),
+                c.Descricao,
+                c.Valor
+            })
+            .OrderByDescending(c => c.DataOcorrencia)
+    };
+
+    return await _excelService.ExportarTCO(dados);
+}
+```
+
+---
+
+### RN014 - Recomendação de Substituição
+
+**Descrição:**
+O sistema deve recomendar substituição de ativo quando TCO anual > 50% do valor de aquisição de ativo novo similar.
+
+**Justificativa:**
+Identifica ativos cujo custo de manutenção não compensa manter.
+
+**Implementação:**
+```csharp
+public class VerificarRecomendacaoSubstituicaoQuery : IRequest<RecomendacaoSubstituicaoDto>
+{
+    public Guid AtivoId { get; init; }
+}
+
+public async Task<RecomendacaoSubstituicaoDto> Handle(VerificarRecomendacaoSubstituicaoQuery request, CancellationToken cancellationToken)
+{
+    var ativo = await _context.Ativos
+        .Include(a => a.CustosAtivo)
+        .Include(a => a.TipoAtivo)
+        .FirstOrDefaultAsync(a => a.Id == request.AtivoId, cancellationToken);
+
+    // TCO dos últimos 12 meses
+    var dozeMesesAtras = DateTime.Now.AddMonths(-12);
+    var tcoAnual = ativo.CustosAtivo
+        .Where(c => c.DataOcorrencia >= dozeMesesAtras && !c.FlExcluido)
+        .Sum(c => c.Valor);
+
+    // Valor de mercado de ativo novo similar
+    var valorNovoAtivo = ativo.TipoAtivo.ValorMedioMercado;
+
+    // Calcular percentual
+    var percentualTCO = (tcoAnual / valorNovoAtivo * 100);
+
+    var recomendacao = percentualTCO >= 50 ? "Substituir urgentemente" :
+                       percentualTCO >= 30 ? "Considerar substituição" :
+                       percentualTCO >= 15 ? "Monitorar custos" :
+                       "Manter ativo";
+
+    return new RecomendacaoSubstituicaoDto
+    {
+        TCOAnual = tcoAnual,
+        ValorNovoAtivo = valorNovoAtivo,
+        PercentualTCO = percentualTCO,
+        Recomendacao = recomendacao,
+        JustificativaDetalhada = percentualTCO >= 50
+            ? $"TCO anual (R$ {tcoAnual:N2}) representa {percentualTCO:F2}% do valor de um ativo novo. Substituição é mais econômica."
+            : $"TCO anual (R$ {tcoAnual:N2}) está em {percentualTCO:F2}% do valor de ativo novo. Manutenção ainda é viável."
+    };
+}
+```
+
+---
+
+### RN015 - Auditoria Completa de Operações
+
+**Descrição:**
+Todas as operações de criação, edição e exclusão de custos devem ser auditadas com registro de usuário, timestamp e valores antes/depois.
+
+**Justificativa:**
+Conformidade com LGPD e rastreabilidade fiscal completa.
+
+**Implementação:**
+```csharp
+// Automático via AuditInterceptor configurado no DbContext
+public class CustoAtivo : BaseAuditableEntity
+{
+    public Guid Id { get; set; }
+    // Campos herdados de BaseAuditableEntity:
+    // - Guid UsuarioCriacaoId
+    // - DateTime DataCriacao
+    // - Guid? UsuarioAlteracaoId
+    // - DateTime? DataAlteracao
+    // - bool FlExcluido
+    // - Guid ConglomeradoId
+}
+```
+
+---
+
+## SEÇÃO 3: REFERÊNCIAS AO LEGADO
+
+### 3.1. Páginas e Componentes do Sistema Legado
+
+**Tabelas Principais:**
+
+| Componente Legado | Tipo | Localização | Funcionalidade |
+|-------------------|------|-------------|----------------|
+| `Custo_Ativo` | Tabela SQL | `BancoDados/Interno/K2A.sql` (não localizada) | Possível tabela de custos por ativo |
+| (Não encontrado) | Formulário Web | Não localizado | Gestão de custos de ativos |
+| (Não encontrado) | WebService | Não localizado | APIs de TCO |
+
+**Observações:**
+- Sistema legado pode não ter módulo específico de TCO
+- Controle de custos pode estar disperso em múltiplos módulos
+- Cálculo de TCO provavelmente manual em planilhas
+
+### 3.2. WebServices e APIs Legadas
+
+**Nenhum WebService identificado especificamente para gestão de TCO.**
+
+### 3.3. Classes Helper e Utilitárias Legadas
+
+**Nenhuma classe helper específica identificada.**
+
+---
+
+## SEÇÃO 4: BANCO DE DADOS LEGADO
+
+### 4.1. Modelo Modernizado Proposto
+
+```sql
+CREATE TABLE CustosAtivo (
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    ConglomeradoId UNIQUEIDENTIFIER NOT NULL,
+    AtivoId UNIQUEIDENTIFIER NOT NULL,
+    TipoCustoAtivoId UNIQUEIDENTIFIER NOT NULL,
+    Categoria INT NOT NULL, -- 1=Aquisicao, 2=Manutencao, 3=Licencas, etc.
+    Descricao NVARCHAR(500) NOT NULL,
+    Valor DECIMAL(18,2) NOT NULL,
+    DataOcorrencia DATE NOT NULL,
+    OrdemServicoId UNIQUEIDENTIFIER NULL,
+    ContratoId UNIQUEIDENTIFIER NULL,
+    FornecedorId UNIQUEIDENTIFIER NULL,
+    FlDepreciacaoAutomatica BIT NOT NULL DEFAULT 0,
+
+    -- Auditoria
+    UsuarioCriacaoId UNIQUEIDENTIFIER NOT NULL,
+    DataCriacao DATETIME2 NOT NULL DEFAULT GETDATE(),
+    UsuarioAlteracaoId UNIQUEIDENTIFIER NULL,
+    DataAlteracao DATETIME2 NULL,
+    FlExcluido BIT NOT NULL DEFAULT 0,
+
+    -- FKs
+    CONSTRAINT FK_CustosAtivo_Ativo FOREIGN KEY (AtivoId) REFERENCES Ativos(Id),
+    CONSTRAINT FK_CustosAtivo_Conglomerado FOREIGN KEY (ConglomeradoId) REFERENCES Conglomerados(Id),
+
+    -- Índices
+    INDEX IX_CustosAtivo_AtivoId (AtivoId) WHERE FlExcluido = 0,
+    INDEX IX_CustosAtivo_Categoria (Categoria) WHERE FlExcluido = 0,
+    INDEX IX_CustosAtivo_DataOcorrencia (DataOcorrencia) WHERE FlExcluido = 0,
+    INDEX IX_CustosAtivo_ContratoId (ContratoId) WHERE FlExcluido = 0 AND ContratoId IS NOT NULL
+);
+
+-- Tabela de agregação de TCO (materialized view)
+CREATE TABLE AtivosTCOCache (
+    AtivoId UNIQUEIDENTIFIER PRIMARY KEY,
+    TCOTotal DECIMAL(18,2) NOT NULL,
+    TCOAquisicao DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TCOManutencao DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TCOLicencas DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TCOConsumiveis DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TCODepreciacao DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TCOOutros DECIMAL(18,2) NOT NULL DEFAULT 0,
+    DataUltimaAtualizacao DATETIME2 NOT NULL DEFAULT GETDATE(),
+
+    CONSTRAINT FK_AtivosTCOCache_Ativo FOREIGN KEY (AtivoId) REFERENCES Ativos(Id)
+);
+
+CREATE TABLE BeneficiosAtivo (
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    AtivoId UNIQUEIDENTIFIER NOT NULL,
+    Descricao NVARCHAR(500) NOT NULL,
+    TipoBeneficio INT NOT NULL, -- 1=ReceitaGerada, 2=EconomiaObtida, 3=ProdutividadeGanha
+    Valor DECIMAL(18,2) NOT NULL,
+    DataOcorrencia DATE NOT NULL,
+
+    -- Auditoria
+    UsuarioCriacaoId UNIQUEIDENTIFIER NOT NULL,
+    DataCriacao DATETIME2 NOT NULL DEFAULT GETDATE(),
+    FlExcluido BIT NOT NULL DEFAULT 0,
+
+    CONSTRAINT FK_BeneficiosAtivo_Ativo FOREIGN KEY (AtivoId) REFERENCES Ativos(Id),
+    INDEX IX_BeneficiosAtivo_AtivoId (AtivoId) WHERE FlExcluido = 0
+);
+```
+
+---
+
+## SEÇÃO 5: INTEGRAÇÕES OBRIGATÓRIAS
+
+### 5.1. Central de Funcionalidades
+
+**Registro da Funcionalidade:**
+
+```json
+{
+  "codigo": "GES.CUSTOS_ATIVO",
+  "nome": "Gestão de Custos por Ativo (TCO)",
+  "descricao": "Sistema completo de TCO (Total Cost of Ownership) para análise de custos ao longo do ciclo de vida de ativos",
+  "modulo": "Gestão",
+  "categoria": "Ativos",
+  "icone": "trending_up",
+  "rota": "/gestao/custos-ativo",
+  "ordem": 370,
+  "ativo": true,
+  "permissoesNecessarias": ["GES.CUSTOS_ATIVO.VIEW"],
+  "subFuncionalidades": [
+    {
+      "codigo": "GES.CUSTOS_ATIVO.LISTAR",
+      "nome": "Listar Custos de Ativos",
+      "rota": "/gestao/custos-ativo/listar"
+    },
+    {
+      "codigo": "GES.CUSTOS_ATIVO.DASHBOARD_TCO",
+      "nome": "Dashboard de TCO",
+      "rota": "/gestao/custos-ativo/dashboard"
+    },
+    {
+      "codigo": "GES.CUSTOS_ATIVO.COMPARACAO",
+      "nome": "Comparar TCO entre Ativos",
+      "rota": "/gestao/custos-ativo/comparacao"
+    },
+    {
+      "codigo": "GES.CUSTOS_ATIVO.ROI",
+      "nome": "Análise de ROI",
+      "rota": "/gestao/custos-ativo/roi"
+    }
+  ]
+}
+```
+
+---
+
+### 5.2. Internacionalização (i18n)
+
+**Chaves de Tradução (pt-BR, en-US, es-ES):**
+
+```json
+{
+  "custosAtivo": {
+    "titulo": "Custos por Ativo (TCO) | Asset Costs (TCO) | Costos por Activo (TCO)",
+    "subtitulo": "Análise de TCO e ROI de ativos | TCO and ROI analysis of assets | Análisis de TCO y ROI de activos",
+    "tco": "TCO Total | Total TCO | TCO Total",
+    "roi": "ROI (Retorno sobre Investimento) | ROI (Return on Investment) | ROI (Retorno sobre la Inversión)",
+    "campos": {
+      "categoria": "Categoria | Category | Categoría",
+      "valor": "Valor | Amount | Valor",
+      "dataOcorrencia": "Data de Ocorrência | Occurrence Date | Fecha de Ocurrencia",
+      "descricao": "Descrição | Description | Descripción"
+    },
+    "categorias": {
+      "aquisicao": "Aquisição (CAPEX) | Acquisition (CAPEX) | Adquisición (CAPEX)",
+      "manutencao": "Manutenção (OPEX) | Maintenance (OPEX) | Mantenimiento (OPEX)",
+      "licencas": "Licenças (OPEX) | Licenses (OPEX) | Licencias (OPEX)",
+      "consumiveis": "Consumíveis (OPEX) | Consumables (OPEX) | Consumibles (OPEX)",
+      "depreciacao": "Depreciação | Depreciation | Depreciación"
+    },
+    "mensagens": {
+      "tcoRecalculado": "TCO recalculado automaticamente | TCO recalculated automatically | TCO recalculado automáticamente",
+      "custoAcimaMedia": "Custo {{percentual}}% acima da média | Cost {{percentual}}% above average | Costo {{percentual}}% por encima del promedio",
+      "recomendarSubstituicao": "Recomendado: substituir ativo (TCO > 50% valor novo) | Recommended: replace asset (TCO > 50% new value) | Recomendado: reemplazar activo (TCO > 50% valor nuevo)"
+    }
+  }
+}
+```
+
+---
+
+### 5.3. Auditoria
+
+**Operações Auditadas:**
+
+| Operação | Trigger | Dados Registrados | Retenção |
+|----------|---------|-------------------|----------|
+| **CREATE** | Criação de custo | Todos os campos da entidade | 7 anos |
+| **UPDATE** | Edição de custo | Campos alterados (antes/depois) | 7 anos |
+| **DELETE** | Exclusão lógica | Registro completo | 7 anos |
+| **RECALCULAR_TCO** | Recalculo automático de TCO | Valor anterior, novo valor | 7 anos |
+| **DEPRECIAR** | Depreciação automática | Valor depreciado, ativo | 7 anos |
+
+---
+
+### 5.4. Controle de Acesso (RBAC)
+
+**Matriz de Permissões:**
+
+| Perfil | VIEW | CREATE | UPDATE | DELETE | EXPORT | VIEW_ROI |
+|--------|------|--------|--------|--------|--------|----------|
+| **Super Admin** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Administrador** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Financeiro** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Gestor de Ativos** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Auditor** | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ |
+
+**Códigos de Permissão:**
+
+```csharp
+public static class CustosAtivoPermissions
+{
+    public const string View = "GES.CUSTOS_ATIVO.VIEW";
+    public const string Create = "GES.CUSTOS_ATIVO.CREATE";
+    public const string Update = "GES.CUSTOS_ATIVO.UPDATE";
+    public const string Delete = "GES.CUSTOS_ATIVO.DELETE";
+    public const string Export = "GES.CUSTOS_ATIVO.EXPORT";
+    public const string ViewROI = "GES.CUSTOS_ATIVO.VIEW_ROI";
+}
+```
+
+---
+
+## CONCLUSÃO
+
+O **RF037 - Gestão de Custos por Ativo (TCO)** moderniza completamente a análise de custos de ativos, transformando um processo manual e fragmentado em uma solução analítica completa com cálculos automáticos, dashboards interativos e decisões baseadas em dados.
+
+**Principais Melhorias:**
+- ✅ **15 regras de negócio** detalhadas para controle rigoroso de TCO
+- ✅ **Cálculo automático de TCO** em tempo real com Domain Events
+- ✅ **Depreciação automática** mensal com métodos linear e acelerado
+- ✅ **Análise de ROI** com payback period e recomendações
+- ✅ **Alertas de custos acima da média** (>30% da média do tipo)
+- ✅ **Comparação e benchmarking** entre ativos similares
+- ✅ **Projeção de custos futuros** baseada em histórico
+- ✅ **Recomendação de substituição** quando TCO > 50% valor novo
+- ✅ **Auditoria completa** com retenção de 7 anos (LGPD)
+- ✅ **RBAC granular** com 6 permissões específicas
+- ✅ **i18n** suportando pt-BR, en-US e es-ES
+
+**Próximos Passos:**
+1. Implementação de backend com Clean Architecture + CQRS
+2. Desenvolvimento de interface Angular 19 com dashboards ApexCharts
+3. Configuração de jobs Hangfire para depreciação automática
+4. Criação de casos de uso detalhados (UC00-UC04)
+5. Desenvolvimento de testes automatizados (Backend + Sistema + Outros)
+
+---
+
+**Documento criado em:** 2025-12-17
+**Versão:** 1.0
+**Status:** ✅ Completo e Pronto para Implementação
+**Aprovação Pendente:** Product Owner / Architect Lead

@@ -1,0 +1,580 @@
+rf_id: RF068
+rf_title: "Inventário Cíclico e Auditoria de Estoque"
+versao_governanca: "2.0"
+data_migracao: "2025-12-30"
+epic: "EPIC009-AST-Ativos-Inventario"
+fase: "Fase 6 - Ativos, Auditoria e Integrações"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF068-001"
+    titulo: "Classificação ABC Obrigatória para Inventário Cíclico"
+    descricao: |
+      Todo item de estoque deve ter classificação ABC (A, B ou C) para ser incluído em inventário cíclico.
+      Classificação calculada por valor acumulado (Quantidade × Custo Unitário).
+      A: 80% do valor, 20% dos itens (contagem mensal)
+      B: 15% do valor, 30% dos itens (contagem trimestral)
+      C: 5% do valor, 50% dos itens (contagem anual)
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+      job_hangfire: true
+    validacao:
+      tipo: "classificacao_obrigatoria"
+      mensagem_erro: "Item sem classificação ABC não pode ser incluído em inventário cíclico"
+      http_code: 400
+
+  - id: "RN-RF068-002"
+    titulo: "Contagem Dupla Cega para Itens Classificação A"
+    descricao: |
+      Itens classificação A devem ser contados por 2 usuários diferentes de forma independente (cega).
+      Sistema só aceita se ambas concordarem ou se houver aprovação de supervisor.
+      Divergência > 2% entre contadores → recontagem obrigatória.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "contagem_dupla_obrigatoria"
+      mensagem_erro: "Item classificação A requer contagem por segundo usuário"
+      http_code: 400
+
+  - id: "RN-RF068-003"
+    titulo: "Divergência > 5% Exige Recontagem"
+    descricao: |
+      Quando divergência entre Qtd_Sistema e Qtd_Contada > 5%, sistema exige recontagem obrigatória.
+      Cálculo: |(Qtd_Contada - Qtd_Sistema) / Qtd_Sistema| * 100
+      Após recontagem, nova divergência > 5% → aprovação de gerente obrigatória.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "threshold_divergencia"
+      mensagem_erro: "Divergência superior a 5% exige recontagem obrigatória"
+      http_code: 400
+
+  - id: "RN-RF068-004"
+    titulo: "Ajuste de Estoque Exige Aprovação de Supervisor"
+    descricao: |
+      Qualquer ajuste de quantidade (positivo ou negativo) identificado em inventário
+      deve ser aprovado por usuário com perfil Supervisor ou superior.
+      Aprovador não pode ser o mesmo usuário que contou.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "aprovacao_obrigatoria"
+      mensagem_erro: "Ajuste de estoque requer aprovação de Supervisor"
+      http_code: 403
+
+  - id: "RN-RF068-005"
+    titulo: "Bloqueio de Movimentação Durante Inventário"
+    descricao: |
+      Enquanto inventário estiver com status "Em Andamento", almoxarifado inventariado
+      não pode ter movimentações de entrada ou saída.
+      Ao iniciar inventário → bloquear almoxarifado automaticamente.
+      Ao finalizar/cancelar → desbloquear almoxarifado.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "bloqueio_movimentacao"
+      mensagem_erro: "Almoxarifado bloqueado por inventário em andamento"
+      http_code: 409
+
+  - id: "RN-RF068-006"
+    titulo: "Almoxarifado Deve Estar Ativo"
+    descricao: |
+      Inventário só pode ser criado para almoxarifados com status "Ativo".
+      Almoxarifados inativos não podem ter inventário.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "status_ativo"
+      mensagem_erro: "Inventário só pode ser criado para almoxarifados ativos"
+      http_code: 400
+
+  - id: "RN-RF068-007"
+    titulo: "Periodicidade Inventário Cíclico"
+    descricao: |
+      Inventário cíclico respeita periodicidade ABC:
+      A: mensal (30 dias), B: trimestral (90 dias), C: anual (365 dias)
+      Job Hangfire executa diariamente para verificar e gerar alertas de vencimento.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+      job_hangfire: true
+    validacao:
+      tipo: "periodicidade_automatica"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF068-008"
+    titulo: "Histórico Imutável de Contagens"
+    descricao: |
+      Todas as contagens (primeira, segunda, recontagem) devem ser preservadas no histórico
+      de forma imutável. Não é permitido alterar ou deletar contagens registradas.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "imutabilidade"
+      mensagem_erro: "Contagem registrada não pode ser alterada ou deletada"
+      http_code: 403
+
+  - id: "RN-RF068-009"
+    titulo: "Dashboard Tempo Real via SignalR"
+    descricao: |
+      Dashboard de acompanhamento de inventário atualiza em tempo real via SignalR.
+      Exibir: progresso %, divergências, contadores ativos, tempo estimado de conclusão.
+      Latência máxima: 2 segundos.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: true
+      signalr: true
+    validacao:
+      tipo: "tempo_real"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF068-010"
+    titulo: "Integração com ERP para Ajustes Contábeis"
+    descricao: |
+      Ajustes de estoque aprovados devem ser enviados automaticamente para ERP para lançamento contábil.
+      Perda = despesa, Sobra = receita.
+      Falha → retry 3x com backoff exponencial (5min, 15min, 30min) → alerta admin.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+      integracao_erp: true
+    validacao:
+      tipo: "integracao_externa"
+      mensagem_erro: "Falha ao enviar ajuste para ERP após 3 tentativas"
+      http_code: 500
+
+  - id: "RN-RF068-011"
+    titulo: "Relatório de Auditoria ISO 9001"
+    descricao: |
+      Ao finalizar inventário, gerar relatório em formato PDF compatível com ISO 9001.
+      Conteúdo: cabeçalho, resumo, detalhamento item a item, assinaturas digitais.
+      Armazenamento obrigatório por 7 anos (compliance LGPD).
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+      geracao_pdf: true
+    validacao:
+      tipo: "relatorio_compliance"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF068-012"
+    titulo: "App Mobile Offline-First"
+    descricao: |
+      App mobile de contagem funciona offline (PWA) e sincroniza quando conexão for restabelecida.
+      Contagem registrada localmente (IndexedDB) → sincronização automática quando online.
+      Conflito (mesmo item contado offline por 2 usuários) → supervisor resolve.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: true
+      pwa_offline: true
+    validacao:
+      tipo: "offline_first"
+      mensagem_erro: null
+      http_code: null
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "INVENTARIO.CREATE"
+    descricao: "Criar novo inventário"
+    roles_autorizadas:
+      - "Gerente de Almoxarifado"
+      - "Coordenador de Inventário"
+    endpoint: "POST /api/inventarios"
+
+  - permission_code: "INVENTARIO.VIEW"
+    descricao: "Visualizar inventários"
+    roles_autorizadas:
+      - "Gerente"
+      - "Coordenador"
+      - "Contador"
+      - "Auditor"
+    endpoint: "GET /api/inventarios"
+
+  - permission_code: "INVENTARIO.COUNT"
+    descricao: "Registrar contagem de item"
+    roles_autorizadas:
+      - "Contador de Inventário"
+    endpoint: "POST /api/inventarios/{id}/itens/{itemId}/contar"
+
+  - permission_code: "INVENTARIO.APPROVE_ADJUSTMENT"
+    descricao: "Aprovar ajuste de estoque"
+    roles_autorizadas:
+      - "Supervisor"
+      - "Gerente de Almoxarifado"
+    endpoint: "POST /api/inventarios/{id}/ajustes/{ajusteId}/aprovar"
+
+  - permission_code: "INVENTARIO.FINALIZE"
+    descricao: "Finalizar inventário"
+    roles_autorizadas:
+      - "Coordenador de Inventário"
+      - "Gerente"
+    endpoint: "PUT /api/inventarios/{id}/finalizar"
+
+  - permission_code: "INVENTARIO.CANCEL"
+    descricao: "Cancelar inventário"
+    roles_autorizadas:
+      - "Gerente de Almoxarifado"
+    endpoint: "PUT /api/inventarios/{id}/cancelar"
+
+  - permission_code: "INVENTARIO.EXPORT"
+    descricao: "Exportar relatório de inventário"
+    roles_autorizadas:
+      - "Gerente"
+      - "Auditor"
+      - "Coordenador"
+    endpoint: "GET /api/inventarios/{id}/relatorio"
+
+  - permission_code: "INVENTARIO.DASHBOARD"
+    descricao: "Visualizar dashboard de inventário"
+    roles_autorizadas:
+      - "Gerente"
+      - "Coordenador"
+    endpoint: "GET /api/inventarios/{id}/dashboard"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  # Inventários
+  - method: "GET"
+    route: "/api/inventarios"
+    descricao: "Listar inventários com filtros (status, tipo, período, almoxarifado)"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.VIEW"
+    request_dto: null
+    response_dto: "PaginatedListDto<InventarioDto>"
+    query_params:
+      - nome: "status"
+        tipo: "string"
+        obrigatorio: false
+        valores: ["Planejado", "EmAndamento", "AguardandoConciliacao", "Concluido", "Cancelado"]
+      - nome: "tipo"
+        tipo: "string"
+        obrigatorio: false
+        valores: ["Geral", "Ciclico", "Parcial"]
+      - nome: "almoxarifadoId"
+        tipo: "Guid"
+        obrigatorio: false
+      - nome: "dataInicio"
+        tipo: "DateTime"
+        obrigatorio: false
+      - nome: "dataFim"
+        tipo: "DateTime"
+        obrigatorio: false
+      - nome: "pageNumber"
+        tipo: "int"
+        obrigatorio: false
+        default: 1
+      - nome: "pageSize"
+        tipo: "int"
+        obrigatorio: false
+        default: 20
+
+  - method: "GET"
+    route: "/api/inventarios/{id}"
+    descricao: "Obter detalhes completos de um inventário"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.VIEW"
+    request_dto: null
+    response_dto: "InventarioDetalhadoDto"
+
+  - method: "POST"
+    route: "/api/inventarios"
+    descricao: "Criar novo inventário"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.CREATE"
+    request_dto: "CreateInventarioCommand"
+    response_dto: "Guid"
+    campos_obrigatorios:
+      - "AlmoxarifadoId"
+      - "TipoInventario"
+      - "DataInicio"
+
+  - method: "PUT"
+    route: "/api/inventarios/{id}/iniciar"
+    descricao: "Iniciar inventário (bloquear almoxarifado, gerar lista de itens)"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.CREATE"
+    request_dto: null
+    response_dto: "void"
+
+  - method: "PUT"
+    route: "/api/inventarios/{id}/finalizar"
+    descricao: "Finalizar inventário (aplicar ajustes, gerar relatório, desbloquear almoxarifado)"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.FINALIZE"
+    request_dto: null
+    response_dto: "void"
+
+  - method: "PUT"
+    route: "/api/inventarios/{id}/cancelar"
+    descricao: "Cancelar inventário (desbloquear almoxarifado, manter histórico)"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.CANCEL"
+    request_dto: "CancelarInventarioCommand"
+    response_dto: "void"
+    campos_obrigatorios:
+      - "Justificativa"
+
+  - method: "GET"
+    route: "/api/inventarios/{id}/dashboard"
+    descricao: "Dashboard de progresso em tempo real (SignalR)"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.DASHBOARD"
+    request_dto: null
+    response_dto: "InventarioDashboardDto"
+    signalr: true
+
+  - method: "GET"
+    route: "/api/inventarios/{id}/relatorio"
+    descricao: "Gerar e baixar relatório PDF de auditoria ISO 9001"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.EXPORT"
+    request_dto: null
+    response_dto: "FileContentResult (application/pdf)"
+
+  # Contagens
+  - method: "GET"
+    route: "/api/inventarios/{id}/itens"
+    descricao: "Listar itens a contar com status e filtros"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.VIEW"
+    request_dto: null
+    response_dto: "PaginatedListDto<InventarioItemDto>"
+    query_params:
+      - nome: "statusItem"
+        tipo: "string"
+        obrigatorio: false
+        valores: ["Pendente", "Contado", "Divergente", "RecontagemSolicitada", "AguardandoAprovacao", "Ajustado", "Rejeitado"]
+      - nome: "classificacaoABC"
+        tipo: "string"
+        obrigatorio: false
+        valores: ["A", "B", "C"]
+
+  - method: "POST"
+    route: "/api/inventarios/{id}/itens/{itemId}/contar"
+    descricao: "Registrar contagem de item (via app mobile ou web)"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.COUNT"
+    request_dto: "RegistrarContagemCommand"
+    response_dto: "void"
+    campos_obrigatorios:
+      - "QtdContada"
+      - "DataContagem"
+      - "UsuarioContadorId"
+      - "Observacao (opcional)"
+
+  - method: "GET"
+    route: "/api/inventarios/{id}/divergencias"
+    descricao: "Listar divergências identificadas (ordenadas por valor DESC)"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.VIEW"
+    request_dto: null
+    response_dto: "List<DivergenciaDto>"
+
+  - method: "POST"
+    route: "/api/inventarios/{id}/itens/{itemId}/recontar"
+    descricao: "Solicitar recontagem de item (divergência > 5%)"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.COUNT"
+    request_dto: "SolicitarRecontagemCommand"
+    response_dto: "void"
+    campos_obrigatorios:
+      - "Justificativa"
+
+  # Ajustes
+  - method: "GET"
+    route: "/api/inventarios/{id}/ajustes"
+    descricao: "Listar ajustes pendentes de aprovação"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.APPROVE_ADJUSTMENT"
+    request_dto: null
+    response_dto: "List<AjusteEstoqueDto>"
+
+  - method: "POST"
+    route: "/api/inventarios/{id}/ajustes/{ajusteId}/aprovar"
+    descricao: "Aprovar ajuste de estoque (aplicar ao estoque + notificar ERP)"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.APPROVE_ADJUSTMENT"
+    request_dto: "AprovarAjusteCommand"
+    response_dto: "void"
+    campos_obrigatorios:
+      - "UsuarioAprovadorId"
+      - "DataAprovacao"
+
+  - method: "POST"
+    route: "/api/inventarios/{id}/ajustes/{ajusteId}/rejeitar"
+    descricao: "Rejeitar ajuste de estoque (solicitar recontagem)"
+    autenticacao: true
+    authorization_policy: "INVENTARIO.APPROVE_ADJUSTMENT"
+    request_dto: "RejeitarAjusteCommand"
+    response_dto: "void"
+    campos_obrigatorios:
+      - "Justificativa"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Acurácia de Inventário"
+    descricao: "Percentual de itens sem divergência"
+    meta: ">= 95%"
+    calculo: "(Itens sem divergência / Total de itens) * 100"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Inventário"
+    descricao: "Tempo médio para finalizar inventário"
+    meta: "<= 48h para parcial, <= 7 dias para geral"
+    calculo: "AVG(DATEDIFF(HOUR, DataInicio, DataFim))"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Recontagem"
+    descricao: "Percentual de itens que exigiram recontagem"
+    meta: "<= 5%"
+    calculo: "(Itens com recontagem / Total de itens) * 100"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Aprovação de Ajustes"
+    descricao: "Percentual de ajustes aprovados vs rejeitados"
+    meta: ">= 90% aprovados"
+    calculo: "(Ajustes aprovados / Total de ajustes) * 100"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Aprovação"
+    descricao: "Tempo médio entre solicitação e aprovação de ajuste"
+    meta: "<= 24h"
+    calculo: "AVG(DATEDIFF(HOUR, DataSolicitacao, DataAprovacao))"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "Divergência > 10% em item classificação A"
+    threshold: "> 1 ocorrência"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "push"
+      - "signalr"
+    destinatarios:
+      - "Gerente de Almoxarifado"
+      - "Coordenador de Inventário"
+
+  - evento: "Inventário cíclico atrasado"
+    threshold: "> 7 dias após vencimento periodicidade"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "push"
+    destinatarios:
+      - "Coordenador de Inventário"
+
+  - evento: "Falha de integração com ERP após 3 retries"
+    threshold: "> 1 ocorrência"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+    destinatarios:
+      - "Admin"
+      - "Gerente TI"
+
+  - evento: "Inventário não finalizado em prazo esperado"
+    threshold: "> 48h para parcial, > 7 dias para geral"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+    destinatarios:
+      - "Coordenador de Inventário"
+
+# ==============================================================================
+# CENTRAL DE FUNCIONALIDADES
+# ==============================================================================
+
+central_funcionalidades:
+  codigo: "INVENTARIO"
+  modulo: "Estoque"
+  i18n_key_titulo: "inventario.titulo"
+  i18n_key_menu: "menu.estoque.inventario"
+  rota_frontend: "/estoque/inventario"
+  icone: "inventory"
+  ordem_menu: 30
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_regras_negocio: 12
+  total_endpoints_api: 13
+  total_permissoes_rbac: 8
+  total_integracoes_obrigatorias: 4
+  total_kpis: 5
+  total_alertas: 4
+  linhas_documentacao_md: 485
+
+  tags:
+    - "inventario"
+    - "estoque"
+    - "auditoria"
+    - "iso9001"
+    - "classificacao-abc"
+    - "offline-first"
+    - "signalr"
+    - "erp"

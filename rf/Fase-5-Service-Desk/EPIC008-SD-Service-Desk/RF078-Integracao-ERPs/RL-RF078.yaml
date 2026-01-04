@@ -1,0 +1,682 @@
+# =============================================
+# RL-RF078 - Referência ao Legado
+# Integração com ERPs
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF078
+titulo: "Integração com ERPs"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: ".NET Framework 4.5"
+  arquitetura: "Monolítica WebForms com batch jobs diários"
+  banco_dados: "SQL Server 2012 com múltiplos bancos por cliente"
+  multi_tenant: false
+  auditoria: "none"
+
+# =============================================
+# REFERÊNCIAS AO LEGADO COM DESTINO OBRIGATÓRIO
+# =============================================
+
+referencias:
+  # TELAS LEGADAS
+  - id: "LEG-RF078-001"
+    tipo: "tela"
+    nome: "frmIntegracaoERP.aspx"
+    caminho: "ic1_legado/IControlIT/Admin/Integracao/frmIntegracaoERP.aspx"
+    descricao: |
+      Dashboard manual de integrações com SAP e TOTVS.
+      - Filtros: Tipo ERP, Tipo Operação, Data Início/Fim
+      - GridView com logs de integrações (limitado a 1000 registros)
+      - Paginação manual com ViewState
+      - Sem refresh automático
+    destino: "substituido"
+    justificativa: |
+      Substituído por dashboard Angular com:
+      - Real-time updates via SignalR
+      - Paginação server-side ilimitada
+      - Filtros avançados com persistência
+      - Export para CSV/JSON
+    rf_item_relacionado: "RN-RF078-007"
+    uc_relacionado: "UC00-listar-integracoes"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF078-002"
+    tipo: "tela"
+    nome: "frmConfiguracaoERP.aspx"
+    caminho: "ic1_legado/IControlIT/Admin/Integracao/frmConfiguracaoERP.aspx"
+    descricao: |
+      Configuração de credenciais e endpoints do ERP.
+      - Campos: Nome ERP, Usuário, Senha (texto plano), Host RFC, Porta RFC
+      - Checkbox Ativa (habilitar/desabilitar integração)
+      - Senha armazenada em texto plano na tabela tbCredencialERP
+      - Sem validação de conexão (teste apenas em produção)
+      - Alteração de credencial não auditada
+    destino: "substituido"
+    justificativa: |
+      Substituído por gestão de credenciais via Azure Key Vault:
+      - Senhas/tokens criptografados em Key Vault
+      - Rotação automática a cada 90 dias
+      - Teste de conexão obrigatório antes de salvar
+      - Auditoria completa de leituras/escritas
+    rf_item_relacionado: "RN-RF078-002"
+    uc_relacionado: "UC01-configurar-credenciais"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF078-003"
+    tipo: "tela"
+    nome: "frmLogIntegracao.aspx"
+    caminho: "ic1_legado/IControlIT/Admin/Integracao/frmLogIntegracao.aspx"
+    descricao: |
+      Visualização detalhada de logs de integração.
+      - Labels: MessageId (ID autoincrement), Tipo, Data, Status
+      - TextBox MultiLine para mensagem de erro (truncada em 1000 chars)
+      - Não exibia payload de entrada/saída
+      - Sem export de dados
+      - Sem paginação (limitado a 100 registros)
+    destino: "substituido"
+    justificativa: |
+      Substituído por auditoria estruturada em IntegrationAudit:
+      - UUID (MessageId) obrigatório
+      - Payload completo de entrada/saída em JSON
+      - Retenção de 7 anos (conformidade LGPD)
+      - Export para JSON/CSV ilimitado
+      - Paginação server-side com filtros avançados
+    rf_item_relacionado: "RN-RF078-007"
+    uc_relacionado: "UC00-listar-integracoes"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF078-004"
+    tipo: "tela"
+    nome: "frmReconciliacao.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/frmReconciliacao.aspx"
+    descricao: |
+      Reconciliação manual de faturas telecom com contas a pagar do ERP.
+      - GridView de faturas pendentes vs contas a pagar
+      - Botão Reconciliar (matching manual)
+      - TextBox de tolerância (padrão 0,5%)
+      - Reconciliação 100% manual
+      - Diferença de valor não calculada automaticamente
+      - Sem auditoria de quem reconciliou
+    destino: "substituido"
+    justificativa: |
+      Substituído por reconciliação automática com:
+      - Matching automático (diferença ≤ 0,5%)
+      - Cálculo automático de diferença percentual
+      - Auditoria completa (quem, quando, valores)
+      - Notificação financeiro para itens > 0,5%
+      - Dashboard de status de reconciliação
+    rf_item_relacionado: "RN-RF078-010"
+    uc_relacionado: "UC03-reconciliar-faturas"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # WEBSERVICES LEGADOS
+  - id: "LEG-RF078-005"
+    tipo: "webservice"
+    nome: "WSIntegracaoERP.asmx - ImportarNotaFiscal"
+    caminho: "ic1_legado/IControlIT/WebService/WSIntegracaoERP.asmx.vb"
+    descricao: |
+      Importa NF-e do ERP (SAP RFC).
+      Método: ImportarNotaFiscal(xmlNF As String)
+      - Parsing XML manual em VB.NET
+      - Sem validação de schema XSD
+      - Erros silenciosos em XML malformado
+      - Sem deduplicação (notas processadas 2x)
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST API moderno:
+      - Validação obrigatória com XSD
+      - Deduplicação por MessageId (UUID)
+      - Erros estruturados (HTTP 400 + JSON)
+      - Webhooks em tempo real (elimina polling)
+    rf_item_relacionado: "RN-RF078-005, RN-RF078-006"
+    uc_relacionado: "UC04-processar-webhook"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF078-006"
+    tipo: "webservice"
+    nome: "WSIntegracaoERP.asmx - ExportarCustosTI"
+    caminho: "ic1_legado/IControlIT/WebService/WSIntegracaoERP.asmx.vb"
+    descricao: |
+      Exporta custos de TI para contabilização no ERP.
+      Método: ExportarCustosTI(mes As Integer, ano As Integer)
+      - Sem validação de período contábil aberto
+      - Sem validação de centro de custo existe no ERP
+      - Erros silenciosos (descobertos no fechamento mensal)
+      - Exportação batch (1x ao mês)
+    destino: "assumido"
+    justificativa: |
+      Comportamento assumido com melhorias:
+      - Validação obrigatória de período aberto no ERP
+      - Validação obrigatória de centro de custo existe
+      - Erro 400 se período fechado ou centro inválido
+      - Exportação sob demanda (não apenas batch)
+    rf_item_relacionado: "RN-RF078-004"
+    uc_relacionado: "UC02-exportar-custos"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF078-007"
+    tipo: "webservice"
+    nome: "WSIntegracaoERP.asmx - ValidarSincronizacao"
+    caminho: "ic1_legado/IControlIT/WebService/WSIntegracaoERP.asmx.vb"
+    descricao: |
+      Valida status de sincronização.
+      Método: ValidarSincronizacao(tipo As String)
+      - Retorna apenas "OK" ou "ERRO"
+      - Sem detalhes do erro
+      - Sem timestamp da última sincronização
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint detalhado:
+      - Retorna status completo (PENDENTE, SUCESSO, ERRO, DLQ)
+      - Timestamp da última execução
+      - Detalhes do erro (se aplicável)
+      - Quantidade de mensagens em DLQ
+    rf_item_relacionado: "RN-RF078-007"
+    uc_relacionado: "UC00-listar-integracoes"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF078-008"
+    tipo: "webservice"
+    nome: "WSIntegracaoERP.asmx - ObterLogIntegracao"
+    caminho: "ic1_legado/IControlIT/WebService/WSIntegracaoERP.asmx.vb"
+    descricao: |
+      Retorna logs detalhados de uma execução.
+      Método: ObterLogIntegracao(idIntegracao As Integer)
+      - Sem filtro por data ou tipo
+      - Limitado a 1 registro por ID
+      - Não retorna payload
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint com filtros avançados:
+      - Filtro por data, tipo, status, ERP
+      - Paginação server-side
+      - Retorna payload completo (entrada + saída)
+      - Export para JSON/CSV
+    rf_item_relacionado: "RN-RF078-007"
+    uc_relacionado: "UC00-listar-integracoes"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # TABELAS LEGADAS
+  - id: "LEG-RF078-009"
+    tipo: "tabela"
+    nome: "tbCentroCusto"
+    caminho: "Database/dbo.tbCentroCusto"
+    descricao: |
+      Armazena centros de custo importados do ERP.
+      Campos: id, codigo, descricao, ativo, codigoErp, dataCriacao
+      Problemas:
+      - Falta FK para validar relacionamento
+      - Campo codigoErp aceita NULL (centros sem mapeamento)
+      - Sem índice em codigoErp (performance ruim)
+      - Sem auditoria (Created, Modified)
+    destino: "substituido"
+    justificativa: |
+      Substituído por tabela CentroCusto moderna:
+      - Campo CodigoERP obrigatório (NOT NULL)
+      - Índice em CodigoERP + EmpresaId
+      - Auditoria completa (Created, CreatedBy, Modified, ModifiedBy)
+      - Multi-tenancy com EmpresaId
+      - Soft delete com Fl_Excluido
+    rf_item_relacionado: "RN-RF078-001"
+    uc_relacionado: "UC01-sincronizar-centro-custo"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF078-010"
+    tipo: "tabela"
+    nome: "tbIntegracaoERP"
+    caminho: "Database/dbo.tbIntegracaoERP"
+    descricao: |
+      Registra execuções de integrações com ERP.
+      Campos: id, tipoErp, tipoOperacao, dataExecucao, status, mensagemErro, quantidadeRegistros, tempoExecucaoMs
+      Problemas:
+      - Sem campo MessageId (impossível deduplicação)
+      - Sem payload de entrada/saída (impossível debug)
+      - Sem retenção definida (cresce indefinidamente)
+      - Sem índice em dataExecucao (consultas lentas)
+    destino: "substituido"
+    justificativa: |
+      Substituído por tabela IntegrationAudit moderna:
+      - Campo MessageId (UUID) obrigatório
+      - Payload de entrada/saída em JSON
+      - Retenção de 7 anos (conformidade LGPD)
+      - Índices em dataExecucao, status, tipoErp
+      - Multi-tenancy com EmpresaId
+    rf_item_relacionado: "RN-RF078-005, RN-RF078-007"
+    uc_relacionado: "UC00-listar-integracoes"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF078-011"
+    tipo: "tabela"
+    nome: "tbCredencialERP"
+    caminho: "Database/dbo.tbCredencialERP"
+    descricao: |
+      Armazena credenciais de acesso aos ERPs.
+      Campos: id, nomeErp, usuario, senha (texto plano!), hostRFC, portaRFC, ativa
+      Problemas CRÍTICOS:
+      - Senhas em texto plano (violação SOX/LGPD)
+      - Sem rotação automática
+      - Sem auditoria de leitura de credencial
+      - Sem criptografia de certificados RFC
+    destino: "descartado"
+    justificativa: |
+      Tabela DESCARTADA completamente.
+      Migrado para Azure Key Vault:
+      - Senhas/tokens criptografados em Key Vault
+      - Rotação automática a cada 90 dias
+      - Auditoria completa de leituras/escritas
+      - Certificados RFC armazenados como secrets
+      - NUNCA armazenar credenciais no banco
+    rf_item_relacionado: "RN-RF078-002"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # JOBS BATCH LEGADOS
+  - id: "LEG-RF078-012"
+    tipo: "job_batch"
+    nome: "SyncDiarioERP.vb"
+    caminho: "ic1_legado/IControlIT/Jobs/SyncDiarioERP.vb"
+    descricao: |
+      Job batch diário para sincronização com ERP.
+      - Execução: 22h todos os dias (polling)
+      - Importa centros de custo, departamentos, colaboradores
+      - Latência de até 24h para refletir mudanças
+      - Sem retry automático em caso de falha
+      - Logs em arquivo de texto
+    destino: "substituido"
+    justificativa: |
+      Substituído por webhooks em tempo real:
+      - Latência reduzida de 24h para < 5 min
+      - Notificação imediata de mudanças (webhooks)
+      - Retry automático com backoff exponencial
+      - Auditoria estruturada em banco
+      - Dead Letter Queue para falhas permanentes
+    rf_item_relacionado: "RN-RF078-001, RN-RF078-003"
+    uc_relacionado: "UC04-processar-webhook"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  - id: "LEG-RF078-013"
+    tipo: "regra_negocio"
+    nome: "Sincronização unidirecional de Centro de Custo"
+    caminho: "ic1_legado/IControlIT/Jobs/SyncCentroCusto.vb - Linha 45"
+    descricao: |
+      Centros de custo eram importados do SAP para IControlIT,
+      mas mudanças em IControlIT não eram exportadas de volta para SAP.
+      Causava divergências entre sistemas.
+    destino: "substituido"
+    justificativa: |
+      Substituído por sincronização bidirecional:
+      - Mudanças em IControlIT → exportadas para SAP
+      - Mudanças em SAP → importadas para IControlIT
+      - Conflitos resolvidos com timestamp (última atualização prevalece)
+      - Auditoria registra origem da mudança
+    rf_item_relacionado: "RN-RF078-001"
+    uc_relacionado: "UC01-sincronizar-centro-custo"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF078-014"
+    tipo: "regra_negocio"
+    nome: "Exportação de custos sem validação de período contábil"
+    caminho: "ic1_legado/IControlIT/WebService/WSIntegracaoERP.asmx.vb - Linha 120"
+    descricao: |
+      Custos eram exportados para SAP sem validar se o período estava aberto,
+      causando erros silenciosos no ERP descobertos apenas no fechamento mensal.
+    destino: "assumido"
+    justificativa: |
+      Comportamento assumido com validação obrigatória:
+      - Validar período está aberto no ERP antes de exportar
+      - Validar centro de custo existe no ERP
+      - Erro 400 se período fechado ou centro inválido
+      - Notificação de erro para administrador
+    rf_item_relacionado: "RN-RF078-004"
+    uc_relacionado: "UC02-exportar-custos"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF078-015"
+    tipo: "regra_negocio"
+    nome: "Reconciliação com tolerância fixa de 1% (hardcoded)"
+    caminho: "ic1_legado/IControlIT/Financeiro/ReconciliacaoService.vb - Linha 78"
+    descricao: |
+      Diferença de até 1% entre fatura telecom e conta a pagar era aceita automaticamente,
+      mas percentual era hardcoded. Mudanças exigiam recompilação e deploy.
+    destino: "assumido"
+    justificativa: |
+      Comportamento assumido com tolerância configurável:
+      - Tolerância padrão: 0,5% (mais restritiva)
+      - Configurável por cliente/tenant
+      - Diferença > tolerância → reconciliação manual
+      - Auditoria registra percentual de diferença
+    rf_item_relacionado: "RN-RF078-010"
+    uc_relacionado: "UC03-reconciliar-faturas"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF078-016"
+    tipo: "regra_negocio"
+    nome: "Retry manual de integrações falhadas"
+    caminho: "ic1_legado/IControlIT/Jobs/IntegracaoJob.vb - Linha 200"
+    descricao: |
+      Falhas de integração eram registradas em log,
+      mas retry exigia intervenção manual do administrador.
+      Integrações falhavam silenciosamente durante indisponibilidades temporárias.
+    destino: "substituido"
+    justificativa: |
+      Substituído por retry automático:
+      - Backoff exponencial: 2s, 4s, 8s, 16s, 32s (5 tentativas)
+      - Após 5 falhas → mover para Dead Letter Queue
+      - Notificação de erro para administrador
+      - Auditoria completa de tentativas
+    rf_item_relacionado: "RN-RF078-003"
+    uc_relacionado: "UC01-sincronizar-centro-custo, UC02-exportar-custos"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF078-017"
+    tipo: "regra_negocio"
+    nome: "Polling a cada 24h (sem webhooks)"
+    caminho: "ic1_legado/IControlIT/Jobs/SyncDiarioERP.vb"
+    descricao: |
+      Sincronização era feita via job batch diário às 22h,
+      sem notificações em tempo real. Latência de até 24h para refletir mudanças.
+    destino: "substituido"
+    justificativa: |
+      Substituído por webhooks em tempo real:
+      - Notificação imediata de mudanças
+      - Validação de assinatura HMAC-SHA256
+      - Latência < 5 min
+      - Polling mantido como fallback para ERPs sem webhook
+    rf_item_relacionado: "RN-RF078-008"
+    uc_relacionado: "UC04-processar-webhook"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF078-018"
+    tipo: "regra_negocio"
+    nome: "Validação de schema XML inexistente"
+    caminho: "ic1_legado/IControlIT/WebService/WSIntegracaoERP.asmx.vb - Linha 50"
+    descricao: |
+      XML de nota fiscal recebido do SAP não era validado contra XSD,
+      causando erros silenciosos em campos malformados.
+      Notas fiscais com dados incorretos eram importadas.
+    destino: "assumido"
+    justificativa: |
+      Comportamento assumido com validação obrigatória:
+      - Validação com JSON Schema v7 ou XSD
+      - Erro 400 se payload inválido
+      - Lista de campos inválidos no erro
+      - Auditoria registra resultado da validação
+    rf_item_relacionado: "RN-RF078-006"
+    uc_relacionado: "UC04-processar-webhook"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# =============================================
+# GAP ANALYSIS (LEGADO x MODERNO)
+# =============================================
+
+gap_analysis:
+  - item: "Sincronização em tempo real"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Webhooks eliminam latência de 24h do polling batch"
+    impacto: "ALTO"
+
+  - item: "Retry automático com backoff exponencial"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Elimina intervenção manual em falhas temporárias"
+    impacto: "ALTO"
+
+  - item: "Credenciais em Azure Key Vault"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Conformidade SOX/LGPD, rotação automática"
+    impacto: "CRÍTICO"
+
+  - item: "Deduplicação por MessageId (UUID)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Previne processamento duplicado de mensagens"
+    impacto: "ALTO"
+
+  - item: "Validação de schema obrigatória"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Garante qualidade dos dados, previne erros silenciosos"
+    impacto: "ALTO"
+
+  - item: "Dashboard real-time com Angular"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Visibilidade operacional, export de dados, filtros avançados"
+    impacto: "MÉDIO"
+
+  - item: "Auditoria estruturada com retenção 7 anos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Conformidade LGPD, payload completo, consultas SQL"
+    impacto: "ALTO"
+
+  - item: "Reconciliação automática (95%)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Reduz trabalho financeiro, tolerância configurável"
+    impacto: "MÉDIO"
+
+  - item: "Multi-tenancy com Row-Level Security"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Reduz custo de infraestrutura, unifica bancos"
+    impacto: "ALTO"
+
+  - item: "Validação de período contábil"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Evita erros contábeis, validação obrigatória"
+    impacto: "MÉDIO"
+
+# =============================================
+# DECISÕES DE MODERNIZAÇÃO
+# =============================================
+
+decisoes_modernizacao:
+  - decisao: "Migrar credenciais para Azure Key Vault"
+    motivo: |
+      Conformidade com SOX, LGPD e boas práticas de segurança.
+      Tabela tbCredencialERP armazenava senhas em texto plano (vulnerabilidade crítica).
+    impacto: "alto"
+    data: "2025-12-30"
+    responsavel: "Agência ALC - alc.dev.br"
+
+  - decisao: "Substituir batch diário por webhooks em tempo real"
+    motivo: |
+      Reduzir latência de 24h para < 5 min, melhorar experiência do usuário.
+      Job SyncDiarioERP.vb será eliminado completamente.
+    impacto: "alto"
+    data: "2025-12-30"
+    responsavel: "Agência ALC - alc.dev.br"
+
+  - decisao: "Implementar Dead Letter Queue (DLQ) para mensagens com falha"
+    motivo: |
+      Garantir que nenhuma integração seja perdida silenciosamente.
+      Mensagens com 5 falhas de retry movidas para DLQ (Azure Service Bus).
+    impacto: "medio"
+    data: "2025-12-30"
+    responsavel: "Agência ALC - alc.dev.br"
+
+  - decisao: "Unificar bancos de dados multi-cliente em banco único com Row-Level Security"
+    motivo: |
+      Reduzir custo de infraestrutura, simplificar backups, melhorar escalabilidade.
+      Múltiplos bancos IControlIT_ClienteXX consolidados em banco único com EmpresaId.
+    impacto: "alto"
+    data: "2025-12-30"
+    responsavel: "Agência ALC - alc.dev.br"
+
+  - decisao: "Implementar validação obrigatória de schema (JSON Schema v7 / XSD)"
+    motivo: |
+      Prevenir erros silenciosos em dados malformados.
+      XML/JSON recebidos do ERP validados antes de processar.
+    impacto: "medio"
+    data: "2025-12-30"
+    responsavel: "Agência ALC - alc.dev.br"
+
+# =============================================
+# RISCOS DE MIGRAÇÃO
+# =============================================
+
+riscos_migracao:
+  - risco: "Perda de mensagens durante cutover (legado → moderno)"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      - Manter legado em paralelo por 30 dias
+      - Sincronizar DLQ com tabela legado tbIntegracaoERP
+      - Comparar contadores antes/depois do cutover
+      - Validar 100% das integrações críticas manualmente
+
+  - risco: "ERPs não suportam webhooks (SAP, Oracle EBS antigos)"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Manter polling como fallback para ERPs sem webhook
+      - Frequência de polling configurável (padrão 5 min)
+      - Notificar administrador se polling > 10 min sem sucesso
+
+  - risco: "Rotação automática de credencial quebra integração"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Testar rotação em ambiente HOM antes de PRD
+      - Manter credencial antiga ativa por 7 dias após rotação
+      - Notificar administrador 7 dias antes da rotação
+      - Rollback automático se integração falhar pós-rotação
+
+  - risco: "Tolerância de reconciliação muito restritiva (0,5%)"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      - Tornar tolerância configurável por cliente/tenant
+      - Padrão: 0,5% (mais restritiva que legado 1%)
+      - Permitir ajuste via interface administrativa
+      - Monitorar taxa de reconciliação manual (meta < 5%)
+
+  - risco: "Latência de Key Vault causa timeout em integrações"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Cache local de credenciais com TTL de 1h
+      - Refresh assíncrono de credenciais antes do vencimento
+      - Fallback para credencial em cache se Key Vault indisponível
+      - Alertar se latência Key Vault > 500ms
+
+  - risco: "Volume de mensagens sobrecarrega Dead Letter Queue"
+    impacto: "baixo"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Alertar quando DLQ > 50 mensagens
+      - Escalar automaticamente Azure Service Bus
+      - Dashboard de monitoramento de DLQ em tempo real
+      - Processo de investigação e reprocessamento de DLQ
+
+# =============================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# =============================================
+
+rastreabilidade:
+  - elemento_legado: "frmIntegracaoERP.aspx"
+    referencia_rf: "RN-RF078-007"
+    referencia_uc: "UC00-listar-integracoes"
+    status: "migrado"
+
+  - elemento_legado: "frmConfiguracaoERP.aspx"
+    referencia_rf: "RN-RF078-002"
+    referencia_uc: "UC01-configurar-credenciais"
+    status: "migrado"
+
+  - elemento_legado: "WSIntegracaoERP.asmx"
+    referencia_rf: "RN-RF078-001 a RN-RF078-010"
+    referencia_uc: "UC01 a UC04"
+    status: "migrado"
+
+  - elemento_legado: "tbIntegracaoERP"
+    referencia_rf: "RN-RF078-007"
+    referencia_uc: "IntegrationAudit (MD-RF078)"
+    status: "migrado"
+
+  - elemento_legado: "tbCredencialERP"
+    referencia_rf: "RN-RF078-002"
+    referencia_uc: "Azure Key Vault"
+    status: "descartado"
+
+  - elemento_legado: "tbCentroCusto"
+    referencia_rf: "RN-RF078-001"
+    referencia_uc: "CentroCusto (RF021)"
+    status: "migrado"
+
+  - elemento_legado: "SyncDiarioERP.vb (job batch)"
+    referencia_rf: "RN-RF078-001"
+    referencia_uc: "UC04-processar-webhook"
+    status: "migrado"
+
+  - elemento_legado: "ReconciliacaoService.vb"
+    referencia_rf: "RN-RF078-010"
+    referencia_uc: "UC03-reconciliar-faturas"
+    status: "migrado"
+
+# =============================================
+# METADADOS
+# =============================================
+
+metadados:
+  total_itens_legado: 18
+  itens_assumidos: 4
+  itens_substituidos: 13
+  itens_descartados: 1
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+
+# =============================================
+# CHANGELOG
+# =============================================
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Documentação completa do sistema legado de integrações com ERPs (18 itens rastreados, 100% destinos definidos)"
+    autor: "Agência ALC - alc.dev.br"

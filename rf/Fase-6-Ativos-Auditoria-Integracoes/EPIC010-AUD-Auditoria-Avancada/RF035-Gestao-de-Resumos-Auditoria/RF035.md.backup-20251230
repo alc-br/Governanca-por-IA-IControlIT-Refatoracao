@@ -1,0 +1,666 @@
+# RF035 - Gestão de Resumos de Auditoria
+
+**Versão:** 2.0 | **Data:** 2025-01-14
+**RF Relacionado:** RF034 (Gestão de Itens de Auditoria), RF054 (Gestão de Lotes de Auditoria) | **EPIC:** EPIC010-AUD-Auditoria-Avancada
+**Fase:** Fase 6 - Ativos, Auditoria e Integrações
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+O **RF035 - Gestão de Resumos de Auditoria** implementa o módulo de consolidação, análise e relatório gerencial de auditorias de faturas de telecomunicações. Este sistema é responsável por agregar dados detalhados de itens de auditoria (RF034) em resumos consolidados por período, operadora, tipo de serviço e lote, fornecendo visões executivas, indicadores de desempenho e alertas automáticos de desvios.
+
+O módulo permite que gestores, diretores e analistas visualizem o impacto financeiro das auditorias através de dashboards executivos, gráficos de tendências, análises comparativas entre períodos e indicadores de retorno sobre investimento (ROI), transformando dados granulares em inteligência de negócios estratégica.
+
+### 1.2 Importância Estratégica
+
+O módulo de Resumos de Auditoria é crítico para:
+
+- **Visibilidade Executiva:** Fornece dashboards gerenciais consolidados com KPIs em tempo real para tomada de decisão estratégica sobre continuidade de programas de auditoria
+- **Inteligência Financeira:** Calcula ROI de auditoria (economia realizada vs. investimento), justificando continuidade e expansão de programas
+- **Análise Comparativa:** Compara períodos (mês/mês, trimestre/trimestre, ano/ano) e operadoras para identificação de padrões de glosa e tendências
+- **Conformidade Contratual:** Documenta não-conformidades recorrentes de operadoras como base para renegociações de contratos e SLAs
+- **Performance Management:** Avalia efetividade de equipes de auditoria através de métricas de produtividade e ROI individual
+- **Alertas Operacionais:** Detecta desvios de padrão (glosas acima da média histórica) para investigação proativa e gestão de risco
+- **Exportação Gerencial:** Gera relatórios consolidados para diretoria, conselhos, stakeholders e acionistas em PDF e Excel
+
+### 1.3 Conceitos Fundamentais
+
+**Resumo de Auditoria:** Agregação consolidada de itens auditados (RF034) em um período específico, agrupado por dimensões (operadora, tipo serviço, centro custo, lote). Inclui totalizadores financeiros e indicadores de desempenho.
+
+- Período de consolidação (dia, mês, trimestre, ano)
+- Dimensões de agrupamento (operadora, tipo serviço, centro custo, lote)
+- Totalizadores financeiros (valor faturado, valor glosado, economia, %)
+
+**Glosa de Auditoria:** Diferença entre valor cobrado pela operadora e valor contratualmente correto, representando sobrecobranças a serem recuperadas. Calculada como: Valor Cobrado - Valor Correto.
+
+- Expressão em R$ (valor absoluto) e % de divergência para benchmarking
+- Essencial para quantificar impacto financeiro e justificar contestações
+
+**Drill-Down de Navegação:** Funcionalidade que permite exploração entre níveis hierárquicos de agregação, navegando de resumo consolidado para itens específicos para bilhetes originais.
+
+- Resumo (consolidado) → Itens (filtrados) → Bilhete (detalhe)
+- Preservação automática de contexto (filtros, período, operadora)
+
+**Indicador de Performance:** Métrica calculada derivada de dados de auditoria que quantifica efetividade, qualidade ou retorno do programa.
+
+- % glosa média por operadora (benchmark)
+- Taxa de economia realizada vs. investimento em auditoria (ROI)
+- Tempo médio de processamento de item por auditor (eficiência)
+- Ticket médio glosado (valor econômico médio por item)
+
+### 1.4 Legado vs. Modernizado
+
+| Aspecto | Legado (VB.NET + ASPX) | Modernizado (.NET 10 + Angular 19) |
+|---------|------------------------|-------------------------------------|
+| **Arquitetura** | Queries SQL simples em ASPX, sem camadas | Clean Architecture com CQRS, DDD e Event Sourcing |
+| **Consolidação** | Manual via SPs chamadas por Job do Scheduler | Hangfire Job + Domain Aggregates com lógica determinística |
+| **Cálculos** | Campos computados complexos em SELECT | Domain Value Objects com comportamento encapsulado |
+| **Performance** | Índices básicos (Clustered + 1-2 NonClustered) | Índices estratégicos + particionamento por período |
+| **Visualização** | Relatórios estáticos em Crystal Reports | Dashboards dinâmicos com Chart.js + atualização SignalR real-time |
+| **Drill-Down** | Abertura de múltiplas janelas ASPX desconexas | Navegação modal preservando contexto e breadcrumb |
+| **Alertas** | Verificação manual ou Jobs periódicos sem notification | Processamento baseado em Domain Events com notificação real-time |
+| **Multi-tenancy** | Campo Id_Conglomerado sem isolamento | Row-Level Security automática em TODAS queries + CONTEXT_INFO |
+| **Auditoria** | Log básico de alterações sem rastreamento completo | Event Sourcing completo com quem/quando/o quê/por quê |
+| **Exportação** | VBA em Excel com macros instáveis | PDF (iText 8+) e Excel (EPPlus 6+) gerado server-side com streaming |
+
+### 1.5 Funcionalidades Principais
+
+1. **Consolidação Automática Diária** - Job Hangfire executado diariamente (02h) consolidando itens auditados do dia anterior em resumos agrupados por período, operadora, tipo serviço e lote
+
+2. **Totalizadores Financeiros Automáticos** - Cálculo de somas: valor total faturado, valor total glosado, valor econômico realizado, percentual de glosa, percentual de economia com precisão de 8 casas decimais
+
+3. **Análise Comparativa Multi-Período** - Comparação mês atual vs. mês anterior, trimestre atual vs. anterior, ano atual vs. anterior com variações em valor absoluto e percentual
+
+4. **Indicadores de Performance Calculados** - KPIs: taxa de economia em %, ROI de auditoria, % glosa por operadora, ticket médio glosado, itens processados por auditor/dia, eficiência operacional
+
+5. **Dashboard Executivo em Tempo Real** - Visualização de principais indicadores com gráficos (Chart.js: linhas/barras/pizza), totalizadores, Top 10 (maiores glosas, operadoras divergentes) com atualização SignalR
+
+6. **Drill-Down Navegável com Contexto** - Capacidade de descer de resumo consolidado para itens específicos para bilhetes originais preservando filtros aplicados, período, operadora, lote
+
+7. **Alertas de Desvios Automáticos** - Detecção quando: glosa operadora > limite histórico, glosa mês atual > mês anterior em +20%, economia < 80% meta, padrões novos de glosa detectados
+
+8. **Exportação de Relatórios Gerenciais** - Geração de PDF (iText) e Excel (EPPlus) com gráficos, tabelas consolidadas, análises comparativas, 16 pontos i18n, assinatura digital
+
+9. **Histórico de Períodos com Arquivamento** - Manutenção de arquivo histórico de resumos anteriores (3 anos online, 7 anos em backup conforme LGPD) para análise de tendências multi-ano
+
+10. **Integração Bidirecional com Lotes** - Vinculação com RF054 (Gestão de Lotes), permitindo navegação: resumo → lote origem e lote → resumos consolidados
+
+11. **Segurança Row-Level Automática** - Isolamento por conglomerado (ClienteId obrigatório) com validação em TODAS operações CRUD, RLS SQL Server, CONTEXT_INFO
+
+12. **Integração com SLA Audit** - Links para configurações de SLA (RF028, RF029) permitindo contexto sobre tolerância de divergências por tipo serviço
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-RES-035-01: Consolidação Automática Diária com Agrupamento Multi-Dimensional
+
+**Descrição:** O sistema deve executar automaticamente um job Hangfire a cada dia às 02h00 (horário servidor UTC) que consolida todos os itens de auditoria criados no dia anterior, agrupando por ClienteId, Operadora, TipoServico, LoteAuditoriaId e DataPeriodo, criando um resumo por combinação única.
+
+**Justificativa:** Garante dados sempre atualizados sem ações manuais. Executa fora horário comercial minimizando impacto performance. Agrupamento multi-dimensional permite análises em múltiplos níveis.
+
+**Implementação:**
+```csharp
+[DisableConcurrentExecution(timeoutInSeconds: 3600)]
+public class ConsolidacaoAuditoriaJobHandler : IBackgroundJob
+{
+    private readonly IAuditoriaResumoRepository _repository;
+    private readonly IAuditoriaItemRepository _itemRepository;
+    private readonly IDomainEventPublisher _eventPublisher;
+    private readonly ILogger<ConsolidacaoAuditoriaJobHandler> _logger;
+
+    [JobName("ConsolidacaoAuditoriaJob")]
+    public async Task Execute()
+    {
+        _logger.LogInformation("Iniciando consolidação de auditoria");
+        var ontem = DateTime.UtcNow.AddDays(-1).Date;
+
+        // Agrupar itens por ClienteId, Operadora, TipoServico, Lote
+        var itensAgrupados = await _itemRepository.GetItensPorConsolidar(ontem);
+
+        foreach (var grupo in itensAgrupados)
+        {
+            try
+            {
+                // Criar resumo do agregado
+                var resumo = AuditoriaResumo.CriarDoGrupoItens(
+                    grupo.ClienteId,
+                    grupo.Operadora,
+                    grupo.TipoServico,
+                    grupo.LoteId,
+                    ontem,
+                    grupo.Itens
+                );
+
+                await _repository.SalvarResumo(resumo);
+                await _eventPublisher.PublishAsync(
+                    new AuditoriaResumoConsolidadoEvent(resumo.Id));
+
+                _logger.LogInformation(
+                    $"Resumo consolidado: {resumo.Operadora} {resumo.TotalGlosado:C}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Erro ao consolidar grupo: {ex.Message}");
+                throw;
+            }
+        }
+
+        _logger.LogInformation("Consolidação concluída");
+    }
+}
+
+// Aggregado de Domínio
+public class AuditoriaResumo : AggregateRoot
+{
+    public Guid ClienteId { get; private set; }
+    public string Operadora { get; private set; }
+    public string TipoServico { get; private set; }
+    public Guid? LoteAuditoriaId { get; private set; }
+    public DateTime DataPeriodo { get; private set; }
+
+    public decimal TotalFaturado { get; private set; }
+    public decimal TotalGlosado { get; private set; }
+    public decimal TotalEconomia { get; private set; }
+    public decimal PercentualGlosa { get; private set; }
+    public decimal PercentualEconomia { get; private set; }
+    public int QuantidadeItens { get; private set; }
+
+    public DateTime DataConsolidacao { get; private set; }
+    public Guid? CriadoPorUserId { get; private set; }
+    public byte[] RowVersion { get; private set; }
+
+    public static AuditoriaResumo CriarDoGrupoItens(
+        Guid clienteId, string operadora, string tipoServico, Guid? loteId,
+        DateTime periodo, List<AuditoriaItem> itens)
+    {
+        var resumo = new AuditoriaResumo
+        {
+            Id = Guid.NewGuid(),
+            ClienteId = clienteId,
+            Operadora = operadora,
+            TipoServico = tipoServico,
+            LoteAuditoriaId = loteId,
+            DataPeriodo = periodo,
+            DataConsolidacao = DateTime.UtcNow
+        };
+
+        resumo.ConsolidarItens(itens);
+        return resumo;
+    }
+
+    private void ConsolidarItens(List<AuditoriaItem> itens)
+    {
+        TotalFaturado = itens.Sum(x => x.ValorCobrado);
+        TotalGlosado = itens.Sum(x => x.ValorCobradoAMais);
+        TotalEconomia = TotalGlosado;
+        QuantidadeItens = itens.Count;
+
+        if (TotalFaturado > 0)
+        {
+            PercentualGlosa = (TotalGlosado / TotalFaturado) * 100;
+            PercentualEconomia = (TotalEconomia / TotalFaturado) * 100;
+        }
+        else
+        {
+            PercentualGlosa = 0;
+            PercentualEconomia = 0;
+        }
+
+        RaiseEvent(new AuditoriaResumoConsolidadoEvent(this.Id));
+    }
+}
+```
+
+**Exemplos Válidos:**
+- Dia 2025-01-14: Consolida itens de 2025-01-13, agrupa 5 resumos (VIVO/SMS, VIVO/Dados, TIM/Chamada, etc)
+- Cada resumo único por (ClienteId=ABC, Operadora=VIVO, TipoServico=SMS, LoteId=L001)
+
+---
+
+### RN-RES-035-02: Cálculo Automático e Validado de Totalizadores
+
+**Descrição:** Sistema calcula automaticamente: TotalFaturado (Σ ValorCobrado), TotalGlosado (Σ ValorCobradoAMais), TotalEconomia (= TotalGlosado), PercentualGlosa (Glosado / Faturado * 100), PercentualEconomia (Economia / Faturado * 100) com precisão de 8 casas decimais conforme padrão telecomunicações.
+
+**Justificativa:** Elimina erros de cálculo manual. Garante consistência em todas visualizações. Cálculo determinístico permite auditoria e verificação.
+
+**Implementação:**
+```csharp
+public class TotalizadorAuditoriaValueObject : ValueObject
+{
+    public const int PRECISION = 8;
+    public const int SCALE = 2; // casas decimais para moeda
+
+    public decimal TotalFaturado { get; }
+    public decimal TotalGlosado { get; }
+    public decimal TotalEconomia { get; }
+    public decimal PercentualGlosa { get; }
+    public decimal PercentualEconomia { get; }
+    public int QuantidadeItens { get; }
+    public decimal TicketMedioGlosado { get; }
+
+    public static TotalizadorAuditoriaValueObject Calcular(List<AuditoriaItem> itens)
+    {
+        if (!itens.Any())
+            throw new DomainException("Não há itens para calcular totalizadores");
+
+        var totalFaturado = itens.Sum(x => x.ValorCobrado);
+        var totalGlosado = itens.Sum(x => x.ValorCobradoAMais);
+        var quantidade = itens.Count;
+
+        // Validar coerência
+        if (totalGlosado > totalFaturado)
+            throw new DomainException("Glosa não pode ser maior que faturado");
+
+        if (totalGlosado < 0 || totalFaturado < 0)
+            throw new DomainException("Valores não podem ser negativos");
+
+        var percentualGlosa = totalFaturado > 0
+            ? Math.Round((totalGlosado / totalFaturado) * 100, 2)
+            : 0;
+
+        var ticketMedio = quantidade > 0
+            ? Math.Round(totalGlosado / quantidade, 2)
+            : 0;
+
+        return new TotalizadorAuditoriaValueObject(
+            totalFaturado,
+            totalGlosado,
+            totalGlosado, // Economia = Glosado
+            percentualGlosa,
+            percentualGlosa, // % Economia = % Glosa
+            quantidade,
+            ticketMedio
+        );
+    }
+
+    protected override IEnumerable<object> GetEqualityComponents()
+    {
+        yield return TotalFaturado;
+        yield return TotalGlosado;
+        yield return PercentualGlosa;
+    }
+}
+```
+
+**Exemplos:**
+- Válido: 10 itens, Faturado=R$1.000,00, Glosado=R$150,00, % Glosa=15,00%
+- Inválido: Glosado=R$1.500 (> Faturado) → DomainException lançada
+
+---
+
+### RN-RES-035-03: Análise Comparativa Automática Entre Períodos
+
+**Descrição:** Sistema calcula automaticamente variações: período atual vs. período anterior, em valores absolutos e percentuais com contexto (mês, trimestre, ano). Variações > 20% geram alertas.
+
+**Justificativa:** Permite identificação rápida de tendências e desvios sem processamento manual. Essencial para análises executivas proativas.
+
+---
+
+### RN-RES-035-04: Cálculo de Indicadores de Performance
+
+**Descrição:** Sistema calcula: % Glosa Média por Operadora, ROI Auditoria, Taxa Economia vs Meta, Ticket Médio, Eficiência por Auditor com atualização automática.
+
+**Justificativa:** Indicadores consolidados permitem análise gerencial rápida e identificação de operadoras problema.
+
+---
+
+### RN-RES-035-05: Alertas de Desvios Automáticos
+
+**Descrição:** Gera alertas quando: glosa > limite, variação > 20%, economia < 80% meta, padrões novos detectados (>2 desvios padrão).
+
+**Justificativa:** Identificação proativa sem monitoramento manual. Severidade diferenciada (CRITICO, ALERTA, AVISO) direciona atenção.
+
+---
+
+### RN-RES-035-06: Drill-Down com Preservação de Contexto
+
+**Descrição:** Navegação entre níveis: Resumo → Itens → Bilhete preservando TODOS os filtros e mantendo breadcrumb.
+
+**Justificativa:** Análise exploratória essencial. Contexto preservado melhora usabilidade.
+
+---
+
+### RN-RES-035-07: Integração Bidirecional com Lotes (RF054)
+
+**Descrição:** Resumos vinculados a lotes. A partir de resumo, acessar lote. A partir de lote, visualizar resumos que contêm seus itens.
+
+**Justificativa:** Rastreabilidade completa. Integração entre módulos obrigatória.
+
+---
+
+### RN-RES-035-08: Exportação em Múltiplos Formatos
+
+**Descrição:** Exportação em PDF (iText 8+) com gráficos e Excel (EPPlus 6+) com múltiplas abas.
+
+**Justificativa:** Compartilhamento com stakeholders sem acesso ao sistema. Formatos estruturados facilitam análise.
+
+---
+
+### RN-RES-035-09: Row-Level Security por ClienteId
+
+**Descrição:** Isolamento automático por ClienteId com RLS SQL Server em TODAS operações CRUD.
+
+**Justificativa:** Multi-tenancy obrigatório. Sem RLS, dados vazar entre clientes.
+
+---
+
+### RN-RES-035-10: Auditoria Completa de Alterações
+
+**Descrição:** Registra: quem, quando, o quê (campo + antes/depois), por quê com retenção de 7 anos.
+
+**Justificativa:** Conformidade LGPD e rastreabilidade para auditorias.
+
+---
+
+### RN-RES-035-11: Validação de Integridade Referencial
+
+**Descrição:** Valida que lote (FK) existe, todos itens pertencem ao resumo, período coincide.
+
+**Justificativa:** Previne dados órfãos e inconsistências.
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco:** `Auditoria` (SQL Server 2019+)
+
+**Tabelas Principais:**
+
+```sql
+CREATE TABLE [dbo].[Auditoria_Resumo](
+    [Id_Auditoria_Resumo] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Conglomerado] [int] NOT NULL,
+    [Id_Operadora] [int] NOT NULL,
+    [Nm_Operadora] [varchar](100) NOT NULL,
+    [Id_Lote_Auditoria] [int] NULL,
+    [Dt_Resumo] [datetime] NOT NULL,
+    [Vl_Total_Faturado] [numeric](13,2) NOT NULL,
+    [Vl_Total_Glosado] [numeric](13,2) NOT NULL,
+    [Vl_Total_Economia] [numeric](13,2) NOT NULL,
+    [Pc_Glosa] [numeric](5,2) NOT NULL,
+    [Pc_Economia] [numeric](5,2) NOT NULL,
+    [Qt_Itens_Auditados] [int] NOT NULL,
+    [Vl_Ticket_Medio] [numeric](13,2) NULL,
+    [Dt_Consolidacao] [datetime] NOT NULL,
+    [Id_Usuario_Consolidacao] [int] NULL,
+    [Fl_Ativo] [tinyint] NOT NULL DEFAULT 1,
+    CONSTRAINT [PK_Auditoria_Resumo] PRIMARY KEY CLUSTERED ([Id_Auditoria_Resumo] ASC)
+)
+```
+
+**Mapeamento:**
+
+| Campo Legado | Modernizado | Descrição |
+|--------------|------------|-----------|
+| `Id_Auditoria_Resumo` | `Id` (Guid) | Identificador |
+| `Id_Conglomerado` | `ClienteId` (Guid) | Multi-tenancy |
+| `Nm_Operadora` | `Operadora` (string) | Operadora |
+| `Dt_Resumo` | `DataPeriodo` (DateTime) | Período |
+| `Vl_Total_Faturado` | `TotalFaturado` (decimal) | Valor faturado |
+| `Vl_Total_Glosado` | `TotalGlosado` (decimal) | Valor glosado |
+| `Pc_Glosa` | `PercentualGlosa` (%) | % glosa |
+
+### 3.2 Stored Procedures Legado
+
+| SP | Migração |
+|----|----------|
+| `pa_ConsolidarAuditoria` | ConsolidacaoAuditoriaJobHandler (Hangfire) |
+| `pa_CalcularIndicadores` | IndicadorPerformanceCalculador |
+| `pa_GerarAlertas` | AlertaGlosaDomainService |
+| `pa_ExportarPDF` | ExportadorResumoPDF (iText) |
+| `pa_ExportarExcel` | ExportadorResumoExcel (EPPlus) |
+
+### 3.3 Telas ASPX Legado
+
+| Página | Tela Angular |
+|--------|------------|
+| `ResumoAuditoria.aspx` | `/admin/auditoria/resumos` |
+| `DashboardAuditoria.aspx` | `/admin/auditoria/dashboard` |
+| `ComparaPeriodos.aspx` | `/admin/auditoria/comparacao` |
+| `AlertasAuditoria.aspx` | `/admin/auditoria/alertas` |
+
+### 3.4 WebServices Legado
+
+**Arquivo:** `D:\IC2\ic1_legado\WebService\WSAuditoria.asmx.vb`
+
+| Método | Endpoint Moderno |
+|--------|-----------------|
+| `GetResumosPeriodo` | `GET /api/auditoria/resumos` |
+| `GetResumoDetalhes` | `GET /api/auditoria/resumos/{id}` |
+| `CalcularIndicadores` | `POST /api/auditoria/indicadores` |
+| `GetAlertas` | `GET /api/auditoria/alertas` |
+| `ExportarPDF` | `GET /api/auditoria/resumos/{id}/pdf` |
+| `ExportarExcel` | `GET /api/auditoria/resumos/{id}/excel` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades
+
+```json
+{
+    "featureKey": "AUDITORIA_RESUMOS",
+    "nome": "Gestão de Resumos de Auditoria",
+    "descricao": "Consolidação e análise gerencial",
+    "habilitado": true
+}
+```
+
+### 4.2 Internacionalização (i18n - 16 Pontos)
+
+```json
+{
+    "auditoria": {
+        "resumos": {
+            "titulo": "Resumos de Auditoria",
+            "dashboard": "Dashboard Executivo",
+            "periodo": "Período",
+            "operadora": "Operadora",
+            "totalFaturado": "Total Faturado",
+            "totalGlosado": "Total Glosado",
+            "economia": "Economia",
+            "percentualGlosa": "% Glosa",
+            "acoes": "Ações",
+            "exportar": "Exportar",
+            "analisar": "Analisar",
+            "filtrar": "Filtrar",
+            "comparar": "Comparar",
+            "alerst": "Alertas"
+        }
+    }
+}
+```
+
+### 4.3 Auditoria
+
+Operações auditadas: CREATE, UPDATE, DELETE, EXPORT com retenção de 7 anos (LGPD).
+
+### 4.4 Controle de Acesso (RBAC)
+
+| Permissão | Perfis |
+|-----------|--------|
+| `auditoria:resumo:read` | Gerente, Auditor, Diretor, Admin |
+| `auditoria:resumo:export` | Gerente, Auditor, Diretor, Admin |
+| `auditoria:indicador:read` | Gerente, Diretor, Admin |
+| `auditoria:alerta:read` | Gerente, Diretor, Admin |
+| `auditoria:itens:read` | Gerente, Auditor, Diretor, Admin |
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/auditoria/resumos` | Listar com filtros | `auditoria:resumo:read` |
+| GET | `/api/auditoria/resumos/{id}` | Obter específico | `auditoria:resumo:read` |
+| POST | `/api/auditoria/resumos` | Criar | `auditoria:resumo:create` |
+| PUT | `/api/auditoria/resumos/{id}` | Atualizar | `auditoria:resumo:update` |
+| DELETE | `/api/auditoria/resumos/{id}` | Excluir (soft) | `auditoria:resumo:delete` |
+
+### 5.2 Operações Especiais
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| POST | `/api/auditoria/resumos/{id}/calcular-indicadores` | Recalcula KPIs | `auditoria:indicador:read` |
+| GET | `/api/auditoria/resumos/{id}/itens` | Drill-down itens | `auditoria:itens:read` |
+| POST | `/api/auditoria/resumos/{id}/comparar-periodos` | Análise comparativa | `auditoria:resumo:read` |
+| GET | `/api/auditoria/resumos/{id}/exportar/pdf` | PDF | `auditoria:resumo:export` |
+| GET | `/api/auditoria/resumos/{id}/exportar/excel` | Excel | `auditoria:resumo:export` |
+| GET | `/api/auditoria/resumos/{id}/lote` | Navega para lote | `auditoria:resumo:read` |
+| POST | `/api/auditoria/resumos/consolidar/agora` | Job manual | `auditoria:resumo:create` |
+| GET | `/api/auditoria/alertas` | Lista alertas | `auditoria:alerta:read` |
+| POST | `/api/auditoria/alertas/{id}/reconhecer` | Marca alerta | `auditoria:alerta:acknowledge` |
+| GET | `/api/auditoria/dashboard` | Dashboard KPIs | `auditoria:indicador:read` |
+| GET | `/api/auditoria/resumos/top10/divergencias` | Top 10 maiores glosas | `auditoria:resumo:read` |
+| GET | `/api/auditoria/evolucao/ultimos-12-meses` | Tendência 12 meses | `auditoria:resumo:read` |
+| GET | `/api/auditoria/indicadores/roi` | ROI da auditoria | `auditoria:indicador:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Consolidação Automática Diária
+
+```
+00:00 Dia +1
+  → Job Hangfire executa ConsolidacaoJob
+  → Query: SELECT itens WHERE DataCriacao = ontem
+  → Agrupar por (ClienteId, Operadora, TipoServico, LoteId)
+  → Para cada grupo: Criar resumo, calcular totalizadores
+  → Validar integridade (lote existe, itens pertencem)
+  → Salvar no BD com soft delete antiga
+  → Publicar AuditoriaResumoConsolidadoEvent
+  → Event Handler gera alertas, calcula indicadores
+  → SignalR notifica dashboards
+  → 02:30 Concluído com sucesso
+```
+
+### 6.2 Drill-Down com Navegação Preservada
+
+```
+Dashboard → Clica em VIVO R$22.500
+  → URL: /admin/auditoria/resumos/{id}/itens?operadora=VIVO&periodo=2025-01
+  → API valida ClienteId e filtros
+  → Retorna 450 itens com contexto preservado
+  → Breadcrumb: Dashboard > Resumo VIVO Jan/2025 > Itens
+  → Clica item com divergência R$300
+  → URL: /admin/auditoria/itens/{item-id}/bilhete?contexto=...
+  → Exibe bilhete detalhe com link "voltar"
+  → Clica voltar → restaura contexto anterior
+```
+
+### 6.3 Geração de Alerta de Desvio
+
+```
+AuditoriaResumoConsolidado
+  → AlertaDomainService.Verificar
+  → Query: Obter limite para (ClienteId, Operadora)
+  → IF Glosa > limite → Criar AlertaAuditoria(ALERTA)
+  → Query: Obter resumo período anterior
+  → IF variação > 20% → Criar AlertaAuditoria(AVISO)
+  → Query: Obter histórico 12 meses
+  → IF padrão novo (>2σ) → Criar AlertaAuditoria(CRITICO)
+  → Salvar alertas no BD
+  → Publicar AlertaAuditoriaGeradoEvent
+  → Event Handler registra em AuditLog
+  → SignalR notifica usuários conectados
+  → Dashboard mostra notificação real-time
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Implementação |
+|----------|---------------|
+| **Row-Level Security** | SQL Server RLS + CONTEXT_INFO |
+| **JWT Validation** | [Authorize] attribute |
+| **RBAC** | AuthorizationHandler customizado |
+| **SQL Injection** | EF Core + parametrização |
+| **XSS** | Angular sanitizer + CSP |
+| **CSRF** | AntiForgeryToken middleware |
+| **Encryption** | HTTPS/TLS obrigatório |
+| **Audit Logging** | [Audit] attribute + Log |
+| **Concurrency** | RowVersion em aggregates |
+| **Input Validation** | Fluent Validation |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] SQL Injection: `' OR '1'='1` escapado
+- [ ] XSS: `<script>alert()</script>` sanitizado
+- [ ] CSRF: POST sem token → 403
+- [ ] Acesso não-autorizado: ClienteId diferente → 403
+- [ ] Escalação: Auditor deletar → 403
+- [ ] Race condition: Dois PUTs → 409
+- [ ] Auditoria: Todas C/U/D geram log
+- [ ] JWT expirado → 401
+- [ ] Timeout: > 30s → 504
+- [ ] Rate Limiting: > 100/min → 429
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medição |
+|-----|------|---------|
+| **Glosa Média** | < 10% | (Glosado / Faturado) * 100 |
+| **ROI Auditoria** | > 300% | (Economia / Investimento) * 100 |
+| **Taxa Economia** | > 80% | (Economia / Meta) * 100 |
+| **Ticket Médio** | > R$100 | Glosado / Itens |
+| **Eficiência** | > 50 itens/dia | Itens / Dias |
+| **Tempo Resposta** | < 5s | Response time |
+| **Disponibilidade** | > 99.5% | Uptime |
+| **Conformidade** | > 95% | Conformes / Total |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| **Glosa Alta** | % > limite | Notificar supervisor |
+| **Aumento** | +20% vs anterior | Revisar lote |
+| **Meta** | < 80% | Avaliar expansão |
+| **Lentidão** | Response > 10s | Investigar índices |
+| **Falha Job** | Job erro | Reexecutar manualmente |
+| **Inconsistência** | Validação falha | Alertar DBA |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF035](./MD-RF035.md) com DDL, índices, particionamento
+2. **Casos de Uso**: Criar [UC-RF035](./UC-RF035.md) com 5 casos de uso
+3. **Workflows**: Criar [WF-RF035](./WF-RF035.md) com mockups Angular
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml) com mínimo 2 stories
+5. **Backend**: Commands/Queries/Handlers/Repositories
+6. **Frontend**: Componentes Angular com Chart.js/SignalR
+7. **Testes**: TC-RF035-BACKEND.md, FRONTEND.md, E2E.md
+8. **Deploy**: Playbook HOM/PRD com seed
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição |
+|--------|------|-----------|
+| 2.0 | 2025-01-14 | Reescrita completa com 11 regras, 13 endpoints, 3 fluxos |
+| 1.0 | 2025-01-14 | Versão inicial |
+
+---
+
+**Última Atualização:** 2025-01-14
+**Autor:** Architect Agent
+**Revisão:** Pendente
+**Status:** Pronto para MD-RF035

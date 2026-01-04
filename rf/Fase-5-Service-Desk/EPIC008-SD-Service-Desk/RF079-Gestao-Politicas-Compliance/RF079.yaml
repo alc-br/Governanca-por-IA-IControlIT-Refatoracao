@@ -1,0 +1,475 @@
+# =============================================
+# RF-079 - Gestão de Políticas e Compliance
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF079"
+  nome: "Gestão de Políticas e Compliance"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 5 - Service Desk (Operações, Governance e Conformidade)"
+  epic: "EPIC008-SD-Service-Desk"
+  status: "draft"  # draft | aprovado | em_desenvolvimento | concluido
+
+descricao:
+  objetivo: "Centralizar, versionizar e rastrear o cumprimento de políticas corporativas em toda a organização, garantindo conformidade com regulamentações (LGPD, SOX, ISO 27001, ISO 20000, ITIL v4)"
+  problema_resolvido: "Falta de rastreabilidade de aceites de políticas, conformidade manual impossível em escala, dificuldade de demonstrar compliance em auditorias externas"
+  publico_afetado: "Compliance Officers, Gestores, Diretores, Usuários Finais, Auditores Externos"
+
+escopo:
+  incluso:
+    - "Criação e manutenção de políticas corporativas"
+    - "Versionamento automático de políticas"
+    - "Workflow de aprovação multi-nível"
+    - "Aceite obrigatório de políticas por usuários"
+    - "Verificação automática de conformidade"
+    - "Dashboard de compliance em tempo real"
+    - "Gestão de exceções de conformidade"
+    - "Matriz de compliance (políticas × regulamentações)"
+    - "Notificações automáticas (email, in-app, SignalR)"
+    - "Busca full-text em políticas"
+    - "Categorização de políticas"
+    - "Controle de acesso RBAC"
+    - "Auditoria completa"
+    - "Multi-idioma (pt-BR, en-US, es-ES)"
+  fora:
+    - "Interface visual específica"
+    - "Tecnologia de implementação"
+    - "Integração com sistemas externos de compliance terceiros"
+
+entidades:
+  - nome: "Politica"
+    descricao: "Política corporativa com versionamento e workflow de aprovação"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "PoliticaHistorico"
+    descricao: "Histórico de versões de políticas (imutável)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "AceitePolitica"
+    descricao: "Registro de aceite de política por usuário"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "MatrizCompliance"
+    descricao: "Mapeamento entre políticas e regulamentações externas"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "VerificacaoConformidade"
+    descricao: "Registro de verificação automática de conformidade"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "ExcecaoConformidade"
+    descricao: "Exceção temporária de conformidade com data de expiração"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "RegraConformidadeAutomatica"
+    descricao: "Regra configurável para detecção automática de violações"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF079-01"
+    descricao: "Versionamento automático de políticas - alteração em estado Elaboração ou Revisão incrementa versão e cria histórico imutável"
+    tipo: "regra_negocio"
+    campos_afetados: ["Versao", "PoliticaHistorico"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+  - id: "RN-RF079-02"
+    descricao: "Aceite obrigatório de políticas publicadas - usuário bloqueado até aceitar, aceite registrado com timestamp, IP e User-Agent"
+    tipo: "validacao"
+    campos_afetados: ["DataAceite", "IpAddress", "UserAgent"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+  - id: "RN-RF079-03"
+    descricao: "Workflow de aprovação multi-nível - transições de estado exigem aprovador com perfil específico"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "TransicaoPoliticaAprovacao"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+  - id: "RN-RF079-04"
+    descricao: "Matriz de compliance - política publicada deve estar mapeada a uma ou mais regulamentações (LGPD, SOX, ISO 27001, ISO 20000, ITIL v4)"
+    tipo: "regra_negocio"
+    campos_afetados: ["MatrizCompliance.Regulamentacao", "RequisitoCodigo"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF079-05"
+    descricao: "Detecção automática de não-conformidade - job diário verifica aceites e regras configuradas, gera alertas"
+    tipo: "regra_negocio"
+    campos_afetados: ["VerificacaoConformidade.EmConformidade", "MotivoDeSconformidade"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF079-06"
+    descricao: "Gestão de exceções de conformidade - aprovador pode conceder exceção temporária com data de expiração"
+    tipo: "regra_negocio"
+    campos_afetados: ["ExcecaoConformidade.DataExpiracao", "AprovadoPor"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF079-07"
+    descricao: "Dashboard de compliance em tempo real - taxa de conformidade geral e por dimensões (política, departamento, usuário)"
+    tipo: "regra_negocio"
+    campos_afetados: ["TaxaConformidadeGeral"]
+    obrigatorio: true
+    criticidade: "MÉDIA"
+
+  - id: "RN-RF079-08"
+    descricao: "Notificações de atualização e violação - envio automático via email, in-app e SMS (opcional)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Notificacao"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF079-09"
+    descricao: "Busca full-text em políticas - performance < 200ms P95, tolerância a erros de digitação"
+    tipo: "performance"
+    campos_afetados: ["Titulo", "Descricao", "Conteudo"]
+    obrigatorio: true
+    criticidade: "MÉDIA"
+
+  - id: "RN-RF079-10"
+    descricao: "Integração com auditoria - todas as operações registradas com código padronizado (POL_*), retenção 7 anos"
+    tipo: "seguranca"
+    campos_afetados: ["Auditoria.OperacaoCodigo"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+  - id: "RN-RF079-11"
+    descricao: "Isolamento multi-tenant - usuário acessa apenas dados do próprio ClienteId"
+    tipo: "seguranca"
+    campos_afetados: ["ClienteId"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+  - id: "RN-RF079-12"
+    descricao: "Permissões RBAC - cada operação exige permissão explícita (compliance:politica:*, compliance:dashboard:*, compliance:excepcao:*)"
+    tipo: "seguranca"
+    campos_afetados: ["Permissao"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+estados:
+  - id: "Elaboracao"
+    descricao: "Criador edita livremente, versão pode ser incrementada"
+  - id: "Revisao"
+    descricao: "Revisor(es) analisam, edição bloqueada para criador"
+  - id: "Aprovada"
+    descricao: "Aprovador(es) validaram, versão congelada"
+  - id: "Publicada"
+    descricao: "Usuários devem aceitar, não editável"
+  - id: "Obsoleta"
+    descricao: "Política desativada, não exigível"
+
+transicoes:
+  permitidas:
+    - de: "Elaboracao"
+      para: "Revisao"
+      requer_aprovacao: false
+    - de: "Revisao"
+      para: "Aprovada"
+      requer_aprovacao: true
+      aprovador: "Revisor Técnico"
+    - de: "Aprovada"
+      para: "Publicada"
+      requer_aprovacao: true
+      aprovador: "Diretor / Compliance Officer"
+    - de: "Publicada"
+      para: "Obsoleta"
+      requer_aprovacao: true
+      aprovador: "Compliance Officer"
+    - de: "Revisao"
+      para: "Elaboracao"
+      requer_aprovacao: true
+      aprovador: "Revisor (rejeição)"
+  proibidas:
+    - de: "Elaboracao"
+      para: "Publicada"
+      motivo: "Pula revisão e aprovação"
+    - de: "Obsoleta"
+      para: "Publicada"
+      motivo: "Política obsoleta não pode voltar"
+    - de: "Publicada"
+      para: "Elaboracao"
+      motivo: "Políticas aceitas não podem ser editadas"
+
+permissoes:
+  - codigo: "compliance:politica:create"
+    descricao: "Criar nova política"
+    roles_autorizadas:
+      - "Compliance Officer"
+      - "Diretor"
+  - codigo: "compliance:politica:read"
+    descricao: "Visualizar políticas"
+    roles_autorizadas:
+      - "Todos os usuários autenticados"
+  - codigo: "compliance:politica:update"
+    descricao: "Editar política existente"
+    roles_autorizadas:
+      - "Compliance Officer"
+      - "Revisor"
+      - "Aprovador"
+  - codigo: "compliance:politica:delete"
+    descricao: "Excluir política (soft delete)"
+    roles_autorizadas:
+      - "Compliance Officer"
+      - "Diretor"
+  - codigo: "compliance:politica:publicar"
+    descricao: "Publicar política (transição Aprovada → Publicada)"
+    roles_autorizadas:
+      - "Aprovador"
+      - "Diretor"
+  - codigo: "compliance:aceite:view"
+    descricao: "Visualizar histórico de aceites"
+    roles_autorizadas:
+      - "Compliance Officer"
+      - "Gestor"
+      - "Diretor"
+  - codigo: "compliance:excepcao:criar"
+    descricao: "Criar exceção de conformidade"
+    roles_autorizadas:
+      - "Gerente de Compliance"
+      - "Diretor"
+  - codigo: "compliance:dashboard:view"
+    descricao: "Visualizar dashboard de compliance"
+    roles_autorizadas:
+      - "Compliance Officer"
+      - "Gestor"
+      - "Diretor"
+  - codigo: "compliance:auditoria:view"
+    descricao: "Visualizar logs de auditoria"
+    roles_autorizadas:
+      - "Compliance Officer"
+      - "Diretor"
+      - "Auditor Externo"
+  - codigo: "compliance:exportar"
+    descricao: "Exportar relatórios de compliance"
+    roles_autorizadas:
+      - "Compliance Officer"
+      - "Diretor"
+
+integracoes:
+  internas:
+    - "Autenticação (JWT Bearer Token)"
+    - "Multi-Tenancy (ClienteId)"
+    - "Auditoria (RF095, RF096, RF098)"
+    - "Controle de Acesso RBAC (RF012, RF013)"
+    - "Internacionalização i18n (Transloco)"
+    - "Central de Funcionalidades (Feature Flags)"
+  externas:
+    - sistema: "ElasticSearch"
+      tipo: "Busca Full-Text"
+      obrigatoria: false
+      fallback: "Busca SQL com LIKE"
+    - sistema: "SendGrid"
+      tipo: "Envio de Email"
+      obrigatoria: true
+      fallback: "SMTP padrão"
+    - sistema: "SignalR"
+      tipo: "Notificações Real-Time"
+      obrigatoria: true
+      fallback: "Polling"
+    - sistema: "Hangfire"
+      tipo: "Jobs Assíncronos (verificação automática)"
+      obrigatoria: true
+      fallback: "N/A"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_entrada: true
+  protecao_sql_injection: true
+  protecao_xss: true
+  jwt_obrigatorio: true
+  https_tls_13: true
+  rate_limiting: true
+  rate_limit_valor: "100 requests/min por usuário"
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00 - Listar Políticas"
+    - "UC01 - Criar Política"
+    - "UC02 - Visualizar Política"
+    - "UC03 - Editar Política"
+    - "UC04 - Excluir Política (Soft Delete)"
+    - "UC05 - Transicionar Status de Política"
+    - "UC06 - Publicar Política"
+    - "UC07 - Aceitar Política"
+    - "UC08 - Obter Dashboard de Compliance"
+    - "UC09 - Obter Matriz de Compliance"
+    - "UC10 - Criar Exceção de Conformidade"
+    - "UC11 - Buscar Políticas (Full-Text)"
+    - "UC12 - Exportar Relatórios de Compliance"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar política corporativa"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar políticas com filtros e paginação"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar política por ID"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar política com versionamento"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Excluir política (soft delete)"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar campos obrigatórios (título, descrição, categoria)"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar transições de estado permitidas"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar permissões de aprovador conforme workflow"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar aceite único por usuário/política"
+      required: true
+    - id: "RF-VAL-05"
+      title: "Validar data de expiração de exceção (futuro obrigatório)"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant (ClienteId)"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC em todos os endpoints"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria completa (POL_*) com retenção 7 anos"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Soft delete para preservar histórico"
+      required: true
+    - id: "RF-SEC-05"
+      title: "Hash de versão para detectar alteração não autorizada"
+      required: true
+
+  performance:
+    - id: "RF-PERF-01"
+      title: "Busca full-text < 200ms P95"
+      required: true
+    - id: "RF-PERF-02"
+      title: "Dashboard atualizado em tempo real (< 5 segundos)"
+      required: true
+    - id: "RF-PERF-03"
+      title: "Notificações enviadas em até 1 minuto após evento"
+      required: true
+
+  compliance:
+    - id: "RF-COMP-01"
+      title: "Conformidade LGPD (retenção 7 anos, auditoria)"
+      required: true
+    - id: "RF-COMP-02"
+      title: "Conformidade SOX (rastreabilidade completa)"
+      required: true
+    - id: "RF-COMP-03"
+      title: "Conformidade ISO 27001 (workflow de aprovação)"
+      required: true
+    - id: "RF-COMP-04"
+      title: "Matriz de compliance (políticas × regulamentações)"
+      required: true
+
+exclusions:
+  rf_items: []
+
+kpis:
+  - nome: "Taxa de Conformidade Geral"
+    descricao: "Percentual de usuários em conformidade com todas as políticas"
+    meta: ">= 90%"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Aceite de Novas Políticas"
+    descricao: "Percentual de usuários que aceitaram política em até 30 dias"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Publicação"
+    descricao: "Tempo médio entre criação e publicação de política"
+    meta: "<= 5 dias"
+    log_obrigatorio: true
+
+  - nome: "Performance de Busca"
+    descricao: "Tempo de resposta P95 da busca full-text"
+    meta: "<= 200ms"
+    log_obrigatorio: true
+
+  - nome: "Uptime de API"
+    descricao: "Disponibilidade da API de compliance"
+    meta: ">= 99.9%"
+    log_obrigatorio: true
+
+alertas:
+  - evento: "Taxa de conformidade crítica"
+    threshold: "< 70%"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "sms"
+
+  - evento: "Política sem revisor designado por >5 dias"
+    threshold: "Status=Revisao e DataCriacao < today-5"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+
+  - evento: "Exceção vence amanhã"
+    threshold: "DataExpiracao = today+1"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "in-app"
+
+  - evento: "Violação crítica detectada"
+    threshold: "Regra com severidade=Alta"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "sms"
+      - "in-app"
+
+  - evento: "Falha no job de verificação"
+    threshold: "Job falha 3x consecutivas"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0 (separação RF/RL completa, remoção de código e legado)"
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Claude Code"
+    descricao: "Versão inicial com 10 regras de negócio, 15 endpoints, fluxos e segurança"

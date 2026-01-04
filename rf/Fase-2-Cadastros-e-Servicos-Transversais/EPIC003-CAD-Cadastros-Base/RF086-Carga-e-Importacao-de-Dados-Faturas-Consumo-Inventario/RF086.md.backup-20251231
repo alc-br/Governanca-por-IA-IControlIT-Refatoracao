@@ -1,0 +1,1500 @@
+# RF-086: Carga e Importação de Dados - Faturas, Consumo e Inventário
+
+**Versão**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF032 (Gestão de Notas Fiscais), RF001-RF005, RF021 (Catálogo de Serviços) | **EPIC**: EPIC003-CAD-Cadastros-Base
+**Fase**: Fase 2 - Cadastros e Serviços Transversais
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o módulo de **Carga e Importação de Dados** do sistema IControlIT, responsável pela ingestão, validação, processamento e conciliação de dados provenientes de múltiplas operadoras de telecomunicações brasileiras (Vivo, Claro, TIM, Oi), bem como dados de inventário de ativos e consumo de serviços.
+
+O RF086 fornece funcionalidades para:
+- Importação de faturas eletrônicas com suporte a múltiplos layouts por operadora
+- Processamento de CDRs (Call Detail Records) com detecção automática de anomalias
+- Importação de inventário de ativos de telecomunicação
+- Conciliação automática entre faturas e consumo efetivo
+- Detecção e alertas de divergências (glosas, cobranças indevidas, consumos não facturados)
+- Integração com módulo de Notas Fiscais (RF032) para alimentação de faturamento
+- Rastreabilidade completa de importações com histórico auditável
+
+### 1.2 Importância Estratégica
+
+O módulo de Carga e Importação de Dados é crítico para:
+- **Precisão Financeira**: Garantir que todas as cobranças das operadoras sejam corretamente registradas e validadas antes de serem incorporadas à contabilidade
+- **Conformidade Legal**: Manter histórico completo de importações e processamentos conforme LGPD e requisitos de auditoria (7 anos de retenção)
+- **Eficiência Operacional**: Automatizar o processo manual de upload e validação de arquivos, reduzindo erros humanos e tempo de processamento
+- **Inteligência de Negócio**: Fornecer dados consolidados e confiáveis para análises de consumo, detecção de anomalias e otimização de custos
+- **Controle de Custos**: Identificar automaticamente cobranças duplicadas, taxas indevidas e consumos não autorizados
+- **Integração Automática**: Alimentar outros módulos (RF032 - Notas Fiscais, Relatórios, Dashboards) com dados validados e consistentes
+
+### 1.3 Conceitos Fundamentais
+
+**Fatura de Operadora**: Documento eletrônico enviado pela operadora de telecomunicação contendo lista de serviços prestados, consumos realizados, taxas administrativas e valores a cobrar em determinado período.
+- Layouts específicos por operadora (Vivo: XML, Claro: EDI, TIM: PDF estruturado, Oi: EDIFACT)
+- Período de cobertura (mensal, em geral)
+
+**CDR (Call Detail Record)**: Registro granular de cada comunicação realizada, contendo origem, destino, duração, tipo de serviço, data/hora, valor.
+- Necessário para validação de consumo contra fatura
+- Base para detecção de fraudes e anomalias
+
+**Inventário de Ativos**: Cadastro de chips, linhas, DDD, planos, terminais associados a cada fatura.
+- Relacionamento entre fatura e ativos que consumiram os serviços
+- Essencial para rastreabilidade de consumo
+
+**Glosa**: Identificação e marcação de cobranças indevidas ou duplicadas.
+- Pode ser automática (por regras) ou manual (por usuário)
+- Deve gerar evidência para disputa com operadora
+
+**Conciliação Fatura vs Consumo**: Validação de que o consumo registrado nos CDRs corresponde exatamente ao consumo cobrado na fatura.
+- Detecta cobranças sem consumo (fraude)
+- Detecta consumos não cobrados (erro operadora)
+
+**Divergência**: Discrepância entre consumo esperado e consumo faturado.
+- Tipos: valor diferente, item duplicado, consumo não faturado, fatura sem consumo
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Importação de Arquivo** | Upload manual em ASPX, sem validação de formato | Upload via REST API com validação de schema, encoding, tamanho |
+| **Parser de Fatura** | Funções VB isoladas, sem suporte a múltiplos formatos | Padrão Strategy com classes dedic por operadora (Vivo, Claro, TIM, Oi) |
+| **Processamento** | Síncrono, bloqueia interface por minutos | Assíncrono via Hangfire, permite múltiplos uploads simultâneos |
+| **Detecção de Anomalias** | Regras codificadas, sem configurabilidade | Engine configurável de regras com suporte a regras customizadas por cliente |
+| **Rastreabilidade** | Log simples em tabela sem estrutura | Auditoria completa com antes/depois, usuário, timestamp, chain of custody |
+| **Relatórios** | SQL Server Reporting Services (SSRS) | Dashboards Angular + API de exportação com suporte a múltiplos formatos |
+| **Integração com Faturamento** | Batch noturno, sem validação de status | Integração real-time com RF032, com workflow de aprovação |
+| **Multi-Operadora** | Uma operadora por cliente | Suporte nativo a múltiplas operadoras por cliente com roteamento automático |
+
+### 1.5 Funcionalidades Principais
+
+1. **Importação de Arquivo** - Upload de arquivo de fatura de operadora com validação de formato, tamanho, encoding e schema
+2. **Parsing de Fatura** - Extração de dados estruturados do arquivo de fatura de acordo com formato específico da operadora
+3. **Validação de Dados** - Validação de integridade, tipos de dados, ranges, valores obrigatórios e regras de negócio
+4. **Processamento de CDR** - Leitura de Call Detail Records e registro de consumo em nível de item
+5. **Reconciliação Automática** - Comparação entre fatura e CDRs para validar consistência de valores
+6. **Detecção de Anomalias** - Identificação automática de padrões anormais (consumo fora de padrão, valores outliers, etc.)
+7. **Glosa Automática** - Marcação automática de cobranças identificadas como indevidas conforme regras configuradas
+8. **Histórico de Importações** - Rastreamento completo de cada importação com status, erros, quantidade de registros processados
+9. **Relatórios de Conciliação** - Geração de relatórios comparativos entre fatura vs consumo com identificação de divergências
+10. **Integração com Faturamento** - Envio de dados validados para módulo de Notas Fiscais (RF032) com workflow de aprovação
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-CRG-086-01: Validação de Formato de Arquivo
+
+**Descrição**: Todo arquivo importado DEVE ser validado quanto a formato, encoding, tamanho máximo e conformidade com schema esperado da operadora específica.
+
+**Justificativa**: Arquivos malformados causam falhas no parser e corrupção de dados. A validação antecipada previne reprocessamento desnecessário e alertas de erro ao usuário.
+
+**Implementação**:
+```csharp
+public class FileValidator
+{
+    public async Task<ValidationResult> ValidateAsync(IFormFile file, OperadoraEnum operadora)
+    {
+        var errors = new List<string>();
+
+        // Validação de tamanho (máx 50MB)
+        if (file.Length > 52_428_800)
+            errors.Add("Arquivo excede tamanho máximo de 50MB");
+
+        // Validação de extensão
+        var allowedExtensions = operadora switch
+        {
+            OperadoraEnum.Vivo => new[] { ".xml" },
+            OperadoraEnum.Claro => new[] { ".txt", ".edi" },
+            OperadoraEnum.TIM => new[] { ".pdf" },
+            OperadoraEnum.Oi => new[] { ".txt", ".edi" },
+            _ => new[] { ".txt" }
+        };
+
+        var ext = Path.GetExtension(file.FileName).ToLower();
+        if (!allowedExtensions.Contains(ext))
+            errors.Add($"Extensão inválida. Esperado: {string.Join(", ", allowedExtensions)}");
+
+        // Validação de encoding (deve ser UTF-8 ou ISO-8859-1)
+        try
+        {
+            using var reader = new StreamReader(file.OpenReadStream(),
+                detectEncodingFromByteOrderMarks: true);
+            var firstLine = await reader.ReadLineAsync();
+            if (firstLine == null)
+                errors.Add("Arquivo vazio");
+        }
+        catch (Exception ex)
+        {
+            errors.Add($"Erro ao ler arquivo: {ex.Message}");
+        }
+
+        return new ValidationResult { IsValid = !errors.Any(), Errors = errors };
+    }
+}
+```
+
+**Exemplos**:
+- Válido: `fatura_vivo_202512.xml` (XML válido, < 50MB)
+- Inválido: `fatura_claro_202512.doc` (extensão não suportada)
+- Inválido: `fatura_tim_202512.pdf` (arquivo vazio ou > 50MB)
+
+---
+
+### RN-CRG-086-02: Parser Específico por Operadora
+
+**Descrição**: Cada operadora possui formato de fatura distinto. DEVE existir um parser específico que extrai corretamente os campos conforme layout esperado da operadora.
+
+**Justificativa**: Operadoras usam formatos proprietários diferentes (XML Vivo, EDI Claro, PDF estruturado TIM, EDIFACT Oi). Um parser genérico falharia. Parsers específicos garantem extração correta e minimizam reprocessamento.
+
+**Implementação**:
+```csharp
+public interface IFaturaParser
+{
+    Task<FaturaDTO> ParseAsync(Stream fileStream);
+}
+
+public class VivoXmlParser : IFaturaParser
+{
+    public async Task<FaturaDTO> ParseAsync(Stream fileStream)
+    {
+        var doc = new XmlDocument();
+        doc.Load(fileStream);
+
+        var faturaNode = doc.SelectSingleNode("//Fatura");
+        return new FaturaDTO
+        {
+            NumeroFatura = faturaNode?.SelectSingleNode("NumeroNF")?.InnerText,
+            DataFatura = DateTime.Parse(faturaNode?.SelectSingleNode("DataEmissao")?.InnerText ?? ""),
+            Operadora = OperadoraEnum.Vivo,
+            Itens = faturaNode?.SelectNodes("//ItemFatura")
+                ?.Cast<XmlNode>()
+                .Select(n => new ItemFaturaDTO
+                {
+                    Descricao = n.SelectSingleNode("Descricao")?.InnerText,
+                    Quantidade = int.Parse(n.SelectSingleNode("Qtd")?.InnerText ?? "0"),
+                    ValorUnitario = decimal.Parse(n.SelectSingleNode("VlUnit")?.InnerText ?? "0"),
+                    Subtotal = decimal.Parse(n.SelectSingleNode("VlSubtotal")?.InnerText ?? "0"),
+                    CodigoServico = n.SelectSingleNode("CodServico")?.InnerText
+                })
+                .ToList() ?? new List<ItemFaturaDTO>()
+        };
+    }
+}
+
+public class ClaroEdiParser : IFaturaParser
+{
+    public async Task<FaturaDTO> ParseAsync(Stream fileStream)
+    {
+        // Parser para formato EDIFACT Claro
+        var reader = new StreamReader(fileStream, Encoding.GetEncoding("ISO-8859-1"));
+        // Lógica específica para parsing EDI...
+    }
+}
+
+// Factory pattern para seleção automática
+public class FaturaParserFactory
+{
+    public IFaturaParser CreateParser(OperadoraEnum operadora)
+    {
+        return operadora switch
+        {
+            OperadoraEnum.Vivo => new VivoXmlParser(),
+            OperadoraEnum.Claro => new ClaroEdiParser(),
+            OperadoraEnum.TIM => new TimPdfParser(),
+            OperadoraEnum.Oi => new OiEdifactParser(),
+            _ => throw new NotSupportedException($"Operadora {operadora} não suportada")
+        };
+    }
+}
+```
+
+**Exemplos**:
+- Vivo: Arquivo XML com estrutura `<Fatura><ItemFatura>...`
+- Claro: Arquivo EDI com registros UNH/UNT
+- TIM: PDF estruturado com tabelas extraíveis
+- Oi: Arquivo EDIFACT com segmentos ORDERS
+
+---
+
+### RN-CRG-086-03: Registro de Consumo (CDR) com Rastreamento Completo
+
+**Descrição**: Cada item de consumo importado DEVE ser registrado como um CDR individual com rastreamento de origem, data/hora, quantidade, valor e referência à fatura de origem.
+
+**Justificativa**: CDRs individualizados permitem análise granular, conciliação precisa, detecção de fraudes e cumprimento de conformidade. Rastreamento de origem garante auditoria completa.
+
+**Implementação**:
+```csharp
+public class CdrEntity : BaseEntity
+{
+    // Identificação
+    public required string NumeroCdr { get; set; } // Seq única
+    public required Guid IdFaturaOrigem { get; set; } // FK
+    public required int IdConglomerado { get; set; } // Multi-tenancy
+
+    // Dados do consumo
+    public required string NumeroLinha { get; set; } // Linha que consumiu
+    public required string Servico { get; set; } // Ex: "Chamada Local", "Internet Móvel"
+    public required string Origem { get; set; } // Ex: "(11) 98765-4321"
+    public required string Destino { get; set; } // Ex: "(21) 3333-4444"
+    public DateTime? DataHoraInicio { get; set; }
+    public int? DuracaoSegundos { get; set; }
+
+    // Valores
+    public required decimal QuantidadeConsumo { get; set; } // Minutos, MB, etc
+    public required string UnidadeConsumo { get; set; } // min, MB, SMS, etc
+    public required decimal ValorCobrado { get; set; }
+
+    // Status e auditoria
+    public CdrStatusEnum Status { get; set; } = CdrStatusEnum.ConfirmadoEmFatura;
+    public string? MotivoDivergencia { get; set; } // Se divergente
+    public DateTime DataImportacao { get; set; } = DateTime.UtcNow;
+    public Guid IdUsuarioImportacao { get; set; }
+
+    // Soft delete
+    public bool FlExcluido { get; set; } = false;
+    public DateTime? DataExclusao { get; set; }
+}
+
+public enum CdrStatusEnum
+{
+    ConfirmadoEmFatura = 1,
+    DivergenteFatura = 2,
+    NaoFaturado = 3,
+    Duplicado = 4,
+    Bloqueado = 5
+}
+```
+
+**Exemplos**:
+- CDR com divergência: Consumo de 100 min registrado, mas fatura cobra por 150 min
+- CDR não faturado: Consumo registrado mas não aparece na fatura
+- CDR duplicado: Mesmo CDR aparece 2x na fatura
+
+---
+
+### RN-CRG-086-04: Validação de Integridade de Totalizações
+
+**Descrição**: Antes de qualquer processamento, DEVE ser validado que os totalizadores da fatura (subtotal, impostos, desconto, total) correspondem exatamente à soma dos itens individuais. Qualquer discrepância DEVE ser rejeitada com erro específico.
+
+**Justificativa**: Arquivos corruptos ou intencionalmente alterados podem ter totalizadores incorretos. Validação de integridade detecta problemas antes do processamento prejudicial.
+
+**Implementação**:
+```csharp
+public class IntegridadeValidator
+{
+    public ValidationResult ValidarIntegridade(FaturaDTO fatura)
+    {
+        var errors = new List<string>();
+
+        // Validar subtotal
+        var subtotalCalculado = fatura.Itens.Sum(i => i.Subtotal);
+        if (Math.Abs(subtotalCalculado - fatura.ValorSubtotal) > 0.01m)
+            errors.Add($"Subtotal inconsistente: esperado {subtotalCalculado:C}, " +
+                      $"informado {fatura.ValorSubtotal:C}");
+
+        // Validar impostos
+        var impostosCalculados = fatura.Itens.Sum(i => i.ValorImposto ?? 0);
+        if (Math.Abs(impostosCalculados - (fatura.ValorImpostos ?? 0)) > 0.01m)
+            errors.Add($"Impostos inconsistentes: esperado {impostosCalculados:C}, " +
+                      $"informado {fatura.ValorImpostos:C}");
+
+        // Validar total
+        var totalCalculado = fatura.ValorSubtotal + (fatura.ValorImpostos ?? 0)
+                           - (fatura.ValorDesconto ?? 0);
+        if (Math.Abs(totalCalculado - fatura.ValorTotal) > 0.01m)
+            errors.Add($"Total inconsistente: esperado {totalCalculado:C}, " +
+                      $"informado {fatura.ValorTotal:C}");
+
+        return new ValidationResult
+        {
+            IsValid = !errors.Any(),
+            Errors = errors
+        };
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Subtotal R$ 1.000, Impostos R$ 100, Desconto R$ 50, Total R$ 1.050
+- Inválido: Subtotal R$ 1.000, mas soma dos itens é R$ 900
+- Inválido: Total informado R$ 1.050, mas cálculo é R$ 1.040
+
+---
+
+### RN-CRG-086-05: Detecção de Cobranças Duplicadas
+
+**Descrição**: DEVE ser detectado automaticamente quando o mesmo item de fatura (mesmo CDR, mesma descrição, mesma data) aparece mais de uma vez no arquivo ou em importações diferentes. Duplicatas DEVEM ser marcadas com status "Duplicado" e DEVEM gerar alerta para revisão do usuário.
+
+**Justificativa**: Duplicação é erro comum em processamento de arquivos. Detecção automática evita pagamentos duplicados e fraudes.
+
+**Implementação**:
+```csharp
+public class DuplicacaoDetector
+{
+    private readonly IFaturaRepository _faturaRepository;
+    private readonly ICdrRepository _cdrRepository;
+
+    public async Task<List<CdrDuplicadoDTO>> DetectarDuplicatasAsync(
+        FaturaDTO faturaNovaImportacao,
+        int idConglomerado)
+    {
+        var duplicatas = new List<CdrDuplicadoDTO>();
+
+        // 1. Verificar CDRs já existentes com mesmo fingerprint
+        foreach (var item in faturaNovaImportacao.Itens)
+        {
+            var fingerprint = GerarFingerprint(item); // Hash baseado em descricao+valor+data
+
+            var cdrExistente = await _cdrRepository.FirstOrDefaultAsync(c =>
+                c.IdConglomerado == idConglomerado &&
+                c.Fingerprint == fingerprint &&
+                !c.FlExcluido);
+
+            if (cdrExistente != null)
+            {
+                duplicatas.Add(new CdrDuplicadoDTO
+                {
+                    ItemFatura = item,
+                    CdrExistente = cdrExistente,
+                    TempoDesdeImportacaoAnterior = DateTime.UtcNow - cdrExistente.DataImportacao
+                });
+            }
+        }
+
+        // 2. Verificar dentro da própria fatura (duplicação intra-fatura)
+        var gruposItens = faturaNovaImportacao.Itens
+            .GroupBy(i => GerarFingerprint(i))
+            .Where(g => g.Count() > 1);
+
+        foreach (var grupo in gruposItens)
+        {
+            foreach (var item in grupo.Skip(1)) // Primeiro é original
+            {
+                duplicatas.Add(new CdrDuplicadoDTO
+                {
+                    ItemFatura = item,
+                    TipoDuplicacao = "IntraFatura",
+                    QuantidadeDuplicatas = grupo.Count()
+                });
+            }
+        }
+
+        return duplicatas;
+    }
+
+    private string GerarFingerprint(ItemFaturaDTO item)
+    {
+        var content = $"{item.Descricao}|{item.Subtotal}|{item.CodigoServico}";
+        return content.GetHashCode().ToString();
+    }
+}
+```
+
+**Exemplos**:
+- Duplicação detectada: Item "Chamadas locais - 100 min" R$ 50,00 aparece 2x no mesmo arquivo
+- Duplicação inter-faturas: Mesmo CDR foi importado em janeiro e fevereiro
+- Ação: Marcar CDRs duplicados com status "Duplicado" e enviar alerta ao usuário
+
+---
+
+### RN-CRG-086-06: Conciliação Automática Fatura vs CDRs
+
+**Descrição**: Para cada fatura importada, DEVE ser executada automaticamente uma conciliação que compara valor total da fatura com soma dos CDRs extraídos. Discrepâncias DEVEM ser identificadas e classificadas (valor, quantidade, item faltante, item extra).
+
+**Justificativa**: Conciliação automática detecta erros de parsing, itens perdidos ou valores incorretos ANTES de afetarem o faturamento.
+
+**Implementação**:
+```csharp
+public class ConciliadorFaturaVsCdr
+{
+    public async Task<ResultadoConciliacao> ConciliarAsync(
+        FaturaDTO faturaImportada,
+        List<CdrEntity> cdrsProcessados)
+    {
+        var resultado = new ResultadoConciliacao
+        {
+            DataConciliacao = DateTime.UtcNow,
+            ValorFatura = faturaImportada.ValorTotal,
+            ValorCdrs = cdrsProcessados.Sum(c => c.ValorCobrado),
+            Status = Conciliacao
+        };
+
+        // Validar correspondência de valores
+        resultado.DiferencaValor = resultado.ValorFatura - resultado.ValorCdrs;
+
+        if (Math.Abs(resultado.DiferencaValor) > 0.01m)
+        {
+            resultado.Status = ConciliacaoStatus.Divergente;
+            resultado.MotivoDivergencia.Add(
+                $"Diferença de valor: R$ {resultado.DiferencaValor:F2}");
+        }
+
+        // Validar correspondência de itens
+        resultado.QuantidadeItens = faturaImportada.Itens.Count;
+        resultado.QuantidadeCdrs = cdrsProcessados.Count;
+
+        if (resultado.QuantidadeItens != resultado.QuantidadeCdrs)
+        {
+            resultado.Status = ConciliacaoStatus.Divergente;
+            resultado.MotivoDivergencia.Add(
+                $"Quantidade de itens divergente: fatura {resultado.QuantidadeItens}, " +
+                $"CDRs {resultado.QuantidadeCdrs}");
+        }
+
+        // Validar itens específicos
+        var itensNaoEncontrados = faturaImportada.Itens
+            .Where(i => !cdrsProcessados.Any(c => CorrespondemPorConteudo(i, c)))
+            .ToList();
+
+        if (itensNaoEncontrados.Any())
+        {
+            resultado.Status = ConciliacaoStatus.Divergente;
+            resultado.MotivoDivergencia.Add(
+                $"{itensNaoEncontrados.Count} itens da fatura não foram encontrados em CDRs");
+            resultado.ItensAlertar.AddRange(itensNaoEncontrados);
+        }
+
+        return resultado;
+    }
+
+    private bool CorrespondemPorConteudo(ItemFaturaDTO item, CdrEntity cdr)
+    {
+        return item.CodigoServico == cdr.Servico &&
+               Math.Abs(item.Subtotal - cdr.ValorCobrado) < 0.01m;
+    }
+}
+
+public class ResultadoConciliacao
+{
+    public DateTime DataConciliacao { get; set; }
+    public ConciliacaoStatus Status { get; set; }
+    public decimal ValorFatura { get; set; }
+    public decimal ValorCdrs { get; set; }
+    public decimal DiferencaValor { get; set; }
+    public int QuantidadeItens { get; set; }
+    public int QuantidadeCdrs { get; set; }
+    public List<string> MotivoDivergencia { get; set; } = new();
+    public List<ItemFaturaDTO> ItensAlertar { get; set; } = new();
+}
+
+public enum ConciliacaoStatus
+{
+    Conciliada = 1,
+    Divergente = 2,
+    PendingManualReview = 3
+}
+```
+
+**Exemplos**:
+- Conciliada: Fatura R$ 1.000, CDRs somam R$ 1.000
+- Divergente valor: Fatura R$ 1.000, CDRs somam R$ 980 (diferença de R$ 20)
+- Divergente quantidade: Fatura tem 50 itens, CDRs extraídos = 48
+
+---
+
+### RN-CRG-086-07: Glosa Automática de Cobranças Indevidas
+
+**Descrição**: DEVEM ser definidas regras configuráveis que identificam automaticamente cobranças indevidas (duplicatas, valores outliers, serviços não autorizados). Itens glosados DEVEM ser marcados com status "Glosado" e DEVEM gerar um registro de Glosa com evidência.
+
+**Justificativa**: Glosa automática reduz custos operacionais e evita pagamento de cobranças fraudulentas. Configurabilidade permite customização por cliente.
+
+**Implementação**:
+```csharp
+public interface IGlosaRule
+{
+    Task<GlosaResult> ValidarAsync(CdrEntity cdr, GlosaContext contexto);
+}
+
+public class GlosaRuleDuplicacao : IGlosaRule
+{
+    public async Task<GlosaResult> ValidarAsync(CdrEntity cdr, GlosaContext contexto)
+    {
+        var duplicatas = contexto.CdrsJaProcessados
+            .Where(c => GerarFingerprint(c) == GerarFingerprint(cdr))
+            .ToList();
+
+        if (duplicatas.Any())
+            return new GlosaResult
+            {
+                EhGlosado = true,
+                Motivo = "Duplicação detectada",
+                Evidencia = $"CDR duplicado encontrado em {duplicatas.First().DataImportacao:dd/MM/yyyy}"
+            };
+
+        return GlosaResult.NaoGlosado();
+    }
+}
+
+public class GlosaRuleValorOutlier : IGlosaRule
+{
+    private readonly decimal _percentualMaximoDesvio = 0.5m; // 50%
+
+    public async Task<GlosaResult> ValidarAsync(CdrEntity cdr, GlosaContext contexto)
+    {
+        var cdrsHistoricos = contexto.CdrsHistoricos
+            .Where(c => c.Servico == cdr.Servico)
+            .Select(c => c.ValorCobrado)
+            .ToList();
+
+        if (cdrsHistoricos.Count < 5) // Mínimo para cálculo estatístico
+            return GlosaResult.NaoGlosado();
+
+        var media = cdrsHistoricos.Average();
+        var desvio = cdrsHistoricos.Max() - cdrsHistoricos.Min();
+        var desvioMaximoPermitido = media * (1 + _percentualMaximoDesvio);
+
+        if (cdr.ValorCobrado > desvioMaximoPermitido)
+            return new GlosaResult
+            {
+                EhGlosado = true,
+                Motivo = "Valor outlier detectado",
+                Evidencia = $"Média histórica: R$ {media:F2}, valor deste CDR: R$ {cdr.ValorCobrado:F2}"
+            };
+
+        return GlosaResult.NaoGlosado();
+    }
+}
+
+public class GlosaProcessor
+{
+    private readonly List<IGlosaRule> _rules;
+
+    public async Task<GlosaResult> ProcessarGlosaAsync(
+        CdrEntity cdr,
+        GlosaContext contexto)
+    {
+        foreach (var rule in _rules)
+        {
+            var resultado = await rule.ValidarAsync(cdr, contexto);
+            if (resultado.EhGlosado)
+                return resultado;
+        }
+
+        return GlosaResult.NaoGlosado();
+    }
+}
+```
+
+**Exemplos**:
+- Glosado: Duplicação (mesmo CDR 2x na fatura)
+- Glosado: Valor outlier (chamada internacional de R$ 5.000 quando média é R$ 50)
+- Glosado: Serviço não autorizado (SMS premium não contratado)
+
+---
+
+### RN-CRG-086-08: Histórico Completo de Importações com Rastreamento de Status
+
+**Descrição**: Cada importação DEVE criar um registro de Importação que rastreia arquivo original, data, usuário, quantidade de registros processados, quantidade de erros, quantidade de glosados, e status de processamento (Pendente, Em Processamento, Concluída, Errada). Histórico DEVE ser imutável (auditoria).
+
+**Justificativa**: Histórico de importações permite rastreabilidade completa, investigação de problemas, reprocessamento de importações falhadas e conformidade regulatória.
+
+**Implementação**:
+```csharp
+public class ImportacaoEntity : BaseEntity
+{
+    // Identificação
+    public required string NomeArquivoOriginal { get; set; }
+    public required byte[] ConteudoArquivoHash { get; set; } // Hash SHA256 do arquivo
+    public required OperadoraEnum Operadora { get; set; }
+    public required int IdConglomerado { get; set; }
+
+    // Auditoria de execução
+    public required Guid IdUsuarioUpload { get; set; }
+    public required DateTime DataHoraUpload { get; set; }
+    public DateTime? DataHoraProcessamento { get; set; }
+    public DateTime? DataHoraConclusao { get; set; }
+    public Guid? IdUsuarioAprovacao { get; set; }
+    public DateTime? DataHoraAprovacao { get; set; }
+
+    // Estatísticas de processamento
+    public int QuantidadeLinhasArquivo { get; set; }
+    public int QuantidadeItensExtraidos { get; set; }
+    public int QuantidadeItensValidos { get; set; }
+    public int QuantidadeItensComErro { get; set; }
+    public int QuantidadeItensGlosados { get; set; }
+    public int QuantidadeItensNaoFaturados { get; set; }
+
+    // Status
+    public ImportacaoStatusEnum Status { get; set; }
+    public string? DescricaoErroProcessamento { get; set; }
+
+    // Dados extraídos
+    public Guid? IdFaturaExtraida { get; set; }
+    public decimal? ValorTotalFatura { get; set; }
+    public DateTime? PeriodoFatura { get; set; }
+
+    // Soft delete (para auditoria histórica)
+    public bool FlExcluido { get; set; } = false;
+}
+
+public enum ImportacaoStatusEnum
+{
+    EmAguardoUpload = 1,
+    Validando = 2,
+    Processando = 3,
+    ProcessadoComErro = 4,
+    Concluida = 5,
+    Rejeitada = 6,
+    AguardandoAprovacao = 7
+}
+
+// Handler de caso de uso: registrar importação
+public class RegistrarImportacaoHandler :
+    IRequestHandler<RegistrarImportacaoCommand, ImportacaoDTO>
+{
+    private readonly IImportacaoRepository _importacaoRepository;
+    private readonly IAuditoriaService _auditoria;
+
+    public async Task<ImportacaoDTO> Handle(RegistrarImportacaoCommand request,
+        CancellationToken cancellationToken)
+    {
+        var importacao = new ImportacaoEntity
+        {
+            NomeArquivoOriginal = request.NomeArquivo,
+            ConteudoArquivoHash = ComputarHashArquivo(request.ConteudoArquivo),
+            Operadora = request.Operadora,
+            IdConglomerado = request.IdConglomerado,
+            IdUsuarioUpload = request.IdUsuarioAutenticado,
+            DataHoraUpload = DateTime.UtcNow,
+            Status = ImportacaoStatusEnum.Validando,
+            QuantidadeLinhasArquivo = ContarLinhasArquivo(request.ConteudoArquivo)
+        };
+
+        await _importacaoRepository.AddAsync(importacao);
+        await _auditoria.RegistrarOperacaoAsync(
+            idOperacao: "CARGA_IMPORTACAO_CRIADA",
+            idUsuario: request.IdUsuarioAutenticado,
+            dados: importacao.ToDto()
+        );
+
+        return importacao.ToDto();
+    }
+}
+```
+
+**Exemplos**:
+- Importação concluída: Arquivo "fatura_vivo_202512.xml", 100 linhas, 100 itens extraídos, 0 erros
+- Importação com erro: Arquivo "fatura_claro_202512.txt", erro no parsing linha 45
+- Importação glosada: 50 itens extraídos, 10 glosados por duplicação
+
+---
+
+### RN-CRG-086-09: Integração com Módulo de Notas Fiscais (RF032)
+
+**Descrição**: Quando uma importação é concluída com sucesso e aprovada, os dados de fatura DEVEM ser automaticamente enviados para o módulo de Notas Fiscais (RF032) para criação de Nota Fiscal correspondente. O status da importação DEVE ser atualizado para refletir sucesso da integração ou falha.
+
+**Justificativa**: Integração automática elimina reentrada de dados e garante consistência entre sistemas. Rastreamento de status permite investigação de falhas.
+
+**Implementação**:
+```csharp
+public class IntegradorComRF032
+{
+    private readonly ICriarNotaFiscalServiceClient _notaFiscalClient;
+    private readonly IImportacaoRepository _importacaoRepository;
+
+    public async Task<ResultadoIntegracao> IntegrarComRF032Async(
+        ImportacaoEntity importacao,
+        FaturaDTO faturaDados)
+    {
+        try
+        {
+            // 1. Mapear dados da fatura para comando de NF
+            var comando = MapearFaturaParaNotaFiscal(faturaDados);
+
+            // 2. Enviar para RF032
+            var resultado = await _notaFiscalClient.CriarNotaFiscalAsync(comando);
+
+            // 3. Atualizar status de importação
+            importacao.IdFaturaExtraida = resultado.IdNotaFiscalCriada;
+            importacao.Status = ImportacaoStatusEnum.Concluida;
+            await _importacaoRepository.SaveChangesAsync();
+
+            return new ResultadoIntegracao
+            {
+                Sucesso = true,
+                IdNotaFiscalCriada = resultado.IdNotaFiscalCriada
+            };
+        }
+        catch (Exception ex)
+        {
+            importacao.Status = ImportacaoStatusEnum.ProcessadoComErro;
+            importacao.DescricaoErroProcessamento = ex.Message;
+            await _importacaoRepository.SaveChangesAsync();
+
+            return new ResultadoIntegracao
+            {
+                Sucesso = false,
+                Erro = ex.Message
+            };
+        }
+    }
+
+    private CriarNotaFiscalCommand MapearFaturaParaNotaFiscal(FaturaDTO fatura)
+    {
+        return new CriarNotaFiscalCommand
+        {
+            NumeroNf = fatura.NumeroFatura,
+            DataEmissao = fatura.DataFatura,
+            FornecedorCnpj = fatura.OperadoraCnpj,
+            Itens = fatura.Itens.Select(i => new ItemNotaFiscalDTO
+            {
+                Descricao = i.Descricao,
+                Quantidade = i.Quantidade,
+                ValorUnitario = i.ValorUnitario,
+                // ... outros campos
+            }).ToList()
+        };
+    }
+}
+```
+
+**Exemplos**:
+- Sucesso: Importação concluída, Nota Fiscal #NF-2025-000123 criada automaticamente em RF032
+- Falha: Integração com RF032 falhou (endpoint indisponível), importação fica em status "ProcessadoComErro"
+- Re-envio: Usuário aprova importação, sistema retenta envio para RF032
+
+---
+
+### RN-CRG-086-10: Processamento Assíncrono via Hangfire com Monitoramento
+
+**Descrição**: Processamento de importações DEVE ser executado de forma assíncrona via Hangfire, permitindo múltiplos uploads simultâneos. Status DEVE ser atualizado em tempo real e acessível via API. Erros DEVEM gerar retentativas automáticas (máx. 3 vezes) com backoff exponencial.
+
+**Justificativa**: Processamento assíncrono evita bloqueio de interface e permite escalabilidade. Retentativas automáticas garantem entrega resiliente mesmo com falhas transitórias.
+
+**Implementação**:
+```csharp
+public class ProcessadorImportacaoHangfire
+{
+    private readonly IBackgroundJobClient _jobClient;
+    private readonly IRecurringJobManager _recurringJobManager;
+    private readonly IFaturaParserFactory _parserFactory;
+
+    public string AgendarProcessamentoImportacao(
+        Guid idImportacao,
+        int idConglomerado)
+    {
+        var jobId = _jobClient.Enqueue(() =>
+            ProcessarImportacaoAsync(idImportacao, idConglomerado));
+
+        return jobId;
+    }
+
+    [AutomaticRetry(Attempts = 3)]
+    public async Task ProcessarImportacaoAsync(
+        Guid idImportacao,
+        int idConglomerado)
+    {
+        try
+        {
+            var importacao = await _importacaoRepository.GetByIdAsync(idImportacao);
+
+            // 1. Validar arquivo
+            var validacao = await _validador.ValidarAsync(
+                importacao.NomeArquivoOriginal,
+                importacao.ConteudoArquivoHash);
+
+            if (!validacao.IsValid)
+                throw new InvalidOperationException(string.Join(", ", validacao.Errors));
+
+            // 2. Fazer parsing
+            var parser = _parserFactory.CreateParser(importacao.Operadora);
+            var fatura = await parser.ParseAsync(
+                new MemoryStream(importacao.ConteudoArquivoHash));
+
+            // 3. Extrair CDRs
+            var cdrs = await ExtrairCdrsAsync(fatura, importacao.IdConglomerado);
+
+            // 4. Conciliar
+            var conciliacao = await _conciliador.ConciliarAsync(fatura, cdrs);
+            if (conciliacao.Status == ConciliacaoStatus.Divergente)
+            {
+                importacao.Status = ImportacaoStatusEnum.AguardandoAprovacao;
+                importacao.DescricaoErroProcessamento =
+                    string.Join("|", conciliacao.MotivoDivergencia);
+            }
+            else
+            {
+                importacao.Status = ImportacaoStatusEnum.Concluida;
+            }
+
+            // 5. Glosar itens automático
+            foreach (var cdr in cdrs)
+            {
+                var glosa = await _glosaProcessor.ProcessarGlosaAsync(cdr,
+                    new GlosaContext { CdrsJaProcessados = cdrs });
+                if (glosa.EhGlosado)
+                    cdr.Status = CdrStatusEnum.Bloqueado;
+            }
+
+            // 6. Persistir
+            await _cdrRepository.AddRangeAsync(cdrs);
+            await _importacaoRepository.SaveChangesAsync();
+
+            // 7. Integrar com RF032 se aprovado
+            if (importacao.Status == ImportacaoStatusEnum.Concluida)
+            {
+                await _integradorRF032.IntegrarComRF032Async(importacao, fatura);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Hangfire fará retentativa automática
+            throw;
+        }
+    }
+}
+
+// Configuração do Hangfire (Startup)
+services.AddHangfire(config =>
+{
+    config.UseSqlServerStorage(connectionString);
+    config.UseRecommendedSerializerSettings();
+});
+
+services.AddHangfireServer(options =>
+{
+    options.WorkerCount = Environment.ProcessorCount;
+});
+```
+
+**Exemplos**:
+- Importação agendada: Job ID "carga_086_20251228_093045" criado
+- Processamento em progresso: Usuario vê status "Processando" em tempo real
+- Retentativa: Falha na primeira tentativa, Hangfire retenta 2 vezes mais
+- Sucesso: Importação concluída após 2 minutos
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `ICONTROLIT_LEGADO` (SQL Server 2012)
+
+**Tabela Principal**: `[dbo].[FaturaOperadora]`
+```sql
+CREATE TABLE [dbo].[FaturaOperadora](
+    [Id_Fatura] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Conglomerado] [int] NOT NULL,
+    [Cd_Operadora] [varchar](10) NOT NULL, -- V=Vivo, C=Claro, T=TIM, O=Oi
+    [Nm_Arquivo] [varchar](255) NOT NULL,
+    [Nr_Fatura] [varchar](50) NOT NULL,
+    [Dt_Fatura] [datetime] NOT NULL,
+    [Vl_Total_Fatura] [numeric](15,2) NOT NULL,
+    [Tp_Status] [varchar](20) NOT NULL, -- Pendente, Processada, Glosada, Aprovada
+    [Dt_Upload] [datetime] NOT NULL,
+    [Id_Usuario_Upload] [int] NOT NULL,
+    [Dt_Processamento] [datetime] NULL,
+    [Dt_Excluido] [datetime] NULL,
+    CONSTRAINT [PK_FaturaOperadora] PRIMARY KEY CLUSTERED ([Id_Fatura] ASC),
+    CONSTRAINT [FK_FaturaOperadora_Conglomerado] FOREIGN KEY ([Id_Conglomerado])
+        REFERENCES [dbo].[Conglomerado]([Id_Conglomerado])
+)
+
+CREATE TABLE [dbo].[ItemFaturaOperadora](
+    [Id_ItemFatura] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Fatura] [int] NOT NULL,
+    [Sq_Item] [int] NOT NULL,
+    [Ds_Servico] [varchar](255) NOT NULL,
+    [Qt_Consumo] [numeric](15,4) NOT NULL,
+    [Vl_Unitario] [numeric](15,2) NOT NULL,
+    [Vl_Subtotal] [numeric](15,2) NOT NULL,
+    [Tp_Status] [varchar](20) NOT NULL, -- Validado, Glosado, Duplicado
+    [Dt_Excluido] [datetime] NULL,
+    CONSTRAINT [PK_ItemFaturaOperadora] PRIMARY KEY CLUSTERED ([Id_ItemFatura] ASC),
+    CONSTRAINT [FK_ItemFaturaOperadora_Fatura] FOREIGN KEY ([Id_Fatura])
+        REFERENCES [dbo].[FaturaOperadora]([Id_Fatura])
+)
+
+CREATE TABLE [dbo].[GlosaFaturaOperadora](
+    [Id_Glosa] [int] IDENTITY(1,1) NOT NULL,
+    [Id_ItemFatura] [int] NOT NULL,
+    [Ds_Motivo] [varchar](500) NOT NULL,
+    [Tp_Glosa] [varchar](30) NOT NULL, -- Duplicacao, ValorOutlier, ServicoNaoAutorizado
+    [Vl_Glosado] [numeric](15,2) NOT NULL,
+    [Dt_Glosa] [datetime] NOT NULL,
+    [Tp_Status] [varchar](20) NOT NULL, -- Pendente, Aprovada, Rejeitada
+    [Dt_Excluido] [datetime] NULL,
+    CONSTRAINT [PK_GlosaFaturaOperadora] PRIMARY KEY CLUSTERED ([Id_Glosa] ASC)
+)
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descrição | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `[Id_Fatura]` | Identificador único da fatura | Mapeado para `FaturaEntity.Id` |
+| `[Cd_Operadora]` | Código da operadora (V/C/T/O) | Mapeado para `OperadoraEnum` com parsing |
+| `[Nm_Arquivo]` | Nome do arquivo original | Auditoria de rastreamento |
+| `[Vl_Total_Fatura]` | Valor total da fatura | Conciliação com CDRs |
+| `[Tp_Status]` | Status textual | Mapeado para `ImportacaoStatusEnum` |
+| `[Dt_Upload]` | Data/hora do upload | Rastreamento de importação |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `[pa_ImportarFatura]` | Inicia processamento de fatura de operadora | Migrado para Handler `ProcessarImportacaoHandler` + Hangfire |
+| `[pa_ValidarFatura]` | Valida totalizadores de fatura | Migrado para `IntegridadeValidator` |
+| `[pa_GlosaAutomatica]` | Aplica regras de glosa automática | Migrado para `GlosaProcessor` + Rules |
+| `[pa_ListarImportacoes]` | Lista histórico de importações | Migrado para Query CQRS `ListarImportacoesQuery` |
+| `[pa_ExportarRelatoriosConciliacao]` | Gera relatórios de conciliação | Migrado para `RelatoriosConciliacaoService` |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `ImportarFatura.aspx` | Upload de arquivo de fatura | `/carga/importar-faturas` (Angular) |
+| `ListarImportacoes.aspx` | Histórico de importações com status | `/carga/historico-importacoes` (Angular) |
+| `GlosaManual.aspx` | Aprovação manual de glosas | `/carga/glosa-manual` (Angular) |
+| `RelatoriosConciliacao.aspx` | Relatórios de conciliação | `/relatorios/conciliacao` (Angular) |
+| `ConfiguracaoRegrasGlosa.aspx` | Configuração de regras de glosa | `/configuracao/regras-glosa` (Angular) |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSImportacaoFatura.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ImportarFatura(nomeArquivo, conteudoBase64)` | Recebe upload de arquivo e inicia processamento | `POST /api/carga/importacoes` |
+| `ListarImportacoes(filtros)` | Lista histórico com filtros | `GET /api/carga/importacoes` |
+| `ObtenerStatusImportacao(idImportacao)` | Obtém status de uma importação | `GET /api/carga/importacoes/{id}` |
+| `AprovarGlosa(idGlosa)` | Aprova uma glosa pendente | `PUT /api/carga/glosas/{id}/aprovar` |
+| `RejeitarGlosa(idGlosa, motivo)` | Rejeita uma glosa | `PUT /api/carga/glosas/{id}/rejeitar` |
+| `ExportarRelatoriosConciliacao(filtros)` | Exporta relatórios em Excel | `GET /api/relatorios/conciliacao/exportar` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `CARGA_IMPORTACAO_FATURAS`
+
+**Configuração**:
+```json
+{
+    "featureKey": "CARGA_IMPORTACAO_FATURAS",
+    "nome": "Importação de Faturas de Operadoras",
+    "descricao": "Permite upload, validação e processamento de faturas de operadoras de telecom",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "operadorasSuportadas": ["VIVO", "CLARO", "TIM", "OI"],
+    "tamanhoMaximoArquivoMb": 50,
+    "timeoutProcessamentoMinutos": 30
+}
+```
+
+**Nota**: Feature pode ser desabilitada globalmente ou por cliente para bloquear novos uploads enquanto servidor está em manutenção.
+
+---
+
+**FeatureKey**: `CARGA_GLOSA_AUTOMATICA`
+
+**Configuração**:
+```json
+{
+    "featureKey": "CARGA_GLOSA_AUTOMATICA",
+    "nome": "Glosa Automática de Cobranças",
+    "descricao": "Ativa aplicação automática de regras de glosa durante processamento",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "requerAprovacaoManual": false
+}
+```
+
+**Nota**: Se desabilitada, todas as glosas ficam pendentes de aprovação manual.
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Tradução** (Transloco):
+
+```json
+{
+    "carga": {
+        "importacao": {
+            "titulo": "Importar Faturas de Operadoras",
+            "subtitulo": "Carregue arquivos de faturas para processamento automático",
+            "labels": {
+                "arquivo": "Arquivo",
+                "operadora": "Operadora",
+                "periodo": "Período da Fatura",
+                "nomeArquivo": "Nome do Arquivo",
+                "dataUpload": "Data do Upload",
+                "status": "Status",
+                "usuarioUpload": "Usuário",
+                "quantidadeItens": "Quantidade de Itens",
+                "quantidadeErros": "Quantidade de Erros",
+                "quantidadeGlosados": "Quantidade Glosada",
+                "valoresStatus": "Valor Total"
+            },
+            "selecione": {
+                "operadora": "Selecione uma operadora",
+                "periodo": "Selecione o período"
+            },
+            "botoes": {
+                "carregar": "Carregar Arquivo",
+                "processar": "Processar Importação",
+                "aprovação": "Aprovar",
+                "rejeitar": "Rejeitar",
+                "reprocessar": "Reprocessar",
+                "exportar": "Exportar Relatório"
+            },
+            "mensagens": {
+                "sucesso_upload": "Arquivo carregado com sucesso. Processamento iniciado.",
+                "sucesso_processamento": "Importação concluída com sucesso.",
+                "sucesso_aprovacao": "Importação aprovada e enviada para faturamento.",
+                "erro_arquivo_invalido": "Arquivo inválido. Verifique formato e tamanho.",
+                "erro_arquivo_vazio": "O arquivo está vazio.",
+                "erro_parsing": "Erro ao processar arquivo. Verifique se está corrompido.",
+                "erro_conciliacao": "Arquivo processado mas contém divergências. Requer aprovação manual.",
+                "erro_duplicacao": "Arquivo contém itens duplicados.",
+                "aviso_glosa": "Algumas cobranças foram automaticamente glosadas por não estarem em conformidade.",
+                "confirmacao_aprovar": "Deseja aprovar esta importação e enviá-la para faturamento?",
+                "confirmacao_rejeitar": "Deseja rejeitar esta importação?"
+            },
+            "validacoes": {
+                "obrigatorio": "Este campo é obrigatório",
+                "extensao_invalida": "Extensão de arquivo não suportada. Use: {extensoes}",
+                "tamanho_maximo": "Arquivo não pode exceder {tamanho}MB",
+                "operadora_obrigatoria": "Operadora é obrigatória",
+                "arquivo_obrigatorio": "Arquivo é obrigatório"
+            },
+            "status": {
+                "emAguardo": "Em Aguardo",
+                "processando": "Processando",
+                "concluida": "Concluída",
+                "errada": "Com Erro",
+                "aguardandoAprovacao": "Aguardando Aprovação",
+                "rejeitada": "Rejeitada",
+                "validando": "Validando"
+            }
+        },
+        "glosa": {
+            "titulo": "Aprovação de Glosas",
+            "subtitulo": "Revise e aprove glosas detectadas automaticamente",
+            "labels": {
+                "motivo": "Motivo da Glosa",
+                "valor": "Valor Glosado",
+                "evidencia": "Evidência",
+                "dataCriacao": "Data de Criação",
+                "tipoGlosa": "Tipo de Glosa"
+            },
+            "tipos": {
+                "duplicacao": "Duplicação",
+                "valorOutlier": "Valor Anômalo",
+                "servicoNaoAutorizado": "Serviço Não Autorizado",
+                "naoFaturado": "Não Faturado"
+            },
+            "botoes": {
+                "aprovar": "Aprovar Glosa",
+                "rejeitar": "Rejeitar Glosa",
+                "aprovarTodas": "Aprovar Todas"
+            }
+        },
+        "relatorios": {
+            "titulo": "Relatórios de Conciliação",
+            "subtitulo": "Análise de divergências entre faturas e consumo",
+            "filtros": {
+                "periodo": "Período",
+                "operadora": "Operadora",
+                "status": "Status da Conciliação"
+            },
+            "colunas": {
+                "numeroFatura": "Nº Fatura",
+                "operadora": "Operadora",
+                "periodo": "Período",
+                "valorFatura": "Valor da Fatura",
+                "valorCdr": "Valor CDR",
+                "diferenca": "Diferença",
+                "percentualDivergencia": "% Divergência",
+                "status": "Status",
+                "dataImportacao": "Data de Importação"
+            },
+            "botoes": {
+                "exportarPdf": "Exportar PDF",
+                "exportarExcel": "Exportar Excel",
+                "imprir": "Imprimir"
+            }
+        }
+    },
+    "mensagens_sistema": {
+        "processamento_iniciado": "Processamento de importação iniciado. Você receberá notificação quando concluído.",
+        "processamento_em_andamento": "Processamento em andamento. Não feche esta janela.",
+        "processamento_concluido_com_sucesso": "Processamento concluído com sucesso.",
+        "importacao_ja_existe": "Esta fatura já foi importada anteriormente em {data}.",
+        "arquivo_corrompido": "Arquivo aparenta estar corrompido. Tente novamente ou contate o suporte."
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|----------|--------|-------------------|
+| Upload de arquivo | `CARGA_IMPORTACAO_UPLOAD` | Nome arquivo, hash SHA256, tamanho, operadora, usuário, IP |
+| Validação de arquivo | `CARGA_IMPORTACAO_VALIDACAO` | Resultado validação, erros encontrados, campo afetado |
+| Parsing concluído | `CARGA_IMPORTACAO_PARSING` | Quantidade itens extraídos, valor total, período fatura |
+| Conciliação executada | `CARGA_IMPORTACAO_CONCILIACAO` | Status conciliação, divergências encontradas, valor diferença |
+| Glosa automática aplicada | `CARGA_GLOSA_AUTOMATICA_APLICADA` | Quantidade glosado, itens afetados, regra aplicada |
+| Glosa aprovada manualmente | `CARGA_GLOSA_APROVACAO_MANUAL` | Usuário aprovador, data, itens aprovados |
+| Glosa rejeitada manualmente | `CARGA_GLOSA_REJEICAO_MANUAL` | Usuário, motivo rejeição, data |
+| Integração com RF032 | `CARGA_INTEGRACAO_RF032` | ID Nota Fiscal criada, status integração, data |
+| Reprocessamento de importação | `CARGA_REPROCESSAMENTO` | ID importação, motivo, resultado |
+| Relatório gerado | `CARGA_RELATORIO_GERADO` | Tipo relatório, filtros aplicados, quantidade registros |
+
+**Retenção**: 7 anos (conforme LGPD e requisitos de auditoria fiscal)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis Padrão |
+|-----------|-----------|---------------|
+| `carga:importacao:create` | Realizar upload de arquivo | Gestor Telecom, Supervisor Financeiro, Admin |
+| `carga:importacao:read` | Visualizar histórico de importações | Todos (com filtro por conglomerado) |
+| `carga:importacao:update` | Reprocessar importação | Gestor Telecom, Admin |
+| `carga:importacao:delete` | Remover registro de importação | Admin (apenas teste/desenvolvimento) |
+| `carga:glosa:read` | Visualizar glosas | Gestor Telecom, Supervisor Financeiro, Admin |
+| `carga:glosa:approve` | Aprovar glosas | Supervisor Financeiro, Admin |
+| `carga:glosa:reject` | Rejeitar glosas | Supervisor Financeiro, Admin |
+| `carga:configuracao:read` | Visualizar configurações | Admin, Gestor Telecom |
+| `carga:configuracao:update` | Alterar regras de glosa | Admin |
+| `carga:relatorios:read` | Acessar relatórios | Todos (com filtro por conglomerado) |
+| `carga:relatorios:export` | Exportar relatórios | Gestor Telecom, Supervisor Financeiro, Admin |
+
+**Matriz de Perfis**:
+
+| Perfil | Importação | Visualização | Aprovação de Glosa | Configuração |
+|--------|-----------|--------------|-------------------|--------------|
+| **Gestor Telecom** | ✓ | ✓ | ✗ | ✗ |
+| **Supervisor Financeiro** | ✗ | ✓ | ✓ | ✗ |
+| **Admin** | ✓ | ✓ | ✓ | ✓ |
+| **Auditor** | ✗ | ✓ | ✗ | ✗ |
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 Operações de Importação
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| POST | `/api/carga/importacoes` | Criar nova importação (upload) | `carga:importacao:create` |
+| GET | `/api/carga/importacoes` | Listar importações com filtros | `carga:importacao:read` |
+| GET | `/api/carga/importacoes/{id}` | Obter detalhes de importação | `carga:importacao:read` |
+| GET | `/api/carga/importacoes/{id}/status` | Obter status em tempo real | `carga:importacao:read` |
+| POST | `/api/carga/importacoes/{id}/reprocessar` | Reprocessar importação | `carga:importacao:update` |
+| DELETE | `/api/carga/importacoes/{id}` | Deletar importação | `carga:importacao:delete` |
+| GET | `/api/carga/importacoes/{id}/arquivo` | Download do arquivo original | `carga:importacao:read` |
+| GET | `/api/carga/importacoes/{id}/cdrs` | Listar CDRs extraídos | `carga:importacao:read` |
+
+### 5.2 Operações de Glosa
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/carga/glosas` | Listar glosas pendentes | `carga:glosa:read` |
+| GET | `/api/carga/glosas/{id}` | Obter detalhes da glosa | `carga:glosa:read` |
+| PUT | `/api/carga/glosas/{id}/aprovar` | Aprovar glosa | `carga:glosa:approve` |
+| PUT | `/api/carga/glosas/{id}/rejeitar` | Rejeitar glosa | `carga:glosa:reject` |
+| POST | `/api/carga/glosas/aprovar-lote` | Aprovar múltiplas glosas | `carga:glosa:approve` |
+| POST | `/api/carga/glosas/rejeitar-lote` | Rejeitar múltiplas glosas | `carga:glosa:reject` |
+
+### 5.3 Operações de Conciliação e Relatórios
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/carga/conciliacao` | Listar conciliações | `carga:relatorios:read` |
+| GET | `/api/carga/conciliacao/{id}` | Obter detalhes conciliação | `carga:relatorios:read` |
+| GET | `/api/carga/relatorios/conciliacao` | Gerar relatório de conciliação | `carga:relatorios:read` |
+| GET | `/api/carga/relatorios/conciliacao/exportar` | Exportar relatório | `carga:relatorios:export` |
+| GET | `/api/carga/relatorios/divergencias` | Listar divergências encontradas | `carga:relatorios:read` |
+| POST | `/api/carga/relatorios/comparativo` | Gerar comparativo fatura vs CDR | `carga:relatorios:read` |
+
+### 5.4 Operações de Configuração
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/carga/configuracao/regras-glosa` | Listar regras de glosa configuradas | `carga:configuracao:read` |
+| POST | `/api/carga/configuracao/regras-glosa` | Criar nova regra de glosa | `carga:configuracao:update` |
+| PUT | `/api/carga/configuracao/regras-glosa/{id}` | Atualizar regra de glosa | `carga:configuracao:update` |
+| DELETE | `/api/carga/configuracao/regras-glosa/{id}` | Deletar regra de glosa | `carga:configuracao:update` |
+| GET | `/api/carga/configuracao/operadoras` | Listar operadoras suportadas | `carga:configuracao:read` |
+| GET | `/api/carga/configuracao/parametros` | Obter parâmetros de sistema | `carga:configuracao:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Importação e Processamento de Fatura
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ USUÁRIO ACESSA /carga/importar-faturas                                  │
+└──────────────────────────────────────┬──────────────────────────────────┘
+                                       │
+                                       v
+                    ┌──────────────────────────────────┐
+                    │ 1. SELECIONAR ARQUIVO E OPERADORA│
+                    │ POST /api/carga/importacoes      │
+                    └──────────────────┬───────────────┘
+                                       │
+                         ┌─────────────┴──────────────┐
+                         │                            │
+                         v (VÁLIDO)                   v (INVÁLIDO)
+                    ┌─────────────┐            ┌──────────────────┐
+                    │ UPLOAD OK   │            │ ERRO: Arquivo    │
+                    │ Status: Validando        │ inválido, tamanho│
+                    │ Job Hangfire criado      │ ou formato       │
+                    └─────────────┬──────────────────────────────┘
+                                  │
+                                  v
+                    ┌─────────────────────────────────┐
+                    │ 2. HANGFIRE INICIA PROCESSAMENTO │
+                    │ ProcessarImportacaoAsync        │
+                    └──────────────────┬───────────────┘
+                                       │
+                    ┌──────────────────┴──────────────────┐
+                    │                                     │
+                    v (PARSING OK)                        v (FALHA PARSING)
+        ┌───────────────────────────┐         ┌──────────────────────┐
+        │ 3. EXTRAIR CDRs DA FATURA │         │ Status: ProcessadoComErro
+        │ Parser específico operadora         │ Hangfire retenta (3x)
+        │ Criar registros CdrEntity           └──────────────────────┘
+        └───────────────┬───────────────┘
+                        │
+                        v
+            ┌────────────────────────────┐
+            │ 4. VALIDAR INTEGRIDADE     │
+            │ Totalizadores vs itens    │
+            └───────────┬────────────────┘
+                        │
+            ┌───────────┴──────────────┐
+            │                          │
+        v (OK)                    v (ERRO)
+    ┌──────────────┐         ┌────────────────┐
+    │ Prosseguir   │         │ Status: ProcessadoComErro
+    │              │         │ Alertar usuário
+    └──────┬───────┘         └────────────────┘
+           │
+           v
+    ┌──────────────────────────────┐
+    │ 5. EXECUTAR GLOSA AUTOMÁTICA │
+    │ GlosaProcessor.ProcessarGlosaAsync
+    │ Marcar CDRs glosados = Bloqueado
+    └──────────────┬───────────────┘
+                   │
+                   v
+    ┌──────────────────────────────────┐
+    │ 6. CONCILIAR FATURA vs CDRs      │
+    │ ConciliadorFaturaVsCdr.ConciliarAsync
+    │ Validar valores e quantidades
+    └──────────────┬───────────────────┘
+                   │
+        ┌──────────┴──────────────┐
+        │                         │
+    v (CONCILIADA)           v (DIVERGENTE)
+ ┌───────────────┐     ┌──────────────────────┐
+ │ Prosseguir    │     │ Status: AguardandoAprovacao
+ │ para step 7   │     │ Alertar usuário com divergências
+ └───────┬───────┘     └──────────────────────┘
+         │
+         v
+ ┌────────────────────────────────────┐
+ │ 7. INTEGRAR COM RF032 (Notas Fiscais)
+ │ IntegradorComRF032.IntegrarAsync   │
+ │ Criar Nota Fiscal automaticamente  │
+ └──────────────┬─────────────────────┘
+                │
+      ┌─────────┴─────────┐
+      │                   │
+  v (SUCESSO)        v (ERRO INTEGRAÇÃO)
+┌──────────────┐  ┌──────────────────────┐
+│ Status:      │  │ Status: ProcessadoComErro
+│ Concluida    │  │ Notificar admin
+│ Enviar aviso │  │ Ficar em AguardandoAprovacao manual
+└──────────────┘  └──────────────────────┘
+```
+
+### 6.2 Fluxo de Aprovação de Glosa
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ SUPERVISOR ACESSA /carga/glosa-manual                       │
+│ Vê lista de glosas pendentes (Status = Pendente)           │
+└──────────────────────────────┬──────────────────────────────┘
+                               │
+                               v
+                   ┌───────────────────────┐
+                   │ 1. REVISAR GLOSA      │
+                   │ Visualizar evidência  │
+                   │ Motivo + valor glosado
+                   └───────────┬───────────┘
+                               │
+                ┌──────────────┴──────────────┐
+                │                             │
+            v (APROVAR)                   v (REJEITAR)
+     ┌──────────────────┐          ┌────────────────────┐
+     │ 2a. CLICA APROVAR│          │ 2b. CLICA REJEITAR │
+     │ PUT /api/carga/  │          │ PUT /api/carga/    │
+     │ glosas/{id}/aprovar         │ glosas/{id}/rejeitar
+     └────────┬─────────┘          └────────┬───────────┘
+              │                              │
+              v                              v
+     ┌──────────────────┐          ┌────────────────────┐
+     │ Status: Aprovada │          │ Status: Rejeitada  │
+     │ CdrEntity marcado│          │ CdrEntity = Normal │
+     │ como "Bloqueado" │          │ Criar log evidência
+     │ Auditoria registra         │ Auditoria registra
+     └────────┬────────┘           └────────┬───────────┘
+              │                              │
+              v                              v
+     ┌──────────────────┐          ┌────────────────────┐
+     │ 3. ATUALIZAR     │          │ 3. NOTIFICAR USUÁRIO
+     │ NOTA FISCAL      │          │ Glosa rejeitada    │
+     │ Reduzir valor    │          │ CDR será faturado  │
+     │ conforme glosa   │          └────────────────────┘
+     └──────────────────┘
+```
+
+### 6.3 Fluxo de Reprocessamento de Importação Falhada
+
+```
+┌─────────────────────────────────────────────┐
+│ IMPORTAÇÃO FALHOU (Status: ProcessadoComErro)
+│ Usuário acessa detalhes da importação      │
+└──────────────────────┬──────────────────────┘
+                       │
+                       v
+            ┌──────────────────────┐
+            │ 1. CLICA REPROCESSAR │
+            │ POST /api/carga/     │
+            │ importacoes/{id}/reprocessar
+            └──────────┬───────────┘
+                       │
+                       v
+        ┌──────────────────────────────┐
+        │ 2. HANGFIRE AGENDA NOVO JOB  │
+        │ ProcessarImportacaoAsync novamente
+        │ Status: Processando
+        └──────────────┬───────────────┘
+                       │
+            ┌──────────┴──────────┐
+            │                     │
+        v (SUCESSO)          v (FALHA NOVAMENTE)
+     ┌─────────────┐      ┌──────────────────────┐
+     │ Status:     │      │ Hangfire retentará  │
+     │ Concluida   │      │ máx 3 vezes com     │
+     │ Notificar   │      │ backoff exponencial │
+     └─────────────┘      │ Se todas falharem:  │
+                          │ Notificar admin     │
+                          │ Requer investigação │
+                          └──────────────────────┘
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição |
+|----------|-----------|
+| **Validação de Arquivo** | Verificação de tamanho (max 50MB), extensão, encoding, schema antes de processamento |
+| **Hash de Arquivo (SHA256)** | Todos os arquivos recebem hash criptográfico para evitar tamperência e duplicação |
+| **Isolamento por Conglomerado** | Cada importação está vinculada a conglomerado específico, impossível acessar dados de outro |
+| **RBAC em Operações Críticas** | Aprovação de glosas requer perfil específico (Supervisor Financeiro) |
+| **Auditoria Completa** | Todas as operações são registradas com usuário, timestamp, IP, antes/depois |
+| **Retentativas com Exponential Backoff** | Hangfire retenta 3x com backoff para evitar consumo de recursos em caso de falha |
+| **Soft Delete Obrigatório** | Nenhum registro é fisicamente deletado (apenas marcado como excluído) |
+| **SSL/TLS para Transmissão** | Todos os endpoints HTTPS, dados em trânsito criptografados |
+| **Validação de Integridade em Banco** | Constraints verificam antes de inserção de dados inválidos |
+| **Detecção de Anomalias** | Valores outliers e padrões anormais são bloqueados e alertados |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] SQL Injection em filtros de busca (`/api/carga/importacoes?nome=...`)
+- [ ] XSS em campos de entrada (descrição de glosa, motivo rejeição)
+- [ ] CSRF Protection em operações de estado (aprovar, rejeitar)
+- [ ] Validação de permissões RBAC em cada endpoint
+- [ ] Validação de isolamento por conglomerado (não acessar dados de outro)
+- [ ] Validação de upload seguro (sem execução de código, validação de tipo MIME)
+- [ ] Validação de tamanho máximo de arquivo (50MB)
+- [ ] Proteção contra race condition em aprovação de glosa (double submit)
+- [ ] Validação de signature de arquivo (se aplicável por operadora)
+- [ ] Teste de auditoria completa em operações sensíveis (antes/depois, usuário, timestamp)
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medição |
+|-----|------|---------|
+| **Taxa de Sucesso de Importação** | ≥ 98% | (Importações Concluídas / Total Importações) * 100 |
+| **Tempo Médio de Processamento** | ≤ 2 min | Tempo desde upload até conciliação concluída |
+| **Taxa de Glosa Automática** | 5-15% | (Itens Glosados / Total Itens Processados) * 100 |
+| **Taxa de Conciliação Automática** | ≥ 95% | (Faturas Conciliadas Sem Divergência / Total) * 100 |
+| **Tempo de Aprovação de Glosa** | ≤ 24h | Intervalo entre criação e aprovação/rejeição |
+| **Taxa de Acurácia de Parsing** | ≥ 99,5% | (Itens Extraídos Corretamente / Total) * 100 |
+| **Disponibilidade do Serviço** | ≥ 99,5% | Uptime do endpoint de importação |
+| **Taxa de Erros de Integração RF032** | ≤ 0,5% | (Falhas Integração / Total Integrações) * 100 |
+| **Volume Processado por Hora** | ≥ 500 itens/hora | Total itens CDR processados por hora |
+| **Taxa de Reprocessamento** | ≤ 2% | (Importações Reprocessadas / Total) * 100 |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| **Arquivo Muito Grande** | > 40MB | Avisar usuário, permitir continuar mas com atenção |
+| **Processamento Lento** | > 5 min | Notificar admin, verificar se há gargalo |
+| **Taxa de Erro Alta** | > 50 itens com erro | Pausar processamento, notificar admin |
+| **Glosa Excessiva** | > 30% de itens glosados | Alertar supervisor, possível regra de glosa problemática |
+| **Divergência Alta** | Fatura vs CDR > R$ 1.000 | Requer aprovação manual, notificar supervisor |
+| **Falha Repetida** | 3 retentativas falhadas | Notificar admin, criar ticket de suporte |
+| **Arquivo Duplicado** | Hash já existe | Avisar usuário, perguntar se deseja reprocessar |
+| **Timeout de Processamento** | > 30 min | Cancelar job, registrar erro, notificar user |
+| **Fila de Hangfire Acumulada** | > 100 jobs pendentes | Escalacionar para operações, aumentar workers |
+| **Indisponibilidade RF032** | Integração falha 3x | Marcar importação como AguardandoAprovacao, notificar admin |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF086](./MD-RF086-Carga-e-Importacao.md) com DDL completo, ER diagram, tabelas de auditoria
+2. **Casos de Uso**: Criar [UC-RF086](./UC-RF086-Carga-e-Importacao.md) com 5 UCs (Upload, Listar, Detalhar, Reprocessar, Glosa)
+3. **Fluxos e Wireframes**: Criar [WF-RF086](./WF-RF086-Carga-e-Importacao.md) com telas Angular e transições de estado
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml) quebrado em histórias de usuário implementáveis
+5. **Teste - Cenários**: Criar [CN-RF086-SISTEMA.md](./Testes/Sistema/CN-RF086-SISTEMA.md) com 80-150 cenários de teste
+6. **Teste - Casos**: Criar [TC-RF086-SISTEMA.md](./Testes/Sistema/TC-RF086-SISTEMA.md) com 30-50 casos de teste consolidados
+7. **Teste - Dados**: Criar [MT-RF086-SISTEMA.csv](./Testes/Sistema/Massa/MT-RF086-SISTEMA.csv) com dados de teste
+8. **Teste - Backend**: Criar [TC-RF086-BACKEND.md](./Testes/Backend/TC-RF086-BACKEND.md) e [MT-RF086-BACKEND.csv](./Testes/Backend/Massa/)
+9. **Implementação**: Iniciar CONTRATO-EXECUÇÃO-BACKEND para codificar API REST em .NET 10
+10. **Frontend**: Após backend aprovado, CONTRATO-EXECUÇÃO-FRONTEND para telas Angular 19
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versão inicial - RF086 completo com 9 seções | Claude Architect |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: Claude Architect - IControlIT v2
+**Revisão**: Pendente

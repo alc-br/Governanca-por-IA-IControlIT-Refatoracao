@@ -1,0 +1,271 @@
+# Casos de Uso - RF051
+
+**Versão:** 1.0
+**Data:** 2025-12-17
+**RF Relacionado:** [RF051 - Gestao-Marcas-Modelos](./RF051.md)
+
+---
+
+## Índice de Casos de Uso
+
+| UC | Nome | Descrição |
+|----|------|-----------|
+| UC00 | UC00 - Listar Fabricantes e Modelos | Caso de uso |
+| UC01 | UC01 - Criar Fabricante e Modelo | Caso de uso |
+| UC02 | UC02 - Visualizar Fabricante e Modelo | Caso de uso |
+| UC03 | UC03 - Editar Fabricante e Modelo | Caso de uso |
+| UC04 | UC04 - Inativar Fabricante e Modelo | Caso de uso |
+
+---
+
+# UC00 - Listar Fabricantes e Modelos
+
+**RF:** RF-090 - Gestão de Marcas e Modelos
+**Versão:** 1.0
+**Última Atualização:** 04/11/2025
+
+## Descrição
+Permite visualizar lista de fabricantes e seus respectivos modelos cadastrados no sistema.
+
+## Atores
+- **Principal**: Usuário do Sistema (com permissão CAD.MARCAS_MODELOS.VISUALIZAR)
+
+## Pré-condições
+- Usuário autenticado
+- Permissão `CAD.MARCAS_MODELOS.VISUALIZAR`
+
+## Fluxo Principal
+1. Usuário acessa menu "Cadastros" → "Marcas e Modelos"
+2. Sistema exibe abas: "Fabricantes", "Modelos"
+3. Usuário visualiza aba "Fabricantes" (padrão)
+4. Sistema lista fabricantes com:
+   - Logo, Nome, País, Website
+   - Quantidade de modelos cadastrados
+   - Status (Ativo/Inativo)
+5. Usuário pode filtrar por: Nome, País, Status
+6. Ao clicar em fabricante, sistema exibe modelos deste fabricante
+7. Para cada modelo exibe: Nome, Tipo Ativo, Part Number, Status Homologação, EOL
+
+## Fluxos Alternativos
+**FA01 - Visualizar em Modo Hierárquico**
+1. Usuário clica em "Visualização em Árvore"
+2. Sistema exibe: Fabricante → Marcas → Modelos
+
+## Pós-condições
+- Lista de fabricantes/modelos exibida
+
+## Regras de Negócio
+- **RN-CAD-016-01**: Isolamento multi-tenant
+
+## Critérios de Aceite
+- [ ] Lista apenas dados do conglomerado do usuário
+- [ ] Filtros funcionam corretamente
+- [ ] Paginação funciona
+- [ ] Quantidade de modelos é exata
+
+**Última Revisão:** 04/11/2025
+
+---
+
+# UC01 - Criar Fabricante e Modelo
+
+**RF:** RF-090
+**Versão:** 1.0
+**Última Atualização:** 04/11/2025
+
+## Descrição
+Permite criar novos fabricantes e modelos de equipamentos.
+
+## Atores
+- **Principal**: Administrador do Sistema
+
+## Pré-condições
+- Usuário autenticado com permissão `CAD.MARCAS_MODELOS.CRIAR`
+
+## Fluxo Principal - Criar Fabricante
+1. Usuário clica em "Novo Fabricante"
+2. Sistema exibe formulário:
+   - Nome (obrigatório, único)
+   - País (obrigatório)
+   - Website (opcional, URL válida)
+   - Logo (upload de imagem)
+   - Descrição (opcional)
+3. Usuário preenche e salva
+4. Sistema valida:
+   - Nome único ✓
+   - URL válida ✓
+5. Sistema cria fabricante
+6. Sistema registra auditoria
+7. Mensagem de sucesso
+
+## Fluxo Principal - Criar Modelo
+1. Usuário clica em "Novo Modelo"
+2. Sistema exibe formulário:
+   - Nome Modelo (obrigatório)
+   - Fabricante (dropdown, obrigatório)
+   - Tipo de Ativo (dropdown, obrigatório)
+   - Part Number (obrigatório, único por fabricante)
+   - SKU (opcional)
+   - Ano Lançamento (opcional)
+   - Especificações Técnicas (JSON)
+   - Homologado? (checkbox)
+   - EOL? (checkbox)
+   - Preço Referência (opcional)
+3. Usuário preenche e salva
+4. Sistema valida:
+   - Part Number único para este fabricante ✓
+   - JSON válido ✓
+   - Se EOL, não pode ser homologado ✓
+5. Sistema cria modelo
+6. Sistema registra auditoria
+7. Mensagem de sucesso
+
+## Fluxos de Exceção
+**FE01 - Nome Fabricante Duplicado**
+- Sistema exibe: "Já existe fabricante com este nome"
+
+**FE02 - Part Number Duplicado**
+- Sistema exibe: "Part Number já existe para este fabricante"
+
+**FE03 - JSON Inválido**
+- Sistema exibe: "Formato JSON inválido nas especificações"
+
+**FE04 - EOL e Homologado**
+- Sistema exibe: "Modelos EOL não podem ser homologados"
+
+## Pós-condições
+- Fabricante/Modelo criado e disponível
+- Auditoria registrada
+
+## Regras de Negócio
+- **RN-CAD-016-01**: Nome fabricante único
+- **RN-CAD-016-02**: Part Number único por fabricante
+- **RN-CAD-016-03**: Modelos EOL não homologados
+- **RN-CAD-016-04**: Especificações JSON válido
+
+## Critérios de Aceite
+- [ ] Nome duplicado é rejeitado
+- [ ] Part Number duplicado (mesmo fabricante) é rejeitado
+- [ ] JSON inválido é rejeitado
+- [ ] EOL + Homologado é rejeitado
+- [ ] Auditoria registrada
+
+**Última Revisão:** 04/11/2025
+
+---
+
+# UC02 - Visualizar Fabricante e Modelo
+
+**RF:** RF-090
+**Versão:** 1.0
+
+## Descrição
+Visualizar detalhes completos de fabricante ou modelo.
+
+## Fluxo Principal
+1. Usuário clica em fabricante/modelo na lista
+2. Sistema exibe modal/painel com:
+   - **Fabricante**: Nome, País, Website, Logo, Total Modelos
+   - **Modelo**: Nome, Fabricante, Tipo, Part Number, SKU, Especificações, Homologação, EOL, Preço, Total Ativos com este modelo
+3. Possível navegar para edição
+
+## Pós-condições
+- Detalhes exibidos
+
+## Critérios de Aceite
+- [ ] Todos dados exibidos
+- [ ] Total de ativos é exato
+
+**Última Revisão:** 04/11/2025
+
+---
+
+# UC03 - Editar Fabricante e Modelo
+
+**RF:** RF-090
+**Versão:** 1.0
+
+## Descrição
+Editar dados de fabricante ou modelo existente.
+
+## Pré-condições
+- Permissão `CAD.MARCAS_MODELOS.EDITAR`
+
+## Fluxo Principal
+1. Usuário clica em "Editar"
+2. Sistema carrega formulário pré-preenchido
+3. Usuário altera campos permitidos
+4. Sistema valida alterações
+5. Sistema atualiza registro
+6. Sistema registra auditoria com antes/depois
+7. Mensagem de sucesso
+
+## Fluxos de Exceção
+**FE01 - Marcar EOL com Homologação Ativa**
+- Sistema desmarca homologação automaticamente
+- Alerta: "Modelo marcado como EOL. Homologação removida"
+
+## Regras de Negócio
+- **RN-CAD-016-03**: EOL remove homologação
+
+## Critérios de Aceite
+- [ ] Alterações validadas
+- [ ] EOL remove homologação
+- [ ] Auditoria com antes/depois
+
+**Última Revisão:** 04/11/2025
+
+---
+
+# UC04 - Inativar Fabricante e Modelo
+
+**RF:** RF-090
+**Versão:** 1.0
+
+## Descrição
+Inativar (soft delete) fabricante ou modelo.
+
+## Pré-condições
+- Permissão `CAD.MARCAS_MODELOS.EXCLUIR`
+
+## Fluxo Principal
+1. Usuário clica em "Excluir"
+2. Sistema verifica vínculos:
+   - Fabricante: possui modelos ativos?
+   - Modelo: possui ativos cadastrados?
+3. Se sem vínculos, exibe confirmação
+4. Usuário confirma
+5. Sistema marca Fl_Ativo = 0
+6. Sistema registra auditoria
+7. Mensagem de sucesso
+
+## Fluxos de Exceção
+**FE01 - Fabricante com Modelos**
+- Sistema exibe: "Fabricante possui N modelos ativos. Inactive os modelos primeiro"
+
+**FE02 - Modelo com Ativos**
+- Sistema exibe: "Modelo possui N ativos cadastrados. Não é possível inativar"
+
+## Pós-condições
+- Registro inativado
+- Possível restaurar
+
+## Regras de Negócio
+- **RN-CAD-016-05**: Não inativar fabricante com modelos
+- **RN-CAD-016-06**: Não inativar modelo com ativos
+
+## Critérios de Aceite
+- [ ] Fabricante com modelos é protegido
+- [ ] Modelo com ativos é protegido
+- [ ] Soft delete executado
+- [ ] Auditoria registrada
+
+**Última Revisão:** 04/11/2025
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-12-17 | Sistema | Consolidação de 5 casos de uso |

@@ -1,0 +1,710 @@
+# Template de Referência ao Legado (RL-RF061.yaml)
+# Versão: 2.0
+# Data: 2025-12-30
+# RF: RF061 - Gestão de Ordens de Serviço (OS)
+
+rf_id: RF061
+titulo: "Gestão de Ordens de Serviço (OS)"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "ASP.NET 4.x"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2012+"
+  multi_tenant: false
+  auditoria: "partial"  # Apenas tabela de log genérica
+
+# ==============================================================================
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+# Cada item DEVE ter campo "destino" preenchido
+# ==============================================================================
+
+referencias:
+  # ----------------------------------------------------------------------------
+  # TELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF061-001"
+    tipo: "tela"
+    nome: "ListaOrdensServico.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/OrdensServico/ListaOrdensServico.aspx"
+    descricao: |
+      Tela de listagem de OSs com filtros por status, técnico, período e cliente.
+      Grid com paginação fixa de 50 registros, ordenação por data de criação DESC.
+      Cores diferentes por status (verde=finalizada, amarelo=agendada, vermelho=atrasada).
+      Sem refresh automático (usuário precisa fazer F5).
+
+    destino: "substituido"
+    justificativa: |
+      Tela substituída por componente Angular com paginação flexível, filtros avançados e
+      atualização automática a cada 30 segundos. Cores de status mantidas mas com design moderno.
+
+    rf_item_relacionado: "RN-RF061-015"
+    uc_relacionado: "UC00-RF061"
+
+    migracao_moderna:
+      componente_angular: "ordens-servico-list.component.ts"
+      rota_frontend: "/gestao/service-desk/ordens-servico"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF061-002"
+    tipo: "tela"
+    nome: "CadastroOrdemServico.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/OrdensServico/CadastroOrdemServico.aspx"
+    descricao: |
+      Tela de criação/edição de OS. Campos: cliente, tipo, técnico, data agendada, descrição,
+      observações, flag de prioridade. Número da OS gerado automaticamente (OS-{ID}).
+      Status inicial fixo: AGUARDANDO_AGENDAMENTO. Sem validação de disponibilidade de técnico.
+      Sem integração com solicitações (criação sempre manual).
+
+    destino: "substituido"
+    justificativa: |
+      Tela substituída por componente Angular com validação de disponibilidade de técnico,
+      criação automática a partir de solicitações, e formato de número OS-YYYY-NNNNN.
+
+    rf_item_relacionado: "RN-RF061-001, RN-RF061-002"
+    uc_relacionado: "UC01-RF061"
+
+    migracao_moderna:
+      componente_angular: "ordens-servico-create.component.ts"
+      rota_frontend: "/gestao/service-desk/ordens-servico/create"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF061-003"
+    tipo: "tela"
+    nome: "ExecutarOrdemServico.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/OrdensServico/ExecutarOrdemServico.aspx"
+    descricao: |
+      Tela de execução de OS pelo técnico. Campos: data/hora início (manual), data/hora fim (manual),
+      relatório de execução (texto livre), grid de peças utilizadas, upload de 2 fotos (antes/depois).
+      Sem check-in/check-out automático. Sem geolocalização. Sem assinatura digital.
+      Baixa de estoque manual (processo separado). Sem checklist estruturado.
+
+    destino: "substituido"
+    justificativa: |
+      Tela substituída por componente Angular com check-in/check-out automático com GPS,
+      checklist estruturado obrigatório, assinatura digital com hash SHA-256,
+      múltiplas fotos com descrição, baixa automática de estoque.
+
+    rf_item_relacionado: "RN-RF061-003, RN-RF061-004, RN-RF061-005, RN-RF061-006, RN-RF061-007, RN-RF061-008"
+    uc_relacionado: "UC02-RF061"
+
+    migracao_moderna:
+      componente_angular: "ordens-servico-execute.component.ts"
+      rota_frontend: "/gestao/service-desk/ordens-servico/{id}/execute"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICES LEGADOS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF061-004"
+    tipo: "webservice"
+    nome: "OrdemServicoService.asmx"
+    caminho: "ic1_legado/IControlIT/Services/OrdemServicoService.asmx"
+    descricao: |
+      Webservice SOAP com métodos:
+      - CriarOrdemServico: Criar nova OS via integração (sem validação de disponibilidade)
+      - ConsultarOrdemServico: Consultar OS por ID (retorna todos os campos)
+      - ListarOrdensServico: Listar OSs com filtros (sem paginação, retorna todos)
+      - AgendarOrdemServico: Definir técnico e data (sem validação de conflito)
+      - FinalizarOrdemServico: Marcar como finalizada (sem validação de checklist)
+      Problemas: Sem JWT, sem versionamento, sem throttling, erros genéricos HTTP 200 com XML.
+
+    destino: "substituido"
+    justificativa: |
+      Webservice SOAP substituído por REST API com JSON, JWT, versionamento, paginação,
+      validações completas e códigos HTTP apropriados.
+
+    rf_item_relacionado: "Seção 11 (API Endpoints)"
+    uc_relacionado: "Todos os UCs"
+
+    migracao_moderna:
+      endpoints_rest:
+        - "GET /api/ordens-servico"
+        - "POST /api/ordens-servico"
+        - "PUT /api/ordens-servico/{id}/agendar"
+        - "PUT /api/ordens-servico/{id}/finalizar"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # STORED PROCEDURES LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF061-005"
+    tipo: "stored_procedure"
+    nome: "sp_CriarOrdemServico"
+    caminho: "ic1_legado/Database/Procedures/sp_CriarOrdemServico.sql"
+    descricao: |
+      Stored procedure que cria nova OS. Lógica:
+      1. Gera número sequencial OS consultando MAX(Id_OS) + 1 (vulnerável a race condition)
+      2. Insere registro com status AGUARDANDO_AGENDAMENTO
+      3. Insere log genérico (apenas operação CREATE, sem valores dos campos)
+      4. Retorna ID da OS criada
+      Problemas: Race condition em MAX+1, não valida se cliente existe, auditoria insuficiente.
+
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Application Layer (CQRS Handler) com geração de ID por GUID,
+      número de OS com formato OS-YYYY-NNNNN, validações de FK, auditoria completa.
+
+    rf_item_relacionado: "RN-RF061-001"
+    uc_relacionado: "UC01-RF061"
+
+    migracao_moderna:
+      handler: "CreateOrdemServicoCommandHandler"
+      validacao: "CreateOrdemServicoCommandValidator (FluentValidation)"
+
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF061-006"
+    tipo: "stored_procedure"
+    nome: "sp_AgendarOrdemServico"
+    caminho: "ic1_legado/Database/Procedures/sp_AgendarOrdemServico.sql"
+    descricao: |
+      Stored procedure que agenda OS. Lógica:
+      1. Atualiza campos Id_Tecnico e Data_Agendada
+      2. Altera status para AGENDADA
+      3. Registra log de alteração
+      Problema CRÍTICO: Não verifica se técnico está disponível (pode agendar em horário ocupado).
+
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Application Layer com validação obrigatória de disponibilidade de técnico,
+      verificação de conflitos de agenda, cálculo de janelas livres.
+
+    rf_item_relacionado: "RN-RF061-002"
+    uc_relacionado: "UC03-RF061"
+
+    migracao_moderna:
+      handler: "AgendarOrdemServicoCommandHandler"
+      validacao: "AgendarOrdemServicoCommandValidator (FluentValidation + regra de disponibilidade)"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF061-007"
+    tipo: "stored_procedure"
+    nome: "sp_FinalizarOrdemServico"
+    caminho: "ic1_legado/Database/Procedures/sp_FinalizarOrdemServico.sql"
+    descricao: |
+      Stored procedure que finaliza OS. Lógica:
+      1. Atualiza data início, fim, relatório
+      2. Altera status para FINALIZADA
+      3. Calcula tempo de atendimento (minutos) = DATEDIFF
+      4. Registra log
+      Problemas: Não valida checklist (não existia), não valida assinatura (não existia).
+
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Application Layer com validações obrigatórias de checklist completo,
+      assinatura digital coletada, fotos anexadas, baixa de estoque executada.
+
+    rf_item_relacionado: "RN-RF061-004, RN-RF061-005, RN-RF061-008"
+    uc_relacionado: "UC02-RF061"
+
+    migracao_moderna:
+      handler: "FinalizarOrdemServicoCommandHandler"
+      validacao: "FinalizarOrdemServicoCommandValidator (FluentValidation + regras completas)"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF061-008"
+    tipo: "stored_procedure"
+    nome: "Tabela OrdemServico"
+    caminho: "ic1_legado/Database/Schema/dbo.OrdemServico.sql"
+    descricao: |
+      Tabela principal de OSs com problemas:
+      - Chave primária INT IDENTITY (vulnerável a race condition)
+      - Número OS sem padrão de ano (formato OS-{ID})
+      - Sem Foreign Keys para Cliente, TipoOS, Tecnico (órfãos possíveis)
+      - Status VARCHAR sem CONSTRAINT (valores livres, sem enum)
+      - Data_Agendada NULLABLE (deveria ser obrigatório quando AGENDADA)
+      - Sem campo EmpresaId (multi-tenancy não existia)
+      - Sem soft delete (exclusão física)
+      - Auditoria parcial (falta IP, User Agent)
+
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com GUID, multi-tenancy (EmpresaId), soft delete (Fl_Excluido),
+      auditoria completa, FKs com ON DELETE RESTRICT, status como enum, número OS com ano.
+
+    rf_item_relacionado: "Seção 12 (Modelo de Dados)"
+    md_relacionado: "MD-RF061.md - Tabela OrdemServico"
+
+    migracao_moderna:
+      tabela_moderna: "OrdemServico"
+      migration_ef_core: "20251230_CreateOrdemServicoTable.cs"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF061-009"
+    tipo: "stored_procedure"
+    nome: "Tabela PecaUtilizadaOS"
+    caminho: "ic1_legado/Database/Schema/dbo.PecaUtilizadaOS.sql"
+    descricao: |
+      Tabela de peças utilizadas com problemas:
+      - Sem Foreign Keys para OS e Peca (órfãos possíveis)
+      - Quantidade INT sem validação (podia ser negativo)
+      - Valor_Total calculado manualmente (inconsistência possível)
+      - Baixa de estoque não automática (processo separado)
+      - Sem rastreabilidade de almoxarifado
+
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com FKs obrigatórias, validação de quantidade > 0,
+      valor total calculado automaticamente, trigger de baixa de estoque.
+
+    rf_item_relacionado: "RN-RF061-005"
+    md_relacionado: "MD-RF061.md - Tabela PecaUtilizadaOS"
+
+    migracao_moderna:
+      tabela_moderna: "PecaUtilizadaOS"
+      migration_ef_core: "20251230_CreatePecaUtilizadaOSTable.cs"
+
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF061-010"
+    tipo: "stored_procedure"
+    nome: "Tabela FotoOS"
+    caminho: "ic1_legado/Database/Schema/dbo.FotoOS.sql"
+    descricao: |
+      Tabela de fotos com problemas:
+      - Sem Foreign Key para OS
+      - Tipo_Foto VARCHAR sem CONSTRAINT
+      - Caminho físico no servidor (vulnerável)
+      - Sem compressão automática
+      - Sem validação de tipo de arquivo
+      - Sem descrição da foto
+
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com FK obrigatória, tipo como enum, armazenamento em blob storage,
+      compressão automática, validação de extensão, campo descrição.
+
+    rf_item_relacionado: "RN-RF061-006"
+    md_relacionado: "MD-RF061.md - Tabela FotoOS"
+
+    migracao_moderna:
+      tabela_moderna: "FotoOS"
+      migration_ef_core: "20251230_CreateFotoOSTable.cs"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # ----------------------------------------------------------------------------
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF061-011"
+    tipo: "regra_negocio"
+    nome: "Número da OS Sequencial Simples"
+    caminho: "ic1_legado/Database/Procedures/sp_CriarOrdemServico.sql"
+    localizacao_codigo: "ic1_legado/Database/Procedures/sp_CriarOrdemServico.sql - Linha 15-20"
+    descricao: |
+      Número da OS gerado automaticamente no formato OS-{ID_SEQUENCIAL}, sem ano, mês ou
+      identificador de empresa. Causava duplicatas em migrações multi-cliente.
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno usa formato OS-YYYY-NNNNN com ano para organização e evitar conflitos.
+
+    rf_item_relacionado: "RN-RF061-001"
+    uc_relacionado: "UC01-RF061"
+
+    migracao_moderna:
+      validador: "CreateOrdemServicoCommandValidator"
+      linha_codigo: "RuleFor(x => x.Numero).Must(BeUniqueNumber)"
+
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF061-012"
+    tipo: "regra_negocio"
+    nome: "Agendamento Sem Validação de Disponibilidade"
+    caminho: "ic1_legado/Database/Procedures/sp_AgendarOrdemServico.sql"
+    localizacao_codigo: "ic1_legado/Database/Procedures/sp_AgendarOrdemServico.sql - Linha 8-12"
+    descricao: |
+      Sistema permitia agendar OS para qualquer técnico em qualquer horário, sem verificar
+      se técnico já tinha outra OS agendada. Causava conflitos de agenda.
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno valida disponibilidade antes de permitir agendamento.
+
+    rf_item_relacionado: "RN-RF061-002"
+    uc_relacionado: "UC03-RF061"
+
+    migracao_moderna:
+      validador: "AgendarOrdemServicoCommandValidator"
+      linha_codigo: "RuleFor(x => x).MustAsync(TecnicoEstarDisponivel)"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF061-013"
+    tipo: "regra_negocio"
+    nome: "Data/Hora de Execução Informada Manualmente"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/OrdensServico/ExecutarOrdemServico.aspx.vb"
+    localizacao_codigo: "ic1_legado/IControlIT/ServiceDesk/OrdensServico/ExecutarOrdemServico.aspx.vb - Linha 45-60"
+    descricao: |
+      Técnico digitava manualmente data/hora de início e fim. Sem check-in/check-out automático,
+      permitindo manipulação de dados.
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno captura automaticamente timestamp no check-in/check-out.
+
+    rf_item_relacionado: "RN-RF061-007, RN-RF061-008"
+    uc_relacionado: "UC02-RF061"
+
+    migracao_moderna:
+      handler: "CheckInOrdemServicoCommandHandler, CheckOutOrdemServicoCommandHandler"
+      linha_codigo: "checkpoint.DataHora = DateTime.UtcNow"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF061-014"
+    tipo: "regra_negocio"
+    nome: "Baixa de Estoque Manual"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/OrdensServico/ExecutarOrdemServico.aspx.vb"
+    localizacao_codigo: "ic1_legado/IControlIT/ServiceDesk/OrdensServico/ExecutarOrdemServico.aspx.vb - Linha 120-135"
+    descricao: |
+      Após finalizar OS, técnico informava peças mas baixa no estoque era manual (almoxarifado).
+      Causava inconsistências e atrasos.
+
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno dá baixa automática no estoque ao finalizar OS.
+
+    rf_item_relacionado: "RN-RF061-005"
+    uc_relacionado: "UC02-RF061"
+
+    migracao_moderna:
+      handler: "FinalizarOrdemServicoCommandHandler"
+      linha_codigo: "await _estoqueService.BaixarPeca(peca.PecaId, peca.Quantidade)"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF061-015"
+    tipo: "regra_negocio"
+    nome: "Sem Assinatura Digital"
+    caminho: "Não existia no legado"
+    localizacao_codigo: "Não existia no legado"
+    descricao: |
+      Sistema legado não coletava assinatura digital do cliente. Comprovação era apenas
+      através do relatório do técnico.
+
+    destino: "a_revisar"
+    justificativa: |
+      Funcionalidade NOVA sem equivalente no legado. Requer tablet/smartphone com touch.
+      Necessário validar com usuários finais se é viável tecnicamente.
+
+    rf_item_relacionado: "RN-RF061-004"
+    uc_relacionado: "UC02-RF061"
+
+    migracao_moderna:
+      handler: "ColetarAssinaturaCommand Handler"
+      linha_codigo: "assinatura.Hash = ComputeSHA256Hash(assinatura.AssinaturaBase64)"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF061-016"
+    tipo: "regra_negocio"
+    nome: "Sem Geolocalização"
+    caminho: "Não existia no legado"
+    localizacao_codigo: "Não existia no legado"
+    descricao: |
+      Sistema legado não capturava localização GPS do técnico. Rastreabilidade geográfica inexistente.
+
+    destino: "a_revisar"
+    justificativa: |
+      Funcionalidade NOVA sem equivalente. Requer consentimento LGPD e GPS funcional.
+      Necessário validar cobertura GPS em áreas de atendimento.
+
+    rf_item_relacionado: "RN-RF061-007"
+    uc_relacionado: "UC02-RF061"
+
+    migracao_moderna:
+      handler: "CheckInOrdemServicoCommandHandler, CheckOutOrdemServicoCommandHandler"
+      linha_codigo: "checkpoint.Latitude = gpsData.Latitude; checkpoint.Longitude = gpsData.Longitude"
+
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF061-017"
+    tipo: "regra_negocio"
+    nome: "Sem Checklist Estruturado"
+    caminho: "Não existia no legado"
+    localizacao_codigo: "Não existia no legado"
+    descricao: |
+      Técnico preenchia apenas campo de texto livre "Relatório de Execução".
+      Não havia checklist estruturado com itens obrigatórios.
+
+    destino: "assumido"
+    justificativa: |
+      Funcionalidade NOVA essencial para padronização de procedimentos.
+      Checklist definido por tipo de OS com itens obrigatórios.
+
+    rf_item_relacionado: "RN-RF061-003"
+    uc_relacionado: "UC02-RF061"
+
+    migracao_moderna:
+      handler: "FinalizarOrdemServicoCommandValidator"
+      linha_codigo: "RuleFor(x => x.ChecklistRespostas).Must(TodosItensObrigatoriosPreenchidos)"
+
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+# ==============================================================================
+# TABELAS LEGADAS DETALHADAS (opcional)
+# ==============================================================================
+
+tabelas:
+  - nome: "OrdemServico"
+    finalidade: "Armazenar dados principais da ordem de serviço"
+    problemas:
+      - "INT IDENTITY (race condition em MAX+1)"
+      - "Sem Foreign Keys (órfãos)"
+      - "Sem multi-tenancy"
+      - "Sem soft delete"
+
+  - nome: "PecaUtilizadaOS"
+    finalidade: "Registrar peças/materiais utilizados"
+    problemas:
+      - "Quantidade sem validação (podia ser negativo)"
+      - "Baixa de estoque não automática"
+
+  - nome: "FotoOS"
+    finalidade: "Armazenar fotos de evidência"
+    problemas:
+      - "Caminho físico (vulnerável)"
+      - "Sem compressão automática"
+
+# ==============================================================================
+# GAP ANALYSIS (LEGADO × MODERNO)
+# ==============================================================================
+
+gap_analysis:
+  - item: "Criação de OS"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Evoluído: criação automática a partir de solicitações adicionada"
+
+  - item: "Agendamento"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Evoluído: validação de disponibilidade adicionada"
+
+  - item: "Check-in/Check-out Automático"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO: funcionalidade não existia no legado"
+
+  - item: "Checklist Estruturado"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO: funcionalidade não existia no legado"
+
+  - item: "Assinatura Digital"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO: funcionalidade crítica não existia"
+
+  - item: "Geolocalização GPS"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO: rastreabilidade geográfica adicionada"
+
+  - item: "SLA"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO: controle completo de SLA com alertas"
+
+  - item: "NPS"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO: avaliação de satisfação adicionada"
+
+  - item: "Notificações"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO: notificações automáticas SMS/WhatsApp"
+
+  - item: "Multi-tenancy"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO: isolamento por EmpresaId"
+
+# ==============================================================================
+# DECISÕES DE MODERNIZAÇÃO
+# ==============================================================================
+
+decisoes_modernizacao:
+  - decisao: "Substituir SOAP por REST API"
+    motivo: |
+      REST com JSON é padrão moderno, leve e flexível.
+      Facilita integração com frontend Angular.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Implementar Check-in/Check-out com GPS"
+    motivo: |
+      Data/hora manual é vulnerável a manipulação.
+      GPS garante rastreabilidade geográfica.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Implementar Assinatura Digital"
+    motivo: |
+      Comprovação formal de execução do serviço.
+      Integridade garantida por hash SHA-256.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Baixa Automática de Estoque"
+    motivo: |
+      Eliminar inconsistências entre OS e estoque.
+      Sincronização em tempo real.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Multi-Tenancy por EmpresaId"
+    motivo: |
+      Eliminar bancos separados por cliente.
+      Reduzir custos de infraestrutura.
+    impacto: "critico"
+    data: "2025-12-30"
+
+# ==============================================================================
+# RISCOS DE MIGRAÇÃO
+# ==============================================================================
+
+riscos_migracao:
+  - risco: "Perda de dados históricos"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      ETL cuidadoso com validação pós-migração.
+      Backup completo antes da migração.
+
+  - risco: "Quebra de integrações externas"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      Manter webservice SOAP em paralelo (deprecado) por 6 meses.
+      Comunicação proativa com parceiros.
+
+  - risco: "Resistência de técnicos"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      Treinamento intensivo e suporte no go-live.
+      Período de adaptação com suporte dedicado.
+
+  - risco: "Falha na baixa automática de estoque"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      Implementar mecanismo de retry e alertas.
+      Monitoramento em tempo real.
+
+  - risco: "GPS impreciso em áreas remotas"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Permitir justificativa manual quando GPS falhar.
+      Registrar tentativas de captura.
+
+# ==============================================================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# ==============================================================================
+
+rastreabilidade:
+  - elemento_legado: "ListaOrdensServico.aspx"
+    referencia_rf: "RN-RF061-015"
+    referencia_uc: "UC00-RF061"
+    status: "migrado"
+
+  - elemento_legado: "CadastroOrdemServico.aspx"
+    referencia_rf: "RN-RF061-001, RN-RF061-002"
+    referencia_uc: "UC01-RF061, UC03-RF061"
+    status: "migrado"
+
+  - elemento_legado: "ExecutarOrdemServico.aspx"
+    referencia_rf: "RN-RF061-003 a RN-RF061-008"
+    referencia_uc: "UC02-RF061"
+    status: "migrado"
+
+  - elemento_legado: "OrdemServicoService.asmx"
+    referencia_rf: "Seção 11 (API Endpoints)"
+    referencia_uc: "Todos os UCs"
+    status: "migrado"
+
+  - elemento_legado: "sp_CriarOrdemServico"
+    referencia_rf: "RN-RF061-001"
+    referencia_uc: "UC01-RF061"
+    status: "migrado"
+
+  - elemento_legado: "sp_AgendarOrdemServico"
+    referencia_rf: "RN-RF061-002"
+    referencia_uc: "UC03-RF061"
+    status: "migrado"
+
+  - elemento_legado: "sp_FinalizarOrdemServico"
+    referencia_rf: "RN-RF061-004 a RN-RF061-008"
+    referencia_uc: "UC02-RF061"
+    status: "migrado"
+
+# ==============================================================================
+# METADADOS (CALCULADOS AUTOMATICAMENTE)
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 17
+  itens_assumidos: 1    # LEG-RF061-017 (checklist)
+  itens_substituidos: 14  # LEG-RF061-001 a -014 exceto -015 e -016
+  itens_descartados: 0
+  itens_a_revisar: 2    # LEG-RF061-015 (assinatura), LEG-RF061-016 (GPS)
+  cobertura_destinos: "100%"  # Todos os 17 itens têm campo destino preenchido
+
+# ==============================================================================
+# CHANGELOG
+# ==============================================================================
+
+changelog:
+  - versao: "2.0"
+    data: "2025-12-30"
+    descricao: "Documentação completa de referência ao legado RF061. 17 itens rastreados com 100% de destinos preenchidos."
+    autor: "Agência ALC - alc.dev.br"

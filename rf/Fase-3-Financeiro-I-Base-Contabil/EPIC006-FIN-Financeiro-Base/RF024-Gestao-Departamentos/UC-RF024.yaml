@@ -1,0 +1,1269 @@
+# =============================================
+# UC-RF024 - Casos de Uso (Contrato Comportamental)
+# Gestão de Departamentos e Estrutura Organizacional
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+uc:
+  rf: "RF024"
+  versao: "2.0"
+  data: "2025-12-31"
+
+casos_de_uso:
+
+  - id: "UC00"
+    nome: "Listar Departamentos"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      rf_items:
+        - "RF-CRUD-02"
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa a funcionalidade Departamentos pelo menu"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema valida permissão do usuário"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Sistema carrega departamentos do tenant (query filter global)"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Sistema aplica paginação padrão (20 registros)"
+          required: true
+        - id: "FP-UC00-005"
+          title: "Sistema aplica ordenação padrão (Nome_Departamento ASC)"
+          required: true
+        - id: "FP-UC00-006"
+          title: "Sistema exibe lista com colunas"
+          required: true
+        - id: "FA-UC00-001"
+          title: "Buscar por termo"
+          required: false
+        - id: "FA-UC00-002"
+          title: "Ordenar por coluna"
+          required: false
+        - id: "FA-UC00-003"
+          title: "Filtrar por Tipo"
+          required: false
+        - id: "FA-UC00-004"
+          title: "Filtrar por Líder"
+          required: false
+        - id: "FA-UC00-005"
+          title: "Filtrar por Nível Hierárquico"
+          required: false
+        - id: "FE-UC00-001"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+        - id: "FE-UC00-002"
+          title: "Nenhum registro → estado vazio"
+          required: true
+        - id: "FE-UC00-003"
+          title: "Erro conexão banco → HTTP 500"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.DEPARTAMENTOS.VIEW_ANY"
+      - autenticacao: true
+
+    gatilho: "Usuario acessa funcionalidade Departamentos pelo menu"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_departamentos"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_departamentos_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "aplicar_paginacao"
+      - passo: 5
+        ator: "sistema"
+        acao: "aplicar_ordenacao"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibir_lista"
+
+    fluxos_alternativos:
+      - id: "FA-UC00-01"
+        condicao: "usuario_aplica_filtro_busca"
+        resultado: "lista_filtrada_por_termo"
+      - id: "FA-UC00-02"
+        condicao: "usuario_ordena_coluna"
+        resultado: "lista_reordenada"
+
+    fluxos_excecao:
+      - id: "FE-UC00-01"
+        condicao: "sem_permissao"
+        resultado: "acesso_negado_403"
+      - id: "FE-UC00-02"
+        condicao: "nenhum_registro"
+        resultado: "estado_vazio"
+
+    regras_aplicadas:
+      - "RN-RF024-001"
+      - "RN-RF024-002"
+
+    resultado_final:
+      estado: "lista_exibida_paginada"
+
+  - id: "UC01"
+    nome: "Criar Departamento"
+    ator_principal: "admin"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RF-CRUD-01"
+        - "RF-VAL-01"
+        - "RF-VAL-02"
+        - "RF-VAL-03"
+        - "RF-SEC-01"
+        - "RF-SEC-03"
+        - "RF-FUNC-01"
+      uc_items:
+        - id: "FP-UC01-001"
+          title: "Usuário clica em Novo Departamento"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema valida permissão CREATE"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Sistema exibe formulário"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Usuário informa dados"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Usuário clica em Salvar"
+          required: true
+        - id: "FP-UC01-006"
+          title: "Sistema valida dados (FluentValidation)"
+          required: true
+        - id: "FP-UC01-007"
+          title: "Sistema valida referências circulares"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Sistema calcula hierarquia"
+          required: true
+        - id: "FP-UC01-009"
+          title: "Sistema cria registro com campos automáticos"
+          required: true
+        - id: "FP-UC01-010"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FP-UC01-011"
+          title: "Sistema notifica líder"
+          required: true
+        - id: "FP-UC01-012"
+          title: "Sistema retorna HTTP 201"
+          required: true
+        - id: "FP-UC01-013"
+          title: "Frontend exibe mensagem sucesso"
+          required: true
+        - id: "FA-UC01-001"
+          title: "Salvar e criar outro"
+          required: false
+        - id: "FA-UC01-002"
+          title: "Cancelar criação"
+          required: false
+        - id: "FE-UC01-001"
+          title: "Código duplicado → HTTP 409"
+          required: true
+        - id: "FE-UC01-002"
+          title: "Código formato inválido → HTTP 422"
+          required: true
+        - id: "FE-UC01-003"
+          title: "Líder inválido → HTTP 422"
+          required: true
+        - id: "FE-UC01-004"
+          title: "Referência circular → HTTP 422"
+          required: true
+        - id: "FE-UC01-005"
+          title: "Departamento Pai inexistente → HTTP 404"
+          required: true
+        - id: "FE-UC01-006"
+          title: "Departamento Pai outro tenant → HTTP 403"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.DEPARTAMENTOS.CREATE"
+      - role: "Admin|Super Admin"
+
+    gatilho: "Usuario clica em Novo Departamento"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_novo"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_formulario"
+      - passo: 4
+        ator: "usuario"
+        acao: "preencher_dados"
+      - passo: 5
+        ator: "usuario"
+        acao: "salvar"
+      - passo: 6
+        ator: "sistema"
+        acao: "validar_dados_fluent"
+      - passo: 7
+        ator: "sistema"
+        acao: "validar_circular_references"
+      - passo: 8
+        ator: "sistema"
+        acao: "calcular_hierarquia"
+      - passo: 9
+        ator: "sistema"
+        acao: "persistir_registro"
+      - passo: 10
+        ator: "sistema"
+        acao: "registrar_auditoria"
+      - passo: 11
+        ator: "sistema"
+        acao: "notificar_lider"
+
+    fluxos_excecao:
+      - id: "FE-UC01-01"
+        condicao: "codigo_duplicado"
+        resultado: "http_409_conflict"
+      - id: "FE-UC01-04"
+        condicao: "circular_reference_detectada"
+        resultado: "http_422_unprocessable"
+
+    regras_aplicadas:
+      - "RN-RF024-001"
+      - "RN-RF024-002"
+      - "RN-RF024-003"
+      - "RN-RF024-004"
+      - "RN-RF024-010"
+      - "RN-RF024-015"
+
+    resultado_final:
+      estado: "departamento_criado"
+
+  - id: "UC02"
+    nome: "Visualizar Departamento"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      rf_items:
+        - "RF-CRUD-03"
+        - "RF-SEC-01"
+        - "RF-FUNC-01"
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Usuário clica em Visualizar"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema valida autenticação"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema carrega departamento por ID"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Sistema valida tenant"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Sistema carrega dados relacionados"
+          required: true
+        - id: "FP-UC02-006"
+          title: "Sistema exibe informações"
+          required: true
+        - id: "FP-UC02-007"
+          title: "Sistema exibe colaboradores alocados"
+          required: true
+        - id: "FA-UC02-001"
+          title: "Visualizar organograma a partir deste departamento"
+          required: false
+        - id: "FA-UC02-002"
+          title: "Editar departamento"
+          required: false
+        - id: "FE-UC02-001"
+          title: "Departamento inexistente → HTTP 404"
+          required: true
+        - id: "FE-UC02-002"
+          title: "Departamento outro tenant → HTTP 404"
+          required: true
+        - id: "FE-UC02-003"
+          title: "Departamento soft-deleted → HTTP 404"
+          required: true
+
+    precondicoes:
+      - autenticacao: true
+
+    gatilho: "Usuario clica em Visualizar na listagem"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_visualizar"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_autenticacao"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_por_id"
+      - passo: 4
+        ator: "sistema"
+        acao: "validar_tenant"
+      - passo: 5
+        ator: "sistema"
+        acao: "carregar_relacionados"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibir_dados"
+
+    fluxos_excecao:
+      - id: "FE-UC02-01"
+        condicao: "departamento_inexistente"
+        resultado: "http_404_not_found"
+
+    regras_aplicadas: []
+
+    resultado_final:
+      estado: "dados_exibidos"
+
+  - id: "UC03"
+    nome: "Editar Departamento"
+    ator_principal: "admin"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RF-CRUD-04"
+        - "RF-VAL-02"
+        - "RF-SEC-01"
+        - "RF-SEC-03"
+        - "RF-FUNC-01"
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Usuário clica em Editar"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema valida permissão UPDATE"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Sistema carrega dados atuais"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Sistema valida tenant"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Sistema exibe formulário pré-preenchido"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Usuário altera campos"
+          required: true
+        - id: "FP-UC03-007"
+          title: "Usuário clica em Salvar"
+          required: true
+        - id: "FP-UC03-008"
+          title: "Sistema valida dados"
+          required: true
+        - id: "FP-UC03-009"
+          title: "Sistema valida referências circulares"
+          required: true
+        - id: "FP-UC03-010"
+          title: "Sistema detecta mudanças e recalcula hierarquia"
+          required: true
+        - id: "FP-UC03-011"
+          title: "Sistema atualiza campos automáticos"
+          required: true
+        - id: "FP-UC03-012"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FP-UC03-013"
+          title: "Sistema retorna HTTP 200"
+          required: true
+        - id: "FP-UC03-014"
+          title: "Frontend exibe mensagem sucesso"
+          required: true
+        - id: "FA-UC03-001"
+          title: "Cancelar edição"
+          required: false
+        - id: "FA-UC03-002"
+          title: "Alterar hierarquia (reparenting)"
+          required: false
+        - id: "FE-UC03-001"
+          title: "Líder inválido → HTTP 422"
+          required: true
+        - id: "FE-UC03-002"
+          title: "Referência circular → HTTP 422"
+          required: true
+        - id: "FE-UC03-003"
+          title: "Departamento Pai inexistente → HTTP 404"
+          required: true
+        - id: "FE-UC03-004"
+          title: "Tentativa alterar Código → HTTP 422"
+          required: true
+        - id: "FE-UC03-005"
+          title: "Conflito edição concorrente → HTTP 409"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.DEPARTAMENTOS.UPDATE"
+      - role: "Admin|Super Admin|Gestor"
+
+    gatilho: "Usuario clica em Editar"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_editar"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_dados"
+      - passo: 4
+        ator: "sistema"
+        acao: "validar_tenant"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_formulario"
+      - passo: 6
+        ator: "usuario"
+        acao: "alterar_campos"
+      - passo: 7
+        ator: "usuario"
+        acao: "salvar"
+      - passo: 8
+        ator: "sistema"
+        acao: "validar_dados"
+      - passo: 9
+        ator: "sistema"
+        acao: "validar_circular_references"
+      - passo: 10
+        ator: "sistema"
+        acao: "recalcular_hierarquia"
+      - passo: 11
+        ator: "sistema"
+        acao: "atualizar_campos_auto"
+      - passo: 12
+        ator: "sistema"
+        acao: "registrar_auditoria"
+
+    fluxos_excecao:
+      - id: "FE-UC03-02"
+        condicao: "circular_reference_detectada"
+        resultado: "http_422_unprocessable"
+
+    regras_aplicadas:
+      - "RN-RF024-002"
+      - "RN-RF024-003"
+      - "RN-RF024-004"
+      - "RN-RF024-010"
+      - "RN-RF024-015"
+
+    resultado_final:
+      estado: "departamento_atualizado"
+
+  - id: "UC04"
+    nome: "Excluir Departamento"
+    ator_principal: "super_admin"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RF-CRUD-05"
+        - "RF-SEC-01"
+        - "RF-SEC-03"
+      uc_items:
+        - id: "FP-UC04-001"
+          title: "Usuário clica em Excluir"
+          required: true
+        - id: "FP-UC04-002"
+          title: "Sistema valida permissão DELETE"
+          required: true
+        - id: "FP-UC04-003"
+          title: "Sistema exibe modal confirmação"
+          required: true
+        - id: "FP-UC04-004"
+          title: "Usuário confirma exclusão"
+          required: true
+        - id: "FP-UC04-005"
+          title: "Sistema verifica dependências"
+          required: true
+        - id: "FP-UC04-006"
+          title: "Sistema executa soft delete"
+          required: true
+        - id: "FP-UC04-007"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FP-UC04-008"
+          title: "Sistema retorna HTTP 200"
+          required: true
+        - id: "FP-UC04-009"
+          title: "Frontend exibe mensagem sucesso"
+          required: true
+        - id: "FP-UC04-010"
+          title: "Frontend redireciona para listagem"
+          required: true
+        - id: "FA-UC04-001"
+          title: "Cancelar exclusão"
+          required: false
+        - id: "FE-UC04-001"
+          title: "Departamento tem filhos → HTTP 422"
+          required: true
+        - id: "FE-UC04-002"
+          title: "Departamento tem colaboradores → HTTP 422"
+          required: true
+        - id: "FE-UC04-003"
+          title: "Departamento já excluído → HTTP 404"
+          required: true
+        - id: "FE-UC04-004"
+          title: "Departamento outro tenant → HTTP 404"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.DEPARTAMENTOS.DELETE"
+      - role: "Super Admin"
+
+    gatilho: "Usuario clica em Excluir"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_excluir"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_modal_confirmacao"
+      - passo: 4
+        ator: "usuario"
+        acao: "confirmar"
+      - passo: 5
+        ator: "sistema"
+        acao: "verificar_dependencias"
+      - passo: 6
+        ator: "sistema"
+        acao: "soft_delete"
+      - passo: 7
+        ator: "sistema"
+        acao: "registrar_auditoria"
+
+    fluxos_excecao:
+      - id: "FE-UC04-01"
+        condicao: "tem_filhos"
+        resultado: "http_422_bloquear_exclusao"
+      - id: "FE-UC04-02"
+        condicao: "tem_colaboradores"
+        resultado: "http_422_bloquear_exclusao"
+
+    regras_aplicadas:
+      - "RN-RF024-002"
+      - "RN-RF024-008"
+      - "RN-RF024-015"
+
+    resultado_final:
+      estado: "departamento_excluido"
+
+  - id: "UC05"
+    nome: "Visualizar Organograma"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      rf_items:
+        - "RF-FUNC-02"
+      uc_items:
+        - id: "FP-UC05-001"
+          title: "Usuário acessa Organograma"
+          required: true
+        - id: "FP-UC05-002"
+          title: "Sistema valida autenticação"
+          required: true
+        - id: "FP-UC05-003"
+          title: "Sistema consulta cache Redis"
+          required: true
+        - id: "FP-UC05-004"
+          title: "Cache HIT → retorna DTO"
+          required: true
+        - id: "FP-UC05-005"
+          title: "Cache MISS → executa query recursiva"
+          required: true
+        - id: "FP-UC05-006"
+          title: "Sistema monta DTO recursivo"
+          required: true
+        - id: "FP-UC05-007"
+          title: "Sistema armazena cache Redis"
+          required: true
+        - id: "FP-UC05-008"
+          title: "Sistema retorna JSON"
+          required: true
+        - id: "FP-UC05-009"
+          title: "Frontend renderiza D3.js"
+          required: true
+        - id: "FA-UC05-001"
+          title: "Buscar departamento"
+          required: false
+        - id: "FA-UC05-002"
+          title: "Filtrar por tipo"
+          required: false
+        - id: "FA-UC05-003"
+          title: "Exportar organograma"
+          required: false
+        - id: "FA-UC05-004"
+          title: "Visualizar subárvore"
+          required: false
+        - id: "FA-UC05-005"
+          title: "Ver colaboradores"
+          required: false
+        - id: "FE-UC05-001"
+          title: "Nenhum departamento → estado vazio"
+          required: true
+        - id: "FE-UC05-002"
+          title: "Organograma muito grande → HTTP 413"
+          required: true
+        - id: "FE-UC05-003"
+          title: "Erro renderizar D3.js → mensagem erro"
+          required: true
+
+    precondicoes:
+      - autenticacao: true
+
+    gatilho: "Usuario acessa Organograma pelo menu"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessar_organograma"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_autenticacao"
+      - passo: 3
+        ator: "sistema"
+        acao: "consultar_cache_redis"
+      - passo: 4
+        ator: "sistema"
+        acao: "executar_query_recursiva"
+      - passo: 5
+        ator: "sistema"
+        acao: "montar_dto_recursivo"
+      - passo: 6
+        ator: "sistema"
+        acao: "armazenar_cache"
+      - passo: 7
+        ator: "sistema"
+        acao: "retornar_json"
+      - passo: 8
+        ator: "frontend"
+        acao: "renderizar_d3js"
+
+    fluxos_alternativos:
+      - id: "FA-UC05-03"
+        condicao: "usuario_exporta_organograma"
+        resultado: "arquivos_png_pdf_svg_gerados"
+
+    fluxos_excecao:
+      - id: "FE-UC05-02"
+        condicao: "organograma_maior_500_nos"
+        resultado: "http_413_payload_too_large"
+
+    regras_aplicadas:
+      - "RN-RF024-009"
+
+    resultado_final:
+      estado: "organograma_renderizado"
+
+  - id: "UC06"
+    nome: "Alocar Colaborador em Departamento"
+    ator_principal: "admin_rh"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RF-FUNC-03"
+        - "RF-SEC-01"
+        - "RF-SEC-03"
+      uc_items:
+        - id: "FP-UC06-001"
+          title: "Usuário acessa Alocar Colaborador"
+          required: true
+        - id: "FP-UC06-002"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC06-003"
+          title: "Sistema exibe formulário"
+          required: true
+        - id: "FP-UC06-004"
+          title: "Usuário preenche dados e clica Alocar"
+          required: true
+        - id: "FP-UC06-005"
+          title: "Sistema valida dados"
+          required: true
+        - id: "FP-UC06-006"
+          title: "Sistema cria registro Usuario_Departamento"
+          required: true
+        - id: "FP-UC06-007"
+          title: "Trigger atualiza Qtd_Colaboradores"
+          required: true
+        - id: "FP-UC06-008"
+          title: "Sistema notifica líder"
+          required: true
+        - id: "FP-UC06-009"
+          title: "SignalR broadcast OnColaboradorAlocado"
+          required: true
+        - id: "FP-UC06-010"
+          title: "Sistema retorna HTTP 201"
+          required: true
+        - id: "FP-UC06-011"
+          title: "Frontend exibe mensagem sucesso"
+          required: true
+        - id: "FA-UC06-001"
+          title: "Alocação temporária"
+          required: false
+        - id: "FA-UC06-002"
+          title: "Dotted-line (matricial)"
+          required: false
+        - id: "FE-UC06-001"
+          title: "Colaborador já tem lotação principal → HTTP 422"
+          required: true
+        - id: "FE-UC06-002"
+          title: "Soma alocações >100% → HTTP 422"
+          required: true
+        - id: "FE-UC06-003"
+          title: "Percentual inválido → HTTP 422"
+          required: true
+        - id: "FE-UC06-004"
+          title: "Data Fim anterior Data Início → HTTP 422"
+          required: true
+        - id: "FE-UC06-005"
+          title: "Temporaria sem Data Fim → HTTP 422"
+          required: true
+
+    precondicoes:
+      - permissao: "implícita_admin_rh"
+
+    gatilho: "Usuario acessa Alocar Colaborador"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessar_alocar"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_formulario"
+      - passo: 4
+        ator: "usuario"
+        acao: "preencher_e_alocar"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_soma_alocacoes"
+      - passo: 6
+        ator: "sistema"
+        acao: "criar_registro"
+      - passo: 7
+        ator: "trigger"
+        acao: "atualizar_qtd_colaboradores"
+      - passo: 8
+        ator: "sistema"
+        acao: "notificar_lider_multicanal"
+      - passo: 9
+        ator: "signalr"
+        acao: "broadcast_evento"
+
+    fluxos_excecao:
+      - id: "FE-UC06-02"
+        condicao: "soma_alocacoes_maior_100"
+        resultado: "http_422_validacao_falhou"
+
+    regras_aplicadas:
+      - "RN-RF024-007"
+      - "RN-RF024-008"
+      - "RN-RF024-010"
+
+    resultado_final:
+      estado: "colaborador_alocado"
+
+  - id: "UC07"
+    nome: "Criar Movimentação Interdepartamental"
+    ator_principal: "gestor_rh"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RF-FUNC-05"
+      uc_items:
+        - id: "FP-UC07-001"
+          title: "Usuário acessa Criar Movimentação"
+          required: true
+        - id: "FP-UC07-002"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC07-003"
+          title: "Sistema exibe formulário"
+          required: true
+        - id: "FP-UC07-004"
+          title: "Usuário preenche e clica Criar"
+          required: true
+        - id: "FP-UC07-005"
+          title: "Sistema valida dados"
+          required: true
+        - id: "FP-UC07-006"
+          title: "Sistema cria Departamento_Movimentacao"
+          required: true
+        - id: "FP-UC07-007"
+          title: "Sistema notifica Líder Origem"
+          required: true
+        - id: "FP-UC07-008"
+          title: "Sistema retorna HTTP 201"
+          required: true
+        - id: "FP-UC07-009"
+          title: "Frontend exibe mensagem sucesso"
+          required: true
+        - id: "FA-UC07-001"
+          title: "Movimentação temporária"
+          required: false
+        - id: "FA-UC07-002"
+          title: "Promoção"
+          required: false
+        - id: "FE-UC07-001"
+          title: "Colaborador não lotado na origem → HTTP 422"
+          required: true
+        - id: "FE-UC07-002"
+          title: "Origem = Destino → HTTP 422"
+          required: true
+        - id: "FE-UC07-003"
+          title: "Motivo vazio → HTTP 422"
+          required: true
+
+    precondicoes:
+      - permissao: "implícita_gestor_rh"
+
+    gatilho: "Usuario acessa Criar Movimentacao"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessar_criar_movimentacao"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_formulario"
+      - passo: 4
+        ator: "usuario"
+        acao: "preencher_e_criar"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_lotacao_origem"
+      - passo: 6
+        ator: "sistema"
+        acao: "criar_movimentacao_pendente"
+      - passo: 7
+        ator: "sistema"
+        acao: "notificar_lider_origem"
+
+    fluxos_excecao:
+      - id: "FE-UC07-01"
+        condicao: "colaborador_nao_lotado_origem"
+        resultado: "http_422_validacao_falhou"
+
+    regras_aplicadas:
+      - "RN-RF024-006"
+
+    resultado_final:
+      estado: "movimentacao_criada_pendente"
+
+  - id: "UC08"
+    nome: "Aprovar Movimentação"
+    ator_principal: "lider_rh"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RF-FUNC-05"
+        - "RF-FUNC-04"
+      uc_items:
+        - id: "FP-UC08-001"
+          title: "Líder Origem acessa Minhas Aprovações"
+          required: true
+        - id: "FP-UC08-002"
+          title: "Sistema lista movimentações pendentes"
+          required: true
+        - id: "FP-UC08-003"
+          title: "Líder clica Aprovar"
+          required: true
+        - id: "FP-UC08-004"
+          title: "Sistema valida permissão APPROVE_MOVE_ORIGIN"
+          required: true
+        - id: "FP-UC08-005"
+          title: "Sistema valida que usuário é Líder Origem"
+          required: true
+        - id: "FP-UC08-006"
+          title: "Sistema atualiza Status=Aprovado_Origem"
+          required: true
+        - id: "FP-UC08-007"
+          title: "Sistema registra Dt e Id aprovador"
+          required: true
+        - id: "FP-UC08-008"
+          title: "Sistema notifica Líder Destino"
+          required: true
+        - id: "FP-UC08-009"
+          title: "Sistema retorna HTTP 200"
+          required: true
+        - id: "FP-UC08-010"
+          title: "Frontend exibe mensagem próxima etapa"
+          required: true
+        - id: "FP-UC08-011"
+          title: "Líder Destino acessa Minhas Aprovações"
+          required: true
+        - id: "FP-UC08-012"
+          title: "Sistema lista Status=Aprovado_Origem"
+          required: true
+        - id: "FP-UC08-013"
+          title: "Líder Destino clica Aprovar"
+          required: true
+        - id: "FP-UC08-014"
+          title: "Sistema valida permissão APPROVE_MOVE_DEST"
+          required: true
+        - id: "FP-UC08-015"
+          title: "Sistema valida que usuário é Líder Destino"
+          required: true
+        - id: "FP-UC08-016"
+          title: "Sistema atualiza Status=Aprovado_Destino"
+          required: true
+        - id: "FP-UC08-017"
+          title: "Sistema registra Dt e Id aprovador"
+          required: true
+        - id: "FP-UC08-018"
+          title: "Sistema notifica RH"
+          required: true
+        - id: "FP-UC08-019"
+          title: "Sistema retorna HTTP 200"
+          required: true
+        - id: "FP-UC08-020"
+          title: "Frontend exibe mensagem aguardando RH"
+          required: true
+        - id: "FP-UC08-021"
+          title: "RH acessa Aprovações Pendentes"
+          required: true
+        - id: "FP-UC08-022"
+          title: "Sistema lista Status=Aprovado_Destino"
+          required: true
+        - id: "FP-UC08-023"
+          title: "RH clica Aprovar"
+          required: true
+        - id: "FP-UC08-024"
+          title: "Sistema valida permissão APPROVE_MOVE_HR"
+          required: true
+        - id: "FP-UC08-025"
+          title: "Sistema valida role RH"
+          required: true
+        - id: "FP-UC08-026"
+          title: "Sistema atualiza Status=Aprovado_RH"
+          required: true
+        - id: "FP-UC08-027"
+          title: "Sistema registra Dt e Id aprovador"
+          required: true
+        - id: "FP-UC08-028"
+          title: "Sistema EFETIVA movimentação"
+          required: true
+        - id: "FP-UC08-029"
+          title: "Sistema sincroniza Azure AD"
+          required: true
+        - id: "FP-UC08-030"
+          title: "Sistema define Dt_Efetivacao"
+          required: true
+        - id: "FP-UC08-031"
+          title: "Sistema notifica colaborador"
+          required: true
+        - id: "FP-UC08-032"
+          title: "Sistema retorna HTTP 200"
+          required: true
+        - id: "FP-UC08-033"
+          title: "Frontend exibe mensagem efetivado"
+          required: true
+        - id: "FA-UC08-001"
+          title: "Rejeitar movimentação"
+          required: false
+        - id: "FE-UC08-001"
+          title: "Usuário não é líder correto → HTTP 403"
+          required: true
+        - id: "FE-UC08-002"
+          title: "Status inválido → HTTP 422"
+          required: true
+        - id: "FE-UC08-003"
+          title: "Movimentação já processada → HTTP 409"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.DEPARTAMENTOS.APPROVE_MOVE_ORIGIN|APPROVE_MOVE_DEST|APPROVE_MOVE_HR"
+
+    gatilho: "Lider ou RH acessa Aprovacoes Pendentes"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "lider_origem"
+        acao: "aprovar_etapa_1"
+      - passo: 2
+        ator: "sistema"
+        acao: "atualizar_status_aprovado_origem"
+      - passo: 3
+        ator: "sistema"
+        acao: "notificar_lider_destino"
+      - passo: 4
+        ator: "lider_destino"
+        acao: "aprovar_etapa_2"
+      - passo: 5
+        ator: "sistema"
+        acao: "atualizar_status_aprovado_destino"
+      - passo: 6
+        ator: "sistema"
+        acao: "notificar_rh"
+      - passo: 7
+        ator: "rh"
+        acao: "aprovar_etapa_3_final"
+      - passo: 8
+        ator: "sistema"
+        acao: "efetivar_movimentacao"
+      - passo: 9
+        ator: "sistema"
+        acao: "sincronizar_azure_ad"
+      - passo: 10
+        ator: "sistema"
+        acao: "notificar_colaborador"
+
+    fluxos_excecao:
+      - id: "FE-UC08-01"
+        condicao: "usuario_nao_e_lider_correto"
+        resultado: "http_403_forbidden"
+
+    regras_aplicadas:
+      - "RN-RF024-005"
+      - "RN-RF024-006"
+      - "RN-RF024-008"
+
+    resultado_final:
+      estado: "movimentacao_efetivada"
+
+  - id: "UC09"
+    nome: "Sincronizar com Azure AD"
+    ator_principal: "super_admin"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RF-FUNC-04"
+      uc_items:
+        - id: "FP-UC09-001"
+          title: "Usuário clica Sincronizar Azure AD"
+          required: true
+        - id: "FP-UC09-002"
+          title: "Sistema valida permissão SYNC_AZUREAD"
+          required: true
+        - id: "FP-UC09-003"
+          title: "Sistema valida credenciais Azure AD"
+          required: true
+        - id: "FP-UC09-004"
+          title: "Sistema obtém access token"
+          required: true
+        - id: "FP-UC09-005"
+          title: "Sistema verifica se grupo existe"
+          required: true
+        - id: "FP-UC09-006"
+          title: "Sistema cria ou atualiza grupo"
+          required: true
+        - id: "FP-UC09-007"
+          title: "Sistema armazena Azure_AD_Object_Id"
+          required: true
+        - id: "FP-UC09-008"
+          title: "Sistema busca colaboradores ativos"
+          required: true
+        - id: "FP-UC09-009"
+          title: "Sistema adiciona membros ao grupo"
+          required: true
+        - id: "FP-UC09-010"
+          title: "Sistema atualiza Dt_Ultima_Sincronizacao_AD"
+          required: true
+        - id: "FP-UC09-011"
+          title: "Sistema retorna resultado sincronização"
+          required: true
+        - id: "FP-UC09-012"
+          title: "Frontend exibe mensagem sucesso"
+          required: true
+        - id: "FA-UC09-001"
+          title: "Sincronização automática via Hangfire"
+          required: false
+        - id: "FE-UC09-001"
+          title: "Falha autenticação → HTTP 500"
+          required: true
+        - id: "FE-UC09-002"
+          title: "Falha criação grupo → HTTP 500"
+          required: true
+        - id: "FE-UC09-003"
+          title: "Falha adição membros → HTTP 500"
+          required: true
+        - id: "FE-UC09-004"
+          title: "3+ falhas consecutivas → Alerta crítico"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.DEPARTAMENTOS.SYNC_AZUREAD"
+      - role: "Super Admin"
+
+    gatilho: "Usuario clica Sincronizar Azure AD"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_sincronizar"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "obter_access_token"
+      - passo: 4
+        ator: "sistema"
+        acao: "criar_ou_atualizar_grupo"
+      - passo: 5
+        ator: "sistema"
+        acao: "adicionar_membros"
+      - passo: 6
+        ator: "sistema"
+        acao: "atualizar_dt_sincronizacao"
+
+    fluxos_excecao:
+      - id: "FE-UC09-04"
+        condicao: "tres_falhas_consecutivas"
+        resultado: "alerta_critico_ti_super_admin"
+
+    regras_aplicadas:
+      - "RN-RF024-005"
+
+    resultado_final:
+      estado: "departamento_sincronizado_azure_ad"
+
+  - id: "UC10"
+    nome: "Visualizar Dashboard Headcount"
+    ator_principal: "gestor_rh"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      rf_items:
+        - "RF-FUNC-06"
+      uc_items:
+        - id: "FP-UC10-001"
+          title: "Usuário acessa Dashboard Headcount"
+          required: true
+        - id: "FP-UC10-002"
+          title: "Sistema valida permissão implícita"
+          required: true
+        - id: "FP-UC10-003"
+          title: "Sistema estabelece conexão SignalR"
+          required: true
+        - id: "FP-UC10-004"
+          title: "Sistema calcula métricas"
+          required: true
+        - id: "FP-UC10-005"
+          title: "Sistema define cor gauge"
+          required: true
+        - id: "FP-UC10-006"
+          title: "Sistema retorna JSON métricas"
+          required: true
+        - id: "FP-UC10-007"
+          title: "Frontend renderiza dashboard Chart.js"
+          required: true
+        - id: "FP-UC10-008"
+          title: "Sistema escuta SignalR OnHeadcountAtualizado"
+          required: true
+        - id: "FP-UC10-009"
+          title: "Frontend atualiza métricas automaticamente"
+          required: true
+        - id: "FA-UC10-001"
+          title: "Visualizar subárvore"
+          required: false
+        - id: "FA-UC10-002"
+          title: "Exportar relatório"
+          required: false
+        - id: "FE-UC10-001"
+          title: "Erro conexão SignalR → mensagem"
+          required: true
+        - id: "FE-UC10-002"
+          title: "Sem meta configurada → Não configurado"
+          required: true
+
+    precondicoes:
+      - permissao: "implícita_gestor_rh"
+
+    gatilho: "Usuario acessa Dashboard Headcount"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessar_dashboard"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "estabelecer_signalr"
+      - passo: 4
+        ator: "sistema"
+        acao: "calcular_metricas"
+      - passo: 5
+        ator: "sistema"
+        acao: "definir_cor_gauge"
+      - passo: 6
+        ator: "frontend"
+        acao: "renderizar_dashboard"
+      - passo: 7
+        ator: "signalr"
+        acao: "escutar_eventos"
+
+    fluxos_alternativos:
+      - id: "FA-UC10-01"
+        condicao: "visualizar_subarvore"
+        resultado: "metricas_agregadas_filhos"
+
+    fluxos_excecao:
+      - id: "FE-UC10-01"
+        condicao: "erro_conexao_signalr"
+        resultado: "mensagem_dados_desatualizados"
+
+    regras_aplicadas:
+      - "RN-RF024-011"
+
+    resultado_final:
+      estado: "dashboard_exibido_tempo_real"
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão canônica com 11 UCs cobrindo 100% do RF024"

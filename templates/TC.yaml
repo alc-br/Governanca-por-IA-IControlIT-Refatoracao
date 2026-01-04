@@ -1,0 +1,422 @@
+# =============================================
+# Casos de Teste (TC) — Template YAML (Agnóstico de Plataforma)
+# Versão: 2.0
+# Autor padrão: Agência ALC - alc.dev.br
+# =============================================
+# Este arquivo define CASOS DE TESTE como CONTRATOS DE CENÁRIO.
+# Ele é projetado para:
+# - Cobrir completamente UC-RFXXX.md (múltiplos UCs)
+# - Referenciar Massas de Teste (MT)
+# - Ser interpretável por humanos, IA e qualquer runner
+# - NÃO depender de linguagem, framework ou ferramenta específica
+#
+# REGRAS OBRIGATÓRIAS (GOVERNANÇA):
+# 1. TODO TC DEVE nascer de um Critério de Aceite (CA-UCXX-NNN)
+# 2. TODO TC DEVE referenciar UC, fluxo (FP/FA/FE) e regra de negócio
+# 3. PROIBIDO criar TC sem rastreabilidade explícita
+# 4. PROIBIDO usar texto livre não rastreável (sem IDs canônicos)
+# 5. TC sem origem em CA é considerado ERRO DE GOVERNANÇA
+
+# =============================================
+# 1. METADADOS
+# =============================================
+metadata:
+  versao: "2.0"
+  data: "YYYY-MM-DD"
+  autor: "Agência ALC - alc.dev.br"
+
+  rf_relacionado:
+    id: "RFXXX"
+    nome: "Nome do Requisito Funcional"
+
+  arquivo_uc_referencia: "UC-RFXXX.md"
+  arquivo_massa_teste: "MT-RFXXX.yaml"
+
+  tipo_teste: "BACKEND"          # BACKEND | FRONTEND | SEGURANCA | E2E | INTEGRACAO
+  executor_padrao: "TI"          # TI | QA | USUARIO_FINAL
+
+# =============================================
+# 2. OBJETIVO E ESTRATÉGIA
+# =============================================
+estrategia:
+  objetivo_geral:
+    - "Cobrir 100% dos fluxos descritos nos UCs"
+    - "Cobrir regras de negócio explícitas e implícitas"
+    - "Cobrir falhas, exceções e cenários negativos"
+    - "Garantir segurança, isolamento e auditoria"
+
+  abordagem:
+    - "Testes baseados em cenários"
+    - "Reuso de massas de teste (MT)"
+    - "Separação entre DADO (MT) e CENÁRIO (TC)"
+    - "Agnóstico de plataforma e runner"
+
+# =============================================
+# 3. CONVENÇÕES GERAIS
+# =============================================
+conventions:
+  nomenclatura_tc: "TC-[CATEGORIA]-[NUMERO]"
+  categorias:
+    - HAPPY_PATH
+    - VALIDACAO
+    - SEGURANCA
+    - EDGE_CASE
+    - AUDITORIA
+    - INTEGRACAO
+    - E2E
+
+  prioridades:
+    - CRITICA
+    - ALTA
+    - MEDIA
+    - BAIXA
+
+# =============================================
+# 4. CASOS DE TESTE
+# =============================================
+# Cada TC representa um cenário completo e independente
+
+test_cases:
+
+  # ======================================================
+  # HAPPY PATH
+  # ======================================================
+  TC-HP-001:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+
+    uc_ref: "UC01"
+
+    covers:
+      uc_items:
+        - "UC01-FP-01"
+
+    descricao:
+      resumo: "Criar registro com dados completos"
+      objetivo: "Validar criação bem-sucedida no fluxo principal"
+
+    origem:
+      criterios_aceite: ["CA-UC01-001", "CA-UC01-002", "CA-UC01-003"]
+      ucs: ["UC01"]
+      fluxos_uc: ["FP-UC01-001", "FP-UC01-005", "FP-UC01-006"]
+      regras_negocio: ["RN-UC-01-001", "RN-UC-01-002"]
+
+    massa_teste:
+      referencias: ["MT001"]
+
+    contexto:
+      autenticacao:
+        usuario: "padrao"
+        tenant: 1
+        permissoes: ["{entidade}.create"]
+      estado_inicial:
+        banco:
+          "{TABELA}": []
+
+    acao:
+      tipo: "CRIAR"
+      endpoint_logico: "entidade.create"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+      resposta:
+        deve_conter:
+          "{CAMPO_1}": "{VALOR_VALIDO_1}"
+        campos_gerados:
+          - id
+          - created_at
+          - created_by
+
+      banco:
+        "{TABELA}":
+          deve_existir:
+            - "{CAMPO_1}": "{VALOR_VALIDO_1}"
+
+    criterio_aprovacao:
+      - "Resposta indica sucesso"
+      - "Registro persistido corretamente"
+      - "Auditoria registrada"
+
+  # ======================================================
+  # VALIDAÇÃO
+  # ======================================================
+  TC-VAL-001:
+    categoria: "VALIDACAO"
+    prioridade: "CRITICA"
+
+    uc_ref: "UC01"
+
+    covers:
+      uc_items:
+        - "UC01-FE-01"
+
+    descricao:
+      resumo: "Campo obrigatório ausente"
+      objetivo: "Garantir validação de campos obrigatórios"
+
+    origem:
+      criterios_aceite: ["CA-UC01-005"]
+      ucs: ["UC01"]
+      fluxos_uc: ["FE-UC01-001"]
+      regras_negocio: ["RN-UC-01-001"]
+
+    massa_teste:
+      referencias: ["MT100"]
+
+    contexto:
+      autenticacao:
+        usuario: "padrao"
+        permissoes: ["{entidade}.create"]
+      estado_inicial:
+        banco:
+          "{TABELA}": []
+
+    acao:
+      tipo: "CRIAR"
+      endpoint_logico: "entidade.create"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          "{CAMPO_1}": "obrigatorio"
+
+      banco:
+        "{TABELA}":
+          quantidade: 0
+
+    criterio_aprovacao:
+      - "Erro de validação retornado"
+      - "Nenhum dado persistido"
+
+  # ======================================================
+  # SEGURANÇA
+  # ======================================================
+  TC-SEC-001:
+    categoria: "SEGURANCA"
+    prioridade: "CRITICA"
+
+    uc_ref: "UC01"
+
+    covers:
+      uc_items:
+        - "UC01-FE-03"
+
+    descricao:
+      resumo: "Usuário não autenticado"
+      objetivo: "Bloquear acesso sem autenticação"
+
+    origem:
+      ucs: ["UC-SEC-01"]
+      regras_negocio: ["SEC-001"]
+
+    massa_teste:
+      referencias: ["MT400"]
+
+    contexto:
+      autenticacao:
+        autenticado: false
+
+    acao:
+      tipo: "CRIAR"
+      endpoint_logico: "entidade.create"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 401
+      erro:
+        tipo: "UNAUTHENTICATED"
+
+    criterio_aprovacao:
+      - "Acesso negado"
+      - "Nenhuma alteração no banco"
+
+  # ======================================================
+  # EDGE CASE
+  # ======================================================
+  TC-EDGE-001:
+    categoria: "EDGE_CASE"
+    prioridade: "MEDIA"
+
+    uc_ref: "UC01"
+
+    covers:
+      uc_items:
+        - "UC01-FE-01"
+
+    descricao:
+      resumo: "Campo excede tamanho máximo"
+      objetivo: "Garantir validação de limites"
+
+    origem:
+      ucs: ["UC001"]
+      regras_negocio: ["RN-UC-001-012"]
+
+    massa_teste:
+      referencias: ["MT500"]
+
+    acao:
+      tipo: "CRIAR"
+      endpoint_logico: "entidade.create"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          "{CAMPO_1}": "max_length"
+
+  # ======================================================
+  # AUDITORIA
+  # ======================================================
+  TC-AUD-001:
+    categoria: "AUDITORIA"
+    prioridade: "ALTA"
+
+    uc_ref: "UC01"
+
+    covers:
+      uc_items:
+        - "UC01-FP-01"
+
+    descricao:
+      resumo: "Auditoria na criação"
+      objetivo: "Garantir rastreabilidade do autor da ação"
+
+    origem:
+      ucs: ["UC001"]
+      regras_negocio: ["AUD-001"]
+
+    massa_teste:
+      referencias: ["MT800"]
+
+    contexto:
+      autenticacao:
+        usuario: 5
+        permissoes: ["{entidade}.create"]
+
+    acao:
+      tipo: "CRIAR"
+      endpoint_logico: "entidade.create"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        campos_gerados:
+          - created_at
+          - created_by
+        valores:
+          created_by: 5
+
+  # ======================================================
+  # INTEGRAÇÃO
+  # ======================================================
+  TC-INT-001:
+    categoria: "INTEGRACAO"
+    prioridade: "ALTA"
+
+    uc_ref: "UC01"
+
+    covers:
+      uc_items:
+        - "UC01-FE-01"
+
+    descricao:
+      resumo: "FK inválida"
+      objetivo: "Garantir integridade referencial"
+
+    origem:
+      ucs: ["UC001"]
+      regras_negocio: ["RN-UC-001-015"]
+
+    massa_teste:
+      referencias: ["MT900"]
+
+    acao:
+      tipo: "CRIAR"
+      endpoint_logico: "entidade.create"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          "{CAMPO_FK}": "invalido"
+
+  # ======================================================
+  # E2E
+  # ======================================================
+  TC-E2E-001:
+    categoria: "E2E"
+    prioridade: "CRITICA"
+
+    uc_ref: "UC00"
+
+    covers:
+      uc_items:
+        - "UC00-FP-01"
+        - "UC01-FP-01"
+
+    descricao:
+      resumo: "Fluxo completo CRUD"
+      objetivo: "Validar experiência ponta a ponta"
+
+    origem:
+      ucs: ["UC001", "UC002", "UC003", "UC004"]
+
+    abordagem:
+      tipo: "GUI"
+      observacao: "Passos descritos semanticamente, não em código"
+
+    passos_alto_nivel:
+      - "Usuário autentica no sistema"
+      - "Usuário cria registro"
+      - "Usuário visualiza registro"
+      - "Usuário edita registro"
+      - "Usuário exclui registro"
+
+    resultado_esperado:
+      sucesso: true
+      validacoes:
+        - "Fluxo completo executado"
+        - "Nenhum erro funcional"
+        - "Dados consistentes ao final"
+
+# =============================================
+# 5. MATRIZ DE RASTREABILIDADE
+# =============================================
+rastreabilidade:
+  - tc: "TC-HP-001"
+    ucs: ["UC001"]
+    massas: ["MT001"]
+  - tc: "TC-VAL-001"
+    ucs: ["UC001"]
+    massas: ["MT100"]
+  - tc: "TC-SEC-001"
+    ucs: ["UC-SEC-01"]
+    massas: ["MT400"]
+  - tc: "TC-AUD-001"
+    ucs: ["UC001"]
+    massas: ["MT800"]
+  - tc: "TC-INT-001"
+    ucs: ["UC001"]
+    massas: ["MT900"]
+  - tc: "TC-E2E-001"
+    ucs: ["UC001", "UC002", "UC003", "UC004"]
+
+# =============================================
+# 6. HISTÓRICO
+# =============================================
+historico:
+  - versao: "2.0"
+    data: "YYYY-MM-DD"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Template TC agnóstico de plataforma, orientado a cobertura total de UC"

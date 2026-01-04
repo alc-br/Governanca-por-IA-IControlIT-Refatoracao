@@ -1,0 +1,1361 @@
+# RF-015: Gestão de Locais e Endereços
+
+**Versão**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF-043 (Endereços de Entrega), RF-052 (Gestão de Consumidores) | **EPIC**: EPIC003-CAD-Cadastros-Base
+**Fase**: Fase 2 - Cadastros e Serviços Transversais
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o **Sistema de Gestão de Locais e Endereços** do IControlIT, responsável por gerenciar a estrutura física e geográfica da empresa, permitindo rastrear onde cada ativo está localizado fisicamente. O módulo implementa uma hierarquia completa de locais (país → estado → cidade → edifício → andar → sala → rack → posição), integrada com APIs de geolocalização e validação de endereços.
+
+O sistema permite que organizações com múltiplas filiais, unidades de negócio e centros de dados gerenciem de forma centralizada a localização de todos os seus ativos, equipamentos e instalações, facilitando inventário, manutenção, cumprimento de conformidade regulatória e análises geoespaciais.
+
+### 1.2 Importância Estratégica
+
+O módulo de Gestão de Locais e Endereços é crítico para o negócio por:
+
+- **Conformidade Regulatória**: Rastreamento de ativos em diferentes jurisdições, cumprimento de LGPD, segurança da informação e compliance internacional
+- **Eficiência Operacional**: Localização rápida de ativos, otimização de rotas de manutenção, planejamento de recursos físicos, gestão de espaço em datacenters
+- **Gestão de Infraestrutura**: Controle de capacidade de racks/salas, alertas de saturação, planejamento de expansão, análise de custo por localidade
+- **Rastreabilidade e Auditoria**: Histórico completo de movimentações de ativos, identificação de discrepâncias, suporte a investigações de segurança
+- **Integração com Terceiros**: Suporte a integrações com APIs de mapeamento, geolocalização, logística e sistemas de localização de ativos (RTLS)
+
+### 1.3 Conceitos Fundamentais
+
+**Local (Localização Física)**: Estrutura hierárquica que representa uma posição geográfica ou física dentro da organização.
+- País: Nação (ex: Brasil, Estados Unidos)
+- Estado: Unidade federativa (ex: São Paulo, Minas Gerais)
+- Cidade: Município (ex: São Paulo, Belo Horizonte)
+- Edifício/Site: Estrutura física principal (ex: Matriz, Filial Rio de Janeiro, Datacenter 1)
+- Andar: Nível dentro de edifício (ex: Andar 1, Andar 2)
+- Sala: Ambiente específico (ex: Sala de Servidores, Sala de Arquivos)
+- Rack: Armário de TI (ex: Rack A1, Rack B5)
+- Posição: Unidade dentro de rack (ex: U1-U3, U10-U20)
+
+**Endereço**: Informação geográfica completa (logradouro, número, complemento, bairro, cidade, estado, CEP).
+
+**Geocodificação**: Processo de conversão de endereço em coordenadas geográficas (latitude/longitude).
+
+**Hierarquia Multinível**: Estrutura em árvore onde cada nível depende do nível anterior.
+
+**Multi-tenancy**: Cada conglomerado tem seus próprios locais isolados do ponto de vista de dados.
+
+**Auditoria de Movimentações**: Registro imutável de toda mudança de localização de ativo.
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Validação de CEP** | Validação manual, sem integração com APIs | Integração automática com ViaCEP API, autocompletar de endereço, validação em tempo real |
+| **Geolocalização** | Armazenamento manual de coordenadas | Geocodificação automática via Google Maps API, atualização em tempo real |
+| **Hierarquia de Locais** | Tabelas separadas, sem relacionamento claro | Estrutura em árvore com foreign keys, validação de integridade referencial |
+| **Ocupação de Racks** | Controle manual, propenso a erros | Validação automática de posições, alertas de sobreposição, cálculo de ocupação em tempo real |
+| **Histórico de Movimentações** | Logs em tabela separada, edição permitida | Tabela de auditoria imutável (append-only), rastreamento completo com usuário e motivação |
+| **Interface de Usuário** | Telas ASPX desacopladas, carregamento lento | Dashboard Angular moderno, filtros avançados, visualização de mapa interativo |
+| **Performance** | Queries N+1, sem índices otimizados | Queries otimizadas com CTEs, índices compostos, cache distribuído |
+| **Segurança** | Validação básica, sem proteção de concorrência | Versionamento otimista, validação completa, RBAC granular |
+| **Integração com APIs Externas** | Webhooks manuais, sem padronização | Serviço de integração centralizado, retry logic, circuit breaker |
+| **Relatórios e Análises** | SQL Server Reporting Services (SSRS) estática | Power BI integrado, dashboards dinâmicos, análise geoespacial |
+
+### 1.5 Funcionalidades Principais
+
+1. **Gestão de Endereços Completos** - CRUD com validação de CEP via ViaCEP API, autocompletar de estado/cidade/bairro, armazenamento de coordenadas geográficas (latitude/longitude), histórico de alterações
+2. **Hierarquia de Locais Multinível** - Suporte a estrutura País → Estado → Cidade → Edifício → Andar → Sala → Rack → Posição, validação de integridade referencial, impedimento de loops na hierarquia
+3. **Gestão de Edifícios e Filiais** - Cadastro de unidades operacionais, associação com endereço, informações de contato e responsável, ativação/inativação, marcação de local como principal/secundário
+4. **Gestão de Andares** - Organização lógica dentro de edifício, nomenclatura customizável (Andar 1, Terreo, Subsolo), controle de acesso por andar
+5. **Gestão de Salas** - Tipos de sala (Datacenter, Sala de Servidores, Sala de Telecomunicações, Escritório, Reunião, etc.), capacidade máxima de racks, temperatura/umidade controlada (quando aplicável)
+6. **Gestão de Racks de TI** - Cadastro de racks com altura em Us (1-48U), profundidade (600mm, 800mm, 1000mm), suporte a peso/potência máxima, posições disponíveis/ocupadas
+7. **Controle de Posições em Rack** - Mapeamento de posições (U1, U2, ..., U48) com status (disponível, ocupada, reservada), validação de sobreposição, cálculo dinâmico de ocupação
+8. **Integração com APIs de Geolocalização** - ViaCEP API para validação e autocompletar de CEP, Google Maps Geocoding API para obter coordenadas, cálculo de distância entre locais via Google Distance Matrix
+9. **Timezone por Local** - Associação de timezone (IANA) com cada local para cálculos de tempo correto, suporte a horário de verão/inverno
+10. **Histórico Imutável de Movimentações** - Registro de toda movimentação de ativo entre locais, com usuário responsável, data/hora, motivo, validação de discrepâncias
+11. **Alertas de Capacidade** - Notificações quando sala/rack atingir 80% de ocupação, alertas configuráveis por local e tipo de alerta
+12. **Custo de Deslocamento** - Cálculo de custo por km, suporte a múltiplas rotas e transportadoras, integração com sistema de gestão de frota
+13. **Importação em Lote** - Upload de arquivo CSV/Excel com estrutura de locais, validação automática, report de erros com linhas problemáticas
+14. **Mapa Interativo** - Visualização geográfica de todos os locais em mapa interativo (Google Maps ou Mapbox), cluster de marcadores em zoom baixo, popup com informações do local
+15. **Relatórios de Distribuição Geográfica** - Dashboard com ocupação por local, ativos por andar/sala, matriz de calor de ocupação, análise geoespacial de distribuição de ativos
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-LOC-015-01: Validação de CEP Obrigatória e Consistência
+
+**Descrição**: CEPs brasileiros devem ter exatamente 8 dígitos numéricos no formato XXXXX-XXX. A validação ocorre em duas camadas: (1) formato numérico correto, (2) existência no cadastro de CEPs do Brasil via ViaCEP API. Se o CEP for válido, os campos de estado, cidade e bairro são automaticamente preenchidos. Se o endereço for atualizado sem CEP, estes campos devem ser preenchidos manualmente com validação de coerência.
+
+**Justificativa**: Garante consistência dos dados endereçais, reduz erros de digitação, facilita processamento de correspondência e auditoria. A integração com ViaCEP evita manutenção manual de tabela completa de CEPs.
+
+**Implementação**:
+```csharp
+public class EnderecoValidator : AbstractValidator<EnderecoCommand>
+{
+    public EnderecoValidator()
+    {
+        RuleFor(e => e.CEP)
+            .Matches(@"^\d{5}-\d{3}$|^\d{8}$")
+            .WithMessage("CEP deve estar no formato XXXXX-XXX ou XXXXXXXX")
+            .When(e => !string.IsNullOrEmpty(e.CEP));
+
+        RuleFor(e => e)
+            .MustAsync(async (endereco, ct) =>
+                await _viaCepService.ValidarCEPAsync(endereco.CEP, ct))
+            .WithMessage("CEP não é válido de acordo com ViaCEP")
+            .When(e => !string.IsNullOrEmpty(e.CEP));
+    }
+}
+
+public class ViaCepService
+{
+    public async Task<ViaCepResult> BuscarEnderecoPorCepAsync(string cep)
+    {
+        var cepLimpo = cep.Replace("-", "");
+        var response = await _httpClient.GetAsync($"https://viacep.com.br/ws/{cepLimpo}/json/");
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            throw new CepNotFoundException($"CEP {cep} não encontrado");
+
+        return JsonConvert.DeserializeObject<ViaCepResult>(await response.Content.ReadAsStringAsync());
+    }
+}
+```
+
+**Exemplos**:
+- CEP válido: 01310-100 (Av. Paulista, São Paulo)
+- CEP inválido: 12345-678 (não existe no Brasil)
+- Sem CEP: preenchimento manual de estado/cidade/bairro com validação
+
+---
+
+### RN-LOC-015-02: Endereço Principal Único por Conglomerado
+
+**Descrição**: Apenas um local pode ser marcado como "Principal" (Fl_Principal = 1) por conglomerado. Ao marcar novo local como principal, o sistema automaticamente desmarca o anterior. Esta regra garante que não haja ambiguidade sobre qual é a sede/localização oficial da empresa.
+
+**Justificativa**: Facilita comunicações, correspondência oficial, conformidade regulatória, e fornece ponto de referência único para cálculos de distância quando não especificado de forma diferente.
+
+**Implementação**:
+```csharp
+public class Local_CadastroHandler : ICommandHandler<CadastroLocalCommand>
+{
+    private readonly IRepository<Local> _repository;
+
+    public async Task<Result> Handle(CadastroLocalCommand command)
+    {
+        if (command.Fl_Principal)
+        {
+            var localAnterior = await _repository
+                .FirstOrDefaultAsync(l => l.Id_Conglomerado == command.Id_Conglomerado
+                    && l.Fl_Principal && l.Id_Local != command.Id_Local);
+
+            if (localAnterior != null)
+            {
+                localAnterior.Fl_Principal = false;
+                await _repository.UpdateAsync(localAnterior);
+            }
+        }
+
+        var novoLocal = new Local { /* ... */ };
+        return await _repository.CreateAsync(novoLocal);
+    }
+}
+```
+
+**Exemplos**:
+- Empresa com uma filial: marcada como principal
+- Empresa com múltiplas filiais: apenas matriz marcada como principal, filiais como secundárias
+- Mudança de sede: antiga desativada, nova marcada como principal
+
+---
+
+### RN-LOC-015-03: Hierarquia de Locais Obrigatória e Integridade Referencial
+
+**Descrição**: A estrutura de hierarquia de locais deve ser respeitada em cascata:
+- Sala DEVE pertencer a um Andar (FK obrigatória)
+- Andar DEVE pertencer a um Edifício (FK obrigatória)
+- Edifício DEVE pertencer a um Endereço (FK obrigatória)
+- Endereço DEVE pertencer a um Conglomerado (FK obrigatória)
+
+Não é permitido criar sala sem que toda hierarquia anterior esteja completa. Cada nível herda o `Id_Conglomerado` do nível anterior para garantir isolamento multi-tenancy.
+
+**Justificativa**: Garante integridade dos dados, previne orfandade de registros, facilita navegação hierárquica, suporta soft delete em cascata, permite cálculos de ocupação agregados.
+
+**Implementação**:
+```csharp
+// Constraint de FK em cascata
+ALTER TABLE [dbo].[Local_Sala]
+    ADD CONSTRAINT [FK_Sala_Andar]
+    FOREIGN KEY ([Id_Andar], [Id_Conglomerado])
+    REFERENCES [dbo].[Local_Andar]([Id_Andar], [Id_Conglomerado])
+    ON DELETE CASCADE;
+
+// Validação em command handler
+public async Task<Result> Handle(CadastroSalaCommand command)
+{
+    var andar = await _repository.GetByIdAsync(command.Id_Andar);
+    if (andar == null)
+        return Result.Failure("Andar não encontrado");
+
+    if (andar.Id_Conglomerado != command.Id_Conglomerado)
+        return Result.Failure("Andar não pertence ao conglomerado informado");
+
+    var edificio = await _repository.GetByIdAsync(andar.Id_Edificio);
+    if (edificio?.Fl_Excluido == true)
+        return Result.Failure("Edifício foi inativado");
+
+    // Criar sala
+}
+```
+
+**Exemplos**:
+- Fluxo válido: Conglomerado → Endereço → Edifício → Andar → Sala
+- Fluxo inválido: Tentar criar Sala antes de Andar
+- Soft delete: Inativar Edifício desativa Andares → Salas → Racks em cascata
+
+---
+
+### RN-LOC-015-04: Validação de Capacidade de Racks (Altura, Profundidade, Peso, Potência)
+
+**Descrição**: Racks de TI devem atender a padrões da indústria:
+- **Altura**: Entre 1U e 48U (onde U = 1,75 polegadas = 44,45 mm). Valores comuns: 9U, 18U, 24U, 42U, 48U
+- **Profundidade**: Padrão 600mm, 800mm, 1000mm ou customizada (registrado em cm)
+- **Peso Máximo**: Capacidade estrutural em kg (típico: 500kg-1500kg)
+- **Potência Máxima**: Capacidade em watts (típico: 2000W-10000W, dependendo de PDU)
+
+O sistema deve validar que equipamentos instalados não excedem estes limites em tempo real.
+
+**Justificativa**: Evita sobrecarga de racks, garante segurança da infraestrutura, previne falhas de equipamento, suporta planejamento de expansão e cálculo de custo de operação.
+
+**Implementação**:
+```csharp
+public class Rack
+{
+    [Range(1, 48)]
+    public int Nr_Altura_Us { get; set; }
+
+    [Range(300, 2000)]
+    public int Nr_Profundidade_Mm { get; set; }
+
+    [Range(100, 5000)]
+    public decimal Nr_Peso_Maximo_Kg { get; set; }
+
+    [Range(500, 50000)]
+    public int Nr_Potencia_Maxima_Watts { get; set; }
+
+    public decimal Nr_Peso_Atual_Kg { get; set; }
+    public int Nr_Potencia_Atual_Watts { get; set; }
+}
+
+public class InstalarEquipamentoHandler : ICommandHandler<InstalarEquipamentoCommand>
+{
+    public async Task<Result> Handle(InstalarEquipamentoCommand command)
+    {
+        var rack = await _rackRepository.GetByIdAsync(command.Id_Rack);
+
+        if (rack.Nr_Peso_Atual_Kg + command.Nr_Peso_Equipamento > rack.Nr_Peso_Maximo_Kg)
+            return Result.Failure("Peso total excederia capacidade do rack");
+
+        if (rack.Nr_Potencia_Atual_Watts + command.Nr_Potencia_Equipamento > rack.Nr_Potencia_Maxima_Watts)
+            return Result.Failure("Potência total excederia capacidade do rack");
+
+        // Instalar
+    }
+}
+```
+
+**Exemplos**:
+- Rack 42U, 800mm profundidade, 1200kg máx, 5000W máx
+- Equipamento 3U, 20kg, 300W → cabe perfeitamente
+- Equipamento 25U, 800kg → não cabe (excede altura e peso)
+
+---
+
+### RN-LOC-015-05: Controle de Ocupação de Posições em Rack (Sem Sobreposição)
+
+**Descrição**: Posições em racks (U1, U2, ..., U48) não podem se sobrepor. Ao instalar um equipamento que ocupa U10-U12 (3Us), o sistema marca todas estas posições como ocupadas e indisponíveis. Validação impede sobreposição: equipamento não pode estar em U10-U12 se já existe equipamento em U9-U11.
+
+**Justificativa**: Garante utilização correta de espaço em rack, previne instalações incorretas, facilita visualização de espaço disponível, otimiza planejamento de futuros equipamentos.
+
+**Implementação**:
+```csharp
+public class ValidarSobrecargaRackValidator : AbstractValidator<InstalarEquipamentoCommand>
+{
+    public ValidarSobrecargaRackValidator(IRackRepository rackRepository)
+    {
+        RuleFor(cmd => cmd)
+            .MustAsync(async (cmd, ct) =>
+            {
+                var rack = await rackRepository.GetByIdAsync(cmd.Id_Rack);
+
+                // Validar sobreposição de Us
+                var posicoesOcupadas = await rackRepository
+                    .GetPosicoesOcupadasAsync(cmd.Id_Rack);
+
+                var posicoesNovas = Enumerable.Range(cmd.Nr_Posicao_Inicio, cmd.Nr_Altura_Equipamento_Us)
+                    .ToList();
+
+                var temSobreposicao = posicoesOcupadas.Any(p => posicoesNovas.Contains(p));
+
+                return !temSobreposicao;
+            })
+            .WithMessage("Posição de rack sobrepõe com equipamento existente");
+    }
+}
+
+public async Task<Result> Handle(InstalarEquipamentoCommand command)
+{
+    // Após validação, registrar ocupação
+    for (int i = 0; i < command.Nr_Altura_Equipamento_Us; i++)
+    {
+        await _posicaoRepository.Create(new RackPosicao
+        {
+            Id_Rack = command.Id_Rack,
+            Nr_Posicao_U = command.Nr_Posicao_Inicio + i,
+            Id_Equipamento = command.Id_Equipamento,
+            Fl_Ocupada = true
+        });
+    }
+}
+```
+
+**Exemplos**:
+- Equipamento 1 em U1-U3: posições 1, 2, 3 marcadas como ocupadas
+- Equipamento 2 em U4-U6: OK, sem sobreposição
+- Equipamento 3 em U2-U5: ERRO, sobrepõe com equipamento 1 (U2, U3) e equipamento 2 (U4, U5)
+
+---
+
+### RN-LOC-015-06: Tipos de Sala e Compatibilidade com Racks
+
+**Descrição**: Diferentes tipos de sala possuem diferentes características e compatibilidades:
+
+| Tipo de Sala | Permite Racks | Características | Uso Típico |
+|--|--|--|--|
+| **Datacenter** | Sim | Controle de clima, acesso restrito, piso elevado | Servidores, infraestrutura crítica |
+| **Sala de Servidores** | Sim | Ar-condicionado, monitoramento 24/7 | Servidores departamentais |
+| **CPD (Centro de Processamento de Dados)** | Sim | Redundância, gerador backup, monitoramento | Operações críticas |
+| **Sala Técnica** | Sim (limitado) | Instalações de TI, telecomunicações | Cabeamento, switches, firewalls |
+| **Escritório** | Não | Climatização padrão | Pessoal, equipamentos de trabalho |
+| **Reunião** | Não | Mesas, cadeiras, projetor | Colaboração |
+| **Armazenamento** | Não | Prateleiras, controle de umidade | Backup em fita, documentos |
+
+Racks só podem ser instalados em salas do tipo: Datacenter, Sala_Servidores, CPD, Sala_Tecnica. Sistema alerta se capacidade de racks da sala será excedida.
+
+**Justificativa**: Garante que infraestrutura crítica esteja em ambientes apropriados, facilita planejamento de recursos, melhora conformidade regulatória (ex: data centers certificados ISO 27001).
+
+**Implementação**:
+```csharp
+public enum TipoSala
+{
+    Datacenter = 1,
+    Sala_Servidores = 2,
+    CPD = 3,
+    Sala_Tecnica = 4,
+    Escritorio = 5,
+    Reuniao = 6,
+    Armazenamento = 7
+}
+
+public static class TipoSalaExtensions
+{
+    public static bool PermiteRacks(this TipoSala tipo) =>
+        tipo switch
+        {
+            TipoSala.Datacenter => true,
+            TipoSala.Sala_Servidores => true,
+            TipoSala.CPD => true,
+            TipoSala.Sala_Tecnica => true,
+            _ => false
+        };
+}
+
+public class InstalarRackHandler : ICommandHandler<InstalarRackCommand>
+{
+    public async Task<Result> Handle(InstalarRackCommand command)
+    {
+        var sala = await _salaRepository.GetByIdAsync(command.Id_Sala);
+
+        if (!sala.Tipo_Sala.PermiteRacks())
+            return Result.Failure($"Salas do tipo {sala.Tipo_Sala} não podem conter racks");
+
+        var racksExistentes = await _rackRepository.CountAsync(r => r.Id_Sala == command.Id_Sala);
+
+        if (racksExistentes >= sala.Nr_Capacidade_Maxima_Racks)
+            return Result.Failure("Sala atingiu capacidade máxima de racks");
+
+        // Instalar rack
+    }
+}
+```
+
+**Exemplos**:
+- Tentar instalar rack em Sala de Escritório: ERRO
+- Sala de Servidores com capacidade 5 racks, já tem 4, adicionar 1 mais: OK
+- Sala de Servidores com capacidade 5 racks, já tem 5, tentar adicionar: ERRO com aviso
+
+---
+
+### RN-LOC-015-07: Geocodificação Automática de Endereços Completos
+
+**Descrição**: Quando um endereço é registrado com logradouro + número + cidade + estado (dados completos), o sistema automaticamente tenta geocodificar o endereço via Google Maps Geocoding API para obter latitude e longitude. Geocodificação é assíncrona e não-bloqueante: se falhar, não impede salvamento do endereço. Sistema registra timestamp da última tentativa de geocodificação para controle de reprocessamento.
+
+**Justificativa**: Permite visualização em mapas interativos, cálculo de rotas e distâncias, análise geoespacial, integração com sistemas de logística, sem forçar validação que poderia bloquear entrada de dados de clientes externos.
+
+**Implementação**:
+```csharp
+public class LocalGeocodeService
+{
+    private readonly IGoogleMapsService _googleMaps;
+    private readonly IRepository<Local> _localRepository;
+
+    public async Task<Result> GeocificarLocalAsync(int idLocal, CancellationToken ct)
+    {
+        var local = await _localRepository.GetByIdAsync(idLocal);
+
+        if (string.IsNullOrEmpty(local.Ds_Logradouro) ||
+            string.IsNullOrEmpty(local.Nm_Cidade) ||
+            string.IsNullOrEmpty(local.Sg_Estado))
+            return Result.Failure("Endereço incompleto para geocodificação");
+
+        var endereco = $"{local.Ds_Logradouro}, {local.Nr_Numero}, " +
+                      $"{local.Nm_Cidade}, {local.Sg_Estado}, Brasil";
+
+        try
+        {
+            var resultado = await _googleMaps.GeocodeAsync(endereco, ct);
+
+            if (resultado.Status == GeocodeStatus.OK && resultado.Results.Count > 0)
+            {
+                local.Nr_Latitude = resultado.Results[0].Geometry.Location.Latitude;
+                local.Nr_Longitude = resultado.Results[0].Geometry.Location.Longitude;
+                local.Dt_Ultima_Geocodificacao = DateTime.UtcNow;
+
+                await _localRepository.UpdateAsync(local);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log erro mas não relança - geocodificação é best-effort
+            _logger.LogError(ex, "Erro ao geocodificar local {IdLocal}", idLocal);
+        }
+
+        return Result.Success();
+    }
+}
+
+// Chamar em background job após criar endereço
+public class CadastroLocalHandler : ICommandHandler<CadastroLocalCommand>
+{
+    public async Task<Result> Handle(CadastroLocalCommand command)
+    {
+        var local = new Local { /* ... */ };
+        await _localRepository.CreateAsync(local);
+
+        // Fire-and-forget: geocodificar em background
+        _ = _geocodeService.GeocificarLocalAsync(local.Id_Local);
+
+        return Result.Success();
+    }
+}
+```
+
+**Exemplos**:
+- Endereço completo: Av. Paulista 1000, São Paulo, SP → Geocodificação bem-sucedida, lat/lon armazenadas
+- Endereço parcial: Av. Paulista, (sem número) → Geocodificação falha, endereço salvo sem coordenadas
+- Atualização de endereço: Mudar de Av. Paulista para Av. Berrini → Reprocessar geocodificação automaticamente
+
+---
+
+### RN-LOC-015-08: Histórico de Movimentações Imutável e Auditável
+
+**Descrição**: Toda mudança de localização de um ativo deve gerar registro imutável em tabela de auditoria `Local_Historico_Movimentacao`. Este histórico é append-only (somente INSERT, nunca UPDATE ou DELETE). Cada registro contém:
+- Id_Ativo (qual ativo foi movido)
+- Id_Local_Origem (local anterior)
+- Id_Local_Destino (novo local)
+- Id_Usuario (quem moveu)
+- Dt_Movimentacao (quando)
+- Ds_Motivo (por quê: manutenção, realocação, descarte, etc)
+- Fl_Validado (se foi validado por supervisor)
+
+**Justificativa**: Suporta investigações de segurança, conformidade com regulamentações (LGPD, SOX), rastreamento de discrepâncias de inventário, análise de padrões de movimento.
+
+**Implementação**:
+```csharp
+[Table("Local_Historico_Movimentacao")]
+public class HistoricoMovimentacao
+{
+    [Key]
+    public int Id_Historico { get; set; }
+
+    [Required]
+    public int Id_Ativo { get; set; }
+
+    [Required]
+    public int Id_Local_Origem { get; set; }
+
+    [Required]
+    public int Id_Local_Destino { get; set; }
+
+    [Required]
+    public int Id_Usuario_Movimentacao { get; set; }
+
+    [Required]
+    public DateTime Dt_Movimentacao { get; set; } = DateTime.UtcNow;
+
+    [MaxLength(500)]
+    public string Ds_Motivo { get; set; }
+
+    public bool Fl_Validado { get; set; } = false;
+
+    public int? Id_Usuario_Validacao { get; set; }
+
+    public DateTime? Dt_Validacao { get; set; }
+
+    // Audit trail
+    public int Id_Usuario_Criacao { get; set; }
+    public DateTime Dt_Criacao { get; set; } = DateTime.UtcNow;
+
+    // Sem UPDATE/DELETE - apenas INSERT
+}
+
+public class MoverAtivoHandler : ICommandHandler<MoverAtivoCommand>
+{
+    private readonly IRepository<Ativo> _ativoRepository;
+    private readonly IRepository<HistoricoMovimentacao> _historicoRepository;
+    private readonly ICurrentUserService _currentUser;
+
+    public async Task<Result> Handle(MoverAtivoCommand command)
+    {
+        var ativo = await _ativoRepository.GetByIdAsync(command.Id_Ativo);
+
+        var historico = new HistoricoMovimentacao
+        {
+            Id_Ativo = command.Id_Ativo,
+            Id_Local_Origem = ativo.Id_Local,
+            Id_Local_Destino = command.Id_Local_Destino,
+            Id_Usuario_Movimentacao = _currentUser.UserId,
+            Ds_Motivo = command.Ds_Motivo,
+            Fl_Validado = command.Fl_Validado
+        };
+
+        // Apenas INSERT, nunca UPDATE
+        await _historicoRepository.CreateAsync(historico);
+
+        ativo.Id_Local = command.Id_Local_Destino;
+        await _ativoRepository.UpdateAsync(ativo);
+    }
+}
+```
+
+**Exemplos**:
+- Ativo movido de Sala A (U1-U3) para Sala B (U10-U12) por manutenção: registro criado, imutável
+- Tentativa de editar histórico: erro - tabela permite apenas INSERT
+- Auditoria de movimento: consultar histórico identifica que foi usuario X em data Y por motivo Z
+
+---
+
+### RN-LOC-015-09: Validação de Unidades Federativas (UF) Brasileiras
+
+**Descrição**: Campo `Sg_Estado` deve conter sigla válida de unidade federativa brasileira (27 opções: AC, AL, AM, AP, BA, CE, DF, ES, GO, MA, MG, MS, MT, PA, PB, PE, PI, PR, RJ, RN, RO, RR, RS, RO, SC, SP, TO). O sistema padroniza automaticamente para UPPERCASE ao salvar. Validação ocorre em CREATE e UPDATE.
+
+**Justificativa**: Garante dados consistentes e utilizáveis em integração com sistemas de logística, correios, e conformidade regulatória que requerem siglas de UF padronizadas.
+
+**Implementação**:
+```csharp
+public static class EstadoValidator
+{
+    private static readonly HashSet<string> UfsValidas = new()
+    {
+        "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA",
+        "MG", "MS", "MT", "PA", "PB", "PE", "PI", "PR", "RJ", "RN",
+        "RO", "RR", "RS", "SC", "SP", "TO"
+    };
+
+    public static bool EhUfValida(string uf) =>
+        !string.IsNullOrEmpty(uf) &&
+        UfsValidas.Contains(uf.ToUpper()) &&
+        uf.Length == 2;
+}
+
+public class EnderecoValidator : AbstractValidator<EnderecoCommand>
+{
+    public EnderecoValidator()
+    {
+        RuleFor(e => e.Sg_Estado)
+            .Must(uf => EstadoValidator.EhUfValida(uf))
+            .WithMessage("Estado deve ser sigla válida (AC, AL, AM, ..., TO)");
+    }
+}
+
+public class EnderecoEntitySaveHandler
+{
+    public void NormalizarAntesDeSalvar(Endereco endereco)
+    {
+        if (!string.IsNullOrEmpty(endereco.Sg_Estado))
+            endereco.Sg_Estado = endereco.Sg_Estado.ToUpper().Trim();
+    }
+}
+```
+
+**Exemplos**:
+- Entrada "sp": normalizado para "SP"
+- Entrada "SP": aceito como-é
+- Entrada "XX": ERRO - UF inválida
+- Entrada "são paulo": ERRO - deve ser sigla, não nome completo
+
+---
+
+### RN-LOC-015-10: Timeout e Circuit Breaker para Integrações Externas
+
+**Descrição**: Requisições para APIs externas (ViaCEP, Google Maps) possuem timeout de 5 segundos. Se a API estiver indisponível e 3 tentativas consecutivas falhem, circuit breaker ativa modo "aberto" por 60 segundos, rejeitando novas requisições para evitar desperdício de tempo. Modo "meio-aberto" tenta reconectar a cada 60 segundos. Sistema continua funcionando sem geolocalização se integração falhar.
+
+**Justificativa**: Garante que falhas de API externa não derrubem sistema todo, melhora resiliência, respeita SLAs de terceiros, evita cascata de timeouts.
+
+**Implementação**:
+```csharp
+public class ResilientGeocodePolicy
+{
+    public static IAsyncPolicy<HttpResponseMessage> GetPolicy()
+    {
+        var timeoutPolicy = Policy.TimeoutAsync<HttpResponseMessage>(
+            TimeSpan.FromSeconds(5));
+
+        var circuitBreakerPolicy = Policy
+            .Handle<HttpRequestException>()
+            .Or<OperationCanceledException>()
+            .OrResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode)
+            .CircuitBreakerAsync(
+                handledEventsAllowedBeforeBreaking: 3,
+                durationOfBreak: TimeSpan.FromSeconds(60),
+                onBreak: (outcome, timespan) =>
+                {
+                    _logger.LogWarning("Circuit breaker ativado por 60s");
+                });
+
+        var retryPolicy = Policy
+            .Handle<HttpRequestException>()
+            .Or<OperationCanceledException>()
+            .OrResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode)
+            .WaitAndRetryAsync(
+                retryCount: 2,
+                sleepDurationProvider: retryAttempt =>
+                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                onRetry: (outcome, timespan, retryCount, context) =>
+                {
+                    _logger.LogWarning("Retry {RetryCount} para geolocalização", retryCount);
+                });
+
+        return Policy.WrapAsync(timeoutPolicy, retryPolicy, circuitBreakerPolicy);
+    }
+}
+```
+
+**Exemplos**:
+- API responde em 2s: sucesso, registro salvo com coordenadas
+- API indisponível: 3 tentativas falham, circuit breaker ativa, requisições rejeitadas por 60s
+- Recuperação: após 60s, modo meio-aberto tenta reconectar
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IControlIT` (SQL Server 2016+)
+
+**Tabela Principal**: `Endereco` (e relacionadas `Filial`, `Empresa`, `Local`, `Rack`, `RackPosicao`)
+
+```sql
+CREATE TABLE [dbo].[Endereco](
+    [Id_Endereco] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Conglomerado] [int] NOT NULL,
+    [Nm_Tipo] [varchar](50) NOT NULL,  -- 'Empresa', 'Filial', 'Fornecedor', 'Consumidor'
+    [Id_Referencia] [int] NOT NULL,     -- FK para tabela correspondente
+    [Nm_Logradouro] [varchar](255) NOT NULL,
+    [Nr_Numero] [varchar](10) NOT NULL,
+    [Ds_Complemento] [varchar](255) NULL,
+    [Nm_Bairro] [varchar](100) NULL,
+    [Nm_Cidade] [varchar](100) NOT NULL,
+    [Sg_Estado] [char](2) NOT NULL,
+    [Nr_CEP] [varchar](10) NOT NULL,
+    [Ds_Pais] [varchar](100) NOT NULL DEFAULT 'Brasil',
+    [Nr_Latitude] [decimal](11, 8) NULL,
+    [Nr_Longitude] [decimal](11, 8) NULL,
+    [Fl_Principal] [bit] NOT NULL DEFAULT 0,
+    [Fl_Excluido] [bit] NOT NULL DEFAULT 0,
+    [Dt_Atualizacao] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    [Id_Usuario_Atualizacao] [int] NULL,
+    CONSTRAINT [PK_Endereco] PRIMARY KEY CLUSTERED ([Id_Endereco] ASC),
+    CONSTRAINT [FK_Endereco_Conglomerado] FOREIGN KEY([Id_Conglomerado])
+        REFERENCES [dbo].[Conglomerado]([Id_Conglomerado])
+);
+
+CREATE TABLE [dbo].[Local](
+    [Id_Local] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Conglomerado] [int] NOT NULL,
+    [Id_Endereco] [int] NOT NULL,
+    [Nm_Local] [varchar](200) NOT NULL,
+    [Nm_Tipo] [varchar](50) NOT NULL,  -- 'Edificio', 'Andar', 'Sala', 'Rack', 'Posicao'
+    [Id_Local_Pai] [int] NULL,
+    [Nr_Sequencia] [int] NULL,
+    [Ds_Descricao] [varchar](500) NULL,
+    [Nr_Capacidade_Racks] [int] NULL,
+    [Tipo_Sala] [varchar](50) NULL,    -- 'Datacenter', 'Sala_Servidores', etc
+    [Nr_Latitude] [decimal](11, 8) NULL,
+    [Nr_Longitude] [decimal](11, 8) NULL,
+    [Sg_Timezone] [varchar](50) NULL,
+    [Fl_Excluido] [bit] NOT NULL DEFAULT 0,
+    [Dt_Criacao] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    [Id_Usuario_Criacao] [int] NOT NULL,
+    [Dt_Atualizacao] [datetime] NULL,
+    [Id_Usuario_Atualizacao] [int] NULL,
+    CONSTRAINT [PK_Local] PRIMARY KEY CLUSTERED ([Id_Local] ASC),
+    CONSTRAINT [FK_Local_Conglomerado] FOREIGN KEY([Id_Conglomerado])
+        REFERENCES [dbo].[Conglomerado]([Id_Conglomerado]),
+    CONSTRAINT [FK_Local_Endereco] FOREIGN KEY([Id_Endereco])
+        REFERENCES [dbo].[Endereco]([Id_Endereco]),
+    CONSTRAINT [FK_Local_Pai] FOREIGN KEY([Id_Local_Pai])
+        REFERENCES [dbo].[Local]([Id_Local]) ON DELETE CASCADE,
+    CONSTRAINT [CK_Tipo_Local] CHECK ([Nm_Tipo] IN ('Edificio','Andar','Sala','Rack','Posicao'))
+);
+
+CREATE TABLE [dbo].[Rack](
+    [Id_Rack] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Conglomerado] [int] NOT NULL,
+    [Id_Local] [int] NOT NULL,
+    [Nm_Rack] [varchar](100) NOT NULL,
+    [Nr_Altura_Us] [int] NOT NULL,           -- 1-48
+    [Nr_Profundidade_Mm] [int] NOT NULL,     -- 600, 800, 1000
+    [Nr_Peso_Maximo_Kg] [decimal](10, 2) NOT NULL,
+    [Nr_Potencia_Maxima_Watts] [int] NOT NULL,
+    [Nr_Peso_Atual_Kg] [decimal](10, 2) NOT NULL DEFAULT 0,
+    [Nr_Potencia_Atual_Watts] [int] NOT NULL DEFAULT 0,
+    [Fl_Excluido] [bit] NOT NULL DEFAULT 0,
+    [Dt_Criacao] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    [Id_Usuario_Criacao] [int] NOT NULL,
+    CONSTRAINT [PK_Rack] PRIMARY KEY CLUSTERED ([Id_Rack] ASC),
+    CONSTRAINT [FK_Rack_Conglomerado] FOREIGN KEY([Id_Conglomerado])
+        REFERENCES [dbo].[Conglomerado]([Id_Conglomerado]),
+    CONSTRAINT [FK_Rack_Local] FOREIGN KEY([Id_Local])
+        REFERENCES [dbo].[Local]([Id_Local])
+);
+
+CREATE TABLE [dbo].[RackPosicao](
+    [Id_Posicao] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Rack] [int] NOT NULL,
+    [Nr_Posicao_U] [int] NOT NULL,
+    [Id_Ativo] [int] NULL,
+    [Fl_Ocupada] [bit] NOT NULL DEFAULT 0,
+    CONSTRAINT [PK_RackPosicao] PRIMARY KEY CLUSTERED ([Id_Posicao] ASC),
+    CONSTRAINT [FK_RackPosicao_Rack] FOREIGN KEY([Id_Rack])
+        REFERENCES [dbo].[Rack]([Id_Rack]) ON DELETE CASCADE,
+    CONSTRAINT [UQ_Rack_Posicao] UNIQUE ([Id_Rack], [Nr_Posicao_U])
+);
+
+CREATE TABLE [dbo].[Local_Historico_Movimentacao](
+    [Id_Historico] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Ativo] [int] NOT NULL,
+    [Id_Local_Origem] [int] NOT NULL,
+    [Id_Local_Destino] [int] NOT NULL,
+    [Id_Usuario_Movimentacao] [int] NOT NULL,
+    [Dt_Movimentacao] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    [Ds_Motivo] [varchar](500) NULL,
+    [Fl_Validado] [bit] NOT NULL DEFAULT 0,
+    [Id_Usuario_Validacao] [int] NULL,
+    [Dt_Validacao] [datetime] NULL,
+    [Id_Usuario_Criacao] [int] NOT NULL,
+    [Dt_Criacao] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT [PK_Local_Historico] PRIMARY KEY CLUSTERED ([Id_Historico] ASC),
+    CONSTRAINT [FK_Historico_Ativo] FOREIGN KEY([Id_Ativo])
+        REFERENCES [dbo].[Ativo]([Id_Ativo]),
+    CONSTRAINT [FK_Historico_Local_Origem] FOREIGN KEY([Id_Local_Origem])
+        REFERENCES [dbo].[Local]([Id_Local]),
+    CONSTRAINT [FK_Historico_Local_Destino] FOREIGN KEY([Id_Local_Destino])
+        REFERENCES [dbo].[Local]([Id_Local])
+);
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descricão | Uso no Modernizado |
+|--|--|--|
+| `Id_Endereco` | ID único de endereço | Migrar como-é, manter histórico de imports |
+| `Nm_Logradouro` | Nome da rua/avenida | Campo string completo, sem truncamento |
+| `Nr_CEP` | CEP no formato XXXXX-XXX | Validar com ViaCEP, armazenar em dois formatos (com e sem hífen) |
+| `Fl_Principal` | Flag de endereço principal | Implementar regra de unicidade por conglomerado |
+| `Nr_Latitude, Nr_Longitude` | Coordenadas geográficas | Usar para visualização em mapa, recalcular periodicamente |
+| `Id_Local_Pai` | Hierarquia parent-child | Implementar como FK recursiva com validação de loops |
+| `Nr_Altura_Us` | Altura do rack em Us | Validar range 1-48, alertar para capacidade |
+| `Nr_Peso_Maximo_Kg` | Capacidade de peso | Validar ao instalar equipamentos |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descricão | Migracao |
+|--|--|--|
+| `pa_Endereco_ListarPorConglomerado` | Lista endereços do conglomerado | LINQ query no backend moderno |
+| `pa_Endereco_BuscarPorCEP` | Busca endereço por CEP | Integração com ViaCEP API |
+| `pa_Local_ObterHierarquia` | Obtém árvore de locais | CTE em SQL ou query LINQ recursiva |
+| `pa_Rack_ObterOcupacao` | Calcula Us ocupadas em rack | LINQ aggregate query |
+| `pa_Movimentacao_Registrar` | Registra histórico de movimento | Insert em tabela de auditoria |
+
+### 3.3 Telas ASPX
+
+| Página | Descricão | Tela Moderna |
+|--|--|--|
+| `Endereco.aspx` | CRUD de endereços | `/locais` (Angular) |
+| `Local.aspx` | Hierarquia de locais | `/locais/hierarquia` (tree view) |
+| `Rack.aspx` | Gestão de racks | `/locais/racks/{idSala}` (grid com posições) |
+| `RackVisual.aspx` | Visualização de rack (Us) | `/locais/racks/{idRack}/visual` (3D/2D representation) |
+| `MapaLocais.aspx` | Mapa com locais | `/locais/mapa` (Google Maps integration) |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSLocal.asmx.vb`
+
+| Método | Descricão | Endpoint Moderno |
+|--|--|--|
+| `CadastrarEndereco(endereco)` | Cria novo endereço | `POST /api/locais/enderecos` |
+| `AtualizarEndereco(id, endereco)` | Atualiza endereço | `PUT /api/locais/enderecos/{id}` |
+| `ListarEnderecos(idConglomerado)` | Lista todos endereços | `GET /api/locais/enderecos?conglomeradoId={id}` |
+| `BuscarEnderecoPorCEP(cep)` | Busca em ViaCEP | `GET /api/locais/enderecos/buscar-cep?cep={cep}` |
+| `CadastrarLocal(local)` | Cria local/andar/sala | `POST /api/locais` |
+| `ListarLocalHierarquia(idRaiz)` | Obtém árvore | `GET /api/locais/hierarquia/{id}` |
+| `CadastrarRack(rack)` | Cria rack | `POST /api/locais/racks` |
+| `RegistrarMovimentacao(ativo, origem, destino)` | Log de movimento | `POST /api/locais/movimentacoes` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `LOCAIS_ENDERECOS_CRUD`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "LOCAIS_ENDERECOS_CRUD",
+    "nome": "Gestão de Locais e Endereços",
+    "descricao": "Módulo completo de CRUD de endereços, hierarquia de locais, racks e histórico de movimentações",
+    "habilitado": true,
+    "isSystemFeature": false
+}
+```
+
+**Nota**: Feature flags adicionais para funcionalidades específicas:
+- `LOCAIS_GEOCODIFICACAO_AUTOMATICA` - Ativa geocodificação automática via Google Maps
+- `LOCAIS_VALIDACAO_VIACEP` - Ativa validação de CEP via ViaCEP API
+- `LOCAIS_MAPA_INTERATIVO` - Ativa visualização de mapa com marcadores de locais
+- `LOCAIS_HISTORICO_MOVIMENTACOES` - Ativa registro e consulta de histórico de movimentações
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao**:
+
+```json
+{
+    "locais": {
+        "titulo": "Gestão de Locais e Endereços",
+        "descricao": "Módulo para gerenciar endereços, hierarquia de locais e racks",
+
+        "endereco": {
+            "titulo": "Endereços",
+            "form": {
+                "logradouro": "Logradouro",
+                "numero": "Número",
+                "complemento": "Complemento (Apt, Sala, etc)",
+                "bairro": "Bairro",
+                "cidade": "Cidade",
+                "estado": "Estado (UF)",
+                "cep": "CEP",
+                "pais": "País",
+                "latitude": "Latitude",
+                "longitude": "Longitude",
+                "principal": "Endereço Principal",
+                "tipo": "Tipo de Endereço"
+            },
+            "messages": {
+                "sucesso_criar": "Endereço criado com sucesso",
+                "sucesso_atualizar": "Endereço atualizado com sucesso",
+                "sucesso_excluir": "Endereço excluído com sucesso",
+                "erro_criar": "Erro ao criar endereço",
+                "erro_atualizar": "Erro ao atualizar endereço",
+                "erro_validacao_cep": "CEP inválido. Verifique o formato e tente novamente",
+                "cep_nao_encontrado": "CEP não encontrado no sistema de correios"
+            },
+            "validation": {
+                "logradouro_obrigatorio": "Logradouro é obrigatório",
+                "numero_obrigatorio": "Número é obrigatório",
+                "cidade_obrigatoria": "Cidade é obrigatória",
+                "estado_obrigatorio": "Estado é obrigatório",
+                "cep_formato_invalido": "CEP deve estar no formato XXXXX-XXX",
+                "estado_invalido": "UF deve ser sigla válida (AC, AL, AM, ..., TO)"
+            }
+        },
+
+        "local": {
+            "titulo": "Locais",
+            "form": {
+                "nome": "Nome",
+                "tipo": "Tipo de Local",
+                "localpai": "Local Pai",
+                "endereco": "Endereço",
+                "descricao": "Descrição",
+                "capacidaderacks": "Capacidade Máxima de Racks",
+                "tiposalas": "Tipo de Sala",
+                "timezone": "Timezone"
+            },
+            "messages": {
+                "sucesso_criar": "Local criado com sucesso",
+                "sucesso_atualizar": "Local atualizado com sucesso",
+                "erro_criar": "Erro ao criar local",
+                "hierarquia_invalida": "Hierarquia inválida. Verifique se o local pai existe",
+                "loop_detectado": "Loop detectado na hierarquia. Um local não pode ser seu próprio ascendente"
+            },
+            "validation": {
+                "nome_obrigatorio": "Nome do local é obrigatório",
+                "tipo_obrigatorio": "Tipo de local é obrigatório",
+                "endereco_obrigatorio": "Endereço é obrigatório",
+                "tipos_validos": "Tipos válidos: Edifício, Andar, Sala, Rack, Posição"
+            }
+        },
+
+        "rack": {
+            "titulo": "Racks",
+            "form": {
+                "nome": "Nome do Rack",
+                "alturaus": "Altura (Us)",
+                "profundidade": "Profundidade (mm)",
+                "pesomaximo": "Peso Máximo (kg)",
+                "potenciamaximo": "Potência Máxima (W)"
+            },
+            "messages": {
+                "sucesso_criar": "Rack criado com sucesso",
+                "erro_capacidade": "Sala atingiu capacidade máxima de racks",
+                "erro_tipo_sala": "Salas deste tipo não podem conter racks",
+                "posicao_sobreposta": "Posição sobrepõe com equipamento existente"
+            },
+            "validation": {
+                "altura_invalida": "Altura deve estar entre 1 e 48 Us",
+                "profundidade_invalida": "Profundidade deve ser 600, 800 ou 1000 mm",
+                "peso_invalido": "Peso máximo deve ser maior que 0",
+                "potencia_invalida": "Potência máxima deve ser maior que 0"
+            }
+        },
+
+        "movimentacao": {
+            "titulo": "Histórico de Movimentações",
+            "form": {
+                "ativo": "Ativo",
+                "origem": "Local de Origem",
+                "destino": "Local de Destino",
+                "motivo": "Motivo da Movimentação",
+                "data": "Data/Hora",
+                "usuario": "Usuário responsável"
+            },
+            "messages": {
+                "sucesso_registro": "Movimentação registrada com sucesso",
+                "erro_registro": "Erro ao registrar movimentação"
+            },
+            "validation": {
+                "ativo_obrigatorio": "Ativo é obrigatório",
+                "destino_obrigatorio": "Local de destino é obrigatório",
+                "motivo_obrigatorio": "Motivo da movimentação é obrigatório"
+            }
+        },
+
+        "mapa": {
+            "titulo": "Mapa de Locais",
+            "descricao": "Visualização geográfica de todos os locais",
+            "carregando": "Carregando mapa...",
+            "erro_carregamento": "Erro ao carregar mapa",
+            "legenda": "Legenda",
+            "zoom": "Zoom",
+            "satelite": "Satélite"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|--|--|--|
+| Criar Endereço | `LOCAIS_ENDERECO_CREATE` | Id_Endereco, Logradouro, Numero, Cidade, Estado, CEP, Latitude, Longitude |
+| Atualizar Endereço | `LOCAIS_ENDERECO_UPDATE` | Id_Endereco, Campos alterados (before/after), Motivo |
+| Inativar Endereço | `LOCAIS_ENDERECO_DELETE` | Id_Endereco, Data inativação |
+| Criar Local | `LOCAIS_LOCAL_CREATE` | Id_Local, Nm_Local, Tipo, Id_Local_Pai, Id_Endereco |
+| Atualizar Local | `LOCAIS_LOCAL_UPDATE` | Id_Local, Campos alterados (before/after) |
+| Criar Rack | `LOCAIS_RACK_CREATE` | Id_Rack, Nm_Rack, Altura_Us, Capacidade peso/potência |
+| Instalar Equipamento em Rack | `LOCAIS_RACK_INSTALAR_EQUIPAMENTO` | Id_Rack, Id_Ativo, Posição_U, Data instalação |
+| Remover Equipamento de Rack | `LOCAIS_RACK_REMOVER_EQUIPAMENTO` | Id_Rack, Id_Ativo, Data remoção, Motivo |
+| Registrar Movimentação | `LOCAIS_MOVIMENTACAO_REGISTRAR` | Id_Ativo, Id_Local_Origem, Id_Local_Destino, Motivo, Usuario |
+| Validar Movimentação | `LOCAIS_MOVIMENTACAO_VALIDAR` | Id_Historico, Usuario validação, Observações |
+| Geocodificar Endereço | `LOCAIS_GEOCODIFICACAO` | Id_Endereco, Latitude, Longitude, Status |
+| Importar Locais em Lote | `LOCAIS_IMPORTACAO_LOTE` | Quantidade de registros, Quantidade sucesso/erro, Arquivo origem |
+
+**Retencao**: 7 anos (conforme LGPD - Lei Geral de Proteção de Dados Pessoais)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|--|--|--|
+| `locais:endereco:create` | Criar novo endereço | Administrateur, Gestor de Locais, Operacional |
+| `locais:endereco:read` | Visualizar endereços | Todos (exceto Visitante) |
+| `locais:endereco:update` | Editar endereço | Administrador, Gestor de Locais |
+| `locais:endereco:delete` | Inativar endereço | Administrador, Gestor de Locais |
+| `locais:local:create` | Criar local/andar/sala | Administrador, Gestor de Locais |
+| `locais:local:read` | Visualizar hierarquia de locais | Todos (exceto Visitante) |
+| `locais:local:update` | Editar local | Administrador, Gestor de Locais |
+| `locais:local:delete` | Inativar local | Administrador |
+| `locais:rack:create` | Criar rack | Administrador, Gestor Infraestrutura TI |
+| `locais:rack:read` | Visualizar racks | Todos (exceto Visitante) |
+| `locais:rack:update` | Editar rack | Administrador, Gestor Infraestrutura TI |
+| `locais:rack:delete` | Inativar rack | Administrador |
+| `locais:equipamento:instalar` | Instalar equipamento em rack | Administrador, Técnico TI, Gestor Infraestrutura |
+| `locais:equipamento:remover` | Remover equipamento de rack | Administrador, Técnico TI, Gestor Infraestrutura |
+| `locais:movimentacao:registrar` | Registrar movimentação de ativo | Administrador, Técnico TI, Operacional |
+| `locais:movimentacao:validar` | Validar movimentação registrada | Administrador, Supervisor Operacional |
+| `locais:movimentacao:read` | Consultar histórico de movimentações | Administrador, Supervisor, Operacional |
+| `locais:importacao:executar` | Executar importação em lote | Administrador, Gestor de Locais |
+| `locais:mapa:visualizar` | Visualizar mapa interativo | Todos (exceto Visitante) |
+
+**Nota**: Usuários com permissão de `read` só visualizam dados do seu conglomerado (isolamento multi-tenancy).
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--|--|--|--|
+| GET | `/api/locais/enderecos` | Listar todos endereços do conglomerado com filtros e paginação | `locais:endereco:read` |
+| GET | `/api/locais/enderecos/{id}` | Obter detalhes de um endereço especifico | `locais:endereco:read` |
+| POST | `/api/locais/enderecos` | Criar novo endereço com validação de CEP | `locais:endereco:create` |
+| PUT | `/api/locais/enderecos/{id}` | Atualizar endereço existente | `locais:endereco:update` |
+| DELETE | `/api/locais/enderecos/{id}` | Inativar endereço (soft delete) | `locais:endereco:delete` |
+| GET | `/api/locais` | Listar todos locais do conglomerado | `locais:local:read` |
+| GET | `/api/locais/{id}` | Obter detalhes de um local especifico | `locais:local:read` |
+| POST | `/api/locais` | Criar novo local (Edifício, Andar, Sala, etc) | `locais:local:create` |
+| PUT | `/api/locais/{id}` | Atualizar local existente | `locais:local:update` |
+| DELETE | `/api/locais/{id}` | Inativar local (soft delete) | `locais:local:delete` |
+| GET | `/api/locais/hierarquia/{id}` | Obter árvore completa de locais a partir de um nó | `locais:local:read` |
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--|--|--|--|
+| GET | `/api/locais/enderecos/buscar-cep/{cep}` | Buscar dados de endereço via ViaCEP API | `locais:endereco:read` |
+| POST | `/api/locais/enderecos/{id}/geocodificar` | Geocodificar endereço manualmente via Google Maps | `locais:endereco:update` |
+| GET | `/api/locais/mapa` | Obter dados de todos locais para visualização em mapa | `locais:mapa:visualizar` |
+| GET | `/api/locais/racks` | Listar todos racks do conglomerado com ocupação | `locais:rack:read` |
+| GET | `/api/locais/racks/{id}` | Obter detalhes de um rack com posições ocupadas | `locais:rack:read` |
+| POST | `/api/locais/racks` | Criar novo rack | `locais:rack:create` |
+| PUT | `/api/locais/racks/{id}` | Atualizar rack | `locais:rack:update` |
+| DELETE | `/api/locais/racks/{id}` | Inativar rack | `locais:rack:delete` |
+| POST | `/api/locais/racks/{idRack}/equipamentos` | Instalar equipamento em posição de rack | `locais:equipamento:instalar` |
+| DELETE | `/api/locais/racks/{idRack}/equipamentos/{idEquipamento}` | Remover equipamento de rack | `locais:equipamento:remover` |
+| GET | `/api/locais/movimentacoes` | Listar histórico de movimentações com filtros | `locais:movimentacao:read` |
+| POST | `/api/locais/movimentacoes` | Registrar movimentação de ativo | `locais:movimentacao:registrar` |
+| PUT | `/api/locais/movimentacoes/{id}/validar` | Validar movimentação registrada | `locais:movimentacao:validar` |
+| POST | `/api/locais/importacao` | Importar locais em lote (CSV/Excel) | `locais:importacao:executar` |
+| GET | `/api/locais/relatorios/ocupacao` | Relatório de ocupação de racks/salas | `locais:local:read` |
+| GET | `/api/locais/relatorios/distribuicao-geografica` | Relatório de distribuição geográfica de ativos | `locais:local:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Cadastro de Novo Endereço com Validação de CEP
+
+```
+Usuario acessa /locais/enderecos/novo
+    |
+    v
+Formulario de endereço exibido
+    |
+    v
+Usuario digita CEP (ex: 01310-100)
+    |
+    v
+Sistema valida formato (XXXXX-XXX ou XXXXXXXX)
+    |
+    +--- Formato inválido ---> Exibe erro de validação
+    |
+    v (Formato OK)
+Sistema consulta ViaCEP API
+    |
+    +--- CEP não existe ---> Exibe "CEP não encontrado"
+    |
+    v (CEP válido)
+Sistema autocompeta:
+- Estado (SP)
+- Cidade (São Paulo)
+- Bairro (Bela Vista)
+    |
+    v
+Usuario completa:
+- Logradouro (preenchido: Avenida Paulista)
+- Número (1000)
+- Complemento (Sala 1500)
+    |
+    v
+Usuario clica "Salvar"
+    |
+    v
+Sistema valida dados completos
+    |
+    v
+Sistema chama Google Maps Geocoding API em background
+    (não bloqueia salvamento)
+    |
+    v
+Endereço salvo com sucesso
+    |
+    v
+Geocodificação completa → Latitude/Longitude armazenadas
+    |
+    v
+Exibe confirmação ao usuário
+```
+
+### 6.2 Fluxo de Movimentação de Ativo entre Locais
+
+```
+Usuario acessa /ativos/{idAtivo}/movimentar
+    |
+    v
+Exibe formulario com:
+- Ativo atual (ex: Servidor A em Sala 1, U10-U12)
+- Campo "Local de Destino" (dropdown com hierarquia)
+- Campo "Motivo" (manutenção, realocação, etc)
+    |
+    v
+Usuario seleciona "Sala 2" como destino
+    |
+    v
+Sistema valida compatibilidade:
+- Sala 2 permite este tipo de equipamento?
+- Há posição disponível em Sala 2?
+    |
+    +--- Validação falha ---> Exibe erro
+    |
+    v (Validação OK)
+Usuario digita motivo "Manutenção preventiva"
+    |
+    v
+Usuario clica "Registrar Movimentação"
+    |
+    v
+Sistema cria registro em Local_Historico_Movimentacao:
+- Id_Ativo = [Servidor A]
+- Id_Local_Origem = [Sala 1]
+- Id_Local_Destino = [Sala 2]
+- Id_Usuario_Movimentacao = [Usuario logado]
+- Ds_Motivo = "Manutenção preventiva"
+- Fl_Validado = false
+    |
+    v
+Sistema atualiza Ativo.Id_Local = [Sala 2]
+    |
+    v
+Sistema gera auditoria LOCAIS_MOVIMENTACAO_REGISTRAR
+    |
+    v
+Notificação enviada a supervisor para validação
+    |
+    v
+Exibe "Movimentação registrada. Aguardando validação"
+    |
+    v
+[Fluxo posterior: Supervisor valida movimentação]
+Supervisor acessa /locais/movimentacoes/pendentes
+    |
+    v
+Clica em "Validar" para movimentação
+    |
+    v
+Atualiza Fl_Validado = true, registra supervisão
+    |
+    v
+Movimentação marcada como validada
+```
+
+### 6.3 Fluxo de Importação em Lote de Locais
+
+```
+Usuario acessa /locais/importacao
+    |
+    v
+Exibe formulario de upload
+    |
+    v
+Usuario seleciona arquivo CSV/Excel com estrutura:
+Id,Nome,Tipo,IdLocalPai,CEP,Estado,Cidade
+1,Matriz,Edificio,,01310-100,SP,São Paulo
+2,Andar 1,Andar,1,,SP,São Paulo
+3,Sala 101,Sala,2,,SP,São Paulo
+    |
+    v
+Usuario clica "Importar"
+    |
+    v
+Sistema valida arquivo:
+- Formato correto?
+- Colunas obrigatórias presentes?
+- Tipos de dado válidos?
+    |
+    +--- Validação falha ---> Exibe relatório de erros
+    |
+    v (Validacao OK)
+Sistema processa cada linha:
+- Valida regras de negócio
+- Geocodifica endereços (background)
+- Cria registros no banco
+    |
+    v
+Para cada erro detectado (ex: CEP inválido na linha 5):
+- Registra linha, coluna e motivo do erro
+    |
+    v
+Gera relatório de importação:
+- Total linhas: 100
+- Importadas com sucesso: 95
+- Erros: 5
+- Avisos: 2
+    |
+    v
+Exibe relatório e oferece opção:
+- [OK] - Importar apenas registros válidos (95)
+- [Cancelar] - Não importar nada
+    |
+    v
+Usuario confirma
+    |
+    v
+Sistema cria registros válidos
+    |
+    v
+Sistema cria auditoria LOCAIS_IMPORTACAO_LOTE
+    |
+    v
+Exibe confirmação "95 locais importados com sucesso"
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|--|--|
+| **Validação de Input** | Todos os campos validados em CREATE/UPDATE: tipo de dado, comprimento, formato (CEP, UF, latitude/longitude), valores permitidos (enums) |
+| **Injection Prevention** | Parametrizadas todas as queries SQL, sem concatenação de strings. LINQ to Entities previne SQL Injection |
+| **XSS Protection** | Angular sanitiza automaticamente bindings, Content Security Policy headers configurados |
+| **CSRF Protection** | Tokens CSRF em formulários POST/PUT/DELETE, validação obrigatória |
+| **Rate Limiting** | Limitador de taxa em endpoints críticos (importação, geocodificação): máx 100 req/min por usuário |
+| **Isolamento Multi-tenancy** | Queries filtram automaticamente por Id_Conglomerado, não podem acessar dados de outro conglomerado |
+| **Auditoria Imutável** | Histórico de movimentações é append-only, não permite UPDATE/DELETE após inserção |
+| **Versionamento Otimista** | Campo RowVersion em tabelas críticas, previne race conditions em atualizações simultâneas |
+| **Criptografia em Trânsito** | HTTPS obrigatório, TLS 1.3 mínimo, certificados válidos |
+| **Proteção de Dados Sensíveis** | Coordenadas GPS não retornadas para usuários sem permissão, logs sanitizados de informações PII |
+| **Autenticação e Autorização** | RBAC granular, permissões verificadas em cada endpoint, token JWT com expiracao |
+| **Proteção contra Escalação de Privilégio** | Usuários não podem alterar permissões próprias, auditoria de mudanças de role |
+
+### 7.2 Testes de Segurança Obrigatorios
+
+- [ ] **SQL Injection**: Tentar passar `'; DROP TABLE Endereco; --` em campo CEP
+- [ ] **XSS Stored**: Tentar inserir `<script>alert('XSS')</script>` em campo Logradouro
+- [ ] **XSS Reflected**: Tentar passar script em parametro de query string
+- [ ] **CSRF Protection**: Enviar POST sem token CSRF, validar rejeição
+- [ ] **Validacao de Permissoes**: Usuário sem permissão tenta acessar `/api/locais/enderecos/1`, valida 403
+- [ ] **Isolamento Multi-tenancy**: Conglomerado A tenta acessar dados de Conglomerado B, valida rejeição
+- [ ] **Rate Limiting**: Enviar 150 requisições em 1 minuto, validar throttling após 100
+- [ ] **Auditoria Imutável**: Tentar UPDATE em registro de histórico_movimentacao, validar erro
+- [ ] **Versionamento Otimista**: Dois usuários atualizam mesmo endereço simultaneamente, valida conflito
+- [ ] **Autenticacao Expirada**: Tentar usar JWT expirado, valida 401 Unauthorized
+- [ ] **Proteção de Dados PII**: Validar que coordenadas GPS não retornadas para usuário sem permissão
+- [ ] **Injection em Importacao**: CSV com valores maliciosos, validar rejeição
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao |
+|--|--|--|
+| **Taxa de Precisão de Geocodificação** | 98% | Percentual de endereços com lat/lon válidos vs total de endereços |
+| **Performance de Hierarquia** | < 500ms | Tempo para retornar árvore de 1000+ locais |
+| **Ocupação Média de Racks** | 70-80% | Percentual de Us ocupadas vs total de Us disponíveis |
+| **Disponibilidade da API de Locais** | 99.9% | Uptime mensal do serviço de locais |
+| **Taxa de Sucesso de Importacao** | 95%+ | Percentual de linhas importadas com sucesso em upload em lote |
+| **Tempo de Resposta do Mapa** | < 2s | Tempo para carregar mapa com todos os marcadores |
+| **Taxa de Validacao de CEP** | 99%+ | Percentual de CEPs validados com sucesso via ViaCEP |
+| **Conformidade de Auditoria** | 100% | Percentual de operações auditadas vs total de operações |
+| **Tempo Medio de Movimentacao** | < 5min | Tempo média para registrar movimentação de ativo |
+| **Taxa de Discrepancia de Inventario** | < 1% | Percentual de ativos com localização incorreta detectada |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--|--|--|
+| **Rack Proximo a Saturacao** | Ocupação >= 80% | Enviar notificação a gestor infraestrutura para planejar expansão |
+| **CEP Invalido** | ViaCEP retorna 404 | Enviar para fila de revisão manual, alertar usuário |
+| **Geocodificacao Falhando** | 5+ tentativas consecutivas com erro | Criar ticket para revisar API Google Maps, notificar admin |
+| **Movimentacao Nao Validada** | Movimentação pendente > 24h | Enviar email a supervisor lembrando de validar |
+| **Discrepancia de Inventario** | Ativo marcado em local A mas encontrado em local B | Alerta critico, investigação solicitada |
+| **Taxa de Erro Alta** | > 5% de requisições retornando erro | Criar incident, verificar logs de erro |
+| **Capacidade de Armazenamento** | Tabela de histórico > 10GB | Iniciar processo de arquivamento de dados antigos |
+| **Circuit Breaker Aberto** | Google Maps API indisponível | Enviar notificação, usar fallback (sem mapa) |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-015](./MD-015-Gestao-Locais-Enderecos.md) com DDL completo, ER diagram, relacionamentos, índices e tabelas de auditoria
+2. **Casos de Uso**: Criar [UC-015](./UC-015-Gestao-Locais-Enderecos.md) documentando 5 UCs padrão:
+   - UC00: Listar Endereços e Locais
+   - UC01: Criar Novo Endereço
+   - UC02: Visualizar Detalhes de Local
+   - UC03: Editar Endereço
+   - UC04: Inativar/Arquivar Endereço
+3. **Workflows**: Criar [WF-015](./WF-015-Gestao-Locais-Enderecos.md) com telas Angular, mockups de UI, fluxo de navegação
+4. **Test Scenarios**: Criar [TC-015](./TC-015-Gestao-Locais-Enderecos.md) com 80+ cenários de teste cobrindo CRUD, validações, integrações, segurança
+5. **Implementacao Backend**: Criar entities, commands, queries, handlers, validadores, repositórios conforme Clean Architecture
+6. **Implementacao Frontend**: Criar componentes Angular (Listar, Criar, Editar, Deletar), formulários reactivos, validadores, mapas interativos
+7. **Testes Automatizados**: Testes unitários (80%+ cobertura), testes de integração (API), testes E2E (Playwright)
+8. **Documentacao de API**: Swagger/OpenAPI completo com exemplos de requisição/resposta
+9. **Deploy**: Executar CONTRATO-DEPLOY-AZURE para movimentar para HOM e PRD
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--|--|--|--|
+| 1.0 | 2025-12-28 | Versao inicial com 9 seções completas conforme template | IControlIT Architect Agent |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: IControlIT Architect Agent
+**Revisão**: Pendente
+
+---
+
+[← Voltar ao Índice](../../README.md)

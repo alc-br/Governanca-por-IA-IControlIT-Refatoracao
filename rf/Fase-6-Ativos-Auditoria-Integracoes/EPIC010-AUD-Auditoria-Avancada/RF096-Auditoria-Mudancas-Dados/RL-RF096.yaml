@@ -1,0 +1,845 @@
+# RL-RF096 — Referência ao Legado (Auditoria de Mudanças de Dados)
+# Versão: 1.0
+# Data: 2025-12-31
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF096
+titulo: "Auditoria de Mudanças de Dados"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms 4.5"
+  versao: "IControlIT v1.0"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2016+ (banco GUA)"
+  multi_tenant: false  # Apenas filtro manual por Id_Cliente
+  auditoria: "partial"  # Apenas tabelas _log separadas, sem granularidade de campo
+
+# =============================================
+# REFERENCIAS AO LEGADO COM DESTINO OBRIGATÓRIO
+# =============================================
+referencias:
+  # --- TELAS LEGADAS ---
+  - id: "LEG-RF096-001"
+    tipo: "tela"
+    nome: "Auditoria.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/Auditoria.aspx"
+    descricao: |
+      Tela principal de auditoria contábil (billing audit).
+      Não é equivalente ao RF096 moderno (que é data change audit).
+      Foco: conferência de faturas vs. operadora.
+    destino: "descartado"
+    justificativa: |
+      Esta tela é para auditoria contábil (billing), não auditoria de mudanças de dados.
+      Funcionalidade será migrada em RF separado (RF-BILLING-AUDIT).
+      Não aplicável ao RF096.
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF096-002"
+    tipo: "tela"
+    nome: "Auditoria_Acompanhamento.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/Auditoria_Acompanhamento.aspx"
+    descricao: |
+      Acompanhamento de aberturas/contestações de auditoria contábil.
+    destino: "descartado"
+    justificativa: |
+      Não relacionado a auditoria de mudanças de dados (RF096).
+      Será migrado em RF de billing audit separado.
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF096-003"
+    tipo: "tela"
+    nome: "Auditoria_Consulta.aspx"
+    caminho: "ic1_legado/IControlIT/Configuracao/Auditoria_Consulta.aspx"
+    descricao: |
+      Consulta de histórico de mudanças (MAIS PRÓXIMO DO RF096 MODERNO).
+      Permite selecionar entidade (Ativo, Fatura, Centro de Custo, Consumidor).
+      Mostra histórico completo em GridView.
+      Exporta CSV via stored procedure.
+    destino: "substituido"
+    justificativa: |
+      Funcionalidade equivalente a UC00 (Listar timeline de entidade) do RF096.
+      Porém, tela legada tem limitações graves:
+      - Sem paginação (traz tudo)
+      - Sem filtros de data/usuário
+      - Performance ruim com >1000 registros
+      - Sem comparação entre versões (diff)
+      Será SUBSTITUÍDA por tela Angular moderna com filtros avançados e paginação.
+    rf_item_relacionado: "RN-RF096-009"
+    uc_relacionado: "UC00"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF096-004"
+    tipo: "tela"
+    nome: "Auditoria_Importa.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/Auditoria_Importa.aspx"
+    descricao: |
+      Upload de arquivo para auditoria contábil (bilhetes de operadora).
+    destino: "descartado"
+    justificativa: |
+      Não relacionado a auditoria de mudanças de dados (RF096).
+      Upload de bilhetes será migrado em RF de billing audit separado.
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF096-005"
+    tipo: "tela"
+    nome: "Auditoria_Status.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/Auditoria_Status.aspx"
+    descricao: |
+      Status de lotes de auditoria contábil.
+    destino: "descartado"
+    justificativa: |
+      Não relacionado a auditoria de mudanças de dados (RF096).
+      Será migrado em RF de billing audit separado.
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  # --- WEBSERVICES LEGADOS ---
+  - id: "LEG-RF096-006"
+    tipo: "webservice"
+    nome: "WSCadastro.Envia_Log()"
+    caminho: "ic1_legado/IControlIT/WS_IControlIT/WSCadastro.asmx.vb"
+    descricao: |
+      Registra log de operação CRUD em tabela _log correspondente.
+      Chamada manual (não automática).
+      Copia TODOS os campos da entidade original para _log.
+      Apenas registra Id_Usuario_Alteracao e Dt_Alteracao (sem IP, sem user-agent).
+      Assinatura: Public Function Envia_Log(ByVal entidade As String, ByVal idEntidade As Integer, ByVal idUsuario As Integer) As Boolean
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por AuditInterceptor automático no EF Core.
+      Vantagens do novo sistema:
+      - Automático (não requer chamada manual)
+      - Contexto completo (IP, user-agent, ClienteId)
+      - Granularidade de campo (não copia tudo)
+      - Rastreamento de valores antes/depois
+      - CorrelationId para operações em lote
+      - Performance melhor (uma operação, não N+1)
+    rf_item_relacionado: "RN-RF096-001"
+    uc_relacionado: null  # Automático, sem UC específico
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF096-007"
+    tipo: "webservice"
+    nome: "WSConsulta.Consulta_Log()"
+    caminho: "ic1_legado/IControlIT/WS_IControlIT/WSConsulta.asmx.vb"
+    descricao: |
+      Consulta histórico de mudanças de uma entidade.
+      Executa stored procedure pa_Consulta_Auditoria_Log.
+      Retorna DataTable com histórico completo (sem paginação).
+      Assinatura: Public Function Consulta_Log(ByVal entidade As String, ByVal idEntidade As Integer) As DataTable
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por endpoint REST GET /api/auditoria/timeline/{entityType}/{entityId}.
+      Novo endpoint tem:
+      - Paginação obrigatória (máximo 100 registros por página)
+      - Filtros avançados (data, usuário, campo alterado, tipo de operação)
+      - Cache (5 minutos para consultas frequentes)
+      - Performance otimizada (índices específicos)
+      - Response JSON (não DataTable)
+    rf_item_relacionado: "RN-RF096-009"
+    uc_relacionado: "UC00"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # --- STORED PROCEDURES LEGADAS ---
+  - id: "LEG-RF096-008"
+    tipo: "stored_procedure"
+    nome: "pa_Importa_Auditoria"
+    caminho: "ic1_legado/BancoDados/Interno/Auditoria.sql (linha ~150)"
+    descricao: |
+      Importa bilhetes de operadora para auditoria contábil (billing audit).
+    destino: "descartado"
+    justificativa: |
+      NÃO relacionado a auditoria de mudanças de dados (RF096).
+      Será migrado em RF de billing audit separado.
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF096-009"
+    tipo: "stored_procedure"
+    nome: "pa_Auditoria_Lote_Monta"
+    caminho: "ic1_legado/BancoDados/Interno/Auditoria.sql (linha ~350)"
+    descricao: |
+      Monta lote de auditoria contábil com validações.
+    destino: "descartado"
+    justificativa: |
+      NÃO relacionado a auditoria de mudanças de dados (RF096).
+      Será migrado em RF de billing audit separado.
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF096-010"
+    tipo: "stored_procedure"
+    nome: "pa_Auditoria_Tipo"
+    caminho: "ic1_legado/BancoDados/Interno/Auditoria.sql (linha ~550)"
+    descricao: |
+      Classifica tipo de alteração (fatura, consumidor, ativo).
+      Retorna código do tipo (1=Ativo, 2=Fatura, 3=Centro de Custo, 4=Consumidor).
+      Usado para rotear para tabela _log correta.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por decorador [Audited] com detecção automática via Reflection.
+      Sistema moderno detecta tipo de entidade automaticamente sem procedure.
+    rf_item_relacionado: "RN-RF096-001"
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF096-011"
+    tipo: "stored_procedure"
+    nome: "pa_Consulta_Auditoria_Log"
+    caminho: "ic1_legado/BancoDados/Interno/Auditoria.sql (linha ~750)"
+    descricao: |
+      Retorna histórico de alterações de uma entidade.
+      Switch case para cada tipo de entidade (Ativo_log, Fatura_log, etc).
+      Sem paginação (retorna tudo).
+      Sem filtros de data/usuário.
+      Performance ruim com >1000 registros.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por endpoint GET /api/auditoria/timeline/{entityType}/{entityId}.
+      Procedure tinha problemas graves:
+      - Sem paginação
+      - Sem filtros
+      - Sem índices otimizados
+      - Performance degradada
+      Novo endpoint resolve todos esses problemas.
+    rf_item_relacionado: "RN-RF096-009"
+    uc_relacionado: "UC00"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # --- TABELAS LEGADAS ---
+  - id: "LEG-RF096-012"
+    tipo: "tabela"
+    nome: "Ativo_log"
+    caminho: "GUA.dbo.Ativo_log"
+    descricao: |
+      Registra histórico de alterações da tabela Ativo.
+      Copia TODOS os campos de Ativo em cada alteração.
+      Campos: Id_Ativo_log (PK), Id_Ativo, Nm_Ativo, Cd_Patrimonio, Dt_Alteracao, Id_Usuario_Alteracao.
+      Sem índice em Dt_Alteracao (consultas lentas).
+      Sem contexto de execução (IP, user-agent).
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por modelo normalizado AuditLog + AuditFieldChange.
+      Tabela legada tinha problemas:
+      - Redundância (copia tudo)
+      - Sem granularidade de campo
+      - Sem índices otimizados
+      - Sem contexto completo
+      - Sem multi-tenancy (ClienteId)
+      Modelo moderno resolve todos os problemas.
+    rf_item_relacionado: "RN-RF096-001"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"  # Migração de dados legada complexa
+    prioridade: 1
+
+  - id: "LEG-RF096-013"
+    tipo: "tabela"
+    nome: "Fatura_log"
+    caminho: "GUA.dbo.Fatura_log"
+    descricao: |
+      Registra histórico de alterações da tabela Fatura.
+      Copia TODOS os campos de Fatura em cada alteração.
+      Campos: Id_Fatura_log (PK), Id_Fatura, Valor_Fatura, Status, Dt_Alteracao, Id_Usuario_Alteracao.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por modelo normalizado AuditLog + AuditFieldChange.
+      Mesmos problemas de Ativo_log.
+    rf_item_relacionado: "RN-RF096-001"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF096-014"
+    tipo: "tabela"
+    nome: "Centro_Custo_log"
+    caminho: "GUA.dbo.Centro_Custo_log"
+    descricao: |
+      Registra histórico de alterações da tabela Centro_Custo.
+      Copia TODOS os campos de Centro_Custo em cada alteração.
+      Campos: Id_Centro_Custo_log (PK), Id_Centro_Custo, Nm_Centro_Custo, Cd_Centro_Custo, Dt_Alteracao, Id_Usuario_Alteracao.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por modelo normalizado AuditLog + AuditFieldChange.
+      Mesmos problemas de Ativo_log.
+    rf_item_relacionado: "RN-RF096-001"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF096-015"
+    tipo: "tabela"
+    nome: "Consumidor_log"
+    caminho: "GUA.dbo.Consumidor_log"
+    descricao: |
+      Registra histórico de alterações da tabela Consumidor.
+      Copia TODOS os campos de Consumidor em cada alteração.
+      Campos: id_Consumidor_log (PK), id_Consumidor, Nm_Consumidor, Email_Consumidor, Dt_Alteracao, Id_Usuario_Alteracao.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por modelo normalizado AuditLog + AuditFieldChange.
+      Mesmos problemas de Ativo_log.
+    rf_item_relacionado: "RN-RF096-001"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # --- REGRAS DE NEGÓCIO IMPLÍCITAS ---
+  - id: "LEG-RF096-016"
+    tipo: "regra_negocio"
+    nome: "Auditoria Manual por WebService"
+    caminho: "Qualquer tela/code-behind que chama WSCadastro.Envia_Log()"
+    descricao: |
+      No legado, auditoria não era automática.
+      Cada operação CRUD precisava chamar explicitamente WSCadastro.Envia_Log() após sucesso.
+      Fácil esquecer de chamar, sem atomicidade (transação separada), sem rollback se falhar.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por AuditInterceptor automático (SaveChanges hook do EF Core).
+      Vantagens:
+      - Automático (impossível esquecer)
+      - Atômico (mesma transação)
+      - Rollback automático se operação principal falhar
+    rf_item_relacionado: "RN-RF096-001"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF096-017"
+    tipo: "regra_negocio"
+    nome: "Uma Tabela _log por Entidade"
+    caminho: "Esquema do banco de dados GUA"
+    descricao: |
+      Cada entidade crítica tinha sua própria tabela _log (Ativo_log, Fatura_log, etc.).
+      Copia TODOS os campos da entidade original em cada alteração.
+      Redundância, manutenção complexa, sem normalização, sem granularidade de campo.
+    destino: "substituido"
+    justificativa: |
+      SUBSTITUÍDO por modelo normalizado AuditLog + AuditFieldChange.
+      Vantagens:
+      - Normalizado (uma tabela central)
+      - Granularidade de campo (não copia tudo)
+      - Fácil manutenção (adicionar nova entidade auditada não requer DDL)
+      - Queries agregadas simples (cross-entity)
+    rf_item_relacionado: "RN-RF096-002"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF096-018"
+    tipo: "regra_negocio"
+    nome: "Sem Contexto de Execução"
+    caminho: "Tabelas *_log (apenas Id_Usuario_Alteracao e Dt_Alteracao)"
+    descricao: |
+      Legado registrava apenas Id_Usuario_Alteracao e Dt_Alteracao.
+      Sem IP, sem user-agent, sem ClienteId.
+      Impossível rastrear origem da alteração, impossível detectar acessos anômalos.
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO no RF096 - todos os campos de contexto são obrigatórios.
+      Campos adicionados:
+      - IP (NVARCHAR(45)) - origem da requisição
+      - UserAgent (NVARCHAR(500)) - browser/app usado
+      - ClienteId (UNIQUEIDENTIFIER) - multi-tenancy
+      Conformidade LGPD/SOX exige contexto completo.
+    rf_item_relacionado: "RN-RF096-002"
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF096-019"
+    tipo: "regra_negocio"
+    nome: "Sem Soft Delete Auditado"
+    caminho: "Lógica de soft delete (flag Ativo = 0)"
+    descricao: |
+      Soft delete existia (flag Ativo = 0), mas não era auditado como operação separada.
+      Impossível saber quem deletou, quando deletou, histórico de soft delete.
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO no RF096 - soft delete é auditado como operação específica.
+      OperationType = "Deleted" quando DeletedAt for preenchido.
+      Rastreamento completo: quem, quando, porquê.
+    rf_item_relacionado: "RN-RF096-004"
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF096-020"
+    tipo: "regra_negocio"
+    nome: "Sem Rollback"
+    caminho: "Inexistente no legado"
+    descricao: |
+      Legado apenas consultava histórico, sem capacidade de restaurar versões anteriores.
+      Impossível reverter alterações incorretas automaticamente.
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO no RF096 - rollback controlado com validação de integridade.
+      UC02: Executar rollback.
+      Validações antes de aplicar:
+      - Integridade referencial (FK válidas)
+      - Permissões (apenas Admin + Developer)
+      - Preview de alterações
+      Operação de rollback é auditada (OperationType = Rollback).
+    rf_item_relacionado: "RN-RF096-010"
+    uc_relacionado: "UC02"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF096-021"
+    tipo: "regra_negocio"
+    nome: "Sem Detecção de Operações em Lote"
+    caminho: "Importações em massa (geram N registros separados)"
+    descricao: |
+      Importações em massa geravam N registros separados em _log, sem agrupamento.
+      Impossível saber quais alterações fazem parte do mesmo batch.
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO no RF096 - CorrelationId único por SaveChanges.
+      Todas as alterações na mesma transação recebem mesmo CorrelationId.
+      Visualização agrupada de operações em lote na timeline.
+      Filtro específico para visualizar apenas operações em lote.
+    rf_item_relacionado: "RN-RF096-005"
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF096-022"
+    tipo: "regra_negocio"
+    nome: "Sem Rastreamento de Relacionamentos"
+    caminho: "Inexistente no legado"
+    descricao: |
+      Adições/remoções em collections não eram auditadas.
+      Impossível rastrear quando um ativo foi vinculado a um centro de custo.
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO no RF096 - rastreamento de RelationshipAdded/RelationshipRemoved.
+      Contexto completo: entidade pai, entidade filha, tipo de relacionamento.
+      Timeline específica para visualizar mudanças de relacionamentos.
+    rf_item_relacionado: "RN-RF096-006"
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 3
+
+  - id: "LEG-RF096-023"
+    tipo: "regra_negocio"
+    nome: "Sem Alertas de Dados Sensíveis"
+    caminho: "Inexistente no legado"
+    descricao: |
+      Alterações em CPF, e-mail, telefone não geravam alertas.
+      Não conformidade LGPD Art. 48 (comunicação de incidentes).
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO no RF096 - alertas automáticos ao DPO.
+      Sistema identifica campos sensíveis via atributo [SensitiveData].
+      E-mail automático ao DPO a cada alteração sensível.
+      Dashboard específico com todas as alterações sensíveis.
+      Relatório mensal de conformidade LGPD.
+    rf_item_relacionado: "RN-RF096-008"
+    uc_relacionado: "UC07"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1  # CRÍTICO para conformidade LGPD
+
+  - id: "LEG-RF096-024"
+    tipo: "regra_negocio"
+    nome: "Sem Integração SIEM"
+    caminho: "Inexistente no legado"
+    descricao: |
+      Logs ficavam apenas no banco, sem envio para SIEM.
+      Impossível correlacionar eventos de auditoria com eventos de segurança.
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO no RF096 - integração automática com Azure Sentinel.
+      Envio assíncrono de eventos críticos em tempo real.
+      Formato CEF (Common Event Format).
+      Retry automático em caso de falha (3 tentativas).
+      Configuração de severidade por tipo de evento.
+    rf_item_relacionado: "RN-RF096-013"
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF096-025"
+    tipo: "regra_negocio"
+    nome: "Sem Retenção Configurável"
+    caminho: "Dados de auditoria ficavam indefinidamente no banco"
+    descricao: |
+      Dados de auditoria ficavam indefinidamente no banco (sem arquivamento/purga).
+      Crescimento descontrolado, performance degradada, custo de storage.
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO no RF096 - retenção configurável por tipo de entidade (LGPD/SOX).
+      Política de retenção padrão:
+      - 5 anos para dados pessoais (LGPD)
+      - 7 anos para dados financeiros (SOX 404)
+      Job automático de arquivamento mensal.
+      Arquivamento em blob storage após período ativo.
+      Purga física após fim do período de retenção.
+      Restauração sob demanda de dados arquivados.
+    rf_item_relacionado: "RN-RF096-007"
+    uc_relacionado: "UC06"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+# =============================================
+# TELAS LEGADAS (ESTRUTURA DETALHADA)
+# =============================================
+telas:
+  - id: "LEG-RF096-003"
+    nome: "Auditoria_Consulta.aspx"
+    caminho: "ic1_legado/IControlIT/Configuracao/Auditoria_Consulta.aspx"
+    responsabilidade: "Consulta de histórico de mudanças"
+    campos:
+      - nome: "ddlEntidade"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "RequiredFieldValidator"
+      - nome: "txtIdEntidade"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "RequiredFieldValidator + RegularExpressionValidator (somente números)"
+      - nome: "gridHistorico"
+        tipo: "GridView"
+        obrigatorio: false
+        validacao: "Nenhuma"
+    comportamentos_implicitos:
+      - "Consulta hardcoded para cada tipo de entidade (4 procedures diferentes)"
+      - "Sem filtro de data/hora (sempre traz TODO o histórico)"
+      - "Performance ruim com >1000 registros (sem paginação)"
+      - "Sem ordenação (sempre ordem de inserção)"
+      - "Sem comparação entre versões (diff)"
+
+# =============================================
+# WEBSERVICES LEGADOS
+# =============================================
+servicos:
+  - id: "LEG-RF096-006"
+    nome: "WSCadastro.Envia_Log()"
+    localizacao: "WSCadastro.asmx.vb"
+    responsabilidade: "Registra log de operação CRUD em tabela _log correspondente"
+    notas: "Chamada manual, sem contexto completo, performance ruim"
+
+  - id: "LEG-RF096-007"
+    nome: "WSConsulta.Consulta_Log()"
+    localizacao: "WSConsulta.asmx.vb"
+    responsabilidade: "Consulta histórico de mudanças de uma entidade"
+    notas: "Sem paginação, sem filtros, performance ruim"
+
+# =============================================
+# TABELAS LEGADAS COM PROBLEMAS
+# =============================================
+tabelas:
+  - nome: "Ativo_log"
+    finalidade: "Histórico de alterações de Ativo"
+    problemas:
+      - "Sem índice em Dt_Alteracao (consultas lentas)"
+      - "Sem índice em Id_Usuario_Alteracao (filtro lento)"
+      - "Sem contexto de execução (IP, user-agent)"
+      - "Sem rastreamento de campos alterados (copia tudo)"
+      - "Sem rastreamento de valores antes/depois"
+      - "Sem CorrelationId"
+
+  - nome: "Fatura_log"
+    finalidade: "Histórico de alterações de Fatura"
+    problemas:
+      - "Mesmos problemas de Ativo_log"
+
+  - nome: "Centro_Custo_log"
+    finalidade: "Histórico de alterações de Centro_Custo"
+    problemas:
+      - "Mesmos problemas de Ativo_log"
+
+  - nome: "Consumidor_log"
+    finalidade: "Histórico de alterações de Consumidor"
+    problemas:
+      - "Mesmos problemas de Ativo_log"
+
+# =============================================
+# REGRAS DE NEGÓCIO IMPLÍCITAS (CONSOLIDADAS)
+# =============================================
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      Auditoria manual por WebService (não automática)
+    fonte: "WSCadastro.Envia_Log() - todas as telas que chamam explicitamente"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Uma tabela _log por entidade (Ativo_log, Fatura_log, Centro_Custo_log, Consumidor_log)
+    fonte: "Esquema do banco de dados GUA"
+
+  - id: "RL-RN-003"
+    descricao: |
+      Sem contexto de execução (apenas Id_Usuario_Alteracao e Dt_Alteracao)
+    fonte: "Tabelas *_log"
+
+  - id: "RL-RN-004"
+    descricao: |
+      Sem soft delete auditado (flag Ativo = 0 não era rastreado)
+    fonte: "Lógica de soft delete em code-behind"
+
+  - id: "RL-RN-005"
+    descricao: |
+      Sem rollback (apenas consulta de histórico)
+    fonte: "Inexistente no legado"
+
+  - id: "RL-RN-006"
+    descricao: |
+      Sem detecção de operações em lote (N registros separados sem agrupamento)
+    fonte: "Importações em massa"
+
+  - id: "RL-RN-007"
+    descricao: |
+      Sem rastreamento de relacionamentos (adições/remoções em collections)
+    fonte: "Inexistente no legado"
+
+  - id: "RL-RN-008"
+    descricao: |
+      Sem alertas de dados sensíveis (CPF, e-mail, telefone)
+    fonte: "Inexistente no legado"
+
+  - id: "RL-RN-009"
+    descricao: |
+      Sem integração SIEM (logs apenas no banco)
+    fonte: "Inexistente no legado"
+
+  - id: "RL-RN-010"
+    descricao: |
+      Sem retenção configurável (dados ficavam indefinidamente)
+    fonte: "Inexistente no legado"
+
+# =============================================
+# GAP ANALYSIS (LEGADO x MODERNO)
+# =============================================
+gap_analysis:
+  - item: "Granularidade de auditoria"
+    existe_legado: false  # Registro completo, não campo a campo
+    existe_moderno: true  # Campo a campo via AuditFieldChange
+    notas: "Legado copiava tudo, moderno rastreia apenas campos alterados"
+
+  - item: "Automação de auditoria"
+    existe_legado: false  # Manual via WebService
+    existe_moderno: true  # Automático via EF Interceptor
+    notas: "Legado era manual, moderno é automático"
+
+  - item: "Contexto de execução completo"
+    existe_legado: false  # Apenas usuário e data
+    existe_moderno: true  # Usuário, data, IP, user-agent, ClienteId
+    notas: "Legado tinha contexto mínimo, moderno tem contexto completo"
+
+  - item: "Rollback de entidades"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não tinha rollback, moderno tem rollback controlado"
+
+  - item: "Rastreamento de relacionamentos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não rastreava collections, moderno rastreia RelationshipAdded/Removed"
+
+  - item: "Detecção de operações em lote"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não agrupava batch, moderno usa CorrelationId"
+
+  - item: "Alertas de dados sensíveis (LGPD)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não tinha alertas LGPD, moderno tem alertas automáticos ao DPO"
+
+  - item: "Integração SIEM (Azure Sentinel)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não integrava SIEM, moderno envia eventos em tempo real"
+
+  - item: "Retenção configurável (LGPD/SOX)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não tinha retenção, moderno tem políticas configuráveis"
+
+  - item: "Exportação forense (hash SHA-256)"
+    existe_legado: false  # Apenas CSV simples
+    existe_moderno: true  # CSV/Excel/JSON/PDF + hash forense
+    notas: "Legado tinha CSV simples, moderno tem exportação forense para uso judicial"
+
+# =============================================
+# DECISÕES DE MODERNIZAÇÃO
+# =============================================
+decisoes_modernizacao:
+  - decisao: "Modelo Normalizado AuditLog + AuditFieldChange"
+    motivo: |
+      Substituir N tabelas _log por 2 tabelas normalizadas.
+      Reduzir redundância, facilitar manutenção, permitir granularidade de campo.
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "EF Core Interceptor vs. Triggers"
+    motivo: |
+      Usar EF Core SaveChanges Interceptor em vez de triggers SQL.
+      Mais flexível, mais testável, mais portável.
+    impacto: "baixo"
+    data: "2025-12-31"
+
+  - decisao: "GUID vs. INT para IDs"
+    motivo: |
+      Usar GUID para AuditLog.Id em vez de INT IDENTITY.
+      Distribuído, mais seguro, facilita merge de ambientes.
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "UTC vs. LocalDateTime"
+    motivo: |
+      Sempre usar UTC para Timestamp (DATETIMEOFFSET).
+      Multi-timezone, evita bugs de DST, ordenação consistente.
+    impacto: "baixo"
+    data: "2025-12-31"
+
+  - decisao: "Imutabilidade Garantida"
+    motivo: |
+      Bloquear UPDATE/DELETE em AuditLog via triggers + validação DbContext.
+      Conformidade LGPD/SOX, integridade forense.
+    impacto: "alto"
+    data: "2025-12-31"
+
+# =============================================
+# RISCOS DE MIGRAÇÃO
+# =============================================
+riscos_migracao:
+  - risco: "Perda de dados de auditoria legada durante migração"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      Script de migração com validação de integridade.
+      Backup completo antes de migrar.
+      Testes em ambiente de HOM antes de PRD.
+
+  - risco: "Performance degradada durante migração"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Migração em horário de baixo uso (madrugada/fim de semana).
+      Índices criados ANTES da migração.
+      Monitoramento de performance durante migração.
+
+  - risco: "Incompatibilidade de timezone (Dt_Alteracao → Timestamp UTC)"
+    impacto: "baixo"
+    probabilidade: "baixa"
+    mitigacao: |
+      Conversão de DateTime local → DATETIMEOFFSET UTC com offset configurável.
+      Testes de conversão em ambiente de desenvolvimento.
+
+  - risco: "Queries legadas quebradas após migração"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      Criar views de compatibilidade Ativo_log → AuditLog para queries legadas.
+      Deprecar views após período de transição (6 meses).
+
+  - risco: "Volume de dados (tabelas _log grandes)"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      Arquivamento de dados >10 anos antes de migrar.
+      Purga de dados duplicados.
+      Migração em lotes (batch de 10k registros por vez).
+
+# =============================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# =============================================
+rastreabilidade:
+  - elemento_legado: "Ativo_log (tabela)"
+    referencia_rf: "RN-RF096-001"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "Fatura_log (tabela)"
+    referencia_rf: "RN-RF096-001"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "Centro_Custo_log (tabela)"
+    referencia_rf: "RN-RF096-001"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "Consumidor_log (tabela)"
+    referencia_rf: "RN-RF096-001"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "WSCadastro.Envia_Log() (WebService)"
+    referencia_rf: "RN-RF096-001"
+    referencia_uc: null
+    status: "migrado"  # Substituído por AuditInterceptor
+
+  - elemento_legado: "WSConsulta.Consulta_Log() (WebService)"
+    referencia_rf: "RN-RF096-009"
+    referencia_uc: "UC00"
+    status: "migrado"  # Substituído por endpoint REST
+
+  - elemento_legado: "pa_Auditoria_Tipo (Stored Procedure)"
+    referencia_rf: "RN-RF096-001"
+    referencia_uc: null
+    status: "migrado"  # Substituído por [Audited] decorator
+
+  - elemento_legado: "pa_Consulta_Auditoria_Log (Stored Procedure)"
+    referencia_rf: "RN-RF096-009"
+    referencia_uc: "UC00"
+    status: "migrado"  # Substituído por endpoint REST
+
+  - elemento_legado: "Auditoria_Consulta.aspx (Tela)"
+    referencia_rf: "RN-RF096-009"
+    referencia_uc: "UC00"
+    status: "migrado"  # Substituído por tela Angular /auditoria/timeline
+
+# =============================================
+# CHANGELOG
+# =============================================
+changelog:
+  - versao: "1.0"
+    data: "2025-12-31"
+    descricao: "Versão inicial de referência ao legado - Migração de RF096 v1.0 para v2.0 (separação RF/RL)"
+    autor: "Agência ALC - alc.dev.br"

@@ -1,0 +1,1597 @@
+# RF-089: Conciliação e Auditoria de Faturas
+
+**Versão**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF-032 (Notas Fiscais), RF-023 (Contratos) | **EPIC**: EPIC006-FIN-Financeiro-Base
+**Fase**: Fase 3 - Financeiro I - Base Contábil
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o módulo de **Conciliação e Auditoria de Faturas** do sistema IControlIT, responsável por automatizar e controlar o processo de validação, matching e auditoria de documentos fiscais (Notas Fiscais Eletrônicas) contra pedidos de compra, recebimentos de mercadorias e contratos. O módulo detecta divergências em valores, quantidades, datas e informações fiscais (CFOP, alíquotas, impostos), classifica-as por severidade, implementa workflow de aprovação e gera relatórios fiscais completos com rastreabilidade total para conformidade com normas SOX e LGPD.
+
+O sistema integra-se com RF-032 (Gestão de Notas Fiscais) para captura de dados fiscais, RF-023 (Gestão de Contratos) para validação de termos contratuais, e utiliza Azure Machine Learning para detecção de padrões anômalos. Implementa matching automático em três níveis (two-way e three-way matching), conciliação bancária, notificações em tempo real via SignalR e processamento batch via Hangfire.
+
+### 1.2 Importância Estratégica
+
+O módulo de Conciliação e Auditoria é crítico para:
+
+- **Conformidade Regulatória**: Atende requisitos de auditoria fiscal (NF-e, CTe), conformidade com SPED Fiscal, e regulamentações LGPD para retenção de dados contábeis
+- **Redução de Fraudes**: Detecta divergências suspeitas, padrões anômalos e possíveis duplicações usando ML; implementa auditoria completa com trilha de todas as operações
+- **Eficiência Operacional**: Automatiza 80% do matching de documentos, elimina processamento manual em Excel, reduz tempo de conciliação de semanas para horas
+- **Gestão de Caixa**: Vincula automaticamente faturas a pagamentos, identifica descontos perdidos, detecta erros de faturamento antes do pagamento
+- **Inteligência de Negócio**: Fornece KPIs de performance de fornecedores, SLAs de conciliação, análise de divergências por categoria, suportando decisões de compra e negociação
+
+### 1.3 Conceitos Fundamentais
+
+**Matching de Documentos**: Processo automático de validação cruzada de Nota Fiscal Eletrônica (NF-e) com Pedido de Compra (PC), Recebimento de Mercadorias (RM) e contrato, para detectar conformidade em valores, quantidades, datas e termos.
+- Implementação: Two-way (NF-e ↔ PC) e Three-way (NF-e ↔ PC ↔ RM) matching
+- Utiliza algoritmo fuzzy matching para tolerâncias configuráveis por empresa
+
+**Divergências Fiscais**: Diferenças identificadas entre documentos em:
+- Valores (preço unitário, subtotal, impostos, frete)
+- Quantidades (quantidade pedida vs. recebida vs. faturada)
+- Datas (data do pedido, recebimento, emissão, vencimento)
+- Dados fiscais (CFOP, alíquotas de ICMS/IPI, natureza de operação)
+- Condições contratuais (prazos de pagamento, descontos, multas)
+
+**Conciliação Bancária**: Vinculação de faturas com seus respectivos pagamentos em extratos bancários, identificando atrasos, adiantamentos e discrepâncias.
+
+**Auditoria Contábil**: Registro imutável de todas as operações de conciliação, aprovações, rejeições e alterações, com identificação de usuário, timestamp e justificativa.
+
+**Detecção de Anomalias**: Utilização de modelos de Machine Learning treinados em dados históricos para identificar padrões suspeitos (ex: valores fora de desvio padrão, fornecedores atípicos, CFOP inusitados).
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular 19) |
+|---------|-----------------|--------------------------------|
+| **Matching** | Manual em Excel ou SP simples | Engine automático com ML, tolerâncias configuráveis, regras por fornecedor |
+| **Divergências** | Cadastro livre em formulário | Classificação automática (crítica, alta, média, baixa), workflow de aprovação |
+| **Relatórios** | Hardcoded em RDLC, filtros limitados | Dinâmicos com Pivot, múltiplos formatos (PDF, Excel, JSON), exportação programável |
+| **Auditoria** | Simples update/delete com usuário | Event sourcing completo, trilha imutável, dados sensíveis criptografados |
+| **Performance** | Consultas N+1, timeout em 50k registros | Índices estratégicos, paginação, agregações no BD, processamento async |
+| **Integração** | WebService ASMX pontual | REST API completa, webhooks, Azure Event Grid, SignalR para notificações |
+| **Conformidade** | Retenção indefinida, sem controle | LGPD com retenção configurável, anonimização, direito ao esquecimento |
+
+### 1.5 Funcionalidades Principais
+
+1. **Matching Automático Multi-Nível** - Two-way (NF-e ↔ PC) e Three-way (NF-e ↔ PC ↔ RM) com tolerâncias ajustáveis
+2. **Detecção de Divergências** - Análise em tempo real de valores, quantidades, datas e dados fiscais com classificação de severidade
+3. **Workflow de Aprovação** - Roteamento automático de divergências para gerentes, controllers e diretores com comentários e auditoria
+4. **Conciliação Bancária** - Vinculação de faturas a pagamentos, análise de prazos, detecção de adiantamentos/atrasos
+5. **Machine Learning para Anomalias** - Modelos treinados em histórico para detectar padrões suspeitos (fraude, erro de digitação)
+6. **Dashboard de Divergências** - Visualização em tempo real, filtros dinâmicos, drilldown para análise de causa raiz
+7. **Relatórios Fiscais** - Geração de relatórios para conformidade (SPED Fiscal, NF-e, CTe), auditoria e gestão
+8. **Auditoria Completa** - Event sourcing de todas as operações, razão de todas as mudanças, rastreabilidade total
+9. **Notificações em Tempo Real** - SignalR para alertas críticos, dashboard vivo, integração com e-mail e chat
+10. **Processamento Batch Automático** - Hangfire para execução noturna de matching, reconciliação, limpeza de dados expirados
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-FIN-089-01: Validação de Integração de Nota Fiscal com Pedido de Compra
+
+**Descrição**: Toda Nota Fiscal (NF-e) deve ser automaticamente associada ao seu Pedido de Compra (PC) antes de qualquer processamento de conciliação. A validação deve verificar CHAVE_NFE (número + série + CNPJ emitente) contra PC_ID e validar que ambos pertencem ao mesmo fornecedor e cliente.
+
+**Justificativa**: Previne erros de matching entre documentos não relacionados; garante rastreabilidade e conformidade fiscal.
+
+**Implementação**:
+```csharp
+public class MatchingValidator
+{
+    public async Task<MatchingResult> ValidateNFeIntegrationAsync(
+        NotaFiscal notaFiscal,
+        PedidoCompra pedido,
+        CancellationToken ct = default)
+    {
+        // Validar CHAVE_NFE
+        if (string.IsNullOrEmpty(notaFiscal.ChaveNFe) || notaFiscal.ChaveNFe.Length != 44)
+            return MatchingResult.Invalid("CHAVE_NFE inválida ou ausente");
+
+        // Validar correspondência de fornecedor
+        if (notaFiscal.FornecedorCNPJ != pedido.FornecedorCNPJ)
+            return MatchingResult.Invalid("Fornecedor da NF-e não corresponde ao pedido");
+
+        // Validar correspondência de cliente (multi-tenancy)
+        if (notaFiscal.ClienteId != pedido.ClienteId)
+            return MatchingResult.Invalid("Empresa da NF-e não corresponde ao pedido");
+
+        // Validar duplicação de NF-e
+        var existingNFe = await _notaFiscalRepository.GetByChaveNFeAsync(
+            notaFiscal.ChaveNFe,
+            notaFiscal.ClienteId,
+            ct);
+
+        if (existingNFe != null && existingNFe.Id != notaFiscal.Id)
+            return MatchingResult.Invalid($"NF-e duplicada (ID: {existingNFe.Id})");
+
+        return MatchingResult.Valid();
+    }
+}
+```
+
+**Exemplos**:
+- Válido: NF-e com CHAVE válida, fornecedor = PC.Fornecedor, cliente = PC.Cliente
+- Inválido: NF-e com CHAVE inválida (menos de 44 dígitos)
+- Inválido: NF-e de fornecedor diferente do PC
+
+---
+
+### RN-FIN-089-02: Classificação de Divergências por Severidade
+
+**Descrição**: Toda divergência identificada no matching deve ser classificada automaticamente em um dos seguintes níveis: CRÍTICA, ALTA, MÉDIA ou BAIXA, conforme regras de impacto financeiro, quantidade e complexidade.
+
+**Justificativa**: Prioriza recursos de revisão para itens mais importantes; possibilita SLA diferenciado por severidade; permite automação de aprovações de baixa severidade.
+
+**Implementação**:
+```csharp
+public class DivergenciaClassifier
+{
+    public DivergenciaClassificacao ClassificarDivergencia(
+        DivergenciaDetectada divergencia,
+        PedidoCompra pedido)
+    {
+        var percentualDiferenca = CalcularPercentualDiferenca(
+            divergencia.ValorEsperado,
+            divergencia.ValorRealizado);
+
+        // CRÍTICA: valor > 10% ou quantidade 0 ou CFOP inválido
+        if (percentualDiferenca > 10m ||
+            divergencia.QuantidadeRealizada == 0 ||
+            divergencia.TipoDivergencia == TipoDivergencia.CFOPInvalido)
+            return DivergenciaClassificacao.Critica;
+
+        // ALTA: valor 5-10% ou desconto não contratado > 5%
+        if (percentualDiferenca > 5m ||
+            (divergencia.DescontoAplicado > 5m && !divergencia.DescontoContratado))
+            return DivergenciaClassificacao.Alta;
+
+        // MÉDIA: valor 2-5% ou diferença de datas > 30 dias
+        if (percentualDiferenca > 2m ||
+            Math.Abs((divergencia.DataRealizada - divergencia.DataEsperada).TotalDays) > 30)
+            return DivergenciaClassificacao.Media;
+
+        // BAIXA: valor < 2% e quantidade OK
+        return DivergenciaClassificacao.Baixa;
+    }
+
+    private decimal CalcularPercentualDiferenca(decimal esperado, decimal realizado)
+    {
+        if (esperado == 0) return 0;
+        return Math.Abs((realizado - esperado) / esperado) * 100;
+    }
+}
+```
+
+**Exemplos**:
+- CRÍTICA: NF-e com valor 50% acima do pedido (R$ 10.000 esperado, R$ 15.000 faturado)
+- ALTA: NF-e com desconto 7% não contratado em pedido original
+- MÉDIA: NF-e com quantidade 10% menor (100 unidades esperadas, 90 recebidas)
+- BAIXA: NF-e com valor R$ 50 a mais (0,5% de diferença)
+
+---
+
+### RN-FIN-089-03: Three-Way Matching com Tolerâncias Configuráveis
+
+**Descrição**: Sistema deve implementar matching entre três documentos: Pedido (PC) → Recebimento (RM) → Nota Fiscal (NF-e). Cada empresa pode configurar tolerâncias diferentes por tipo de item (materiais, serviços, ativos fixos) com valores máximos absolutos (R$) e percentuais (%).
+
+**Justificativa**: Detecta erros em qualquer etapa; identifica recebimentos não faturados ou excesso de faturamento; respeita realidades operacionais com tolerâncias; facilita auditoria.
+
+**Implementação**:
+```csharp
+public class ThreeWayMatchingEngine
+{
+    public async Task<MatchingResult> ExecuteThreeWayMatchingAsync(
+        PedidoCompra pc,
+        RecebimentoMercadoria rm,
+        NotaFiscal nfe,
+        EmpresaConfiguracoes config,
+        CancellationToken ct = default)
+    {
+        var resultado = new MatchingResult();
+
+        // Validação: Quantidade (RM vs PC)
+        var toleranciaQtde = config.GetTolerancia(pc.TipoItem, ToleranciaType.Quantidade);
+        var difQtde = Math.Abs(rm.QuantidadeRecebida - pc.QuantidadeTotal);
+
+        if (difQtde > toleranciaQtde.ValorAbsoluto &&
+            (pc.QuantidadeTotal > 0 &&
+             (difQtde / pc.QuantidadeTotal * 100) > toleranciaQtde.Percentual))
+        {
+            resultado.Divergencias.Add(new Divergencia
+            {
+                Tipo = TipoDivergencia.QuantidadeInsuportada,
+                Valor = difQtde,
+                Percentual = (difQtde / pc.QuantidadeTotal * 100),
+                Severidade = DivergenciaClassificacao.Alta
+            });
+        }
+
+        // Validação: Valor (NF-e vs PC, ajustado por RM)
+        var valorEsperado = pc.ValorTotal * (rm.QuantidadeRecebida / pc.QuantidadeTotal);
+        var toleranciaValor = config.GetTolerancia(pc.TipoItem, ToleranciaType.Valor);
+        var difValor = Math.Abs(nfe.ValorTotal - valorEsperado);
+
+        if (difValor > toleranciaValor.ValorAbsoluto &&
+            (valorEsperado > 0 &&
+             (difValor / valorEsperado * 100) > toleranciaValor.Percentual))
+        {
+            resultado.Divergencias.Add(new Divergencia
+            {
+                Tipo = TipoDivergencia.ValorInsuportado,
+                Valor = difValor,
+                Percentual = (difValor / valorEsperado * 100),
+                Severidade = DivergenciaClassificacao.Alta
+            });
+        }
+
+        // Validação: Datas
+        ValidarCronologia(pc, rm, nfe, resultado);
+
+        resultado.Conciliado = resultado.Divergencias.Count == 0;
+        return resultado;
+    }
+
+    private void ValidarCronologia(
+        PedidoCompra pc,
+        RecebimentoMercadoria rm,
+        NotaFiscal nfe,
+        MatchingResult resultado)
+    {
+        // RM.Data deve ser >= PC.Data
+        if (rm.DataRecebimento < pc.DataPedido)
+            resultado.Divergencias.Add(new Divergencia
+            {
+                Tipo = TipoDivergencia.DataInconsistente,
+                Mensagem = "Recebimento anterior ao pedido",
+                Severidade = DivergenciaClassificacao.Critica
+            });
+
+        // NF-e.Data deve ser <= RM.Data (permite 2 dias de tolerância)
+        if ((nfe.DataEmissao - rm.DataRecebimento).TotalDays > 2)
+            resultado.Divergencias.Add(new Divergencia
+            {
+                Tipo = TipoDivergencia.DataInconsistente,
+                Mensagem = $"NF-e emitida {(nfe.DataEmissao - rm.DataRecebimento).Days} dias após recebimento",
+                Severidade = DivergenciaClassificacao.Media
+            });
+    }
+}
+```
+
+**Exemplos**:
+- Válido: PC 100 un, RM 98 un, NF-e 98 un (dentro de tolerância 5%)
+- Divergência: PC 100 un, RM 70 un, NF-e 100 un (excesso de faturamento)
+- Divergência: PC 100 un @ R$ 10, RM 100 un, NF-e R$ 1.500 (R$ 1.000 esperado)
+
+---
+
+### RN-FIN-089-04: Integração com Contratos para Validação de Termos
+
+**Descrição**: Antes de marcar uma fatura como conciliada, o sistema deve validar automaticamente que os termos da NF-e (preço, condições de pagamento, descontos, frete) estão de acordo com o contrato vinculado ao pedido. Qualquer desvio deve gerar divergência.
+
+**Justificativa**: Previne fraudes de preço; garante cumprimento de cláusulas contratuais; documenta violações para cobranças futuras.
+
+**Implementação**:
+```csharp
+public class ContratoValidationEngine
+{
+    public async Task<ValidationResult> ValidarComtratoAsync(
+        NotaFiscal nfe,
+        PedidoCompra pc,
+        Contrato contrato,
+        CancellationToken ct = default)
+    {
+        var resultado = new ValidationResult();
+
+        if (contrato == null)
+        {
+            resultado.Erros.Add("Contrato não vinculado ao pedido");
+            return resultado;
+        }
+
+        // Validar preço
+        var precoContratado = contrato.ObterPreco(pc.CodigoItemFornecedor);
+        if (Math.Abs(nfe.ValorUnitario - precoContratado) > 0.01m)
+        {
+            resultado.Divergencias.Add(new DivergenciaContratual
+            {
+                Campo = "PreçoUnitário",
+                Esperado = precoContratado,
+                Realizado = nfe.ValorUnitario,
+                Severidade = DivergenciaClassificacao.Alta
+            });
+        }
+
+        // Validar prazo de pagamento
+        var prazoContratado = contrato.PrazoPagamento;
+        var prazoNFe = (nfe.DataVencimento - nfe.DataEmissao).Days;
+
+        if (prazoNFe != prazoContratado)
+        {
+            resultado.Divergencias.Add(new DivergenciaContratual
+            {
+                Campo = "PrazoPagamento",
+                Esperado = prazoContratado,
+                Realizado = prazoNFe,
+                Severidade = DivergenciaClassificacao.Media
+            });
+        }
+
+        // Validar descontos
+        if (nfe.PercentualDesconto > contrato.PercentualDescontoMaximo)
+        {
+            resultado.Divergencias.Add(new DivergenciaContratual
+            {
+                Campo = "Desconto",
+                Esperado = contrato.PercentualDescontoMaximo,
+                Realizado = nfe.PercentualDesconto,
+                Mensagem = "Desconto acima do permitido em contrato",
+                Severidade = DivergenciaClassificacao.Alta
+            });
+        }
+
+        // Validar condições especiais (frete, embalagem, etc)
+        await ValidarCondicoesTributariasAsync(nfe, contrato, resultado, ct);
+
+        return resultado;
+    }
+
+    private async Task ValidarCondicoesTributariasAsync(
+        NotaFiscal nfe,
+        Contrato contrato,
+        ValidationResult resultado,
+        CancellationToken ct)
+    {
+        // Exemplo: validar ICMS/IPI conforme Incoterms
+        var incoterm = contrato.Incoterm; // ex: "CIF", "FOB"
+        var aliquotaEsperada = ObterAliquotaPorIncoterm(incoterm, nfe.EstadoDestino);
+
+        if (Math.Abs(nfe.AliquotaICMS - aliquotaEsperada) > 0.01m)
+        {
+            resultado.Divergencias.Add(new DivergenciaContratual
+            {
+                Campo = "AliquotaICMS",
+                Esperado = aliquotaEsperada,
+                Realizado = nfe.AliquotaICMS,
+                Severidade = DivergenciaClassificacao.Media
+            });
+        }
+    }
+
+    private decimal ObterAliquotaPorIncoterm(string incoterm, string estado)
+    {
+        // Buscar em tabela de configuração de ICMS por estado e incoterm
+        return 0.18m; // Exemplo simplificado
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Preço NF-e R$ 100 = Preço Contrato R$ 100, prazo 30 dias conforme contrato
+- Divergência: Preço NF-e R$ 105, contrato R$ 100 (5% acima)
+- Divergência: Desconto 15% em NF-e, contrato permite máximo 10%
+
+---
+
+### RN-FIN-089-05: Detecção Automática de Anomalias com Machine Learning
+
+**Descrição**: Sistema deve utilizar modelo de Machine Learning treinado em histórico de 24 meses para detectar padrões anômalos em faturas. Qualquer fatura com score de anomalia > 0.75 deve ser automaticamente marcada como "Revisar" e notificada.
+
+**Justificativa**: Detecta fraudes, erros de digitação e operações suspeitas; reduz carga manual de análise; melhora conformidade.
+
+**Implementação**:
+```csharp
+public class AnomalyDetectionService
+{
+    private readonly IMLModelService _mlService;
+    private readonly ILogger<AnomalyDetectionService> _logger;
+
+    public async Task<AnomalyScore> DetectarAnomaliaAsync(
+        NotaFiscal nfe,
+        PedidoCompra pc,
+        Fornecedor fornecedor,
+        CancellationToken ct = default)
+    {
+        var features = new Dictionary<string, object>
+        {
+            // Features numéricos
+            { "Valor", nfe.ValorTotal },
+            { "QuantidadeItens", nfe.Itens.Count },
+            { "DiasSemUltimaFatura", (DateTime.Now - fornecedor.DataUltimaFatura).TotalDays },
+            { "DesvioPercentualValor", CalcularDesvioValor(nfe, fornecedor) },
+            { "DesvioPercentualQuantidade", CalcularDesvioQuantidade(nfe, fornecedor) },
+            { "HorarioEmissao", nfe.DataEmissao.Hour },
+            { "DiaSemana", (int)nfe.DataEmissao.DayOfWeek },
+
+            // Features categóricos
+            { "CFOP", nfe.Itens.First().CFOP },
+            { "EstadoDestino", nfe.EstadoDestino },
+            { "FornecedorCNPJ_UltimoDigito", fornecedor.CNPJ.Substring(fornecedor.CNPJ.Length - 1) },
+            { "TipoItem", pc.TipoItem.ToString() }
+        };
+
+        var prediction = await _mlService.PredictAnomalyAsync(
+            "modelo-fraude-faturas",
+            features,
+            ct);
+
+        var score = new AnomalyScore
+        {
+            Valor = prediction.Score,
+            Risco = prediction.Score > 0.75m ? RiscoAnomalia.Alto :
+                    prediction.Score > 0.5m ? RiscoAnomalia.Medio :
+                    RiscoAnomalia.Baixo,
+            Fatores = prediction.TopFeatures.Take(3).ToList(), // Top 3 fatores contribuintes
+            Timestamp = DateTime.UtcNow
+        };
+
+        if (score.Risco == RiscoAnomalia.Alto)
+        {
+            _logger.LogWarning(
+                "Anomalia detectada em NF-e {ChaveNFe}: score {Score}. Fatores: {Fatores}",
+                nfe.ChaveNFe,
+                score.Valor,
+                string.Join(", ", score.Fatores));
+        }
+
+        return score;
+    }
+
+    private decimal CalcularDesvioValor(NotaFiscal nfe, Fornecedor fornecedor)
+    {
+        var mediaHistorica = fornecedor.ObterMediaValorFaturasUltimos12Meses();
+        var desviopadrao = fornecedor.ObterDesviopadraovalorFaturasUltimos12Meses();
+
+        if (desviopadrao == 0) return 0;
+
+        var zScore = (nfe.ValorTotal - mediaHistorica) / desviopadrao;
+        return Math.Abs(zScore);
+    }
+
+    private decimal CalcularDesvioQuantidade(NotaFiscal nfe, Fornecedor fornecedor)
+    {
+        var totalItens = nfe.Itens.Count;
+        var mediaItens = fornecedor.ObterMediaItensUltimas50Faturas();
+
+        return Math.Abs(totalItens - mediaItens) / (mediaItens > 0 ? mediaItens : 1);
+    }
+}
+```
+
+**Exemplos**:
+- Score Alto (0.85): NF-e de fornecedor X com valor 300% acima da média, emitida às 2 AM (score 0.85 - revisar)
+- Score Médio (0.55): NF-e com quantidade 15% acima do esperado, mas dentro de padrão sazonal
+- Score Baixo (0.15): NF-e dentro de todos os padrões históricos do fornecedor
+
+---
+
+### RN-FIN-089-06: Workflow de Aprovação com SLA por Severidade
+
+**Descrição**: Divergências devem passar por workflow de aprovação com roteamento automático conforme severidade. CRÍTICA → Diretor + Controller, ALTA → Manager + Supervisor, MÉDIA → Supervisor, BAIXA → Auto-aprovação após 24h sem ação.
+
+**Justificativa**: Garante que itens críticos sejam revistos por autoridades competentes; reduz bottleneck operacional; automação de baixo risco.
+
+**Implementação**:
+```csharp
+public class DivergenciaWorkflowService
+{
+    public async Task<WorkflowStep> RotearDivergenciaAsync(
+        Divergencia divergencia,
+        EmpresaConfiguracoes config,
+        CancellationToken ct = default)
+    {
+        var roteadores = divergencia.Severidade switch
+        {
+            DivergenciaClassificacao.Critica =>
+                await _usuarioRepository.ObterUsuriosPorRoleAsync("DIRETOR", "CONTROLLER", ct),
+            DivergenciaClassificacao.Alta =>
+                await _usuarioRepository.ObterUsuriosPorRoleAsync("MANAGER", "SUPERVISOR", ct),
+            DivergenciaClassificacao.Media =>
+                await _usuarioRepository.ObterUsuriosPorRoleAsync("SUPERVISOR", ct),
+            DivergenciaClassificacao.Baixa => null, // Auto-aprovação
+            _ => throw new ArgumentException("Severidade inválida")
+        };
+
+        var slaHoras = divergencia.Severidade switch
+        {
+            DivergenciaClassificacao.Critica => 4,
+            DivergenciaClassificacao.Alta => 24,
+            DivergenciaClassificacao.Media => 72,
+            DivergenciaClassificacao.Baixa => 0,
+            _ => 0
+        };
+
+        var step = new WorkflowStep
+        {
+            DivergenciaId = divergencia.Id,
+            TipoAprovacao = TipoAprovacao.Manual,
+            Roteadores = roteadores,
+            DataCriacao = DateTime.UtcNow,
+            DataSLA = DateTime.UtcNow.AddHours(slaHoras),
+            Status = StatusWorkflow.Pendente
+        };
+
+        if (divergencia.Severidade == DivergenciaClassificacao.Baixa)
+        {
+            step.TipoAprovacao = TipoAprovacao.Automatica;
+            step.Status = StatusWorkflow.AutoAprovado;
+            step.DataAcao = DateTime.UtcNow;
+            step.UsuarioAcao = "SISTEMA";
+            step.Justificativa = "Auto-aprovação de divergência baixa";
+        }
+
+        await _workflowRepository.CreateAsync(step, ct);
+
+        if (roteadores?.Any() == true)
+            await NotificarRoteadoresAsync(divergencia, roteadores, ct);
+
+        return step;
+    }
+
+    private async Task NotificarRoteadoresAsync(
+        Divergencia divergencia,
+        List<Usuario> roteadores,
+        CancellationToken ct)
+    {
+        foreach (var usuario in roteadores)
+        {
+            await _notificacaoService.EnviarAsync(
+                usuario.Id,
+                titulo: $"Divergência {divergencia.Severidade} - Fatura {divergencia.ChaveNFe}",
+                mensagem: $"Requer revisão: {divergencia.Descricao}",
+                tipo: TipoNotificacao.Urgente,
+                ct: ct);
+
+            // Enviar também via SignalR para dashboard vivo
+            await _hubContext.Clients
+                .User(usuario.Id)
+                .SendAsync("DivergenciaRoteada", divergencia, cancellationToken: ct);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- CRÍTICA: Roteada para Diretor + Controller, SLA 4h
+- ALTA: Roteada para Manager + Supervisor, SLA 24h
+- MÉDIA: Roteada para Supervisor, SLA 72h
+- BAIXA: Auto-aprovada em 24h, sem necessidade de ação manual
+
+---
+
+### RN-FIN-089-07: Bloqueio de Pagamento Automático em Divergências Críticas
+
+**Descrição**: Qualquer fatura com divergência CRÍTICA ou ALTA não resolvida deve ter seu pagamento automaticamente bloqueado. O sistema deve impedir criar contas a pagar (Boleto, TED, Cartão) enquanto divergência não for aprovada.
+
+**Justificativa**: Previne pagamento de valores incorretos; força resolução de problemas antes de comprometer caixa; reduz necessidade de cancelamento/estorno posterior.
+
+**Implementação**:
+```csharp
+public class PagamentoAutoProhibitionService
+{
+    public async Task<ProhibitionResult> ValidarLiberacaoPagamentoAsync(
+        NotaFiscal nfe,
+        CancellationToken ct = default)
+    {
+        var divergencias = await _divergenciaRepository
+            .GetByNotaFiscalAsync(nfe.Id, ct);
+
+        var divergenciaCritica = divergencias.FirstOrDefault(d =>
+            d.Severidade == DivergenciaClassificacao.Critica &&
+            d.Status != StatusDivergencia.Aprovada);
+
+        if (divergenciaCritica != null)
+        {
+            return ProhibitionResult.Blocked(
+                motivo: $"Divergência crítica pendente: {divergenciaCritica.Descricao}",
+                divergenciaId: divergenciaCritica.Id);
+        }
+
+        var divergenciaAlta = divergencias.FirstOrDefault(d =>
+            d.Severidade == DivergenciaClassificacao.Alta &&
+            d.Status != StatusDivergencia.Aprovada &&
+            !d.CodicionadoEmOutra); // Permite se é dependente de resolução em cascata
+
+        if (divergenciaAlta != null)
+        {
+            return ProhibitionResult.Blocked(
+                motivo: $"Divergência alta pendente: {divergenciaAlta.Descricao}",
+                divergenciaId: divergenciaAlta.Id);
+        }
+
+        return ProhibitionResult.Allowed();
+    }
+
+    public async Task<TransactionResult> AntecipacaoBloqueioAsync(
+        int notaFiscalId,
+        CancellationToken ct = default)
+    {
+        var nfe = await _notaFiscalRepository.GetByIdAsync(notaFiscalId, ct);
+
+        var resultado = await ValidarLiberacaoPagamentoAsync(nfe, ct);
+
+        if (!resultado.Permitido)
+        {
+            // Criar evento de auditoria
+            await _auditService.LogarBloqueioAsync(new BloqueioAuditLog
+            {
+                NotaFiscalId = nfe.Id,
+                ChaveNFe = nfe.ChaveNFe,
+                DataBloqueio = DateTime.UtcNow,
+                Motivo = resultado.Motivo,
+                DivergenciaId = resultado.DivergenciaId,
+                UsuarioSistema = "SISTEMA_BLOQUEIO_AUTOMATICO"
+            }, ct);
+
+            return TransactionResult.Failure(resultado.Motivo);
+        }
+
+        return TransactionResult.Success();
+    }
+}
+```
+
+**Exemplos**:
+- Bloqueado: NF-e com divergência de valor crítica (50% acima) - pagamento impedido até aprovação
+- Bloqueado: NF-e com CFOP inválido (divergência crítica) - necessário correção
+- Permitido: NF-e com divergência de 0,5% (baixa) - pagamento liberado
+
+---
+
+### RN-FIN-089-08: Conciliação Bancária Automática com Detecção de Desvios
+
+**Descrição**: Sistema deve implementar matching automático entre faturas (contas a pagar) e pagamentos em extratos bancários. Deve identificar adiantamentos, atrasos, divergências de valor e pagamentos sem fatura correspondente.
+
+**Justificativa**: Valida fluxo de caixa; detecta erros de pagamento; identifica possíveis fraudes; melhora controle administrativo.
+
+**Implementação**:
+```csharp
+public class ConciliacaoBancariaService
+{
+    public async Task<ConciliationResult> ExecutarConciliaBancariaAsync(
+        List<ContaPagar> contas,
+        List<MovimentacaoBancaria> movimentacoes,
+        ClienteId clienteId,
+        CancellationToken ct = default)
+    {
+        var resultado = new ConciliationResult();
+
+        foreach (var conta in contas)
+        {
+            var pagamentoCorrespondente = movimentacoes
+                .Where(m =>
+                    Math.Abs(m.Valor - conta.ValorTotal) < 0.01m && // Valor compatível
+                    m.Data >= conta.DataVencimento.AddDays(-5) && // Prazo de tolerância
+                    m.Data <= conta.DataVencimento.AddDays(5) &&
+                    !m.ConciliadoComConta) // Não já conciliado
+                .FirstOrDefault();
+
+            if (pagamentoCorrespondente != null)
+            {
+                // Conciliar
+                var conciliacao = new Conciliacao
+                {
+                    ContaPagarId = conta.Id,
+                    MovimentacaoBancariaId = pagamentoCorrespondente.Id,
+                    DataConciliacao = DateTime.UtcNow,
+                    Status = StatusConciliacao.Conciliada,
+                    DesvioValor = 0,
+                    DesvioData = (pagamentoCorrespondente.Data - conta.DataVencimento).Days
+                };
+
+                resultado.ConciliacoesSucesso.Add(conciliacao);
+                pagamentoCorrespondente.ConciliadoComConta = true;
+            }
+            else
+            {
+                // Não encontrou pagamento
+                var desvio = DateTime.Now - conta.DataVencimento;
+
+                if (desvio.TotalDays > 0)
+                {
+                    resultado.ContasEmAtraso.Add(new ContaEmAtraso
+                    {
+                        ContaId = conta.Id,
+                        DatasEmAtraso = (int)desvio.TotalDays,
+                        ValorAtrasoMulta = CalcularMultaPorAtraso(conta.ValorTotal, desvio.TotalDays)
+                    });
+                }
+                else
+                {
+                    resultado.ContasPendentes.Add(conta);
+                }
+            }
+        }
+
+        // Detectar pagamentos sem fatura
+        var pagamentosSemFatura = movimentacoes
+            .Where(m => !m.ConciliadoComConta)
+            .ToList();
+
+        foreach (var pagamento in pagamentosSemFatura)
+        {
+            resultado.PagamentosSemFatura.Add(new PagamentoOrfao
+            {
+                Valor = pagamento.Valor,
+                Data = pagamento.Data,
+                Descricao = pagamento.Descricao,
+                Banco = pagamento.Banco,
+                Sugestoes = await SugerirConciliacaoAsync(pagamento, contas, ct)
+            });
+        }
+
+        return resultado;
+    }
+
+    private decimal CalcularMultaPorAtraso(decimal valor, double diasAtraso)
+    {
+        // Juros de mora: 0.033% ao dia + multa de 2%
+        var juros = valor * (decimal)diasAtraso * 0.00033m;
+        var multa = valor * 0.02m;
+        return Math.Min(juros + multa, valor * 0.20m); // Limite máximo de 20%
+    }
+
+    private async Task<List<SugestáoConciliacao>> SugerirConciliacaoAsync(
+        MovimentacaoBancaria pagamento,
+        List<ContaPagar> contas,
+        CancellationToken ct)
+    {
+        var sugestoes = new List<SugestáoConciliacao>();
+
+        // Sugestão 1: Valor próximo (diferença < 1%)
+        var contaSimilarValor = contas
+            .Where(c => !c.Conciliada &&
+                   Math.Abs(c.ValorTotal - pagamento.Valor) / c.ValorTotal < 0.01m)
+            .OrderBy(c => Math.Abs(c.ValorTotal - pagamento.Valor))
+            .FirstOrDefault();
+
+        if (contaSimilarValor != null)
+            sugestoes.Add(new SugestáoConciliacao
+            {
+                ContaId = contaSimilarValor.Id,
+                Motivo = "Valor similar",
+                Confianca = 0.9m
+            });
+
+        // Sugestão 2: Mesmo fornecedor, mesma data ±5 dias
+        var contaMesmoFornecedor = contas
+            .Where(c => !c.Conciliada &&
+                   c.FornecedorId == pagamento.FornecedorId &&
+                   Math.Abs((c.DataVencimento - pagamento.Data).TotalDays) <= 5)
+            .FirstOrDefault();
+
+        if (contaMesmoFornecedor != null)
+            sugestoes.Add(new SugestáoConciliacao
+            {
+                ContaId = contaMesmoFornecedor.Id,
+                Motivo = "Mesmo fornecedor, data próxima",
+                Confianca = 0.7m
+            });
+
+        return sugestoes;
+    }
+}
+```
+
+**Exemplos**:
+- Conciliado: Conta a pagar R$ 1.000 em 10/01, pagamento de R$ 1.000 em 10/01 (match exato)
+- Atraso: Conta a pagar R$ 1.000 em 10/01, hoje é 25/01 (15 dias de atraso, multa devida)
+- Orfão: Pagamento de R$ 500 sem fatura correspondente, sugerir contas próximas
+
+---
+
+### RN-FIN-089-09: Auditoria Completa com Event Sourcing
+
+**Descrição**: Todas as operações de conciliação, aprovação, rejeição e alteração devem ser registradas em log imutável de auditoria com identificação de usuário, timestamp UTC, hash de integridade, e descrição da mudança.
+
+**Justificativa**: Atende requisitos SOX de auditoria financeira; garante conformidade LGPD; permite investigação de irregularidades; prova integridade de dados.
+
+**Implementação**:
+```csharp
+public class AuditoriaFinanceiraService
+{
+    private readonly IAuditEventRepository _auditRepo;
+    private readonly IHash512Service _hashService;
+
+    public async Task LogarOperacaoAsync(
+        OperacaoFinanceira operacao,
+        Usuario usuario,
+        string descricao,
+        CancellationToken ct = default)
+    {
+        var evento = new AuditoriaEvento
+        {
+            Id = Guid.NewGuid(),
+            Timestamp = DateTime.UtcNow,
+            UsuarioId = usuario.Id,
+            UsuarioNome = usuario.Nome,
+            OperacaoTipo = operacao switch
+            {
+                OperacaoFinanceira.AprovarDivergencia => AuditoriaOperacao.Aprovou,
+                OperacaoFinanceira.RejeitarDivergencia => AuditoriaOperacao.Rejeitou,
+                OperacaoFinanceira.ConciliarFatura => AuditoriaOperacao.Conciliou,
+                OperacaoFinanceira.BloqueiarPagamento => AuditoriaOperacao.Bloqueou,
+                _ => throw new ArgumentException("Operação inválida")
+            },
+            Descricao = descricao,
+            DadosAntes = null, // Será preenchido conforme contexto
+            DadosDepois = null,
+            ClienteId = usuario.ClienteId,
+            IPAddress = "0.0.0.0", // Será obtido de HttpContext
+            UserAgent = "Sistema"
+        };
+
+        // Calcular hash SHA-512 para integridade
+        var conteudo = $"{evento.Timestamp:O}|{evento.UsuarioId}|{evento.OperacaoTipo}|{evento.Descricao}";
+        evento.HashIntegridade = _hashService.GerarSHA512(conteudo);
+
+        await _auditRepo.CreateAsync(evento, ct);
+
+        // Log também em Application Insights para monitoramento
+        _logger.LogInformation(
+            "Auditoria: {Operacao} por {Usuario} em {Timestamp}. Descricao: {Descricao}",
+            evento.OperacaoTipo,
+            usuario.Nome,
+            evento.Timestamp,
+            descricao);
+    }
+
+    public async Task<List<AuditoriaEvento>> ObterTrilhaAsync(
+        int notaFiscalId,
+        CancellationToken ct = default)
+    {
+        var trilha = await _auditRepo
+            .GetByNotaFiscalAsync(notaFiscalId, ct);
+
+        // Validar integridade da trilha
+        foreach (var evento in trilha)
+        {
+            var conteudo = $"{evento.Timestamp:O}|{evento.UsuarioId}|{evento.OperacaoTipo}|{evento.Descricao}";
+            var hashEsperado = _hashService.GerarSHA512(conteudo);
+
+            if (evento.HashIntegridade != hashEsperado)
+            {
+                _logger.LogError(
+                    "Integridade comprometida no evento {EventoId}. Hash esperado: {Esperado}, Hash armazenado: {Armazenado}",
+                    evento.Id,
+                    hashEsperado,
+                    evento.HashIntegridade);
+            }
+        }
+
+        return trilha.OrderBy(e => e.Timestamp).ToList();
+    }
+}
+```
+
+**Exemplos**:
+- Log: "2025-12-28 14:30:00Z | João Silva (usuario123) | APROVOU | Divergência #5 (R$ 500, 2,5%) - Autorizado após revisão"
+- Log: "2025-12-28 15:45:00Z | Sistema | CONCILIOU | Fatura NF-e 35250103123456000106550010000001411234567890 com PC #1234"
+- Trilha íntegra recuperável, com validação de hash em cada acesso
+
+---
+
+### RN-FIN-089-10: Exportação de Relatórios Fiscais com Conformidade SPED
+
+**Descrição**: Sistema deve gerar relatórios de conciliação em formato compatível com SPED Fiscal, incluindo registro E-100, E-200, E-310 para integração com declaração fiscal. Deve permitir exportação em Excel, PDF e JSON para análise.
+
+**Justificativa**: Facilita cumprimento de obrigações fiscais; acelera processo de declaração; reduz retrabalho contábil.
+
+**Implementação**:
+```csharp
+public class RelatorioFiscalExportService
+{
+    public async Task<ExportResult> ExportarSPEDAsync(
+        DateTime dataInicio,
+        DateTime dataFim,
+        ClienteId clienteId,
+        CancellationToken ct = default)
+    {
+        var faturas = await _notaFiscalRepository
+            .GetBetweenDatesAsync(dataInicio, dataFim, clienteId, ct);
+
+        var bloco_e = new SPEDBloco
+        {
+            Numero = "E"
+        };
+
+        // E100 - Identificação do arquivo
+        var e100 = new SPED_E100
+        {
+            CNPJ_Empresa = clienteId.CNPJ,
+            DataInicio = dataInicio,
+            DataFim = dataFim,
+            DataExporta = DateTime.Now
+        };
+        bloco_e.Registros.Add(e100.ToRegistro());
+
+        // E200 - Identificação de NF-e
+        foreach (var fatura in faturas)
+        {
+            var e200 = new SPED_E200
+            {
+                ChaveNFe = fatura.ChaveNFe,
+                DataEmissao = fatura.DataEmissao,
+                FornecedorCNPJ = fatura.FornecedorCNPJ,
+                ValorNota = fatura.ValorTotal,
+                CFOP = fatura.Itens.First().CFOP,
+                ValorTotalICMS = fatura.ValorICMS,
+                ValorTotalIPI = fatura.ValorIPI
+            };
+            bloco_e.Registros.Add(e200.ToRegistro());
+
+            // E310 - Itens da NF-e
+            foreach (var item in fatura.Itens)
+            {
+                var e310 = new SPED_E310
+                {
+                    NumeroItem = item.NumeroSequencial,
+                    CodigoProduto = item.CodigoProduto,
+                    Descricao = item.Descricao,
+                    ValorItem = item.ValorTotal,
+                    ICMS_Aliquota = item.AliquotaICMS,
+                    IPI_Aliquota = item.AliquotaIPI,
+                    ValorICMS = item.ValorICMS,
+                    ValorIPI = item.ValorIPI
+                };
+                bloco_e.Registros.Add(e310.ToRegistro());
+            }
+        }
+
+        // Gerar arquivo SPED
+        var spedContent = GenerarArquivoSPED(bloco_e);
+
+        return new ExportResult
+        {
+            Conteudo = spedContent,
+            MimeType = "text/plain",
+            NomeArquivo = $"SPED_E_{clienteId.CNPJ}_{dataInicio:yyyyMMdd}_{dataFim:yyyyMMdd}.txt"
+        };
+    }
+
+    public async Task<ExportResult> ExportarExcelAsync(
+        DateTime dataInicio,
+        DateTime dataFim,
+        ClienteId clienteId,
+        CancellationToken ct = default)
+    {
+        var faturas = await _notaFiscalRepository
+            .GetBetweenDatesAsync(dataInicio, dataFim, clienteId, ct);
+
+        var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Conciliação");
+
+        // Cabeçalho
+        worksheet.Cell("A1").Value = "CHAVE_NFE";
+        worksheet.Cell("B1").Value = "DATA_EMISSAO";
+        worksheet.Cell("C1").Value = "FORNECEDOR";
+        worksheet.Cell("D1").Value = "VALOR_TOTAL";
+        worksheet.Cell("E1").Value = "STATUS_CONCILIACAO";
+        worksheet.Cell("F1").Value = "DIVERGENCIAS";
+
+        var row = 2;
+        foreach (var fatura in faturas)
+        {
+            var divergencias = await _divergenciaRepository
+                .GetByNotaFiscalAsync(fatura.Id, ct);
+
+            worksheet.Cell($"A{row}").Value = fatura.ChaveNFe;
+            worksheet.Cell($"B{row}").Value = fatura.DataEmissao;
+            worksheet.Cell($"C{row}").Value = fatura.FornecedorNome;
+            worksheet.Cell($"D{row}").Value = fatura.ValorTotal;
+            worksheet.Cell($"E{row}").Value = fatura.StatusConciliacao.ToString();
+            worksheet.Cell($"F{row}").Value = string.Join("; ",
+                divergencias.Select(d => $"{d.Tipo}({d.Severidade})"));
+
+            row++;
+        }
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+
+        return new ExportResult
+        {
+            Conteudo = stream.ToArray(),
+            MimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            NomeArquivo = $"Relatorio_Conciliacao_{dataInicio:yyyyMMdd}_{dataFim:yyyyMMdd}.xlsx"
+        };
+    }
+
+    private string GenerarArquivoSPED(SPEDBloco bloco)
+    {
+        var sb = new StringBuilder();
+
+        foreach (var registro in bloco.Registros)
+        {
+            sb.AppendLine(registro.ToSPEDFormat());
+        }
+
+        return sb.ToString();
+    }
+}
+```
+
+**Exemplos**:
+- Exportação SPED: Arquivo .txt com registros E100/E200/E310 pronto para ECAC
+- Exportação Excel: Planilha com todas as faturas, status de conciliação e divergências
+- Exportação JSON: Dados estruturados para sistemas terceiros
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IC1_Producao` (SQL Server 2019)
+
+**Tabela Principal**: `dbo.tblNotaFiscalEletronica`
+```sql
+CREATE TABLE [dbo].[tblNotaFiscalEletronica](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [ChaveNFe] [varchar](44) NOT NULL,
+    [NumeroNFe] [int] NOT NULL,
+    [SerieNFe] [int] NOT NULL,
+    [DataEmissao] [datetime] NOT NULL,
+    [DataRecebimento] [datetime] NULL,
+    [FornecedorCNPJ] [varchar](14) NOT NULL,
+    [FornecedorRazaoSocial] [varchar](150) NOT NULL,
+    [ClienteCNPJ] [varchar](14) NOT NULL,
+    [ClienteRazaoSocial] [varchar](150) NOT NULL,
+    [ValorTotal] [decimal](15,2) NOT NULL,
+    [ValorICMS] [decimal](15,2) NULL,
+    [ValorIPI] [decimal](15,2) NULL,
+    [ValorFrete] [decimal](15,2) NULL,
+    [PercentualDesconto] [decimal](5,2) NULL,
+    [ValorDesconto] [decimal](15,2) NULL,
+    [StatusConciliacao] [varchar](20) NOT NULL DEFAULT 'NaoConciliada',
+    [PedidoCompraId] [int] NULL,
+    [ContratoId] [int] NULL,
+    [DataCriacao] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    [UsuarioCriacao] [varchar](100) NOT NULL,
+    [DataAlteracao] [datetime] NULL,
+    [UsuarioAlteracao] [varchar](100) NULL,
+    CONSTRAINT [PK_tblNotaFiscalEletronica] PRIMARY KEY CLUSTERED ([Id] ASC),
+    CONSTRAINT [UQ_ChaveNFe] UNIQUE NONCLUSTERED ([ChaveNFe] ASC),
+    CONSTRAINT [FK_NotaFiscal_PedidoCompra] FOREIGN KEY ([PedidoCompraId])
+        REFERENCES [dbo].[tblPedidoCompra]([Id])
+)
+```
+
+**Tabelas Relacionadas**:
+```sql
+-- Itens da NF-e
+CREATE TABLE [dbo].[tblNotaFiscalEletronicaItem](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [NotaFiscalId] [int] NOT NULL,
+    [NumeroSequencial] [int] NOT NULL,
+    [CodigoProduto] [varchar](30) NOT NULL,
+    [Descricao] [varchar](250) NOT NULL,
+    [QuantidadeFaturada] [decimal](15,4) NOT NULL,
+    [ValorUnitario] [decimal](15,2) NOT NULL,
+    [ValorTotal] [decimal](15,2) NOT NULL,
+    [CFOP] [varchar](4) NOT NULL,
+    [AliquotaICMS] [decimal](5,2) NULL,
+    [AliquotaIPI] [decimal](5,2) NULL,
+    [ValorICMS] [decimal](15,2) NULL,
+    [ValorIPI] [decimal](15,2) NULL,
+    CONSTRAINT [PK_tblNotaFiscalEletronicaItem] PRIMARY KEY CLUSTERED ([Id] ASC),
+    CONSTRAINT [FK_Item_NotaFiscal] FOREIGN KEY ([NotaFiscalId])
+        REFERENCES [dbo].[tblNotaFiscalEletronica]([Id]) ON DELETE CASCADE
+)
+
+-- Divergências
+CREATE TABLE [dbo].[tblDivergenciaFatura](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [NotaFiscalId] [int] NOT NULL,
+    [PedidoCompraId] [int] NULL,
+    [TipoDivergencia] [varchar](50) NOT NULL,
+    [Descricao] [nvarchar](500) NOT NULL,
+    [ValorDivergencia] [decimal](15,2) NOT NULL,
+    [Severidade] [varchar](20) NOT NULL,
+    [StatusDivergencia] [varchar](20) NOT NULL DEFAULT 'Pendente',
+    [DataDeteccao] [datetime] NOT NULL,
+    [DataResolucao] [datetime] NULL,
+    [UsuarioResolucao] [varchar](100) NULL,
+    [JustificativaResolucao] [nvarchar](500) NULL,
+    CONSTRAINT [PK_tblDivergenciaFatura] PRIMARY KEY CLUSTERED ([Id] ASC),
+    CONSTRAINT [FK_Divergencia_NotaFiscal] FOREIGN KEY ([NotaFiscalId])
+        REFERENCES [dbo].[tblNotaFiscalEletronica]([Id])
+)
+
+-- Matching de documentos
+CREATE TABLE [dbo].[tblMatchingDocumentos](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [NotaFiscalId] [int] NOT NULL,
+    [PedidoCompraId] [int] NULL,
+    [RecebimentoMercadoriaId] [int] NULL,
+    [StatusMatching] [varchar](20) NOT NULL,
+    [PercentualConcordancia] [decimal](5,2) NOT NULL,
+    [DataMatching] [datetime] NOT NULL,
+    CONSTRAINT [PK_tblMatchingDocumentos] PRIMARY KEY CLUSTERED ([Id] ASC)
+)
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descrição | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `ChaveNFe` | Chave de 44 dígitos da NF-e | Identificador único, índice para busca |
+| `StatusConciliacao` | Valores: NaoConciliada, ConciliadaParcial, Conciliada | Mapeado para enum StatusConciliacao |
+| `PedidoCompraId` | FK para pedido | Vinculação com RF-032 |
+| `ContratoId` | FK para contrato | Vinculação com RF-023 |
+| `TipoDivergencia` | Valores: ValorDiferente, QuantidadeDiferente, CFOPInvalido, etc | Enum TipoDivergencia |
+| `Severidade` | Valores: Baixa, Media, Alta, Critica | Enum DivergenciaClassificacao |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `pa_ConciliarNotaFiscal` | Executa matching NF-e vs PC vs RM | Migrard para engine CSharp (ThreeWayMatchingEngine) |
+| `pa_DetectarDivergencias` | Identifica divergências | Migrared para DivergenciaClassifier + ML |
+| `pa_GerarRelatorioFiscal` | Gera relatório de conciliação | Migrado para RelatorioFiscalExportService |
+| `pa_ValidarCFOP` | Valida CFOP da NF-e | Migrado para validação em Command Handler |
+| `pa_AtualizarStatusDivergencia` | Aprova/rejeita divergência | Migrado para DivergenciaWorkflowService |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `ConciliacaoNFe.aspx` | Tela principal de conciliação | `/financial/reconciliation/invoices` (Angular) |
+| `DivergenciasAprovacao.aspx` | Workflow de aprovação de divergências | `/financial/reconciliation/discrepancies` |
+| `RelatorioFiscal.aspx` | Geração de relatórios | `/financial/reconciliation/reports` |
+| `ConciliaBancaria.aspx` | Matching fatura vs pagamento | `/financial/reconciliation/banking` |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSNotaFiscal.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ObterNotaFiscal(id)` | Busca NF-e por ID | `GET /api/invoices/{id}` |
+| `ListarNotasFiscais(filtro)` | Lista NFs com filtros | `GET /api/invoices` |
+| `ConciliarNFe(nfeId, pcId)` | Executa matching | `POST /api/invoices/{id}/reconcile` |
+| `AprovaDivergencia(divId, justificativa)` | Aprova divergência | `PUT /api/discrepancies/{id}/approve` |
+| `RejeitaDivergencia(divId, justificativa)` | Rejeita divergência | `PUT /api/discrepancies/{id}/reject` |
+| `ExportarRelatorio(filtro)` | Exporta dados | `GET /api/reports/export` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `FIN_CONCILIACAO_AUTOMATICA`
+
+**Configuração**:
+```json
+{
+    "featureKey": "FIN_CONCILIACAO_AUTOMATICA",
+    "nome": "Conciliação Automática de Faturas",
+    "descricao": "Ativa matching automático de NF-e com PC e RM via Hangfire",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "modulo": "FINANCEIRO"
+}
+```
+
+**FeatureKey**: `FIN_DETECCAO_ANOMALIAS`
+
+**Configuração**:
+```json
+{
+    "featureKey": "FIN_DETECCAO_ANOMALIAS",
+    "nome": "Detecção de Anomalias com ML",
+    "descricao": "Ativa análise de padrões suspeitos usando modelo Azure ML",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "modulo": "FINANCEIRO"
+}
+```
+
+**FeatureKey**: `FIN_CONCILIACAO_BANCARIA`
+
+**Configuração**:
+```json
+{
+    "featureKey": "FIN_CONCILIACAO_BANCARIA",
+    "nome": "Conciliação Bancária",
+    "descricao": "Ativa matching automático entre faturas e pagamentos",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "modulo": "FINANCEIRO"
+}
+```
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Tradução**:
+
+```json
+{
+    "financeiro": {
+        "conciliacao": {
+            "titulo": "Conciliação de Faturas",
+            "formulario": {
+                "chaveNFe": "Chave da NF-e",
+                "fornecedor": "Fornecedor",
+                "valorTotal": "Valor Total",
+                "statusConciliacao": "Status de Conciliação",
+                "dataEmissao": "Data de Emissão"
+            },
+            "validacao": {
+                "chaveNFeInvalida": "Chave NF-e deve ter 44 dígitos",
+                "fornecedorObrigatorio": "Fornecedor é obrigatório",
+                "valorMenorZero": "Valor deve ser maior que zero"
+            },
+            "mensagens": {
+                "conciliacaoSucesso": "Fatura conciliada com sucesso",
+                "divergenciaDetectada": "Divergência detectada: {{tipo}}",
+                "bloqueioAuto": "Pagamento bloqueado automaticamente",
+                "anomaliaDetectada": "Anomalia detectada com score {{score}}"
+            },
+            "divergencias": {
+                "severidadeCritica": "Crítica",
+                "severidadeAlta": "Alta",
+                "severidadeMedia": "Média",
+                "severidadeBaixa": "Baixa",
+                "valordiferen": "Valor diferente",
+                "quantidadediferente": "Quantidade diferente",
+                "cfofinvalido": "CFOP inválido"
+            },
+            "relatorios": {
+                "titulo": "Relatórios Fiscais",
+                "exportarSPED": "Exportar SPED",
+                "exportarExcel": "Exportar Excel",
+                "exportarPDF": "Exportar PDF",
+                "periodo": "Período"
+            }
+        },
+        "conciliacao_bancaria": {
+            "titulo": "Conciliação Bancária",
+            "contasAReceber": "Contas a Receber",
+            "contasAPagar": "Contas a Pagar",
+            "movimentacoes": "Movimentações Bancárias",
+            "status": {
+                "conciliada": "Conciliada",
+                "nao_conciliada": "Não Conciliada",
+                "em_atraso": "Em Atraso",
+                "adiantada": "Adiantada"
+            }
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|----------|--------|-------------------|
+| Conciliação de fatura | `FIN_FATURA_CONCILIADA` | ChaveNFe, Valores, Status Anterior, Status Novo |
+| Aprovação de divergência | `FIN_DIVERGENCIA_APROVADA` | ID Divergência, Justificativa, Usuário |
+| Rejeição de divergência | `FIN_DIVERGENCIA_REJEITADA` | ID Divergência, Motivo, Usuário |
+| Bloqueio de pagamento | `FIN_FATURA_BLOQUEADA` | ChaveNFe, Motivo do Bloqueio, Divergência |
+| Matching automático | `FIN_MATCHING_EXECUTADO` | Documentos vinculados, Resultado, Score |
+| Anomalia detectada | `FIN_ANOMALIA_DETECTADA` | ChaveNFe, Score, Fatores |
+
+**Retenção**: 7 anos (conforme Lei da Contabilidade, Código Civil Art. 406)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis |
+|-----------|-----------|--------|
+| `fin:fatura:read` | Visualizar faturas | CONSULTOR, SUPERVISOR, GERENTE, DIRETOR |
+| `fin:fatura:update` | Editar fatura | SUPERVISOR, GERENTE, DIRETOR |
+| `fin:fatura:delete` | Excluir fatura | DIRETOR, AUDITOR |
+| `fin:conciliacao:criar` | Criar conciliação | SUPERVISOR, GERENTE, DIRETOR |
+| `fin:conciliacao:aprovar_baixa` | Aprovar divergência BAIXA | SUPERVISOR, GERENTE |
+| `fin:conciliacao:aprovar_media` | Aprovar divergência MÉDIA | GERENTE, DIRETOR |
+| `fin:conciliacao:aprovar_alta` | Aprovar divergência ALTA | DIRETOR, CONTROLLER |
+| `fin:conciliacao:aprovar_critica` | Aprovar divergência CRÍTICA | DIRETOR |
+| `fin:bloqueio:desbloquear` | Desbloquear fatura para pagamento | DIRETOR, CONTROLLER |
+| `fin:relatorio:exportar` | Exportar relatórios | CONSULTOR, SUPERVISOR, GERENTE, DIRETOR |
+| `fin:auditoria:visualizar` | Visualizar auditoria | AUDITOR, DIRETOR |
+
+**Nota**: Permissões são combinadas com ClienteId (multi-tenancy). Usuário só vê dados do seu cliente.
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/v1/invoices` | Listar notas fiscais com paginação | `fin:fatura:read` |
+| GET | `/api/v1/invoices/{id}` | Obter detalhes de uma NF-e | `fin:fatura:read` |
+| POST | `/api/v1/invoices` | Criar/importar nova NF-e | `fin:fatura:create` |
+| PUT | `/api/v1/invoices/{id}` | Atualizar dados de NF-e | `fin:fatura:update` |
+| DELETE | `/api/v1/invoices/{id}` | Excluir NF-e (apenas rascunhos) | `fin:fatura:delete` |
+
+### 5.2 Operações Especiais
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| POST | `/api/v1/invoices/{id}/reconcile` | Executar matching/conciliação | `fin:conciliacao:criar` |
+| POST | `/api/v1/invoices/{id}/reconcile/three-way` | Executar three-way matching | `fin:conciliacao:criar` |
+| GET | `/api/v1/invoices/{id}/discrepancies` | Listar divergências de uma fatura | `fin:fatura:read` |
+| PUT | `/api/v1/discrepancies/{id}/approve` | Aprovar divergência | `fin:conciliacao:aprovar_*` |
+| PUT | `/api/v1/discrepancies/{id}/reject` | Rejeitar divergência | `fin:conciliacao:aprovar_*` |
+| POST | `/api/v1/invoices/{id}/block` | Bloquear fatura para pagamento | `fin:bloqueio:bloquear` |
+| POST | `/api/v1/invoices/{id}/unblock` | Desbloquear fatura | `fin:bloqueio:desbloquear` |
+| GET | `/api/v1/invoices/anomalies` | Listar faturas com anomalia detectada | `fin:fatura:read` |
+| POST | `/api/v1/reconciliation/banking` | Executar conciliação bancária | `fin:conciliacao:criar` |
+| GET | `/api/v1/reconciliation/banking/unmatched` | Listar pagamentos sem fatura | `fin:fatura:read` |
+| GET | `/api/v1/reports/fiscal/export` | Exportar relatório SPED | `fin:relatorio:exportar` |
+| GET | `/api/v1/reports/reconciliation/excel` | Exportar conciliação em Excel | `fin:relatorio:exportar` |
+| GET | `/api/v1/audit-trail/{notaFiscalId}` | Obter trilha de auditoria | `fin:auditoria:visualizar` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Conciliação Automática (Two-Way Matching)
+
+```
+NF-e recebida (RF-032)
+    |
+    v
+Validar estrutura e CHAVE_NFe
+    |
+    v
+[CHAVE válida?] --NÃO--> Erro: CHAVE_NFE inválida
+    |SIM
+    v
+Buscar Pedido de Compra relacionado
+    |
+    v
+[PC encontrado?] --NÃO--> Erro: Pedido não encontrado
+    |SIM
+    v
+Executar Two-Way Matching
+    +---> Validar Fornecedor: NF-e.Fornecedor = PC.Fornecedor?
+    +---> Validar Valor: |NF-e.Valor - PC.Valor| <= Tolerância?
+    +---> Validar Quantidade: |NF-e.Qtde - PC.Qtde| <= Tolerância?
+    +---> Validar Datas: NF-e.Data >= PC.Data?
+    |
+    v
+[Todos os validadores passam?] --SIM--> Marcar como "Conciliada"
+    |                                        |
+    |NÃO                                      v
+    v                                  Notificar (SignalR)
+Classificar Divergências             Dashboard atualizado
+    |
+    v
+Roteamento automático (SLA)
+    |
+    v
+Notificar (E-mail + SignalR)
+    |
+    v
+Aguardar aprovação manual
+```
+
+### 6.2 Fluxo de Three-Way Matching
+
+```
+NF-e recebida
+    |
+    v
+Two-Way Matching (NF-e vs PC)
+    |
+    v
+[Passou?] --NÃO--> Bloquear e classificar divergência
+    |SIM
+    v
+Buscar Recebimento de Mercadoria (RM)
+    |
+    v
+[RM encontrado?] --NÃO--> Warnings: "Fatura sem recebimento registrado"
+    |SIM
+    v
+Validar quantidade RM vs NF-e
+    +---> Validar quantidade RM vs PC
+    +---> Validar cronologia: PC.Data <= RM.Data <= NF-e.Data
+    |
+    v
+[Todos validadores?] --SIM--> "Three-Way Conciliada"
+    |NÃO
+    v
+Classificar divergências
+    |
+    v
+Roteamento
+```
+
+### 6.3 Fluxo de Detecção de Anomalias
+
+```
+NF-e em processamento
+    |
+    v
+Feature Engineering (15 features)
+    |
+    v
+Chamar modelo Azure ML
+    |
+    v
+Score retornado: 0.0 a 1.0
+    |
+    v
+[Score > 0.75?] --SIM--> RiscoAlto
+    |                        |
+    |                        v
+    |                   Marcar como "Revisar"
+    |                        |
+    |                        v
+    |                   Notificar gestor imediatamente (SignalR)
+    |                        |
+    |                        v
+    |                   Bloquear pagamento
+    |
+    |[0.50 < Score <= 0.75?] --SIM--> RiscoMedio
+    |                                  Alocar para supervisor
+    |
+    |[Score <= 0.50?] --SIM--> RiscoB
+    |
+    v
+Prosseguir com workflow normal
+```
+
+### 6.4 Fluxo de Workflow de Aprovação
+
+```
+Divergência criada
+    |
+    v
+Classificar severidade
+    |
+    v
+[CRÍTICA?] --SIM--> Roteadores: Diretor + Controller, SLA 4h
+    |
+    |[ALTA?] --SIM--> Roteadores: Manager + Supervisor, SLA 24h
+    |
+    |[MÉDIA?] --SIM--> Roteador: Supervisor, SLA 72h
+    |
+    |[BAIXA?] --SIM--> Auto-aprovação após 24h
+    |                  (nenhuma ação necessária)
+    |
+    v
+Notificar via SignalR + E-mail
+    |
+    v
+Roteador acessa dashboard
+    |
+    v
+Revisar descrição + justificativa
+    |
+    v
+[Aprovado?] --SIM--> Marcar divergência como APROVADA
+    |                   |
+    |NÃO                v
+    v            Desbloquear fatura para pagamento
+Marcar como REJEITADA
+    |
+    v
+Registrar auditoria com hash
+    |
+    v
+Notificar back-office
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição |
+|----------|-----------|
+| **RBAC Multi-Nível** | Controle fino com 8 níveis de aprovação conforme severidade |
+| **Bloqueio de Pagamento Automático** | Impede criação de conta a pagar em divergências críticas/altas |
+| **Validação de CHAVE_NFe** | 44 dígitos obrigatórios, validação de dígito verificador |
+| **Matching de Múltiplos Campos** | Exige correspondência de Fornecedor, Cliente, Valor, Quantidade e Datas |
+| **Event Sourcing** | Registra imutável de todas as operações com hash SHA-512 |
+| **Criptografia de Dados Sensíveis** | CNPJ, valores, dados bancários criptografados em repouso |
+| **Validação de CFOP** | Validação contra tabela de CFOP válidos conforme tipo de operação |
+| **Detecção de Anomalias ML** | Identifica padrões suspeitos automaticamente |
+| **Notificações em Tempo Real** | SignalR para alertas críticos, impede omissão de eventos |
+| **Conformidade LGPD** | Retenção configurável, direito ao esquecimento, anonimização |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] SQL Injection em campos de busca (CHAVE_NFe, CNPJ)
+- [ ] XSS em campos de texto (Descricao, Justificativa)
+- [ ] CSRF Protection em operações de aprovação
+- [ ] Validação de permissões (RBAC bypass)
+- [ ] Bloqueio de pagamento honrado em todos os fluxos
+- [ ] Integridade de auditoria (validação de hash)
+- [ ] Força bruta em APIs de matching
+- [ ] Vazamento de dados sensíveis em logs
+- [ ] Validação de CHAVE_NFe em duplicação
+- [ ] Conformidade SPED em exportações
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medição |
+|-----|------|---------|
+| Taxa de Conciliação Automática | >= 85% | (Faturas conciliadas auto / Total) / dia |
+| Tempo Médio de Conciliação | < 2 horas | Do recebimento da NF-e até conciliação completa |
+| Taxa de Divergências Críticas | < 2% | (Divergências críticas / Total) / mês |
+| SLA de Aprovação (CRÍTICA) | 4 horas | % que cumprem SLA |
+| SLA de Aprovação (ALTA) | 24 horas | % que cumprem SLA |
+| Taxa de Anomalias Detectadas | >= 95% | (Anomalias detectadas / Total suspeitas reais) |
+| Tempo de Resolução Divergência | < 5 dias | Média dias até aprovação/rejeição |
+| Acurácia ML | >= 92% | Validação contra classificação manual |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| SLA Divergência Crítica | SLA_HORAS > 4 | Escalar para Diretor imediatamente |
+| Fatura Bloqueada > 15 dias | COUNT(*) WHERE bloqueada=true AND dias > 15 | Revisar com Financial Manager |
+| Taxa Anomalia Alta | Score_medio > 0.65 | Retreinar modelo ML |
+| Conciliação Bancária Desbalanceada | |Recebido - Pago| > 1% de receita/mês | Auditoria de contas |
+| Tentativa Bypass Bloqueio | unauthorized_payment_attempt = true | Registrar em Security Log, Notificar CISO |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-089](./MD-089-Conciliacao-Auditoria-Faturas.md) com DDL completo, índices, constraints
+2. **Casos de Uso**: Criar [UC-089](./UC-089-Conciliacao-Auditoria-Faturas.md) com 5+ cenários de conciliação
+3. **Implementação Backend**: Commands/Queries/Handlers, CQRS, agregados
+4. **Implementação Frontend**: Telas Angular (Dashboard, Detalhes, Aprovação, Relatórios)
+5. **Testes**: Executar cenários E2E com dados reais do legado
+6. **Machine Learning**: Treinar modelo em Azure ML com histórico 24 meses
+7. **Integração RF-032**: Garantir que NF-e importadas acionam matching automático
+8. **Integração RF-023**: Validar termos contratuais antes de aprovação
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versão inicial - Especificação completa do módulo RF-089 | Sistema |
+
+---
+
+**Última Atualização**: 2025-12-28 15:45 UTC
+**Autor**: Claude Code (Sistema de Documentação)
+**Revisão**: Pendente de validação com stakeholders financeiros
+
+---
+
+## Resumo de Cobertura
+
+Este documento RF-089 possui:
+- **1.200+ linhas** de especificação técnica
+- **10 regras de negócio** completas com exemplos e código
+- **4 fluxos principais** documentados em ASCII art
+- **13 endpoints API** REST bem definidos
+- **4 integrações obrigatórias** (Feature Flags, i18n, Auditoria, RBAC)
+- **8 KPIs e 5 alertas** para monitoramento
+- **Conformidade fiscal** (SPED, NF-e, CTe)
+- **Conformidade legal** (SOX, LGPD, Código Civil)
+- **Padrão de modernização** legado → .NET 10 + Angular 19
+- **Multi-tenancy** com ClienteId em todas as operações
+
+Pronto para início de contrato de documentação UC/MD/WF.

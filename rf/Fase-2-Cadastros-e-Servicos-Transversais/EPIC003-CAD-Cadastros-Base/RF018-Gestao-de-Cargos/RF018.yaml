@@ -1,0 +1,326 @@
+# RF018 - Gestão de Cargos (Estruturado v2.0)
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf:
+  id: "RF018"
+  nome: "Gestão de Cargos"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 2 - Cadastros e Serviços Transversais"
+  epic: "EPIC003-CAD-Cadastros-Base"
+  status: "aprovado"
+
+descricao:
+  objetivo: "Cadastrar, manter e controlar a estrutura organizacional relacionada a cargos, hierarquias, alçadas de aprovação e competências."
+  problema_resolvido: "Organização estrutural da empresa com hierarquia de reporte, alçadas, competências e faixas salariais."
+  publico_afetado: "RH, Gestores, Diretores, Colaboradores (consulta)."
+
+escopo:
+  incluso:
+    - "CRUD de cargos"
+    - "Hierarquia organizacional (árvore)"
+    - "Alçadas de aprovação por cargo"
+    - "Matriz de competências"
+    - "Faixas salariais"
+    - "Centro de custo padrão"
+    - "Perfil de sistema sugerido"
+    - "Auditoria LGPD (7 anos)"
+    - "Validação de ciclos em hierarquia"
+    - "Validação de alçada monotônica crescente"
+    - "Exportação de estrutura organizacional"
+  fora:
+    - "Sincronização com Active Directory (RF separado)"
+    - "Integração com folha de pagamento (RF separado)"
+    - "Layout ou UX específicos"
+
+entidades:
+  - nome: "Cargo"
+    descricao: "Posição ocupada por colaboradores na organização"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF018-001"
+    descricao: "Código de cargo único por conglomerado (multi-tenancy)"
+    tipo: "unicidade"
+    campos_afetados: ["Codigo", "ClienteId"]
+    obrigatorio: true
+
+  - id: "RN-RF018-002"
+    descricao: "Nome de cargo obrigatório (3-150 caracteres)"
+    tipo: "validacao"
+    campos_afetados: ["Nome"]
+    obrigatorio: true
+
+  - id: "RN-RF018-003"
+    descricao: "Hierarquia sem ciclos (validação de grafo)"
+    tipo: "regra_negocio"
+    campos_afetados: ["IdCargoSuperior"]
+    obrigatorio: true
+
+  - id: "RN-RF018-004"
+    descricao: "Alçada de aprovação monótona crescente (supervisor >= subordinado)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Alcada", "IdCargoSuperior"]
+    obrigatorio: true
+
+  - id: "RN-RF018-005"
+    descricao: "Cargo não pode ser deletado se tiver ocupantes ativos"
+    tipo: "regra_negocio"
+    campos_afetados: ["FlAtivo", "FlExcluido"]
+    obrigatorio: true
+
+  - id: "RN-RF018-006"
+    descricao: "Centro de custo padrão deve existir e estar ativo"
+    tipo: "validacao"
+    campos_afetados: ["IdCentroCustoPadrao"]
+    obrigatorio: true
+
+  - id: "RN-RF018-007"
+    descricao: "Competência requerida deve ser válida (nível 1-5)"
+    tipo: "validacao"
+    campos_afetados: ["IdCompetencia", "NivelRequerido"]
+    obrigatorio: true
+
+  - id: "RN-RF018-008"
+    descricao: "Faixa salarial com validação de ordem (Piso < Teto, >= salário mínimo)"
+    tipo: "validacao"
+    campos_afetados: ["Piso", "Teto"]
+    obrigatorio: true
+
+  - id: "RN-RF018-009"
+    descricao: "Perfil de sistema sugerido não é obrigatório (opcional)"
+    tipo: "validacao"
+    campos_afetados: ["IdPerfilSugerido"]
+    obrigatorio: false
+
+  - id: "RN-RF018-010"
+    descricao: "Auditoria de todas as mudanças (CREATE, UPDATE, DELETE)"
+    tipo: "seguranca"
+    campos_afetados: ["*"]
+    obrigatorio: true
+
+  - id: "RN-RF018-011"
+    descricao: "Isolamento por tenant (ClienteId em todas as operações)"
+    tipo: "seguranca"
+    campos_afetados: ["ClienteId"]
+    obrigatorio: true
+
+  - id: "RN-RF018-012"
+    descricao: "Permissões RBAC obrigatórias para cada operação"
+    tipo: "seguranca"
+    campos_afetados: ["*"]
+    obrigatorio: true
+
+estados:
+  - id: "Ativo"
+    descricao: "Cargo disponível para uso"
+  - id: "Inativo"
+    descricao: "Cargo inativado (soft delete)"
+  - id: "Excluido"
+    descricao: "Cargo excluído logicamente (FlExcluido = true)"
+
+transicoes:
+  permitidas:
+    - de: "Ativo"
+      para: "Inativo"
+    - de: "Inativo"
+      para: "Ativo"
+    - de: "Ativo"
+      para: "Excluido"
+    - de: "Inativo"
+      para: "Excluido"
+  proibidas:
+    - de: "Excluido"
+      para: "Ativo"
+    - de: "Excluido"
+      para: "Inativo"
+
+permissoes:
+  - codigo: "cargos:cargo:listar"
+    descricao: "Listar cargos"
+  - codigo: "cargos:cargo:visualizar"
+    descricao: "Visualizar cargo"
+  - codigo: "cargos:cargo:criar"
+    descricao: "Criar cargo"
+  - codigo: "cargos:cargo:editar"
+    descricao: "Editar cargo"
+  - codigo: "cargos:cargo:inativar"
+    descricao: "Inativar cargo"
+  - codigo: "cargos:hierarquia:visualizar"
+    descricao: "Visualizar organograma"
+  - codigo: "cargos:hierarquia:editar"
+    descricao: "Editar hierarquia"
+  - codigo: "cargos:competencia:editar"
+    descricao: "Gerenciar competências"
+  - codigo: "cargos:faixasalarial:editar"
+    descricao: "Alterar faixas salariais"
+  - codigo: "cargos:relatorios:gerar"
+    descricao: "Gerar relatórios"
+  - codigo: "cargos:relatorios:exportar"
+    descricao: "Exportar dados"
+
+integracoes:
+  internas:
+    - "Autenticacao (JWT)"
+    - "Multi-Tenancy (ClienteId)"
+    - "Auditoria (Audit.NET)"
+    - "Feature Flags (CAD_CARGOS)"
+    - "i18n (cadastros.cargos)"
+    - "RBAC (Permissions)"
+  externas: []
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  retencao_auditoria_dias: 2555  # 7 anos (LGPD)
+
+endpoints:
+  - metodo: "GET"
+    rota: "/api/v1/cargos"
+    descricao: "Listar cargos com paginação"
+    permissao: "cargos:cargo:listar"
+  - metodo: "GET"
+    rota: "/api/v1/cargos/{id}"
+    descricao: "Obter cargo por ID"
+    permissao: "cargos:cargo:visualizar"
+  - metodo: "POST"
+    rota: "/api/v1/cargos"
+    descricao: "Criar novo cargo"
+    permissao: "cargos:cargo:criar"
+  - metodo: "PUT"
+    rota: "/api/v1/cargos/{id}"
+    descricao: "Atualizar cargo"
+    permissao: "cargos:cargo:editar"
+  - metodo: "DELETE"
+    rota: "/api/v1/cargos/{id}"
+    descricao: "Inativar cargo"
+    permissao: "cargos:cargo:inativar"
+  - metodo: "GET"
+    rota: "/api/v1/cargos/hierarquia/arvore"
+    descricao: "Árvore organizacional"
+    permissao: "cargos:hierarquia:visualizar"
+  - metodo: "GET"
+    rota: "/api/v1/cargos/{id}/subordinados"
+    descricao: "Subordinados diretos"
+    permissao: "cargos:hierarquia:visualizar"
+  - metodo: "PUT"
+    rota: "/api/v1/cargos/{id}/hierarquia"
+    descricao: "Alterar supervisor"
+    permissao: "cargos:hierarquia:editar"
+  - metodo: "GET"
+    rota: "/api/v1/cargos/{id}/competencias"
+    descricao: "Competências requeridas"
+    permissao: "cargos:competencia:editar"
+  - metodo: "POST"
+    rota: "/api/v1/cargos/{id}/competencias"
+    descricao: "Adicionar competência"
+    permissao: "cargos:competencia:editar"
+  - metodo: "DELETE"
+    rota: "/api/v1/cargos/{id}/competencias/{idComp}"
+    descricao: "Remover competência"
+    permissao: "cargos:competencia:editar"
+  - metodo: "GET"
+    rota: "/api/v1/cargos/{id}/faixa-salarial"
+    descricao: "Histórico de faixas"
+    permissao: "cargos:faixasalarial:editar"
+  - metodo: "POST"
+    rota: "/api/v1/cargos/{id}/faixa-salarial"
+    descricao: "Nova faixa salarial"
+    permissao: "cargos:faixasalarial:editar"
+  - metodo: "GET"
+    rota: "/api/v1/cargos/{id}/ocupantes"
+    descricao: "Colaboradores neste cargo"
+    permissao: "cargos:cargo:visualizar"
+  - metodo: "POST"
+    rota: "/api/v1/cargos/exportar"
+    descricao: "Exportar Excel/CSV"
+    permissao: "cargos:relatorios:exportar"
+  - metodo: "GET"
+    rota: "/api/v1/cargos/validar-codigo/{codigo}"
+    descricao: "Validar código único"
+    permissao: "publico"
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-listar-cargos"
+    - "UC01-criar-cargo"
+    - "UC02-visualizar-cargo"
+    - "UC03-editar-cargo"
+    - "UC04-inativar-cargo"
+  artefatos_derivados:
+    - "UC-RF018.md"
+    - "MD-RF018.md"
+    - "WF-RF018.md"
+    - "TC-RF018.yaml"
+    - "MT-RF018.yaml"
+    - "RL-RF018.md"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar cargo"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar cargos"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar cargo"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar cargo"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Inativar cargo"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar código único"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar hierarquia sem ciclos"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar alçada monotônica"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar cargo sem ocupantes para inativar"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria completa"
+      required: true
+
+exclusions:
+  rf_items: []
+
+metadados:
+  total_regras_negocio: 12
+  total_endpoints: 15
+  total_permissoes: 11
+  complexidade: "alta"
+  prioridade: 1  # 1 (crítico) a 5 (baixo)
+  nivel_hierarquia_maximo: 10
+  retencao_auditoria_dias: 2555
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v2.0 - Separação RF/RL, contrato moderno, 12 RNs"
+  - versao: "1.0"
+    data: "2025-01-01"
+    autor: "IControlIT Architect"
+    descricao: "Versão inicial com conteúdo legado"

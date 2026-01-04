@@ -1,0 +1,330 @@
+# =============================================
+# RF-028 - Gestão de SLA - Operações (Contrato Canônico v2.0)
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# Data Migração v1.0 → v2.0: 2025-12-30
+# =============================================
+
+rf:
+  id: "RF028"
+  nome: "Gestão de SLA - Operações"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 5 - Service Desk"
+  epic: "EPIC008-SD-Service-Desk"
+  status: "concluido"
+  rfs_relacionados:
+    - "RF072" # Escalação Automática
+    - "RF077" # Ordens de Serviço
+
+descricao:
+  objetivo: "Especificar o módulo de Gestão de SLA para Operações do sistema IControlIT, responsável por definir, monitorar e garantir o cumprimento de Service Level Agreements (SLAs) para operações de ativos."
+  problema_resolvido: "Gerenciar metas de tempo (resposta, resolução, atendimento) para operações, calcular automaticamente tempo consumido, gerar alertas em cascata e escalar quando SLA está prestes a vencer, com múltiplos calendários de atendimento e integração de feriados."
+  publico_afetado: "Gerentes Técnicos, Técnicos L1/L2/L3, Managers, Clientes (Service Level)"
+
+escopo:
+  incluso:
+    - "CRUD completo de SLAs para operações"
+    - "Definição de metas por prioridade (P1, P2, P3, P4)"
+    - "Priorização por tipo de ativo"
+    - "Calendário de atendimento flexível (24x7, comercial, dias úteis)"
+    - "Pausa automática fora do horário"
+    - "Cálculo automático de SLA consumido vs disponível"
+    - "Alertas em cascata (50%, 75%, 90%, 100%)"
+    - "Escalação automática por nível (L1 → L2 → L3 → Manager)"
+    - "Dashboard em tempo real (SignalR)"
+    - "Relatórios de compliance"
+    - "Integração com Ordens de Serviço (RF077)"
+    - "Multi-tenancy por ClienteId"
+    - "Auditoria completa"
+    - "Versionamento"
+    - "Integração com BrasilAPI (feriados)"
+  fora:
+    - "Interface visual específica"
+    - "Tecnologia, framework ou linguagem"
+    - "Layout, UX ou identidade visual"
+    - "Estratégia de deploy ou infraestrutura"
+    - "Integração com sistemas externos de gestão de SLA"
+
+entidades:
+  - nome: "SLAOperacao"
+    descricao: "Entidade central - configuração de SLA para operações de ativos"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "Id (Guid)"
+      - "ClienteId (Guid) - Multi-tenancy"
+      - "Nome (string)"
+      - "Descricao (string)"
+      - "CalendarioId (Guid) - FK para Calendario"
+      - "MetaRespostaP1 (TimeSpan)"
+      - "MetaRespostaP2 (TimeSpan)"
+      - "MetaRespostaP3 (TimeSpan)"
+      - "MetaRespostaP4 (TimeSpan)"
+      - "MetaResolucaoP1 (TimeSpan)"
+      - "MetaResolucaoP2 (TimeSpan)"
+      - "MetaResolucaoP3 (TimeSpan)"
+      - "MetaResolucaoP4 (TimeSpan)"
+      - "MetaAtendimentoP1 (TimeSpan)"
+      - "MetaAtendimentoP2 (TimeSpan)"
+      - "MetaAtendimentoP3 (TimeSpan)"
+      - "MetaAtendimentoP4 (TimeSpan)"
+      - "IsAtivo (bool)"
+      - "IsDeleted (bool)"
+
+  - nome: "PausaSLA"
+    descricao: "Pausas de SLA (fora horário, aguardando cliente)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "AlertaSLA"
+    descricao: "Alertas gerados (50%, 75%, 90%, 100%)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "EscalacaoSLA"
+    descricao: "Histórico de escalações"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "SLAOperacaoVersion"
+    descricao: "Versionamento de SLA"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF028-01"
+    descricao: "Tempo de resposta deve ser sempre menor que tempo de resolução, que deve ser menor que tempo de atendimento."
+    tipo: "validacao"
+    campos_afetados: ["MetaResposta*", "MetaResolucao*", "MetaAtendimento*"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Tempo resposta >= tempo resolução → Rejeição HTTP 400"
+      - "Tempo resolução >= tempo atendimento → Rejeição HTTP 400"
+      - "Mensagem de erro clara indicando violação"
+
+  - id: "RN-RF028-02"
+    descricao: "Contador de SLA não inclui períodos de pausa (fora horário, aguardando cliente) e feriados nacionais."
+    tipo: "regra_negocio"
+    campos_afetados: ["TempoConsumido"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Cálculo deduz duração total de pausas"
+      - "Feriados nacionais não contam"
+      - "Fins de semana excluídos se calendário não for 24x7"
+
+  - id: "RN-RF028-03"
+    descricao: "Pausa automática quando operação sai do horário de atendimento, retoma ao voltar."
+    tipo: "regra_negocio"
+    campos_afetados: ["PausaSLA"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Job background verifica horário a cada 15 minutos"
+      - "Saída de horário → cria PausaSLA com TipoPausa=ForaHorario"
+      - "Entrada de horário → fecha PausaSLA com DataFim"
+
+  - id: "RN-RF028-04"
+    descricao: "Alertas em cascata gerados em 50%, 75%, 90%, 100% de SLA consumido."
+    tipo: "regra_negocio"
+    campos_afetados: ["AlertaSLA"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Alertas gerados apenas uma vez por threshold"
+      - "Severidade: 50%=Informativo, 75%=Aviso, 90%=Crítico, 100%=Violação"
+      - "Notificação por e-mail + SignalR"
+
+  - id: "RN-RF028-05"
+    descricao: "Escalação automática quando SLA atinge 90% (Level 2), 100% (Level 3/Manager)."
+    tipo: "regra_negocio"
+    campos_afetados: ["EscalacaoSLA"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Escalação só ocorre se nível atual < nível requerido"
+      - "Busca técnico disponível no nível alvo"
+      - "Notifica novo responsável por e-mail + SMS"
+
+  - id: "RN-RF028-06"
+    descricao: "Prioridade P1: 2h resposta, 4h resolução, 8h atendimento (ativos críticos)."
+    tipo: "regra_negocio"
+    campos_afetados: ["MetaRespostaP1", "MetaResolucaoP1", "MetaAtendimentoP1"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Meta resposta P1 ≤ 2 horas"
+      - "Meta resolução P1 ≤ 4 horas"
+      - "Meta atendimento P1 ≤ 8 horas"
+
+  - id: "RN-RF028-07"
+    descricao: "Prioridade P2: 4h resposta, 8h resolução, 24h atendimento (ativos importantes)."
+    tipo: "regra_negocio"
+    campos_afetados: ["MetaRespostaP2", "MetaResolucaoP2", "MetaAtendimentoP2"]
+    obrigatorio: true
+
+  - id: "RN-RF028-08"
+    descricao: "Prioridade P3: 8h resposta, 24h resolução, 48h atendimento (ativos padrão)."
+    tipo: "regra_negocio"
+    campos_afetados: ["MetaRespostaP3", "MetaResolucaoP3", "MetaAtendimentoP3"]
+    obrigatorio: true
+
+  - id: "RN-RF028-09"
+    descricao: "Prioridade P4: 24h resposta, 72h resolução, 5 dias atendimento (ativos não essenciais)."
+    tipo: "regra_negocio"
+    campos_afetados: ["MetaRespostaP4", "MetaResolucaoP4", "MetaAtendimentoP4"]
+    obrigatorio: true
+
+  - id: "RN-RF028-10"
+    descricao: "Multi-tenancy obrigatório por ClienteId. Isolamento total de dados por cliente."
+    tipo: "seguranca"
+    campos_afetados: ["ClienteId"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Todas as queries incluem WHERE ClienteId = [ClienteId do usuário]"
+      - "Tentativa de acesso cruzado → HTTP 403 Forbidden"
+
+  - id: "RN-RF028-11"
+    descricao: "Soft delete via IsDeleted = true. Nunca deleta permanentemente."
+    tipo: "seguranca"
+    campos_afetados: ["IsDeleted", "DataDelecao", "UsuarioDeletouId"]
+    obrigatorio: true
+    criterios_aceite:
+      - "DELETE marca IsDeleted = true, DataDelecao, UsuarioDeletouId"
+      - "Queries padrão filtram WHERE IsDeleted = false"
+
+  - id: "RN-RF028-12"
+    descricao: "Integração com BrasilAPI para obter feriados nacionais/estaduais. Feriados excluídos do cálculo."
+    tipo: "integracao"
+    campos_afetados: ["CalculoSLA"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Consulta BrasilAPI anualmente e cacheia resultados"
+      - "Fallback usa cache em caso de falha"
+
+endpoints:
+  - method: "GET"
+    route: "/api/sla-operacoes"
+    descricao: "Listar SLAs da empresa"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:read"
+    response_dto: "PaginatedListDto<SLAOperacaoDto>"
+
+  - method: "GET"
+    route: "/api/sla-operacoes/{id}"
+    descricao: "Obter SLA por ID"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:read"
+    response_dto: "SLAOperacaoDto"
+
+  - method: "POST"
+    route: "/api/sla-operacoes"
+    descricao: "Criar novo SLA"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:create"
+    request_dto: "CriarSLAOperacaoCommand"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/sla-operacoes/{id}"
+    descricao: "Atualizar SLA"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:update"
+    request_dto: "AtualizarSLAOperacaoCommand"
+    response_dto: "void"
+
+  - method: "DELETE"
+    route: "/api/sla-operacoes/{id}"
+    descricao: "Deletar SLA (soft delete)"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:delete"
+    response_dto: "void"
+
+  - method: "GET"
+    route: "/api/sla-operacoes/{id}/calcular"
+    descricao: "Calcular SLA de uma OS"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:read"
+    response_dto: "SLACalculoDto"
+
+  - method: "POST"
+    route: "/api/sla-operacoes/{id}/pausar"
+    descricao: "Pausar SLA manualmente"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:pause"
+    request_dto: "PausarSLACommand"
+    response_dto: "void"
+
+  - method: "POST"
+    route: "/api/sla-operacoes/{id}/retomar"
+    descricao: "Retomar SLA pausado"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:resume"
+    response_dto: "void"
+
+  - method: "POST"
+    route: "/api/sla-operacoes/{id}/escalar"
+    descricao: "Escalar SLA manualmente"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:escalate"
+    request_dto: "EscalarSLACommand"
+    response_dto: "void"
+
+  - method: "GET"
+    route: "/api/sla-operacoes/dashboard/compliance"
+    descricao: "Dashboard compliance SLA"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:metrics"
+    response_dto: "SLAComplianceDto"
+
+  - method: "GET"
+    route: "/api/sla-operacoes/metricas"
+    descricao: "Métricas gerenciais (KPIs)"
+    autenticacao: true
+    authorization_policy: "sla:operacoes:metrics"
+    response_dto: "SLAMetricasDto"
+
+kpis:
+  - nome: "Taxa de Compliance SLA"
+    descricao: "Percentual de operações concluídas dentro da meta"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Resposta"
+    descricao: "Média (DataResposta - DataAbertura) excluindo pausas"
+    meta: "<= Meta SLA"
+    log_obrigatorio: true
+
+  - nome: "% Violações SLA"
+    descricao: "Percentual de operações que estouraram SLA"
+    meta: "<= 5%"
+    log_obrigatorio: true
+
+  - nome: "Tempo de Escalação"
+    descricao: "Média (DataEscalacao - DataAlerta)"
+    meta: "<= 30 min"
+    log_obrigatorio: true
+
+alertas:
+  - evento: "SLA Crítico (90%)"
+    threshold: ">= 90%"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "sms"
+      - "signalr"
+
+  - evento: "SLA Violado (100%)"
+    threshold: ">= 100%"
+    severidade: "VIOLAÇÃO"
+    canal_notificacao:
+      - "email"
+      - "sms"
+      - "signalr"
+
+  - evento: "Múltiplas Escalações"
+    threshold: "> 3 escalações"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"

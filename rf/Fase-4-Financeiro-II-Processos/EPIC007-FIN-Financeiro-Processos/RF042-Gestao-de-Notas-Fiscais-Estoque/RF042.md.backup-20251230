@@ -1,0 +1,1516 @@
+# RF042 - Gestão de Notas Fiscais Estoque
+
+**Fase:** 2 - Serviços Essenciais
+**EPIC:** EPIC003-GES - Gestão
+**Módulo:** Gestão
+**Responsável:** Architect Agent
+**Data Criação:** 17/12/2025
+**Versão:** 1.0
+**Status:** Especificação Completa
+
+---
+
+## SEÇÃO 1: RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+O **RF042 - Gestão de Notas Fiscais Estoque** implementa o sistema completo de gerenciamento de notas fiscais de entrada de estoque (NFe), incluindo importação automatizada de arquivos XML, validação automática junto à SEFAZ, OCR de PDFs escaneados, lançamento automático no estoque, conciliação com pedidos de compra, cálculo de impostos (ICMS, IPI, PIS, COFINS), rateio de frete, e rastreamento de divergências entre pedido vs recebido. O sistema garante conformidade fiscal, reduz erros manuais de digitação, acelera o processo de entrada de mercadorias e fornece visibilidade completa da cadeia de suprimentos desde a emissão da NFe pelo fornecedor até a entrada no estoque.
+
+### 1.2 Importância Estratégica
+
+A gestão eficaz de notas fiscais de estoque é crucial para:
+- **Conformidade Fiscal** garantindo que todas as NFes sejam válidas, autorizadas pela SEFAZ e armazenadas por 7 anos conforme legislação
+- **Automação de Processos** eliminando digitação manual de NFes e reduzindo erros humanos em 95%
+- **Conciliação Financeira** comparando pedido de compra vs NFe vs entrada física de mercadorias
+- **Gestão de Impostos** calculando automaticamente todos os tributos (ICMS, IPI, PIS, COFINS, DIFAL) com base nas alíquotas vigentes
+- **Visibilidade de Cadeia** rastreando todo o ciclo desde emissão da NFe até entrada no estoque com alertas de atrasos
+- **Auditoria e Compliance** mantendo histórico completo de todas as operações com rastreabilidade para auditorias internas e externas
+- **Redução de Custos** identificando divergências de preços, quantidades e condições comerciais antes da aprovação de pagamento
+
+### 1.3 Comparação Sistema Legado vs. Modernizado
+
+| Aspecto | Sistema Legado | Sistema Modernizado |
+|---------|----------------|---------------------|
+| **Importação de XML** | Upload manual arquivo por arquivo | Drag-and-drop múltiplos arquivos + importação automática de e-mail |
+| **Validação SEFAZ** | Não suportado (validação manual) | Validação automática em tempo real via WebService SEFAZ |
+| **OCR de PDFs** | Não suportado | OCR com IA para extrair dados de PDFs escaneados (Tesseract + Azure Form Recognizer) |
+| **Conciliação com Pedidos** | Manual, planilhas externas | Matching automático NFe ↔ Pedido de Compra com alertas de divergência |
+| **Cálculo de Impostos** | Manual ou via stored procedures | Cálculo automático com engine fiscal atualizada (alíquotas CONFAZ) |
+| **Rateio de Frete** | Não suportado | Rateio proporcional por peso/valor com múltiplos critérios |
+| **Lançamento no Estoque** | Manual via tela separada | Lançamento automático com regras de aprovação configuráveis |
+| **Alertas de Divergência** | E-mails esporádicos | Alertas em tempo real (SignalR) para comprador responsável |
+| **DANFE** | Geração manual externa | Geração automática de DANFE em PDF/A com QR Code |
+| **Auditoria** | Logs básicos | Rastreabilidade completa de todas as etapas com timeline visual |
+| **Multi-tenant** | Não suportado | Isolamento completo por fornecedor com limite de 1.000 NFes/mês no plano básico |
+
+### 1.4 Principais Funcionalidades
+
+1. **Importação Automatizada de XML NFe**
+   - Upload via drag-and-drop de múltiplos arquivos XML
+   - Importação automática de e-mails (monitora caixa de entrada de nfe@empresa.com)
+   - Integração com portais de fornecedores (API REST)
+   - Parser robusto que extrai todos os campos da NFe conforme layout SEFAZ v4.0
+   - Detecção de duplicatas (evita importação da mesma NFe 2x)
+
+2. **Validação Automática SEFAZ**
+   - Consulta chave de acesso na base da SEFAZ via WebService
+   - Valida: autorização, cancelamento, inutilização
+   - Verifica assinatura digital do XML
+   - Detecta NFes canceladas/denegadas
+   - Retry automático em caso de indisponibilidade da SEFAZ
+
+3. **OCR de PDFs Escaneados**
+   - Upload de PDF quando XML não disponível
+   - OCR inteligente com Tesseract + Azure Form Recognizer
+   - Extração automática: chave, número, emitente, itens, valores
+   - Validação cruzada: se detectar chave de acesso, busca XML na SEFAZ
+   - Taxa de precisão >95% em PDFs de boa qualidade
+
+4. **Conciliação com Pedidos de Compra**
+   - Matching automático via CNPJ fornecedor + número do pedido
+   - Comparação item a item: código, descrição, quantidade, valor unitário
+   - Alertas de divergência:
+     - Quantidade diferente (±5% tolerância configurável)
+     - Preço diferente (±2% tolerância configurável)
+     - Itens não previstos no pedido
+     - Itens do pedido não entregues
+   - Workflow de aprovação para divergências >R$ 1.000
+
+5. **Cálculo Automático de Impostos**
+   - ICMS (próprio, substituição tributária, diferencial de alíquota)
+   - IPI (Tabela TIPI atualizada)
+   - PIS/COFINS (cumulativo, não-cumulativo)
+   - ISS (para serviços)
+   - DIFAL (diferencial de alíquota entre estados)
+   - Base de cálculo respeitando regras de redução de base
+
+6. **Rateio de Frete e Despesas Acessórias**
+   - Frete rateado proporcionalmente ao peso ou valor de cada item
+   - Seguro, despesas aduaneiras, outras despesas
+   - Critérios configuráveis: peso, valor, quantidade, percentual fixo
+   - Impacto no custo médio de estoque
+
+7. **Lançamento Automático no Estoque**
+   - Entrada automática após aprovação da NFe
+   - Atualiza quantidade, custo médio, última compra
+   - Gera movimentação de estoque (rastreável)
+   - Notifica almoxarifado para recebimento físico
+   - Integração com código de barras para conferência
+
+8. **Gestão de Divergências**
+   - Dashboard de NFes pendentes de aprovação
+   - Workflow: Comprador → Gestor → Financeiro
+   - Comentários e anexos em cada etapa
+   - SLA configurável (ex: aprovar em 24h)
+   - Relatório de divergências por fornecedor
+
+9. **Geração de DANFE**
+   - PDF/A com QR Code para consulta SEFAZ
+   - Marca d'água em NFes canceladas
+   - Impressão em lote
+   - Envio por e-mail para fornecedor/transportadora
+
+10. **Integrações Mandatórias**
+    - **Central de Funcionalidades** - Registro da feature "Gestão de NFes Estoque"
+    - **Internacionalização (i18n)** - Todas as mensagens em pt-BR, en-US, es-ES
+    - **Auditoria** - Log de todas as importações, validações, aprovações, lançamentos
+    - **Controle de Acesso (RBAC)** - Permissões: importar, aprovar, lançar, cancelar, visualizar
+
+---
+
+## SEÇÃO 2: REGRAS DE NEGÓCIO
+
+### RN001 - Importação Automática de E-mails com XML NFe
+
+**Descrição:**
+O sistema monitora automaticamente uma caixa de e-mail corporativa (ex: nfe@empresa.com) e importa todos os anexos XML de notas fiscais recebidos.
+
+**Justificativa:**
+Eliminar trabalho manual de download de e-mails e upload individual de XMLs, garantindo que nenhuma NFe seja perdida.
+
+**Implementação:**
+- Hangfire job a cada 15 minutos conecta via IMAP/Exchange na caixa nfe@empresa.com
+- Busca e-mails não lidos com assunto contendo "NFe", "Nota Fiscal", "XML"
+- Extrai todos os anexos com extensão .xml
+- Valida se XML é realmente uma NFe (tag raiz <nfeProc> ou <NFe>)
+- Importa automaticamente e marca e-mail como lido
+- Se importação falhar, marca e-mail como não lido para retry
+- Armazena XML original em blob storage (7 anos de retenção)
+
+**Exemplo:**
+```
+Hangfire Job: ImportarNFesPorEmailJob
+Execução: A cada 15 minutos
+
+E-mail Processado:
+De: fornecedor@empresa.com.br
+Assunto: NFe 12345 - Pedido 98765
+Anexos:
+  - NFe_35250112345678000199550010000123451000123456.xml (23 KB) ✅
+  - Boleto_12345.pdf (120 KB) ❌ (ignorado)
+
+Parsing do XML:
+- Chave de Acesso: 35250112345678000199550010000123451000123456
+- Emitente: FORNECEDOR LTDA (CNPJ 12.345.678/0001-99)
+- Destinatário: MINHA EMPRESA LTDA (CNPJ 98.765.432/0001-00)
+- Valor Total: R$ 12.345,67
+- Itens: 15 produtos
+
+Validação SEFAZ:
+- Status: Autorizado
+- Data Autorização: 15/12/2025 10:32:45
+- Protocolo: 135250000123456
+
+Conciliação Pedido:
+- Pedido Encontrado: #98765 (CNPJ 12.345.678/0001-99)
+- Match: 15/15 itens
+- Divergências: Nenhuma
+- Status: Aprovação Automática
+
+Lançamento Estoque:
+- 15 movimentações criadas
+- Custo médio atualizado
+- Notificação enviada para almoxarifado
+
+Status Final: Processado com sucesso em 3,2 segundos
+```
+
+**Validações:**
+- ✅ Caixa de e-mail deve estar acessível (credenciais válidas)
+- ✅ XML deve ser válido conforme schema SEFAZ
+- ✅ CNPJ destinatário deve pertencer ao fornecedor logado (multi-tenancy)
+- ✅ NFe não pode estar duplicada (chave de acesso única)
+
+---
+
+### RN002 - Validação Automática na SEFAZ
+
+**Descrição:**
+Toda NFe importada é validada automaticamente junto à base da SEFAZ via WebService oficial para garantir autenticidade e status de autorização.
+
+**Justificativa:**
+Evitar fraudes com NFes falsas ou canceladas, garantindo conformidade fiscal e segurança jurídica.
+
+**Implementação:**
+- Consulta WebService SEFAZ: https://nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx
+- Envia chave de acesso (44 dígitos)
+- Recebe: status (100=Autorizada, 101=Cancelada, 110=Denegada, etc.)
+- Armazena protocolo de autorização e data/hora
+- Se status ≠ 100, marca NFe como "Inválida" e bloqueia lançamento
+- Retry automático se SEFAZ indisponível (máx 3 tentativas com backoff exponencial)
+- Cache de 1 hora para evitar consultas repetidas da mesma chave
+
+**Exemplo:**
+```
+NFe Importada:
+Chave: 35250112345678000199550010000123451000123456
+UF: São Paulo (35)
+Ambiente: Produção (1)
+
+Consulta SEFAZ:
+URL: https://nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx
+Request XML:
+<consStatServNFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <tpAmb>1</tpAmb>
+  <cUF>35</cUF>
+  <xServ>STATUS</xServ>
+</consStatServNFe>
+
+Response:
+<retConsSitNFe>
+  <cStat>100</cStat>
+  <xMotivo>Autorizado o uso da NF-e</xMotivo>
+  <chNFe>35250112345678000199550010000123451000123456</chNFe>
+  <protNFe>
+    <infProt>
+      <tpAmb>1</tpAmb>
+      <verAplic>SP_NFE_PL009_V4.00</verAplic>
+      <chNFe>35250112345678000199550010000123451000123456</chNFe>
+      <dhRecbto>2025-12-15T10:32:45-03:00</dhRecbto>
+      <nProt>135250000123456</nProt>
+      <digVal>xyzABC123...</digVal>
+      <cStat>100</cStat>
+      <xMotivo>Autorizado o uso da NF-e</xMotivo>
+    </infProt>
+  </protNFe>
+</retConsSitNFe>
+
+Resultado:
+✅ NFe AUTORIZADA
+Protocolo: 135250000123456
+Data Autorização: 15/12/2025 10:32:45
+Digest: xyzABC123...
+Status: Liberada para lançamento
+```
+
+**Validações:**
+- ✅ Chave de acesso deve ter exatamente 44 dígitos
+- ✅ Status SEFAZ deve ser 100 (Autorizada) para prosseguir
+- ✅ Data de autorização deve ser ≤ data atual
+- ✅ Assinatura digital deve ser válida
+
+---
+
+### RN003 - OCR de PDFs com Fallback para Busca na SEFAZ
+
+**Descrição:**
+Quando fornecedor envia apenas PDF (sem XML), sistema aplica OCR para extrair dados e, se detectar chave de acesso, busca XML oficial na SEFAZ.
+
+**Justificativa:**
+Muitos fornecedores pequenos enviam apenas o DANFE em PDF. OCR + busca SEFAZ recupera dados completos.
+
+**Implementação:**
+- Upload de PDF via interface
+- Pré-processamento: conversão para imagem de alta resolução (300 DPI)
+- OCR duplo:
+  - Tesseract (gratuito, rápido, boa precisão em PDFs de qualidade)
+  - Azure Form Recognizer (pago, alta precisão, treinado em DANFEs)
+- Busca padrão regex para chave de acesso (44 dígitos)
+- Se chave encontrada: consulta SEFAZ para download do XML oficial
+- Se chave NÃO encontrada: extrai manualmente número, CNPJ, itens, valores
+- Confiança mínima: 85% (abaixo disso, solicita revisão manual)
+
+**Exemplo:**
+```
+Upload de PDF:
+Arquivo: DANFE_Fornecedor_12345.pdf
+Tamanho: 234 KB
+Páginas: 2
+
+Pré-processamento:
+- Conversão PDF → PNG (300 DPI)
+- Melhoria de contraste e nitidez
+- Remoção de ruído
+
+OCR com Tesseract:
+Texto Extraído:
+"DANFE
+Documento Auxiliar da Nota Fiscal Eletrônica
+FORNECEDOR LTDA
+CNPJ: 12.345.678/0001-99
+...
+CHAVE DE ACESSO
+3525 0112 3456 7800 0199 5500 1000 0123 4510 0012 3456
+..."
+
+Extração de Chave:
+Chave Detectada: 35250112345678000199550010000123451000123456
+Confiança: 98%
+
+Busca na SEFAZ:
+Request: NFeDistribuicaoDFe (WebService)
+Chave: 35250112345678000199550010000123456
+Response: XML completo da NFe (23 KB)
+
+Parsing do XML:
+✅ Todos os dados extraídos com 100% de precisão
+✅ 15 itens processados
+✅ Impostos calculados automaticamente
+
+Status: PDF processado com sucesso via OCR + SEFAZ
+Tempo total: 8,5 segundos
+```
+
+**Validações:**
+- ✅ PDF deve ser legível (não corrompido)
+- ✅ Confiança do OCR ≥85%
+- ✅ Se chave detectada, XML SEFAZ deve ser encontrado
+- ✅ CNPJ emitente no PDF = CNPJ no XML
+
+---
+
+### RN004 - Conciliação Automática NFe ↔ Pedido de Compra
+
+**Descrição:**
+Sistema cruza automaticamente NFe recebida com pedido de compra correspondente, validando CNPJ, itens, quantidades e valores.
+
+**Justificativa:**
+Detectar divergências antes do pagamento, evitando pagamentos incorretos e garantindo conformidade com o pedido.
+
+**Implementação:**
+- Matching por: CNPJ fornecedor + Número do Pedido (campo xPed da NFe) OU CNPJ + Data + Valor aproximado
+- Comparação item a item:
+  - Código do produto (cProd)
+  - Quantidade (qCom vs qPed)
+  - Valor unitário (vUnCom vs vUnPed)
+  - Valor total (vProd vs vTotalPed)
+- Tolerâncias configuráveis:
+  - Quantidade: ±5% (ex: pedido 100, aceita 95-105)
+  - Valor: ±2% (ex: pedido R$ 100, aceita R$ 98-102)
+- Se divergência >tolerância: cria alerta e encaminha para aprovação manual
+- Se divergência <tolerância: aprova automaticamente
+
+**Exemplo:**
+```
+NFe Recebida:
+Número: 123456
+Emitente: FORNECEDOR LTDA (CNPJ 12.345.678/0001-99)
+Valor Total: R$ 12.450,00
+Itens: 15
+
+Busca de Pedido:
+Critério 1: CNPJ 12.345.678/0001-99 + xPed = "98765"
+Pedido Encontrado: #98765
+Comprador: João Silva
+Data: 01/12/2025
+Valor: R$ 12.300,00
+Itens: 15
+
+Comparação Item a Item:
+
+Item 1:
+Pedido: Mouse USB (cód 1001) | Qtd: 50 | R$ 25,00 | Total: R$ 1.250,00
+NFe:    Mouse USB (cód 1001) | Qtd: 50 | R$ 25,00 | Total: R$ 1.250,00
+Status: ✅ Match perfeito
+
+Item 2:
+Pedido: Teclado (cód 2002) | Qtd: 30 | R$ 80,00 | Total: R$ 2.400,00
+NFe:    Teclado (cód 2002) | Qtd: 30 | R$ 85,00 | Total: R$ 2.550,00
+Divergência: Valor unitário +6,25% (R$ 5,00 a mais)
+Tolerância: 2%
+Status: ⚠️ DIVERGÊNCIA - Requer aprovação
+
+Item 3:
+Pedido: Monitor 24" (cód 3003) | Qtd: 20 | R$ 650,00 | Total: R$ 13.000,00
+NFe:    Monitor 24" (cód 3003) | Qtd: 22 | R$ 650,00 | Total: R$ 14.300,00
+Divergência: Quantidade +10% (2 unidades a mais)
+Tolerância: 5%
+Status: ⚠️ DIVERGÊNCIA - Requer aprovação
+
+Resumo:
+✅ 13 itens OK
+⚠️ 2 itens com divergência
+Divergência Total: R$ 150,00 (1,2% do pedido)
+
+Ação Automática:
+- Alerta enviado para comprador João Silva
+- E-mail para gestor de compras
+- Workflow: Aguardando aprovação
+- SLA: 24 horas
+```
+
+**Validações:**
+- ✅ Pedido deve existir e estar ativo
+- ✅ CNPJ emitente = CNPJ fornecedor do pedido
+- ✅ Todos os itens da NFe devem estar no pedido (ou ser aprovados como "item extra")
+- ✅ Divergências acima da tolerância exigem justificativa
+
+---
+
+### RN005 - Cálculo Automático de Impostos Conforme Legislação Vigente
+
+**Descrição:**
+Sistema calcula automaticamente todos os impostos (ICMS, IPI, PIS, COFINS, DIFAL) com base nas alíquotas vigentes e natureza da operação.
+
+**Justificativa:**
+Garantir conformidade fiscal, evitar erros de cálculo manual e facilitar auditoria.
+
+**Implementação:**
+- Engine fiscal com tabelas de alíquotas atualizadas mensalmente (fonte: CONFAZ, RFB)
+- Regras por UF origem, UF destino, NCM, CFOP
+- ICMS:
+  - Próprio (vBC, pICMS, vICMS)
+  - Substituição Tributária (vBCST, pICMSST, vICMSST)
+  - Diferencial de Alíquota - DIFAL para estados diferentes
+- IPI: Tabela TIPI por NCM
+- PIS/COFINS: Regime cumulativo vs não-cumulativo (CST)
+- Redução de base de cálculo quando aplicável
+- Isenções e imunidades
+
+**Exemplo:**
+```
+Item da NFe:
+Produto: Notebook Dell Inspiron 15
+NCM: 8471.30.12
+CFOP: 5.102 (Venda de mercadoria adquirida de terceiros)
+UF Origem: SP
+UF Destino: RJ
+Valor: R$ 3.000,00
+
+Cálculo ICMS:
+- Alíquota ICMS SP: 18%
+- Alíquota ICMS RJ: 20%
+- DIFAL (diferencial): 20% - 18% = 2%
+- Base de Cálculo: R$ 3.000,00
+- ICMS Próprio (SP): R$ 3.000 × 18% = R$ 540,00
+- ICMS DIFAL (RJ): R$ 3.000 × 2% = R$ 60,00
+- ICMS Total: R$ 600,00
+
+Cálculo IPI:
+- NCM 8471.30.12: Alíquota 0% (Informática - Lei 8.248/91)
+- Base de Cálculo: R$ 3.000,00
+- IPI: R$ 0,00
+
+Cálculo PIS/COFINS:
+- Regime: Não-cumulativo (empresa Lucro Real)
+- PIS: R$ 3.000 × 1,65% = R$ 49,50
+- COFINS: R$ 3.000 × 7,6% = R$ 228,00
+
+Resumo do Item:
+- Valor Produto: R$ 3.000,00
+- ICMS: R$ 600,00
+- IPI: R$ 0,00
+- PIS: R$ 49,50
+- COFINS: R$ 228,00
+- Total Tributos: R$ 877,50 (29,25%)
+- Valor Final: R$ 3.877,50
+```
+
+**Validações:**
+- ✅ NCM deve ser válido (8 dígitos)
+- ✅ CFOP deve existir na tabela de CFOPs
+- ✅ Alíquotas devem ser da competência correta (vigentes na data da NFe)
+- ✅ Base de cálculo não pode ser negativa
+
+---
+
+### RN006 - Rateio Proporcional de Frete por Peso ou Valor
+
+**Descrição:**
+Valor do frete total da NFe é rateado entre os itens proporcionalmente ao peso ou valor de cada um, impactando o custo médio de estoque.
+
+**Justificativa:**
+Custo médio correto do produto deve incluir frete proporcional, não apenas o valor do item.
+
+**Implementação:**
+- Frete total extraído do campo vFrete da NFe
+- Critério de rateio configurável por empresa:
+  - Por peso: (peso_item / peso_total) × frete_total
+  - Por valor: (valor_item / valor_total) × frete_total
+  - Por quantidade: (qtd_item / qtd_total) × frete_total
+- Arredondamento: últimos centavos ajustados no item de maior valor
+- Custo médio atualizado: (valor_item + frete_rateado + outras_despesas) / quantidade
+
+**Exemplo:**
+```
+NFe com Frete:
+Frete Total: R$ 500,00
+Seguro: R$ 50,00
+Valor Total Produtos: R$ 10.000,00
+Peso Total: 250 kg
+Itens: 3
+
+Item 1: Mouse (50 unidades)
+- Valor: R$ 1.250,00 (12,5% do total)
+- Peso: 5 kg (2% do total)
+- Rateio Frete (por valor): R$ 500 × 12,5% = R$ 62,50
+- Rateio Seguro (por valor): R$ 50 × 12,5% = R$ 6,25
+- Custo Unitário: (R$ 1.250 + R$ 62,50 + R$ 6,25) / 50 = R$ 26,375 ≈ R$ 26,38
+
+Item 2: Teclado (30 unidades)
+- Valor: R$ 2.400,00 (24% do total)
+- Peso: 15 kg (6% do total)
+- Rateio Frete (por valor): R$ 500 × 24% = R$ 120,00
+- Rateio Seguro (por valor): R$ 50 × 24% = R$ 12,00
+- Custo Unitário: (R$ 2.400 + R$ 120 + R$ 12) / 30 = R$ 84,40
+
+Item 3: Monitor (20 unidades)
+- Valor: R$ 6.350,00 (63,5% do total)
+- Peso: 230 kg (92% do total)
+- Rateio Frete (por valor): R$ 500 × 63,5% = R$ 317,50
+- Rateio Seguro (por valor): R$ 50 × 63,5% = R$ 31,75
+- Custo Unitário: (R$ 6.350 + R$ 317,50 + R$ 31,75) / 20 = R$ 334,96
+
+Verificação:
+R$ 62,50 + R$ 120,00 + R$ 317,50 = R$ 500,00 ✅
+R$ 6,25 + R$ 12,00 + R$ 31,75 = R$ 50,00 ✅
+```
+
+**Validações:**
+- ✅ Soma dos rateios = frete total (tolerância ±R$ 0,10)
+- ✅ Critério de rateio deve estar configurado
+- ✅ Peso/valor dos itens não pode ser zero
+
+---
+
+### RN007 - Lançamento Automático no Estoque Após Aprovação
+
+**Descrição:**
+NFe aprovada gera automaticamente movimentação de entrada no estoque, atualizando quantidade disponível e custo médio.
+
+**Justificativa:**
+Eliminar digitação manual de entrada de estoque, reduzir erros e garantir sincronia NFe ↔ Estoque.
+
+**Implementação:**
+- Trigger após aprovação final da NFe
+- Cria movimentação tipo "ENTRADA_COMPRA" para cada item
+- Atualiza tabela Estoque:
+  - Quantidade += quantidade_nfe
+  - Custo_Medio = (estoque_atual × custo_atual + qtd_nfe × custo_nfe) / (estoque_atual + qtd_nfe)
+  - Data_Ultima_Compra = data_nfe
+  - Id_Ultima_NFe = id_nfe
+- Gera notificação para almoxarifado: "Mercadoria aguardando recebimento físico"
+- Se produto não existe: cria automaticamente com dados da NFe
+- Rastreabilidade: cada movimentação vinculada à NFe original
+
+**Exemplo:**
+```
+NFe Aprovada:
+Número: 123456
+Data: 15/12/2025
+Fornecedor: FORNECEDOR LTDA
+
+Item 1: Mouse USB (cód 1001)
+Quantidade NFe: 50 unidades
+Custo Unitário NFe: R$ 26,38 (incluindo frete rateado)
+
+Estoque Atual (antes):
+Produto: Mouse USB (cód 1001)
+Quantidade: 150 unidades
+Custo Médio: R$ 24,50
+Última Compra: 01/11/2025
+
+Cálculo Novo Custo Médio:
+Estoque Valor Atual: 150 × R$ 24,50 = R$ 3.675,00
+Entrada Valor: 50 × R$ 26,38 = R$ 1.319,00
+Total: R$ 3.675 + R$ 1.319 = R$ 4.994,00
+Quantidade Total: 150 + 50 = 200
+Novo Custo Médio: R$ 4.994 / 200 = R$ 24,97
+
+Estoque Atualizado (depois):
+Produto: Mouse USB (cód 1001)
+Quantidade: 200 unidades ✅
+Custo Médio: R$ 24,97 ✅
+Última Compra: 15/12/2025 ✅
+Id Última NFe: 123456 ✅
+
+Movimentação Criada:
+Id: MOV-2025-12345
+Tipo: ENTRADA_COMPRA
+Data: 15/12/2025 14:30:15
+Produto: Mouse USB (1001)
+Quantidade: +50
+Custo Unitário: R$ 26,38
+NFe: 123456
+Usuário: Sistema (importação automática)
+Status: Aguardando Recebimento Físico
+
+Notificação Enviada:
+Para: almoxarifado@empresa.com
+Assunto: Mercadoria Aguardando Recebimento - NFe 123456
+Mensagem: "50 unidades de Mouse USB chegaram. NFe 123456 aprovada. Receba fisicamente e confirme no sistema."
+```
+
+**Validações:**
+- ✅ NFe deve estar aprovada (status = "Aprovada")
+- ✅ Produto deve existir ou ser criado automaticamente
+- ✅ Quantidade deve ser >0
+- ✅ Custo médio não pode ser negativo
+
+---
+
+### RN008 - Workflow de Aprovação com SLA Configurável
+
+**Descrição:**
+NFes com divergências seguem workflow de aprovação: Comprador → Gestor → Financeiro, com SLA e escalação automática.
+
+**Justificativa:**
+Garantir que divergências sejam analisadas por pessoas autorizadas antes do pagamento e lançamento no estoque.
+
+**Implementação:**
+- Workflow configurável por valor de divergência:
+  - <R$ 500: Comprador aprova sozinho
+  - R$ 500 - R$ 5.000: Comprador + Gestor
+  - >R$ 5.000: Comprador + Gestor + Financeiro
+- SLA padrão: 24 horas por etapa
+- Se SLA vencido: escalação automática para superior
+- Comentários obrigatórios em cada aprovação/rejeição
+- Histórico completo de aprovações com timestamp e justificativa
+
+**Exemplo:**
+```
+NFe em Aprovação:
+Número: 123456
+Fornecedor: FORNECEDOR LTDA
+Valor Total: R$ 12.450,00
+Divergência: R$ 150,00 (1,2%)
+Motivo: 2 monitores a mais que o pedido (22 vs 20)
+
+Workflow Ativado:
+Etapa 1: Comprador (João Silva)
+- Iniciado: 15/12/2025 14:30
+- SLA: 16/12/2025 14:30 (24h)
+- Ação: Aprovado
+- Comentário: "Fornecedor enviou cortesia de 2 monitores por atraso anterior. Pedido #98123 teve entrega parcial. Aceitar."
+- Timestamp: 15/12/2025 16:45 (2h 15min)
+
+Etapa 2: Gestor (Maria Costa)
+- Iniciado: 15/12/2025 16:45
+- SLA: 16/12/2025 16:45 (24h)
+- Ação: Aprovado
+- Comentário: "Ciente da cortesia. Atualizar pedido #98123 como completo."
+- Timestamp: 16/12/2025 09:30 (16h 45min)
+
+Etapa 3: Financeiro (Carlos Lima)
+- Iniciado: 16/12/2025 09:30
+- SLA: 17/12/2025 09:30 (24h)
+- Ação: Aprovado com Ajuste
+- Comentário: "Atualizar valor do pedido para R$ 12.450. Autorizar pagamento."
+- Ajuste: Pedido #98765 valor alterado de R$ 12.300 → R$ 12.450
+- Timestamp: 16/12/2025 11:00 (1h 30min)
+
+Status Final:
+✅ NFe APROVADA
+Tempo Total: 20h 30min
+Lançamento no Estoque: Automático
+Pagamento: Liberado
+```
+
+**Validações:**
+- ✅ Todos os aprovadores devem ter permissão RBAC adequada
+- ✅ Comentário obrigatório se divergência >R$ 1.000
+- ✅ Se rejeitado, bloquear lançamento e pagamento
+- ✅ Se SLA vencido 2x, escalar para diretoria
+
+---
+
+### RN009 - Geração Automática de DANFE em PDF/A com QR Code
+
+**Descrição:**
+Sistema gera DANFE (Documento Auxiliar da NFe) em formato PDF/A para arquivamento de longo prazo, com QR Code para consulta na SEFAZ.
+
+**Justificativa:**
+PDF/A é padrão ISO para arquivamento digital de longo prazo (7 anos de retenção fiscal). QR Code facilita validação por auditores.
+
+**Implementação:**
+- Template DANFE conforme layout oficial SEFAZ
+- Geração via biblioteca iTextSharp ou PDFSharp
+- QR Code contém: chave de acesso + URL consulta SEFAZ
+- Marca d'água "CANCELADA" em NFes canceladas
+- Assinatura digital opcional
+- Compressão otimizada (100-200 KB por DANFE)
+- Armazenamento em blob storage (Azure/S3)
+
+**Exemplo:**
+```
+NFe: 123456
+Chave: 35250112345678000199550010000123451000123456
+
+Geração de DANFE:
+Template: DANFE_Modelo_Retrato_v4.0.pdf
+Engine: iTextSharp 5.5.13.3
+
+Seções do DANFE:
+1. Cabeçalho (logo empresa, chave, número NFe)
+2. Emitente (razão social, CNPJ, endereço)
+3. Destinatário (razão social, CNPJ, endereço)
+4. Fatura (número, vencimento, valor)
+5. Cálculo do Imposto (base ICMS, valor ICMS, base ST, etc.)
+6. Transportador (razão social, CNPJ, placa)
+7. Dados dos Produtos (tabela: código, descrição, NCM, CFOP, qtd, valor)
+8. Cálculo do Issqn (se aplicável)
+9. Dados Adicionais (informações complementares)
+10. QR Code (canto inferior direito)
+
+QR Code Gerado:
+Conteúdo: https://nfe.fazenda.sp.gov.br/NFeConsultaPublica/ConsultaPublica.aspx?chNFe=35250112345678000199550010000123451000123456
+Tamanho: 3x3 cm
+Resolução: 300 DPI
+
+PDF/A Gerado:
+Arquivo: DANFE_123456_20251215.pdf
+Tamanho: 156 KB
+Formato: PDF/A-1b (ISO 19005-1)
+Fontes Embutidas: Arial, Courier New
+Metadata: Chave NFe, Data Emissão, CNPJ Emitente
+
+Validação PDF/A:
+✅ Fontes embutidas
+✅ Sem JavaScript
+✅ Sem criptografia
+✅ Metadata completa
+✅ Conforme ISO 19005-1
+
+Armazenamento:
+Blob Storage: Azure Blob
+Container: danfes-2025-12
+Path: /fornecedor-12345678000199/DANFE_123456_20251215.pdf
+URL: https://storage.empresa.com/danfes/DANFE_123456_20251215.pdf
+Retenção: 7 anos (até 15/12/2032)
+```
+
+**Validações:**
+- ✅ PDF deve ser válido PDF/A-1b
+- ✅ QR Code deve apontar para URL SEFAZ correta
+- ✅ Todas as fontes devem estar embutidas
+- ✅ Tamanho máximo 5 MB
+
+---
+
+### RN010 - Detecção de Duplicatas por Chave de Acesso
+
+**Descrição:**
+Sistema bloqueia importação de NFes duplicadas verificando se chave de acesso já existe no banco de dados.
+
+**Justificativa:**
+Evitar lançamento duplo no estoque e pagamento em duplicidade ao fornecedor.
+
+**Implementação:**
+- Índice único na tabela NotaFiscalEstoque: chave_acesso + fornecedor_id
+- Validação antes de salvar: SELECT COUNT(*) WHERE chave_acesso = ? AND fornecedor_id = ?
+- Se encontrada: rejeita com mensagem "NFe já importada em DD/MM/AAAA HH:MM por Usuário X"
+- Log de tentativa de duplicação para auditoria (pode ser tentativa de fraude)
+- Permite reimportar se NFe anterior foi cancelada/rejeitada
+
+**Exemplo:**
+```
+Tentativa de Importação:
+Chave: 35250112345678000199550010000123451000123456
+Fornecedor: 12.345.678/0001-99
+Usuário: João Silva
+Data: 17/12/2025 10:30
+
+Verificação no Banco:
+Query:
+SELECT Id, Numero, DataImportacao, UsuarioImportacao, Status
+FROM NotaFiscalEstoque
+WHERE ChaveAcesso = '35250112345678000199550010000123451000123456'
+  AND FornecedorId = 'abc-123-def-456'
+
+Resultado:
+Id: NFE-2025-00123
+Número: 123456
+Data Importação: 15/12/2025 14:30
+Usuário Importação: Maria Costa
+Status: Aprovada e Lançada
+
+Ação do Sistema:
+❌ IMPORTAÇÃO BLOQUEADA
+
+Mensagem para Usuário:
+"⚠️ DUPLICATA DETECTADA
+Esta NFe já foi importada anteriormente:
+- Número: 123456
+- Data: 15/12/2025 14:30
+- Importado por: Maria Costa
+- Status: Aprovada e Lançada no Estoque
+- Movimentação: MOV-2025-12345
+
+Se esta for uma NFe diferente, verifique:
+1. Chave de acesso está correta?
+2. Fornecedor é o mesmo?
+3. NFe anterior foi cancelada?
+
+Contate o suporte se acreditar que há erro."
+
+Log de Auditoria:
+Evento: TENTATIVA_IMPORTACAO_DUPLICATA
+Usuário: João Silva
+IP: 192.168.1.100
+Data: 17/12/2025 10:30:15
+NFe: 123456 (Chave: 3525...)
+Fornecedor: FORNECEDOR LTDA
+Ação: Bloqueado automaticamente
+```
+
+**Validações:**
+- ✅ Chave de acesso deve ser única por fornecedor
+- ✅ Permitir reimportação se status anterior = "Cancelada" ou "Rejeitada"
+- ✅ Log de todas as tentativas de duplicação
+
+---
+
+### RN011 - Integração com ERP via API REST
+
+**Descrição:**
+Sistema exporta automaticamente dados de NFes aprovadas para ERPs externos (SAP, TOTVS, Protheus) via API REST.
+
+**Justificativa:**
+Eliminar duplicação de trabalho (importar NFe no IControlIT e depois no ERP). Integração automática garante sincronia.
+
+**Implementação:**
+- API REST padronizada JSON
+- Autenticação via OAuth 2.0 ou API Key
+- Payload: NFe completa + impostos + rateio + pedido vinculado
+- Retry automático em caso de falha (máx 5 tentativas)
+- Log de sincronização: sucesso, falha, timestamp
+- Webhook reverso: ERP notifica IControlIT quando processar
+
+**Exemplo:**
+```
+NFe Aprovada:
+Número: 123456
+Fornecedor: FORNECEDOR LTDA
+Valor: R$ 12.450,00
+Status: Aprovada e Lançada
+
+Integração ERP TOTVS:
+Endpoint: https://erp.empresa.com/api/v1/notas-fiscais/entrada
+Method: POST
+Headers:
+  Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+  Content-Type: application/json
+
+Request Body:
+{
+  "origem": "IControlIT",
+  "timestamp": "2025-12-17T10:30:00Z",
+  "nfe": {
+    "chave_acesso": "35250112345678000199550010000123451000123456",
+    "numero": "123456",
+    "serie": "1",
+    "data_emissao": "2025-12-15",
+    "fornecedor": {
+      "cnpj": "12.345.678/0001-99",
+      "razao_social": "FORNECEDOR LTDA",
+      "inscricao_estadual": "123.456.789.012"
+    },
+    "destinatario": {
+      "cnpj": "98.765.432/0001-00",
+      "razao_social": "MINHA EMPRESA LTDA"
+    },
+    "itens": [
+      {
+        "sequencia": 1,
+        "codigo_produto": "1001",
+        "descricao": "Mouse USB",
+        "ncm": "8471.60.52",
+        "cfop": "5102",
+        "unidade": "UN",
+        "quantidade": 50,
+        "valor_unitario": 25.00,
+        "valor_total": 1250.00,
+        "frete_rateado": 62.50,
+        "custo_total": 1312.50,
+        "icms": {
+          "base_calculo": 1250.00,
+          "aliquota": 18.00,
+          "valor": 225.00
+        }
+      }
+    ],
+    "totais": {
+      "valor_produtos": 10000.00,
+      "frete": 500.00,
+      "seguro": 50.00,
+      "desconto": 0.00,
+      "icms": 1800.00,
+      "ipi": 0.00,
+      "pis": 165.00,
+      "cofins": 760.00,
+      "valor_total": 12450.00
+    },
+    "pedido_compra": {
+      "numero": "98765",
+      "data": "2025-12-01",
+      "comprador": "João Silva"
+    }
+  }
+}
+
+Response (ERP):
+HTTP 201 Created
+{
+  "status": "sucesso",
+  "mensagem": "NFe importada com sucesso no ERP TOTVS",
+  "protocolo_erp": "TOTVS-2025-67890",
+  "documento_lancamento": "DOC-001234",
+  "centro_custo": "CC-VENDAS",
+  "data_lancamento": "2025-12-17T10:30:15Z"
+}
+
+Log de Integração:
+Timestamp: 17/12/2025 10:30:15
+Sistema Destino: ERP TOTVS
+Endpoint: https://erp.empresa.com/api/v1/notas-fiscais/entrada
+Status: ✅ Sucesso (HTTP 201)
+Protocolo ERP: TOTVS-2025-67890
+Documento Gerado: DOC-001234
+Tentativa: 1/5
+Tempo Resposta: 1,2 segundos
+```
+
+**Validações:**
+- ✅ API ERP deve estar acessível (timeout máx 10s)
+- ✅ Response HTTP 200-299 = sucesso
+- ✅ Se falhar, retry com backoff exponencial (1s, 2s, 4s, 8s, 16s)
+- ✅ Após 5 falhas, alertar equipe de TI
+
+---
+
+### RN012 - Alertas em Tempo Real via SignalR
+
+**Descrição:**
+Notificações push em tempo real para usuários quando NFe é importada, aprovada, rejeitada ou com divergência crítica.
+
+**Justificativa:**
+Reduzir tempo de resposta para aprovações e ações corretivas, melhorando eficiência operacional.
+
+**Implementação:**
+- SignalR Hub: NotasFiscaisHub
+- Grupos: por usuário, por departamento, por perfil
+- Eventos:
+  - NFeImportada: notifica comprador responsável
+  - NFeComDivergencia: alerta comprador + gestor
+  - NFeAprovada: notifica almoxarifado + financeiro
+  - NFeRejeitada: notifica comprador + fornecedor
+  - SLAVencido: escalação para superior
+- Persistência: notificações salvas no banco (tabela Notificacoes)
+- Badge de contagem: "3 NFes aguardando aprovação"
+
+**Exemplo:**
+```
+Evento: NFe Importada com Divergência
+
+SignalR Notification:
+Hub: NotasFiscaisHub
+Method: NotificarDivergenciaNFe
+Target Users:
+  - João Silva (Comprador responsável pelo fornecedor)
+  - Maria Costa (Gestor de Compras)
+  - Grupo: "Compradores"
+
+Payload:
+{
+  "tipo": "nfe_divergencia",
+  "severidade": "alta",
+  "titulo": "NFe com Divergência - Ação Requerida",
+  "mensagem": "NFe 123456 do fornecedor FORNECEDOR LTDA possui divergência de R$ 150 (2 monitores extras). Revisar em até 24h.",
+  "nfe": {
+    "numero": "123456",
+    "fornecedor": "FORNECEDOR LTDA",
+    "valor": 12450.00,
+    "divergencia_valor": 150.00,
+    "divergencia_percentual": 1.2
+  },
+  "acoes": [
+    {
+      "label": "Aprovar NFe",
+      "url": "/gestao/notas-fiscais/123456/aprovar",
+      "cor": "success"
+    },
+    {
+      "label": "Rejeitar NFe",
+      "url": "/gestao/notas-fiscais/123456/rejeitar",
+      "cor": "danger"
+    },
+    {
+      "label": "Ver Detalhes",
+      "url": "/gestao/notas-fiscais/123456",
+      "cor": "primary"
+    }
+  ],
+  "timestamp": "2025-12-17T10:30:00Z",
+  "sla": "2025-12-18T10:30:00Z"
+}
+
+Exibição no Frontend:
+🔴 Notificação Toast (canto superior direito):
+"⚠️ NFe com Divergência
+NFe 123456 - FORNECEDOR LTDA
+Divergência: R$ 150,00 (2 monitores extras)
+SLA: 24 horas
+[Aprovar] [Rejeitar] [Ver Detalhes]"
+
+Badge de Contagem (menu lateral):
+"📄 Notas Fiscais (3)" ← Incrementado
+```
+
+**Validações:**
+- ✅ Usuário deve estar autenticado e conectado ao SignalR
+- ✅ Notificação salva no banco mesmo se usuário offline
+- ✅ Badge atualizado automaticamente
+- ✅ Som de alerta configurável (ativado/desativado por usuário)
+
+---
+
+### RN013 - Retenção de XML Original por 7 Anos (LGPD/Legislação Fiscal)
+
+**Descrição:**
+Sistema armazena XML original da NFe em blob storage com criptografia AES-256 por 7 anos conforme legislação fiscal.
+
+**Justificativa:**
+Legislação fiscal exige guarda de documentos fiscais por 7 anos. LGPD exige segurança e rastreabilidade.
+
+**Implementação:**
+- Upload para Azure Blob Storage ou AWS S3
+- Criptografia em repouso: AES-256
+- Estrutura de pastas: /ano/mes/fornecedor/
+- Política de retenção: 7 anos (2.555 dias)
+- Após 7 anos: exclusão automática ou arquivamento em storage de baixo custo (Glacier)
+- Backup redundante em datacenter secundário
+- Auditoria: log de acesso ao XML (quem, quando, IP)
+
+**Exemplo:**
+```
+NFe Importada:
+Número: 123456
+Chave: 35250112345678000199550010000123451000123456
+Data Emissão: 15/12/2025
+Fornecedor: FORNECEDOR LTDA (CNPJ 12.345.678/0001-99)
+
+Armazenamento Blob Storage:
+Provedor: Azure Blob Storage
+Container: nfes-xml-originais
+Path: /2025/12/fornecedor-12345678000199/NFe_35250112345678000199550010000123451000123456.xml
+URL: https://storage.empresa.com/nfes-xml/2025/12/fornecedor-12345678000199/NFe_352501...xml (URL assinada, válida 1h)
+
+Criptografia:
+Algoritmo: AES-256-CBC
+Chave: Armazenada no Azure Key Vault
+IV: Gerado aleatoriamente por arquivo
+Hash (SHA-256): a1b2c3d4e5f6...
+
+Metadata:
+{
+  "chave_acesso": "35250112345678000199550010000123451000123456",
+  "numero_nfe": "123456",
+  "cnpj_emitente": "12.345.678/0001-99",
+  "cnpj_destinatario": "98.765.432/0001-00",
+  "data_emissao": "2025-12-15",
+  "valor_total": 12450.00,
+  "data_upload": "2025-12-17T10:30:00Z",
+  "usuario_upload": "João Silva",
+  "ip_origem": "192.168.1.100",
+  "tamanho_bytes": 23456,
+  "hash_sha256": "a1b2c3d4e5f6...",
+  "data_retencao_ate": "2032-12-17" ← 7 anos
+}
+
+Política de Lifecycle:
+- Anos 0-2: Hot Storage (acesso frequente)
+- Anos 2-5: Cool Storage (acesso esporádico, 50% mais barato)
+- Anos 5-7: Archive Storage (acesso raro, 80% mais barato)
+- Após 7 anos: Exclusão automática OU transferência para Glacier (backup histórico)
+
+Backup Redundante:
+Primary: Azure Brazil South (São Paulo)
+Secondary: Azure Brazil Southeast (Rio de Janeiro)
+Replicação: Geo-redundante (GRS)
+
+Auditoria de Acesso:
+Evento: Download XML
+Usuário: Auditor Fiscal (José Santos)
+Data: 20/01/2026 15:45:12
+IP: 192.168.2.50
+Motivo: Auditoria interna trimestral
+Arquivo: NFe_352501...xml
+Ação: Permitido (perfil autorizado)
+```
+
+**Validações:**
+- ✅ XML deve ser armazenado IMEDIATAMENTE após importação
+- ✅ Criptografia obrigatória (AES-256 ou superior)
+- ✅ Backup redundante em datacenter diferente
+- ✅ Log de TODOS os acessos ao XML
+
+---
+
+### RN014 - Dashboard Executivo de Notas Fiscais
+
+**Descrição:**
+Dashboard visual com KPIs de notas fiscais: volume mensal, top fornecedores, divergências pendentes, tempo médio de aprovação.
+
+**Justificativa:**
+Gestores precisam de visibilidade rápida sobre status geral de NFes para tomada de decisão.
+
+**Implementação:**
+- Gráficos: ApexCharts ou Chart.js
+- KPIs principais:
+  - Total NFes importadas no mês
+  - Valor total (R$)
+  - NFes pendentes de aprovação
+  - Tempo médio de aprovação
+  - Top 10 fornecedores por valor
+  - Taxa de divergência (%)
+  - NFes rejeitadas/canceladas
+- Filtros: período, fornecedor, comprador, centro de custo
+- Atualização em tempo real via SignalR
+- Exportação: PDF, Excel
+
+**Exemplo:**
+```
+Dashboard - Gestão de Notas Fiscais Estoque
+Período: Dezembro/2025
+
+╔════════════════════════════════════════════════════════════╗
+║  KPIs PRINCIPAIS                                            ║
+╠════════════════════════════════════════════════════════════╣
+║  📄 NFes Importadas: 234 (+12% vs Nov)                     ║
+║  💰 Valor Total: R$ 1.234.567,89 (+8% vs Nov)              ║
+║  ⏳ Pendentes Aprovação: 15 (6,4%)                         ║
+║  ⚡ Tempo Médio Aprovação: 18h 35min (-2h vs Nov)          ║
+║  ⚠️ Taxa Divergência: 8,5% (-1,2% vs Nov)                  ║
+║  ❌ Rejeitadas: 3 (1,3%)                                    ║
+╚════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────┐
+│  📊 VOLUME MENSAL (últimos 12 meses)                        │
+├─────────────────────────────────────────────────────────────┤
+│  [Gráfico de Linhas]                                        │
+│  Jan  Fev  Mar  Abr  Mai  Jun  Jul  Ago  Set  Out  Nov  Dez │
+│  180  195  210  198  205  220  215  225  230  220  209  234 │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  🏢 TOP 10 FORNECEDORES (por valor)                         │
+├─────────────────────────────────────────────────────────────┤
+│  1. FORNECEDOR A LTDA       R$ 234.567,00  (19%)            │
+│  2. FORNECEDOR B S/A        R$ 189.234,50  (15,3%)          │
+│  3. FORNECEDOR C EIRELI     R$ 145.678,90  (11,8%)          │
+│  4. FORNECEDOR D LTDA       R$ 112.345,67  (9,1%)           │
+│  5. FORNECEDOR E S/A        R$ 98.765,43   (8%)             │
+│  ...                                                         │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  ⚠️ DIVERGÊNCIAS PENDENTES (SLA crítico)                    │
+├─────────────────────────────────────────────────────────────┤
+│  NFe 123456 - FORNECEDOR A - R$ 150 - SLA: 2h restantes    │
+│  NFe 123457 - FORNECEDOR B - R$ 320 - SLA: 5h restantes    │
+│  NFe 123458 - FORNECEDOR C - R$ 890 - SLA: VENCIDO (1h)    │
+│  [Ver Todas (15)]                                           │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  📈 TEMPO MÉDIO DE APROVAÇÃO (últimos 30 dias)              │
+├─────────────────────────────────────────────────────────────┤
+│  [Gráfico de Barras]                                        │
+│  Comprador A: 12h                                           │
+│  Comprador B: 18h                                           │
+│  Comprador C: 24h ← Atenção: acima da meta (20h)           │
+│  Comprador D: 16h                                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Validações:**
+- ✅ Dados atualizados em tempo real
+- ✅ Filtros persistidos na sessão do usuário
+- ✅ Exportação fiel ao filtro aplicado
+- ✅ Performance: carregar <2 segundos
+
+---
+
+### RN015 - Multi-tenancy com Limite de NFes por Plano
+
+**Descrição:**
+Isolamento completo de dados por fornecedor (ClienteId) com limites de importação conforme plano contratado.
+
+**Justificativa:**
+SaaS multi-tenant exige isolamento de dados e controle de consumo para precificação justa.
+
+**Implementação:**
+- Filtro global EF Core: .Where(x => x.ClienteId == currentClienteId)
+- Limites por plano:
+  - Básico: 1.000 NFes/mês
+  - Profissional: 5.000 NFes/mês
+  - Enterprise: Ilimitado
+- Se exceder limite: bloqueio de importação + alerta para upgrade
+- Dashboard de consumo: "Você usou 750/1.000 NFes neste mês (75%)"
+- Reset automático todo dia 1º de cada mês
+
+**Exemplo:**
+```
+Fornecedor: MINHA EMPRESA LTDA
+ClienteId: abc-123-def-456
+Plano: Profissional
+Limite: 5.000 NFes/mês
+
+Consumo Dezembro/2025:
+- NFes importadas: 4.850
+- Disponível: 150 (3%)
+
+Tentativa de Importação (NFe 4.851):
+✅ Permitido (ainda dentro do limite)
+
+Tentativa de Importação (NFe 5.001):
+❌ BLOQUEADO
+
+Mensagem para Usuário:
+"⚠️ LIMITE DE IMPORTAÇÃO ATINGIDO
+Seu plano Profissional permite 5.000 NFes/mês.
+Você já importou 5.000 NFes em Dezembro/2025.
+
+Opções:
+1. Aguardar até 01/01/2026 para reset automático
+2. Fazer upgrade para plano Enterprise (importações ilimitadas)
+3. Contratar pacote extra de 1.000 NFes por R$ 199
+
+[Fazer Upgrade] [Contratar Pacote Extra] [Falar com Vendas]"
+
+Auditoria:
+Evento: LIMITE_IMPORTACAO_ATINGIDO
+ClienteId: abc-123-def-456
+Plano: Profissional
+Limite: 5.000
+Consumo: 5.000
+Data: 28/12/2025
+Ação: Bloqueio de importação
+```
+
+**Validações:**
+- ✅ ClienteId obrigatório em todas as queries
+- ✅ Contador de consumo atualizado em tempo real
+- ✅ Reset automático no dia 1º às 00:00 UTC
+- ✅ Alertas aos 80%, 90%, 95%, 100% do limite
+
+---
+
+## SEÇÃO 3: REFERÊNCIAS AO SISTEMA LEGADO
+
+### 3.1 Telas Web Forms (ASPX)
+
+| Tela Legada | Funcionalidade | Observações |
+|-------------|----------------|-------------|
+| `Cadastro/NotaFiscalEntrada.aspx` | Cadastro manual de NFe | Substituída por importação automática de XML |
+| `Cadastro/NotaFiscalEntradaItem.aspx` | Itens da NFe | Parsing automático do XML |
+| `Relatorios/NotasFiscaisEntrada.aspx` | Listagem e filtros | Migrado para Angular com DataGrid avançado |
+| `Validacao/ValidarNFeSEFAZ.aspx` | Validação manual SEFAZ | Automática via WebService |
+
+### 3.2 Stored Procedures
+
+| Procedure Legada | Finalidade | Status Modernização |
+|------------------|------------|---------------------|
+| `sp_ImportarNFeXML` | Parser XML manual | Substituída por NFeXmlParser.cs (C#) |
+| `sp_CalcularImpostosNFe` | Cálculo de impostos | Migrado para ImpostosCalculator.cs |
+| `sp_RatearFreteNFe` | Rateio de frete | Migrado para FreteRateioService.cs |
+| `sp_LancarEstoqueNFe` | Lançamento manual | Automático via EstoqueMovimentacaoService.cs |
+
+### 3.3 Tabelas do Banco
+
+| Tabela Legada | Nova Tabela | Mudanças Principais |
+|---------------|-------------|---------------------|
+| `NotaFiscalEntrada` | `NotaFiscalEstoque` | +ClienteId, +XmlOriginalUrl, +StatusSEFAZ |
+| `NotaFiscalEntradaItem` | `NotaFiscalEstoqueItem` | +ImpostosJSON, +FreteRateado |
+| `NotaFiscalEntradaImpostos` | (incorporado) | JSON dentro de NotaFiscalEstoqueItem.ImpostosJSON |
+
+### 3.4 Web Services
+
+| WebService Legado | Endpoint Modernizado | Tecnologia |
+|-------------------|----------------------|------------|
+| `WS/NotaFiscal.asmx` | `/api/notas-fiscais-estoque` | Minimal API (.NET 10) |
+| `WS/ValidacaoSEFAZ.asmx` | `SEFAZValidationService.cs` | HttpClient + Polly retry |
+
+### 3.5 Mapeamento Funcional
+
+| Funcionalidade | Legado | Modernizado |
+|----------------|--------|-------------|
+| Importação XML | Upload manual, 1 arquivo por vez | Drag-and-drop múltiplos + e-mail automático |
+| Validação SEFAZ | Não suportado | Automática em tempo real |
+| OCR de PDF | Não suportado | Tesseract + Azure Form Recognizer |
+| Conciliação Pedido | Manual em planilha | Automática com alertas |
+| Cálculo Impostos | Stored procedures | Engine fiscal C# atualizada |
+| Workflow Aprovação | E-mails manuais | Workflow automático + SLA |
+| DANFE | Geração externa | PDF/A com QR Code automático |
+| Auditoria | Logs básicos | Rastreabilidade completa 7 anos |
+
+---
+
+## SEÇÃO 4: IMPACTO E DEPENDÊNCIAS
+
+### 4.1 Dependências de Outros RFs
+
+| RF Dependente | Tipo Dependência | Descrição |
+|---------------|------------------|-----------|
+| **RF008 - Gestão de Fornecedores** | **CRÍTICA** | CNPJ do fornecedor deve existir na base |
+| **RF010 - Gestão de Produtos** | **CRÍTICA** | Produtos da NFe devem estar cadastrados (ou criar automático) |
+| **RF019 - Gestão de Pedidos de Compra** | **ALTA** | Conciliação NFe ↔ Pedido |
+| **RF021 - Gestão de Estoque** | **CRÍTICA** | Lançamento automático de entrada |
+| **RF024 - Gestão de Centros de Custo** | **MÉDIA** | Rateio de custos por CC |
+| **RF001 - Parâmetros e Configurações** | **ALTA** | Tolerâncias, SLAs, limites de plano |
+| **RF003 - Auditoria** | **ALTA** | Log de todas as operações |
+| **RF006 - Gestão de Usuários** | **ALTA** | Workflow de aprovação, RBAC |
+
+### 4.2 Tecnologias Utilizadas
+
+**Backend:**
+- **.NET 10** - Runtime principal
+- **Entity Framework Core 10** - ORM para SQL Server
+- **MediatR** - CQRS (Commands/Queries)
+- **FluentValidation** - Validação de dados
+- **Hangfire** - Jobs agendados (importação e-mail, limpeza)
+- **Polly** - Retry policy para SEFAZ
+- **iTextSharp** - Geração de DANFE em PDF/A
+- **Tesseract** - OCR de PDFs (gratuito)
+- **Azure Form Recognizer** - OCR avançado (pago)
+- **SignalR** - Notificações em tempo real
+- **Azure Blob Storage** - Armazenamento de XMLs (7 anos)
+
+**Frontend:**
+- **Angular 19** - Framework SPA
+- **Angular Material** - Componentes UI
+- **ApexCharts** - Gráficos do dashboard
+- **Transloco** - Internacionalização (i18n)
+- **ngx-file-drop** - Drag-and-drop de arquivos
+
+**Integrações:**
+- **WebService SEFAZ** - Validação de NFes
+- **ViaCEP** - Validação de endereços
+- **APIs ERPs** - SAP, TOTVS, Protheus
+
+### 4.3 Complexidade de Implementação
+
+**Complexidade Geral:** MUITO ALTA
+
+| Componente | Complexidade | Estimativa | Justificativa |
+|------------|--------------|-----------|---------------|
+| **Parser XML NFe** | ALTA | 40h | Schema SEFAZ v4.0 é extenso (300+ campos) |
+| **Validação SEFAZ** | MÉDIA | 16h | WebService oficial, mas instável |
+| **OCR de PDFs** | MUITO ALTA | 60h | Treinamento de IA, múltiplos layouts DANFE |
+| **Conciliação Pedidos** | ALTA | 32h | Matching fuzzy, tolerâncias, alertas |
+| **Engine Fiscal** | MUITO ALTA | 80h | ICMS, IPI, PIS, COFINS, DIFAL, ST, reduções |
+| **Workflow Aprovação** | MÉDIA | 24h | MediatR + aprovações multinível |
+| **Geração DANFE PDF/A** | MÉDIA | 20h | Layout oficial + QR Code |
+| **SignalR Notifications** | BAIXA | 12h | Já implementado em outros RFs |
+| **Dashboard Executivo** | MÉDIA | 24h | ApexCharts + KPIs |
+| **Testes Automatizados** | ALTA | 40h | 150+ cenários de teste |
+| **Total** | **MUITO ALTA** | **348h** | ~9 semanas (2 devs) |
+
+### 4.4 Riscos Identificados
+
+| Risco | Probabilidade | Impacto | Mitigação |
+|-------|---------------|---------|-----------|
+| **SEFAZ indisponível/instável** | ALTA | ALTO | Retry com backoff exponencial, cache 1h |
+| **OCR com baixa precisão em PDFs ruins** | MÉDIA | MÉDIO | Fallback para revisão manual, treinamento contínuo IA |
+| **NFes com layout fora do padrão** | MÉDIA | MÉDIO | Parser robusto com tratamento de exceções |
+| **Fornecedores não enviam XML** | BAIXA | ALTO | OCR + busca SEFAZ automática |
+| **Divergências excessivas** | MÉDIA | MÉDIO | Tolerâncias configuráveis, workflow flexível |
+| **Performance com volume alto** | BAIXA | ALTO | Processamento assíncrono, índices otimizados |
+| **Limite de importação atingido** | MÉDIA | BAIXO | Alertas proativos, upgrade fácil de plano |
+
+---
+
+## SEÇÃO 5: INTEGRAÇÃO COM CENTRAL DE FUNCIONALIDADES
+
+### 5.1 Permissões RBAC
+
+**Módulo:** `GES.NOTAS_FISCAIS_ESTOQUE`
+
+| Permissão | Código | Descrição | Roles Padrão |
+|-----------|--------|-----------|--------------|
+| **Visualizar** | `GES.NOTAS_FISCAIS_ESTOQUE.VIEW` | Visualizar lista e detalhes de NFes | Comprador, Gestor, Financeiro, Auditor |
+| **Importar** | `GES.NOTAS_FISCAIS_ESTOQUE.IMPORT` | Importar XMLs/PDFs de NFes | Comprador, Almoxarife |
+| **Aprovar Menor** | `GES.NOTAS_FISCAIS_ESTOQUE.APPROVE_MINOR` | Aprovar divergências <R$ 500 | Comprador |
+| **Aprovar Maior** | `GES.NOTAS_FISCAIS_ESTOQUE.APPROVE_MAJOR` | Aprovar divergências >R$ 500 | Gestor, Diretor |
+| **Rejeitar** | `GES.NOTAS_FISCAIS_ESTOQUE.REJECT` | Rejeitar NFes com problemas | Comprador, Gestor |
+| **Lançar Estoque** | `GES.NOTAS_FISCAIS_ESTOQUE.POST_INVENTORY` | Forçar lançamento manual no estoque | Almoxarife, Gestor |
+| **Cancelar** | `GES.NOTAS_FISCAIS_ESTOQUE.CANCEL` | Cancelar NFe lançada (estorno) | Gestor, Controller |
+| **Exportar** | `GES.NOTAS_FISCAIS_ESTOQUE.EXPORT` | Exportar relatórios Excel/PDF | Comprador, Gestor, Auditor |
+| **Configurar** | `GES.NOTAS_FISCAIS_ESTOQUE.CONFIGURE` | Configurar tolerâncias, SLAs, integração ERP | Super Admin, Diretor |
+| **Auditar** | `GES.NOTAS_FISCAIS_ESTOQUE.AUDIT` | Acessar logs de auditoria completos | Auditor, Controller, Super Admin |
+
+### 5.2 Chaves i18n (Internacionalização)
+
+**Namespace:** `ges.notasFiscaisEstoque`
+
+```json
+{
+  "ges.notasFiscaisEstoque": {
+    "title": "Gestão de Notas Fiscais Estoque",
+    "subtitle": "Importação, validação e lançamento de NFes de entrada",
+    "actions": {
+      "import": "Importar NFe",
+      "importMultiple": "Importar Múltiplas NFes",
+      "validate": "Validar na SEFAZ",
+      "approve": "Aprovar NFe",
+      "reject": "Rejeitar NFe",
+      "postInventory": "Lançar no Estoque",
+      "cancel": "Cancelar NFe",
+      "generateDANFE": "Gerar DANFE",
+      "viewXML": "Visualizar XML",
+      "downloadXML": "Baixar XML"
+    },
+    "fields": {
+      "chaveAcesso": "Chave de Acesso",
+      "numero": "Número NFe",
+      "serie": "Série",
+      "dataEmissao": "Data Emissão",
+      "fornecedor": "Fornecedor",
+      "valorTotal": "Valor Total",
+      "statusSEFAZ": "Status SEFAZ",
+      "statusInterno": "Status Interno",
+      "divergenciaValor": "Divergência Valor",
+      "pedidoVinculado": "Pedido Vinculado",
+      "comprador": "Comprador Responsável",
+      "dataImportacao": "Data Importação",
+      "dataAprovacao": "Data Aprovação"
+    },
+    "status": {
+      "aguardandoValidacao": "Aguardando Validação SEFAZ",
+      "autorizada": "Autorizada pela SEFAZ",
+      "cancelada": "Cancelada",
+      "rejeitada": "Rejeitada",
+      "aguardandoAprovacao": "Aguardando Aprovação",
+      "aprovada": "Aprovada",
+      "lancadaEstoque": "Lançada no Estoque",
+      "divergencia": "Com Divergência"
+    },
+    "messages": {
+      "importSuccess": "NFe importada com sucesso!",
+      "importError": "Erro ao importar NFe: {{error}}",
+      "validateSuccess": "NFe validada na SEFAZ com sucesso!",
+      "validateError": "Erro na validação SEFAZ: {{error}}",
+      "approveSuccess": "NFe aprovada e lançada no estoque!",
+      "rejectSuccess": "NFe rejeitada com sucesso",
+      "duplicateDetected": "NFe duplicada! Já importada em {{date}} por {{user}}",
+      "slaExpired": "SLA vencido! Aprovação pendente há {{hours}} horas",
+      "limitReached": "Limite de importações atingido! {{used}}/{{limit}} NFes no mês"
+    },
+    "validations": {
+      "chaveAcessoInvalida": "Chave de acesso inválida (deve ter 44 dígitos)",
+      "xmlInvalido": "XML inválido ou corrompido",
+      "cnpjDiferente": "CNPJ destinatário não corresponde à empresa logada",
+      "divergenciaAcimaToleranc": "Divergência acima da tolerância configurada",
+      "pedidoNaoEncontrado": "Pedido de compra não encontrado",
+      "sefazCancelada": "NFe cancelada na SEFAZ - não pode ser importada"
+    }
+  }
+}
+```
+
+### 5.3 Campos de Auditoria
+
+**Tabela:** `NotaFiscalEstoque`
+
+| Campo Auditoria | Tipo | Descrição |
+|-----------------|------|-----------|
+| `CriadoPor` | NVARCHAR(450) | Usuário que importou a NFe |
+| `CriadoEm` | DATETIME2 | Data/hora da importação |
+| `AlteradoPor` | NVARCHAR(450) | Último usuário que modificou |
+| `AlteradoEm` | DATETIME2 | Data/hora última modificação |
+| `AprovadoPor` | NVARCHAR(450) | Usuário que aprovou |
+| `AprovadoEm` | DATETIME2 | Data/hora da aprovação |
+| `RejeitadoPor` | NVARCHAR(450) | Usuário que rejeitou |
+| `RejeitadoEm` | DATETIME2 | Data/hora da rejeição |
+| `LancadoPor` | NVARCHAR(450) | Usuário que lançou no estoque |
+| `LancadoEm` | DATETIME2 | Data/hora do lançamento |
+
+**Operações Auditadas:**
+- ✅ Importação de NFe (XML ou PDF)
+- ✅ Validação na SEFAZ
+- ✅ Aprovação (com justificativa se divergência)
+- ✅ Rejeição (com motivo obrigatório)
+- ✅ Lançamento no estoque
+- ✅ Cancelamento/estorno
+- ✅ Download de XML original
+- ✅ Geração de DANFE
+- ✅ Alteração de configurações
+
+### 5.4 Multi-tenancy
+
+**Discriminador:** `ClienteId` (GUID do fornecedor)
+
+**Filtro Global EF Core:**
+```csharp
+modelBuilder.Entity<NotaFiscalEstoque>().HasQueryFilter(e => e.ClienteId == _currentClienteId);
+```
+
+**Índices Multi-tenant:**
+```sql
+CREATE NONCLUSTERED INDEX IX_NotaFiscalEstoque_ClienteId_DataEmissao
+ON NotaFiscalEstoque(ClienteId, DataEmissao DESC)
+WHERE FlExcluido = 0;
+
+CREATE UNIQUE NONCLUSTERED INDEX UX_NotaFiscalEstoque_ClienteId_ChaveAcesso
+ON NotaFiscalEstoque(ClienteId, ChaveAcesso)
+WHERE FlExcluido = 0;
+```
+
+**Limites por Plano:**
+- **Básico:** 1.000 NFes/mês
+- **Profissional:** 5.000 NFes/mês
+- **Enterprise:** Ilimitado
+
+---
+
+**FIM DA ESPECIFICAÇÃO RF042**

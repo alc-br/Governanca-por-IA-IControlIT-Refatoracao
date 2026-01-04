@@ -1,0 +1,458 @@
+# RL-RF054 - Referência ao Legado: Gestão de Lotes de Auditoria
+
+rl_id: RL-RF054
+rf_relacionado: RF054
+versao: "1.0"
+data: "2025-12-30"
+fase: "Fase-6-Ativos-Auditoria-Integracoes"
+epic: "EPIC010-AUD-Auditoria-Avancada"
+
+# ==============================================================================
+# SEÇÃO 1: METADADOS DO DOCUMENTO
+# ==============================================================================
+
+metadados:
+  objetivo: "Registrar referências ao sistema legado (ASPX+VB.NET) de Gestão de Lotes de Auditoria"
+  escopo: "Mapear telas ASPX, stored procedures, WebServices ASMX e tabelas para rastreabilidade e migração"
+  nao_especifica_requisitos: true
+  apenas_memoria_historica: true
+
+# ==============================================================================
+# SEÇÃO 2: BANCO DE DADOS LEGADO
+# ==============================================================================
+
+banco_dados_legado:
+  nome_banco: "IControlIT_Base"
+  tecnologia: "SQL Server 2014+"
+
+  tabelas:
+    - nome: "tb_AuditoriaBatch"
+      descricao: "Tabela principal de lotes de auditoria no legado"
+      destino: "SUBSTITUÍDA"
+      destino_detalhado: "Migrada para entidade AuditBatch (.NET 10)"
+      schema: |
+        CREATE TABLE tb_AuditoriaBatch (
+            ID_AuditoriaBatch INT PRIMARY KEY IDENTITY(1,1),
+            ID_Conglomerado INT NOT NULL,
+            NM_Batch NVARCHAR(200) NOT NULL,
+            DS_Batch NVARCHAR(MAX),
+            DT_Inicio DATETIME,
+            DT_Fim DATETIME,
+            QT_Faturas INT DEFAULT 0,
+            QT_Processadas INT DEFAULT 0,
+            ST_Lote NVARCHAR(50),
+            ID_Auditor INT,
+            ID_JobHangfire NVARCHAR(100),
+            VL_TotalGlosa DECIMAL(18,2) DEFAULT 0,
+            PC_Progresso DECIMAL(5,2) DEFAULT 0,
+            DS_Erro NVARCHAR(MAX),
+            DT_Criacao DATETIME DEFAULT GETDATE(),
+            ID_UsuarioCriacao INT
+        )
+      problemas_identificados:
+        - "ST_Lote como string livre (permitia valores inconsistentes)"
+        - "Sem foreign keys para ID_Conglomerado e ID_Auditor"
+        - "PC_Progresso calculado incorretamente"
+        - "ID_JobHangfire nunca utilizado (coluna morta)"
+        - "Sem campos de auditoria (UpdatedBy, UpdatedAt, IsDeleted)"
+      mapeamento_campos:
+        ID_AuditoriaBatch: "AuditBatch.Id (Guid)"
+        ID_Conglomerado: "AuditBatch.CompanyId (Guid)"
+        NM_Batch: "AuditBatch.Name"
+        DS_Batch: "AuditBatch.Description"
+        DT_Inicio: "AuditBatch.StartedAt"
+        DT_Fim: "AuditBatch.CompletedAt"
+        QT_Faturas: "AuditBatch.TotalInvoices"
+        QT_Processadas: "AuditBatch.ProcessedInvoices"
+        ST_Lote: "AuditBatch.Status (enum AuditBatchStatus)"
+        ID_Auditor: "AuditBatch.AssignedAuditorId"
+        VL_TotalGlosa: "AuditBatch.TotalGlossesValue"
+
+    - nome: "tb_AuditoriaBatchCriteria"
+      descricao: "Armazena critérios de seleção configurados para o lote"
+      destino: "SUBSTITUÍDA"
+      destino_detalhado: "Migrada para entidade AuditBatchCriteria (.NET 10)"
+      schema: |
+        CREATE TABLE tb_AuditoriaBatchCriteria (
+            ID_Criterio INT PRIMARY KEY IDENTITY(1,1),
+            ID_AuditoriaBatch INT NOT NULL,
+            TP_Criterio NVARCHAR(50),
+            VL_Criterio NVARCHAR(MAX)
+        )
+      problemas_identificados:
+        - "VL_Criterio como JSON manual (parsing propenso a erros)"
+        - "Sem tipagem forte"
+        - "Sem validação de critérios válidos"
+      mapeamento_campos:
+        ID_Criterio: "AuditBatchCriteria.Id (Guid)"
+        ID_AuditoriaBatch: "AuditBatchCriteria.AuditBatchId"
+        TP_Criterio: "AuditBatchCriteria.CriteriaType (enum)"
+        VL_Criterio: "Campos individuais tipados (StartDate, EndDate, CarrierId, etc.)"
+
+    - nome: "tb_AuditoriaBatchInvoices"
+      descricao: "Associação many-to-many entre lotes e faturas selecionadas"
+      destino: "SUBSTITUÍDA"
+      destino_detalhado: "Migrada para entidade AuditBatchInvoice (.NET 10)"
+      schema: |
+        CREATE TABLE tb_AuditoriaBatchInvoices (
+            ID_BatchInvoice INT PRIMARY KEY IDENTITY(1,1),
+            ID_AuditoriaBatch INT NOT NULL,
+            ID_Fatura INT NOT NULL,
+            ST_Processamento NVARCHAR(50),
+            DT_Processamento DATETIME,
+            DS_Erro NVARCHAR(MAX),
+            QT_Tentativas INT DEFAULT 0
+        )
+      problemas_identificados:
+        - "Sem índice composto em (ID_AuditoriaBatch, ID_Fatura)"
+        - "ST_Processamento como string livre"
+        - "Sem campo HangfireJobId (não rastreava job específico)"
+      mapeamento_campos:
+        ID_BatchInvoice: "AuditBatchInvoice.Id (Guid)"
+        ID_AuditoriaBatch: "AuditBatchInvoice.AuditBatchId"
+        ID_Fatura: "AuditBatchInvoice.InvoiceId"
+        ST_Processamento: "AuditBatchInvoice.ProcessingStatus (enum)"
+        QT_Tentativas: "AuditBatchInvoice.RetryAttempts"
+
+# ==============================================================================
+# SEÇÃO 3: STORED PROCEDURES LEGADO
+# ==============================================================================
+
+stored_procedures:
+  - nome: "pa_AuditoriaBatch_Create"
+    descricao: "Cria novo lote de auditoria no legado"
+    destino: "DESCARTADO"
+    destino_detalhado: "Substituído por Command CQRS CreateAuditBatchCommand"
+    assinatura: |
+      CREATE PROCEDURE pa_AuditoriaBatch_Create
+          @ID_Conglomerado INT,
+          @NM_Batch NVARCHAR(200),
+          @DS_Batch NVARCHAR(MAX),
+          @ID_Auditor INT = NULL,
+          @ID_UsuarioCriacao INT
+    regras_negocio_extraidas:
+      - "Status inicial sempre 'Criado' (RN-LOT-054-05)"
+      - "Data de criação automática (auditoria automática no moderno)"
+      - "Auditor opcional (RN-LOT-054-04)"
+
+  - nome: "pa_AuditoriaBatch_SelectInvoices"
+    descricao: "Seleciona faturas baseado em critérios do lote"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "Job Hangfire SelectInvoicesForBatchJob"
+    assinatura: |
+      CREATE PROCEDURE pa_AuditoriaBatch_SelectInvoices
+          @ID_AuditoriaBatch INT,
+          @DT_InicioPeriodo DATE = NULL,
+          @DT_FimPeriodo DATE = NULL,
+          @ID_Operadora INT = NULL,
+          @ID_Filial INT = NULL,
+          @VL_Minimo DECIMAL(18,2) = NULL,
+          @VL_Maximo DECIMAL(18,2) = NULL
+    regras_negocio_extraidas:
+      - "Critérios opcionais (RN-LOT-054-01)"
+      - "Faturas em lotes ativos não incluídas (RN-LOT-054-03)"
+      - "Atualização automática de contador de faturas"
+    problemas_identificados:
+      - "Processamento síncrono (travamento prolongado)"
+      - "Sem transação explícita"
+      - "Query N+1 na subquery de exclusão"
+
+  - nome: "pa_AuditoriaBatch_UpdateStatus"
+    descricao: "Atualiza status do lote durante processamento"
+    destino: "DESCARTADO"
+    destino_detalhado: "State Machine gerenciada pelo Domain Model"
+    assinatura: |
+      CREATE PROCEDURE pa_AuditoriaBatch_UpdateStatus
+          @ID_AuditoriaBatch INT,
+          @ST_Lote NVARCHAR(50)
+    problemas_identificados:
+      - "Aceita qualquer string sem validação"
+      - "Não registra histórico de mudanças"
+      - "Não valida transições de estado"
+
+  - nome: "pa_AuditoriaBatch_GetProgress"
+    descricao: "Calcula progresso do processamento do lote"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "Cálculo em tempo real via SignalR"
+    assinatura: |
+      CREATE PROCEDURE pa_AuditoriaBatch_GetProgress
+          @ID_AuditoriaBatch INT
+    regras_negocio_extraidas:
+      - "Progresso = (processadas / total) × 100 (RN-LOT-054-07)"
+      - "Considerar sucesso e erro como processadas"
+
+  - nome: "pa_AuditoriaBatch_Archive"
+    descricao: "Arquiva lotes antigos concluídos"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "Job Hangfire ArchiveOldBatchesJob"
+    assinatura: |
+      CREATE PROCEDURE pa_AuditoriaBatch_Archive
+          @DiasAposConclusao INT = 90
+    regras_negocio_extraidas:
+      - "Arquivamento automático após 90 dias por padrão"
+      - "Apenas lotes concluídos podem ser arquivados"
+
+# ==============================================================================
+# SEÇÃO 4: TELAS ASPX LEGADO
+# ==============================================================================
+
+telas_aspx:
+  - nome: "AuditoriaBatch.aspx"
+    titulo: "Listagem de Lotes de Auditoria"
+    caminho: "ic1_legado/IControlIT/Auditoria/AuditoriaBatch.aspx"
+    code_behind: "AuditoriaBatch.aspx.vb"
+    destino: "SUBSTITUÍDA"
+    destino_detalhado: "Componente Angular AuditBatchesListComponent"
+    funcionalidades:
+      - "GridView com paginação manual (20 registros/página)"
+      - "Filtros: Status, Auditor, Período de Criação"
+      - "Botões: Criar Novo, Processar, Cancelar, Arquivar"
+    componentes_ui:
+      - "asp:GridView"
+      - "asp:DropDownList"
+      - "asp:Button"
+      - "asp:UpdatePanel"
+    problemas_identificados:
+      - "Sem ordenação de colunas"
+      - "Sem busca textual"
+      - "Paginação manual ineficiente"
+
+  - nome: "AuditoriaBatchCreate.aspx"
+    titulo: "Criar Lote de Auditoria"
+    caminho: "ic1_legado/IControlIT/Auditoria/AuditoriaBatchCreate.aspx"
+    code_behind: "AuditoriaBatchCreate.aspx.vb"
+    destino: "SUBSTITUÍDA"
+    destino_detalhado: "Componente Angular AuditBatchCreateComponent"
+    funcionalidades:
+      - "Campos: Nome, Descrição"
+      - "Critérios de Seleção (accordion)"
+      - "Auditor Responsável (dropdown)"
+      - "Botão Estimar Faturas"
+    problemas_identificados:
+      - "JavaScript legado sem framework (jQuery 1.x)"
+      - "Validações duplicadas e inconsistentes"
+      - "Sem feedback visual de progresso"
+
+  - nome: "AuditoriaBatchEdit.aspx"
+    titulo: "Editar Lote de Auditoria"
+    caminho: "ic1_legado/IControlIT/Auditoria/AuditoriaBatchEdit.aspx"
+    code_behind: "AuditoriaBatchEdit.aspx.vb"
+    destino: "SUBSTITUÍDA"
+    destino_detalhado: "Mesmo componente AuditBatchCreateComponent (modo edição)"
+    funcionalidades:
+      - "Reutiliza layout de Create"
+      - "Bloqueia edição de critérios após início"
+    problemas_identificados:
+      - "Duplicação de código com Create"
+      - "Lógica de bloqueio inconsistente"
+
+  - nome: "AuditoriaBatchMonitor.aspx"
+    titulo: "Monitorar Processamento de Lote"
+    caminho: "ic1_legado/IControlIT/Auditoria/AuditoriaBatchMonitor.aspx"
+    code_behind: "AuditoriaBatchMonitor.aspx.vb"
+    destino: "SUBSTITUÍDA"
+    destino_detalhado: "Componente Angular AuditBatchMonitorComponent com SignalR"
+    funcionalidades:
+      - "Barra de progresso manual"
+      - "Botão Atualizar (refresh manual via AJAX)"
+      - "Lista de faturas com status"
+      - "Botão Cancelar Processamento"
+    problemas_identificados:
+      - "Sem atualização em tempo real"
+      - "Timer AutoPostBack a cada 5s (ineficiente)"
+      - "Barra de progresso fake (não refletia progresso real)"
+      - "Sobrecarga no servidor (polling excessivo)"
+
+  - nome: "AuditoriaBatchDetail.aspx"
+    titulo: "Detalhes do Lote de Auditoria"
+    caminho: "ic1_legado/IControlIT/Auditoria/AuditoriaBatchDetail.aspx"
+    code_behind: "AuditoriaBatchDetail.aspx.vb"
+    destino: "SUBSTITUÍDA"
+    destino_detalhado: "Componente Angular AuditBatchDetailComponent"
+    funcionalidades:
+      - "Informações do lote (readonly)"
+      - "Valores consolidados"
+      - "Estatísticas"
+      - "GridView de faturas auditadas"
+      - "Botão Exportar Excel (SSRS)"
+    problemas_identificados:
+      - "Sem histórico de auditoria das operações"
+      - "Exportação apenas Excel (sem PDF)"
+      - "Relatório SSRS lento para lotes grandes"
+
+# ==============================================================================
+# SEÇÃO 5: WEBSERVICES LEGADO (ASMX)
+# ==============================================================================
+
+webservices_asmx:
+  - nome: "WSAuditoriaBatch.asmx"
+    caminho: "ic1_legado/IControlIT/WebServices/WSAuditoriaBatch.asmx"
+    linguagem: "VB.NET"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "API REST .NET 10 (Minimal APIs)"
+
+    metodos:
+      - nome: "CreateBatch"
+        assinatura: "Function CreateBatch(ID_Conglomerado, NM_Batch, DS_Batch, ID_Auditor?) As Integer"
+        destino: "SUBSTITUÍDO"
+        destino_detalhado: "POST /api/audit-batches"
+
+      - nome: "SelectInvoicesForBatch"
+        assinatura: "Sub SelectInvoicesForBatch(ID_AuditoriaBatch, criterios As Dictionary)"
+        destino: "SUBSTITUÍDO"
+        destino_detalhado: "Job Hangfire assíncrono (não mais endpoint síncrono)"
+        problemas:
+          - "Método síncrono bloqueante (travava por minutos)"
+          - "Parsing manual de Dictionary (erros de runtime)"
+
+      - nome: "StartProcessing"
+        assinatura: "Sub StartProcessing(ID_AuditoriaBatch)"
+        destino: "SUBSTITUÍDO"
+        destino_detalhado: "POST /api/audit-batches/{id}/process (dispara job assíncrono)"
+        problemas:
+          - "Loop síncrono fatura por fatura (catastrófico)"
+          - "Timeout HTTP garantido para >100 faturas"
+          - "Sem recovery em caso de crash"
+
+      - nome: "GetBatchProgress"
+        assinatura: "Function GetBatchProgress(ID_AuditoriaBatch) As Object"
+        destino: "SUBSTITUÍDO"
+        destino_detalhado: "Hub SignalR /hubs/audit-batches (push real-time, não polling)"
+
+      - nome: "CancelBatch"
+        assinatura: "Sub CancelBatch(ID_AuditoriaBatch)"
+        destino: "SUBSTITUÍDO"
+        destino_detalhado: "POST /api/audit-batches/{id}/cancel (com rollback completo)"
+        problemas:
+          - "Sem rollback (bug crítico)"
+          - "Sem registro de histórico de cancelamento"
+
+      - nome: "GetBatchDetails"
+        assinatura: "Function GetBatchDetails(ID_AuditoriaBatch) As Object"
+        destino: "SUBSTITUÍDO"
+        destino_detalhado: "GET /api/audit-batches/{id}"
+
+# ==============================================================================
+# SEÇÃO 6: PROBLEMAS E GAPS IDENTIFICADOS
+# ==============================================================================
+
+problemas_criticos:
+  - id: "PROB-LOT-01"
+    titulo: "Processamento Síncrono Bloqueante"
+    descricao: "Lotes processados de forma síncrona no WebService, travando tela e causando timeouts"
+    impacto: "Impossível processar lotes >500 faturas sem timeout HTTP"
+    solucao_moderna: "Hangfire com jobs assíncronos paralelos (RN-LOT-054-06)"
+    destino: "RESOLVIDO"
+
+  - id: "PROB-LOT-02"
+    titulo: "Sem Retry Automático"
+    descricao: "Faturas falhadas não reprocessadas automaticamente"
+    impacto: "Taxa de erro ~15-20%, reprocessamento manual"
+    solucao_moderna: "Retry policy exponencial (RN-LOT-054-08)"
+    destino: "RESOLVIDO"
+
+  - id: "PROB-LOT-03"
+    titulo: "Sem Monitoramento em Tempo Real"
+    descricao: "Progresso conhecido apenas por polling manual"
+    impacto: "Ansiedade do usuário, sobrecarga do servidor"
+    solucao_moderna: "SignalR com push real-time (RN-LOT-054-07)"
+    destino: "RESOLVIDO"
+
+  - id: "PROB-LOT-04"
+    titulo: "Sem Rollback em Cancelamento"
+    descricao: "Cancelar lote não revertia itens criados"
+    impacto: "Dados inconsistentes, cleanup manual"
+    solucao_moderna: "Rollback automático completo (RN-LOT-054-13)"
+    destino: "RESOLVIDO"
+
+  - id: "PROB-LOT-05"
+    titulo: "Estado Inconsistente em Restart"
+    descricao: "Restart do servidor travava lotes em processamento"
+    impacto: "Necessidade de script SQL manual"
+    solucao_moderna: "Hangfire persiste jobs em banco, recovery automático"
+    destino: "RESOLVIDO"
+
+  - id: "PROB-LOT-06"
+    titulo: "Validações Inconsistentes"
+    descricao: "Validações client-side diferentes de server-side"
+    impacto: "Dados inválidos chegavam ao banco"
+    solucao_moderna: "FluentValidation (backend) + Angular Forms (frontend) com mesmas regras"
+    destino: "RESOLVIDO"
+
+# ==============================================================================
+# SEÇÃO 7: FUNCIONALIDADES DESCARTADAS (NÃO MIGRADAS)
+# ==============================================================================
+
+funcionalidades_descartadas:
+  - id: "FUNC-DESC-01"
+    nome: "Barra de Progresso Fake"
+    descricao: "Legado tinha barra que não refletia progresso real"
+    motivo_descarte: "Enganava usuário, substituída por progresso real via SignalR"
+    destino: "DESCARTADO"
+
+  - id: "FUNC-DESC-02"
+    nome: "Estimativa de Faturas sem Criar Lote"
+    descricao: "Botão 'Estimar' chamava SP sem criar lote"
+    motivo_descarte: "Desnecessária, sistema moderno mostra estimativa em tempo real conforme usuário configura critérios"
+    destino: "DESCARTADO"
+
+  - id: "FUNC-DESC-03"
+    nome: "Relatórios SSRS Específicos"
+    descricao: "Relatórios customizados em SSRS"
+    motivo_descarte: "Substituídos por exportação Excel/PDF genérica com ClosedXML/QuestPDF"
+    destino: "DESCARTADO"
+
+# ==============================================================================
+# SEÇÃO 8: GAPS FUNCIONAIS (LEGADO NÃO TINHA, MODERNO TEM)
+# ==============================================================================
+
+gaps_funcionais:
+  - id: "GAP-LOT-01"
+    titulo: "Notificações Assíncronas via Azure Service Bus"
+    legado: "Sem notificações (apenas emails manuais)"
+    moderno: "Azure Service Bus + webhooks (RN-LOT-054-12)"
+    destino: "NOVO"
+
+  - id: "GAP-LOT-02"
+    titulo: "SLA e Alertas de Timeout"
+    legado: "Sem monitoramento de SLA"
+    moderno: "SLA configurável + alertas automáticos (RN-LOT-054-14)"
+    destino: "NOVO"
+
+  - id: "GAP-LOT-03"
+    titulo: "Dashboard de KPIs em Tempo Real"
+    legado: "Relatórios SSRS estáticos"
+    moderno: "Dashboard Angular com atualização automática"
+    destino: "NOVO"
+
+  - id: "GAP-LOT-04"
+    titulo: "Histórico Completo de Auditoria"
+    legado: "Sem rastreamento de operações"
+    moderno: "Auditoria total com usuário, IP, data/hora (RN-LOT-054-11)"
+    destino: "NOVO"
+
+  - id: "GAP-LOT-05"
+    titulo: "Máquina de Estados Rigorosa"
+    legado: "Transições de estado sem validação"
+    moderno: "State Machine com validação (RN-LOT-054-05)"
+    destino: "NOVO"
+
+# ==============================================================================
+# ESTATÍSTICAS DE MIGRAÇÃO
+# ==============================================================================
+
+estatisticas_migracao:
+  tabelas_legado: 3
+  tabelas_substituidas: 3
+  stored_procedures_legado: 5
+  stored_procedures_descartados: 2
+  stored_procedures_substituidos: 3
+  telas_aspx_legado: 5
+  telas_aspx_substituidas: 5
+  webservice_metodos_legado: 6
+  webservice_metodos_substituidos: 6
+  problemas_criticos_resolvidos: 6
+  funcionalidades_descartadas: 3
+  gaps_funcionais_novos: 5
+  total_itens_rastreados: 28
+  cobertura_destino: 100  # Todos os 28 itens têm destino explícito

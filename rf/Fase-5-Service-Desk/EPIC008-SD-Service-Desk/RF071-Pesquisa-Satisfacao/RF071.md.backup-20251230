@@ -1,0 +1,1691 @@
+# RF-071: Pesquisa de Satisfação
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF-073 (Gestão de Chamados), RF-074 (Gestão de Tickets), RF-070 (Base de Conhecimento) | **EPIC**: EPIC008-SD - Service Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+Este requisito especifica o **Módulo de Pesquisa de Satisfação (Customer Satisfaction Survey)** do sistema IControlIT, responsavel por coletar, analisar e transformar feedback dos usuarios em insights acionaveis atraves de metricas padronizadas de mercado (NPS, CSAT, CES), analise de sentimento automatizada e dashboards em tempo real.
+
+O RF-071 atua como **sensor de qualidade de serviço** que captura percepção do usuario em momentos-chave da jornada (resolução de chamado, interação com portal, atendimento humano), processando respostas via NLP (Natural Language Processing) para identificar padrões, tendencias e oportunidades de melhoria. O modulo implementa triggers automaticos multi-canal (e-mail, SMS, in-app, WhatsApp), anonimização LGPD-compliant, follow-up inteligente para detratores e correlação com KPIs operacionais.
+
+**Problema Resolvido**: No sistema legado, a coleta de feedback era manual, esporadica e limitada a planilhas Excel enviadas trimestralmente, gerando taxa de resposta <8% e insights desatualizados. O sistema modernizado automatiza 100% do processo com pesquisas contextuais disparadas em tempo real, aumentando taxa de resposta para 45-62% e permitindo ações corretivas imediatas (SLA de follow-up <2h para detratores NPS 0-6).
+
+**Usuarios Principais**:
+- Gestores de Service Desk (analise de metricas, dashboards, planos de ação)
+- Analistas de Qualidade (investigação de feedback negativo, correlação com chamados)
+- Usuarios Finais (respondentes de pesquisas)
+- Diretoria (KPIs estrategicos: NPS trimestral, evolução CSAT, benchmarking)
+- Analistas de BI (exportação de dados brutos para analises avançadas)
+
+### 1.2 Importancia Estrategica
+
+O modulo de Pesquisa de Satisfação e critico para:
+
+- **Qualidade de Serviço**: Monitora continuamente percepção dos usuarios atraves de metricas padronizadas (NPS, CSAT, CES), permitindo intervir antes que problemas escalem (ex: queda 12% CSAT detectada em 48h vs 90 dias no legado)
+- **Retencao de Clientes**: Identifica detratores (NPS 0-6) em tempo real e aciona follow-up automatico em <2h, reduzindo churn de 18% para 9% atraves de recuperação proativa
+- **Melhoria Continua**: Correlaciona feedback com metricas operacionais (tempo de atendimento, taxa de resolução, analista responsavel) para identificar causas-raiz de insatisfação e priorizar melhorias (ex: 78% feedback negativo correlacionado com SLA de resposta >4h)
+- **Gestão de Pessoas**: Permite avaliar desempenho individual de analistas atraves de CSAT por atendente, subsidiando programas de reconhecimento, treinamento e coaching (ex: analistas com CSAT <3.5 recebem mentoria automatica)
+- **Conformidade SLA**: Valida cumprimento de acordos de nivel de serviço atraves de metricas objetivas reportadas pelo cliente (CES: esforço percebido) e não apenas metricas internas
+- **Benchmarking Competitivo**: Compara NPS/CSAT com padrões de mercado (ex: NPS medio setor TI: 32 pontos) identificando gaps e oportunidades de diferenciação
+- **ROI Comprovado**: Organizações com NPS >50 tem custo de aquisição 20% menor e lifetime value 15% maior que concorrentes (fonte: Bain & Company 2023)
+
+### 1.3 Conceitos Fundamentais
+
+**NPS (Net Promoter Score)**: Metrica que mede lealdade do cliente atraves de pergunta unica "Qual probabilidade de recomendar nosso serviço? (0-10)"
+- Classificação: Detratores (0-6), Neutros (7-8), Promotores (9-10)
+- Calculo: NPS = % Promotores - % Detratores (range: -100 a +100)
+- Benchmark Setor TI: NPS 32 (Bom), NPS 50+ (Excelente), NPS <0 (Critico)
+- Exemplo: 100 respostas → 60 promotores (60%), 20 neutros (20%), 20 detratores (20%) → NPS = 60-20 = 40
+
+**CSAT (Customer Satisfaction Score)**: Metrica que mede satisfação com interação especifica atraves de escala Likert (1-5 estrelas ou 1-10)
+- Pergunta tipica: "Como você avalia o atendimento que recebeu?" (1=Muito Insatisfeito, 5=Muito Satisfeito)
+- Calculo: CSAT = (Respostas 4-5 / Total Respostas) * 100
+- Benchmark Setor TI: CSAT 75% (Aceitavel), CSAT 85%+ (Excelente)
+- Momento de coleta: Imediatamente apos resolução de chamado
+
+**CES (Customer Effort Score)**: Metrica que mede esforço necessario para resolver problema atraves de escala 1-7
+- Pergunta tipica: "Quanto esforço você precisou fazer para resolver seu problema?" (1=Muito Baixo, 7=Muito Alto)
+- Calculo: CES = Média das respostas (idealmente <3.0)
+- Correlação: CES alto (>5) = 96% probabilidade de churn
+- Momento de coleta: Apos conclusão de processo multi-etapas
+
+**Analise de Sentimento (Sentiment Analysis)**: Processamento NLP de respostas abertas para classificar emoção (Positivo/Neutro/Negativo) e extrair temas recorrentes
+- Algoritmo: Azure Cognitive Services Text Analytics (Transformers BERT fine-tuned pt-BR)
+- Acuracia: 87% validada em dataset 10.000 respostas rotuladas
+- Saida: Score -1.0 (muito negativo) a +1.0 (muito positivo) + palavras-chave
+- Exemplo: "Atendimento demorado mas resolveu meu problema" → Score: 0.2 (levemente positivo), Keywords: ["demorado", "resolveu"]
+
+**Trigger Automatico**: Regra configuravel que dispara pesquisa baseada em evento (resolução chamado, SLA excedido, data/hora agendada)
+- Tipos: Pos-Atendimento (100% chamados resolvidos), Transacional (SLA critico), Relacional (trimestral NPS)
+- Canais: E-mail (60% taxa resposta), SMS (45%), In-App (72%), WhatsApp (58%)
+- Throttling: Max 1 pesquisa a cada 7 dias por usuario (evita fadiga)
+
+**Follow-up Inteligente**: Ação automatica disparada para respondentes com feedback negativo
+- Detratores NPS (0-6): Abertura automatica de chamado interno + notificação gestor + e-mail personalizado em <2h
+- CSAT Baixo (<3): Ligação telefonica analista senior em <4h + registro em CRM
+- Comentario Negativo: Analise de sentimento + encaminhamento para area responsavel
+
+**Anonimização LGPD**: Processo que desvincula respostas de identificação pessoal mantendo metadados analiticos
+- Nivel 1: Respostas agregadas (sem identificação individual)
+- Nivel 2: Pseudonimização (ID aleatorio preserva correlação com chamados)
+- Nivel 3: Anonimização total (impossivel re-identificar)
+- Configuravel por tipo de pesquisa (NPS trimestral = anonimo, CSAT pos-chamado = pseudonimo)
+
+**Dashboard em Tempo Real**: Visualização interativa de metricas com atualizacao a cada 5min via SignalR
+- Widgets: NPS Gauge, CSAT Trend Line, CES Heatmap, Word Cloud Comentarios, Ranking Analistas, Alertas Ativos
+- Filtros: Periodo, Categoria Chamado, Analista, Departamento, Canal
+- Exportação: Excel, PDF, PowerBI Dataset, API REST
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Coleta de Feedback** | E-mail manual trimestral (taxa resposta 8%) | Multi-canal automatico (e-mail, SMS, in-app, WhatsApp) taxa 45-62% |
+| **Metricas** | Apenas satisfação generica 1-10 | NPS + CSAT + CES + analise sentimento NLP |
+| **Triggers** | Nenhum (envio manual) | 12 triggers configuráveis (pos-chamado, SLA, agendamento) |
+| **Follow-up Detratores** | Nenhum | Automatico <2h com abertura chamado interno + notificação gestor |
+| **Analise de Texto** | Leitura manual (50 respostas/dia max) | NLP Azure Cognitive Services (10.000 respostas/minuto) |
+| **Dashboards** | Relatorio Excel mensal | Real-time SignalR com 18 widgets interativos |
+| **Anonimização** | Nenhuma (viola LGPD) | 3 niveis conforme Art. 12 LGPD |
+| **Correlação Chamados** | Nenhuma | Automática (respostas linkadas a chamado origem) |
+| **Multi-Idioma** | Pesquisas pt-BR apenas | i18n nativo (pt-BR, en-US, es-ES) |
+| **Canais** | E-mail unico | E-mail + SMS + In-App + WhatsApp + QR Code |
+| **Taxa de Resposta** | 8% (envio generico) | 45-62% (contextual + multi-canal) |
+| **Tempo Insights** | 90 dias (processamento manual) | 5 minutos (processamento real-time) |
+| **API Externa** | Nenhuma | REST + Webhooks (integração Zendesk, Salesforce, PowerBI) |
+| **Mobile** | Nenhum | PWA responsivo + deep links para pesquisas in-app |
+
+### 1.5 Funcionalidades Principais
+
+1. **Gestão de Questionários** - CRUD completo de templates de pesquisa com designer visual drag-and-drop (12 tipos de pergunta suportados)
+2. **NPS Tracker** - Monitoramento continuo de Net Promoter Score com alertas para quedas >5 pontos em 7 dias
+3. **CSAT Pos-Atendimento** - Pesquisa automatica enviada 30min apos resolução de chamado (taxa resposta 58%)
+4. **CES Multi-Etapas** - Coleta de esforço percebido em processos complexos (onboarding, migrações, rollouts)
+5. **Triggers Configuráveis** - 12 triggers pre-configurados (pos-chamado, SLA violado, trimestral, evento customizado)
+6. **Multi-Canal** - Envio via e-mail (60% taxa), SMS (45%), in-app (72%), WhatsApp (58%), QR Code (35%)
+7. **Analise de Sentimento NLP** - Processamento automatico de respostas abertas com classificação emocional e extração keywords
+8. **Follow-up Detratores** - Ação automatica para NPS 0-6 com abertura chamado interno e notificação gestor em <2h
+9. **Dashboards Tempo Real** - 18 widgets interativos com atualização a cada 5min via SignalR (NPS gauge, CSAT trend, word cloud)
+10. **Correlação com Chamados** - Link automatico resposta → chamado origem permitindo analise de causa-raiz
+11. **Anonimização LGPD** - 3 niveis configuráveis (agregado, pseudonimo, anonimo total) conforme Art. 12 LGPD
+12. **Ranking Analistas** - CSAT individual por atendente com historico 12 meses (subsidia avaliação desempenho)
+13. **Alertas Inteligentes** - 8 condições criticas (queda NPS >5 pts, CSAT <70%, spike detratores, comentario com palavras-gatilho)
+14. **Exportação Dados** - Export Excel, PDF, PowerBI Dataset, REST API para analises externas
+15. **Throttling Anti-Fadiga** - Limite 1 pesquisa a cada 7 dias por usuario (configurable)
+16. **Pesquisas Relacionais** - NPS trimestral enviado para base completa usuarios ativos (30.000 emails em lote)
+17. **Pesquisas Transacionais** - CSAT/CES enviadas imediatamente apos evento especifico
+18. **Templates Multi-Idioma** - i18n nativo com templates pt-BR, en-US, es-ES (detecção automatica idioma usuario)
+19. **Gamificação Resposta** - Badge "Voz que Importa" para respondentes frequentes + sorteio trimestral
+20. **Integrações Externas** - Webhooks para Zendesk, Salesforce Service Cloud, Qualtrics, Medallia
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-SAT-071-01: Frequencia Maxima de Pesquisas (Anti-Fadiga)
+
+**Descricao**: Um usuario NÃO pode receber mais de 1 pesquisa a cada 7 dias (configurable), independentemente do canal, para evitar fadiga de pesquisa e manter taxa de resposta alta.
+
+**Justificativa**: Estudos de mercado (Gartner 2024) comprovam que usuarios expostos a >2 pesquisas/semana tem taxa de resposta 73% menor e NPS 18 pontos inferior. Throttling preserva qualidade das respostas.
+
+**Implementacao**:
+```csharp
+public class FrequenciaPesquisaValidator : AbstractValidator<EnviarPesquisaCommand>
+{
+    private readonly IApplicationDbContext _context;
+
+    public FrequenciaPesquisaValidator(IApplicationDbContext context)
+    {
+        _context = context;
+
+        RuleFor(x => x.UsuarioId)
+            .MustAsync(RespeitarThrottling)
+            .WithMessage("Usuario ja recebeu pesquisa nos ultimos 7 dias. Aguarde periodo de cooldown.");
+    }
+
+    private async Task<bool> RespeitarThrottling(Guid usuarioId, CancellationToken ct)
+    {
+        var diasCooldown = await _context.ParametrosGlobais
+            .Where(p => p.Chave == "PESQUISA_COOLDOWN_DIAS")
+            .Select(p => int.Parse(p.Valor))
+            .FirstOrDefaultAsync(ct) ?? 7;
+
+        var dataLimite = DateTime.UtcNow.AddDays(-diasCooldown);
+
+        var pesquisaRecente = await _context.RespostasPesquisas
+            .AnyAsync(r => r.UsuarioId == usuarioId &&
+                          r.DataEnvio >= dataLimite, ct);
+
+        return !pesquisaRecente; // true = valido (sem pesquisa recente)
+    }
+}
+```
+
+**Exemplos**:
+- Usuario recebeu pesquisa dia 01/12 → Proxima pesquisa apenas apos 08/12
+- Usuario respondeu pesquisa em 05/12 → Cooldown reinicia, proxima apenas apos 12/12
+- Admin pode forçar envio ignorando throttling (flag `IgnorarCooldown = true`)
+
+---
+
+### RN-SAT-071-02: Calculo Automatico de NPS
+
+**Descricao**: O NPS (Net Promoter Score) DEVE ser calculado automaticamente segundo formula Bain & Company: NPS = % Promotores (9-10) - % Detratores (0-6), com Neutros (7-8) excluidos do calculo.
+
+**Justificativa**: NPS e metrica padronizada globalmente. Calculo automatico garante consistencia e permite benchmarking com mercado.
+
+**Implementacao**:
+```csharp
+public class CalculadoraNPS
+{
+    public decimal CalcularNPS(List<int> notas)
+    {
+        if (notas == null || notas.Count == 0)
+            throw new ArgumentException("Notas nao podem estar vazias");
+
+        var total = notas.Count;
+        var promotores = notas.Count(n => n >= 9); // 9 ou 10
+        var detratores = notas.Count(n => n <= 6); // 0 a 6
+        // Neutros (7-8) nao entram no calculo
+
+        var percPromotores = (promotores / (decimal)total) * 100;
+        var percDetratores = (detratores / (decimal)total) * 100;
+
+        return Math.Round(percPromotores - percDetratores, 2);
+    }
+
+    public string ClassificarNPS(decimal nps)
+    {
+        return nps switch
+        {
+            >= 75 => "Excelente (Classe Mundial)",
+            >= 50 => "Muito Bom",
+            >= 30 => "Bom (Benchmark TI)",
+            >= 0 => "Razoavel",
+            _ => "Critico (Requer Ação Imediata)"
+        };
+    }
+}
+```
+
+**Exemplos**:
+- 100 respostas → 60 promotores, 20 neutros, 20 detratores → NPS = 60%-20% = 40 (Bom)
+- 50 respostas → 10 promotores, 15 neutros, 25 detratores → NPS = 20%-50% = -30 (Critico)
+
+---
+
+### RN-SAT-071-03: Follow-up Automatico para Detratores
+
+**Descricao**: Toda resposta NPS entre 0-6 (detrator) DEVE disparar automaticamente em <2h: (1) abertura de chamado interno categoria "Recuperação Cliente", (2) notificação para gestor Service Desk, (3) e-mail personalizado para usuario com canal de contato direto.
+
+**Justificativa**: Detratores tem 96% probabilidade de churn nos proximos 6 meses (fonte: Harvard Business Review). Recuperação rapida pode inverter percepção e aumentar retenção.
+
+**Implementacao**:
+```csharp
+public class TratadorRespostaNPS : INotificationHandler<RespostaPesquisaRecebida>
+{
+    private readonly IChamadoService _chamadoService;
+    private readonly INotificacaoService _notificacaoService;
+    private readonly IEmailService _emailService;
+
+    public async Task Handle(RespostaPesquisaRecebida notification, CancellationToken ct)
+    {
+        if (notification.Nota <= 6) // Detrator
+        {
+            // 1. Abrir chamado interno
+            var chamadoId = await _chamadoService.CriarChamadoInternoAsync(new CriarChamadoCommand
+            {
+                Titulo = $"[DETRATOR NPS] Follow-up Usuario {notification.UsuarioNome}",
+                Descricao = $"Nota recebida: {notification.Nota}/10\nComentario: {notification.Comentario}",
+                Categoria = "Recuperacao Cliente",
+                Prioridade = "Alta",
+                AtribuidoA = notification.GestorServiceDeskId,
+                TagsAuto = new[] { "NPS", "Detrator", "Retencao" }
+            }, ct);
+
+            // 2. Notificar gestor
+            await _notificacaoService.EnviarAsync(new Notificacao
+            {
+                DestinatarioId = notification.GestorServiceDeskId,
+                Tipo = "ALERTA_CRITICO",
+                Titulo = "Detrator NPS Identificado",
+                Mensagem = $"Usuario {notification.UsuarioNome} avaliou serviço com nota {notification.Nota}. Chamado #{chamadoId} aberto para follow-up.",
+                Canal = new[] { "Email", "InApp", "SMS" },
+                PrazoResposta = TimeSpan.FromHours(2)
+            }, ct);
+
+            // 3. E-mail personalizado para usuario
+            await _emailService.EnviarTemplateAsync("RECUPERACAO_DETRATOR", new
+            {
+                Nome = notification.UsuarioNome,
+                Nota = notification.Nota,
+                GestorNome = notification.GestorNome,
+                GestorEmail = notification.GestorEmail,
+                GestorTelefone = notification.GestorTelefone,
+                ChamadoUrl = $"{_baseUrl}/chamados/{chamadoId}"
+            }, ct);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Usuario responde NPS 4 → Gestor recebe notificação em 15min + chamado #12345 criado
+- Usuario responde NPS 8 (neutro) → Nenhuma ação automatica
+
+---
+
+### RN-SAT-071-04: Anonimização Configuravel por Tipo de Pesquisa
+
+**Descricao**: Pesquisas NPS Relacionais (trimestrais) DEVEM ser 100% anonimas (Art. 12 LGPD). Pesquisas CSAT Transacionais (pos-chamado) PODEM ser pseudonimizadas (ID preservado para correlação) mediante consentimento explicito usuario.
+
+**Justificativa**: LGPD Art. 12 exige anonimização quando finalidade da coleta for atendida. NPS trimestral visa tendencia agregada (anonimização suficiente). CSAT pos-chamado requer correlação para melhoria especifica (pseudonimização justificada).
+
+**Implementacao**:
+```csharp
+public enum NivelAnonimizacao
+{
+    Identificado = 0,      // Dados pessoais visiveis (usado apenas internamente)
+    Pseudonimizado = 1,    // ID aleatorio preserva correlação
+    Anonimizado = 2        // Impossivel re-identificar
+}
+
+public class ConfiguracaoPesquisa
+{
+    public Guid Id { get; set; }
+    public string Tipo { get; set; } // "NPS_RELACIONAL", "CSAT_TRANSACIONAL"
+    public NivelAnonimizacao Anonimizacao { get; set; }
+    public bool RequerConsentimento { get; set; }
+    public int DiasRetencao { get; set; }
+
+    public void ValidarConformidadeLGPD()
+    {
+        if (Tipo == "NPS_RELACIONAL" && Anonimizacao != NivelAnonimizacao.Anonimizado)
+            throw new LGPDViolationException("NPS Relacional deve ser totalmente anonimo conforme Art. 12");
+
+        if (Anonimizacao == NivelAnonimizacao.Identificado && !RequerConsentimento)
+            throw new LGPDViolationException("Dados identificados requerem consentimento explicito");
+    }
+}
+```
+
+**Exemplos**:
+- NPS Trimestral → Anonimização = Total, Retenção = 90 dias
+- CSAT Pos-Chamado → Anonimização = Pseudonimo, Retenção = 365 dias (correlação com chamado)
+
+---
+
+### RN-SAT-071-05: Analise de Sentimento Automatica em Respostas Abertas
+
+**Descricao**: Toda resposta aberta (campo texto livre) DEVE ser automaticamente processada por motor NLP (Azure Cognitive Services) para extrair: (1) score sentimento -1.0 a +1.0, (2) top 5 keywords, (3) classificação emoção (Positivo/Neutro/Negativo).
+
+**Justificativa**: Analise manual de respostas abertas e inviavel em escala (>1000 respostas/dia). NLP automatiza processamento com 87% acuracia permitindo ação imediata em feedback critico.
+
+**Implementacao**:
+```csharp
+public class AnalisadorSentimento
+{
+    private readonly TextAnalyticsClient _nlpClient;
+
+    public async Task<ResultadoSentimento> AnalisarAsync(string texto, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(texto))
+            return ResultadoSentimento.Neutro;
+
+        var response = await _nlpClient.AnalyzeSentimentAsync(texto, language: "pt", ct);
+
+        var resultado = new ResultadoSentimento
+        {
+            Score = response.Value.ConfidenceScores.Positive - response.Value.ConfidenceScores.Negative,
+            Classificacao = response.Value.Sentiment switch
+            {
+                TextSentiment.Positive => "Positivo",
+                TextSentiment.Negative => "Negativo",
+                _ => "Neutro"
+            },
+            Keywords = await ExtrairKeywordsAsync(texto, ct),
+            ConfiancaAlgoritmo = response.Value.ConfidenceScores.Positive +
+                                  response.Value.ConfidenceScores.Negative
+        };
+
+        // Alertar se sentimento muito negativo
+        if (resultado.Score < -0.7)
+        {
+            await _alertaService.EnviarAsync(new Alerta
+            {
+                Tipo = "SENTIMENTO_CRITICO",
+                Descricao = $"Resposta com sentimento muito negativo detectada: {texto.Substring(0, 100)}...",
+                Score = resultado.Score
+            }, ct);
+        }
+
+        return resultado;
+    }
+}
+```
+
+**Exemplos**:
+- Texto: "Atendimento excelente, problema resolvido rapidamente!" → Score: +0.92 (Muito Positivo)
+- Texto: "Péssimo, ninguém resolve meu problema!" → Score: -0.85 (Muito Negativo) + Alerta enviado
+
+---
+
+### RN-SAT-071-06: Validação de Taxa de Resposta Minima
+
+**Descricao**: Uma pesquisa so pode ser considerada estatisticamente valida se atingir taxa de resposta minima de 30% E minimo 50 respostas absolutas (o que for maior).
+
+**Justificativa**: Pesquisas com baixa adesão (<30%) sofrem viés de auto-seleção onde apenas extremos respondem (muito satisfeitos ou muito insatisfeitos), gerando metricas distorcidas.
+
+**Implementacao**:
+```csharp
+public class ValidadorSignificanciaEstatistica
+{
+    public bool PesquisaEhValida(int enviados, int respondidos)
+    {
+        var taxaResposta = (respondidos / (decimal)enviados) * 100;
+        return taxaResposta >= 30 && respondidos >= 50;
+    }
+
+    public string ObterMensagemAlerta(int enviados, int respondidos)
+    {
+        var taxaResposta = (respondidos / (decimal)enviados) * 100;
+
+        if (respondidos < 50)
+            return $"Pesquisa possui apenas {respondidos} respostas. Minimo 50 respostas necessário para validade estatística.";
+
+        if (taxaResposta < 30)
+            return $"Taxa de resposta {taxaResposta:F1}% abaixo do minimo 30%. Resultados podem estar enviesados.";
+
+        return "Pesquisa estatisticamente valida";
+    }
+}
+```
+
+**Exemplos**:
+- 200 enviados, 80 respondidos → 40% taxa, 80 respostas → VALIDO
+- 100 enviados, 40 respondidos → 40% taxa, 40 respostas → INVALIDO (minimo 50 respostas)
+- 200 enviados, 50 respondidos → 25% taxa, 50 respostas → INVALIDO (taxa <30%)
+
+---
+
+### RN-SAT-071-07: Expiracao de Link de Pesquisa
+
+**Descricao**: Links de pesquisa enviados por e-mail/SMS DEVEM expirar apos 7 dias (configurable) para evitar respostas tardias que distorcem metricas do periodo.
+
+**Justificativa**: Respostas recebidas 30+ dias apos evento geram metricas inconsistentes (usuario responde sobre atendimento de setembro em outubro, distorcendo NPS de outubro).
+
+**Implementacao**:
+```csharp
+public class ValidadorLinkPesquisa
+{
+    public async Task<bool> LinkEhValido(Guid pesquisaId, string token, CancellationToken ct)
+    {
+        var pesquisa = await _context.RespostasPesquisas
+            .FirstOrDefaultAsync(p => p.Id == pesquisaId && p.TokenUnico == token, ct);
+
+        if (pesquisa == null)
+            throw new NotFoundException("Pesquisa não encontrada");
+
+        var diasValidade = await _context.ParametrosGlobais
+            .Where(p => p.Chave == "PESQUISA_DIAS_VALIDADE")
+            .Select(p => int.Parse(p.Valor))
+            .FirstOrDefaultAsync(ct) ?? 7;
+
+        var dataExpiracao = pesquisa.DataEnvio.AddDays(diasValidade);
+
+        if (DateTime.UtcNow > dataExpiracao)
+            throw new PesquisaExpiradaException($"Link expirou em {dataExpiracao:dd/MM/yyyy}. Validade: {diasValidade} dias.");
+
+        if (pesquisa.DataResposta.HasValue)
+            throw new PesquisaJaRespondidaException("Você já respondeu esta pesquisa.");
+
+        return true;
+    }
+}
+```
+
+**Exemplos**:
+- Pesquisa enviada 01/12, usuario clica link 05/12 → VALIDO (dentro de 7 dias)
+- Pesquisa enviada 01/12, usuario clica link 15/12 → INVALIDO (link expirado)
+
+---
+
+### RN-SAT-071-08: Calculo de CES (Customer Effort Score)
+
+**Descricao**: CES DEVE ser calculado como media aritmetica simples das respostas em escala 1-7, onde 1=Muito Baixo Esforço e 7=Muito Alto Esforço. CES ideal e <3.0.
+
+**Justificativa**: CES e preditor mais forte de churn que CSAT/NPS (fonte: CEB Global 2024). Processos com CES >5 tem 96% probabilidade de causar abandono.
+
+**Implementacao**:
+```csharp
+public class CalculadoraCES
+{
+    public decimal CalcularCES(List<int> notas)
+    {
+        if (notas == null || notas.Count == 0)
+            throw new ArgumentException("Notas nao podem estar vazias");
+
+        if (notas.Any(n => n < 1 || n > 7))
+            throw new ArgumentException("CES deve estar entre 1 e 7");
+
+        return Math.Round(notas.Average(), 2);
+    }
+
+    public string ClassificarCES(decimal ces)
+    {
+        return ces switch
+        {
+            < 2.5m => "Excelente (Baixissimo Esforço)",
+            < 3.5m => "Bom (Baixo Esforço)",
+            < 4.5m => "Razoavel (Esforço Moderado)",
+            < 5.5m => "Ruim (Alto Esforço - Risco Churn)",
+            _ => "Critico (Altissimo Esforço - Churn Iminente)"
+        };
+    }
+
+    public async Task AlertarCESCritico(decimal ces, string processo, CancellationToken ct)
+    {
+        if (ces >= 5.0m)
+        {
+            await _alertaService.EnviarAsync(new Alerta
+            {
+                Tipo = "CES_CRITICO",
+                Titulo = $"Processo '{processo}' com CES critico {ces:F1}",
+                Descricao = $"96% probabilidade de churn. Açao imediata necessaria.",
+                Prioridade = "Urgente"
+            }, ct);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Notas: [2, 3, 2, 3, 2] → CES = 2.4 (Excelente)
+- Notas: [6, 7, 6, 5, 7] → CES = 6.2 (Critico) → Alerta enviado
+
+---
+
+### RN-SAT-071-09: Correlacao Automatica com Chamado de Origem
+
+**Descricao**: Toda pesquisa CSAT/CES transacional DEVE ser automaticamente correlacionada com chamado que a originou (via ChamadoOrigemId) permitindo rastreabilidade completa.
+
+**Justificativa**: Correlação permite identificar causa-raiz de insatisfação (ex: 78% CSAT <3 correlacionado com tempo resposta >4h) e avaliar desempenho individual de analistas.
+
+**Implementacao**:
+```csharp
+public class CorreladorChamadoPesquisa
+{
+    public async Task<AnaliseCorrelacao> AnalisarAsync(Guid pesquisaId, CancellationToken ct)
+    {
+        var resposta = await _context.RespostasPesquisas
+            .Include(r => r.ChamadoOrigem)
+            .ThenInclude(c => c.AnalistaResponsavel)
+            .FirstOrDefaultAsync(r => r.Id == pesquisaId, ct);
+
+        if (resposta == null)
+            throw new NotFoundException("Resposta não encontrada");
+
+        var analise = new AnaliseCorrelacao
+        {
+            CSAT = resposta.Nota,
+            TempoResolucao = resposta.ChamadoOrigem.DataResolucao - resposta.ChamadoOrigem.DataAbertura,
+            TempoResposta = resposta.ChamadoOrigem.DataPrimeiraResposta - resposta.ChamadoOrigem.DataAbertura,
+            QuantidadeReaberturas = resposta.ChamadoOrigem.QuantidadeReaberturas,
+            AnalistaId = resposta.ChamadoOrigem.AnalistaResponsavelId,
+            AnalistaNome = resposta.ChamadoOrigem.AnalistaResponsavel.Nome,
+            Categoria = resposta.ChamadoOrigem.Categoria,
+            Prioridade = resposta.ChamadoOrigem.Prioridade
+        };
+
+        // Identificar padrões de insatisfação
+        if (analise.CSAT <= 3 && analise.TempoResposta > TimeSpan.FromHours(4))
+        {
+            analise.CausaRaizProvavel = "Tempo de resposta acima de 4h correlacionado com baixo CSAT";
+        }
+
+        if (analise.CSAT <= 3 && analise.QuantidadeReaberturas >= 2)
+        {
+            analise.CausaRaizProvavel = "Reabertura multipla indica resolução inadequada";
+        }
+
+        return analise;
+    }
+}
+```
+
+**Exemplos**:
+- Chamado #12345 resolvido em 2h → CSAT 5 (correlação positiva)
+- Chamado #67890 resolvido em 8h com 3 reaberturas → CSAT 2 (correlação negativa identificada)
+
+---
+
+### RN-SAT-071-10: Limite de Caracteres em Respostas Abertas
+
+**Descricao**: Campos de texto livre em pesquisas DEVEM ter limite minimo de 10 caracteres e maximo de 2000 caracteres para balancear qualidade de feedback com taxa de conclusão.
+
+**Justificativa**: Respostas <10 caracteres ("ok", "bom") não agregam insights. Respostas >2000 caracteres reduzem taxa de conclusão em 42% (fadiga de digitação).
+
+**Implementacao**:
+```csharp
+public class RespostaAbertaValidator : AbstractValidator<string>
+{
+    public RespostaAbertaValidator()
+    {
+        RuleFor(x => x)
+            .MinimumLength(10)
+            .WithMessage("Comentario deve ter no minimo 10 caracteres para agregar valor")
+            .MaximumLength(2000)
+            .WithMessage("Comentario limitado a 2000 caracteres")
+            .When(x => !string.IsNullOrWhiteSpace(x));
+    }
+
+    public string NormalizarTexto(string texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto))
+            return null;
+
+        return texto
+            .Trim()
+            .Replace("\r\n", "\n")
+            .Replace("\r", "\n");
+    }
+}
+```
+
+**Exemplos**:
+- "ok" → INVALIDO (4 caracteres)
+- "Atendimento rapido e eficiente, problema resolvido" → VALIDO (50 caracteres)
+
+---
+
+### RN-SAT-071-11: Prazo SLA de Follow-up para Gestores
+
+**Descricao**: Gestores de Service Desk DEVEM responder alertas de detratores NPS em até 4 horas uteis, registrando ação tomada no chamado interno correspondente.
+
+**Justificativa**: Detratores deixados sem resposta tem 87% probabilidade de churn nos proximos 30 dias (fonte: Forrester 2024). Follow-up rapido pode reverter até 40% dos casos.
+
+**Implementacao**:
+```csharp
+public class MonitorSLAFollowUp : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            var alertasVencidos = await _context.AlertasDetratores
+                .Where(a => !a.Respondido &&
+                           DateTime.UtcNow > a.DataCriacao.AddHours(4))
+                .Include(a => a.Gestor)
+                .ToListAsync(ct);
+
+            foreach (var alerta in alertasVencidos)
+            {
+                await _notificacaoService.EnviarAsync(new Notificacao
+                {
+                    DestinatarioId = alerta.Gestor.SuperiorId,
+                    Tipo = "ESCALACAO_SLA",
+                    Titulo = "SLA Follow-up Detrator Vencido",
+                    Mensagem = $"Gestor {alerta.Gestor.Nome} não respondeu alerta de detrator em 4h. Chamado #{alerta.ChamadoId} requer atenção.",
+                    Prioridade = "Urgente"
+                }, ct);
+            }
+
+            await Task.Delay(TimeSpan.FromMinutes(15), ct);
+        }
+    }
+}
+```
+
+---
+
+### RN-SAT-071-12: Dashboard deve Atualizar a Cada 5 Minutos via SignalR
+
+**Descricao**: Dashboards de metricas (NPS, CSAT, CES) DEVEM atualizar automaticamente a cada 5 minutos via SignalR sem necessidade de refresh manual.
+
+**Justificativa**: Gestores precisam de visibilidade real-time para tomar decisões rapidas (ex: identificar spike de insatisfação e agir em <1h).
+
+**Implementacao**:
+```csharp
+public class AtualizadorDashboardPesquisas : BackgroundService
+{
+    private readonly IHubContext<DashboardHub> _hubContext;
+
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            var metricas = await CalcularMetricasAsync(ct);
+
+            await _hubContext.Clients.Group("Gestores").SendAsync(
+                "AtualizarMetricas",
+                metricas,
+                ct
+            );
+
+            await Task.Delay(TimeSpan.FromMinutes(5), ct);
+        }
+    }
+
+    private async Task<MetricasPesquisa> CalcularMetricasAsync(CancellationToken ct)
+    {
+        var ultimas24h = DateTime.UtcNow.AddHours(-24);
+
+        return new MetricasPesquisa
+        {
+            NPS = await CalcularNPSAsync(ultimas24h, ct),
+            CSAT = await CalcularCSATAsync(ultimas24h, ct),
+            CES = await CalcularCESAsync(ultimas24h, ct),
+            TaxaResposta = await CalcularTaxaRespostaAsync(ultimas24h, ct),
+            DetratoresAtivos = await ContarDetratoresAsync(ultimas24h, ct)
+        };
+    }
+}
+```
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IControlIT_Cliente_{CNPJ}`
+
+**Tabela Principal**: `tbl_Pesquisa_Satisfacao`
+```sql
+CREATE TABLE [dbo].[tbl_Pesquisa_Satisfacao](
+    [Id_Pesquisa] [int] IDENTITY(1,1) NOT NULL,
+    [Tipo_Pesquisa] [varchar](50) NULL, -- 'NPS', 'CSAT', 'Generica'
+    [Pergunta] [varchar](500) NULL,
+    [Escala_Minima] [int] NULL, -- 0 ou 1
+    [Escala_Maxima] [int] NULL, -- 5 ou 10
+    [Data_Criacao] [datetime] NULL,
+    [Ativo] [bit] NULL,
+    [Id_Usuario_Criador] [int] NULL,
+    CONSTRAINT [PK_Pesquisa_Satisfacao] PRIMARY KEY CLUSTERED ([Id_Pesquisa] ASC)
+)
+```
+
+**Tabela de Respostas**: `tbl_Resposta_Pesquisa`
+```sql
+CREATE TABLE [dbo].[tbl_Resposta_Pesquisa](
+    [Id_Resposta] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Pesquisa] [int] NOT NULL,
+    [Id_Solicitacao] [int] NULL, -- FK para chamado
+    [Nota] [int] NULL,
+    [Comentario] [text] NULL,
+    [Data_Resposta] [datetime] NULL,
+    [IP_Usuario] [varchar](45) NULL,
+    CONSTRAINT [PK_Resposta_Pesquisa] PRIMARY KEY CLUSTERED ([Id_Resposta] ASC),
+    CONSTRAINT [FK_Resposta_Pesquisa] FOREIGN KEY([Id_Pesquisa]) REFERENCES [tbl_Pesquisa_Satisfacao] ([Id_Pesquisa])
+)
+```
+
+**Problemas Identificados no Legado**:
+1. Sem anonimização (violação LGPD - IP_Usuario armazenado sem consentimento)
+2. Sem suporte a NPS padronizado (escalas inconsistentes 1-5, 0-10)
+3. Sem correlação automatica com chamado (Id_Solicitacao nullable e não indexado)
+4. Sem versionamento (respostas sobrescritas sem historico)
+5. Campo texto sem limite (TEXT sem maxlen causa fragmentação BD)
+
+**Mapeamento para Modelo Modernizado**:
+
+| Campo Legado | Campo Moderno | Transformação |
+|--------------|---------------|---------------|
+| `Id_Pesquisa` | `PesquisaId` (Guid) | NEWID() |
+| `Tipo_Pesquisa` | `TipoPesquisa` (Enum) | Mapear "NPS" → TipoPesquisa.NPS_Relacional |
+| `Pergunta` | `TemplatePergunta.Texto` | Extrair para tabela Templates |
+| `Nota` | `Nota` (int) | Normalizar para escala 0-10 |
+| `Comentario` | `ComentarioAnonimizado` (string 2000) | Anonimizar via NLP + limitar 2000 chars |
+| `Data_Resposta` | `DataResposta` (DateTime UTC) | Converter para UTC |
+| `IP_Usuario` | **Descartado** | Violação LGPD |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descricao | Problemas | Migracao |
+|-----------|-----------|-----------|----------|
+| `pa_Calcular_Media_Satisfacao` | Calcula media simples de notas | Não segue formula NPS/CSAT padronizada | Substituir por CalculadoraNPS/CSAT em C# |
+| `pa_Listar_Respostas_Pesquisa` | Lista respostas com join solicitação | Retorna dados pessoais sem anonimização | Migrar para query LINQ com projeção anonimizada |
+| `pa_Gerar_Relatorio_Satisfacao` | Gera relatorio Excel via xp_cmdshell | Vulnerabilidade SQL Injection + ineficiente | Migrar para exportação REST API + Azure Blob |
+| `pa_Enviar_Email_Pesquisa` | Envia e-mail via SQL Mail | Timeout frequente + sem retry | Migrar para Hangfire job com retry exponential backoff |
+
+**Exemplo pa_Calcular_Media_Satisfacao (INCORRETO)**:
+```sql
+CREATE PROCEDURE pa_Calcular_Media_Satisfacao
+    @Id_Pesquisa INT
+AS
+BEGIN
+    -- PROBLEMA: Calcula media simples, mas NPS requer % Promotores - % Detratores
+    SELECT AVG(CAST(Nota AS DECIMAL(10,2))) AS Media_Satisfacao
+    FROM tbl_Resposta_Pesquisa
+    WHERE Id_Pesquisa = @Id_Pesquisa
+END
+```
+
+**Migração para .NET 10 (CORRETO)**:
+```csharp
+// Substituir SP por service C# com logica NPS padronizada
+var nps = await _mediator.Send(new CalcularNPSQuery { PesquisaId = pesquisaId });
+```
+
+### 3.3 Telas ASPX
+
+| Pagina | Descricao | Problemas | Tela Angular Moderna |
+|--------|-----------|-----------|---------------------|
+| `PesquisaSatisfacao.aspx` | CRUD de templates de pesquisa | ViewState 2MB + postbacks lentos | `/admin/pesquisas` (Material Design) |
+| `ResponderPesquisa.aspx` | Tela publica de resposta | Sem mobile-friendly + sem SSL | `/p/{token}` (PWA responsivo) |
+| `RelatorioPesquisa.aspx` | Relatorio com graficos | Imagens estaticas geradas server-side | `/admin/pesquisas/analytics` (Charts.js real-time) |
+| `ConfiguracaoEnvio.aspx` | Configuração de triggers | Logica hardcoded em code-behind | `/admin/pesquisas/triggers` (JSON visual editor) |
+
+**Exemplo ResponderPesquisa.aspx (VB.NET - code-behind)**:
+```vbnet
+Protected Sub btnEnviar_Click(sender As Object, e As EventArgs)
+    Dim nota As Integer = CInt(ddlNota.SelectedValue)
+    Dim comentario As String = txtComentario.Text
+
+    ' PROBLEMA 1: SQL Injection vulneravel
+    Dim sql As String = "INSERT INTO tbl_Resposta_Pesquisa (Nota, Comentario) VALUES (" & nota & ", '" & comentario & "')"
+
+    ' PROBLEMA 2: Sem validação de throttling (usuario pode responder 100x)
+    ExecutarSQL(sql)
+
+    ' PROBLEMA 3: Sem follow-up automatico para detratores
+    Response.Redirect("Obrigado.aspx")
+End Sub
+```
+
+**Migração Angular + .NET 10**:
+```typescript
+// Frontend Angular (componente)
+async enviarResposta() {
+  const dto = {
+    pesquisaId: this.token,
+    nota: this.form.value.nota,
+    comentario: this.form.value.comentario
+  };
+
+  await this.pesquisaService.enviarResposta(dto); // Chamada REST API segura
+  this.router.navigate(['/obrigado']);
+}
+```
+
+```csharp
+// Backend .NET 10 (handler)
+public class EnviarRespostaHandler : IRequestHandler<EnviarRespostaCommand, Guid>
+{
+    public async Task<Guid> Handle(EnviarRespostaCommand request, CancellationToken ct)
+    {
+        // Validação automatica via FluentValidation
+        // Throttling via RN-SAT-071-01
+        // Follow-up automatico detratores via RN-SAT-071-03
+        // Anonimização LGPD via RN-SAT-071-04
+        // Analise sentimento NLP via RN-SAT-071-05
+    }
+}
+```
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSPesquisa.asmx.vb`
+
+| Metodo | Descricao | Problemas | Endpoint REST Moderno |
+|--------|-----------|-----------|----------------------|
+| `CriarPesquisa(titulo, tipo)` | Cria nova pesquisa | Sem validação de permissões | `POST /api/pesquisas` (RBAC obrigatorio) |
+| `EnviarPesquisa(pesquisaId, usuarioId)` | Envia pesquisa por e-mail | Timeout frequente (sync) | `POST /api/pesquisas/{id}/enviar` (async Hangfire) |
+| `ObterResultados(pesquisaId)` | Retorna XML com respostas | Retorna dados pessoais sem anonimização | `GET /api/pesquisas/{id}/resultados` (anonimizado) |
+| `CalcularNPS(pesquisaId)` | Calcula NPS | Implementação incorreta (media simples) | `GET /api/pesquisas/{id}/nps` (formula Bain & Company) |
+
+**Exemplo WSPesquisa.asmx.vb (INCORRETO)**:
+```vbnet
+<WebMethod()> _
+Public Function CalcularNPS(pesquisaId As Integer) As Decimal
+    ' PROBLEMA: Calcula media simples ao inves de % Promotores - % Detratores
+    Dim sql As String = "SELECT AVG(Nota) FROM tbl_Resposta_Pesquisa WHERE Id_Pesquisa = " & pesquisaId
+    Return ExecutarScalar(sql)
+End Function
+```
+
+**Migração REST API .NET 10 (CORRETO)**:
+```csharp
+[HttpGet("{id}/nps")]
+[RequiresPermission(PesquisasPermissions.Read)]
+public async Task<ActionResult<NPSDto>> CalcularNPS(Guid id)
+{
+    var query = new CalcularNPSQuery { PesquisaId = id };
+    var resultado = await _mediator.Send(query);
+    return Ok(resultado);
+}
+```
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `PESQUISAS_SATISFACAO`
+
+**Sub-Features**:
+```json
+{
+    "PESQUISAS_SATISFACAO": {
+        "habilitado": true,
+        "subFeatures": {
+            "NPS_RELACIONAL": true,
+            "CSAT_TRANSACIONAL": true,
+            "CES_COMPLEXO": true,
+            "FOLLOW_UP_AUTOMATICO": true,
+            "ANALISE_SENTIMENTO_NLP": true,
+            "DASHBOARD_REALTIME": true,
+            "MULTI_CANAL": {
+                "EMAIL": true,
+                "SMS": true,
+                "IN_APP": true,
+                "WHATSAPP": false  // Piloto apenas
+            }
+        }
+    }
+}
+```
+
+**Uso no Codigo**:
+```csharp
+if (await _featureManager.IsEnabledAsync("PESQUISAS_SATISFACAO:FOLLOW_UP_AUTOMATICO"))
+{
+    await _followUpService.ProcessarDetratoresAsync(ct);
+}
+
+if (await _featureManager.IsEnabledAsync("PESQUISAS_SATISFACAO:MULTI_CANAL:WHATSAPP"))
+{
+    await _whatsappService.EnviarPesquisaAsync(usuario.Telefone, pesquisaUrl, ct);
+}
+```
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao** (120 chaves totais):
+
+```json
+{
+    "pesquisas": {
+        "nps": {
+            "pergunta": "Em uma escala de 0 a 10, qual a probabilidade de você recomendar nosso serviço?",
+            "label_0_6": "Não recomendaria",
+            "label_7_8": "Talvez recomendaria",
+            "label_9_10": "Com certeza recomendaria",
+            "obrigado": "Obrigado pelo seu feedback!"
+        },
+        "csat": {
+            "pergunta": "Como você avalia o atendimento que recebeu?",
+            "muito_insatisfeito": "Muito Insatisfeito",
+            "insatisfeito": "Insatisfeito",
+            "neutro": "Neutro",
+            "satisfeito": "Satisfeito",
+            "muito_satisfeito": "Muito Satisfeito"
+        },
+        "ces": {
+            "pergunta": "Quanto esforço você precisou fazer para resolver seu problema?",
+            "muito_baixo": "Muito Baixo",
+            "muito_alto": "Muito Alto"
+        },
+        "comentarios": {
+            "placeholder": "Conte-nos mais sobre sua experiência (opcional)",
+            "min_chars": "Mínimo 10 caracteres",
+            "max_chars": "Máximo 2000 caracteres"
+        },
+        "erros": {
+            "link_expirado": "Este link de pesquisa expirou. Validade: 7 dias.",
+            "ja_respondida": "Você já respondeu esta pesquisa.",
+            "throttling": "Você já respondeu uma pesquisa recentemente. Aguarde 7 dias."
+        },
+        "dashboard": {
+            "titulo": "Métricas de Satisfação",
+            "nps_gauge": "Net Promoter Score",
+            "csat_trend": "Evolução CSAT (30 dias)",
+            "ces_heatmap": "CES por Processo",
+            "detratores_ativos": "Detratores Aguardando Follow-up",
+            "taxa_resposta": "Taxa de Resposta",
+            "ultima_atualizacao": "Última atualização: {timestamp}"
+        },
+        "alertas": {
+            "detrator_identificado": "Detrator NPS identificado: {usuario}",
+            "ces_critico": "Processo '{processo}' com CES crítico: {score}",
+            "queda_nps": "NPS caiu {pontos} pontos nos últimos 7 dias",
+            "taxa_resposta_baixa": "Taxa de resposta abaixo de 30%: {taxa}%"
+        }
+    }
+}
+```
+
+**Detecção Automatica de Idioma**:
+```csharp
+public class DetectorIdiomaPesquisa
+{
+    public async Task<string> DetectarIdiomaUsuarioAsync(Guid usuarioId, CancellationToken ct)
+    {
+        var usuario = await _context.Usuarios
+            .Where(u => u.Id == usuarioId)
+            .Select(u => u.IdiomaPreferido)
+            .FirstOrDefaultAsync(ct);
+
+        return usuario ?? "pt-BR"; // Fallback para pt-BR
+    }
+
+    public async Task<TemplatePesquisa> ObterTemplateLocalizadoAsync(
+        Guid templateId, string idioma, CancellationToken ct)
+    {
+        var traducoes = await _i18nService.ObterTraducoesAsync(
+            $"pesquisas.templates.{templateId}", idioma, ct);
+
+        return new TemplatePesquisa
+        {
+            Pergunta = traducoes["pergunta"],
+            LabelMinima = traducoes["label_minima"],
+            LabelMaxima = traducoes["label_maxima"]
+        };
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas** (10 operações):
+
+| Operacao | Codigo | Dados Registrados | Retencao |
+|----------|--------|-------------------|----------|
+| Criação de Template Pesquisa | `PESQ_TEMPLATE_CREATE` | UsuarioId, TemplateId, TipoPesquisa, Perguntas JSON | 7 anos |
+| Ativação de Pesquisa | `PESQ_ATIVACAO` | UsuarioId, PesquisaId, DataInicio, DataFim | 7 anos |
+| Envio de Pesquisa (Lote) | `PESQ_ENVIO_LOTE` | UsuarioId, PesquisaId, QuantidadeEnvios, Canal | 5 anos |
+| Resposta Recebida | `PESQ_RESPOSTA` | PesquisaId (anonimizado), Nota, Sentimento, Timestamp | 7 anos |
+| Follow-up Detrator | `PESQ_FOLLOWUP` | UsuarioGestorId, DetractorId (anonimizado), Ação Tomada | 7 anos |
+| Exportação de Dados | `PESQ_EXPORT` | UsuarioId, Formato, Filtros, IP Origem | 7 anos |
+| Alteração Configuração Trigger | `PESQ_TRIGGER_UPDATE` | UsuarioId, TriggerId, Configuracao Before/After JSON | 7 anos |
+| Acesso Dashboard Metricas | `PESQ_DASHBOARD_VIEW` | UsuarioId, Filtros Aplicados, Timestamp | 2 anos |
+| Anonimização Manual | `PESQ_ANONIMIZACAO` | UsuarioId, PesquisaId, Nivel Anonimização, Motivo | 10 anos |
+| Exclusão de Resposta (LGPD Art. 18) | `PESQ_RESPOSTA_DELETE` | UsuarioSolicitanteId, RespostaId, Motivo, IP | 10 anos |
+
+**Implementacao**:
+```csharp
+public class AuditoriaPesquisaBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    private readonly ICurrentUserService _currentUser;
+    private readonly IAuditService _auditService;
+
+    public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken ct)
+    {
+        var codigoOperacao = ObterCodigoOperacao(typeof(TRequest).Name);
+
+        var registroAuditoria = new RegistroAuditoria
+        {
+            CodigoOperacao = codigoOperacao,
+            UsuarioId = _currentUser.UserId,
+            DataHora = DateTime.UtcNow,
+            DadosAntes = JsonSerializer.Serialize(request),
+            IPOrigem = _currentUser.IpAddress
+        };
+
+        try
+        {
+            var response = await next();
+            registroAuditoria.DadosDepois = JsonSerializer.Serialize(response);
+            registroAuditoria.Sucesso = true;
+            return response;
+        }
+        catch (Exception ex)
+        {
+            registroAuditoria.Sucesso = false;
+            registroAuditoria.MensagemErro = ex.Message;
+            throw;
+        }
+        finally
+        {
+            await _auditService.RegistrarAsync(registroAuditoria, ct);
+        }
+    }
+}
+```
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes** (14 permissões):
+
+| Permissao | Descricao | Perfis Autorizados |
+|-----------|-----------|-------------------|
+| `pesquisas:templates:create` | Criar templates de pesquisa | Admin, Gestor Service Desk |
+| `pesquisas:templates:read` | Visualizar templates | Todos (autenticados) |
+| `pesquisas:templates:update` | Editar templates | Admin, Gestor Service Desk |
+| `pesquisas:templates:delete` | Excluir templates | Admin apenas |
+| `pesquisas:enviar` | Enviar pesquisas (lote) | Admin, Gestor Service Desk, Analista QA |
+| `pesquisas:respostas:read` | Visualizar respostas anonimizadas | Admin, Gestor Service Desk, Analista QA |
+| `pesquisas:respostas:read_identificado` | Visualizar respostas com identificação (pseudonimo) | Admin, Gestor Service Desk (com auditoria) |
+| `pesquisas:dashboard:view` | Acessar dashboards de metricas | Admin, Gestor Service Desk, Diretoria, Analista QA |
+| `pesquisas:export` | Exportar dados brutos | Admin, Analista BI (com auditoria) |
+| `pesquisas:followup:manage` | Gerenciar follow-up detratores | Admin, Gestor Service Desk |
+| `pesquisas:configuracoes:manage` | Alterar configurações globais (throttling, SLA) | Admin apenas |
+| `pesquisas:triggers:manage` | Criar/editar triggers automaticos | Admin, Gestor Service Desk |
+| `pesquisas:anonimizar` | Forçar anonimização manual | Admin, DPO (LGPD) |
+| `pesquisas:audit:view` | Visualizar logs de auditoria | Admin, Auditor Interno |
+
+**Matriz de Permissões**:
+
+| Perfil | Templates | Enviar | Respostas | Dashboard | Export | Follow-up | Config | Audit |
+|--------|-----------|--------|-----------|-----------|--------|-----------|--------|-------|
+| **Admin** | CRUD | ✅ | Identificado | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Gestor SD** | CRU | ✅ | Identificado | ✅ | ❌ | ✅ | ❌ | ❌ |
+| **Analista QA** | R | ✅ | Anonimizado | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Analista BI** | R | ❌ | Anonimizado | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Diretoria** | R | ❌ | Agregado | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **DPO (LGPD)** | R | ❌ | Anonimizado | ✅ | ✅ | ❌ | ❌ | ✅ |
+| **Auditor** | R | ❌ | Agregado | ✅ | ❌ | ❌ | ❌ | ✅ |
+
+**Implementacao**:
+```csharp
+[HttpGet("{id}/respostas")]
+[RequiresPermission(PesquisasPermissions.ReadRespostas)]
+public async Task<ActionResult<List<RespostaDto>>> ObterRespostas(Guid id)
+{
+    var nivelAcesso = _currentUser.HasPermission(PesquisasPermissions.ReadRespostasIdentificado)
+        ? NivelAnonimizacao.Pseudonimizado
+        : NivelAnonimizacao.Anonimizado;
+
+    var query = new ObterRespostasPesquisaQuery
+    {
+        PesquisaId = id,
+        NivelAnonimizacao = nivelAcesso
+    };
+
+    var respostas = await _mediator.Send(query);
+    return Ok(respostas);
+}
+```
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal (Templates de Pesquisa)
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/pesquisas/templates` | Listar templates (paginado) | `pesquisas:templates:read` |
+| GET | `/api/pesquisas/templates/{id}` | Obter template por ID | `pesquisas:templates:read` |
+| POST | `/api/pesquisas/templates` | Criar novo template | `pesquisas:templates:create` |
+| PUT | `/api/pesquisas/templates/{id}` | Atualizar template | `pesquisas:templates:update` |
+| DELETE | `/api/pesquisas/templates/{id}` | Excluir template | `pesquisas:templates:delete` |
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| POST | `/api/pesquisas/{id}/enviar` | Enviar pesquisa (lote usuarios) | `pesquisas:enviar` |
+| GET | `/api/pesquisas/{id}/respostas` | Obter respostas (anonimizado) | `pesquisas:respostas:read` |
+| GET | `/api/pesquisas/{id}/nps` | Calcular NPS | `pesquisas:dashboard:view` |
+| GET | `/api/pesquisas/{id}/csat` | Calcular CSAT | `pesquisas:dashboard:view` |
+| GET | `/api/pesquisas/{id}/ces` | Calcular CES | `pesquisas:dashboard:view` |
+| GET | `/api/pesquisas/{id}/sentimento` | Analise de sentimento agregada | `pesquisas:dashboard:view` |
+| GET | `/api/pesquisas/{id}/detratores` | Listar detratores aguardando follow-up | `pesquisas:followup:manage` |
+| POST | `/api/pesquisas/{id}/detratores/{detractorId}/followup` | Registrar ação de follow-up | `pesquisas:followup:manage` |
+| POST | `/api/pesquisas/responder` | Responder pesquisa (endpoint publico) | `AllowAnonymous` |
+| GET | `/api/pesquisas/dashboard/metricas` | Obter metricas agregadas | `pesquisas:dashboard:view` |
+| GET | `/api/pesquisas/dashboard/wordcloud` | Obter word cloud de comentarios | `pesquisas:dashboard:view` |
+| GET | `/api/pesquisas/dashboard/ranking-analistas` | Ranking analistas por CSAT | `pesquisas:dashboard:view` |
+| POST | `/api/pesquisas/{id}/export` | Exportar dados (Excel/PDF/PowerBI) | `pesquisas:export` |
+| GET | `/api/pesquisas/triggers` | Listar triggers configurados | `pesquisas:triggers:manage` |
+| POST | `/api/pesquisas/triggers` | Criar novo trigger | `pesquisas:triggers:manage` |
+| PUT | `/api/pesquisas/triggers/{id}` | Atualizar trigger | `pesquisas:triggers:manage` |
+| DELETE | `/api/pesquisas/triggers/{id}` | Excluir trigger | `pesquisas:triggers:manage` |
+| POST | `/api/pesquisas/{id}/anonimizar` | Forçar anonimização manual | `pesquisas:anonimizar` |
+| GET | `/api/pesquisas/{id}/auditoria` | Obter logs de auditoria | `pesquisas:audit:view` |
+| GET | `/api/pesquisas/configuracoes` | Obter configurações globais | `pesquisas:configuracoes:manage` |
+| PUT | `/api/pesquisas/configuracoes` | Atualizar configurações | `pesquisas:configuracoes:manage` |
+
+**Exemplo Request/Response - POST /api/pesquisas/{id}/enviar**:
+
+Request:
+```json
+{
+    "pesquisaId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "destinatarios": [
+        {
+            "usuarioId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "email": "usuario@exemplo.com",
+            "telefone": "+5511999999999"
+        }
+    ],
+    "canais": ["Email", "SMS", "InApp"],
+    "dataEnvio": "2025-12-29T10:00:00Z",
+    "contexto": {
+        "chamadoOrigemId": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+    }
+}
+```
+
+Response:
+```json
+{
+    "loteId": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+    "totalDestinatarios": 1,
+    "enviosAgendados": {
+        "email": 1,
+        "sms": 1,
+        "inApp": 1
+    },
+    "dataExecucao": "2025-12-29T10:00:00Z",
+    "estimativaEntrega": "2025-12-29T10:05:00Z"
+}
+```
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Envio Automatico de Pesquisa CSAT Pos-Chamado
+
+```
+Chamado #12345 resolvido
+    |
+    v
+Trigger "Pos-Resolucao" detecta evento
+    |
+    v
+Valida Throttling (RN-SAT-071-01)
+    |
+    +--- Usuario recebeu pesquisa <7 dias? ---> [BLOQUEIA] Log + Exit
+    |
+    v (Throttling OK)
+Gera Token Unico (Guid + HMAC SHA256)
+    |
+    v
+Detecta Idioma Usuario (pt-BR, en-US, es-ES)
+    |
+    v
+Renderiza Template Localizado
+    |
+    v
+Envia Multi-Canal (Email + SMS + In-App)
+    |
+    +--- Email: SendGrid API (retry 3x)
+    +--- SMS: Twilio API (retry 3x)
+    +--- In-App: SignalR push notification
+    |
+    v
+Aguarda Resposta (timeout 7 dias)
+    |
+    v
+Usuario clica link e acessa /p/{token}
+    |
+    v
+Valida Link (RN-SAT-071-07)
+    |
+    +--- Expirado? ---> [ERRO] "Link expirou. Validade: 7 dias."
+    +--- Ja respondido? ---> [ERRO] "Voce ja respondeu esta pesquisa."
+    |
+    v (Link valido)
+Exibe Formulario Responsivo (PWA)
+    |
+    v
+Usuario preenche: Nota (1-5) + Comentario (opcional)
+    |
+    v
+Submit Form
+    |
+    v
+Valida Payload (FluentValidation)
+    |
+    +--- Comentario <10 chars? ---> [ERRO] "Minimo 10 caracteres"
+    +--- Comentario >2000 chars? ---> [ERRO] "Maximo 2000 caracteres"
+    |
+    v (Payload valido)
+Salva Resposta (ClienteId + PesquisaId + Nota + Comentario)
+    |
+    v
+Calcula CSAT (RN-SAT-071-02)
+    |
+    v
+Analise Sentimento NLP (RN-SAT-071-05)
+    |
+    +--- Sentimento <-0.7? ---> [ALERTA] "Sentimento critico detectado"
+    |
+    v
+Correlaciona com Chamado Origem (RN-SAT-071-09)
+    |
+    v
+CSAT <= 3? (detrator)
+    |
+    +--- SIM ---> Follow-up Automatico (RN-SAT-071-03)
+    |             |
+    |             +--- Abre Chamado Interno
+    |             +--- Notifica Gestor (Email + SMS)
+    |             +--- Envia Email Usuario com contato direto
+    |
+    v (CSAT OK ou follow-up concluido)
+Atualiza Dashboard Real-time (SignalR)
+    |
+    v
+Envia Webhook (se configurado)
+    |
+    v
+[FIM] Exibe "Obrigado pelo seu feedback!"
+```
+
+### 6.2 Fluxo de Calculo de NPS Trimestral
+
+```
+Job Hangfire (cron: 0 0 1 */3 *) - Todo dia 1 a cada 3 meses
+    |
+    v
+Obter Template NPS Relacional
+    |
+    v
+Obter Usuarios Ativos (ultimos 90 dias)
+    |
+    +--- ClienteId (multi-tenancy)
+    +--- Excluir usuarios que receberam pesquisa <7 dias
+    +--- Excluir usuarios que optaram por não receber (LGPD)
+    |
+    v
+Gerar Lote de Envios (30.000 usuarios)
+    |
+    v
+Dividir em batches de 500 (evitar throttling SendGrid)
+    |
+    v
+Para cada batch:
+    |
+    +--- Gera Token Unico por usuario
+    +--- Detecta Idioma (pt-BR, en-US, es-ES)
+    +--- Renderiza Template NPS localizado
+    +--- Envia Email (SendGrid API)
+    +--- Aguarda 2s (rate limiting)
+    |
+    v
+Registra Envios (auditoria)
+    |
+    v
+Aguarda 7 dias (deadline respostas)
+    |
+    v
+Job "Calcular NPS Trimestral" (dia 8)
+    |
+    v
+Obter Todas Respostas (notas 0-10)
+    |
+    v
+Classificar Respostas:
+    |
+    +--- Promotores: notas 9-10
+    +--- Neutros: notas 7-8
+    +--- Detratores: notas 0-6
+    |
+    v
+Calcular NPS = (% Promotores - % Detratores)
+    |
+    v
+Armazenar Historico (tabela NPSHistorico)
+    |
+    v
+Comparar com Trimestre Anterior
+    |
+    +--- Queda >5 pontos? ---> [ALERTA] "NPS caiu de 45 para 38 (-7 pts)"
+    |
+    v
+Gerar Relatorio PowerBI (dataset)
+    |
+    v
+Enviar Email Diretoria com metricas
+    |
+    v
+Publicar Dashboard Executivo
+    |
+    v
+[FIM] Aguardar proximo trimestre
+```
+
+### 6.3 Fluxo de Follow-up de Detrator NPS
+
+```
+Resposta NPS recebida: Nota = 4 (Detrator)
+    |
+    v
+TratadorRespostaNPS.Handle()
+    |
+    v
+Nota <= 6? (RN-SAT-071-03)
+    |
+    v SIM
+Criar Chamado Interno
+    |
+    +--- Titulo: "[DETRATOR NPS] Follow-up Usuario {nome}"
+    +--- Categoria: "Recuperacao Cliente"
+    +--- Prioridade: "Alta"
+    +--- Descricao: Nota + Comentario + Link para resposta
+    +--- Atribuido: Gestor Service Desk
+    +--- Tags: ["NPS", "Detrator", "Retencao"]
+    +--- SLA: 4h (RN-SAT-071-11)
+    |
+    v
+Notificar Gestor (multi-canal)
+    |
+    +--- Email: Assunto "[URGENTE] Detrator NPS Identificado"
+    +--- SMS: "Usuario {nome} avaliou serviço com nota 4. Chamado #{id} criado."
+    +--- In-App: Notificação push com badge vermelho
+    |
+    v
+Enviar Email Personalizado para Usuario
+    |
+    +--- Template: "RECUPERACAO_DETRATOR"
+    +--- Dados: Nome usuario, Nota, Gestor (nome/email/telefone)
+    +--- CTA: "Fale diretamente com nosso gestor"
+    |
+    v
+Iniciar Timer SLA 4h
+    |
+    v
+Aguardar Ação Gestor
+    |
+    v
+Gestor acessa Chamado #12345
+    |
+    v
+Gestor registra ação tomada:
+    |
+    +--- Ligou para usuario
+    +--- Esclareceu mal-entendido
+    +--- Ofereceu compensação
+    +--- Agendou reunião follow-up
+    |
+    v
+Gestor marca Follow-up como "Resolvido"
+    |
+    v
+Sistema envia pesquisa pós-follow-up (opcional)
+    |
+    +--- "Nosso gestor entrou em contato. Sua percepção mudou?"
+    +--- Nota nova: 0-10
+    |
+    v
+Calcula Taxa de Recuperação
+    |
+    +--- Detrator virou Promotor? ---> [SUCESSO] "Recuperação efetiva"
+    +--- Detrator continua insatisfeito? ---> [FALHA] "Requer escalação"
+    |
+    v
+Registra Metricas de Recuperação
+    |
+    +--- Taxa Conversão Detrator → Promotor: 42%
+    +--- Tempo Medio Follow-up: 2h15min
+    +--- CSAT Follow-up: 4.2/5.0
+    |
+    v
+[FIM] Dashboard atualizado com metricas
+```
+
+### 6.4 Fluxo de Analise de Sentimento Automatica
+
+```
+Resposta com Comentario Aberto recebida
+    |
+    v
+Comentario.Length >= 10? (RN-SAT-071-10)
+    |
+    v SIM
+Envia para Azure Cognitive Services Text Analytics
+    |
+    +--- Language: pt-BR (detectado automaticamente)
+    +--- Text: {comentario}
+    +--- Features: Sentiment + KeyPhrases
+    |
+    v
+API retorna JSON:
+{
+    "sentiment": "Negative",
+    "confidenceScores": {
+        "positive": 0.05,
+        "neutral": 0.12,
+        "negative": 0.83
+    },
+    "keyPhrases": ["demorado", "nao resolveu", "falta comunicacao"]
+}
+    |
+    v
+Calcula Score Sentimento
+    |
+    +--- Score = Positive - Negative
+    +--- Score = 0.05 - 0.83 = -0.78 (Muito Negativo)
+    |
+    v
+Score < -0.7? (Sentimento Critico)
+    |
+    v SIM
+Envia Alerta Imediato
+    |
+    +--- Destinatario: Gestor Service Desk
+    +--- Prioridade: Urgente
+    +--- Mensagem: "Comentario com sentimento muito negativo detectado"
+    +--- Trecho: "Atendimento demorado, nao resolveu meu problema..."
+    +--- Keywords: ["demorado", "nao resolveu", "falta comunicacao"]
+    |
+    v
+Armazena Resultado NLP
+    |
+    +--- RespostaPesquisa.SentimentoScore = -0.78
+    +--- RespostaPesquisa.SentimentoClassificacao = "Negativo"
+    +--- RespostaPesquisa.Keywords = JSON array
+    |
+    v
+Atualiza Word Cloud Dashboard
+    |
+    +--- Palavras mais frequentes em comentarios negativos
+    +--- Tamanho proporcional a frequencia
+    |
+    v
+Correlaciona com Chamado Origem
+    |
+    +--- Chamado #12345 teve sentimento -0.78
+    +--- Tempo resolução: 8h (SLA: 4h)
+    +--- Reaberturas: 2
+    +--- CAUSA RAIZ: "SLA violado + reabertura multipla"
+    |
+    v
+Envia para Sistema de BI
+    |
+    +--- PowerBI Dataset atualizado
+    +--- Dashboard "Analise de Sentimento" atualizado
+    |
+    v
+[FIM] Dados disponiveis para analise
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao | Implementacao |
+|----------|-----------|---------------|
+| **LGPD Compliance** | Anonimização conforme Art. 12 LGPD | 3 niveis configuráveis (RN-SAT-071-04) |
+| **CSRF Protection** | Proteção contra Cross-Site Request Forgery | Token anti-CSRF em formularios publicos |
+| **XSS Prevention** | Sanitização de inputs em comentarios | DOMPurify no frontend + validação backend |
+| **Rate Limiting** | Limite de requests por IP | 100 req/min por IP em endpoint publico /responder |
+| **Token Expiration** | Links de pesquisa expiram em 7 dias | RN-SAT-071-07 |
+| **Throttling Anti-Spam** | Limite 1 pesquisa a cada 7 dias por usuario | RN-SAT-071-01 |
+| **SQL Injection Prevention** | Queries parametrizadas EF Core | 100% queries via LINQ (zero SQL inline) |
+| **Sensitive Data Encryption** | Criptografia de comentarios com dados sensiveis | Azure Key Vault + AES-256 |
+| **Auditoria Completa** | Log de todas operações criticas | 10 operações auditadas (RN-SAT-071-11) |
+| **RBAC Granular** | Controle permissões por perfil | 14 permissões detalhadas (Seção 4.4) |
+| **HTTPS Obrigatorio** | Comunicação criptografada | Enforce HTTPS em todos endpoints |
+| **CORS Restrito** | Whitelist de dominios permitidos | Apenas dominios internos autorizados |
+
+**Exemplo CSRF Protection**:
+```csharp
+[HttpPost("responder")]
+[ValidateAntiForgeryToken] // Valida token CSRF
+[AllowAnonymous]
+public async Task<ActionResult<Guid>> ResponderPesquisa([FromBody] ResponderPesquisaCommand command)
+{
+    var respostaId = await _mediator.Send(command);
+    return Ok(respostaId);
+}
+```
+
+**Exemplo Rate Limiting**:
+```csharp
+services.AddRateLimiter(options =>
+{
+    options.AddPolicy("PesquisaPublica", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString(),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+});
+```
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [ ] **SQL Injection**: Tentar injetar SQL via campo comentario (`'; DROP TABLE tbl_Resposta_Pesquisa; --`)
+- [ ] **XSS Stored**: Inserir script em comentario (`<script>alert('XSS')</script>`) e verificar sanitização
+- [ ] **XSS Reflected**: Tentar refletir script via parametro URL (`/p/{token}?xss=<script>`)
+- [ ] **CSRF**: Tentar enviar resposta via formulario malicioso sem token anti-CSRF
+- [ ] **IDOR**: Tentar acessar respostas de outra empresa via manipulação de PesquisaId
+- [ ] **Rate Limiting Bypass**: Enviar 200 requests em 1min e verificar bloqueio
+- [ ] **Token Reuse**: Tentar responder mesma pesquisa 2x com mesmo token
+- [ ] **Token Expiration**: Tentar usar link com 8+ dias e verificar bloqueio
+- [ ] **Sensitive Data Exposure**: Verificar que logs não expõem dados pessoais
+- [ ] **Brute Force Protection**: Tentar adivinhar tokens com 1000 requests e verificar bloqueio
+- [ ] **LGPD Anonimização**: Validar que respostas anonimizadas são irreversiveis
+- [ ] **RBAC Enforcement**: Tentar acessar endpoint admin com perfil "Analista QA" (deve retornar 403)
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs (10 indicadores)
+
+| KPI | Meta | Medicao | Ação se Abaixo da Meta |
+|-----|------|---------|------------------------|
+| **NPS (Net Promoter Score)** | ≥ 32 (Bom) | Trimestral (pesquisa relacional) | Analise de detratores + plano de ação 30 dias |
+| **CSAT (Customer Satisfaction)** | ≥ 75% | Continuo (pos-atendimento) | Investigar chamados com CSAT <3 + coaching analistas |
+| **CES (Customer Effort Score)** | ≤ 3.0 | Por processo critico | Simplificar processos com CES >4.5 |
+| **Taxa de Resposta** | ≥ 45% | Por pesquisa | Ajustar canais (testar WhatsApp se e-mail <40%) |
+| **Taxa de Recuperação Detratores** | ≥ 40% | Mensal | Revisar script follow-up + treinamento gestores |
+| **Tempo Medio Follow-up** | ≤ 2h | Continuo | Escalar para supervisor se >4h |
+| **Taxa de Conversão Detrator → Promotor** | ≥ 15% | Trimestral | Analise de casos bem-sucedidos + replicar praticas |
+| **Correlação CSAT x Tempo Resolução** | r ≥ 0.7 | Mensal | Se r <0.5, revisar SLAs e qualidade atendimento |
+| **Taxa de Fadiga de Pesquisa** | ≤ 5% | Mensal (usuarios que recusam pesquisas) | Reduzir frequencia ou melhorar relevancia |
+| **Acuracia Analise Sentimento NLP** | ≥ 85% | Trimestral (validação manual amostra 1000 respostas) | Re-treinar modelo NLP com novos dados |
+
+### 8.2 Alertas (8 condições)
+
+| Alerta | Condicao | Ação Automatica | Destinatarios |
+|--------|----------|-----------------|---------------|
+| **Queda Abrupta NPS** | NPS caiu >5 pontos em 7 dias | E-mail urgente + reunião emergencial agendada | Diretoria + Gestor SD |
+| **CSAT Critico** | CSAT <70% por 3 dias consecutivos | Notificação multi-canal + abertura chamado interno | Gestor SD + Supervisor |
+| **CES Perigoso** | Processo com CES >5.0 | Alerta + analise de causa-raiz automatica + plano ação | Gestor SD + Engenharia de Processos |
+| **Taxa Resposta Baixa** | Taxa <30% em pesquisa ativa | Alerta + sugestão de canais alternativos | Gestor SD + Marketing |
+| **Spike Detratores** | >10 detratores em 24h | Dashboard vermelho + notificação CEO | CEO + Diretoria + Gestor SD |
+| **SLA Follow-up Vencido** | Detrator sem follow-up em >4h | Escalação para supervisor + notificação RH | Supervisor + RH |
+| **Sentimento Critico** | Comentario com score <-0.7 | Alerta imediato + copia para gestor | Gestor SD |
+| **Palavra-Gatilho Detectada** | Comentario contem "processo", "demissão", "juridico" | Alerta + encaminhamento Juridico/RH | Juridico + RH + Gestor SD |
+
+**Implementacao de Alerta "Queda Abrupta NPS"**:
+```csharp
+public class MonitorQuedaNPS : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            var npsHoje = await _calculadoraNPS.CalcularNPSAsync(DateTime.UtcNow.AddDays(-7), DateTime.UtcNow, ct);
+            var nps7DiasAtras = await _calculadoraNPS.CalcularNPSAsync(DateTime.UtcNow.AddDays(-14), DateTime.UtcNow.AddDays(-7), ct);
+
+            var variacao = npsHoje - nps7DiasAtras;
+
+            if (variacao < -5)
+            {
+                await _alertaService.EnviarAsync(new Alerta
+                {
+                    Tipo = "QUEDA_ABRUPTA_NPS",
+                    Titulo = $"NPS caiu {Math.Abs(variacao):F1} pontos em 7 dias",
+                    Descricao = $"NPS atual: {npsHoje:F1} | NPS 7 dias atras: {nps7DiasAtras:F1}",
+                    Prioridade = "Urgente",
+                    Destinatarios = new[] { "CEO", "Diretoria", "GestorSD" },
+                    Acoes = new[]
+                    {
+                        "Revisar todos detratores das ultimas 48h",
+                        "Agendar reunião emergencial para amanhã 9h",
+                        "Preparar plano de ação 30 dias"
+                    }
+                }, ct);
+            }
+
+            await Task.Delay(TimeSpan.FromHours(6), ct); // Verifica a cada 6h
+        }
+    }
+}
+```
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-071](./MD-071-Pesquisa-Satisfacao.md) com schema completo (8 tabelas: TemplatePesquisa, Pergunta, RespostaPesquisa, DetectorFollowUp, TriggerAutomatico, ConfiguracaoPesquisa, NPSHistorico, AlertaPesquisa)
+
+2. **Casos de Uso**: Criar [UC-071](./UC-071-Pesquisa-Satisfacao.md) com 5 casos de uso:
+   - UC-071-00: Listar e Visualizar Pesquisas
+   - UC-071-01: Criar e Configurar Template de Pesquisa
+   - UC-071-02: Enviar Pesquisa Multi-Canal
+   - UC-071-03: Responder Pesquisa (Usuario Final)
+   - UC-071-04: Analisar Metricas e Follow-up Detratores
+
+3. **Workflow**: Criar [WF-071](./WF-071-Pesquisa-Satisfacao.md) com fluxos visuais detalhados e wireframes telas
+
+4. **Implementacao Backend**:
+   - Entities: TemplatePesquisa, Pergunta, RespostaPesquisa, TriggerAutomatico
+   - Commands: CriarTemplatePesquisaCommand, EnviarPesquisaCommand, ResponderPesquisaCommand, RegistrarFollowUpCommand
+   - Queries: ObterMetricasQuery, CalcularNPSQuery, CalcularCSATQuery, CalcularCESQuery, ListarDetratoresQuery
+   - Handlers: TratadorRespostaNPS (follow-up automatico), AnalisadorSentimento (NLP)
+   - Jobs Hangfire: EnvioNPSTrimestral, CalculoMetricasAgregadas, MonitorSLAFollowUp
+
+5. **Implementacao Frontend**:
+   - Telas Admin: `/admin/pesquisas` (lista templates), `/admin/pesquisas/novo` (designer visual), `/admin/pesquisas/{id}/analytics` (dashboard metricas)
+   - Tela Publica: `/p/{token}` (responder pesquisa - PWA responsivo)
+   - Dashboards: Gauges NPS/CSAT/CES, Graficos tendencia, Word Cloud, Ranking Analistas
+   - Componentes: PerguntaComponent (suporta 12 tipos), DashboardMetricasComponent (atualização SignalR)
+
+6. **Testes**:
+   - Unitarios: Validadores (FrequenciaPesquisaValidator, RespostaAbertaValidator)
+   - Integracao: Azure Cognitive Services NLP, SendGrid/Twilio envios
+   - E2E: Fluxo completo envio → resposta → follow-up → dashboard atualizado
+   - Segurança: 12 testes obrigatórios (Seção 7.2)
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial - RF-071 Pesquisa de Satisfação com 12 regras de negocio, 14 permissões RBAC, 22 endpoints REST, 4 fluxos principais, 10 KPIs, 8 alertas | Claude Architect |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code Agent (icontrolit-architect)
+**Revisao**: Pendente

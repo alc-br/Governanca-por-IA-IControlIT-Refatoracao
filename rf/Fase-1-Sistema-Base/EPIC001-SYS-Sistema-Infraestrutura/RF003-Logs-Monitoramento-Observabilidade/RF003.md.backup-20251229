@@ -1,0 +1,409 @@
+# RF-003: Logs, Monitoramento e Observabilidade
+
+**Versão**: 3.0
+**Última Atualização**: 2025-11-04
+**Status**: ✅ Documentação Completa
+**Fase**: Fase 1 - Fundação e Cadastros Base
+
+---
+
+[← Voltar ao Índice](./README.md)
+
+---
+
+## 📋 RESUMO EXECUTIVO
+
+### Descrição Geral
+
+O RF-003 implementa o **Sistema de Logs, Monitoramento e Observabilidade** do IControlIT, fornecendo visibilidade completa da saúde do sistema, troubleshooting rápido de problemas, métricas de performance e compliance com requisitos de auditoria.
+
+### Importância Estratégica
+
+Este é um RF **CRÍTICO EM PRODUÇÃO** pois:
+
+1. **Troubleshooting Rápido**: Diagnosticar problemas em minutos (não horas)
+2. **SLA 99.9%**: Detectar e resolver incidentes antes de afetar usuários
+3. **Compliance**: Auditoria de logs para LGPD, SOX, ISO 27001
+4. **Performance**: Identificar gargalos (queries lentas, memory leaks)
+5. **Segurança**: Detectar ataques (SQL injection, XSS, DDoS)
+6. **DevOps**: Integração com CI/CD, alertas em produção
+
+### 15 Funcionalidades Principais
+
+1. ✅ **Logs Estruturados JSON**: Serilog com formato pesquisável
+2. ✅ **Níveis Configuráveis**: Verbose, Debug, Info, Warning, Error, Fatal
+3. ✅ **Agregação Centralizada**: Seq (dev) + Elasticsearch (prod)
+4. ✅ **Correlation IDs**: Rastrear requests end-to-end
+5. ✅ **Mascaramento Automático**: CPF, senhas, cartões de crédito
+6. ✅ **Métricas Prometheus**: Response time, throughput, error rate
+7. ✅ **Dashboards Grafana**: Pré-configurados (RED metrics)
+8. ✅ **Health Checks**: `/health` liveness + readiness probes
+9. ✅ **Tracing Distribuído**: OpenTelemetry (Jaeger/Zipkin)
+10. ✅ **Alertas Proativos**: PagerDuty/Opsgenie quando error rate > 5%
+11. ✅ **Log Sampling**: 10% em produção (otimização de custos)
+12. ✅ **Circuit Breaker**: Logging não bloqueia aplicação se falhar
+13. ✅ **Busca Full-Text**: Queries avançadas em Seq/Elasticsearch
+14. ✅ **Export Compliance**: CSV/JSON para auditoria
+15. ✅ **Application Insights**: Integração Azure nativa
+
+### Diferença: Legado vs. Modernizado
+
+| Aspecto | Sistema Legado (VB.NET) | Sistema Modernizado (.NET 10) |
+|---------|-------------------------|------------------------------|
+| **Logs** | Arquivo texto plano `app.log` | Serilog estruturado JSON |
+| **Busca** | `grep` manual | Seq/Elasticsearch full-text search |
+| **Formato** | Texto não estruturado | JSON estruturado com metadados |
+| **Agregação** | Nenhuma (logs locais) | Seq centralizado para todos os servidores |
+| **Métricas** | Nenhuma | Prometheus + Grafana (RED metrics) |
+| **Tracing** | Nenhum | OpenTelemetry distribuído entre microservices |
+| **Health Checks** | Nenhum | Endpoints `/health` para Kubernetes |
+| **Alertas** | Email manual | PagerDuty automático quando error rate > 5% |
+| **Retention** | Manual (disk full) | Automático: 90 dias (LGPD) a 7 anos (SOX) |
+| **Sensibilidade** | CPF/senhas em texto claro ❌ | Mascaramento automático ✅ |
+| **Correlation** | Impossível rastrear requests | Correlation ID em todos os logs |
+| **Performance** | Logs síncronos (bloqueia thread) | Logs assíncronos (background) |
+
+---
+
+## 🔗 INTEGRAÇÕES OBRIGATÓRIAS
+
+### 1️⃣ Central de Funcionalidades
+
+**Código da Funcionalidade**: `FNC-SYS-003`
+**Nome**: Sistema de Logs, Monitoramento e Observabilidade
+**Categoria**: Sistema / Infraestrutura
+**Tipo**: Tela + API + Dashboard
+**Descrição**: Permite aos administradores e equipe DevOps visualizar logs do sistema, métricas de performance, health checks e configurar alertas.
+
+**Permissões Requeridas**:
+- `SYS.LOGS.READ` - Visualizar logs do sistema
+- `SYS.LOGS.SEARCH` - Buscar logs com filtros avançados
+- `SYS.LOGS.EXPORT` - Exportar logs para CSV/JSON
+- `SYS.METRICS.READ` - Visualizar métricas e dashboards
+- `SYS.HEALTH.READ` - Verificar health checks
+- `SYS.ALERTS.READ` - Visualizar alertas configurados
+- `SYS.ALERTS.UPDATE` - Configurar alertas e thresholds
+
+### 2️⃣ Internacionalização (i18n)
+
+**Chaves de Tradução Necessárias** (arquivo `src/assets/i18n/pt-BR.json`):
+
+```json
+{
+  "LOGS": {
+    "TITLE": "Logs do Sistema",
+    "SUBTITLE": "Visualizar e buscar logs de aplicação",
+    "SEARCH_PLACEHOLDER": "Buscar por mensagem, erro ou correlation ID...",
+    "FIELDS": {
+      "TIMESTAMP": "Data/Hora",
+      "LEVEL": "Nível",
+      "MESSAGE": "Mensagem",
+      "EXCEPTION": "Exceção",
+      "USER": "Usuário",
+      "IP": "Endereço IP",
+      "CORRELATION_ID": "Correlation ID",
+      "DURATION": "Duração (ms)"
+    },
+    "LEVELS": {
+      "VERBOSE": "Verbose",
+      "DEBUG": "Debug",
+      "INFORMATION": "Informação",
+      "WARNING": "Aviso",
+      "ERROR": "Erro",
+      "FATAL": "Fatal"
+    },
+    "MESSAGES": {
+      "EXPORT_SUCCESS": "Logs exportados com sucesso",
+      "SEARCH_NO_RESULTS": "Nenhum log encontrado com os filtros aplicados"
+    }
+  },
+  "METRICS": {
+    "TITLE": "Métricas de Performance",
+    "SUBTITLE": "Monitorar saúde e desempenho do sistema",
+    "DASHBOARDS": {
+      "RED_METRICS": "RED Metrics (Rate, Errors, Duration)",
+      "SYSTEM_HEALTH": "Saúde do Sistema",
+      "API_PERFORMANCE": "Performance de APIs",
+      "DATABASE": "Banco de Dados"
+    },
+    "FIELDS": {
+      "REQUEST_RATE": "Taxa de Requisições",
+      "ERROR_RATE": "Taxa de Erros",
+      "RESPONSE_TIME": "Tempo de Resposta",
+      "CPU_USAGE": "Uso de CPU",
+      "MEMORY_USAGE": "Uso de Memória",
+      "DATABASE_CONNECTIONS": "Conexões com Banco"
+    }
+  },
+  "HEALTH": {
+    "TITLE": "Health Checks",
+    "STATUS": {
+      "HEALTHY": "Saudável",
+      "DEGRADED": "Degradado",
+      "UNHEALTHY": "Não Saudável"
+    },
+    "CHECKS": {
+      "DATABASE": "Banco de Dados",
+      "REDIS": "Redis Cache",
+      "AZURE_BLOB": "Azure Blob Storage",
+      "EXTERNAL_API": "APIs Externas"
+    }
+  },
+  "ALERTS": {
+    "TITLE": "Alertas e Notificações",
+    "SUBTITLE": "Configurar alertas proativos",
+    "FIELDS": {
+      "NAME": "Nome do Alerta",
+      "CONDITION": "Condição",
+      "THRESHOLD": "Limite",
+      "NOTIFICATION_CHANNEL": "Canal de Notificação",
+      "ENABLED": "Ativo"
+    },
+    "CHANNELS": {
+      "EMAIL": "E-mail",
+      "SLACK": "Slack",
+      "PAGERDUTY": "PagerDuty",
+      "TEAMS": "Microsoft Teams"
+    },
+    "MESSAGES": {
+      "ALERT_TRIGGERED": "Alerta disparado",
+      "ALERT_RESOLVED": "Alerta resolvido"
+    }
+  }
+}
+```
+
+### 3️⃣ Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Tipo | Dados Registrados | Retenção |
+|----------|------|-------------------|----------|
+| Visualizar Logs | ACCESS | Filtros utilizados, quantidade de registros | 90 dias |
+| Exportar Logs | EXPORT | Período exportado, formato, filtros | 7 anos |
+| Configurar Alerta | UPDATE | Configuração anterior vs nova | 7 anos |
+| Desabilitar Alerta Crítico | UPDATE | Motivo, usuário, timestamp | 7 anos |
+| Acesso a Logs de Segurança | ACCESS | IP, user-agent, logs acessados | 7 anos |
+
+**Nota**: Os próprios logs do sistema já são auditoria. Esta seção registra acesso/manipulação dos logs.
+
+### 4️⃣ Controle de Acesso (RBAC)
+
+**Matriz de Permissões por Perfil**:
+
+| Perfil | READ | SEARCH | EXPORT | METRICS | HEALTH | ALERTS_READ | ALERTS_UPDATE |
+|--------|------|--------|--------|---------|--------|-------------|---------------|
+| **Super Administrador** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Administrador DevOps** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Administrador de Sistema** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Gerente de Operações** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Desenvolvedor** | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **Auditor** | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| **Usuário Final** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+---
+
+## 📐 REGRAS DE NEGÓCIO
+
+**Nota**: Este RF possui 12 regras de negócio. Apresentação resumida por brevidade.
+
+### RN-LOG-001: Logs Estruturados JSON
+**Descrição**: Todos os logs em formato JSON para busca e análise
+**Justificativa**: Permite queries SQL/Elasticsearch complexas
+
+### RN-LOG-002: Níveis de Log por Ambiente
+**Descrição**: DEV=Debug, HOM=Info, PRD=Warning
+**Justificativa**: Reduzir ruído em produção
+
+### RN-LOG-003: Correlation IDs Obrigatórios
+**Descrição**: Todo request recebe GUID único propagado em toda cadeia
+**Justificativa**: Rastrear requests distribuídos end-to-end
+
+### RN-LOG-004: Mascaramento Automático de Dados Sensíveis
+**Descrição**: CPF, senhas, cartões mascarados automaticamente antes de logar
+**Justificativa**: Compliance LGPD (não logar dados pessoais)
+
+### RN-LOG-005: Sampling em Produção (10%)
+**Descrição**: Logar apenas 10% dos requests bem-sucedidos (200 OK)
+**Justificativa**: Reduzir custos (Elasticsearch/Seq) sem perder visibilidade
+
+### RN-LOG-006: 100% de Erros Sempre Logados
+**Descrição**: Erros (4xx, 5xx) são SEMPRE logados (sem sampling)
+**Justificativa**: Não perder nenhum erro crítico
+
+### RN-LOG-007: Circuit Breaker para Logging
+**Descrição**: Se Seq/Elasticsearch falhar, logs vão para arquivo local
+**Justificativa**: Logging nunca deve derrubar a aplicação
+
+### RN-LOG-008: Retenção Automática por Tipo
+**Descrição**:
+- Logs Info/Debug: 90 dias
+- Logs Warning/Error: 1 ano
+- Logs de Segurança: 7 anos
+**Justificativa**: Compliance LGPD + SOX
+
+### RN-LOG-009: Métricas RED (Rate, Errors, Duration)
+**Descrição**: Coletar automaticamente via Prometheus:
+- **Rate**: Requests/segundo
+- **Errors**: % de erros
+- **Duration**: P50, P95, P99 latency
+**Justificativa**: Padrão da indústria para monitoramento
+
+### RN-LOG-010: Health Checks /health Endpoint
+**Descrição**: Endpoint retorna status de dependências (DB, Redis, Azure)
+**Justificativa**: Kubernetes liveness/readiness probes
+
+### RN-LOG-011: Alertas Automáticos
+**Descrição**: Disparar PagerDuty se:
+- Error rate > 5% por 5 minutos
+- P95 latency > 3 segundos
+- CPU > 80% por 10 minutos
+- Memória > 90%
+**Justificativa**: Detecção proativa de problemas
+
+### RN-LOG-012: Tracing Distribuído OpenTelemetry
+**Descrição**: Propagar trace context entre serviços (W3C standard)
+**Justificativa**: Visualizar latência em cada microservice
+
+---
+
+## 🗃️ REFERÊNCIAS AO LEGADO
+
+### Sistema Legado: Arquivo de Log Texto Plano
+
+**Localização**: `D:\IC2\ic1_legado\IControlIT\IControlIT\logs\app.log`
+
+```
+2023-10-15 14:23:45 - Usuário admin@test.com fez login
+2023-10-15 14:24:12 - Erro ao salvar usuário: Object reference not set to an instance of an object
+2023-10-15 14:25:33 - CPF 123.456.789-00 consultado
+2023-10-15 14:26:01 - Senha do usuário: Admin@123
+```
+
+**Problemas do Legado**:
+1. ❌ **Formato texto não estruturado** (impossível buscar por campos)
+2. ❌ **CPF e senhas em texto claro** (violação LGPD)
+3. ❌ **Sem correlation ID** (impossível rastrear request)
+4. ❌ **Sem níveis de log** (tudo é informação)
+5. ❌ **Sem agregação** (cada servidor tem log separado)
+6. ❌ **Sem busca** (apenas `grep` manual)
+7. ❌ **Sem métricas** (não sabe response time, error rate)
+8. ❌ **Sem alertas** (problemas descobertos por usuários)
+
+### Código Legado: Logging
+
+```vb.net
+' Código VB.NET legado
+Public Sub LogError(mensagem As String)
+    Dim logFile As String = Server.MapPath("~/logs/app.log")
+    Dim writer As New StreamWriter(logFile, True)
+    writer.WriteLine($"{DateTime.Now} - {mensagem}")
+    writer.Close()
+End Sub
+
+' Uso (com dados sensíveis!)
+LogError($"Erro ao processar CPF {cpf}: {ex.Message}")
+LogError($"Senha do usuário: {senha}")
+```
+
+---
+
+## 🖥️ TELAS DO LEGADO
+
+Não havia tela de visualização de logs no sistema legado. Administradores acessavam servidor via RDP e abriam arquivos `.log` com Notepad.
+
+**Modernização Implementada**:
+- ✅ Interface web para visualizar logs (Seq UI)
+- ✅ Busca full-text com filtros
+- ✅ Dashboards Grafana para métricas
+- ✅ Health checks endpoint
+- ✅ Integração com PagerDuty
+- ✅ Export para CSV/JSON
+
+---
+
+## 🛠️ IMPLEMENTAÇÃO ATUAL
+
+**Status**: ✅ **Sistema já implementado e em produção**
+
+**Arquivos Existentes**:
+- `LoggingBehaviour.cs`: MediatR pipeline para logar commands/queries
+- `DiagnosticsLogWriter.cs`: Writer customizado de diagnóstico
+- `AuditService.cs`: Integração com auditoria
+- `appsettings.json`: Configuração Serilog
+
+**Stack Tecnológico**:
+- **Serilog**: Logging estruturado
+- **Seq**: Agregação centralizada (dev/hom)
+- **Elasticsearch**: Agregação produção
+- **Prometheus**: Métricas
+- **Grafana**: Dashboards
+- **OpenTelemetry**: Tracing distribuído
+- **Application Insights**: Integração Azure
+
+**Configuração Serilog** (`appsettings.json`):
+```json
+{
+  "Serilog": {
+    "Using": ["Serilog.Sinks.Console", "Serilog.Sinks.Seq", "Serilog.Sinks.File"],
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "System": "Warning"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "Console",
+        "Args": {
+          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"
+        }
+      },
+      {
+        "Name": "Seq",
+        "Args": {
+          "serverUrl": "http://localhost:5341",
+          "apiKey": "YOUR_SEQ_API_KEY"
+        }
+      },
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/log-.txt",
+          "rollingInterval": "Day",
+          "retainedFileCountLimit": 90,
+          "outputTemplate": "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}"
+        }
+      }
+    ],
+    "Enrich": ["FromLogContext", "WithMachineName", "WithThreadId"],
+    "Properties": {
+      "Application": "IControlIT",
+      "Environment": "Production"
+    }
+  }
+}
+```
+
+**Health Checks** (`Program.cs`):
+```csharp
+builder.Services.AddHealthChecks()
+    .AddSqlServer(connectionString, name: "database")
+    .AddRedis(redisConnection, name: "redis")
+    .AddAzureBlobStorage(azureConnection, name: "azure-blob")
+    .AddCheck<ExternalApiHealthCheck>("external-api");
+
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+```
+
+---
+
+[← Voltar ao Índice](./README.md)
+
+---
+
+**Próximos Passos**: Criar MD-003 (Modelo de Dados) e Casos de Uso (UC00-UC02)

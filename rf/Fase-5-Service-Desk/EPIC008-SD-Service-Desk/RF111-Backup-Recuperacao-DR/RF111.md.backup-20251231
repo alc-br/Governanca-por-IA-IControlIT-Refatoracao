@@ -1,0 +1,1216 @@
+# RF-111: Backup, Recuperação e Disaster Recovery
+
+**Versão**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF-110, RF-112 | **EPIC**: EPIC008-SD-Service-Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o módulo de **Backup, Recuperação e Disaster Recovery (DR)** do sistema IControlIT, responsável por garantir a continuidade de negócios através de estratégias robustas de proteção de dados, restauração de informações e planos de contingência em cenários de desastres.
+
+O módulo RF111 implementa uma solução integrada de backup automático de banco de dados, arquivos e configurações do sistema, combinado com planos de disaster recovery que permitem failover automático para regiões secundárias na nuvem Azure. O sistema garante RPO (Recovery Point Objective) de até 6 horas e RTO (Recovery Time Objective) de até 4 horas, assegurando que o sistema possa ser restaurado rapidamente em caso de falha.
+
+### 1.2 Importância Estratégica
+
+O módulo de Backup e Disaster Recovery é crítico para:
+
+- **Continuidade de Negócios**: Garantir que o sistema IControlIT esteja sempre disponível, mesmo em caso de falhas regionais ou desastres naturais
+- **Conformidade Regulatória**: Atender requisitos de Lei Geral de Proteção de Dados (LGPD), ISO 27001 e normas de backup de dados
+- **Proteção de Dados**: Prevenir perda total de dados através de múltiplas cópias de backup em diferentes regiões geográficas
+- **Resiliência Operacional**: Reduzir tempo de indisponibilidade através de testes automáticos de DR e failover orquestrado
+- **Confiabilidade do Sistema**: Implementar estratégias de backup incremental, diferencial e full, com retenção configurável
+
+### 1.3 Conceitos Fundamentais
+
+**Backup Completo (Full Backup)**: Cópia integral de todos os dados do banco de dados no momento da execução. Requer maior espaço de armazenamento, mas é a forma mais segura de backup.
+- Executado diariamente às 2h (horário de baixa demanda)
+- Criptografado com AES-256 antes do upload
+- Armazenado em Azure Blob Storage com replicação geográfica
+
+**Backup Incremental**: Cópia apenas dos dados alterados desde o último backup de qualquer tipo. Reduz significativamente o tempo e espaço de armazenamento.
+- Executado a cada 6 horas
+- Depende do último backup (full ou incremental)
+- Permite RPO de 6 horas
+
+**Backup Diferencial**: Cópia apenas dos dados alterados desde o último backup completo. Oferece equilíbrio entre tamanho e tempo de restauração.
+- Executado uma vez por semana (segunda-feira)
+- Reduz tempo de restauração em relação ao incremental
+- Base para retenção semanal
+
+**Point-in-Time Recovery (PITR)**: Capacidade de restaurar o banco de dados para qualquer ponto específico no tempo dentro da janela de retenção.
+- Utiliza transaction logs do SQL Server
+- Disponível para qualquer momento dos últimos 7 dias
+- Crítico para cenários de corrupção de dados ou exclusão acidental
+
+**Recovery Point Objective (RPO)**: Intervalo máximo aceitável de perda de dados. Para RF111, estabelecido em 6 horas.
+- Significa que o máximo de dados perdido seria 6 horas de transações
+- Drives a frequência de backup incremental
+
+**Recovery Time Objective (RTO)**: Tempo máximo aceitável para restaurar o sistema após uma falha. Para RF111, estabelecido em 4 horas.
+- Depende da velocidade de restauração do backup
+- Influenciado pelo tamanho do banco e largura de banda disponível
+
+**Failover Automático**: Processo de transferência automática de tráfego para ambiente secundário quando a região primária fica indisponível.
+- Acionado após 15 minutos de indisponibilidade da região primária
+- Usa Azure Site Recovery para orquestração
+- Sincronização de configurações e dados de forma transparente
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Azure) |
+|---------|-----------------|------|
+| **Backup de BD** | Backup SQL nativo apenas, armazenado em servidor local | Backup automático com Azure Backup + replicação geográfica |
+| **Backup de Arquivos** | Backup manual via robocopy, armazenado em rede interna | Backup automático em Azure Blob Storage com snapshots |
+| **Retenção** | Sem política definida, acumulação indefinida | Política definida: 7 dias (daily), 4 semanas (weekly), 12 meses (yearly) |
+| **Criptografia** | Sem criptografia em repouso | AES-256 obrigatório para todos os backups |
+| **DR** | Sem plano formal, recuperação manual e lenta | Failover automático em <15 minutos de indisponibilidade |
+| **RTO** | 24+ horas (restauração manual) | 4 horas (restauração automática) |
+| **RPO** | 24 horas | 6 horas |
+| **PITR** | Indisponível | Disponível para últimos 7 dias |
+| **Monitoramento** | Sem alertas automáticos | Azure Monitor com alertas integrados |
+| **Testes de DR** | Sem testes automáticos | Testes simulados trimestrais obrigatórios |
+
+### 1.5 Funcionalidades Principais
+
+1. **Backup Automático de Banco de Dados** - Execução automática de backups completos diários às 2h, incrementais a cada 6 horas e semanais diferenciais
+2. **Backup de Arquivos em Cloud Storage** - Upload automático de documentos, uploads e arquivos temporários para Azure Blob Storage
+3. **Gerenciamento de Retenção** - Política automática de exclusão de backups antigos conforme regras configuradas (7d daily, 4w weekly, 12m yearly)
+4. **Point-in-Time Recovery** - Capacidade de restaurar banco de dados para qualquer momento nos últimos 7 dias
+5. **Restauração de Banco de Dados** - Interface para restaurar a partir de qualquer backup com validação de integridade via checksum SHA-256
+6. **Restauração de Arquivos** - Recuperação seletiva de arquivos de snapshots do Blob Storage
+7. **Plano de Disaster Recovery Automatizado** - Definição de estratégia de DR com failover automático para região secundária
+8. **Failover Automático** - Detecção de indisponibilidade com acionamento automático de failover após 15 minutos
+9. **Testes de DR Simulados** - Execução de testes trimestrais que não afetam ambiente de produção
+10. **Monitoramento e Alertas** - Integração com Azure Monitor para alertas de falha de backup, espaço em disco, etc.
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-BCK-111-01: Backup Completo Diário em Horário de Baixa Demanda
+
+**Descrição**: Backup completo do banco de dados deve ser executado automaticamente todos os dias às 2h da manhã (horário de transição entre períodos de baixa demanda operacional).
+
+**Justificativa**: Horário de 2h foi identificado como período de menor volume de transações, minimizando impacto na performance do sistema. Backup completo diário fornece ponto de restauração garantido para qualquer dia do mês.
+
+**Implementação**:
+```csharp
+public class BackupFullScheduleCommand : IRequest<Result>
+{
+    public DateTime ScheduledTime { get; set; } = DateTime.Today.AddHours(2);
+    public string BackupName { get; set; } = $"Full_Backup_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
+}
+
+public class BackupFullScheduleCommandHandler : IRequestHandler<BackupFullScheduleCommand, Result>
+{
+    private readonly IBackupService _backupService;
+    private readonly IHangfireJobScheduler _scheduler;
+
+    public async Task<Result> Handle(BackupFullScheduleCommand request, CancellationToken ct)
+    {
+        // Agendar job no Hangfire para 2h da manhã
+        var jobId = _scheduler.Schedule<FullDatabaseBackupJob>(
+            job => job.ExecuteAsync(request.BackupName, CancellationToken.None),
+            request.ScheduledTime
+        );
+
+        // Validar que job foi agendado com sucesso
+        if (string.IsNullOrEmpty(jobId))
+            return Result.Failure("Falha ao agendar backup completo");
+
+        return Result.Success($"Backup completo agendado para {request.ScheduledTime}");
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Backup executado em 2025-12-29 02:00:00
+- Inválido: Backup executado em 2025-12-29 14:30:00 (fora do horário configurado)
+
+---
+
+### RN-BCK-111-02: Backup Incremental a Cada 6 Horas
+
+**Descrição**: Backup incremental do banco de dados deve ser executado automaticamente a cada 6 horas (00h, 6h, 12h, 18h), capturando apenas dados alterados desde o último backup de qualquer tipo.
+
+**Justificativa**: Frequência de 6 horas estabelece RPO de 6 horas, permitindo que no máximo 6 horas de transações sejam perdidas em cenário de falha. Incremental reduz significativamente espaço de armazenamento e tempo de execução comparado com backups completos.
+
+**Implementação**:
+```csharp
+public class BackupIncrementalScheduleService
+{
+    private readonly IHangfireJobScheduler _scheduler;
+    private readonly int[] _hoursToRun = new[] { 0, 6, 12, 18 };
+
+    public void ScheduleIncrementalBackups()
+    {
+        foreach (var hour in _hoursToRun)
+        {
+            var scheduledTime = DateTime.Today.AddHours(hour);
+            var jobId = _scheduler.RecurringJob(
+                jobId: $"incremental-backup-{hour}h",
+                job: () => ExecuteIncrementalBackup(),
+                cronExpression: $"0 {hour} * * *" // Cron: 0h, 6h, 12h, 18h
+            );
+        }
+    }
+
+    private async Task ExecuteIncrementalBackup()
+    {
+        var backup = new IncrementalBackupCommand
+        {
+            BackupName = $"Incremental_Backup_{DateTime.UtcNow:yyyyMMdd_HHmmss}",
+            SinceLsn = await GetLastBackupLsn() // Log Sequence Number do SQL
+        };
+
+        await _mediator.Send(backup);
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Backup incremental em 2025-12-29 00:00:00, 06:00:00, 12:00:00, 18:00:00
+- Inválido: Backup incremental em 2025-12-29 05:00:00 (fora dos horários configurados)
+
+---
+
+### RN-BCK-111-03: Política de Retenção: 7 Dias (Daily), 4 Semanas (Weekly), 12 Meses (Yearly)
+
+**Descrição**: Backups devem ser mantidos conforme política de retenção: backups diários por 7 dias, backups semanais por 4 semanas (28 dias), e backups mensais por 12 meses. Backups mais antigos devem ser removidos automaticamente.
+
+**Justificativa**: Política equilibra disponibilidade de pontos de restauração com custo de armazenamento. Período de 7 dias cobre a maioria dos cenários de corrupção de dados detectados. 12 meses cobre conformidade LGPD e auditorias.
+
+**Implementação**:
+```csharp
+public class BackupRetentionPolicy
+{
+    public static readonly BackupRetentionRule[] Rules = new[]
+    {
+        new BackupRetentionRule
+        {
+            BackupType = BackupType.Full,
+            RetentionDays = 7,
+            Description = "Daily full backups retained for 7 days"
+        },
+        new BackupRetentionRule
+        {
+            BackupType = BackupType.Differential,
+            RetentionDays = 28,
+            Description = "Weekly differential backups retained for 28 days"
+        },
+        new BackupRetentionRule
+        {
+            BackupType = BackupType.Incremental,
+            RetentionDays = 7,
+            Description = "Incremental backups retained for 7 days"
+        }
+    };
+}
+
+public class DeleteOldBackupsCommand : IRequest<Result>
+{
+    public class DeleteOldBackupsHandler : IRequestHandler<DeleteOldBackupsCommand, Result>
+    {
+        public async Task<Result> Handle(DeleteOldBackupsCommand request, CancellationToken ct)
+        {
+            var backups = await _backupRepository.GetAllAsync();
+
+            foreach (var rule in BackupRetentionPolicy.Rules)
+            {
+                var cutoffDate = DateTime.UtcNow.AddDays(-rule.RetentionDays);
+                var backupsToDelete = backups
+                    .Where(b => b.BackupType == rule.BackupType && b.CreatedAt < cutoffDate)
+                    .ToList();
+
+                foreach (var backup in backupsToDelete)
+                {
+                    await DeleteBackupFromStorage(backup);
+                    await _backupRepository.DeleteAsync(backup, ct);
+                }
+            }
+
+            return Result.Success($"Deleted {backupsToDelete.Count} old backups");
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Backup full criado em 2025-12-22 mantido até 2025-12-29, então deletado
+- Inválido: Backup full criado em 2025-12-22 ainda presente em 2026-01-05 (ultrapassou 7 dias)
+
+---
+
+### RN-BCK-111-04: Criptografia Obrigatória de Backups em AES-256
+
+**Descrição**: Todos os backups devem ser criptografados com algoritmo AES-256 antes de qualquer envio para armazenamento remoto (Azure Blob Storage). Chaves de criptografia devem ser armazenadas em Azure Key Vault.
+
+**Justificativa**: AES-256 é padrão de segurança federal (FIPS 140-2) e atende conformidade LGPD. Criptografia em repouso protege contra acesso não autorizado a backups interrompidos ou roubados.
+
+**Implementação**:
+```csharp
+public class EncryptBackupCommand : IRequest<Result>
+{
+    public byte[] BackupData { get; set; }
+    public string BackupName { get; set; }
+}
+
+public class EncryptBackupHandler : IRequestHandler<EncryptBackupCommand, Result>
+{
+    private readonly IAzureKeyVaultService _keyVault;
+    private readonly IEncryptionService _encryption;
+
+    public async Task<Result> Handle(EncryptBackupCommand request, CancellationToken ct)
+    {
+        // Recuperar chave de criptografia do Key Vault
+        var encryptionKey = await _keyVault.GetKeyAsync("backup-encryption-key", ct);
+
+        // Criptografar backup com AES-256
+        var encryptedData = _encryption.EncryptAes256(request.BackupData, encryptionKey);
+
+        // Adicionar IV (initialization vector) ao inicio do arquivo
+        var backupWithIv = CombineIvAndEncryptedData(encryptionKey.Iv, encryptedData);
+
+        // Salvar em Azure Blob Storage
+        await _blobStorageService.UploadAsync(
+            containerName: "backups",
+            blobName: request.BackupName,
+            data: backupWithIv,
+            ct: ct
+        );
+
+        return Result.Success("Backup encrypted and stored successfully");
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Backup criptografado com AES-256 antes de upload para Blob Storage
+- Inválido: Backup enviado para Blob Storage sem criptografia
+
+---
+
+### RN-BCK-111-05: Validação de Integridade via Checksum SHA-256
+
+**Descrição**: Toda restauração de backup deve validar integridade do arquivo através de cálculo de checksum SHA-256 e comparação com checksum original armazenado. Restauração deve ser abortada se checksums não coincidirem.
+
+**Justificativa**: Checksum detecta corrupção de dados em trânsito ou em armazenamento. SHA-256 é padrão criptográfico forte (FIPS 180-4) que oferece proteção contra colisões.
+
+**Implementação**:
+```csharp
+public class RestoreBackupCommand : IRequest<Result>
+{
+    public int BackupId { get; set; }
+    public string TargetDatabaseName { get; set; }
+}
+
+public class RestoreBackupHandler : IRequestHandler<RestoreBackupCommand, Result>
+{
+    private readonly IBackupRepository _backupRepository;
+    private readonly IBlobStorageService _blobStorage;
+
+    public async Task<Result> Handle(RestoreBackupCommand request, CancellationToken ct)
+    {
+        var backup = await _backupRepository.GetByIdAsync(request.BackupId, ct);
+        if (backup == null)
+            return Result.Failure("Backup not found");
+
+        // Download backup do Blob Storage
+        var backupData = await _blobStorage.DownloadAsync(
+            containerName: "backups",
+            blobName: backup.BlobName,
+            ct: ct
+        );
+
+        // Descriptografar se necessário
+        var decryptedData = backup.IsEncrypted
+            ? await DecryptBackupData(backupData, ct)
+            : backupData;
+
+        // Calcular checksum SHA-256
+        var calculatedChecksum = CalculateSha256(decryptedData);
+
+        // Comparar com checksum original
+        if (calculatedChecksum != backup.ChecksumSha256)
+            return Result.Failure($"Backup integrity check failed. Expected {backup.ChecksumSha256}, got {calculatedChecksum}");
+
+        // Prosseguir com restauração
+        await ExecuteRestoreToDatabaseAsync(decryptedData, request.TargetDatabaseName, ct);
+
+        return Result.Success("Backup restored successfully");
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Checksum calculado = 7f8e9d4... coincidir com armazenado → restauração prossegue
+- Inválido: Checksum calculado = 3a1b2c5... diferente do armazenado → restauração abortada
+
+---
+
+### RN-BCK-111-06: RPO (Recovery Point Objective) de 6 Horas
+
+**Descrição**: Sistema deve garantir que em cenário de falha, máximo 6 horas de transações sejam perdidas. Isso é estabelecido através de backup incremental a cada 6 horas.
+
+**Justificativa**: RPO de 6 horas é equilibrio entre frequência de backup (que impacta performance) e proteção de dados. Atende maioria dos casos de uso de negócio e conformidade.
+
+**Implementação**:
+```csharp
+public class RpoMonitoringService
+{
+    private readonly IBackupRepository _backupRepository;
+    private readonly IAlertService _alertService;
+
+    public async Task VerifyRpoCompliance(CancellationToken ct)
+    {
+        var lastBackupTime = await _backupRepository.GetLastBackupTimeAsync(ct);
+        var timeSinceLastBackup = DateTime.UtcNow - lastBackupTime;
+
+        const int RpoPeriodHours = 6;
+
+        if (timeSinceLastBackup.TotalHours > RpoPeriodHours)
+        {
+            // RPO violado - enviar alerta crítico
+            await _alertService.SendCriticalAlertAsync(
+                "RPO Violation Detected",
+                $"Last backup was {timeSinceLastBackup.TotalHours:F1} hours ago. RPO is 6 hours.",
+                AlertSeverity.Critical,
+                ct
+            );
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Último backup em 2025-12-29 12:00:00, teste em 2025-12-29 17:00:00 (5 horas)
+- Inválido: Último backup em 2025-12-28 18:00:00, teste em 2025-12-29 01:00:00 (7 horas)
+
+---
+
+### RN-BCK-111-07: RTO (Recovery Time Objective) de 4 Horas
+
+**Descrição**: Sistema deve ser capaz de ser restaurado completamente a partir de backup em máximo 4 horas. Inclui tempo de download do backup, descriptografia, validação de integridade e restauração do banco de dados.
+
+**Justificativa**: RTO de 4 horas atende SLA comercial e permite continuidade de operações com interrupção limitada. Depende de arquitetura, tamanho do banco e largura de banda disponível.
+
+**Implementação**:
+```csharp
+public class RtoCompliance
+{
+    // Métricas base (ajustadas conforme ambiente)
+    private const int BackupDownloadMinutes = 30;       // Download do Blob Storage
+    private const int DecryptionMinutes = 15;           // Descriptografia AES-256
+    private const int IntegrityCheckMinutes = 10;       // Validação SHA-256
+    private const int DatabaseRestoreMinutes = 90;      // Restauração SQL Server
+    private const int ValidationMinutes = 15;           // Testes pós-restauração
+
+    private const int TotalRtoMinutes = BackupDownloadMinutes + DecryptionMinutes
+        + IntegrityCheckMinutes + DatabaseRestoreMinutes + ValidationMinutes;
+
+    private const int RtoThresholdMinutes = 240; // 4 horas
+
+    public bool IsRtoAchievable()
+    {
+        return TotalRtoMinutes <= RtoThresholdMinutes; // 160 min <= 240 min ✓
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Restauração completa concluída em 3 horas 45 minutos
+- Inválido: Restauração leva 5 horas 30 minutos (acima do RTO de 4 horas)
+
+---
+
+### RN-BCK-111-08: Failover Automático Após 15 Minutos de Indisponibilidade
+
+**Descrição**: Se região primária (East US) fica indisponível por mais de 15 minutos consecutivos, sistema deve automaticamente iniciar processo de failover para região secundária (West US) sem intervenção manual.
+
+**Justificativa**: 15 minutos é tempo suficiente para diferenciar falha transitória de falha real, evitando falsos positivos. Failover automático reduz RTO significativamente.
+
+**Implementação**:
+```csharp
+public class FailoverMonitoringService
+{
+    private readonly IHealthCheckService _healthCheck;
+    private readonly IAzureSiteRecoveryService _siteRecovery;
+    private readonly IAlertService _alertService;
+
+    public async Task MonitorAndFailover(CancellationToken ct)
+    {
+        var primaryRegionHealthy = await _healthCheck.CheckPrimaryRegionAsync(ct);
+
+        if (!primaryRegionHealthy)
+        {
+            var outageStartTime = DateTime.UtcNow;
+
+            // Aguardar 15 minutos antes de iniciar failover
+            await Task.Delay(TimeSpan.FromMinutes(15), ct);
+
+            // Verificar se região primária ainda está indisponível
+            primaryRegionHealthy = await _healthCheck.CheckPrimaryRegionAsync(ct);
+
+            if (!primaryRegionHealthy)
+            {
+                // Iniciar failover automático
+                var failoverResult = await _siteRecovery.InitiateFailoverAsync(
+                    recoveryPlanName: "IC2_Prod_DR",
+                    targetRegion: "West US",
+                    ct: ct
+                );
+
+                if (failoverResult.IsSuccess)
+                {
+                    await _alertService.SendAlertAsync(
+                        "Automatic Failover Initiated",
+                        $"Primary region unavailable for {(DateTime.UtcNow - outageStartTime).TotalMinutes} minutes. Failover to West US started.",
+                        AlertSeverity.Critical,
+                        ct
+                    );
+                }
+            }
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Região primária indisponível desde 14:00:00, failover iniciado automaticamente em 14:15:00
+- Inválido: Região primária indisponível desde 14:00:00, mas failover não iniciado em 14:10:00 (menos de 15 min)
+
+---
+
+### RN-BCK-111-09: Teste de Disaster Recovery Obrigatório Trimestralmente
+
+**Descrição**: Teste completo de plano de DR deve ser executado automaticamente a cada trimestre (a cada 3 meses). Teste deve validar que failover funciona, dados são consistentes na região secundária, e aplicação fica funcional.
+
+**Justificativa**: Testes periódicos validam que DR não é apenas um plano teórico, mas funciona na prática. Detecta problemas antes de cenário real de desastre.
+
+**Implementação**:
+```csharp
+public class TrimestrialDrTestService
+{
+    private readonly IScheduledJobService _jobService;
+    private readonly IDrTestExecutor _drTestExecutor;
+    private readonly IAlertService _alertService;
+
+    public void ScheduleQuarterlyDrTests()
+    {
+        // Agendar testes para primeiro dia de cada trimestre às 2h
+        var testDates = new[]
+        {
+            new DateTime(DateTime.UtcNow.Year, 1, 1, 2, 0, 0),   // Q1
+            new DateTime(DateTime.UtcNow.Year, 4, 1, 2, 0, 0),   // Q2
+            new DateTime(DateTime.UtcNow.Year, 7, 1, 2, 0, 0),   // Q3
+            new DateTime(DateTime.UtcNow.Year, 10, 1, 2, 0, 0)   // Q4
+        };
+
+        foreach (var testDate in testDates)
+        {
+            _jobService.ScheduleRecurring(
+                jobId: $"dr-test-{testDate.Month}",
+                job: () => ExecuteDrTest(),
+                cronExpression: $"0 2 1 {testDate.Month} *"
+            );
+        }
+    }
+
+    private async Task ExecuteDrTest()
+    {
+        var testResult = await _drTestExecutor.ExecuteFullDrTestAsync(
+            simulateFailover: true,
+            validateData: true,
+            validateApplication: true
+        );
+
+        if (!testResult.IsSuccess)
+        {
+            await _alertService.SendAlertAsync(
+                "DR Test Failed",
+                $"Quarterly DR test failed: {testResult.ErrorMessage}",
+                AlertSeverity.Critical,
+                CancellationToken.None
+            );
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Teste de DR executado em 2025-01-01, 2025-04-01, 2025-07-01, 2025-10-01
+- Inválido: Nenhum teste de DR executado durante o ano de 2025
+
+---
+
+### RN-BCK-111-10: Auditoria Obrigatória de Todos Backups e Restores
+
+**Descrição**: Cada operação de backup ou restore deve ser registrada em trilha de auditoria com dados: usuário que iniciou, timestamp, tipo de backup, tamanho, checksum, status (sucesso/falha) e detalhes de erro.
+
+**Justificativa**: Auditoria oferece rastreabilidade, detecta atividades suspeitas, atende conformidade LGPD e ISO 27001, e facilita investigação de problemas.
+
+**Implementação**:
+```csharp
+public class BackupAuditLog : AuditedEntity
+{
+    public int BackupId { get; set; }
+    public BackupType BackupType { get; set; }
+    public string BackupName { get; set; }
+    public long SizeBytes { get; set; }
+    public string ChecksumSha256 { get; set; }
+    public string UserId { get; set; }
+    public string UserEmail { get; set; }
+    public string Operation { get; set; } // "Backup" ou "Restore"
+    public bool IsSuccessful { get; set; }
+    public string ErrorMessage { get; set; }
+    public DateTime StartTime { get; set; }
+    public DateTime EndTime { get; set; }
+    public TimeSpan Duration => EndTime - StartTime;
+}
+
+public class AuditBackupOperationCommand : IRequest<Result>
+{
+    public int BackupId { get; set; }
+    public string Operation { get; set; } // "Backup" ou "Restore"
+    public bool IsSuccessful { get; set; }
+    public string ErrorMessage { get; set; }
+}
+
+public class AuditBackupOperationHandler : IRequestHandler<AuditBackupOperationCommand, Result>
+{
+    private readonly IBackupAuditRepository _auditRepository;
+    private readonly ICurrentUserService _currentUser;
+
+    public async Task<Result> Handle(AuditBackupOperationCommand request, CancellationToken ct)
+    {
+        var backup = await _backupRepository.GetByIdAsync(request.BackupId, ct);
+        var currentUser = _currentUser.GetCurrentUser();
+
+        var auditLog = new BackupAuditLog
+        {
+            BackupId = request.BackupId,
+            BackupName = backup.BackupName,
+            BackupType = backup.BackupType,
+            SizeBytes = backup.SizeBytes,
+            ChecksumSha256 = backup.ChecksumSha256,
+            UserId = currentUser.Id,
+            UserEmail = currentUser.Email,
+            Operation = request.Operation,
+            IsSuccessful = request.IsSuccessful,
+            ErrorMessage = request.ErrorMessage,
+            StartTime = DateTime.UtcNow,
+            EndTime = DateTime.UtcNow
+        };
+
+        await _auditRepository.AddAsync(auditLog, ct);
+        return Result.Success("Backup operation audited successfully");
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Log de auditoria criado em 2025-12-29 02:30:00 registrando backup full bem-sucedido de 150GB
+- Inválido: Restore executado sem registro em trilha de auditoria
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IC1_Producao`
+
+**Tabelas Principais de Backup**: Não existem tabelas específicas no legado. Sistema legado utiliza SQL Server Maintenance Plans para backup automático.
+
+```sql
+-- Tabelas que NECESSITAM backup (do legado, mapeadas para novo modelo)
+CREATE TABLE [dbo].[tb_Empresas](
+    [id_empresa] [int] IDENTITY(1,1) NOT NULL,
+    [nm_empresa] [varchar](255) NOT NULL,
+    [dt_criacao] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_Empresas] PRIMARY KEY CLUSTERED ([id_empresa] ASC)
+)
+
+CREATE TABLE [dbo].[tb_Usuarios](
+    [id_usuario] [int] IDENTITY(1,1) NOT NULL,
+    [nm_usuario] [varchar](255) NOT NULL,
+    [em_usuario] [varchar](255) NOT NULL,
+    [id_empresa] [int] NOT NULL,
+    [dt_criacao] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_Usuarios] PRIMARY KEY CLUSTERED ([id_usuario] ASC)
+)
+
+CREATE TABLE [dbo].[tb_Arquivos](
+    [id_arquivo] [int] IDENTITY(1,1) NOT NULL,
+    [nm_arquivo] [varchar](255) NOT NULL,
+    [tp_arquivo] [varchar](50) NOT NULL,
+    [tg_arquivo] [bigint] NOT NULL,
+    [nm_arquivo_original] [varchar](255) NOT NULL,
+    [dt_upload] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_Arquivos] PRIMARY KEY CLUSTERED ([id_arquivo] ASC)
+)
+```
+
+### 3.2 Stored Procedures Legado
+
+Não existem SPs específicas para backup no legado. Backup é gerenciado através de Maintenance Plans do SQL Server Agent.
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| N/A | Backup via Maintenance Plans | Substituir por Azure Backup + Hangfire jobs |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|-------------|
+| `AdminBackup.aspx` | Interface de backup manual | `/admin/backup` (Angular) |
+| `AdminRestore.aspx` | Interface de restauração | `/admin/restore` (Angular) |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSBackup.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ExecuteBackup()` | Executa backup manual | `POST /api/backup/criar` |
+| `GetBackupList()` | Lista backups disponíveis | `GET /api/backup` |
+| `RestoreBackup(backupId)` | Restaura backup específico | `POST /api/backup/{id}/restaurar` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `BACKUP_AUTOMATED_BACKUP`
+
+**Configuração**:
+```json
+{
+    "featureKey": "BACKUP_AUTOMATED_BACKUP",
+    "nome": "Backup Automático de Banco de Dados",
+    "descricao": "Ativa/desativa execução automática de backups completos e incrementais",
+    "habilitado": true,
+    "isSystemFeature": false
+}
+```
+
+**FeatureKey**: `BACKUP_DR_FAILOVER`
+
+**Configuração**:
+```json
+{
+    "featureKey": "BACKUP_DR_FAILOVER",
+    "nome": "Failover Automático para DR",
+    "descricao": "Ativa/desativa failover automático quando região primária fica indisponível",
+    "habilitado": true,
+    "isSystemFeature": false
+}
+```
+
+**FeatureKey**: `BACKUP_PITR`
+
+**Configuração**:
+```json
+{
+    "featureKey": "BACKUP_PITR",
+    "nome": "Point-in-Time Recovery",
+    "descricao": "Ativa/desativa capacidade de restaurar para ponto específico no tempo",
+    "habilitado": true,
+    "isSystemFeature": false
+}
+```
+
+**Nota**: Feature flags permitem ativar/desativar funcionalidades de backup sem redeploy. Crítico para ambientes multi-tenant onde diferentes clientes podem ter diferentes políticas de backup.
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Tradução**:
+
+```json
+{
+    "backup": {
+        "title": "Gestão de Backup e Disaster Recovery",
+        "sidebar": {
+            "backups": "Backups",
+            "restore": "Restauração",
+            "drPlan": "Plano de DR",
+            "drTest": "Teste de DR",
+            "retentionPolicy": "Política de Retenção"
+        },
+        "list": {
+            "title": "Backups Disponíveis",
+            "columns": {
+                "name": "Nome do Backup",
+                "type": "Tipo",
+                "size": "Tamanho",
+                "createdAt": "Data de Criação",
+                "expiresAt": "Data de Expiração",
+                "status": "Status",
+                "actions": "Ações"
+            },
+            "status": {
+                "success": "Sucesso",
+                "failed": "Falhou",
+                "inProgress": "Em Progresso",
+                "verifying": "Verificando Integridade"
+            }
+        },
+        "forms": {
+            "createBackup": "Criar Backup Manual",
+            "backupType": "Tipo de Backup",
+            "backupTypes": {
+                "full": "Backup Completo",
+                "incremental": "Backup Incremental",
+                "differential": "Backup Diferencial"
+            },
+            "scheduleBackup": "Agendar Backup",
+            "startTime": "Hora de Início",
+            "frequency": "Frequência",
+            "frequencies": {
+                "daily": "Diário",
+                "weekly": "Semanal",
+                "monthly": "Mensal"
+            }
+        },
+        "restore": {
+            "title": "Restaurar de Backup",
+            "selectBackup": "Selecione o backup para restauração",
+            "targetDatabase": "Banco de Dados Destino",
+            "pointInTime": "Restaurar até Data/Hora",
+            "validateIntegrity": "Validar Integridade do Backup",
+            "confirmRestore": "Confirmar Restauração"
+        },
+        "drPlan": {
+            "title": "Plano de Disaster Recovery",
+            "primaryRegion": "Região Primária",
+            "secondaryRegion": "Região Secundária",
+            "rpoHours": "RPO (horas)",
+            "rtoHours": "RTO (horas)",
+            "failoverThreshold": "Limite de Failover (minutos)",
+            "lastTestDate": "Data do Último Teste",
+            "nextTestDate": "Data do Próximo Teste"
+        },
+        "drTest": {
+            "title": "Teste de Disaster Recovery",
+            "executeTest": "Executar Teste de DR",
+            "testScope": "Escopo do Teste",
+            "scopes": {
+                "database": "Banco de Dados",
+                "files": "Arquivos",
+                "configuration": "Configuração",
+                "application": "Aplicação Completa"
+            },
+            "simulateFailover": "Simular Failover",
+            "validateData": "Validar Consistência de Dados",
+            "validateApplication": "Validar Funcionalidade da Aplicação",
+            "testResults": "Resultados do Teste",
+            "passed": "Passou",
+            "failed": "Falhou"
+        },
+        "retention": {
+            "title": "Política de Retenção",
+            "dailyRetentionDays": "Retenção de Diários (dias)",
+            "weeklyRetentionDays": "Retenção de Semanais (dias)",
+            "monthlyRetentionMonths": "Retenção de Mensais (meses)",
+            "autoDeleteExpired": "Deletar Automaticamente Expirados"
+        },
+        "messages": {
+            "success": {
+                "backupCreated": "Backup criado com sucesso",
+                "backupScheduled": "Backup agendado com sucesso",
+                "backupDeleted": "Backup deletado com sucesso",
+                "restoreStarted": "Restauração iniciada. Você será notificado quando concluir",
+                "drTestStarted": "Teste de DR iniciado em background",
+                "drTestPassed": "Teste de DR passou com sucesso",
+                "retentionPolicyUpdated": "Política de retenção atualizada com sucesso"
+            },
+            "error": {
+                "backupFailed": "Falha ao criar backup",
+                "restoreFailed": "Falha ao restaurar backup",
+                "integrityCheckFailed": "Validação de integridade falhou",
+                "invalidBackup": "Backup inválido ou corrompido",
+                "drTestFailed": "Teste de DR falhou",
+                "failoverFailed": "Failover automático falhou"
+            },
+            "warning": {
+                "rpoViolation": "Violação de RPO detectada",
+                "largeBackupSize": "Tamanho do backup é muito grande",
+                "lowStorageSpace": "Espaço em disco está baixo",
+                "backupAboutToExpire": "Backup está próximo à data de expiração"
+            },
+            "info": {
+                "backupInProgress": "Backup em andamento. Aguarde.",
+                "restoreInProgress": "Restauração em andamento. Não desligue o sistema.",
+                "drFailoverInitiated": "Failover automático foi iniciado. Sistema está migrandopara região secundária."
+            }
+        },
+        "validation": {
+            "required": {
+                "backupName": "Nome do backup é obrigatório",
+                "backupType": "Tipo de backup é obrigatório",
+                "targetDatabase": "Banco de dados destino é obrigatório",
+                "pointInTime": "Data/hora de restauração é obrigatória"
+            },
+            "invalid": {
+                "invalidBackupName": "Nome do backup contém caracteres inválidos",
+                "invalidTargetDatabase": "Nome do banco de dados destino é inválido",
+                "invalidPointInTime": "Data/hora de restauração não é válida",
+                "backupNotFound": "Backup não encontrado"
+            },
+            "constraints": {
+                "backupNameLength": "Nome do backup deve ter entre 3 e 255 caracteres",
+                "rpoHoursRange": "RPO deve estar entre 1 e 24 horas",
+                "rtoHoursRange": "RTO deve estar entre 1 e 48 horas"
+            }
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|----------|--------|-------------------|
+| Criar Backup Manual | `BACKUP_CREATE_MANUAL` | BackupId, Nome, Tipo, Tamanho, Usuário, Timestamp, Resultado |
+| Agendar Backup | `BACKUP_SCHEDULE` | BackupType, Frequência, HoraInício, Usuário, Timestamp |
+| Restaurar Backup | `BACKUP_RESTORE` | BackupId, NomeBackup, BancoDestino, PointInTime, Usuário, Timestamp, Resultado |
+| Validar Integridade | `BACKUP_VALIDATE` | BackupId, ChecksumCalculado, ChecksumEsperado, Resultado |
+| Deletar Backup | `BACKUP_DELETE` | BackupId, NomeBackup, MotivoDeleção, Usuário, Timestamp |
+| Iniciar Failover | `DR_FAILOVER_INITIATED` | RegiaoPrimária, RegiaoSecundaria, MotivoDo, Timestamp |
+| Completar Failover | `DR_FAILOVER_COMPLETED` | RegiaoPrimária, RegiaoSecundaria, DuraçãoMinutos, Resultado |
+| Testar DR | `DR_TEST_EXECUTED` | EscopoDeTeste, DataTeste, DuraçãoMinutos, Resultado |
+| Política de Retenção | `BACKUP_RETENTION_POLICY_UPDATED` | DadosAntigos, DadosNovos, Usuário, Timestamp |
+
+**Retenção**: 12 meses (conforme Lei Geral de Proteção de Dados - LGPD, artigo 5º)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis |
+|-----------|-----------|--------|
+| `backup:backup:create` | Criar backup manual | Administrador, Operador de Backup |
+| `backup:backup:read` | Visualizar backups | Administrador, Operador de Backup, Auditor |
+| `backup:backup:delete` | Deletar backup | Administrador |
+| `backup:restore:execute` | Executar restauração | Administrador, DBA |
+| `backup:dr:manage` | Gerenciar plano de DR | Administrador |
+| `backup:dr:test` | Executar teste de DR | Administrador, Operador de Backup |
+| `backup:retention:manage` | Gerenciar política de retenção | Administrador |
+
+**Nota**: Permissões de backup são críticas pois acesso não autorizado pode comprometer integridade de backups. Apenas usuários com necessidade explícita devem ter acesso.
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/backup` | Listar todos os backups | `backup:backup:read` |
+| GET | `/api/backup/{id}` | Obter detalhes de backup específico | `backup:backup:read` |
+| POST | `/api/backup/criar` | Criar novo backup manual | `backup:backup:create` |
+| PUT | `/api/backup/{id}` | Atualizar metadados do backup | `backup:backup:update` |
+| DELETE | `/api/backup/{id}` | Deletar backup | `backup:backup:delete` |
+
+### 5.2 Operações Especiais de Backup
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| POST | `/api/backup/agendar` | Agendar backup automático (full, incremental ou differential) | `backup:backup:create` |
+| GET | `/api/backup/status` | Obter status do último backup executado | `backup:backup:read` |
+| POST | `/api/backup/{id}/validar` | Validar integridade do backup via checksum SHA-256 | `backup:backup:read` |
+| POST | `/api/backup/{id}/restaurar` | Iniciar processo de restauração do backup | `backup:restore:execute` |
+| GET | `/api/backup/retenção` | Obter políticas de retenção de backups | `backup:backup:read` |
+| POST | `/api/backup/pitr` | Restaurar banco de dados para ponto específico no tempo | `backup:restore:execute` |
+| GET | `/api/backup/estatísticas` | Obter estatísticas de backups (tamanho total, frequência, etc.) | `backup:backup:read` |
+| POST | `/api/backup/{id}/baixar` | Baixar backup para máquina local (com validação de segurança) | `backup:backup:read` |
+
+### 5.3 Operações de Disaster Recovery
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/dr/plano` | Obter configuração do plano de DR | `backup:dr:manage` |
+| PUT | `/api/dr/plano` | Atualizar configuração do plano de DR | `backup:dr:manage` |
+| POST | `/api/dr/testar` | Executar teste de DR (simulação sem impacto em produção) | `backup:dr:test` |
+| POST | `/api/dr/failover` | Iniciar failover manual para região secundária | `backup:dr:manage` |
+| GET | `/api/dr/status` | Obter status atual do ambiente de DR | `backup:dr:manage` |
+| GET | `/api/dr/histórico` | Obter histórico de failovers e testes de DR | `backup:dr:manage` |
+| POST | `/api/dr/failback` | Falhar de volta para região primária após restauração | `backup:dr:manage` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Backup Automático Completo
+
+```
+Agenda Hangfire (2h da manhã)
+    |
+    v
+Verificar se backup anterior foi bem-sucedido
+    |
+    +--- Não sucedido ---> Enviar alerta e tentar novamente
+    |
+    v (Sucedido)
+Iniciar backup full do banco de dados
+    |
+    v
+Calcular checksum SHA-256 do backup
+    |
+    v
+Criptografar com AES-256 usando chave do Key Vault
+    |
+    v
+Fazer upload para Azure Blob Storage
+    |
+    v
+Salvar registro no banco de dados (nome, tamanho, checksum, timestamp)
+    |
+    v
+Registrar em log de auditoria (BACKUP_CREATE_MANUAL)
+    |
+    v
+Enviar notificação de sucesso para administrador
+    |
+    v
+Fim
+```
+
+### 6.2 Fluxo de Restauração com Validação de Integridade
+
+```
+Usuário seleciona backup na tela
+    |
+    v
+Clicar em "Restaurar"
+    |
+    v
+Sistema exibe confirmação e campos para banco destino
+    |
+    v
+Usuário confirma restauração
+    |
+    v
+Download do backup do Blob Storage
+    |
+    v
+Descriptografar com chave do Key Vault
+    |
+    v
+Calcular checksum SHA-256
+    |
+    v
+Comparar checksum com original
+    |
+    +--- Não coincidem ---> Erro: "Backup corrompido" → Fim (Falha)
+    |
+    v (Coincidem)
+Restaurar banco de dados no SQL Server
+    |
+    v
+Executar testes de validação (integridade referencial, etc.)
+    |
+    v
+Registrar em log de auditoria (BACKUP_RESTORE)
+    |
+    v
+Enviar notificação ao usuário
+    |
+    v
+Fim (Sucesso)
+```
+
+### 6.3 Fluxo de Failover Automático para DR
+
+```
+Health Check monitora região primária a cada 5 minutos
+    |
+    v
+Região primária indisponível?
+    |
+    +--- Não ---> Continuar monitoramento
+    |
+    v (Sim)
+Iniciar contador de 15 minutos
+    |
+    v
+Aguardar 15 minutos
+    |
+    v
+Verificar novamente se região primária está disponível
+    |
+    +--- Sim ---> Cancelar failover, continuar em primária
+    |
+    v (Não - ainda indisponível)
+Enviar alerta crítico para administrador
+    |
+    v
+Iniciar failover via Azure Site Recovery
+    |
+    v
+Sincronizar dados da região primária com secundária
+    |
+    v
+Redirecionar tráfego para região secundária (via Traffic Manager)
+    |
+    v
+Validar que aplicação está funcional em secundária
+    |
+    v
+Registrar em log de auditoria (DR_FAILOVER_COMPLETED)
+    |
+    v
+Enviar notificação que sistema está operando em DR
+    |
+    v
+Fim
+```
+
+### 6.4 Fluxo de Teste Trimestral de DR
+
+```
+Agendamento Hangfire (1º dia de cada trimestre às 2h)
+    |
+    v
+Obter configuração do plano de DR
+    |
+    v
+Selecionar backup mais recente
+    |
+    v
+Criar ambiente de teste isolado em Azure
+    |
+    v
+Restaurar banco para ambiente de teste
+    |
+    v
+Iniciar aplicação em ambiente de teste
+    |
+    v
+Executar validações:
+    |
+    +--- Testes de conectividade ao banco
+    +--- Testes de integridade referencial
+    +--- Testes de funcionalidade da API
+    +--- Testes de autenticação e autorização
+    |
+    v
+Todas as validações passaram?
+    |
+    +--- Não ---> Registrar falhas, enviar alerta crítico
+    |
+    v (Sim)
+Registrar resultado positivo
+    |
+    v
+Destruir ambiente de teste
+    |
+    v
+Registrar em log de auditoria (DR_TEST_EXECUTED)
+    |
+    v
+Enviar relatório de sucesso para administrador
+    |
+    v
+Fim
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição |
+|----------|-----------|
+| **Criptografia AES-256** | Todos os backups são criptografados com AES-256 antes de serem enviados para armazenamento remoto (Azure Blob Storage) |
+| **Azure Key Vault** | Chaves de criptografia são armazenadas em Azure Key Vault com acesso controlado via identidades gerenciadas |
+| **Checksum SHA-256** | Todos os backups possuem checksum SHA-256 que é validado antes de qualquer restauração |
+| **RBAC Multi-Nível** | Permissões granulares garantem que usuários tenham acesso apenas ao necessário |
+| **Auditoria Completa** | Todas as operações são registradas com usuário, timestamp, resultado e detalhes |
+| **Replicação Geográfica** | Backups são replicados para múltiplas regiões Azure automaticamente |
+| **Backup de Configuração** | Configurações do sistema também são backupadas separadamente |
+| **Teste de DR Periódico** | Testes trimestrais validam que DR funciona e não é apenas um plano teórico |
+| **Isolamento de Ambientes** | Testes de DR executam em ambientes isolados, nunca em produção |
+| **Validação de Integridade Referencial** | Restaurações testam constraints de FK, índices e triggers |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] SQL Injection em campos de entrada (BackupName, TargetDatabase)
+- [ ] XSS em mensagens de erro e notificações
+- [ ] CSRF Protection em endpoints POST/PUT/DELETE
+- [ ] Validação de permissões em todos os endpoints
+- [ ] Teste de acesso negado para usuários sem permissão
+- [ ] Validação de criptografia AES-256 (teste com backup corrompido)
+- [ ] Validação de checksum SHA-256 (teste com arquivo modificado)
+- [ ] Teste de escalação de privilégio
+- [ ] Teste de acesso a backups de outros tenants (multi-tenancy)
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medição |
+|-----|------|---------|
+| **Disponibilidade de Backups** | 99.9% | Backups bem-sucedidos / Total de backups agendados |
+| **Tempo Médio de Backup Full** | < 2 horas | Tempo desde início até conclusão do backup |
+| **Tempo Médio de Restauração** | < 4 horas | Tempo desde início até conclusão da restauração |
+| **Taxa de Sucesso de DR Test** | 100% | Testes trimestrais que passam sem erros |
+| **RPO Compliance** | 100% | Tempo desde último backup < 6 horas |
+| **RTO Compliance** | 100% | Tempo de restauração <= 4 horas |
+| **Tamanho Total de Backups** | < 5TB | Soma de todos os backups em armazenamento |
+| **Taxa de Compressão** | > 50% | Tamanho do backup / Tamanho do banco original |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| **Backup Failed** | Backup falhou após 3 tentativas | Enviar email, SMS e notificação no sistema |
+| **RPO Violation** | Último backup > 6 horas atrás | Enviar alerta crítico, tentar backup imediato |
+| **Low Storage Space** | Espaço disponível < 10% | Enviar aviso, considerar aumento de armazenamento |
+| **Integrity Check Failed** | Checksum não coincide | Não permitir restauração, investigar corrupção |
+| **Region Unavailable** | Região primária indisponível > 15 min | Iniciar failover automático |
+| **DR Test Failed** | Teste de DR não passou | Enviar alerta crítico, investigar problema |
+| **Backup About to Expire** | Backup com < 24 horas para expiração | Enviar notificação informativa |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF111](./MD-RF111-Backup-Recuperacao-DR.md) com DDL completo de tabelas de auditoria e configuração
+2. **Casos de Uso**: Criar [UC-RF111](./UC-RF111-Backup-Recuperacao-DR.md) com 5 cenários principais
+3. **Workflow e Telas**: Criar [WF-RF111](./WF-RF111-Backup-Recuperacao-DR.md) com mockups e fluxos
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml) com mínimo 2 user stories implementáveis
+5. **Implementação Backend**: Criar Commands, Queries e Handlers em Clean Architecture + CQRS
+6. **Implementação Frontend**: Criar telas Angular para gerenciamento de backups
+7. **Testes**: Executar cenários documentados e validar RTO/RPO
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versão inicial - RF111 completo com 10 regras de negócio, 13+ endpoints, integrações e fluxos | Claude Code |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: Claude Code
+**Revisão**: Pendente

@@ -1,0 +1,1207 @@
+# RF098: Auditoria de Logs do Sistema
+
+**Versão**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF004, RF095, RF096 | **EPIC**: EPIC010-AUD-Auditoria-Avançada
+**Fase**: Fase 6 - Ativos, Auditoria e Integrações
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o módulo **Auditoria de Logs do Sistema** do IControlIT, responsável por centralizar, estruturar, armazenar e disponibilizar logs de toda a infraestrutura da aplicação de forma controlada, rastreável e conformável com regulamentações.
+
+O sistema registra eventos operacionais em tempo real (erros, avisos, informações, depuração) com contexto completo (usuário, IP, timestamp UTC, correlação de requisição), centraliza em repositório único (Azure Application Insights), fornece ferramentas avançadas de busca e correlação, implementa alertas automáticos para eventos críticos, gera métricas de observabilidade (RED: Rate, Errors, Duration), suporta integração SIEM para investigação de segurança e cumpre retenção de dados conforme legislação.
+
+O módulo é fundamental para detecção e resposta a incidentes, diagnóstico de problemas de performance, conformidade regulatória (LGPD, SOX), investigação forense e compreensão do comportamento da plataforma em produção.
+
+### 1.2 Importância Estratégica
+
+O módulo de Auditoria de Logs é crítico para:
+
+- **Detecção de Incidentes**: Identificação rápida de anomalias, ataques, falhas e comportamentos inusitados através de análise centralizada de eventos
+- **Diagnóstico de Problemas**: Rastreamento completo de requisições (trace ID) permitindo investigação profunda de falhas intermitentes e degradação de performance
+- **Compliance Regulatório**: Manutenção de registros estruturados de todas as operações para cumprimento LGPD (direito ao esquecimento), SOX (segregação de funções, não-repúdio) e auditorias externas
+- **Conformidade de Segurança**: Registro de tentativas de acesso não autorizado, mudanças críticas de configuração e violações de política para investigação forense
+- **Análise de Performance**: Coleta de métricas de observabilidade (latência de requisição, taxa de erro, taxa de sucesso) para otimização contínua
+- **Rastreabilidade de Auditoria**: Registro imutável de quem fez o quê, quando e com que resultado para conformidade e prestação de contas
+- **Investigação Forense**: Armazenamento de logs históricos estruturados permitindo análise posterior de incidentes, ataques e violações
+- **Governança de TI**: Visibilidade em tempo real do estado da plataforma para tomada de decisão informada e planejamento de capacidade
+- **Integração SIEM**: Exportação de eventos estruturados para plataformas de gerenciamento de segurança (Azure Sentinel) para análises complexas
+- **Alertas Inteligentes**: Notificação automática de eventos críticos, tendências anômalas e violações de SLO para resposta rápida
+
+### 1.3 Conceitos Fundamentais
+
+**Log**: Registro estruturado de um evento ocorrido no sistema com metadados completos.
+
+- Estrutura: `{timestamp, nível, mensagem, contexto, user, ip, correlationId, stackTrace}`
+- Nível: Trace (verbose, desenvolvimento), Debug (diagnóstico), Info (informacional), Warning (aviso), Error (erro), Critical (falha crítica)
+- Imutável após registro
+- Indexado para busca rápida
+
+**Nível de Log**: Classificação de severidade do evento.
+
+- **Trace**: Mensagens muito verbosas (entrada/saída de função), apenas em desenvolvimento
+- **Debug**: Informações de diagnóstico (valores de variáveis, decisões), útil para troubleshooting
+- **Info**: Eventos normais (login bem-sucedido, operação concluída), rastreamento de fluxo
+- **Warning**: Condições anormais mas não críticas (quota próxima do limite, validação falhou), possível indicador de problema
+- **Error**: Falhas em operações específicas (falha ao salvar, timeout), não impede funcionamento do sistema
+- **Critical**: Falhas que degradam ou impedem funcionamento da plataforma, requer ação imediata
+
+**Correlação de Requisição**: Mecanismo que conecta múltiplos eventos relacionados.
+
+- TraceId/CorrelationId é gerado no ponto de entrada (API, UI)
+- Propagado através de toda a cadeia de processamento (backend, serviços externos, filas)
+- Permite rastreamento completo de uma requisição do usuário até conclusão
+- Essencial para diagnóstico de problemas distribuídos
+
+**Contexto de Log**: Metadados associados ao evento.
+
+- `UserId`: Identificação do usuário que causou o evento (não logging de senha)
+- `ClientId`: Identificação do cliente (multi-tenancy)
+- `IP`: Endereço IP da requisição (importante para detecção de fraude)
+- `UserAgent`: Navegador/cliente usado
+- `SessionId`: Identificação da sessão do usuário
+- `RequestPath`: Rota da API ou página acessada
+- `Method`: Verbo HTTP (GET, POST, etc.)
+- `StatusCode`: Código HTTP retornado
+- `ResponseTime`: Latência da operação em ms
+- `Exceção**: Stack trace completo em caso de erro
+- `Environment`: Identificação do ambiente (DEV, HOM, PRD)
+
+**Observabilidade**: Capacidade de entender estado interno do sistema através de dados.
+
+- **Metrics**: Valores agregados (taxa de erro por hora, latência p99, throughput)
+- **Traces**: Rastreamento completo de requisição distribuída
+- **Logs**: Registros estruturados de eventos
+- **Alertas**: Notificações automáticas de condições anormais
+
+**Retenção de Dados**: Política de armazenamento e descarte de logs.
+
+- **Online**: 30 dias em Application Insights com acesso rápido
+- **Arquivo**: 7 anos em Azure Blob Storage com acesso sob demanda
+- **Exclusão**: Após 7 anos (cumprimento LGPD e padrões de compliance)
+- **Direito ao Esquecimento**: Exclusão automática de logs relacionados a usuários que solicitam LGPD
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET + ASPX) | Modernizado (.NET 10 + Angular 19) |
+|---------|------------------------|-------------------------------------|
+| **Framework de Logging** | Logging simples em arquivo (EventViewer) ou banco | Serilog + Application Insights com estruturação completa |
+| **Centralização** | Logs espalhados em múltiplos servidores | Centralizado em Application Insights (nuvem) |
+| **Correlação** | Sem correlação entre eventos | TraceId/CorrelationId automático em toda requisição |
+| **Indexação** | Busca manual em arquivos de log | Indexed no Application Insights com KQL (Kusto) |
+| **Níveis** | Primário: Error/Info | Seis níveis: Trace, Debug, Info, Warning, Error, Critical |
+| **Contexto** | Mínimo (apenas mensagem) | Completo (usuário, IP, sesão, path, timing) |
+| **Alertas** | Sem alertas automáticos | Alert Rules no Application Insights com webhooks |
+| **Integração SIEM** | Não integrado | Azure Sentinel com conectores nativos |
+| **Retenção** | Ad hoc, sem política clara | Governada (30 dias online, 7 anos backup) |
+| **Conformidade** | Sem suporte a LGPD/SOX | Automático (direito ao esquecimento, segregação de funções) |
+| **Observabilidade** | Ausente | RED metrics (Rate, Errors, Duration) com Grafana |
+| **Performance** | Impacto variável em aplicação | Mínimo (async, batching, sampling) |
+| **Análise** | Manual via logs | Kusto Query Language (KQL) para análises complexas |
+
+### 1.5 Funcionalidades Principais
+
+1. **Registro Estruturado de Logs** - Captura automática de eventos com estrutura padrão (timestamp UTC, nível, mensagem, contexto, user, IP)
+
+2. **Suporte a Seis Níveis de Log** - Classificação completa de eventos (Trace, Debug, Info, Warning, Error, Critical) com respectivos alertas
+
+3. **Correlação Automática de Requisições** - Geração e propagação de TraceId/CorrelationId através de toda requisição para rastreamento E2E
+
+4. **Contextualização Completa** - Captura automática de UserId, ClientId, IP, UserAgent, SessionId, RequestPath, StatusCode, ResponseTime
+
+5. **Centralização em Application Insights** - Armazenamento único e estruturado de todos os logs com acesso via Azure Portal e KQL
+
+6. **Busca Avançada com KQL** - Queries em linguagem Kusto permitindo análises complexas (filtros, agregações, séries temporais, gráficos)
+
+7. **Alertas Automáticos** - Notificações imediatas para eventos críticos, taxas de erro elevadas, latência acima de SLO
+
+8. **Dashboard de Saúde do Sistema** - Visualização em tempo real de KPIs (erros por hora, uptime, latência p50/p95/p99, throughput)
+
+9. **Detecção de Padrões de Erro** - Identificação automática de erros recorrentes, cascatas de falha, correlação entre eventos
+
+10. **Rastreamento de Performance** - Captura de métricas de observabilidade (RED: Rate de requisições, Error rate, Duration/latência)
+
+11. **Exportação de Dados** - Download de logs em JSON, CSV ou integração com Power BI para análises complexas
+
+12. **Integração SIEM** - Exportação de eventos para Azure Sentinel para análises de segurança e investigação de incidentes
+
+13. **Análise de Tendências** - Gráficos de evolução temporal de erros, latência e taxa de sucesso para identificação de degradação
+
+14. **Compliance LGPD** - Suporte a direito ao esquecimento, retenção governada, criptografia de dados sensíveis
+
+15. **Métricas de SLO** - Tracking automático de objetivos de disponibilidade, latência e taxa de erro para SLAs
+
+16. **Notificações Multi-canal** - Alertas via email, SMS, Teams, PagerDuty para escalação apropriada
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-LOG-098-01: Registro Obrigatório de Todas as Operações
+
+**Descrição**: Todo evento relevante no sistema (requisição HTTP, mudança de dados, erro, acesso negado) deve ser registrado automaticamente no log com contexto completo.
+
+**Justificativa**: Garantir rastreabilidade completa para auditoria, conformidade regulatória e diagnóstico de problemas. Evita falhas silenciosas e facilita investigação forense.
+
+**Implementação**:
+```csharp
+public class LoggingMiddleware
+{
+    public async Task InvokeAsync(HttpContext context, ILogger<LoggingMiddleware> logger)
+    {
+        var correlationId = context.Request.Headers.GetOrAddTraceId();
+        var startTime = DateTime.UtcNow;
+
+        try
+        {
+            await _next(context);
+
+            var duration = DateTime.UtcNow - startTime;
+            var logLevel = context.Response.StatusCode >= 400 ? LogLevel.Warning : LogLevel.Information;
+
+            logger.Log(logLevel,
+                "HTTP {Method} {Path} completed with status {StatusCode} in {Duration}ms",
+                context.Request.Method,
+                context.Request.Path,
+                context.Response.StatusCode,
+                duration.TotalMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Unhandled exception in HTTP {Method} {Path}",
+                context.Request.Method,
+                context.Request.Path);
+            throw;
+        }
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Requisição GET /api/logs registrada com correlationId, usuário, IP, latência
+- ❌ Operação executada sem log → Violação de compliance, impossibilita auditoria
+
+---
+
+### RN-LOG-098-02: Contexto Completo Obrigatório
+
+**Descrição**: Todo log deve incluir obrigatoriamente: timestamp UTC, nível, mensagem, UserId, ClientId, IP, TraceId, RequestPath, StatusCode, ResponseTime.
+
+**Justificativa**: Contexto completo é essencial para diagnóstico eficiente e correlação de eventos em ambiente distribuído. Sem contexto, log torna-se inútil.
+
+**Implementação**:
+```csharp
+public static class LogExtensions
+{
+    public static void LogWithContext(this ILogger logger, LogLevel level,
+        Exception ex, string messageTemplate, params object[] args)
+    {
+        using (LogContext.PushProperty("UserId", GetCurrentUserId()))
+        using (LogContext.PushProperty("ClientId", GetCurrentClientId()))
+        using (LogContext.PushProperty("IP", GetClientIP()))
+        using (LogContext.PushProperty("SessionId", GetSessionId()))
+        {
+            logger.Log(level, ex, messageTemplate, args);
+        }
+    }
+}
+
+// Configuração Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Is(LogEventLevel.Information)
+    .Enrich.FromLogContext()
+    .Enrich.WithMachineName()
+    .Enrich.WithEnvironmentUserName()
+    .Enrich.WithProperty("Environment", environment)
+    .WriteTo.Console()
+    .WriteTo.ApplicationInsights(
+        telemetryClient,
+        TelemetryConverter.Traces,
+        LogEventLevel.Information)
+    .CreateLogger();
+```
+
+**Exemplos**:
+- ✅ Log: `{"timestamp":"2025-12-28T10:30:45Z","level":"Error","userId":"USR-001","clientId":"CLI-001","ip":"192.168.1.100","traceId":"abc123","message":"Falha ao salvar usuário"}`
+- ❌ Log: `"Erro no sistema"` → Falta contexto, impossibilita correlação
+
+---
+
+### RN-LOG-098-03: Níveis de Log Conforme Severidade
+
+**Descrição**: Eventos devem usar nível apropriado: Trace (muito verboso), Debug (diagnóstico), Info (normal), Warning (anormal mas não crítico), Error (falha), Critical (degradação da plataforma).
+
+**Justificativa**: Permite filtração eficiente, alertas apropriados e diferenciação entre eventos normais e problemas reais. Reduz ruído.
+
+**Implementação**:
+```csharp
+public class LogLevelStrategy
+{
+    public void LogEvent(string eventType, object data, Exception ex = null)
+    {
+        switch (eventType)
+        {
+            case "UserLogin":
+                _logger.LogInformation("Usuário {UserId} realizou login com sucesso", data);
+                break;
+
+            case "ValidationFailed":
+                _logger.LogWarning("Validação falhou para {Entity}: {Reason}", data.Type, data.Reason);
+                break;
+
+            case "DatabaseError":
+                _logger.LogError(ex, "Erro na base de dados ao executar {Query}", data);
+                break;
+
+            case "ServiceCrash":
+                _logger.LogCritical(ex, "Serviço {Service} parou inesperadamente", data);
+                break;
+
+            case "VariableValue":
+                _logger.LogDebug("Variável {Name} = {Value}", data.Name, data.Value);
+                break;
+
+            case "FunctionEntry":
+                _logger.LogTrace("Entrando em {Method} com parâmetros: {Params}", data.Method, data.Params);
+                break;
+        }
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Error: Falha ao conectar em banco de dados
+- ✅ Warning: Tentativa de acesso negado (sem erro no sistema)
+- ✅ Info: Operação CRUD completada com sucesso
+- ❌ Critical: Falha na autenticação (deve ser Warning ou Error, não Critical)
+
+---
+
+### RN-LOG-098-04: TraceId Obrigatório para Rastreamento E2E
+
+**Descrição**: Todo contexto de execução (requisição HTTP, job background, integração) deve ter TraceId único que é propagado através de todas as camadas.
+
+**Justificativa**: Permite correlação completa de eventos distribuídos, essencial para diagnóstico em microserviços e processamento assíncrono.
+
+**Implementação**:
+```csharp
+public class TraceIdMiddleware
+{
+    public async Task InvokeAsync(HttpContext context)
+    {
+        var traceId = context.Request.Headers.GetValueOrDefault("X-Trace-Id")
+                      ?? Activity.Current?.Id
+                      ?? context.TraceIdentifier;
+
+        using var activity = new Activity("HttpRequest").Start();
+        activity.Id = traceId;
+
+        using (LogContext.PushProperty("TraceId", traceId))
+        using (LogContext.PushProperty("CorrelationId", traceId))
+        {
+            context.Items["TraceId"] = traceId;
+            await _next(context);
+        }
+    }
+}
+
+// Propagação em chamadas assíncronas
+public async Task ProcessAsync(string data)
+{
+    var traceId = GetCurrentTraceId(); // Do LogContext
+
+    await _backgroundJobClient.EnqueueAsync(() =>
+        ProcessBackgroundJob(data, traceId));
+}
+
+public void ProcessBackgroundJob(string data, string traceId)
+{
+    using (LogContext.PushProperty("TraceId", traceId))
+    {
+        _logger.LogInformation("Processando job com traceId {TraceId}", traceId);
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Requisição: trace=abc123 → Backend: trace=abc123 → Banco: trace=abc123 → Log rastreável
+- ❌ Sem TraceId → Impossível correlacionar eventos de uma requisição
+
+---
+
+### RN-LOG-098-05: Conformidade LGPD - Não Registrar Dados Sensíveis
+
+**Descrição**: Logs devem NUNCA registrar dados sensíveis como senhas, tokens, números de cartão, CPF/CNPJ sem mascaramento.
+
+**Justificativa**: Compliance com LGPD (Lei Geral de Proteção de Dados) e segurança da plataforma. Exposição de dados sensíveis em logs é vulnerabilidade crítica.
+
+**Implementação**:
+```csharp
+public static class SensitiveDataMasking
+{
+    private static readonly string[] SensitivePatterns = new[]
+    {
+        "password", "token", "secret", "apikey",
+        "creditcard", "cpf", "cnpj", "ssn"
+    };
+
+    public static string MaskSensitiveData(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        var maskedInput = SensitivePatterns.Aggregate(input, (current, pattern) =>
+            Regex.Replace(current,
+                $@"{pattern}\s*[:=]\s*([^\s,\}]+)",
+                $"{pattern}=***MASKED***",
+                RegexOptions.IgnoreCase));
+
+        return maskedInput;
+    }
+}
+
+// Enricher Serilog customizado
+public class SensitiveDataEnricher : ILogEventEnricher
+{
+    public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)
+    {
+        if (logEvent.MessageTemplate.Text.Contains("password", StringComparison.OrdinalIgnoreCase))
+        {
+            logEvent.MessageTemplate = new TextMessageTemplate("***FILTERED***");
+        }
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Log: `"Tentativa de login do usuário USR-001 falhou"`
+- ❌ Log: `"Login falhou para usuario@example.com com senha abc123XYZ"` → Violação LGPD
+
+---
+
+### RN-LOG-098-06: Retenção Governada (30 dias online, 7 anos backup)
+
+**Descrição**: Logs online em Application Insights são retidos por 30 dias. Logs históricos são arquivados em Blob Storage por 7 anos. Exclusão automática após 7 anos.
+
+**Justificativa**: Balance entre disponibilidade (acesso rápido) e conformidade (retenção legal). LGPD permite exclusão após 7 anos de armazenamento.
+
+**Implementação**:
+```csharp
+public class LogRetentionPolicy
+{
+    public async Task ArchiveOldLogsAsync()
+    {
+        var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+
+        // Exportar logs com mais de 30 dias para Blob Storage
+        var exportQuery = $@"
+            traces
+            | where timestamp < {thirtyDaysAgo:O}
+            | project
+                timestamp,
+                severityLevel,
+                message,
+                customDimensions,
+                tostring(operation_Id)
+        ";
+
+        var logs = await _appInsights.QueryAsync(exportQuery);
+
+        foreach (var batch in logs.Batch(1000))
+        {
+            var json = JsonConvert.SerializeObject(batch);
+            var fileName = $"logs-{thirtyDaysAgo:yyyy-MM-dd}-{Guid.NewGuid()}.jsonl";
+
+            await _blobClient.UploadAsync(
+                Path.Combine("logs-archive", fileName),
+                BinaryData.FromString(json));
+        }
+
+        // Deletar logs com mais de 7 anos
+        var sevenYearsAgo = DateTime.UtcNow.AddYears(-7);
+        var deleteBlobs = _blobClient.GetBlobsAsync(
+            prefix: "logs-archive/",
+            states: BlobStates.All)
+            .Where(b => ExtractDateFromBlob(b.Name) < sevenYearsAgo);
+
+        foreach (var blob in deleteBlobs)
+        {
+            await _blobClient.DeleteBlobAsync(blob.Name);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Logs de 2025-12: Acessíveis em tempo real no Application Insights
+- ✅ Logs de 2024-01: Arquivados em Blob Storage, acessíveis sob demanda
+- ✅ Logs de 2017: Deletados automaticamente (cumprimento LGPD)
+
+---
+
+### RN-LOG-098-07: Alertas Automáticos para Erros Críticos
+
+**Descrição**: Sistema deve gerar alertas automáticos quando: taxa de erro > 5% por 5 minutos, latência p95 > SLO, evento crítico registrado.
+
+**Justificativa**: Notificação rápida permite resposta imediata a incidentes, reduzindo impacto. Sem alertas, problemas podem passar despercebidos.
+
+**Implementação**:
+```csharp
+public class AlertRuleConfiguration
+{
+    public static void ConfigureAlerts(IApplicationInsightsClient client)
+    {
+        // Alerta 1: Taxa de erro > 5%
+        var errorRateRule = new AlertRuleResource
+        {
+            Name = "HighErrorRate",
+            Condition = new ThresholdRuleCondition
+            {
+                Operator = "GreaterThan",
+                Threshold = 5.0,
+                TimeAggregation = TimeAggregationOperator.Average,
+                WindowSize = TimeSpan.FromMinutes(5)
+            },
+            Source = new RuleMetricDataSource
+            {
+                MetricName = "FailedRequests",
+                MetricNamespace = "Microsoft.Insights/components"
+            }
+        };
+
+        // Alerta 2: Latência P95 > SLO
+        var latencyRule = new AlertRuleResource
+        {
+            Name = "HighLatency",
+            Condition = new ThresholdRuleCondition
+            {
+                Operator = "GreaterThan",
+                Threshold = 2000.0, // 2 segundos
+                TimeAggregation = TimeAggregationOperator.Maximum,
+                WindowSize = TimeSpan.FromMinutes(5)
+            },
+            Source = new RuleMetricDataSource
+            {
+                MetricName = "AjaxCallDuration",
+                MetricNamespace = "Microsoft.Insights/components"
+            }
+        };
+
+        // Alerta 3: Evento crítico
+        var criticalEventRule = new AlertRuleResource
+        {
+            Name = "CriticalEvent",
+            Source = new RuleLogicDataSource
+            {
+                Query = @"
+                    traces
+                    | where severityLevel == 4 or severityLevel == 5
+                    | summarize count() by bin(timestamp, 1m)
+                    | where count_ > 0
+                "
+            }
+        };
+    }
+}
+
+// Webhook para integração com Teams
+public class AlertWebhookHandler
+{
+    public async Task HandleAlertAsync(AlertPayload alert)
+    {
+        var teamsMessage = new AdaptiveCard
+        {
+            Body = new List<IAdaptiveElement>
+            {
+                new TextBlock
+                {
+                    Text = $"Alerta: {alert.RuleName}",
+                    Weight = AdaptiveTextWeight.Bolder,
+                    Size = AdaptiveTextSize.Large
+                },
+                new TextBlock { Text = $"Condição: {alert.Condition}" },
+                new TextBlock { Text = $"Valor: {alert.Value}" },
+                new TextBlock { Text = $"Timestamp: {alert.Timestamp:O}" }
+            }
+        };
+
+        await _teamsWebhook.SendAsync(teamsMessage);
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Taxa de erro 10% por 5 minutos → Alerta enviado ao time via Teams + email
+- ✅ Evento Critical registrado → Notificação imediata via PagerDuty
+- ❌ Sistema com 50% de erro sem alerta → Problema não detectado, clientes impactados
+
+---
+
+### RN-LOG-098-08: Rastreamento Automático de Mudanças Críticas
+
+**Descrição**: Mudanças críticas (permissões, configurações de segurança, dados sensíveis) devem ser registradas com "antes" e "depois" para auditoria.
+
+**Justificativa**: Facilita investigação de incidentes de segurança, compliance e demonstra quem fez o quê e quando.
+
+**Implementação**:
+```csharp
+public class CriticalChangeInterceptor : IInterceptor
+{
+    private readonly ILogger<CriticalChangeInterceptor> _logger;
+    private readonly string[] _criticalTables = new[]
+    {
+        "Usuarios", "Perfis", "Permissoes", "Configuracoes", "ClienteConfigs"
+    };
+
+    public override void SaveChanges(SaveChangesInterceptorEventData eventData)
+    {
+        var context = eventData.Context;
+
+        foreach (var entry in context.ChangeTracker.Entries())
+        {
+            if (_criticalTables.Contains(entry.Entity.GetType().Name)
+                && entry.State != EntityState.Unchanged)
+            {
+                LogCriticalChange(entry);
+            }
+        }
+
+        base.SaveChanges(eventData);
+    }
+
+    private void LogCriticalChange(EntityEntry entry)
+    {
+        var entityName = entry.Entity.GetType().Name;
+        var keyValues = entry.Metadata.FindPrimaryKey()
+            .Properties.Select(p => entry.Property(p.Name).CurrentValue);
+
+        var changes = new Dictionary<string, object>();
+
+        foreach (var property in entry.OriginalValues.Properties)
+        {
+            var original = entry.OriginalValues[property];
+            var current = entry.CurrentValues[property];
+
+            if (!Equals(original, current))
+            {
+                changes[property.Name] = new { Before = original, After = current };
+            }
+        }
+
+        _logger.LogWarning(
+            "Mudança crítica em {Entity} ({Keys}): {@Changes}",
+            entityName,
+            keyValues,
+            changes);
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Log: `Permissão alterada: USR-001 antes=[read,write] depois=[admin], feito por ADM-005`
+- ❌ Sem rastreamento de antes/depois → Impossível auditar mudança de permissões
+
+---
+
+### RN-LOG-098-09: Correlação Automática de Eventos Relacionados
+
+**Descrição**: O sistema deve automaticamente agrupar logs relacionados usando operationId, fazendo possível rastrear uma requisição através de toda a plataforma.
+
+**Justificativa**: Em ambiente distribuído, uma requisição passa por múltiplos serviços. Correlação permite diagnóstico eficiente de falhas.
+
+**Implementação**:
+```csharp
+public class OperationIdPropagation
+{
+    public async Task<T> ExecuteWithCorrelationAsync<T>(
+        Func<Task<T>> operation,
+        string operationId = null)
+    {
+        operationId ??= Guid.NewGuid().ToString();
+
+        using (LogContext.PushProperty("OperationId", operationId))
+        using (new ActivityScope(operationId))
+        {
+            return await operation();
+        }
+    }
+}
+
+public class HttpClientLoggingHandler : DelegatingHandler
+{
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        var operationId = GetCurrentOperationId();
+        request.Headers.Add("X-Operation-Id", operationId);
+        request.Headers.Add("X-Correlation-Id", operationId);
+
+        return await base.SendAsync(request, cancellationToken);
+    }
+}
+
+// Query para correlacionar eventos
+public string GetCorrelatedLogsQuery(string operationId)
+{
+    return $@"
+        union
+            (traces | where operation_Id == ""{operationId}""),
+            (customEvents | where operation_Id == ""{operationId}""),
+            (dependencies | where operation_Id == ""{operationId}""),
+            (requests | where operation_Id == ""{operationId}"")
+        | order by timestamp asc
+    ";
+}
+```
+
+**Exemplos**:
+- ✅ OperationId=op123: Requisição → Backend → Banco → Cache → Resposta (rastreável)
+- ❌ Sem correlação: Não há forma de conectar 5 logs disparados pela mesma requisição
+
+---
+
+### RN-LOG-098-10: Métricas RED (Rate, Errors, Duration)
+
+**Descrição**: Sistema coleta automaticamente métricas de observabilidade: Taxa de requisições por segundo, Taxa de erro %, Latência (p50, p95, p99).
+
+**Justificativa**: Métricas agregadas permitem detecção de tendências e degradação de performance antes que afetem SLA.
+
+**Implementação**:
+```csharp
+public class RedMetricsCollector
+{
+    public void ConfigureMetrics(IServiceCollection services)
+    {
+        var meter = new Meter("IControlIT.Observability");
+
+        // Rate: requisições por segundo
+        var requestCounter = meter.CreateCounter<long>(
+            "http.requests.total",
+            description: "Total HTTP requests");
+
+        // Errors: taxa de erro
+        var errorCounter = meter.CreateCounter<long>(
+            "http.errors.total",
+            description: "Total HTTP errors");
+
+        // Duration: latência em ms
+        var durationHistogram = meter.CreateHistogram<double>(
+            "http.request.duration_ms",
+            description: "HTTP request duration in milliseconds");
+
+        services.AddMetrics(builder =>
+        {
+            builder.AddMeter("IControlIT.Observability");
+        });
+    }
+
+    public void LogRequestMetrics(string method, string path, int statusCode, double durationMs)
+    {
+        _requestCounter.Add(1, new KeyValuePair<string, object>("method", method));
+
+        if (statusCode >= 400)
+        {
+            _errorCounter.Add(1, new KeyValuePair<string, object>("status", statusCode));
+        }
+
+        _durationHistogram.Record(durationMs);
+    }
+}
+
+// Dashboard Grafana: percentis de latência
+public string GetLatencyPercentilesQuery()
+{
+    return @"
+        requests
+        | summarize
+            p50 = percentile(duration, 50),
+            p95 = percentile(duration, 95),
+            p99 = percentile(duration, 99),
+            avg = avg(duration)
+            by bin(timestamp, 5m), name
+        | render timechart
+    ";
+}
+```
+
+**Exemplos**:
+- ✅ Taxa: 100 req/s, Erro: 0.5%, Latência p95: 250ms → Sistema saudável
+- ✅ Taxa: 50 req/s (queda), Erro: 15% (alta) → Alerta de degradação
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `ic1_legado`
+
+**Tabelas de Logging Existentes**:
+
+```sql
+CREATE TABLE [dbo].[LogRegistro](
+    [IdLogRegistro] [int] IDENTITY(1,1) NOT NULL,
+    [DataLog] [datetime] NOT NULL,
+    [TipoLog] [varchar](50) NOT NULL,  -- ERROR, WARNING, INFO
+    [Mensagem] [varchar](1000) NOT NULL,
+    [Usuario] [varchar](50) NULL,
+    [Computador] [varchar](50) NULL,
+    [Excecao] [varchar](max) NULL,
+    CONSTRAINT [PK_LogRegistro] PRIMARY KEY CLUSTERED ([IdLogRegistro] ASC)
+);
+
+CREATE TABLE [dbo].[LogAuditoria](
+    [IdLogAuditoria] [int] IDENTITY(1,1) NOT NULL,
+    [DataOperacao] [datetime] NOT NULL,
+    [Usuario] [varchar](50) NOT NULL,
+    [Tabela] [varchar](100) NOT NULL,
+    [Operacao] [varchar](20) NOT NULL,  -- INSERT, UPDATE, DELETE
+    [ValoresAntigos] [varchar](max) NULL,
+    [ValoresNovos] [varchar](max) NULL,
+    [RegistroId] [int] NOT NULL,
+    CONSTRAINT [PK_LogAuditoria] PRIMARY KEY CLUSTERED ([IdLogAuditoria] ASC)
+);
+
+CREATE TABLE [dbo].[LogErro](
+    [IdErro] [int] IDENTITY(1,1) NOT NULL,
+    [DataErro] [datetime] NOT NULL,
+    [Excepcao] [varchar](max) NOT NULL,
+    [StackTrace] [varchar](max) NOT NULL,
+    [Pagina] [varchar](500) NOT NULL,
+    [Usuario] [varchar](50) NULL,
+    [Parametros] [varchar](max) NULL,
+    CONSTRAINT [PK_LogErro] PRIMARY KEY CLUSTERED ([IdErro] ASC)
+);
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descrição | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `DataLog` | Timestamp do evento | Mapeado para `timestamp` em UTC |
+| `TipoLog` | Nível (ERROR, WARNING, INFO) | Expandido para 6 níveis (Trace, Debug, Info, Warning, Error, Critical) |
+| `Mensagem` | Descrição do evento | Mantido, enriquecido com contexto estruturado |
+| `Usuario` | Identificação de usuário | Estruturado como `UserId` + `UserName` |
+| `Excepcao` | Stack trace | Preservado, incluído em `Exception` |
+| `Tabela` + `Operacao` | O que foi alterado | Mapeado para `AuditCode` (AUD_ENTIDADE_ACAO) |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `pa_LogRegistrar` | Insere registro de log simples | Substituído por Serilog com Application Insights |
+| `pa_LogAuditar` | Registra mudança de dados | Substituído por EF Core Interceptors + Domain Events |
+| `pa_LogLimpar` | Remove logs antigos | Substituído por Azure Blob archival + retenção automática |
+| `pa_LogBuscar` | Busca logs por critério | Substituído por Application Insights KQL queries |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `VisualizarLogs.aspx` | Visualização simples de logs | `/admin/logs` (Angular + Material) |
+| `RelatorioErros.aspx` | Relatório de erros por período | `/admin/logs/errors/report` |
+| `AuditoriaOperacoes.aspx` | Auditoria de mudanças | `/admin/audit-log` |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSAuditoria.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ObterLogs()` | Retorna últimos 100 logs | `GET /api/logs?limit=100` |
+| `BuscarErros(dataInicio, dataFim)` | Busca erros em período | `GET /api/logs/errors?startDate=X&endDate=Y` |
+| `ExportarAuditoria(tabela)` | Exporta auditoria em CSV | `GET /api/audit-log/export?table=X` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `LOG_SISTEMA_AUDITORIA`
+
+**Configuração**:
+```json
+{
+    "featureKey": "LOG_SISTEMA_AUDITORIA",
+    "nome": "Auditoria de Logs do Sistema",
+    "descricao": "Registro centralizado e estruturado de logs com Application Insights",
+    "habilitado": true,
+    "isSystemFeature": true,
+    "enabledFor": {
+        "clients": ["*"]
+    },
+    "relatedFlags": [
+        "LOG_ALERTAS_CRITICOS",
+        "LOG_EXPORTACAO_LOGS",
+        "LOG_INTEGRACAO_SIEM"
+    ]
+}
+```
+
+**Nota**: Feature Flags permitem ativar/desativar componentes de logging por cliente (multi-tenancy):
+- LOG_ALERTAS_CRITICOS: Alertas automáticos
+- LOG_EXPORTACAO_LOGS: Download de logs em CSV/JSON
+- LOG_INTEGRACAO_SIEM: Envio para Azure Sentinel
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Tradução**:
+
+```json
+{
+    "audit": {
+        "logs": {
+            "title": "Auditoria de Logs",
+            "subtitle": "Visualize e analise logs do sistema",
+            "filters": {
+                "level": "Nível",
+                "startDate": "Data Inicial",
+                "endDate": "Data Final",
+                "user": "Usuário",
+                "message": "Mensagem",
+                "correlationId": "ID de Correlação",
+                "statusCode": "Código HTTP"
+            },
+            "levels": {
+                "trace": "Rastreamento",
+                "debug": "Depuração",
+                "info": "Informação",
+                "warning": "Aviso",
+                "error": "Erro",
+                "critical": "Crítico"
+            },
+            "messages": {
+                "noLogs": "Nenhum log encontrado",
+                "loadingLogs": "Carregando logs...",
+                "exportSuccess": "Logs exportados com sucesso",
+                "exportError": "Erro ao exportar logs"
+            },
+            "dashboard": {
+                "errorRate": "Taxa de Erro",
+                "avgLatency": "Latência Média",
+                "uptime": "Disponibilidade",
+                "throughput": "Taxa de Requisições"
+            },
+            "alerts": {
+                "highErrorRate": "Taxa de erro alta",
+                "highLatency": "Latência acima do SLO",
+                "criticalEvent": "Evento crítico detectado"
+            }
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|----------|--------|-------------------|
+| Visualizar logs | `AUD_LOG_READ` | Filtros usados, período, quantidade de registros retornados |
+| Exportar logs | `AUD_LOG_EXPORT` | Formato (JSON/CSV), período, quantidade de registros |
+| Configurar alertas | `AUD_ALERT_UPDATE` | Regra anterior, regra nova, threshold modificado |
+| Arquivar logs | `AUD_LOG_ARCHIVE` | Data de corte, quantidade de registros arquivados |
+| Buscar por traço | `AUD_TRACE_SEARCH` | TraceId procurado, eventos encontrados |
+
+**Retenção**: 7 anos (conforme LGPD e padrão de compliance)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis |
+|-----------|-----------|--------|
+| `log:view` | Visualizar logs | Administrador, Gerente de TI, Analista de Segurança |
+| `log:search` | Buscar logs com filtros avançados | Gerente de TI, Analista de Segurança |
+| `log:export` | Exportar logs em CSV/JSON | Gerente de TI, Analista de Compliance |
+| `log:configure-alerts` | Configurar regras de alerta | Administrador, Gerente de TI |
+| `log:archive` | Arquivar/restaurar logs antigos | Administrador, DBA |
+| `audit:read` | Visualizar logs de auditoria | Auditor Externo, Compliance Officer |
+
+**Nota**: Gerentes de TI podem visualizar apenas logs relacionados a seus serviços. Auditores externos têm acesso read-only a logs de conformidade.
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/logs` | Listar logs com filtros (paginado) | `log:view` |
+| GET | `/api/logs/{id}` | Obter detalhes de um log específico | `log:view` |
+| POST | `/api/logs/search` | Busca avançada com KQL | `log:search` |
+| PUT | `/api/logs/{id}` | Atualizar anotações de log | `log:update` |
+| DELETE | `/api/logs/{id}` | Excluir log (exceto críticos/auditoria) | `log:delete` |
+
+### 5.2 Operações Especiais
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/logs/export` | Exportar logs em CSV/JSON | `log:export` |
+| GET | `/api/logs/dashboard` | Métricas agregadas (taxa erro, latência) | `log:view` |
+| POST | `/api/logs/alerts/configure` | Criar/atualizar regra de alerta | `log:configure-alerts` |
+| GET | `/api/logs/alerts/active` | Listar alertas ativos | `log:view` |
+| GET | `/api/logs/correlation/{traceId}` | Obter todos logs relacionados a um traço | `log:search` |
+| GET | `/api/logs/metrics/red` | Métricas RED (Rate, Errors, Duration) | `log:view` |
+| POST | `/api/logs/archive` | Arquivar logs com mais de 30 dias | `log:archive` |
+| GET | `/api/audit-log` | Visualizar logs de auditoria de sistema | `audit:read` |
+| GET | `/api/logs/performance` | Análise de performance por endpoint | `log:view` |
+| POST | `/api/logs/incidents/create` | Criar incidente baseado em logs | `log:create-incident` |
+| GET | `/api/logs/trends` | Análise de tendências (série temporal) | `log:view` |
+| GET | `/api/logs/siem/export` | Exportar para Azure Sentinel | `log:export` |
+| POST | `/api/logs/retention/configure` | Configurar política de retenção | `log:configure` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Registro Automático de Log
+
+```
+Requisição HTTP entra
+    |
+    v
+Middleware captura TraceId/CorrelationId
+    |
+    v
+Middleware registra: timestamp, method, path, user, client
+    |
+    v
+Requisição é processada
+    |
+    +---> Sucesso (200-299)
+    |     |
+    |     v
+    |     Logger.LogInformation
+    |     Nível: Info
+    |     Contexto: status, latência, registros retornados
+    |
+    +---> Erro de cliente (400-499)
+    |     |
+    |     v
+    |     Logger.LogWarning
+    |     Nível: Warning
+    |     Contexto: status, erro de validação, parâmetros
+    |
+    +---> Erro de servidor (500-599)
+          |
+          v
+          Logger.LogError (com Exception)
+          Nível: Error
+          Contexto: status, stacktrace, usuário, tentativas
+          |
+          v
+          Se severidade crítica:
+            +---> Dispara Alerta via Teams/Email
+                  |
+                  v
+                  Notifica time de operações
+
+Log estruturado enviado para Application Insights
+    |
+    v
+Indexado em tempo real (< 1 segundo)
+    |
+    v
+Disponível para busca via KQL
+    |
+    v
+Após 30 dias: Arquivado em Blob Storage
+    |
+    v
+Após 7 anos: Deletado automaticamente (LGPD)
+```
+
+### 6.2 Fluxo de Investigação de Incidente via Rastreamento
+
+```
+Usuário relata "Sua requisição falhou"
+    |
+    v
+Usuário fornece timestamp (~10:30)
+    |
+    v
+Admin busca em /api/logs/dashboard
+    |
+    v
+Filtra por período (10:25-10:35)
+    |
+    v
+Identifica 50 erros de timeout naquele período
+    |
+    v
+Procura por padrão:
+    "Duration > 5000 AND StatusCode = 504"
+    |
+    v
+Encontra correlação: API X chamou serviço Y
+    |
+    v
+Busca logs do serviço Y naquele período:
+    GET /api/logs/correlation/{service-Y-traceId}
+    |
+    v
+Visualiza sequência:
+    10:30:01 -> Requisição chegou
+    10:30:02 -> Conectou ao banco
+    10:30:07 -> Timeout na query
+    |
+    v
+Root cause: Índice da tabela estava sendo reconstruído
+    |
+    v
+Cria ticket de correção com evidência (logs exportados)
+```
+
+### 6.3 Fluxo de Alerta Automático
+
+```
+Logger registra evento Critical
+    |
+    v
+Serilog enriquece com contexto (user, ip, trace)
+    |
+    v
+Envia para Application Insights
+    |
+    v
+Alert Rule detecta severityLevel = Critical
+    |
+    v
+Dispara webhook para Teams
+    |
+    v
+Teams envia mensagem formatada:
+    [🚨] ALERTA CRÍTICO
+    Evento: ServiceCrash
+    Severidade: Critical
+    Timestamp: 2025-12-28T10:30:45Z
+    Usuário: ADM-001
+    Descrição: Serviço X parou inesperadamente
+    TraceId: abc123
+    |
+    v
+Se escalação automática está ativa:
+    |
+    +---> Cria PagerDuty incident
+    |
+    +---> SMS para Gerente de TI
+    |
+    v
+DevOps acessa /api/logs/correlation/{traceId}
+    |
+    v
+Vê histórico completo do erro
+    |
+    v
+Reinicia serviço + documenta em wiki
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição |
+|----------|-----------|
+| **Mascaramento de Dados Sensíveis** | Passwords, tokens, cartões, CPF nunca aparecem em logs (regex + enricher customizado) |
+| **Isolamento Multi-tenant** | Logs de Cliente A não são acessíveis por Cliente B (Row-Level Security via ClienteId) |
+| **Criptografia em Trânsito** | HTTPS/TLS 1.2+ obrigatório, Application Insights usa HTTPS |
+| **Criptografia em Repouso** | Logs em Blob Storage criptografados com Azure Storage Encryption |
+| **Acesso Baseado em Função** | RBAC obriga permissão `log:view` para ver qualquer log |
+| **Auditoria de Acesso** | Toda busca de logs é registrada com usuário, período, filtros (audit trail) |
+| **Retenção Limitada** | Logs deletados automaticamente após 7 anos (LGPD) |
+| **Direito ao Esquecimento** | Job automático identifica e deleta logs de usuário que solicitou LGPD |
+| **Rate Limiting** | Máximo 100 buscas por minuto por usuário (evita DoS via logs) |
+| **Integridade de Log** | Logs não podem ser editados (apenas anotações em campo separado) |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] Tentativa de acessar log de outro cliente → Retorna 403 Forbidden
+- [ ] Tentativa de buscar "password" em logs → Retorna resultados mascarados (***MASKED***)
+- [ ] Tentativa de deletar log crítico → Retorna 403 Forbidden
+- [ ] Tentativa sem permissão `log:view` → Retorna 403 Forbidden
+- [ ] Injection de KQL em busca (`'; drop table logs`) → Sanitizado, seguro
+- [ ] Rate limit (101ª busca no minuto) → Retorna 429 Too Many Requests
+- [ ] Busca de 1 milhão de registros → Paginado automaticamente (max 1000 por página)
+- [ ] XSS em filtro de mensagem → Sanitizado em HTML antes de render
+- [ ] CSRF em POST /logs/alerts/configure → Token CSRF validado
+- [ ] Tentativa de acessar API sem autenticação → Retorna 401 Unauthorized
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medição |
+|-----|------|---------|
+| **Tempo de Busca de Log** | < 2 segundos | Query em KQL contra Application Insights (p95) |
+| **Latência Média de Requisição** | < 500ms | percentile(duration, 50) em /api/logs |
+| **Taxa de Disponibilidade** | > 99.9% | uptime de Application Insights |
+| **Cobertura de Logs** | 100% | Todas as operações registradas (auditoria manual) |
+| **Taxa de Falso Positivo em Alertas** | < 5% | Alertas que dispararam mas não era problema real |
+| **Tempo de Resposta a Alerta Crítico** | < 5 minutos | Tempo médio do disparo até primeiro log de ação |
+| **Retenção de Dados** | 30 dias online, 7 anos backup | Dias de retenção em Application Insights |
+| **Taxa de Corrupção de Log** | 0% | Logs corrompidos ou perdidos (deve ser zero) |
+| **Conformidade LGPD** | 100% | Dados sensíveis mascarados, direito ao esquecimento implementado |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| **Taxa de Erro Alta** | Taxa de erro > 5% por 5 minutos | Notificar Teams + email, criar PagerDuty |
+| **Latência Acima de SLO** | p95 > 2000ms por 10 minutos | Notificar Gerente de TI, escalar se persiste |
+| **Evento Crítico** | severityLevel == Critical | Alerta imediato via SMS + Teams + PagerDuty |
+| **Falha de Indexação** | Logs não aparecem no Insights em 30s | Alertar DBA, verificar pipeline |
+| **Espaço em Disco Baixo** | Storage < 10% | Aumentar capacidade, revisão de retenção |
+| **Taxa de Alerta Anômala** | Quantidade de alertas > 3x média histórica | Possível ataque ou problema subjacente |
+| **Serviço Não Registrando Logs** | Serviço X sem logs por 5 minutos | Verificar conectividade, status do serviço |
+| **Violação de Acesso** | Tentativa de acessar log de outro cliente | Alerta de segurança, investigação forense |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF098](/docs/rf/Fase-6-Ativos-Auditoria-Integracoes/EPIC010-AUD-Auditoria-Avancada/RF098-Auditoria-Logs-Sistema/MD-RF098.md)
+
+2. **Casos de Uso**: Criar [UC-RF098](/docs/rf/Fase-6-Ativos-Auditoria-Integracoes/EPIC010-AUD-Auditoria-Avancada/RF098-Auditoria-Logs-Sistema/UC-RF098.md)
+
+3. **Fluxos de Tela**: Criar [WF-RF098](/docs/rf/Fase-6-Ativos-Auditoria-Integracoes/EPIC010-AUD-Auditoria-Avancada/RF098-Auditoria-Logs-Sistema/WF-RF098.md)
+
+4. **User Stories**: Criar [user-stories.yaml](/docs/rf/Fase-6-Ativos-Auditoria-Integracoes/EPIC010-AUD-Auditoria-Avancada/RF098-Auditoria-Logs-Sistema/user-stories.yaml)
+
+5. **Implementação Backend**: Serilog, Application Insights, Alert Rules, RBAC filters
+
+6. **Implementação Frontend**: Angular dashboard, filtros, exportação, gráficos
+
+7. **Testes**: Cenários de logging, correlação, alertas, conformidade LGPD
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versão inicial baseada em RF.md | Claude Code |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: Claude Code
+**Revisão**: Pendente de aprovação

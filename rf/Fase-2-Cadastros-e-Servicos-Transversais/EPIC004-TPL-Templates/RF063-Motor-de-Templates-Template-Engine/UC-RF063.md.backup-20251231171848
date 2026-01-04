@@ -1,0 +1,1462 @@
+# Casos de Uso - RF063
+
+**Versão:** 1.0
+**Data:** 2025-12-17
+**RF Relacionado:** [RF063 - Motor-de-Templates-Template-Engine](./RF063.md)
+
+---
+
+## Índice de Casos de Uso
+
+| UC | Nome | Descrição |
+|----|------|-----------|
+| UC00 | UC00 - Listar Templates de E-mail | Caso de uso |
+| UC00 | UC00 - Listar Templates de Relatórios | Caso de uso |
+| UC00 | UC00 - Listar Templates | Caso de uso |
+| UC01 | UC01 - Criar Template | Caso de uso |
+| UC02 | UC02 - Visualizar Template | Caso de uso |
+| UC03 | UC03 - Editar Template | Caso de uso |
+| UC04 | UC04 - Inativar Template | Caso de uso |
+| UC06 | UC06 - Versionar Template | Caso de uso |
+| UC07 | UC07 - Testar Template | Caso de uso |
+| UC08 | UC08 - Publicar Template | Caso de uso |
+| UC09 | UC09 - Clonar Template | Caso de uso |
+
+---
+
+# UC00 - Listar Templates de E-mail
+
+## 1. Cabeçalho
+
+| Item | Descrição |
+|------|-----------|
+| **RF** | RF-090 - Templates de E-mail Transacionais e Marketing |
+| **Código UC** | UC00 |
+| **Nome** | Listar Templates de E-mail |
+| **Ator Principal** | Administrador, Marketing, Developer |
+| **Complexidade** | Baixa |
+| **Estimativa Backend** | 2 horas (Query, Dto, Handler, Validator) |
+| **Estimativa Frontend** | 3 horas (List component, Service, Table com filtros) |
+| **Estimativa Testes** | 2 horas (Unit + Integration + E2E) |
+| **Versão** | 1.0 |
+| **Data** | 2025-01-20 |
+
+---
+
+## 2. Objetivo
+
+Permitir que usuários visualizem a lista de todos os templates de e-mail cadastrados no sistema, filtrando por tipo (Transacional, Marketing, Notificação), status (Ativo/Inativo), data de criação e nome. Suportar paginação, ordenação e busca textual.
+
+---
+
+## 3. Pré-condições
+
+- [x] Usuário autenticado no sistema
+- [x] Usuário possui permissão `EMAIL_TEMPLATES.VIEW` ou perfil `Admin`/`Marketing`
+- [x] Banco de dados possui tabela `Email_Template` criada
+- [x] Frontend carregou componente de listagem de templates
+
+---
+
+## 4. Dependências de Desenvolvimento
+
+### 4.1 RFs Externos
+| RF | UC | Tipo | Descrição |
+|----|-----|------|-----------|
+| RF-001 | UC00-listar-configuracoes | Leitura | Buscar configurações de paginação padrão |
+| RF-008 | UC00-listar-usuarios | Leitura | Obter nome do criador do template |
+| RF-063 | UC00-listar-templates | Leitura | Herda estrutura base de template |
+
+### 4.2 Integrações Backend
+- **Permissões**: `EMAIL_TEMPLATES.VIEW` via RBAC
+- **Auditoria**: Registrar listagem via `AuditInterceptor`
+- **Multi-tenancy**: Filtro automático por `Id_Conglomerado` via Global Query Filter
+- **Cache**: Opcional (cache de 5 minutos para templates ativos)
+
+### 4.3 Dependências de UCs (ordem de implementação)
+| Depende de | Motivo |
+|------------|--------|
+| _(nenhuma)_ | Primeiro UC do RF-090 (operação básica de leitura) |
+
+### 4.4 Endpoints Chamados
+- `GET /api/v1/email-templates?page=1&size=10&tipo=Marketing&fl_ativo=1&search=Boas-vindas`
+
+---
+
+## 5. Fluxo Principal
+
+| Passo | Ator | Ação | Sistema |
+|-------|------|------|---------|
+| 1 | Usuário | Acessa menu "E-mail > Templates" | Carrega tela de listagem |
+| 2 | Usuário | Visualiza grid com templates | Exibe colunas: Nome, Tipo, Assunto, Status, Última Atualização, Ações |
+| 3 | Usuário | _(Opcional)_ Aplica filtro por tipo | Recarrega grid filtrando por tipo selecionado |
+| 4 | Usuário | _(Opcional)_ Busca por nome | Recarrega grid com templates que contém texto no nome ou assunto |
+| 5 | Sistema | Exibe resultados paginados | Grid mostra 10 templates por página (configurável) |
+
+**Resultado**: Lista de templates exibida com sucesso, permitindo navegação e filtragem.
+
+---
+
+## 6. Fluxos Alternativos
+
+### FA-01: Nenhum Template Cadastrado
+- **Gatilho**: Banco de dados vazio ou filtro sem resultados
+- **Fluxo**:
+  1. Sistema exibe mensagem: "Nenhum template encontrado. Clique em 'Novo' para criar seu primeiro template."
+  2. Exibe botão "Novo Template" centralizado
+- **Resultado**: Usuário é incentivado a criar primeiro template
+
+### FA-02: Filtrar por Tipo de E-mail
+- **Gatilho**: Usuário seleciona dropdown "Tipo"
+- **Fluxo**:
+  1. Usuário seleciona "Transacional", "Marketing" ou "Notificação"
+  2. Sistema recarrega grid com filtro aplicado
+  3. Exibe contador: "15 templates encontrados"
+- **Resultado**: Grid filtrado por tipo específico
+
+### FA-03: Filtrar por Status (Ativo/Inativo)
+- **Gatilho**: Usuário seleciona toggle "Mostrar Inativos"
+- **Fluxo**:
+  1. Sistema inclui templates inativos (`Fl_Ativo = 0`) nos resultados
+  2. Templates inativos exibidos em cinza com label "Inativo"
+- **Resultado**: Visualização de templates ativos e inativos
+
+### FA-04: Busca Textual
+- **Gatilho**: Usuário digita no campo de busca
+- **Fluxo**:
+  1. Usuário digita termo (mínimo 3 caracteres)
+  2. Sistema aguarda 500ms (debounce)
+  3. Busca em: `Nome_Template`, `Assunto_Template`
+  4. Recarrega grid com resultados
+- **Resultado**: Busca full-text funcionando
+
+### FA-05: Ordenação por Coluna
+- **Gatilho**: Usuário clica no cabeçalho de coluna
+- **Fluxo**:
+  1. Sistema ordena por coluna selecionada (ASC na primeira vez, DESC na segunda)
+  2. Exibe ícone de seta indicando direção da ordenação
+- **Resultado**: Grid ordenado pela coluna desejada
+
+### FA-06: Paginação
+- **Gatilho**: Mais de 10 templates cadastrados
+- **Fluxo**:
+  1. Sistema exibe paginação no rodapé do grid
+  2. Usuário navega entre páginas com botões "Anterior/Próximo"
+  3. Exibe informação: "Mostrando 1-10 de 45 registros"
+- **Resultado**: Navegação entre páginas funcional
+
+---
+
+## 7. Fluxos de Exceção
+
+### FE-01: Erro de Permissão
+- **Gatilho**: Usuário sem permissão `EMAIL_TEMPLATES.VIEW`
+- **Ação**: Retornar HTTP 403 Forbidden
+- **Mensagem**: "Você não tem permissão para visualizar templates de e-mail."
+- **Recuperação**: Contatar administrador para solicitar acesso
+
+### FE-02: Erro de Comunicação com API
+- **Gatilho**: Backend indisponível ou timeout
+- **Ação**: Exibir mensagem de erro genérica
+- **Mensagem**: "Erro ao carregar templates. Tente novamente em instantes."
+- **Recuperação**: Botão "Tentar Novamente" recarrega a tela
+
+### FE-03: Query Inválida
+- **Gatilho**: Parâmetros de filtro inválidos (ex: `tipo=InvalidType`)
+- **Ação**: Retornar HTTP 400 Bad Request
+- **Mensagem**: "Filtro inválido. Tipos permitidos: Transacional, Marketing, Notificação."
+- **Recuperação**: Frontend valida tipos antes de enviar
+
+### FE-04: Timeout de Cache
+- **Gatilho**: Cache Redis indisponível
+- **Ação**: Buscar diretamente do banco sem cache
+- **Log**: Warning "Redis cache unavailable, falling back to database"
+- **Recuperação**: Operação continua sem cache (performance reduzida)
+
+---
+
+## 8. Regras de Negócio
+
+### RN-UC00-001: Multi-Tenancy Obrigatório
+- **Descrição**: Listar APENAS templates do conglomerado do usuário logado ou templates globais
+- **Validação**:
+  - Query Filter: `WHERE (Id_Conglomerado = @IdConglomeradoUsuario OR Id_Conglomerado IS NULL)`
+  - Templates globais (`Id_Conglomerado = NULL`) são visíveis para todos
+
+### RN-UC00-002: Ordenação Padrão
+- **Descrição**: Templates ordenados por data de atualização decrescente (mais recentes primeiro)
+- **Validação**: `ORDER BY Dt_Ultima_Modificacao DESC, Nome_Template ASC`
+
+### RN-UC00-003: Limite de Paginação
+- **Descrição**: Tamanho de página entre 10 e 100 registros
+- **Validação**:
+  - Valor padrão: 10 (configurável via RF-001)
+  - Máximo: 100 (proteção contra sobrecarga)
+  - Se `size > 100`, forçar `size = 100`
+
+### RN-UC00-004: Cache de Resultados
+- **Descrição**: Resultados de listagem podem ser cacheados por 5 minutos
+- **Validação**:
+  - Cache key: `email-templates:list:{Id_Conglomerado}:{filtros_hash}`
+  - Invalidar ao criar/editar/deletar qualquer template
+  - TTL: 300 segundos (5 minutos)
+
+### RN-UC00-005: Exibir Métricas de Uso
+- **Descrição**: Grid deve exibir quantidade de envios realizados com cada template
+- **Validação**:
+  - Agregar de `Email_Envio_Log WHERE Id_Template = X`
+  - Exibir em coluna "Total de Envios"
+  - Tooltip com detalhes: "45 envios (últimos 30 dias)"
+
+---
+
+## 9. Requisitos Não-Funcionais
+
+### Performance
+- Tempo de resposta: < 500ms para até 1000 templates
+- Query otimizada com índices em: `Id_Conglomerado`, `Tipo_Email`, `Fl_Ativo`, `Dt_Ultima_Modificacao`
+- Cache Redis habilitado para queries frequentes
+
+### Segurança
+- Validação obrigatória de permissões RBAC
+- Filtragem automática por multi-tenancy (não confiar no frontend)
+- SQL Injection: Protegido via EF Core Parameterized Queries
+
+### Usabilidade
+- Grid responsivo (mobile, tablet, desktop)
+- Skeleton loader enquanto carrega dados
+- Feedback visual para filtros aplicados
+
+### Acessibilidade
+- Tabela com headers semânticos (`<th>`)
+- Suporte a navegação por teclado (Tab, Enter, Esc)
+- ARIA labels em botões de ação
+
+---
+
+## 10. Interface UI (Wireframes)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ E-mail > Templates de E-mail                                 [Novo] │
+├─────────────────────────────────────────────────────────────────────┤
+│ 🔍 Buscar...  [Tipo: Todos ▼] [☐ Mostrar Inativos]  [↻ Atualizar]  │
+├────────┬─────────────┬─────────────────────┬─────────┬──────────────┤
+│ Nome   │ Tipo        │ Assunto             │ Status  │ Ações        │
+├────────┼─────────────┼─────────────────────┼─────────┼──────────────┤
+│ Boas-  │ Transacional│ Bem-vindo ao IContro│ 🟢 Ativo│ 👁️ 📝 🗑️      │
+│ vindas │             │ lIT!                │         │              │
+├────────┼─────────────┼─────────────────────┼─────────┼──────────────┤
+│ News   │ Marketing   │ Novidades de Dezembr│ 🟢 Ativo│ 👁️ 📝 🗑️      │
+│ letter │             │ o 2025              │         │              │
+├────────┼─────────────┼─────────────────────┼─────────┼──────────────┤
+│ Reset  │ Transacional│ Redefinir sua senha │ 🔴 Inati│ 👁️ 📝 ✅      │
+│ Senha  │             │                     │ vo      │              │
+└────────┴─────────────┴─────────────────────┴─────────┴──────────────┘
+│ Mostrando 1-10 de 45 registros            [◀ 1 2 3 ... 5 ▶]       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Legenda de Ações:**
+- 👁️ Visualizar
+- 📝 Editar
+- 🗑️ Inativar
+- ✅ Reativar
+
+**Cores de Status:**
+- 🟢 Verde: Ativo
+- 🔴 Vermelho: Inativo
+
+---
+
+## 11. Mensagens ao Usuário
+
+### Sucesso
+- ✅ "45 templates encontrados."
+- ✅ "Filtros aplicados com sucesso."
+
+### Info
+- ℹ️ "Nenhum template encontrado. Clique em 'Novo' para criar."
+- ℹ️ "Mostrando templates ativos. Marque 'Mostrar Inativos' para ver todos."
+
+### Erro
+- ❌ "Erro ao carregar templates. Tente novamente."
+- ❌ "Você não tem permissão para visualizar templates de e-mail."
+
+---
+
+## 12. Testes
+
+### Cenários de Teste Backend
+- [ ] **TC-UC00-001**: Listar templates ativos do conglomerado do usuário
+  - **Dado**: 10 templates ativos, 5 inativos no conglomerado A
+  - **Quando**: Usuário do conglomerado A lista templates (sem filtro)
+  - **Então**: Retorna 10 templates ativos ordenados por data desc
+
+- [ ] **TC-UC00-002**: Filtrar por tipo "Marketing"
+  - **Dado**: 5 templates transacionais, 3 marketing
+  - **Quando**: Usuário filtra por `tipo=Marketing`
+  - **Então**: Retorna apenas 3 templates de marketing
+
+- [ ] **TC-UC00-003**: Busca textual por nome
+  - **Dado**: Templates "Boas-vindas", "Newsletter Dezembro", "Reset Senha"
+  - **Quando**: Usuário busca "Boas"
+  - **Então**: Retorna apenas "Boas-vindas"
+
+- [ ] **TC-UC00-004**: Paginação funcional
+  - **Dado**: 45 templates cadastrados
+  - **Quando**: Usuário acessa página 3 (size=10)
+  - **Então**: Retorna templates 21-30
+
+- [ ] **TC-UC00-005**: Multi-tenancy isolado
+  - **Dado**: 5 templates do conglomerado A, 3 do conglomerado B
+  - **Quando**: Usuário do conglomerado A lista templates
+  - **Então**: Retorna apenas 5 templates (sem vazamento de dados)
+
+### Cenários de Teste Frontend
+- [ ] **TC-UC00-006**: Grid carrega com skeleton loader
+  - **Quando**: Tela é carregada
+  - **Então**: Exibe skeleton loader antes de mostrar dados
+
+- [ ] **TC-UC00-007**: Filtro por tipo funcional
+  - **Quando**: Usuário seleciona "Transacional" no dropdown
+  - **Então**: Grid recarrega com apenas templates transacionais
+
+- [ ] **TC-UC00-008**: Ações contextuais por status
+  - **Dado**: Template ativo e inativo no grid
+  - **Então**: Template ativo tem ação "Inativar", inativo tem "Reativar"
+
+### Cenários de Segurança
+- [ ] **TC-UC00-009**: Usuário sem permissão
+  - **Dado**: Usuário sem `EMAIL_TEMPLATES.VIEW`
+  - **Quando**: Tenta acessar tela de listagem
+  - **Então**: Retorna HTTP 403 com mensagem de erro
+
+- [ ] **TC-UC00-010**: SQL Injection protegido
+  - **Quando**: Usuário envia `search='; DROP TABLE Email_Template;--`
+  - **Então**: Query parametrizada não executa SQL injection
+
+---
+
+## 13. Rastreabilidade
+
+### Origem
+- **RF-090**: Seção "Funcionalidades Principais" (item 1 - Listagem)
+- **RN-TPL-002-14**: Multi-Tenancy por Conglomerado
+
+### Impacto
+- **UC01-criar-template**: Após criar template, retorna para listagem
+- **UC03-editar-template**: Após editar, retorna para listagem atualizada
+- **UC04-inativar-template**: Inativa template diretamente da listagem
+
+### Documentos Relacionados
+- **MD-Email-Template**: Modelo de dados da tabela `Email_Template`
+- **GUIA-DEVELOPER.md**: Padrões de paginação e filtros
+
+---
+
+**Última Atualização**: 2025-01-20
+**Autor**: Equipe IControlIT
+**Revisor**: Arquiteto de Software
+
+---
+
+# UC00 - Listar Templates de Relatórios
+
+## 1. Cabeçalho
+
+| Item | Descrição |
+|------|-----------|
+| **RF** | RF-019 - Templates de Relatórios Excel e PDF Avançados |
+| **Código UC** | UC00 |
+| **Nome** | Listar Templates de Relatórios |
+| **Ator Principal** | Administrador, Analista, Gerente |
+| **Complexidade** | Baixa |
+| **Estimativa Backend** | 2 horas |
+| **Estimativa Frontend** | 3 horas |
+| **Estimativa Testes** | 2 horas |
+| **Versão** | 1.0 |
+| **Data** | 2025-01-20 |
+
+---
+
+## 2. Objetivo
+
+Listar todos os templates de relatórios cadastrados, filtrando por tipo de saída (Excel/PDF/CSV), categoria (Financeiro, Operacional, Gerencial), status e permitindo busca textual.
+
+---
+
+## 3. Dependências
+
+### 3.1 RFs Externos
+| RF | UC | Descrição |
+|----|-----|-----------|
+| RF-001 | UC00 | Configurações de paginação |
+| RF-008 | UC00 | Obter criador do template |
+| RF-063 | UC00 | Estrutura base de listagem |
+
+### 3.2 Endpoints
+- `GET /api/v1/report-templates?page=1&size=10&tipo=Excel&categoria=Financeiro`
+
+---
+
+## 4. Fluxo Principal
+
+| Passo | Ator | Ação | Sistema |
+|-------|------|------|---------|
+| 1 | Usuário | Acessa "Relatórios > Templates" | Carrega grid de templates |
+| 2 | Sistema | Exibe templates | Colunas: Nome, Tipo Saída, Categoria, Última Geração, Ações |
+| 3 | Usuário | _(Opcional)_ Filtra por tipo saída | Excel, PDF, CSV, JSON |
+| 4 | Usuário | _(Opcional)_ Filtra por categoria | Financeiro, Operacional, Gerencial |
+| 5 | Sistema | Exibe resultados paginados | 10 templates por página |
+
+---
+
+## 5. Regras de Negócio
+
+**RN-UC00-001**: Multi-Tenancy - Listar apenas templates do conglomerado ou globais
+
+**RN-UC00-002**: Ordenação padrão por última geração (templates mais usados primeiro)
+
+---
+
+## 6. Interface UI
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Templates de Relatórios                                  [Novo] │
+├─────────────────────────────────────────────────────────────────┤
+│ 🔍 Buscar... [Tipo: Todos ▼] [Categoria: Todos ▼]              │
+├────────────┬─────────┬─────────────┬──────────────┬─────────────┤
+│ Nome       │ Tipo    │ Categoria   │ Última Geração│ Ações      │
+├────────────┼─────────┼─────────────┼──────────────┼─────────────┤
+│ Vendas Mensal│ Excel │ Financeiro  │ Hoje, 08:00  │ 👁️ 📝 📊 🗑️ │
+│ Faturamento │ PDF    │ Gerencial   │ Ontem, 14:30 │ 👁️ 📝 📊 🗑️ │
+└────────────┴─────────┴─────────────┴──────────────┴─────────────┘
+```
+
+---
+
+## 7. Testes
+
+- [ ] **TC-UC00-001**: Listar templates ativos do conglomerado
+- [ ] **TC-UC00-002**: Filtrar por tipo "Excel"
+- [ ] **TC-UC00-003**: Busca textual por nome
+- [ ] **TC-UC00-004**: Multi-tenancy isolado
+
+---
+
+---
+
+# UC00 - Listar Templates
+
+**RF**: RF-063 - Motor de Templates (Template Engine)
+**Ator**: Administrador do Sistema, Desenvolvedor de Templates, Gerente
+**Complexidade**: Baixa
+**Estimativa**: 7h (2h backend + 3h frontend + 2h testes)
+
+---
+
+## 1. OBJETIVO
+
+Permitir que usuários autorizados visualizem e pesquisem a lista de templates cadastrados no sistema, com filtros, paginação e ordenação.
+
+---
+
+## 2. PRÉ-CONDIÇÕES
+
+1. Usuário deve estar autenticado no sistema
+2. Usuário deve ter permissão `templates:template:read`
+3. Sistema deve estar conectado ao banco de dados
+4. Pelo menos um template deve estar cadastrado (ou lista vazia será exibida)
+
+---
+
+## 3. DEPENDÊNCIAS DE DESENVOLVIMENTO
+
+### Pré-requisitos Técnicos
+- Tabela `Templates` criada no banco de dados
+- Entidade `Template` definida no Domain
+- Query `GetTemplatesQuery` implementada (CQRS)
+- Endpoint GET `/api/templates` criado
+
+### Ordem de Implementação
+1. **Backend**: Criar entidade Template
+2. **Backend**: Implementar GetTemplatesQuery + Handler
+3. **Backend**: Criar endpoint `/api/templates`
+4. **Frontend**: Criar service TemplatesService
+5. **Frontend**: Criar component templates-list
+6. **Frontend**: Integrar com i18n, auditoria, RBAC
+
+### Integrações com Outros RFs
+- **RF-001 (Configurações)**: Busca configuração de paginação padrão
+- **RF-008 (Usuários)**: Exibe nome do usuário que criou template
+- **RF-063 (Perfis)**: Valida permissões de acesso
+
+---
+
+## 4. FLUXO PRINCIPAL
+
+**FP01 - Listar Templates com Sucesso**
+
+| Passo | Ator | Ação | Sistema |
+|-------|------|------|---------|
+| 1 | Usuário | Acessa menu "Gerenciar Templates" | Carrega lista de templates |
+| 2 | Sistema | - | Busca templates no banco (SELECT com JOIN) |
+| 3 | Sistema | - | Aplica filtros de multi-tenancy (empresaId) |
+| 4 | Sistema | - | Ordena por nome ASC (padrão) |
+| 5 | Sistema | - | Pagina resultados (20 por página padrão) |
+| 6 | Sistema | - | Retorna JSON com { items, total, page, pageSize } |
+| 7 | Sistema | Exibe tabela com templates | Renderiza lista na UI |
+| 8 | Usuário | Visualiza lista | Vê nome, tipo, status, data criação |
+
+**Campos Exibidos na Lista:**
+- Nome do Template
+- Tipo (Documento, Email, Relatório)
+- Status (Ativo/Inativo)
+- Data de Criação
+- Criado por (nome do usuário)
+- Ações (Visualizar, Editar, Inativar)
+
+---
+
+## 5. FLUXOS ALTERNATIVOS
+
+### FA01 - Filtrar por Nome
+
+**Diverge no passo 1 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 1a | Usuário digita "Contrato" no campo de busca |
+| 1b | Sistema aplica filtro WHERE Nome LIKE '%Contrato%' |
+| 1c | Retorna apenas templates que contenham "Contrato" no nome |
+| 1d | Retorna ao passo 7 do FP01 |
+
+### FA02 - Filtrar por Tipo
+
+**Diverge no passo 1 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 2a | Usuário seleciona tipo "Email" no dropdown |
+| 2b | Sistema aplica filtro WHERE Tipo = 'Email' |
+| 2c | Retorna apenas templates do tipo Email |
+| 2d | Retorna ao passo 7 do FP01 |
+
+### FA03 - Filtrar por Status
+
+**Diverge no passo 1 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 3a | Usuário seleciona status "Ativo" |
+| 3b | Sistema aplica filtro WHERE Ativo = true |
+| 3c | Retorna apenas templates ativos |
+| 3d | Retorna ao passo 7 do FP01 |
+
+### FA04 - Ordenar por Coluna
+
+**Diverge no passo 1 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 4a | Usuário clica no cabeçalho "Data de Criação" |
+| 4b | Sistema ordena por DataCriacao DESC |
+| 4c | Usuário clica novamente |
+| 4d | Sistema ordena por DataCriacao ASC |
+| 4e | Retorna ao passo 7 do FP01 |
+
+### FA05 - Navegar entre Páginas
+
+**Diverge no passo 7 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 5a | Usuário clica em "Próxima Página" |
+| 5b | Sistema carrega página 2 (offset = 20) |
+| 5c | Mantém filtros e ordenação aplicados |
+| 5d | Retorna ao passo 7 do FP01 |
+
+### FA06 - Alterar Tamanho de Página
+
+**Diverge no passo 7 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 6a | Usuário seleciona "50 por página" |
+| 6b | Sistema recarrega lista com pageSize=50 |
+| 6c | Volta para página 1 |
+| 6d | Retorna ao passo 7 do FP01 |
+
+### FA07 - Exportar Lista (Excel/CSV)
+
+**Diverge no passo 7 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 7a | Usuário clica em "Exportar" |
+| 7b | Sistema gera arquivo Excel/CSV com lista completa (sem paginação) |
+| 7c | Sistema registra auditoria de exportação |
+| 7d | Download do arquivo inicia |
+| 7e | Retorna ao passo 7 do FP01 |
+
+---
+
+## 6. FLUXOS DE EXCEÇÃO
+
+### FE01 - Lista Vazia
+
+**Ocorre no passo 2 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 2e1 | Sistema não encontra templates |
+| 2e2 | Retorna lista vazia { items: [], total: 0 } |
+| 2e3 | Exibe mensagem "Nenhum template encontrado" |
+| 2e4 | Exibe botão "Criar Primeiro Template" |
+
+### FE02 - Erro de Conexão com Banco
+
+**Ocorre no passo 2 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 2e1 | Sistema tenta conectar ao banco |
+| 2e2 | Timeout ou erro de conexão |
+| 2e3 | Toast de erro: "Erro ao carregar templates. Tente novamente." |
+| 2e4 | Log detalhado no servidor |
+| 2e5 | Botão "Tentar Novamente" disponível |
+
+### FE03 - Sem Permissão
+
+**Ocorre no passo 1 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 1e1 | Sistema valida permissão `templates:template:read` |
+| 1e2 | Usuário não possui permissão |
+| 1e3 | Retorna 403 Forbidden |
+| 1e4 | Exibe página "Acesso Negado" |
+| 1e5 | Log de tentativa de acesso não autorizado |
+
+### FE04 - Timeout na Pesquisa
+
+**Ocorre no passo 2 do FP01**
+
+| Passo | Ação |
+|-------|------|
+| 4e1 | Query leva mais de 30 segundos |
+| 4e2 | Sistema cancela query |
+| 4e3 | Toast de erro: "Pesquisa demorou muito. Refine os filtros." |
+| 4e4 | Log de performance no servidor |
+
+---
+
+## 7. VALIDAÇÕES DE CAMPOS
+
+**Não aplicável (UC de listagem não possui formulário de entrada)**
+
+---
+
+## 8. REGRAS DE NEGÓCIO
+
+### RN01 - Multi-Tenancy
+- Listar apenas templates da empresa do usuário logado (WHERE EmpresaId = {empresaAtual})
+- Super Admin pode listar templates de todas as empresas
+
+### RN02 - Paginação
+- Tamanho de página padrão: 20 registros
+- Tamanhos permitidos: 10, 20, 50, 100
+- Máximo de 10.000 registros retornados (para exportação)
+
+### RN03 - Ordenação
+- Colunas ordenáveis: Nome, Tipo, Status, DataCriacao
+- Ordenação padrão: Nome ASC
+- Suporte a ASC e DESC
+
+### RN04 - Filtros
+- Busca por nome: case-insensitive, parcial (LIKE %termo%)
+- Filtro por tipo: exact match
+- Filtro por status: booleano (Ativo/Inativo)
+- Filtros podem ser combinados (AND)
+
+### RN05 - Permissões de Ações
+```
+Visualizar: templates:template:read
+Editar: templates:template:update
+Inativar: templates:template:delete
+```
+
+### RN06 - Cache
+- Lista pode ser cacheada por 5 minutos
+- Cache invalidado ao criar/editar/deletar template
+
+---
+
+## 9. REQUISITOS NÃO-FUNCIONAIS
+
+### Performance
+- Tempo de resposta: < 1 segundo para 1.000 registros
+- Tempo de resposta: < 3 segundos para 10.000 registros
+- Suporte a 100 requisições simultâneas
+
+### Segurança
+- Validação de permissões no backend (não confiar no frontend)
+- Logs de acesso para auditoria
+- Proteção contra SQL Injection (usar EF Core)
+
+### Usabilidade
+- Indicador de carregamento durante busca
+- Feedback visual em filtros aplicados
+- Mensagens de erro claras e acionáveis
+
+### Multi-Tenancy
+- Isolamento total entre empresas
+- Filtro aplicado em nível de query (Row-Level Security)
+
+---
+
+## 10. INTERFACE UI
+
+### Wireframe Básico
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ [< Voltar]  GERENCIAR TEMPLATES                    [+ Novo]     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                   │
+│ Buscar: [__________________] [🔍]  Tipo: [Todos ▼]  Status: [Todos ▼]  [Exportar] │
+│                                                                   │
+├─────────────────────────────────────────────────────────────────┤
+│ Nome ↑ | Tipo | Status | Criado em | Criado por | Ações        │
+├─────────────────────────────────────────────────────────────────┤
+│ Contrato Padrão | Documento | ✅ Ativo | 10/01/25 | Admin | [👁️][✏️][🗑️] │
+│ Email Boas-Vindas | Email | ✅ Ativo | 09/01/25 | João | [👁️][✏️][🗑️] │
+│ Relatório Mensal | Relatório | ❌ Inativo | 08/01/25 | Maria | [👁️][✏️][🗑️] │
+├─────────────────────────────────────────────────────────────────┤
+│ Mostrando 1-20 de 156 registros  [< Anterior] [Próxima >]      │
+│ Itens por página: [20 ▼]                                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Chaves i18n Necessárias
+
+```json
+{
+  "templates.list.title": "Gerenciar Templates",
+  "templates.list.newButton": "Novo Template",
+  "templates.list.searchPlaceholder": "Buscar template...",
+  "templates.list.filterType": "Tipo",
+  "templates.list.filterStatus": "Status",
+  "templates.list.export": "Exportar",
+  "templates.list.columns.name": "Nome",
+  "templates.list.columns.type": "Tipo",
+  "templates.list.columns.status": "Status",
+  "templates.list.columns.createdAt": "Criado em",
+  "templates.list.columns.createdBy": "Criado por",
+  "templates.list.columns.actions": "Ações",
+  "templates.list.noRecords": "Nenhum template encontrado",
+  "templates.list.loading": "Carregando templates...",
+  "templates.list.error": "Erro ao carregar templates. Tente novamente."
+}
+```
+
+---
+
+## 11. RASTREABILIDADE
+
+### Requisitos Relacionados
+- **RF-063**: Motor de Templates (Template Engine) - Seção 2.1 (Listagem)
+- **RF-001**: Configurações (paginação padrão)
+- **RF-003**: Auditoria (logs de acesso)
+- **RF-063**: Perfis (permissões de acesso)
+
+### Casos de Teste
+- **CN-UC00-001**: Listar templates com sucesso
+- **CN-UC00-002**: Filtrar por nome
+- **CN-UC00-003**: Filtrar por tipo
+- **CN-UC00-004**: Filtrar por status
+- **CN-UC00-005**: Ordenar por coluna
+- **CN-UC00-006**: Navegar entre páginas
+- **CN-UC00-007**: Alterar tamanho de página
+- **CN-UC00-008**: Exportar lista
+- **CN-UC00-009**: Lista vazia
+- **CN-UC00-010**: Sem permissão
+- **CN-UC00-011**: Multi-tenancy isolado
+- **CN-UC00-012**: Performance com 10.000 registros
+
+### Documentação Técnica
+- **Backend**: `Application/Templates/Queries/GetTemplates/GetTemplatesQuery.cs`
+- **Frontend**: `src/app/modules/templates/list/list.component.ts`
+- **API**: `GET /api/templates?search={termo}&type={tipo}&active={bool}&page={n}&pageSize={n}&sortBy={campo}&sortOrder={asc|desc}`
+
+---
+
+**Criado por**: IControlIT Architect Agent
+**Status**: Aguardando Implementação
+
+---
+
+# UC01 - Criar Template
+
+**RF**: RF-063 - Motor de Templates (Template Engine)
+**Ator**: Administrador do Sistema, Desenvolvedor de Templates
+**Complexidade**: Alta
+**Estimativa**: 12h (4h backend + 5h frontend + 3h testes)
+
+---
+
+## 1. OBJETIVO
+
+Permitir que usuários autorizados criem novos templates no sistema, definindo nome, tipo, conteúdo HTML/texto, variáveis e configurações.
+
+---
+
+## 2. PRÉ-CONDIÇÕES
+
+1. Usuário autenticado com permissão `templates:template:create`
+2. Sistema conectado ao banco de dados
+3. Editor de templates (Monaco Editor ou similar) configurado no frontend
+
+---
+
+## 3. DEPENDÊNCIAS DE DESENVOLVIMENTO
+
+### Pré-requisitos
+- UC00-listar-templates implementado
+- Tabela `Templates` e `TemplateVariables` criadas
+- Command `CreateTemplateCommand` + Handler
+- Endpoint POST `/api/templates`
+
+### Ordem de Implementação
+1. Backend: CreateTemplateCommand + Validator
+2. Backend: Endpoint POST /api/templates
+3. Frontend: template-form component
+4. Frontend: Integração com editor de código (Monaco)
+5. Testes de validação e segurança
+
+### Integrações
+- **RF-001**: Validação de configurações de templates
+- **RF-003**: Auditoria de criação
+- **RF-063**: Permissões de criação
+
+---
+
+## 4. FLUXO PRINCIPAL
+
+**FP01 - Criar Template com Sucesso**
+
+| Passo | Ator | Ação | Sistema |
+|-------|------|------|---------|
+| 1 | Usuário | Clica em "Novo Template" | Exibe formulário vazio |
+| 2 | Usuário | Preenche nome (ex: "Contrato Padrão") | Valida unicidade |
+| 3 | Usuário | Seleciona tipo (Documento/Email/Relatório) | Carrega variáveis disponíveis por tipo |
+| 4 | Usuário | Digita conteúdo HTML no editor | Valida sintaxe HTML |
+| 5 | Usuário | Insere variáveis (ex: {{nome_cliente}}) | Valida variáveis existentes |
+| 6 | Usuário | Define descrição (opcional) | Aceita até 500 caracteres |
+| 7 | Usuário | Marca como ativo/inativo | Aceita boolean |
+| 8 | Usuário | Clica em "Salvar" | Valida todos os campos |
+| 9 | Sistema | - | Gera ID único (GUID) |
+| 10 | Sistema | - | Valida HTML contra XSS |
+| 11 | Sistema | - | Salva template no banco |
+| 12 | Sistema | - | Salva variáveis na tabela TemplateVariables |
+| 13 | Sistema | - | Cria registro de auditoria |
+| 14 | Sistema | - | Retorna 201 Created com ID |
+| 15 | Sistema | Exibe toast "Template criado" | Redireciona para lista |
+
+---
+
+## 5. FLUXOS ALTERNATIVOS
+
+### FA01 - Criar Template Inativo
+- Usuário desmarca "Ativo" no passo 7
+- Template criado mas não disponível para uso até ser ativado
+
+### FA02 - Preview do Template
+- No passo 5, usuário clica em "Visualizar Preview"
+- Sistema renderiza template com dados de exemplo
+- Modal exibe resultado final
+
+### FA03 - Importar Template de Arquivo
+- No passo 4, usuário clica em "Importar HTML"
+- Sistema lê arquivo .html
+- Popula editor com conteúdo do arquivo
+
+### FA04 - Cancelar Criação
+- Qualquer momento antes do passo 8
+- Sistema confirma "Descartar alterações?"
+- Se SIM: retorna à lista, se NÃO: permanece
+
+---
+
+## 6. FLUXOS DE EXCEÇÃO
+
+### FE01 - Nome Duplicado
+- No passo 2, sistema detecta nome já existe
+- Campo fica vermelho: "Este nome já está em uso"
+- Botão Salvar desabilitado
+
+### FE02 - HTML Inválido
+- No passo 4, sistema detecta HTML malformado
+- Editor marca linha com erro
+- Mensagem: "HTML inválido na linha X"
+
+### FE03 - Variável Inválida
+- No passo 5, usuário usa {{variavel_inexistente}}
+- Sistema alerta: "Variável 'variavel_inexistente' não existe"
+- Lista variáveis disponíveis
+
+### FE04 - Tentativa de XSS
+- No passo 10, sistema detecta script malicioso
+- Template rejeitado com erro 400
+- Log de segurança criado
+
+### FE05 - Erro ao Salvar
+- No passo 11, falha na conexão com banco
+- Rollback de transação
+- Toast: "Erro ao salvar. Tente novamente."
+- Dados permanecem no formulário
+
+---
+
+## 7. VALIDAÇÕES DE CAMPOS
+
+### Campos Obrigatórios
+
+| Campo | Validação | Mensagem Erro |
+|-------|-----------|---------------|
+| Nome | Obrigatório, 3-100 caracteres | "Nome deve ter entre 3 e 100 caracteres" |
+| Tipo | Obrigatório, enum válido | "Selecione um tipo de template" |
+| Conteúdo | Obrigatório, HTML válido | "Conteúdo não pode estar vazio" |
+
+### Campos Opcionais
+- Descrição (0-500 caracteres)
+- Ativo (padrão: true)
+
+### Fluxos de Validação
+
+**FA-VAL-01: Campos obrigatórios não preenchidos**
+- Sistema destaca campos vazios em vermelho
+- Toast: "Preencha todos os campos obrigatórios"
+- Foco vai para primeiro campo vazio
+
+**FA-VAL-02: Limite de caracteres excedido**
+- Nome > 100: "Nome muito longo (máximo 100 caracteres)"
+- Descrição > 500: "Descrição muito longa (máximo 500 caracteres)"
+
+**FA-VAL-03: Tipo inválido**
+- Tipo não é Documento/Email/Relatório: erro 400
+- Frontend bloqueia opções inválidas
+
+**FA-VAL-04: HTML malformado**
+- Parser HTML detecta tag não fechada
+- Editor marca linha com erro
+- Mensagem específica da validação
+
+---
+
+## 8. REGRAS DE NEGÓCIO
+
+### RN01 - Nome Único por Empresa
+- Nome deve ser único dentro da mesma empresa (multi-tenancy)
+- Empresas diferentes podem ter templates com mesmo nome
+
+### RN02 - Variáveis por Tipo
+```
+Documento: {{nome_cliente}}, {{data_contrato}}, {{valor}}
+Email: {{destinatario}}, {{assunto}}, {{corpo}}
+Relatório: {{periodo}}, {{total_registros}}, {{data_geracao}}
+```
+
+### RN03 - Segurança HTML
+- Remover tags `<script>`, `<iframe>`, `<object>`
+- Permitir apenas tags seguras: `<p>`, `<div>`, `<span>`, `<table>`, etc.
+- Sanitizar atributos: remover `onclick`, `onerror`, etc.
+
+### RN04 - Versionamento
+- Ao editar template, criar nova versão (não sobrescrever)
+- Manter histórico de versões com timestamp
+
+### RN05 - Auditoria
+```json
+{
+  "acao": "Create",
+  "entidade": "Template",
+  "entidadeId": "guid",
+  "usuario": "admin@sistema.com",
+  "dadosDepois": { "nome": "...", "tipo": "...", "conteudo": "..." }
+}
+```
+
+---
+
+## 9. REQUISITOS NÃO-FUNCIONAIS
+
+### Performance
+- Salvamento < 2 segundos
+- Validação HTML em tempo real (debounce 500ms)
+- Preview renderizado em < 1 segundo
+
+### Segurança
+- Validação XSS no backend (não confiar frontend)
+- Escape de caracteres especiais
+- Logs de tentativas de injeção
+
+### Usabilidade
+- Editor com syntax highlighting
+- Autocomplete de variáveis
+- Atalhos de teclado (Ctrl+S para salvar)
+
+### Multi-Tenancy
+- Template vinculado à empresa do usuário
+- Isolamento total entre empresas
+
+---
+
+## 10. INTERFACE UI
+
+### Wireframe
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ [< Voltar]  NOVO TEMPLATE                   [Salvar]    │
+├─────────────────────────────────────────────────────────┤
+│ Nome: [____________________________]                     │
+│ Tipo: [Documento ▼]                                      │
+│ Descrição: [_____________________________]              │
+│ [ ] Ativo                                                │
+├─────────────────────────────────────────────────────────┤
+│ Conteúdo HTML:                  [Variáveis Disponíveis] │
+│ ┌───────────────────────────┐  ┌──────────────────────┐ │
+│ │ <html>                    │  │ • {{nome_cliente}}   │ │
+│ │   <body>                  │  │ • {{data_contrato}}  │ │
+│ │     <h1>{{titulo}}</h1>   │  │ • {{valor}}          │ │
+│ │     <p>{{conteudo}}</p>   │  │                      │ │
+│ │   </body>                 │  │ [Adicionar Variável] │ │
+│ │ </html>                   │  └──────────────────────┘ │
+│ └───────────────────────────┘                           │
+│                               [Preview] [Importar HTML] │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Chaves i18n
+
+```json
+{
+  "templates.create.title": "Novo Template",
+  "templates.create.nameLabel": "Nome",
+  "templates.create.namePlaceholder": "Nome do template",
+  "templates.create.typeLabel": "Tipo",
+  "templates.create.descriptionLabel": "Descrição",
+  "templates.create.activeLabel": "Ativo",
+  "templates.create.contentLabel": "Conteúdo HTML",
+  "templates.create.variablesTitle": "Variáveis Disponíveis",
+  "templates.create.previewButton": "Visualizar Preview",
+  "templates.create.importButton": "Importar HTML",
+  "templates.create.saveButton": "Salvar",
+  "templates.create.cancelButton": "Cancelar",
+  "templates.create.successMessage": "Template criado com sucesso!",
+  "templates.create.errorMessage": "Erro ao criar template"
+}
+```
+
+---
+
+## 11. RASTREABILIDADE
+
+### Requisitos
+- **RF-063**: Motor de Templates - Seção 2.2 (Criação)
+- **RF-003**: Auditoria de criação
+- **RF-063**: Permissões `templates:template:create`
+
+### Casos de Teste
+- **CN-UC01-001**: Criar template com sucesso
+- **CN-UC01-002**: Nome duplicado
+- **CN-UC01-003**: HTML inválido
+- **CN-UC01-004**: Variável inválida
+- **CN-UC01-005**: Tentativa XSS bloqueada
+- **CN-UC01-006**: Validação de campos obrigatórios
+- **CN-UC01-007**: Preview de template
+- **CN-UC01-008**: Importar HTML de arquivo
+- **CN-UC01-009**: Multi-tenancy isolado
+- **CN-UC01-010**: Sem permissão (403)
+
+### Documentação
+- **Backend**: `Application/Templates/Commands/CreateTemplate/CreateTemplateCommand.cs`
+- **Frontend**: `src/app/modules/templates/form/form.component.ts`
+- **API**: `POST /api/templates`
+
+---
+
+**Criado por**: IControlIT Architect Agent
+
+---
+
+# UC02 - Visualizar Template
+
+**RF**: RF-063 | **Ator**: Admin, Desenvolvedor, Gerente | **Complexidade**: Baixa | **Estimativa**: 7h (2h backend + 3h frontend + 2h testes)
+
+## 1. OBJETIVO
+Permitir visualização de detalhes completos de um template, incluindo conteúdo, variáveis, metadados e histórico de versões.
+
+## 2. PRÉ-CONDIÇÕES
+1. Autenticado com `templates:template:read`
+2. Template deve existir e pertencer à empresa do usuário
+
+## 3. DEPENDÊNCIAS
+**Pré-requisitos**: UC00, UC01 | **Ordem**: 1) Backend GetTemplateByIdQuery 2) Frontend detail component
+**Integrações**: RF-003 (Audit), RF-008 (Usuários), RF-063 (Permissões)
+
+## 4. FLUXO PRINCIPAL
+1. Usuário clica em "Visualizar" na lista → 2. Sistema busca template por ID → 3. Valida permissões e multi-tenancy → 4. Retorna JSON completo → 5. Exibe tela de detalhes (modo somente leitura) → 6. Mostra nome, tipo, descrição, conteúdo HTML, variáveis, status, criado por, data criação/atualização
+
+## 5. FLUXOS ALTERNATIVOS
+**FA01**: Visualizar Versões Anteriores (botão "Histórico" → lista versões → seleciona versão → exibe conteúdo)
+**FA02**: Copiar Conteúdo (botão "Copiar HTML" → copia conteúdo para clipboard → toast "Copiado!")
+**FA03**: Visualizar Preview Renderizado (botão "Preview" → renderiza template com dados exemplo → modal)
+
+## 6. FLUXOS DE EXCEÇÃO
+**FE01**: Template Não Encontrado (404 → "Template não encontrado")
+**FE02**: Sem Permissão (403 → "Acesso negado")
+**FE03**: Template de Outra Empresa (403 → "Você não pode acessar este template")
+
+## 7. VALIDAÇÕES
+N/A (somente leitura)
+
+## 8. REGRAS DE NEGÓCIO
+**RN01**: Multi-tenancy rigoroso (WHERE EmpresaId = {atual} AND Id = {id})
+**RN02**: Exibir versão atual por padrão
+**RN03**: Auditoria de acesso (Action = "View")
+
+## 9. REQUISITOS NÃO-FUNCIONAIS
+**Performance**: < 1s | **Segurança**: Escape XSS na exibição | **Usabilidade**: Modo somente leitura claro
+
+## 10. INTERFACE UI
+```
+┌─────────────────────────────────────────┐
+│ [< Voltar] DETALHES DO TEMPLATE [Editar]│
+├─────────────────────────────────────────┤
+│ Nome: Contrato Padrão                    │
+│ Tipo: Documento                          │
+│ Descrição: Template para contratos...   │
+│ Status: ✅ Ativo                         │
+│ Criado por: Admin em 10/01/2025         │
+│ Atualizado em: 15/01/2025                │
+├─────────────────────────────────────────┤
+│ Conteúdo HTML: [Copiar] [Preview]       │
+│ <html>...</html>                         │
+├─────────────────────────────────────────┤
+│ Variáveis: {{nome}}, {{data}}, {{valor}} │
+├─────────────────────────────────────────┤
+│ [Histórico de Versões (5)]               │
+└─────────────────────────────────────────┘
+```
+
+## 11. RASTREABILIDADE
+**RF**: RF-063 §2.3 | **Testes**: CN-UC02-001 a CN-UC02-008 | **API**: GET /api/templates/{id}
+
+---
+
+# UC03 - Editar Template
+
+**RF**: RF-063 | **Ator**: Admin, Desenvolvedor | **Complexidade**: Alta | **Estimativa**: 12h
+
+## 1. OBJETIVO
+Permitir edição de templates existentes mantendo histórico de versões.
+
+## 2. PRÉ-CONDIÇÕES
+Autenticado com `templates:template:update`, template existe
+
+## 3. DEPENDÊNCIAS
+**Pré-req**: UC00-02 | **Ordem**: Backend UpdateCommand → Frontend edit form
+**Integra**: RF-003 (Audit versionamento), RF-063 (Permissões)
+
+## 4. FLUXO PRINCIPAL
+1. Clica "Editar" → 2. Carrega dados → 3. Edita campos → 4. Salvar → 5. Cria nova versão → 6. Auditoria → 7. Sucesso
+
+## 5. FLUXOS ALTERNATIVOS
+**FA01**: Editar sem alterar conteúdo HTML (só metadados)
+**FA02**: Reverter para versão anterior
+**FA03**: Comparar versões (diff visual)
+
+## 6. FLUXOS DE EXCEÇÃO
+**FE01**: Nome duplicado | **FE02**: HTML inválido | **FE03**: Template sendo usado (warning) | **FE04**: Sem permissão
+
+## 7. VALIDAÇÕES
+Mesmas do UC01: Nome 3-100, Tipo enum, Conteúdo obrigatório, Descrição 0-500
+
+## 8. REGRAS DE NEGÓCIO
+**RN01**: Versionamento automático (salva anterior)
+**RN02**: Não pode editar se em uso crítico
+**RN03**: Auditoria antes/depois
+
+## 9. NÃO-FUNCIONAIS
+Performance < 2s | Segurança XSS | Usabilidade diff visual
+
+## 10. UI
+```
+[< Voltar] EDITAR TEMPLATE [Salvar] [Ver Histórico]
+Nome: [________________] Tipo: [Documento▼]
+Descrição: [____________________________]
+Conteúdo: [editor com conteúdo atual...]
+[Comparar com Versão Anterior] [Reverter]
+```
+
+## 11. RASTREABILIDADE
+**RF**: RF-063 §2.4 | **Testes**: CN-UC03-001 a CN-UC03-010 | **API**: PUT /api/templates/{id}
+
+---
+
+# UC04 - Inativar Template
+
+**RF**: RF-063 | **Ator**: Admin, Desenvolvedor | **Complexidade**: Baixa | **Estimativa**: 6h
+
+## 1. OBJETIVO
+Inativar template (soft delete) sem perder histórico.
+
+## 2. PRÉ-CONDIÇÕES
+Autenticado com `templates:template:delete`, template ativo
+
+## 3. DEPENDÊNCIAS
+**Pré-req**: UC00-02 | **Ordem**: Backend DeleteCommand → Frontend confirm dialog
+**Integra**: RF-003 (Audit), verificar uso em RF-090/019
+
+## 4. FLUXO PRINCIPAL
+1. Clica "Inativar" → 2. Confirma ação → 3. Valida se não está em uso → 4. Ativo=false → 5. Auditoria → 6. Sucesso
+
+## 5. FLUXOS ALTERNATIVOS
+**FA01**: Template em uso (aviso mas permite)
+**FA02**: Reativar template inativo (botão "Ativar")
+
+## 6. FLUXOS DE EXCEÇÃO
+**FE01**: Template já inativo | **FE02**: Sem permissão | **FE03**: Erro ao salvar
+
+## 7. VALIDAÇÕES
+N/A (ação booleana)
+
+## 8. REGRAS DE NEGÓCIO
+**RN01**: Soft delete (Ativo=false, não DELETE)
+**RN02**: Template inativo não aparece em seletores
+**RN03**: Mantém histórico e auditoria
+
+## 9. NÃO-FUNCIONAIS
+Performance < 1s | Segurança validar permissão
+
+## 10. UI
+```
+Modal: "Deseja inativar o template 'Contrato Padrão'?"
+⚠️ Este template está sendo usado em 3 processos
+[ ] Entendo os impactos [Cancelar] [Inativar]
+```
+
+## 11. RASTREABILIDADE
+**RF**: RF-063 §2.5 | **Testes**: CN-UC04-001 a CN-UC04-006 | **API**: DELETE /api/templates/{id}
+
+---
+
+# UC06 - Versionar Template
+
+**RF**: RF-063 | **Ator**: Sistema (automático) | **Complexidade**: Média | **Estimativa**: 8h
+
+## 1. OBJETIVO
+Manter histórico automático de versões ao editar template (integrado ao UC03).
+
+## 2. PRÉ-CONDIÇÕES
+Template existente sendo editado (UC03)
+
+## 3. DEPENDÊNCIAS
+**Pré-req**: UC01-03 | **Ordem**: Tabela TemplateVersions → Trigger/Handler no UC03
+**Integra**: RF-003 (audit histórico)
+
+## 4. FLUXO PRINCIPAL
+1. UC03 é executado → 2. Antes de UPDATE, copia registro atual para TemplateVersions → 3. Incrementa número da versão → 4. Salva timestamp e usuário → 5. UPDATE no Template → 6. Auditoria da alteração
+
+## 5. FLUXOS ALTERNATIVOS
+**FA01**: Restaurar versão anterior (copia TemplateVersions → Template)
+**FA02**: Comparar versões (diff side-by-side)
+**FA03**: Excluir versão antiga (após X meses)
+
+## 6. FLUXOS DE EXCEÇÃO
+**FE01**: Falha ao salvar versão (rollback do UPDATE) | **FE02**: Storage cheio (limitar versões)
+
+## 7. VALIDAÇÕES
+N/A (automático)
+
+## 8. REGRAS DE NEGÓCIO
+**RN01**: Manter últimas 20 versões por template
+**RN02**: Versões antigas arquivadas após 1 ano
+**RN03**: Audit completo: quem alterou, quando, o que mudou
+
+## 9. NÃO-FUNCIONAIS
+Performance < 500ms para versionamento | Storage otimizado (compressão)
+
+## 10. UI
+```
+Histórico de Versões:
+v5 - 20/11/2025 10:30 - Admin - [Ver] [Restaurar]
+v4 - 15/11/2025 14:20 - João - [Ver] [Comparar]
+v3 - 10/11/2025 09:15 - Maria - [Ver]
+[Carregar mais...]
+```
+
+## 11. RASTREABILIDADE
+**RF**: RF-063 §2.7 | **Testes**: CN-UC06-001 a CN-UC06-008 | **API**: GET /api/templates/{id}/versions
+
+---
+
+# UC07 - Testar Template
+
+**RF**: RF-063 | **Ator**: Admin, Desenvolvedor | **Complexidade**: Média | **Estimativa**: 10h
+
+## 1. OBJETIVO
+Testar template com dados de exemplo antes de publicar.
+
+## 2. PRÉ-CONDIÇÕES
+Autenticado, template válido (pode estar inativo)
+
+## 3. DEPENDÊNCIAS
+**Pré-req**: UC01-05 | **Ordem**: Backend TestCommand → Template engine → Preview UI
+**Integra**: RF-063 UC05 (render)
+
+## 4. FLUXO PRINCIPAL
+1. Edita template → 2. Clica "Testar" → 3. Sistema carrega dados de exemplo → 4. Usuário pode editar dados de teste → 5. Clica "Gerar Preview" → 6. Sistema renderiza (UC05) → 7. Exibe resultado em modal → 8. Usuário valida visualmente
+
+## 5. FLUXOS ALTERNATIVOS
+**FA01**: Usar diferentes conjuntos de dados teste
+**FA02**: Testar em dispositivos (mobile/tablet/desktop preview)
+**FA03**: Salvar resultado teste como PDF
+
+## 6. FLUXOS DE EXCEÇÃO
+**FE01**: Erro de renderização (mostra erro detalhado) | **FE02**: Timeout (>30s) | **FE03**: Variável faltando
+
+## 7. VALIDAÇÕES
+JSON de teste válido, variáveis completas
+
+## 8. REGRAS DE NEGÓCIO
+**RN01**: Não salva resultado (apenas preview)
+**RN02**: Não cria auditoria (é teste)
+**RN03**: Dados de exemplo em arquivo JSON padrão
+
+## 9. NÃO-FUNCIONAIS
+Performance < 5s | Usabilidade: side-by-side (código | preview)
+
+## 10. UI
+```
+[Código]             |  [Preview]
+{{nome}} Silva       |  João Silva
+{{valor}}            |  R$ 1.500,00
+[Editar Dados Teste] |  [Download PDF]
+```
+
+## 11. RASTREABILIDADE
+**RF**: RF-063 §2.8 | **Testes**: CN-UC07-001 a CN-UC07-008 | **API**: POST /api/templates/{id}/test
+
+---
+
+# UC08 - Publicar Template
+
+**RF**: RF-063 | **Ator**: Admin, Desenvolvedor | **Complexidade**: Média | **Estimativa**: 8h
+
+## 1. OBJETIVO
+Marcar template como "publicado" e disponível para uso em produção.
+
+## 2. PRÉ-CONDIÇÕES
+Autenticado com `templates:template:publish`, template testado (UC07)
+
+## 3. DEPENDÊNCIAS
+**Pré-req**: UC01-07 | **Ordem**: Backend PublishCommand → Validações → Publicação
+**Integra**: RF-003 (audit publicação), RF-090/019 (disponibilizar)
+
+## 4. FLUXO PRINCIPAL
+1. Template em modo "Rascunho" → 2. Clica "Publicar" → 3. Sistema valida (completo, testado) → 4. Confirma ação → 5. Status="Publicado" → 6. Disponibiliza para uso → 7. Notifica usuários relevantes → 8. Auditoria
+
+## 5. FLUXOS ALTERNATIVOS
+**FA01**: Despublicar template (volta a rascunho)
+**FA02**: Agendar publicação futura
+**FA03**: Publicar nova versão (invalida anterior)
+
+## 6. FLUXOS DE EXCEÇÃO
+**FE01**: Template incompleto (faltam variáveis) | **FE02**: Não testado | **FE03**: Sem permissão
+
+## 7. VALIDAÇÕES
+Template completo, testado, sem erros
+
+## 8. REGRAS DE NEGÓCIO
+**RN01**: Apenas 1 versão publicada por vez
+**RN02**: Publicação requer aprovação (workflow opcional)
+**RN03**: Audit completa com timestamp publicação
+
+## 9. NÃO-FUNCIONAIS
+Performance < 1s | Notificações async
+
+## 10. UI
+```
+Modal: "Publicar template 'Contrato Padrão'?"
+✅ Template completo
+✅ Testado com sucesso
+⚠️ Versão anterior será despublicada
+[Cancelar] [Publicar]
+```
+
+## 11. RASTREABILIDADE
+**RF**: RF-063 §2.9 | **Testes**: CN-UC08-001 a CN-UC08-006 | **API**: POST /api/templates/{id}/publish
+
+---
+
+# UC09 - Clonar Template
+
+**RF**: RF-063 | **Ator**: Admin, Desenvolvedor | **Complexidade**: Baixa | **Estimativa**: 6h
+
+## 1. OBJETIVO
+Duplicar template existente como base para novo template.
+
+## 2. PRÉ-CONDIÇÕES
+Autenticado com `templates:template:create`, template fonte existe
+
+## 3. DEPENDÊNCIAS
+**Pré-req**: UC00-02 | **Ordem**: Backend CloneCommand → UC01 (criação)
+**Integra**: RF-003 (audit)
+
+## 4. FLUXO PRINCIPAL
+1. Visualiza template → 2. Clica "Clonar" → 3. Sistema duplica dados → 4. Abre editor com "(Cópia)" no nome → 5. Usuário ajusta → 6. Salva (UC01)
+
+## 5. FLUXOS ALTERNATIVOS
+**FA01**: Clonar para outra empresa (Super Admin)
+**FA02**: Clonar apenas estrutura (sem conteúdo)
+
+## 6. FLUXOS DE EXCEÇÃO
+**FE01**: Template fonte não existe | **FE02**: Sem permissão | **FE03**: Nome da cópia já existe
+
+## 7. VALIDAÇÕES
+Mesmas do UC01 após edição
+
+## 8. REGRAS DE NEGÓCIO
+**RN01**: Nome padrão: "{Nome Original} (Cópia)"
+**RN02**: Status = Inativo (rascunho)
+**RN03**: Versão = 1 (não copia histórico)
+**RN04**: Audit: OrigemTemplateId no log
+
+## 9. NÃO-FUNCIONAIS
+Performance < 2s | Usabilidade: deixar claro que é cópia
+
+## 10. UI
+```
+[Template: Contrato Padrão]
+[Ver] [Editar] [Clonar] [Inativar]
+        ↓
+[Novo Template]
+Nome: Contrato Padrão (Cópia)
+[editar normalmente...]
+```
+
+## 11. RASTREABILIDADE
+**RF**: RF-063 §2.10 | **Testes**: CN-UC09-001 a CN-UC09-005 | **API**: POST /api/templates/{id}/clone
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-12-17 | Sistema | Consolidação de 11 casos de uso |

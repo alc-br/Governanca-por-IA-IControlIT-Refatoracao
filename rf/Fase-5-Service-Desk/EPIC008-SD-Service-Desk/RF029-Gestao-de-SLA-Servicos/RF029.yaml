@@ -1,0 +1,416 @@
+# =============================================
+# RF029 - Gestão de SLA - Serviços
+# Versão: 2.0 (Governança v2.0)
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF029"
+  nome: "Gestão de SLA - Serviços"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 5 - Service Desk"
+  epic: "EPIC008-SD-Service-Desk"
+  status: "skeleton"  # draft | aprovado | em_desenvolvimento | concluido | skeleton
+
+descricao:
+  objetivo: "Gerenciar Service Level Agreements (SLAs) para serviços de TI do catálogo (RF021) e chamados/tickets (RF073, RF074)."
+  problema_resolvido: "Garantir cumprimento de metas de atendimento, priorização consistente por impacto/urgência, monitoramento em tempo real, alertas automáticos e escalação quando SLA viola."
+  publico_afetado: "Equipe de Service Desk, técnicos de suporte, gestores de TI, usuários finais (solicitantes de chamados)."
+
+escopo:
+  incluso:
+    - "Criação de SLA por serviço do catálogo"
+    - "Atualização de SLA existente"
+    - "Listagem de SLAs com filtros e paginação"
+    - "Exclusão lógica de SLA (soft delete)"
+    - "Definição de metas por prioridade (P1/P2/P3/P4)"
+    - "Matriz de priorização (Impacto × Urgência)"
+    - "Cálculo automático de consumo de SLA em tempo real"
+    - "Pausa automática fora de horário de atendimento"
+    - "Alertas em cascata (50%, 75%, 90%, 100%)"
+    - "Escalação automática quando SLA viola"
+    - "Dashboard de compliance em tempo real (SignalR)"
+    - "Integração com BrasilAPI para feriados nacionais"
+    - "Controle de acesso e isolamento por tenant"
+    - "Auditoria completa de operações"
+  fora:
+    - "Interface visual específica (definida em WF-RF029)"
+    - "Tecnologia, framework ou linguagem (definida em arquitetura)"
+    - "SLA de operações físicas (RF028)"
+    - "Layout, UX ou identidade visual"
+    - "Estratégia de deploy ou infraestrutura"
+
+entidades:
+  - nome: "SlaServico"
+    descricao: "Entidade principal que define metas de SLA para um serviço do catálogo"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "SlaCalculacao"
+    descricao: "Registro de cálculo de SLA para cada chamado/ticket"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "SlaAlert"
+    descricao: "Alertas disparados durante consumo de SLA (50%, 75%, 90%, 100%)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF029-001"
+    descricao: "Matriz de Priorização Impacto × Urgência: Prioridade determinada automaticamente pelo cruzamento"
+    tipo: "regra_negocio"
+    campos_afetados: ["Prioridade", "Impacto", "Urgencia"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "regra_calculada"
+      mensagem_erro: "Prioridade deve ser calculada automaticamente com base em Impacto e Urgência"
+      http_code: 400
+
+  - id: "RN-RF029-002"
+    descricao: "Metas P1 (Crítico): resposta 15min, resolução 4h"
+    tipo: "validacao"
+    campos_afetados: ["TempoResposta", "TempoResolucao"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+
+  - id: "RN-RF029-003"
+    descricao: "Metas P2 (Alto): resposta 1h, resolução 8h"
+    tipo: "validacao"
+    campos_afetados: ["TempoResposta", "TempoResolucao"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF029-004"
+    descricao: "Metas P3 (Médio): resposta 4h, resolução 24h"
+    tipo: "validacao"
+    campos_afetados: ["TempoResposta", "TempoResolucao"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF029-005"
+    descricao: "Metas P4 (Baixo): resposta 8h, resolução 72h"
+    tipo: "validacao"
+    campos_afetados: ["TempoResposta", "TempoResolucao"]
+    obrigatorio: true
+    criticidade: "MÉDIA"
+
+  - id: "RN-RF029-006"
+    descricao: "Pausa Automática Fora de Horário de Atendimento: SLA pausa fora do horário configurado (comercial/24x7/plantão)"
+    tipo: "regra_negocio"
+    campos_afetados: ["HorarioAtendimento", "IsPaused", "PausedAt"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF029-007"
+    descricao: "Alertas em Cascata: notificações automáticas em 50%, 75%, 90%, 100% de consumo com severidade crescente"
+    tipo: "regra_negocio"
+    campos_afetados: ["ConsumoPercentual"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF029-008"
+    descricao: "Escalação Automática Quando SLA Viola: quando SLA atinge 100%, escala para nível técnico superior"
+    tipo: "regra_negocio"
+    campos_afetados: ["ConsumoPercentual", "NivelTecnico"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+  - id: "RN-RF029-009"
+    descricao: "Cálculo de SLA Exclui Pausas e Feriados: tempo em pausa e feriados NÃO contam no consumo"
+    tipo: "regra_negocio"
+    campos_afetados: ["ConsumoPercentual", "TempoPausado"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+  - id: "RN-RF029-010"
+    descricao: "Isolamento Multi-Tenancy por ClienteId: toda entidade SLA deve ter ClienteId"
+    tipo: "seguranca"
+    campos_afetados: ["ClienteId"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+  - id: "RN-RF029-011"
+    descricao: "Soft Delete com IsDeleted: exclusão lógica preserva auditoria"
+    tipo: "seguranca"
+    campos_afetados: ["IsDeleted", "DeletedAt", "DeletedBy"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF029-012"
+    descricao: "Integração BrasilAPI para Feriados: cachear feriados nacionais para cálculo correto de SLA"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF029-013"
+    descricao: "Campos Obrigatórios: ServicoId, Prioridade, TempoResposta, TempoResolucao, HorarioAtendimento, ClienteId"
+    tipo: "validacao"
+    campos_afetados: ["ServicoId", "Prioridade", "TempoResposta", "TempoResolucao", "HorarioAtendimento", "ClienteId"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+  - id: "RN-RF029-014"
+    descricao: "Unicidade de SLA: um serviço pode ter no máximo um SLA por combinação de prioridade e cliente"
+    tipo: "unicidade"
+    campos_afetados: ["ServicoId", "Prioridade", "ClienteId"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+
+estados:
+  - id: "ativo"
+    descricao: "SLA ativo e sendo aplicado a novos chamados"
+  - id: "inativo"
+    descricao: "SLA temporariamente desativado (não aplicado a novos chamados)"
+  - id: "excluido"
+    descricao: "SLA excluído logicamente (IsDeleted = true)"
+
+transicoes:
+  permitidas:
+    - de: "ativo"
+      para: "inativo"
+    - de: "inativo"
+      para: "ativo"
+    - de: "ativo"
+      para: "excluido"
+    - de: "inativo"
+      para: "excluido"
+  proibidas:
+    - de: "excluido"
+      para: "ativo"
+      justificativa: "Apenas restauração via admin permite volta"
+
+permissoes:
+  - codigo: "sla.servicos.view_any"
+    descricao: "Listar SLAs"
+  - codigo: "sla.servicos.view"
+    descricao: "Visualizar SLA específico"
+  - codigo: "sla.servicos.create"
+    descricao: "Criar novo SLA"
+  - codigo: "sla.servicos.update"
+    descricao: "Atualizar SLA existente"
+  - codigo: "sla.servicos.delete"
+    descricao: "Excluir SLA (soft delete)"
+  - codigo: "sla.servicos.pausar"
+    descricao: "Pausar/retomar SLA manualmente"
+  - codigo: "sla.servicos.escalar"
+    descricao: "Escalar chamado manualmente"
+  - codigo: "sla.servicos.dashboard"
+    descricao: "Acessar dashboard de compliance"
+  - codigo: "sla.servicos.export"
+    descricao: "Exportar relatórios de SLA"
+
+integracoes:
+  internas:
+    - "Autenticacao JWT"
+    - "Multi-Tenancy (ClienteId)"
+    - "Auditoria (Created, Modified)"
+    - "RBAC (Permissões)"
+    - "SignalR (Notificações em tempo real)"
+    - "Hangfire/Quartz (Jobs assíncronos)"
+    - "RF021 (Catálogo de Serviços)"
+    - "RF073 (Gestão de Chamados)"
+    - "RF074 (Gestão de Tickets)"
+    - "RF028 (SLA Operações - lógica compartilhada)"
+  externas:
+    - sistema: "BrasilAPI"
+      tipo: "REST API"
+      obrigatoria: true
+      descricao: "Obter feriados nacionais/estaduais/municipais"
+      endpoint: "https://brasilapi.com.br/api/feriados/v1/{ano}"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  protecoes:
+    - "SQL Injection (EF Core parametrizado)"
+    - "XSS (Angular sanitização automática)"
+    - "CSRF (token obrigatório POST/PUT/DELETE)"
+    - "Rate Limiting (100 req/min por usuário)"
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-listar-slas"
+    - "UC01-criar-sla"
+    - "UC02-visualizar-sla"
+    - "UC03-editar-sla"
+    - "UC04-excluir-sla"
+    - "UC05-calcular-consumo-sla"
+    - "UC06-pausar-retomar-sla"
+    - "UC07-dashboard-compliance"
+  dependencias_rfs:
+    - rf: "RF021"
+      descricao: "Catálogo de Serviços (fonte de serviços para SLA)"
+    - rf: "RF073"
+      descricao: "Gestão de Chamados (chamados têm SLA aplicado)"
+    - rf: "RF074"
+      descricao: "Gestão de Tickets (tickets têm SLA aplicado)"
+    - rf: "RF028"
+      descricao: "Gestão de SLA Operações (compartilha lógica de cálculo)"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar SLA para serviço"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar SLAs com filtros"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar SLA por ID"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar SLA existente"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Excluir SLA (soft delete)"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar campos obrigatórios na criação"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar unicidade (Serviço + Prioridade + ClienteId)"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar metas por prioridade (P1/P2/P3/P4)"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant (ClienteId)"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC em todos endpoints"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria completa de operações"
+      required: true
+
+  funcionalidades_especiais:
+    - id: "RF-SPEC-01"
+      title: "Matriz de priorização (Impacto × Urgência)"
+      required: true
+    - id: "RF-SPEC-02"
+      title: "Cálculo automático de consumo de SLA (job assíncrono)"
+      required: true
+    - id: "RF-SPEC-03"
+      title: "Pausa automática fora de horário"
+      required: true
+    - id: "RF-SPEC-04"
+      title: "Alertas em cascata (50%, 75%, 90%, 100%)"
+      required: true
+    - id: "RF-SPEC-05"
+      title: "Escalação automática quando SLA viola"
+      required: true
+    - id: "RF-SPEC-06"
+      title: "Dashboard de compliance em tempo real (SignalR)"
+      required: true
+    - id: "RF-SPEC-07"
+      title: "Integração BrasilAPI para feriados"
+      required: true
+
+exclusions:
+  rf_items: []
+
+kpis:
+  - nome: "Taxa de Cumprimento P1"
+    descricao: "Percentual de chamados P1 que cumpriram SLA"
+    meta: ">= 99%"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Cumprimento P2"
+    descricao: "Percentual de chamados P2 que cumpriram SLA"
+    meta: ">= 98%"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Cumprimento P3"
+    descricao: "Percentual de chamados P3 que cumpriram SLA"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Cumprimento P4"
+    descricao: "Percentual de chamados P4 que cumpriram SLA"
+    meta: ">= 90%"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Resposta P1"
+    descricao: "Tempo médio de primeira resposta em chamados P1"
+    meta: "<= 15 minutos"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Resolução P1"
+    descricao: "Tempo médio de resolução completa em chamados P1"
+    meta: "<= 4 horas"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Escalação"
+    descricao: "Percentual de chamados que foram escalados"
+    meta: "<= 15%"
+    log_obrigatorio: true
+
+  - nome: "MTTR (Mean Time To Resolve)"
+    descricao: "Tempo médio total de resolução por prioridade"
+    meta: "Trend descendente"
+    log_obrigatorio: true
+
+alertas:
+  - evento: "SLA 50% Consumido"
+    threshold: ">= 50%"
+    severidade: "INFORMATIVO"
+    canal_notificacao:
+      - "signalr"
+
+  - evento: "SLA 75% Consumido"
+    threshold: ">= 75%"
+    severidade: "ATENÇÃO"
+    canal_notificacao:
+      - "signalr"
+      - "email"
+
+  - evento: "SLA 90% Consumido"
+    threshold: ">= 90%"
+    severidade: "URGENTE"
+    canal_notificacao:
+      - "signalr"
+      - "email"
+      - "sms"
+
+  - evento: "SLA 100% Violado"
+    threshold: ">= 100%"
+    severidade: "CRÍTICO"
+    canal_notificacao:
+      - "signalr"
+      - "email"
+      - "sms"
+      - "escalacao_automatica"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0 (separação RF/RL completa, 14 RNs em linguagem natural)"
+
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Claude Code"
+    descricao: "Versão inicial com referências ao legado misturadas"

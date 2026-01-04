@@ -1,0 +1,496 @@
+# Template de Referência ao Legado (RL-RF015.yaml)
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF015
+titulo: "Gestão de Locais e Endereços"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "IControlIT Legado v1.x"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2016+"
+  multi_tenant: true
+  auditoria: "partial"  # Campos Dt_Atualizacao, sem histórico imutável
+
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+referencias:
+  - id: "LEG-RF015-001"
+    tipo: "tela"
+    nome: "Endereco.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastros/Endereco.aspx"
+    descricao: |
+      Tela ASPX de CRUD de endereços com validação manual de CEP.
+      Problemas:
+      - Validação de CEP apenas via regex, sem consulta a ViaCEP
+      - Campos lat/lon inseridos manualmente, sem geocodificação automática
+      - Permite marcar múltiplos endereços como principal (bug)
+      - Postback completo ao alterar dropdowns
+      - Botão "Excluir" executa DELETE direto (sem soft delete)
+    destino: "substituido"
+    justificativa: |
+      Substituído por Angular SPA com validação automática via ViaCEP API,
+      geocodificação assíncrona via Google Maps API, e soft delete.
+    rf_item_relacionado: "RN-RF015-01, RN-RF015-02, RN-RF015-07"
+    uc_relacionado: "UC01, UC03"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF015-002"
+    tipo: "tela"
+    nome: "Local.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastros/Local.aspx"
+    descricao: |
+      Tela de gestão de hierarquia de locais (Edifício → Andar → Sala).
+      Problemas:
+      - Hierarquia não validada: permite criar Sala sem Andar (órfãos)
+      - Loop permitido: Local pode ser pai de si mesmo (bug crítico)
+      - Sem cascata: excluir Edifício não desativa Andares/Salas
+      - Performance ruim: query recursiva manual sem CTE
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação obrigatória de hierarquia com FKs, soft delete em cascata, e CTE recursiva otimizada.
+    rf_item_relacionado: "RN-RF015-03"
+    uc_relacionado: "UC02"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF015-003"
+    tipo: "tela"
+    nome: "Rack.aspx"
+    caminho: "ic1_legado/IControlIT/Infraestrutura/Rack.aspx"
+    descricao: |
+      Tela de cadastro de racks e controle de posições (Us).
+      Problemas:
+      - Sobreposição permitida: instalar em U10-U12 mesmo com U11-U13 ocupado
+      - Capacidade não validada: permite exceder peso/potência máxima
+      - Sala não validada: permite criar rack em sala tipo "Escritório"
+      - Sem alertas de saturação (>= 80%)
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação de sobreposição, capacidade, tipo de sala e alertas automáticos.
+    rf_item_relacionado: "RN-RF015-04, RN-RF015-05, RN-RF015-06"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF015-004"
+    tipo: "tela"
+    nome: "RackVisual.aspx"
+    caminho: "ic1_legado/IControlIT/Infraestrutura/RackVisual.aspx"
+    descricao: |
+      Visualização estática de rack com Us ocupadas (tabela HTML).
+      Problemas:
+      - Sem interatividade, sem zoom/detalhes
+      - Não mostra qual equipamento está em cada U
+      - Carrega todos os 48Us mesmo se rack tiver 12Us
+    destino: "substituido"
+    justificativa: |
+      Substituído por componente Angular interativo com drag-and-drop, tooltip com detalhes e zoom.
+    rf_item_relacionado: null
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF015-005"
+    tipo: "tela"
+    nome: "MapaLocais.aspx"
+    caminho: "ic1_legado/IControlIT/Relatorios/MapaLocais.aspx"
+    descricao: |
+      Visualização de locais em mapa (Google Maps).
+      Problemas:
+      - API Key hardcoded em JavaScript (risco de segurança)
+      - Sem agrupamento (lento com 1000+ locais)
+      - Sem filtros por tipo ou região
+      - Marcadores com lat/lon = 0 aparecem no oceano
+    destino: "descartado"
+    justificativa: |
+      Feature opcional via feature flag LOCAIS_MAPA_INTERATIVO, fora do escopo v2.0.
+      Será implementado futuramente com Mapbox e clustering.
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF015-006"
+    tipo: "webservice"
+    nome: "WSLocal.asmx - CadastrarEndereco"
+    caminho: "ic1_legado/IControlIT/Services/WSLocal.asmx.vb"
+    descricao: |
+      WebService SOAP para criar endereço.
+      Problemas:
+      - Validação manual de CEP (sem ViaCEP)
+      - Permite alterar endereço principal sem desmarcar anterior (bug)
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint RESTful POST /api/locais/enderecos com validação ViaCEP e regra de principal único.
+    rf_item_relacionado: "RN-RF015-01, RN-RF015-02"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF015-007"
+    tipo: "webservice"
+    nome: "WSLocal.asmx - ListarEnderecos"
+    caminho: "ic1_legado/IControlIT/Services/WSLocal.asmx.vb"
+    descricao: |
+      WebService SOAP para listar endereços do conglomerado.
+      Problemas:
+      - Query sem paginação (retorna até 10.000 registros)
+      - Sem filtros ou ordenação configurável
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint RESTful GET /api/locais/enderecos com paginação, filtros e ordenação.
+    rf_item_relacionado: null
+    uc_relacionado: "UC00"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF015-008"
+    tipo: "webservice"
+    nome: "WSLocal.asmx - ListarLocalHierarquia"
+    caminho: "ic1_legado/IControlIT/Services/WSLocal.asmx.vb"
+    descricao: |
+      WebService SOAP para obter árvore de locais.
+      Problemas:
+      - Query recursiva manual lenta (O(n²))
+      - Sem paginação ou limite de profundidade
+      - Pode causar loop infinito se houver ciclo
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint RESTful GET /api/locais/hierarquia/{id} com CTE recursiva otimizada e limite de profundidade.
+    rf_item_relacionado: "RN-RF015-03"
+    uc_relacionado: "UC02"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF015-009"
+    tipo: "stored_procedure"
+    nome: "pa_Endereco_ListarPorConglomerado"
+    caminho: "Database/dbo.pa_Endereco_ListarPorConglomerado"
+    descricao: |
+      Stored procedure para listar endereços do conglomerado.
+      Problemas:
+      - Sem paginação
+      - Sem filtros dinâmicos
+    destino: "substituido"
+    justificativa: |
+      Substituído por LINQ query no backend: context.Enderecos.Where(e => e.Id_Conglomerado == id && !e.Fl_Excluido)
+    rf_item_relacionado: null
+    uc_relacionado: "UC00"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF015-010"
+    tipo: "stored_procedure"
+    nome: "pa_Local_ObterHierarquia"
+    caminho: "Database/dbo.pa_Local_ObterHierarquia"
+    descricao: |
+      Stored procedure recursiva manual para obter árvore de locais.
+      Problemas:
+      - Loop manual lento (O(n²))
+      - Sem limite de profundidade (pode travar)
+    destino: "substituido"
+    justificativa: |
+      Substituído por CTE recursiva otimizada com limite de profundidade 10.
+    rf_item_relacionado: "RN-RF015-03"
+    uc_relacionado: "UC02"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF015-011"
+    tipo: "regra_negocio"
+    nome: "Validação de CEP Manual"
+    caminho: "ic1_legado/IControlIT/Cadastros/Endereco.aspx.vb:245"
+    descricao: |
+      Validação de CEP através de regex ^\d{5}-\d{3}$ em code-behind VB.NET, sem consulta a API externa.
+      CEP no formato correto mas inexistente (ex: 99999-999) era aceito.
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação via ViaCEP API para garantir que CEP existe.
+    rf_item_relacionado: "RN-RF015-01"
+    uc_relacionado: "UC01, UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF015-012"
+    tipo: "regra_negocio"
+    nome: "Endereço Principal Duplicado (Bug)"
+    caminho: "ic1_legado/IControlIT/Services/WSLocal.asmx.vb:123"
+    descricao: |
+      Ao marcar novo endereço como principal, sistema NÃO desmarcava o anterior automaticamente.
+      Era possível ter 2+ endereços principais simultaneamente.
+    destino: "assumido"
+    justificativa: |
+      Bug crítico corrigido no sistema moderno com regra de unicidade automática.
+    rf_item_relacionado: "RN-RF015-02"
+    uc_relacionado: "UC01, UC03"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF015-013"
+    tipo: "regra_negocio"
+    nome: "Hierarquia de Locais Não Validada"
+    caminho: "ic1_legado/IControlIT/Cadastros/Local.aspx.vb:189"
+    descricao: |
+      Permitia criar Sala sem Andar, Andar sem Edifício, gerando registros órfãos.
+      Dropdown ddlLocalPai permitia selecionar qualquer local sem validação de tipo.
+    destino: "assumido"
+    justificativa: |
+      Bug crítico corrigido com validação de hierarquia obrigatória e FKs.
+    rf_item_relacionado: "RN-RF015-03"
+    uc_relacionado: "UC02"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF015-014"
+    tipo: "regra_negocio"
+    nome: "Sobreposição de Equipamentos Não Detectada"
+    caminho: "ic1_legado/IControlIT/Infraestrutura/Rack.aspx.vb:405"
+    descricao: |
+      Sistema permitia instalar equipamento em U10-U12 mesmo se já existisse equipamento em U11-U13 (sobreposição).
+    destino: "assumido"
+    justificativa: |
+      Bug crítico corrigido com validação de sobreposição implementada.
+    rf_item_relacionado: "RN-RF015-05"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF015-015"
+    tipo: "regra_negocio"
+    nome: "Histórico de Movimentações Editável"
+    caminho: "Database/dbo.Local_Historico_Movimentacao"
+    descricao: |
+      Tabela de histórico permitia UPDATE e DELETE, violando princípio de auditoria imutável.
+      Registros podiam ser alterados ou apagados.
+    destino: "substituido"
+    justificativa: |
+      Substituído por tabela append-only com trigger de proteção contra UPDATE/DELETE.
+    rf_item_relacionado: "RN-RF015-08"
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "Endereco"
+    finalidade: "Armazenar endereços completos"
+    problemas:
+      - "Campo Nm_Tipo genérico (Empresa, Filial, Fornecedor), sem FK específica"
+      - "Falta constraint CHECK para validar Sg_Estado"
+      - "Falta constraint UNIQUE para garantir 1 principal por conglomerado"
+      - "Falta índice em (Id_Conglomerado, Fl_Excluido, Fl_Principal)"
+    destino: "assumido"
+    justificativa: "Estrutura mantida com correções: constraints CHECK/UNIQUE adicionadas, índices otimizados"
+
+  - nome: "Local"
+    finalidade: "Hierarquia de locais"
+    problemas:
+      - "FK Id_Local_Pai permite NULL (cria órfãos)"
+      - "Falta constraint CHECK para validar Nm_Tipo em enum"
+      - "Falta validação de loops (Local não pode ser pai de si mesmo)"
+      - "Sem ON DELETE CASCADE (excluir pai não propaga)"
+    destino: "assumido"
+    justificativa: "Estrutura mantida com correções: FK obrigatória, CHECK constraint, validação de loops, CASCADE adicionado"
+
+  - nome: "Rack"
+    finalidade: "Racks de TI"
+    problemas:
+      - "Falta constraint CHECK para validar Nr_Altura_Us entre 1-48"
+      - "Falta trigger para validar peso/potência atual <= máximo"
+    destino: "assumido"
+    justificativa: "Estrutura mantida com correções: CHECK constraints e triggers adicionados"
+
+  - nome: "RackPosicao"
+    finalidade: "Posições em racks"
+    problemas:
+      - "Bug crítico: Falta constraint UNIQUE em (Id_Rack, Nr_Posicao_U), permite duplicação"
+      - "Permite Fl_Ocupada = 0 com Id_Ativo IS NOT NULL (inconsistência)"
+    destino: "assumido"
+    justificativa: "Estrutura mantida com correções: UNIQUE constraint adicionada, validação de consistência"
+
+  - nome: "Local_Historico_Movimentacao"
+    finalidade: "Histórico de movimentações"
+    problemas:
+      - "Violação de auditoria: Permite UPDATE e DELETE (deveria ser append-only)"
+      - "Falta trigger para bloquear UPDATE/DELETE após INSERT"
+    destino: "assumido"
+    justificativa: "Estrutura mantida com correções: trigger de proteção adicionado"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Validação de CEP via ViaCEP API"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Feature completamente nova, não existia no legado"
+
+  - item: "Geocodificação automática via Google Maps"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Feature completamente nova, coordenadas eram inseridas manualmente"
+
+  - item: "Hierarquia de locais validada"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado permitia órfãos e loops, moderno tem validação rígida"
+
+  - item: "Endereço principal único"
+    existe_legado: false  # Bug: permitia múltiplos
+    existe_moderno: true
+    notas: "Legado tinha bug, moderno tem validação de unicidade"
+
+  - item: "Validação de sobreposição de racks"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado permitia sobreposição, moderno valida"
+
+  - item: "Histórico imutável de movimentações"
+    existe_legado: false  # Permitia UPDATE/DELETE
+    existe_moderno: true
+    notas: "Legado permitia edição, moderno é append-only"
+
+  - item: "Circuit breaker para APIs externas"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Feature completamente nova, resiliência aprimorada"
+
+  - item: "Soft delete"
+    existe_legado: false  # Hard delete direto
+    existe_moderno: true
+    notas: "Legado usava DELETE, moderno usa Fl_Excluido"
+
+  - item: "Multi-tenancy (Id_Conglomerado)"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Funcionalidade mantida do legado"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Migrar de validação manual para ViaCEP API"
+    motivo: |
+      Validação manual via regex não garante que CEP existe. ViaCEP fornece validação real e autocomplete.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Implementar geocodificação automática"
+    motivo: |
+      Coordenadas manuais têm alta taxa de erro. Geocodificação via Google Maps garante precisão.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Corrigir hierarquia de locais com FKs obrigatórias"
+    motivo: |
+      Hierarquia fraca permitia órfãos e loops, causando bugs críticos.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Tornar histórico de movimentações imutável"
+    motivo: |
+      Auditoria exige append-only, sem UPDATE/DELETE.
+    impacto: "baixo"
+    data: "2025-12-30"
+
+  - decisao: "Implementar circuit breaker"
+    motivo: |
+      Chamadas sem timeout podem travar sistema se API externa estiver indisponível.
+    impacto: "medio"
+    data: "2025-12-30"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Dados legados com hierarquia órfã"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      Script de validação pré-migration, criação de "Local Raiz Padrão" para corrigir órfãos.
+
+  - risco: "CEPs inválidos no banco legado"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Script de validação via ViaCEP em lote, correção manual de CEPs inválidos.
+
+  - risco: "Coordenadas lat/lon erradas"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      Re-geocodificar todos os endereços via Google Maps API após migration.
+
+  - risco: "Posições de rack duplicadas"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      Script de limpeza de duplicatas, manter apenas o registro mais recente.
+
+  - risco: "Endereço principal duplicado"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Script de correção pré-migration, manter apenas o mais recente marcado como principal.
+
+  - risco: "Dependência de APIs externas"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      Circuit breaker, cache local, feature flags para desabilitar se necessário.
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "Endereco.aspx"
+    referencia_rf: "RN-RF015-01, RN-RF015-02"
+    referencia_uc: "UC01, UC03"
+    status: "migrado"
+
+  - elemento_legado: "Local.aspx"
+    referencia_rf: "RN-RF015-03"
+    referencia_uc: "UC02"
+    status: "migrado"
+
+  - elemento_legado: "Rack.aspx"
+    referencia_rf: "RN-RF015-04, RN-RF015-05, RN-RF015-06"
+    referencia_uc: "UC01"
+    status: "migrado"
+
+  - elemento_legado: "MapaLocais.aspx"
+    referencia_rf: null
+    referencia_uc: null
+    status: "descartado"  # Feature opcional v2.0
+
+  - elemento_legado: "WSLocal.asmx"
+    referencia_rf: "Endpoints RESTful /api/locais/*"
+    referencia_uc: "UC00, UC01, UC02, UC03"
+    status: "migrado"
+
+  - elemento_legado: "pa_Endereco_ListarPorConglomerado"
+    referencia_rf: "LINQ query"
+    referencia_uc: "UC00"
+    status: "migrado"
+
+  - elemento_legado: "pa_Local_ObterHierarquia"
+    referencia_rf: "CTE recursiva"
+    referencia_uc: "UC02"
+    status: "migrado"
+
+# Changelog
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Documentação inicial de referência ao legado para RF-015"
+    autor: "Agência ALC - alc.dev.br"

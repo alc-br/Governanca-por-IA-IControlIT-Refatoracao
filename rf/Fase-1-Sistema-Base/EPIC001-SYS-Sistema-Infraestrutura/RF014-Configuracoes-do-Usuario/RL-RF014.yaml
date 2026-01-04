@@ -1,0 +1,506 @@
+# Template de Referência ao Legado (RL-RF014.yaml)
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF014
+titulo: "Configurações do Usuário"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "Sistema IControlIT Legado (pré-migração)"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server (múltiplos bancos por cliente)"
+  multi_tenant: false
+  auditoria: "partial" # Apenas em alguns cadastros críticos
+
+# =============================================
+# SEÇÃO CRÍTICA: Referências ao Legado
+# Cada item DEVE ter campo "destino" preenchido
+# =============================================
+
+referencias:
+  - id: "LEG-RF014-001"
+    tipo: "tela"
+    nome: "Usuario_Cad.aspx - Cadastro de Usuários (Admin)"
+    caminho: "ic1_legado/IControlIT/Admin/Usuario_Cad.aspx"
+    descricao: |
+      Tela de gerenciamento de usuários acessível apenas por administradores.
+      Permitia criar, editar e excluir usuários, incluindo alteração de senha.
+      Usuário final NÃO tinha acesso a esta tela para alterar sua própria senha.
+
+      Limitações:
+      - Sem validação de senha forte (aceitava senhas com 3+ caracteres)
+      - Hash MD5 (inseguro)
+      - Sem blacklist de senhas comuns
+      - Sem auditoria de alterações de senha
+    destino: "substituido"
+    justificativa: |
+      Funcionalidade substituída por self-service completo no RF-014.
+      Usuário agora pode alterar sua própria senha com validações robustas
+      (senha forte, blacklist, não conter dados pessoais, hash BCrypt).
+      Auditoria automática de todas as alterações.
+    rf_item_relacionado: "RN-RF014-03,RN-RF014-04,RN-RF014-05,RN-RF014-06,RN-RF014-07"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF014-002"
+    tipo: "regra_negocio"
+    nome: "Senha Mínima Fraca (3 caracteres)"
+    caminho: "ic1_legado/IControlIT/Admin/Usuario_Cad.aspx.vb"
+    descricao: |
+      Sistema legado validava apenas se senha tinha mais de 2 caracteres.
+      Não verificava complexidade (maiúsculas, minúsculas, números, especiais).
+      Senhas como "123", "abc", "senha" eram aceitas.
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF014-04: senha forte com mínimo 8 caracteres,
+      obrigatoriedade de maiúscula, minúscula, número e caractere especial.
+      Conforme OWASP Top 10 e melhores práticas de segurança.
+    rf_item_relacionado: "RN-RF014-04"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF014-003"
+    tipo: "regra_negocio"
+    nome: "Hash MD5 de Senha (Inseguro)"
+    caminho: "ic1_legado/IControlIT/Common/Security.vb"
+    descricao: |
+      Sistema armazenava senha com hash MD5 usando System.Security.Cryptography.MD5.
+      MD5 é considerado inseguro desde 2004 (vulnerável a colisões e ataques de força bruta).
+      Não utilizava salt aleatório por usuário.
+    destino: "substituido"
+    justificativa: |
+      Substituído por BCrypt com salt aleatório.
+      BCrypt é algoritmo moderno de hash de senha (resistente a GPU cracking).
+      Não é possível migrar hashes MD5 → BCrypt sem senha em texto plano.
+      Usuários migrados precisarão redefinir senha (email automático de reset).
+    rf_item_relacionado: "RN-RF014-04"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF014-004"
+    tipo: "regra_negocio"
+    nome: "Ausência de Self-Service"
+    caminho: "ic1_legado/IControlIT/Admin/Usuario_Cad.aspx"
+    descricao: |
+      Usuário final não podia alterar sua própria senha ou dados pessoais.
+      Dependia de administrador para qualquer alteração.
+      Causava sobrecarga no suporte e atraso nas operações.
+    destino: "substituido"
+    justificativa: |
+      RF-014 implementa self-service completo.
+      Usuário pode alterar senha, telefone, data nascimento e preferências
+      sem necessidade de administrador.
+      Apenas campos críticos (nome, email, CPF) requerem validação administrativa.
+    rf_item_relacionado: "RN-RF014-01,RN-RF014-02,RN-RF014-03"
+    uc_relacionado: "UC02,UC03,UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF014-005"
+    tipo: "regra_negocio"
+    nome: "Sem Auditoria de Alteração de Senha"
+    caminho: "ic1_legado/IControlIT/Admin/Usuario_Cad.aspx.vb"
+    descricao: |
+      Alterações de senha não eram auditadas.
+      Não registrava quem alterou, quando, de onde (IP).
+      Impossível rastrear incidentes de segurança.
+    destino: "substituido"
+    justificativa: |
+      RF-014 audita todas alterações de senha através do evento usuario.senha_alterada.
+      Registra UserId, IP, Timestamp em tabela de auditoria.
+      Compliance com LGPD e ISO 27001.
+    rf_item_relacionado: "Evento usuario.senha_alterada"
+    uc_relacionado: "UC03"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF014-006"
+    tipo: "funcionalidade"
+    nome: "Sistema Monolinguagem (apenas pt-BR)"
+    caminho: "ic1_legado/IControlIT/ (todo o sistema)"
+    descricao: |
+      Sistema legado era monolinguagem (apenas Português do Brasil).
+      Não havia arquivos de recursos (.resx) para outros idiomas.
+      Labels e mensagens eram hardcoded em português.
+      Usuários internacionais tinham dificuldade de uso.
+    destino: "substituido"
+    justificativa: |
+      RF-014 implementa i18n completo com Transloco.
+      Suporta pt-BR (padrão), en-US, es-ES.
+      Usuário pode selecionar idioma nas preferências (RN-RF014-10).
+      Idioma persiste entre sessões.
+    rf_item_relacionado: "RN-RF014-09,RN-RF014-10,RN-RF014-14"
+    uc_relacionado: "UC04"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF014-007"
+    tipo: "funcionalidade"
+    nome: "Ausência de Tema Visual Personalizável"
+    caminho: "ic1_legado/IControlIT/ (todo o sistema)"
+    descricao: |
+      Interface visual era fixa (sem opção de tema claro/escuro).
+      Layout não permitia personalização.
+      CSS era estático e único para todos os usuários.
+    destino: "substituido"
+    justificativa: |
+      RF-014 implementa seleção de tema (light, dark, auto).
+      Tema 'auto' detecta preferência do sistema operacional.
+      Melhora acessibilidade e preferência visual do usuário.
+    rf_item_relacionado: "RN-RF014-11"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF014-008"
+    tipo: "funcionalidade"
+    nome: "Timezone Fixo do Servidor (America/Sao_Paulo)"
+    caminho: "ic1_legado/IControlIT/ (todo o sistema)"
+    descricao: |
+      Sistema usava timezone do servidor (fixo: America/Sao_Paulo).
+      Não havia conversão de timezone por usuário.
+      Usuários em outros países viam horários incorretos.
+      Datas/horas sempre exibidas em GMT-3.
+    destino: "substituido"
+    justificativa: |
+      RF-014 permite seleção de timezone IANA por usuário.
+      Suporta timezones de América, Europa, Ásia.
+      Todas as datas/horas são convertidas para o timezone selecionado.
+    rf_item_relacionado: "RN-RF014-12"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF014-009"
+    tipo: "funcionalidade"
+    nome: "Interface Não Responsiva (Desktop Apenas)"
+    caminho: "ic1_legado/IControlIT/ (todo o sistema)"
+    descricao: |
+      Interface não era responsiva (desktop apenas).
+      Não funcionava adequadamente em tablets ou smartphones.
+      Menu lateral fixo sem adaptação para telas pequenas.
+    destino: "substituido"
+    justificativa: |
+      RF-014 implementa interface responsiva com Material Design.
+      Em telas < 1024px, menu lateral vira drawer overlay (RN-RF014-13).
+      Funciona perfeitamente em dispositivos móveis.
+    rf_item_relacionado: "RN-RF014-13"
+    uc_relacionado: "UC01,UC02,UC03,UC04"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# =============================================
+# Telas Legadas (estrutura detalhada)
+# =============================================
+
+telas:
+  - id: "LEG-RF014-001"
+    nome: "Usuario_Cad.aspx"
+    caminho: "ic1_legado/IControlIT/Admin/Usuario_Cad.aspx"
+    responsabilidade: "Gerenciamento de usuários (criação, edição, exclusão, alteração de senha)"
+    acesso: "Apenas administradores"
+    campos:
+      - nome: "txtNome"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Mínimo 3 caracteres"
+      - nome: "txtEmail"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Formato de email válido"
+      - nome: "txtSenha"
+        tipo: "TextBox (password)"
+        obrigatorio: true
+        validacao: "Mínimo 3 caracteres (fraco!)"
+      - nome: "ddlPerfil"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "Perfil existente no sistema"
+    comportamentos_implicitos:
+      - "Senha armazenada com hash MD5 (inseguro)"
+      - "Sem validação de senha forte"
+      - "Sem blacklist de senhas comuns"
+      - "Sem auditoria de alterações"
+      - "Usuário final não podia acessar esta tela"
+
+# =============================================
+# WebServices Legados
+# =============================================
+
+servicos:
+  - id: "LEG-RF014-WS-001"
+    nome: "Nenhum WebService específico"
+    localizacao: "N/A"
+    responsabilidade: "Sistema legado usava PostBack tradicional do ASP.NET Web Forms"
+    notas: "Não havia arquitetura de APIs REST no legado"
+
+# =============================================
+# Tabelas Legadas
+# =============================================
+
+tabelas:
+  - nome: "Usuario"
+    finalidade: "Armazenar dados de usuários do sistema"
+    problemas:
+      - "Chave primária INT (não GUID)"
+      - "Hash de senha MD5 (inseguro)"
+      - "Sem campos de auditoria (Created, CreatedBy, LastModified, LastModifiedBy)"
+      - "Sem campos de preferências (Idioma, Timezone, Tema)"
+      - "Sem controle de expiração de senha (DataExpiracaoSenha)"
+      - "Sem rastreamento de último acesso (DataUltimoAcesso)"
+
+# =============================================
+# Regras de Negócio Implícitas (não documentadas)
+# =============================================
+
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      Sistema aceitava senhas com mínimo de 3 caracteres.
+      Não validava complexidade (maiúsculas, números, especiais).
+    fonte: "Usuario_Cad.aspx.vb - Método ValidarSenha()"
+    destino: "substituido"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Sistema armazenava senha com hash MD5 (algoritmo inseguro).
+      Vulnerável a ataques de força bruta e rainbow tables.
+    fonte: "Common/Security.vb - Método HashPassword()"
+    destino: "substituido"
+
+  - id: "RL-RN-003"
+    descricao: |
+      Usuário final não podia alterar sua própria senha ou dados.
+      Dependia de administrador para qualquer alteração.
+    fonte: "Usuario_Cad.aspx - Verificação de perfil de acesso"
+    destino: "substituido"
+
+  - id: "RL-RN-004"
+    descricao: |
+      Alterações de senha não eram auditadas.
+      Não registrava quem alterou, quando, de onde (IP).
+    fonte: "Usuario_Cad.aspx.vb - Método SalvarUsuario()"
+    destino: "substituido"
+
+  - id: "RL-RN-005"
+    descricao: |
+      Sistema era monolinguagem (apenas pt-BR).
+      Não suportava i18n.
+    fonte: "Todo o sistema - Labels hardcoded em português"
+    destino: "substituido"
+
+  - id: "RL-RN-006"
+    descricao: |
+      Timezone fixo do servidor (America/Sao_Paulo).
+      Não havia conversão por usuário.
+    fonte: "Todo o sistema - DateTime.Now sem conversão de timezone"
+    destino: "substituido"
+
+# =============================================
+# Gap Analysis (Legado x Moderno)
+# =============================================
+
+gap_analysis:
+  - item: "Tela dedicada para configurações do usuário"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade criada do zero no RF-014"
+
+  - item: "Alteração de senha por usuário (self-service)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Antes apenas admin podia alterar senha"
+
+  - item: "Validação de senha forte (8+ caracteres, complexidade)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado aceitava senhas fracas (3+ caracteres)"
+
+  - item: "Blacklist de senhas comuns"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade nova para segurança"
+
+  - item: "Senha não pode conter dados pessoais"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Validação nova contra engenharia social"
+
+  - item: "Hash seguro de senha (BCrypt)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado usava MD5 (inseguro)"
+
+  - item: "Seleção de idioma (pt-BR, en-US, es-ES)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Sistema era monolinguagem"
+
+  - item: "Seleção de tema (claro/escuro/auto)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade nova de UX"
+
+  - item: "Seleção de timezone"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado usava timezone do servidor"
+
+  - item: "Auditoria de alteração de senha"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Compliance e rastreabilidade"
+
+  - item: "Edição de telefone pelo usuário"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Antes apenas admin podia editar"
+
+  - item: "Interface responsiva (mobile)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado era desktop apenas"
+
+# =============================================
+# Decisões de Modernização
+# =============================================
+
+decisoes_modernizacao:
+  - decisao: "Criar funcionalidade do zero sem migrar código legado"
+    motivo: |
+      Funcionalidade não existia de forma integrada no legado.
+      Arquitetura legada (Web Forms + VB.NET) incompatível com Angular 19.
+      Segurança do legado era inadequada (hash MD5, sem validações).
+    impacto: "alto"
+    data: "2025-11-19"
+
+  - decisao: "Não migrar hashes MD5 antigos diretamente. Forçar reset de senha na migração."
+    motivo: |
+      Hash MD5 é inseguro.
+      BCrypt requer re-hash de todas as senhas.
+      Não é possível converter MD5 → BCrypt sem senha em texto plano.
+    impacto: "medio"
+    data: "2025-11-19"
+    mitigacao: "Email automático com link de reset de senha para usuários migrados"
+
+  - decisao: "Implementar i18n desde o início (pt-BR, en-US, es-ES)"
+    motivo: |
+      Evitar refatoração futura.
+      Facilita expansão para novos mercados.
+      Melhor experiência para usuários internacionais.
+    impacto: "baixo"
+    data: "2025-11-19"
+
+  - decisao: "Auditoria obrigatória de todas alterações de senha"
+    motivo: |
+      Compliance (LGPD, ISO 27001).
+      Investigação de incidentes de segurança.
+      Rastreabilidade completa.
+    impacto: "baixo"
+    data: "2025-11-19"
+
+# =============================================
+# Riscos de Migração
+# =============================================
+
+riscos_migracao:
+  - risco: "Usuários resistentes a senhas fortes (complexidade obrigatória)"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      Mensagens educativas sobre segurança.
+      Assistente de senha com feedback em tempo real.
+      Sugestões de senhas fortes.
+
+  - risco: "Perda de senhas antigas (hash MD5 não migrável)"
+    impacto: "alto"
+    probabilidade: "certa"
+    mitigacao: |
+      Email automático de reset de senha para todos os usuários na migração.
+      Instruções claras no email.
+      Suporte disponível para auxílio.
+
+  - risco: "Confusão com múltiplos idiomas (usuários não familiarizados)"
+    impacto: "baixo"
+    probabilidade: "baixa"
+    mitigacao: |
+      Idioma padrão pt-BR (maioria dos usuários).
+      Seleção de idioma clara e visível.
+      Documentação em português.
+
+  - risco: "Timezone incorreto causa confusão com datas/horas"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Timezone padrão America/Sao_Paulo (maioria dos usuários).
+      Validação de timezone na seleção (lista pré-definida).
+      Exibição clara do timezone atual.
+
+# =============================================
+# Rastreabilidade (Legado → Moderno)
+# =============================================
+
+rastreabilidade:
+  - elemento_legado: "Usuario_Cad.aspx (admin)"
+    referencia_rf: "RN-RF014-03,RN-RF014-04,RN-RF014-05,RN-RF014-06,RN-RF014-07,RN-RF014-08"
+    referencia_uc: "UC03"
+    status: "substituido"
+
+  - elemento_legado: "Hash MD5 de senha"
+    referencia_rf: "RN-RF014-04"
+    referencia_uc: "UC03"
+    status: "substituido"
+
+  - elemento_legado: "Sistema monolinguagem"
+    referencia_rf: "RN-RF014-09,RN-RF014-10,RN-RF014-14"
+    referencia_uc: "UC04"
+    status: "substituido"
+
+  - elemento_legado: "Tema fixo"
+    referencia_rf: "RN-RF014-11"
+    referencia_uc: "UC04"
+    status: "substituido"
+
+  - elemento_legado: "Timezone fixo"
+    referencia_rf: "RN-RF014-12"
+    referencia_uc: "UC04"
+    status: "substituido"
+
+  - elemento_legado: "Sem auditoria de senha"
+    referencia_rf: "Evento usuario.senha_alterada"
+    referencia_uc: "UC03"
+    status: "substituido"
+
+  - elemento_legado: "Interface não responsiva"
+    referencia_rf: "RN-RF014-13"
+    referencia_uc: "UC01,UC02,UC03,UC04"
+    status: "substituido"
+
+# =============================================
+# Changelog
+# =============================================
+
+changelog:
+  - versao: "2.0"
+    data: "2025-12-30"
+    descricao: "Migração para formato v2.0 com destinos obrigatórios, análise completa de gap legado vs moderno, rastreabilidade completa"
+    autor: "Agência ALC - alc.dev.br"
+
+  - versao: "1.0"
+    data: "2025-12-27"
+    descricao: "Extração inicial de referências ao legado do RF-014 v1.1"
+    autor: "Equipe IControlIT"

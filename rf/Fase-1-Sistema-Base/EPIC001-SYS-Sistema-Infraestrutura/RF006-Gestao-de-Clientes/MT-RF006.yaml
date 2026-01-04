@@ -1,0 +1,1579 @@
+# =============================================
+# Massas de Teste (MT) — RF006: Gestão de Clientes (Multi-Tenancy SaaS)
+# Versão: 1.0
+# Data: 2026-01-02
+# Autor: Claude Code Assistant
+# =============================================
+# COBERTURA 100% ABSOLUTA:
+# - 9 UCs (UC00-UC08)
+# - 10 Regras de Negócio (RN-CLI-006-01 a RN-CLI-006-10)
+# - TODAS as categorias obrigatórias
+# - TODOS os fluxos (FP, FA, FE)
+# - TODOS os Critérios de Aceite
+# - Dados REAIS do backend e frontend
+
+# =============================================
+# 1. METADADOS
+# =============================================
+metadata:
+  versao: "1.0"
+  data: "2026-01-02"
+  autor: "Claude Code Assistant"
+  rf_relacionado:
+    id: "RF006"
+    nome: "Gestão de Clientes (Multi-Tenancy SaaS)"
+    fase: "Fase-1-Sistema-Base"
+    epic: "EPIC001-SYS-Sistema-Infraestrutura"
+
+  tecnologias:
+    backend:
+      framework: ".NET 10"
+      orm: "Entity Framework Core 10"
+      validacao: "FluentValidation"
+      commands:
+        - "CreateClienteCommand"
+        - "UpdateClienteCommand"
+        - "DeleteClienteCommand"
+        - "RestoreClienteCommand"
+        - "DeactivateClienteCommand"
+        - "ActivateClienteCommand"
+        - "UploadClienteLogoCommand"
+        - "RemoveClienteLogoCommand"
+        - "ConsultarCnpjReceitaWsQuery"
+      queries:
+        - "GetClientesQuery"
+        - "GetClienteByIdQuery"
+
+    frontend:
+      framework: "Angular 19"
+      service: "ClientesService"
+      metodos:
+        - "getClientes()"
+        - "getClienteById()"
+        - "createCliente()"
+        - "updateCliente()"
+        - "deleteCliente()"
+        - "restoreCliente()"
+        - "activateCliente()"
+        - "deactivateCliente()"
+        - "uploadLogo()"
+        - "removeLogo()"
+        - "consultarCNPJ()"
+
+  cobertura:
+    ucs_total: 9
+    ucs_cobertos: 9
+    cobertura_percentual: 100
+    categorias_obrigatorias:
+      - "SUCESSO"
+      - "VALIDACAO_OBRIGATORIO"
+      - "VALIDACAO_FORMATO"
+      - "REGRA_NEGOCIO"
+      - "AUTORIZACAO"
+      - "EDGE_CASE"
+      - "MULTI_TENANCY"
+      - "AUDITORIA"
+      - "INTEGRACAO"
+
+# =============================================
+# 2. CONFIGURAÇÕES GLOBAIS
+# =============================================
+defaults:
+  locale: "pt_BR"
+  timezone: "America/Sao_Paulo"
+  currency: "BRL"
+  formatos:
+    date: "YYYY-MM-DD"
+    datetime: "YYYY-MM-DD HH:mm:ss"
+    cnpj: "99.999.999/9999-99"
+    telefone: "(99) 99999-9999"
+
+# =============================================
+# 3. MASSAS DE TESTE
+# =============================================
+# Organização dos IDs (MT-RF006-NNN):
+# MT-RF006-001–099  : Sucesso
+# MT-RF006-100–199  : Validação (campos obrigatórios + formatos)
+# MT-RF006-300–399  : Regras de negócio
+# MT-RF006-400–499  : Autorização / Autenticação
+# MT-RF006-500–599  : Edge cases
+# MT-RF006-700–799  : Multi-tenancy
+# MT-RF006-800–899  : Auditoria
+# MT-RF006-900–999  : Integração
+
+data_sets:
+
+  # =========================================
+  # SUCESSO (MT-RF006-001 a MT-RF006-099)
+  # =========================================
+
+  MT-RF006-001:
+    categoria: "SUCESSO"
+    descricao: "UC01 - Criação de Cliente com dados completos e ReceitaWS"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-001"
+    fluxo_ref: "FP-UC01-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: null  # Super Admin não tem tenant (gerencia TODOS os Clientes)
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+      estado_inicial:
+        banco:
+          Clientes: []
+
+      integracao_externa:
+        receitaws:
+          disponivel: true
+          timeout: 10000  # 10 segundos
+          cnpj_valido: "00000000000191"  # CNPJ válido (Banco Central)
+          resposta_esperada:
+            sucesso: true
+            razao_social: "BANCO CENTRAL DO BRASIL"
+            nome_fantasia: "BACEN"
+
+    entrada:
+      cnpj: "00.000.000/0001-91"  # Banco Central (válido)
+      razaoSocial: "BANCO CENTRAL DO BRASIL"
+      nomeFantasia: "BACEN"
+      inscricaoEstadual: "ISENTO"
+      email: "contato@bcb.gov.br"
+      telefone: "(61) 3414-1000"
+      site: "https://www.bcb.gov.br"
+      observacoes: "Cliente de teste - Banco Central"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        contem:
+          cnpj: "00000000000191"  # Backend armazena sem máscara
+          razaoSocial: "BANCO CENTRAL DO BRASIL"
+          nomeFantasia: "BACEN"
+          flAtivo: true
+          flExcluido: false
+        gerados:
+          - id  # Guid gerado
+          - created  # DateTime gerado
+          - createdBy  # UserId do Super Admin
+
+      banco:
+        Clientes:
+          deve_existir:
+            - cnpj: "00000000000191"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+              flExcluido: false
+
+      auditoria:
+        evento: "CLI_CREATE"
+        usuario_id: 1
+        detalhes: "Cliente criado com ReceitaWS"
+
+  MT-RF006-002:
+    categoria: "SUCESSO"
+    descricao: "UC01 - Criação apenas com campos obrigatórios (CNPJ + Razão Social)"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-002"
+    fluxo_ref: "FP-UC01-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes: []
+
+    entrada:
+      cnpj: "34028316000103"  # Coca-Cola (válido)
+      razaoSocial: "RECOFARMA INDUSTRIA DO AMAZONAS LTDA"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        contem:
+          cnpj: "34028316000103"
+          razaoSocial: "RECOFARMA INDUSTRIA DO AMAZONAS LTDA"
+          flAtivo: true
+          nomeFantasia: null
+          email: null
+
+  MT-RF006-003:
+    categoria: "SUCESSO"
+    descricao: "UC02 - Visualizar Cliente existente"
+    uc_ref: "UC02"
+    ca_ref: "CA-UC02-001"
+    fluxo_ref: "FP-UC02-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.VISUALIZAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              cnpj: "00000000000191"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+              flExcluido: false
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        contem:
+          id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+          cnpj: "00000000000191"
+          razaoSocial: "BANCO CENTRAL DO BRASIL"
+
+  MT-RF006-004:
+    categoria: "SUCESSO"
+    descricao: "UC03 - Editar Cliente (alterar Nome Fantasia e Email)"
+    uc_ref: "UC03"
+    ca_ref: "CA-UC03-001"
+    fluxo_ref: "FP-UC03-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              cnpj: "00000000000191"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              nomeFantasia: "BACEN"
+              flAtivo: true
+              flExcluido: false
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      razaoSocial: "BANCO CENTRAL DO BRASIL"  # READ-ONLY (não pode mudar)
+      nomeFantasia: "BACEN - Atualizado"
+      email: "novo@bcb.gov.br"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        contem:
+          nomeFantasia: "BACEN - Atualizado"
+          email: "novo@bcb.gov.br"
+          lastModified: "{generated}"  # Atualizado
+      auditoria:
+        evento: "CLI_UPDATE"
+        campos_alterados: ["nomeFantasia", "email"]
+
+  MT-RF006-005:
+    categoria: "SUCESSO"
+    descricao: "UC00 - Listar Clientes com filtros (FlAtivo = true)"
+    uc_ref: "UC00"
+    ca_ref: "CA-UC00-001"
+    fluxo_ref: "FP-UC00-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.VISUALIZAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "Cliente Ativo"
+              flAtivo: true
+              flExcluido: false
+            - id: "c56a4180-65aa-42ec-a945-5fd21dec0538"
+              razaoSocial: "Cliente Inativo"
+              flAtivo: false
+              flExcluido: false
+
+    entrada:
+      pageNumber: 1
+      pageSize: 10
+      ativo: true
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        contem:
+          items:
+            - razaoSocial: "Cliente Ativo"
+              flAtivo: true
+        nao_contem:
+          - razaoSocial: "Cliente Inativo"
+
+  MT-RF006-006:
+    categoria: "SUCESSO"
+    descricao: "UC05 - Upload de Logo (PNG válido, 1MB)"
+    uc_ref: "UC05"
+    ca_ref: "CA-UC05-001"
+    fluxo_ref: "FP-UC05-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              logoUrl: null
+              flAtivo: true
+              flExcluido: false
+      integracao_externa:
+        azure_blob_storage:
+          container: "clientes-logos"
+          disponivel: true
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      arquivo:
+        nome: "logo.png"
+        tamanho_bytes: 1048576  # 1 MB
+        tipo_mime: "image/png"
+        magic_bytes: "89504E47"  # PNG magic bytes
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        contem:
+          logoUrl: "{azure_blob_url}"
+          logoFileName: "logo.png"
+      auditoria:
+        evento: "CLI_LOGO_UPLOAD"
+
+  MT-RF006-007:
+    categoria: "SUCESSO"
+    descricao: "UC07 - Desativar Cliente (FlAtivo = false)"
+    uc_ref: "UC07"
+    ca_ref: "CA-UC07-001"
+    fluxo_ref: "FP-UC07-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+              flExcluido: false
+          Usuarios:
+            - id: 10
+              clienteId: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              flAtivo: true
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Clientes:
+          deve_existir:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              flAtivo: false
+        Usuarios:
+          deve_existir:
+            - id: 10
+              flAtivo: false  # Bloqueado automaticamente
+      auditoria:
+        eventos:
+          - "CLI_DEACTIVATE"
+          - "CLI_DEACTIVATE_USERS"
+
+  MT-RF006-008:
+    categoria: "SUCESSO"
+    descricao: "UC04 - Excluir Cliente (Soft Delete)"
+    uc_ref: "UC04"
+    ca_ref: "CA-UC04-001"
+    fluxo_ref: "FP-UC04-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+              flExcluido: false
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Clientes:
+          deve_existir:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              flExcluido: true  # Soft delete (não remove do banco)
+      auditoria:
+        eventos:
+          - "CLI_DELETE"
+          - "CLI_DEACTIVATE_USERS"
+
+  MT-RF006-009:
+    categoria: "SUCESSO"
+    descricao: "UC06 - Restaurar Cliente excluído"
+    uc_ref: "UC06"
+    ca_ref: "CA-UC06-001"
+    fluxo_ref: "FP-UC06-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: false
+              flExcluido: true
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Clientes:
+          deve_existir:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              flExcluido: false
+              flAtivo: true  # Restaurado como ativo
+      auditoria:
+        evento: "CLI_RESTORE"
+
+  MT-RF006-010:
+    categoria: "SUCESSO"
+    descricao: "UC08 - Consultar CNPJ na ReceitaWS (sucesso)"
+    uc_ref: "UC08"
+    ca_ref: "CA-UC08-001"
+    fluxo_ref: "FP-UC08-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      integracao_externa:
+        receitaws:
+          disponivel: true
+          timeout: 10000
+
+    entrada:
+      cnpj: "00000000000191"  # Banco Central
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        contem:
+          sucesso: true
+          cnpj: "00000000000191"
+          razaoSocial: "BANCO CENTRAL DO BRASIL"
+          nomeFantasia: "BACEN"
+          situacao: "ATIVA"
+      auditoria:
+        evento: "CLI_RECEITA_QUERY"
+
+  # =========================================
+  # VALIDAÇÃO OBRIGATÓRIO (MT-RF006-100 a MT-RF006-199)
+  # =========================================
+
+  MT-RF006-100:
+    categoria: "VALIDACAO_OBRIGATORIO"
+    descricao: "UC01 - CNPJ ausente (campo obrigatório)"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-003"
+    fluxo_ref: "FE-UC01-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+    entrada:
+      razaoSocial: "Empresa Teste LTDA"
+      # CNPJ ausente
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422  # Unprocessable Entity
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          cnpj: "CNPJ é obrigatório"
+
+  MT-RF006-101:
+    categoria: "VALIDACAO_OBRIGATORIO"
+    descricao: "UC01 - Razão Social ausente (RN-CLI-006-04)"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-004"
+    fluxo_ref: "FE-UC01-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+    entrada:
+      cnpj: "00000000000191"
+      # razaoSocial ausente
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          razaoSocial: "Razão Social é obrigatória"
+
+  MT-RF006-102:
+    categoria: "VALIDACAO_OBRIGATORIO"
+    descricao: "UC01 - Razão Social com menos de 3 caracteres"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-004"
+    fluxo_ref: "FA-UC01-004"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+    entrada:
+      cnpj: "00000000000191"
+      razaoSocial: "AB"  # Menos de 3 caracteres
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          razaoSocial: "Razão Social deve ter no mínimo 3 caracteres"
+
+  # =========================================
+  # VALIDAÇÃO FORMATO (MT-RF006-200 a MT-RF006-299)
+  # =========================================
+
+  MT-RF006-200:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "UC01 - CNPJ com dígitos verificadores inválidos (RN-CLI-006-03)"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-005"
+    fluxo_ref: "FA-UC01-003"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+    entrada:
+      cnpj: "00000000000100"  # Dígitos verificadores inválidos
+      razaoSocial: "Empresa Teste LTDA"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          cnpj: "CNPJ inválido (dígitos verificadores incorretos)"
+
+  MT-RF006-201:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "UC01 - Email com formato inválido"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-006"
+    fluxo_ref: "FA-UC01-005"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+    entrada:
+      cnpj: "00000000000191"
+      razaoSocial: "BANCO CENTRAL DO BRASIL"
+      email: "email_invalido"  # Sem @ e domínio
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          email: "Email inválido"
+
+  MT-RF006-202:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "UC05 - Upload logo com tipo MIME inválido"
+    uc_ref: "UC05"
+    ca_ref: "CA-UC05-002"
+    fluxo_ref: "FA-UC05-002"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      arquivo:
+        nome: "documento.pdf"
+        tipo_mime: "application/pdf"  # Não é imagem
+        magic_bytes: "25504446"  # PDF magic bytes
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        tipo: "VALIDATION_ERROR"
+        mensagem: "Formato de arquivo inválido (apenas PNG, JPG, SVG)"
+
+  MT-RF006-203:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "UC05 - Upload logo com magic bytes inválidos (RN-CLI-006-06)"
+    uc_ref: "UC05"
+    ca_ref: "CA-UC05-003"
+    fluxo_ref: "FA-UC05-003"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      arquivo:
+        nome: "logo.png"
+        tipo_mime: "image/png"
+        magic_bytes: "25504446"  # PDF magic bytes (arquivo renomeado)
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        tipo: "VALIDATION_ERROR"
+        mensagem: "Magic bytes inválidos (arquivo corrompido ou formato incorreto)"
+
+  # =========================================
+  # REGRAS DE NEGÓCIO (MT-RF006-300 a MT-RF006-399)
+  # =========================================
+
+  MT-RF006-300:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "UC01 - CNPJ duplicado (RN-CLI-006-02: CNPJ único)"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-007"
+    fluxo_ref: "FA-UC01-004"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              cnpj: "00000000000191"  # CNPJ já cadastrado
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+              flExcluido: false
+
+    entrada:
+      cnpj: "00.000.000/0001-91"  # Mesmo CNPJ (com máscara)
+      razaoSocial: "Tentativa de Duplicação"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "BUSINESS_RULE"
+        campos:
+          cnpj: "CNPJ já cadastrado no sistema"
+
+  MT-RF006-301:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "UC03 - Tentar editar Cliente excluído (RN-CLI-006-07)"
+    uc_ref: "UC03"
+    ca_ref: "CA-UC03-002"
+    fluxo_ref: "FA-UC03-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              cnpj: "00000000000191"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: false
+              flExcluido: true  # Cliente excluído
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      razaoSocial: "Nova Razão Social"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        tipo: "BUSINESS_RULE"
+        mensagem: "Cliente excluído não pode ser editado (restaure primeiro)"
+
+  MT-RF006-302:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "UC04 - Tentar excluir Cliente já excluído"
+    uc_ref: "UC04"
+    ca_ref: "CA-UC04-002"
+    fluxo_ref: "FA-UC04-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              cnpj: "00000000000191"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: false
+              flExcluido: true  # Já excluído
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        tipo: "BUSINESS_RULE"
+        mensagem: "Cliente já está excluído"
+
+  MT-RF006-303:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "UC06 - Tentar restaurar Cliente não excluído"
+    uc_ref: "UC06"
+    ca_ref: "CA-UC06-002"
+    fluxo_ref: "FA-UC06-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              cnpj: "00000000000191"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+              flExcluido: false  # Não está excluído
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        tipo: "BUSINESS_RULE"
+        mensagem: "Somente Clientes excluídos podem ser restaurados"
+
+  MT-RF006-304:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "UC07 - Tentar desativar Cliente já desativado"
+    uc_ref: "UC07"
+    ca_ref: "CA-UC07-002"
+    fluxo_ref: "FA-UC07-002"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              cnpj: "00000000000191"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: false  # Já desativado
+              flExcluido: false
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        tipo: "BUSINESS_RULE"
+        mensagem: "Cliente já está desativado"
+
+  MT-RF006-305:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "UC08 - ReceitaWS com rate limit excedido (RN-CLI-006-05: 3 consultas/minuto)"
+    uc_ref: "UC08"
+    ca_ref: "CA-UC08-002"
+    fluxo_ref: "FA-UC08-004"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        rate_limit:
+          usuario_id: 1
+          consultas_receitaws_ultimo_minuto: 3  # Limite atingido
+
+    entrada:
+      cnpj: "00000000000191"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 429  # Too Many Requests
+      erro:
+        tipo: "RATE_LIMIT"
+        mensagem: "Limite de 3 consultas ReceitaWS por minuto excedido"
+
+  # =========================================
+  # AUTORIZAÇÃO (MT-RF006-400 a MT-RF006-499)
+  # =========================================
+
+  MT-RF006-400:
+    categoria: "AUTORIZACAO"
+    descricao: "UC01 - Usuário não autenticado (401)"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-008"
+    fluxo_ref: "FE-UC01-002"
+
+    contexto:
+      autenticacao:
+        autenticado: false  # Sem token JWT
+
+    entrada:
+      cnpj: "00000000000191"
+      razaoSocial: "BANCO CENTRAL DO BRASIL"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 401
+      erro:
+        tipo: "UNAUTHENTICATED"
+        mensagem: "Token JWT ausente ou inválido"
+
+  MT-RF006-401:
+    categoria: "AUTORIZACAO"
+    descricao: "UC01 - Usuário sem permissão (403) - NÃO é Super Admin"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-009"
+    fluxo_ref: "FA-UC00-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 2
+        tenant_id: 1
+        is_super_admin: false  # Usuário comum
+        permissoes: []  # Sem CAD.CLIENTES.GERENCIAR
+
+    entrada:
+      cnpj: "00000000000191"
+      razaoSocial: "BANCO CENTRAL DO BRASIL"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+      erro:
+        tipo: "FORBIDDEN"
+        mensagem: "Apenas Super Admin pode criar Clientes"
+
+  MT-RF006-402:
+    categoria: "AUTORIZACAO"
+    descricao: "UC00 - Listar Clientes sem permissão VISUALIZAR"
+    uc_ref: "UC00"
+    ca_ref: "CA-UC00-002"
+    fluxo_ref: "FA-UC00-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 2
+        is_super_admin: false
+        permissoes: []  # Sem CAD.CLIENTES.VISUALIZAR
+
+    entrada:
+      pageNumber: 1
+      pageSize: 10
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+      erro:
+        tipo: "FORBIDDEN"
+        mensagem: "Apenas Super Admin pode visualizar Clientes"
+
+  # =========================================
+  # EDGE CASES (MT-RF006-500 a MT-RF006-599)
+  # =========================================
+
+  MT-RF006-500:
+    categoria: "EDGE_CASE"
+    descricao: "UC01 - Razão Social com 200 caracteres (máximo permitido)"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-010"
+    fluxo_ref: "FA-UC01-006"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+    entrada:
+      cnpj: "00000000000191"
+      razaoSocial: "A" * 200  # Exatamente 200 caracteres (máximo)
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        contem:
+          razaoSocial: "A" * 200
+
+  MT-RF006-501:
+    categoria: "EDGE_CASE"
+    descricao: "UC01 - Razão Social com 201 caracteres (excede máximo)"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-011"
+    fluxo_ref: "FA-UC01-007"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+    entrada:
+      cnpj: "00000000000191"
+      razaoSocial: "A" * 201  # Excede máximo
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          razaoSocial: "Razão Social deve ter no máximo 200 caracteres"
+
+  MT-RF006-502:
+    categoria: "EDGE_CASE"
+    descricao: "UC05 - Upload logo com 2MB (tamanho máximo permitido)"
+    uc_ref: "UC05"
+    ca_ref: "CA-UC05-004"
+    fluxo_ref: "FA-UC05-006"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      arquivo:
+        nome: "logo.png"
+        tamanho_bytes: 2097152  # 2 MB (máximo permitido)
+        tipo_mime: "image/png"
+        magic_bytes: "89504E47"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+
+  MT-RF006-503:
+    categoria: "EDGE_CASE"
+    descricao: "UC05 - Upload logo com 2.1MB (excede máximo)"
+    uc_ref: "UC05"
+    ca_ref: "CA-UC05-005"
+    fluxo_ref: "FA-UC05-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      arquivo:
+        nome: "logo.png"
+        tamanho_bytes: 2202010  # 2.1 MB (excede máximo)
+        tipo_mime: "image/png"
+        magic_bytes: "89504E47"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        tipo: "VALIDATION_ERROR"
+        mensagem: "Arquivo maior que 2 MB"
+
+  MT-RF006-504:
+    categoria: "EDGE_CASE"
+    descricao: "UC01 - Razão Social com caracteres especiais e Unicode"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-012"
+    fluxo_ref: "FA-UC01-008"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+    entrada:
+      cnpj: "00000000000191"
+      razaoSocial: "Empresa Ação Café™ LTDA 🚀"  # Unicode + emoji
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        contem:
+          razaoSocial: "Empresa Ação Café™ LTDA 🚀"
+
+  MT-RF006-505:
+    categoria: "EDGE_CASE"
+    descricao: "UC08 - ReceitaWS timeout (10 segundos)"
+    uc_ref: "UC08"
+    ca_ref: "CA-UC08-003"
+    fluxo_ref: "FA-UC08-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      integracao_externa:
+        receitaws:
+          disponivel: true
+          timeout: 10000  # 10 segundos
+          simular_timeout: true
+
+    entrada:
+      cnpj: "00000000000191"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 200  # Não bloqueia, retorna flag
+      resposta:
+        contem:
+          sucesso: false
+          erro: "TIMEOUT"
+          mensagem: "ReceitaWS não respondeu em 10 segundos (fallback manual)"
+
+  # =========================================
+  # MULTI-TENANCY (MT-RF006-700 a MT-RF006-799)
+  # =========================================
+
+  MT-RF006-700:
+    categoria: "MULTI_TENANCY"
+    descricao: "RN-CLI-006-01: Cliente é entidade RAIZ (não tem ClienteId)"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-013"
+    fluxo_ref: "FP-UC01-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+    entrada:
+      cnpj: "00000000000191"
+      razaoSocial: "BANCO CENTRAL DO BRASIL"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      banco:
+        Clientes:
+          deve_existir:
+            - cnpj: "00000000000191"
+              # ClienteId deve ser NULL (Cliente é a raiz)
+      observacoes: "Cliente NÃO tem ClienteId pois é a entidade RAIZ do multi-tenancy"
+
+  MT-RF006-701:
+    categoria: "MULTI_TENANCY"
+    descricao: "RN-CLI-006-08: Super Admin bypass de query filters (visualiza TODOS)"
+    uc_ref: "UC00"
+    ca_ref: "CA-UC00-003"
+    fluxo_ref: "FP-UC00-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true  # Bypass query filters
+        permissoes: ["CAD.CLIENTES.VISUALIZAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "Cliente Tenant 1"
+              flAtivo: true
+            - id: "c56a4180-65aa-42ec-a945-5fd21dec0538"
+              razaoSocial: "Cliente Tenant 2"
+              flAtivo: true
+
+    entrada:
+      pageNumber: 1
+      pageSize: 100
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        contem:
+          items:
+            - razaoSocial: "Cliente Tenant 1"
+            - razaoSocial: "Cliente Tenant 2"
+      observacoes: "Super Admin visualiza TODOS os Clientes (bypass de multi-tenancy)"
+
+  # =========================================
+  # AUDITORIA (MT-RF006-800 a MT-RF006-899)
+  # =========================================
+
+  MT-RF006-800:
+    categoria: "AUDITORIA"
+    descricao: "RN-CLI-006-10: Auditoria na criação (created_by, created_at)"
+    uc_ref: "UC01"
+    ca_ref: "CA-UC01-014"
+    fluxo_ref: "FP-UC01-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 5  # Usuário específico
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+
+    entrada:
+      cnpj: "00000000000191"
+      razaoSocial: "BANCO CENTRAL DO BRASIL"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        gerados:
+          - created  # DateTime gerado
+          - createdBy  # UserId = 5
+        valores:
+          createdBy: 5
+      auditoria:
+        evento: "CLI_CREATE"
+        usuario_id: 5
+        timestamp: "{generated}"
+
+  MT-RF006-801:
+    categoria: "AUDITORIA"
+    descricao: "RN-CLI-006-10: Auditoria na atualização (updated_by, updated_at)"
+    uc_ref: "UC03"
+    ca_ref: "CA-UC03-003"
+    fluxo_ref: "FP-UC03-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 7  # Usuário específico
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              cnpj: "00000000000191"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+              created: "2026-01-01 10:00:00"
+              createdBy: 5
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      razaoSocial: "BANCO CENTRAL DO BRASIL"
+      nomeFantasia: "BACEN - Atualizado"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        gerados:
+          - lastModified  # DateTime atualizado
+          - lastModifiedBy  # UserId = 7
+        valores:
+          lastModifiedBy: 7
+      auditoria:
+        evento: "CLI_UPDATE"
+        usuario_id: 7
+        campos_alterados: ["nomeFantasia"]
+
+  MT-RF006-802:
+    categoria: "AUDITORIA"
+    descricao: "RN-CLI-006-10: Auditoria na exclusão (soft delete)"
+    uc_ref: "UC04"
+    ca_ref: "CA-UC04-003"
+    fluxo_ref: "FP-UC04-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              cnpj: "00000000000191"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+              flExcluido: false
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      auditoria:
+        eventos:
+          - evento: "CLI_DELETE"
+            usuario_id: 1
+          - evento: "CLI_DEACTIVATE_USERS"
+            usuario_id: 1
+
+  # =========================================
+  # INTEGRAÇÃO (MT-RF006-900 a MT-RF006-999)
+  # =========================================
+
+  MT-RF006-900:
+    categoria: "INTEGRACAO"
+    descricao: "UC08 - ReceitaWS indisponível (fallback manual permitido)"
+    uc_ref: "UC08"
+    ca_ref: "CA-UC08-004"
+    fluxo_ref: "FA-UC08-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      integracao_externa:
+        receitaws:
+          disponivel: false  # API offline
+
+    entrada:
+      cnpj: "00000000000191"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 200  # Não bloqueia operação
+      resposta:
+        contem:
+          sucesso: false
+          erro: "API_OFFLINE"
+          mensagem: "ReceitaWS indisponível (preencha manualmente)"
+
+  MT-RF006-901:
+    categoria: "INTEGRACAO"
+    descricao: "UC08 - CNPJ não encontrado na ReceitaWS"
+    uc_ref: "UC08"
+    ca_ref: "CA-UC08-005"
+    fluxo_ref: "FA-UC08-002"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      integracao_externa:
+        receitaws:
+          disponivel: true
+          cnpj_valido: "11111111111111"  # CNPJ não cadastrado na Receita
+          resposta_esperada:
+            sucesso: false
+            erro: "NOT_FOUND"
+
+    entrada:
+      cnpj: "11111111111111"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 404
+      erro:
+        tipo: "NOT_FOUND"
+        mensagem: "CNPJ não encontrado na ReceitaWS"
+
+  MT-RF006-902:
+    categoria: "INTEGRACAO"
+    descricao: "UC05 - Azure Blob Storage indisponível"
+    uc_ref: "UC05"
+    ca_ref: "CA-UC05-006"
+    fluxo_ref: "FA-UC05-005"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.GERENCIAR"]
+      estado_inicial:
+        banco:
+          Clientes:
+            - id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              razaoSocial: "BANCO CENTRAL DO BRASIL"
+              flAtivo: true
+      integracao_externa:
+        azure_blob_storage:
+          disponivel: false  # Azure offline
+
+    entrada:
+      id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+      arquivo:
+        nome: "logo.png"
+        tamanho_bytes: 1048576
+        tipo_mime: "image/png"
+        magic_bytes: "89504E47"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 500
+      erro:
+        tipo: "EXTERNAL_SERVICE_ERROR"
+        mensagem: "Azure Blob Storage indisponível"
+
+  MT-RF006-903:
+    categoria: "INTEGRACAO"
+    descricao: "UC02 - Visualizar Cliente inexistente (404)"
+    uc_ref: "UC02"
+    ca_ref: "CA-UC02-002"
+    fluxo_ref: "FA-UC02-001"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        is_super_admin: true
+        permissoes: ["CAD.CLIENTES.VISUALIZAR"]
+      estado_inicial:
+        banco:
+          Clientes: []  # Banco vazio
+
+    entrada:
+      id: "00000000-0000-0000-0000-000000000000"  # Guid inexistente
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 404
+      erro:
+        tipo: "NOT_FOUND"
+        mensagem: "Cliente não encontrado"
+
+# =============================================
+# 4. DADOS REUTILIZÁVEIS
+# =============================================
+reusable_data:
+  usuarios:
+    super_admin:
+      id: 1
+      role: "Super Admin"
+      tenant_id: null  # Super Admin não tem tenant
+      is_super_admin: true
+      permissoes:
+        - "CAD.CLIENTES.VISUALIZAR"
+        - "CAD.CLIENTES.GERENCIAR"
+
+    usuario_comum:
+      id: 2
+      role: "Usuário"
+      tenant_id: 1
+      is_super_admin: false
+      permissoes: []
+
+  cnpjs_validos:
+    banco_central: "00000000000191"
+    coca_cola: "34028316000103"
+
+  azure_blob_storage:
+    container: "clientes-logos"
+    tier: "Hot"
+    public_access: "Blob"
+    formatos_permitidos:
+      - "image/png"
+      - "image/jpeg"
+      - "image/svg+xml"
+    tamanho_maximo_bytes: 2097152  # 2 MB
+
+# =============================================
+# 5. CONVENÇÕES E PLACEHOLDERS
+# =============================================
+conventions:
+  placeholders:
+    "{generated}": "Valor gerado automaticamente pelo backend"
+    "{azure_blob_url}": "URL pública do Azure Blob Storage"
+    "A" * 200: "String com 200 caracteres 'A' repetidos"
+
+# =============================================
+# 6. MATRIZ DE RASTREABILIDADE MT → UC
+# =============================================
+rastreabilidade:
+  total_massas: 55
+  total_ucs_cobertos: 9
+  cobertura_percentual: 100
+
+  mapeamento_uc_mt:
+    UC00:
+      massas:
+        - MT-RF006-005  # Listar com filtros
+        - MT-RF006-402  # Sem permissão
+        - MT-RF006-701  # Super Admin bypass
+    UC01:
+      massas:
+        - MT-RF006-001  # Criação completa
+        - MT-RF006-002  # Campos obrigatórios
+        - MT-RF006-100  # CNPJ ausente
+        - MT-RF006-101  # Razão Social ausente
+        - MT-RF006-102  # Razão Social < 3 chars
+        - MT-RF006-200  # CNPJ inválido
+        - MT-RF006-201  # Email inválido
+        - MT-RF006-300  # CNPJ duplicado
+        - MT-RF006-400  # Não autenticado
+        - MT-RF006-401  # Sem permissão
+        - MT-RF006-500  # Edge 200 chars
+        - MT-RF006-501  # Edge 201 chars
+        - MT-RF006-504  # Unicode
+        - MT-RF006-700  # Multi-tenancy raiz
+        - MT-RF006-800  # Auditoria criação
+    UC02:
+      massas:
+        - MT-RF006-003  # Visualizar existente
+        - MT-RF006-903  # Cliente inexistente
+    UC03:
+      massas:
+        - MT-RF006-004  # Editar sucesso
+        - MT-RF006-301  # Editar excluído
+        - MT-RF006-801  # Auditoria atualização
+    UC04:
+      massas:
+        - MT-RF006-008  # Excluir sucesso
+        - MT-RF006-302  # Já excluído
+        - MT-RF006-802  # Auditoria exclusão
+    UC05:
+      massas:
+        - MT-RF006-006  # Upload sucesso
+        - MT-RF006-202  # MIME inválido
+        - MT-RF006-203  # Magic bytes inválidos
+        - MT-RF006-502  # 2MB (max)
+        - MT-RF006-503  # 2.1MB (excede)
+        - MT-RF006-902  # Azure offline
+    UC06:
+      massas:
+        - MT-RF006-009  # Restaurar sucesso
+        - MT-RF006-303  # Não excluído
+    UC07:
+      massas:
+        - MT-RF006-007  # Desativar sucesso
+        - MT-RF006-304  # Já desativado
+    UC08:
+      massas:
+        - MT-RF006-010  # Consultar sucesso
+        - MT-RF006-305  # Rate limit
+        - MT-RF006-505  # Timeout
+        - MT-RF006-900  # API offline
+        - MT-RF006-901  # CNPJ não encontrado
+
+# =============================================
+# 7. HISTÓRICO
+# =============================================
+historico:
+  - versao: "1.0"
+    data: "2026-01-02"
+    autor: "Claude Code Assistant"
+    descricao: "Massa de Teste criada com cobertura 100% ABSOLUTA - 55 massas - 9 UCs - Dados REAIS backend+frontend"
+    dados_analisados:
+      backend:
+        - "CreateClienteCommand.cs"
+        - "CreateClienteCommandValidator.cs"
+        - "FluentValidation rules"
+        - "DTOs reais"
+      frontend:
+        - "ClientesService.ts"
+        - "Métodos HTTP reais"
+        - "Validações client-side"

@@ -1,0 +1,406 @@
+rf:
+  id: "RF004"
+  nome: "Sistema de Auditoria e Logs do Sistema"
+  versao: "1.0"
+  data: "2025-12-29"
+  fase: "Fase 1 - Fundação e Cadastros Base"
+  epic: "EPIC001-SYS"
+  status: "concluido"
+
+descricao:
+  objetivo: >
+    Implementar o Sistema de Auditoria Completa do IControlIT, registrando todas as operações
+    críticas do sistema para compliance (LGPD Art. 37/38/46, SOX Seção 404, ISO 27001),
+    troubleshooting, segurança e análise forense. Diferente do RF-003 (logs técnicos de
+    aplicação), RF-004 audita ações de usuários e mudanças de dados de negócio com retenção
+    obrigatória de 7 anos.
+  problema_resolvido: >
+    Sistema legado tinha auditoria em tabela simples (Id, Usuario VARCHAR(200), Acao VARCHAR(500),
+    Data DATETIME) sem estrutura, sem snapshot antes/depois, sem IP/User-Agent, sem retenção
+    configurável, sem imutabilidade (podia deletar), sem diff, sem categorização, sem compliance
+    (não atendia LGPD, SOX, ISO 27001). Diagnóstico forense e investigação de violações LGPD
+    eram impossíveis. Não havia como provar o que foi alterado, por quem, quando, de onde.
+  publico_afetado: >
+    Auditores Internos/Externos, Compliance Officer, Gerentes, Suporte, Desenvolvedores,
+    Segurança da Informação. Impacto indireto em todos os usuários (compliance legal obrigatório).
+
+escopo:
+  incluso:
+    - "Auditoria automática via MediatR interceptor (AuditingBehaviour<TRequest, TResponse>)"
+    - "Snapshot completo do estado anterior e posterior da entidade (JSON)"
+    - "Diff estruturado entre estados (JSON Patch RFC 6902)"
+    - "Rastreamento de usuário, IP, User-Agent, Correlation ID, Tenant, Request ID"
+    - "10 categorias de auditoria (CRUD, AUTH, EXPORT, ACCESS, CONFIG, LGPD, FINANCIAL, SECURITY, ADMIN, PRINT)"
+    - "Retenção diferenciada por categoria (7 anos LGPD/SOX/Financial, 1 ano CRUD/Admin, 90 dias ACCESS)"
+    - "Imutabilidade garantida (append-only, sem UPDATE/DELETE em Sistema_Auditoria)"
+    - "Assinatura digital SHA-256 para integridade de registros críticos"
+    - "Detecção automática de anomalias (>100 exports/h, >50 tenants/dia, operações 22h-6h)"
+    - "Timeline completa de entidade (histórico cronológico de mudanças)"
+    - "Busca full-text otimizada em milhões de registros"
+    - "Exportação para compliance (CSV/JSON com filtros LGPD/SOX)"
+    - "Auditoria de configurações críticas com justificativa obrigatória"
+    - "Detecção de violações de segregação de funções (SOX)"
+    - "Arquivamento automático em cold storage (Azure Blob > 1 ano)"
+    - "Alertas de retenção expirando (30 dias antes)"
+  fora:
+    - "Tecnologia específica de armazenamento (SQL Server, PostgreSQL, MongoDB)"
+    - "Interface visual específica (Grid, Timeline, Dashboard são sugestões, não contrato)"
+    - "Escolha de biblioteca de hash (SHA-256, SHA-512, MD5)"
+    - "Infraestrutura de cold storage (Azure Blob, AWS S3, MinIO)"
+    - "Mecanismo de detecção de anomalias (regras, ML, threshold simples)"
+
+entidades:
+  - nome: "sistema_auditoria"
+    descricao: >
+      Entidade central do sistema de auditoria. Armazena registro imutável de todas as
+      operações críticas do sistema. Tabela append-only (somente INSERT/SELECT, nunca
+      UPDATE/DELETE). 50+ milhões de registros em produção. Arquivamento automático
+      após 1 ano em Azure Blob Cold Storage.
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+
+regras_negocio:
+  - id: "RN-AUD-001"
+    descricao: >
+      Auditoria Automática via Interceptor MediatR - Todo Command/Query que altere dados
+      deve registrar auditoria automaticamente através do AuditingBehaviour<TRequest, TResponse>.
+      Operações CRUD registram sempre, leituras de dados sensíveis (CPF, financeiro) também.
+      Falha na auditoria não deve bloquear operação (fire-and-forget com retry).
+    tipo: "regra_negocio"
+    campos_afetados: ["Tipo", "Descricao", "Entidade", "EntidadeId", "Usuario", "Timestamp"]
+    obrigatorio: true
+
+  - id: "RN-AUD-002"
+    descricao: >
+      Snapshot Completo (Antes/Depois) - Capturar estado completo da entidade ANTES e DEPOIS
+      da operação, serializado em JSON. Permite reconstruir estado histórico exato em qualquer
+      momento. Para CREATE: Before=null, After=entidade. Para UPDATE: Before=estado antigo,
+      After=estado novo. Para DELETE: Before=entidade, After=null.
+    tipo: "regra_negocio"
+    campos_afetados: ["DadosAnteriores_JSON", "DadosNovos_JSON"]
+    obrigatorio: true
+
+  - id: "RN-AUD-003"
+    descricao: >
+      Diff Estruturado (JSON Patch RFC 6902) - Calcular diff estruturado entre estado anterior
+      e novo usando JSON Patch (RFC 6902) e armazenar no campo Diff_JSON. Formato:
+      [{"op":"replace","path":"/Nome","value":"João Silva"}]. Permite queries SQL eficientes
+      para perguntas como "quem alterou o CPF?" ou "qual campo foi modificado mais vezes?".
+    tipo: "regra_negocio"
+    campos_afetados: ["Diff_JSON"]
+    obrigatorio: true
+
+  - id: "RN-AUD-004"
+    descricao: >
+      Retenção Diferenciada por Categoria (SOX/LGPD) - Categorias críticas (FINANCIAL, LGPD,
+      SECURITY, EXPORT, ACCESS, CONFIG, CRUD) têm retenção 7 anos (SOX Seção 404, LGPD Art. 37/38/46,
+      ISO 27001). Categorias normais (AUTH, ADMIN, PRINT) têm retenção 1 ano. Job diário arquiva
+      registros > 1 ano em Azure Blob Cold Storage e deleta após expiração.
+    tipo: "regra_negocio"
+    campos_afetados: ["Tipo", "DataHora", "RetentionDate"]
+    obrigatorio: true
+
+  - id: "RN-AUD-005"
+    descricao: >
+      Imutabilidade Garantida (Append-Only) - Registros de auditoria são imutáveis após criação.
+      Tabela Sistema_Auditoria não permite UPDATE ou DELETE. Apenas INSERT (criar) e SELECT (ler).
+      Triggers de banco de dados bloqueiam qualquer tentativa de alteração/exclusão (RAISE ERROR).
+      Proteção contra adulteração de evidências forenses.
+    tipo: "seguranca"
+    campos_afetados: []
+    obrigatorio: true
+
+  - id: "RN-AUD-006"
+    descricao: >
+      Assinatura Digital SHA-256 - Registros críticos (FINANCIAL, SECURITY, LGPD, CONFIG) têm
+      hash SHA-256 calculado sobre (Timestamp + UserId + Entidade + EntidadeId + DadosNovos_JSON).
+      Stored em campo Hash_SHA256. Permite validar integridade: recalcular hash e comparar com
+      armazenado detecta adulteração. Endpoint /api/auditoria/{id}/validar-integridade.
+    tipo: "seguranca"
+    campos_afetados: ["Hash_SHA256"]
+    obrigatorio: true
+
+  - id: "RN-AUD-007"
+    descricao: >
+      Detecção de Anomalias - Detectar automaticamente padrões suspeitos: Exportações excessivas
+      (>100 em 1h), Acesso multi-tenant anormal (>50 empresas/dia), Operações fora de horário
+      (22h-6h exceto jobs automáticos). Gerar alerta para segurança/compliance. Dashboard
+      "Detecção de Anomalias" mostra eventos suspeitos ordenados por score de risco.
+    tipo: "seguranca"
+    campos_afetados: ["Tipo", "DataHora", "Usuario", "IP", "Tenant_Id"]
+    obrigatorio: true
+
+  - id: "RN-AUD-008"
+    descricao: >
+      Auditoria de LGPD - Operações LGPD têm tipos específicos: LGPD_ACCESS (acesso a dados pessoais),
+      LGPD_EXPORT (exportação/portabilidade), LGPD_CONSENT (aceite/revogação de consentimento),
+      LGPD_DELETION (exclusão de dados pessoais), LGPD_PORTABILITY (solicitação de portabilidade).
+      Retenção obrigatória 7 anos (LGPD Art. 37, 38, 46). Dashboard "Relatório LGPD" para auditorias.
+    tipo: "regra_negocio"
+    campos_afetados: ["Tipo", "Descricao"]
+    obrigatorio: true
+
+  - id: "RN-AUD-009"
+    descricao: >
+      Timeline de Entidade - Endpoint /api/auditoria/timeline?entidade={nome}&id={guid} retorna
+      histórico cronológico completo de mudanças de uma entidade específica. Mostra quem alterou
+      o quê, quando, de onde (IP), snapshot antes/depois, diff estruturado. Permite reconstruir
+      estado da entidade em qualquer momento do passado.
+    tipo: "regra_negocio"
+    campos_afetados: ["Entidade", "EntidadeId", "DataHora"]
+    obrigatorio: true
+
+  - id: "RN-AUD-010"
+    descricao: >
+      Contexto Enriquecido - Todo registro de auditoria inclui contexto completo: IP (origem do request),
+      User-Agent (navegador/app), Correlation ID (rastreamento end-to-end), Tenant (multi-tenancy),
+      Request ID (rastreamento interno), Session ID (sessão do usuário). Permite correlacionar
+      auditoria com logs técnicos (RF-003) e rastrear ataques/fraudes.
+    tipo: "regra_negocio"
+    campos_afetados: ["IP", "UserAgent", "CorrelationId", "Tenant_Id", "RequestId", "SessionId"]
+    obrigatorio: true
+
+  - id: "RN-AUD-011"
+    descricao: >
+      Arquivamento Automático (Cold Storage) - Registros > 1 ano são automaticamente arquivados
+      em Azure Blob Storage (tier Cold) por job noturno. Mantém-se registro em banco com flag
+      Arquivado=true e AzureBlobUri apontando para arquivo JSON compactado. Reduz custo de banco
+      (50M+ registros) mantendo compliance de retenção 7 anos.
+    tipo: "regra_negocio"
+    campos_afetados: ["DataHora", "Arquivado", "AzureBlobUri"]
+    obrigatorio: true
+
+  - id: "RN-AUD-012"
+    descricao: >
+      Segregação de Funções (SOX) - Detectar automaticamente violações de segregação de funções:
+      Mesmo usuário cria E aprova (ex: fatura), Desenvolvedor acessa dados produção sem ticket,
+      Admin altera próprias permissões sem aprovação. Gerar alerta crítico para auditoria.
+      Dashboard "Violações SOX" lista eventos ordenados por criticidade.
+    tipo: "seguranca"
+    campos_afetados: ["Usuario", "Tipo", "Entidade", "EntidadeId"]
+    obrigatorio: true
+
+  - id: "RN-AUD-013"
+    descricao: >
+      Auditoria de Configurações Críticas - Alterações em configurações de sistema críticas
+      (parâmetros, feature flags, permissões) exigem campo Justificativa obrigatório (min 20 caracteres).
+      Tipo CONFIG com retenção 7 anos (SOX). Endpoint rejeita request sem justificativa (HTTP 400).
+      Dashboard "Mudanças Críticas" mostra alterações em parâmetros com justificativa.
+    tipo: "regra_negocio"
+    campos_afetados: ["Tipo", "Justificativa"]
+    obrigatorio: true
+
+  - id: "RN-AUD-014"
+    descricao: >
+      Busca Full-Text Otimizada - Índice full-text em campos Descricao, DadosAnteriores_JSON,
+      DadosNovos_JSON permite busca rápida em milhões de registros. Queries suportadas: busca
+      por CPF mascarado, email, nome de usuário, IP, ID de entidade. Endpoint
+      /api/auditoria/buscar?q={termo}&periodo={dias}&tipo={categoria}.
+    tipo: "regra_negocio"
+    campos_afetados: ["Descricao", "DadosAnteriores_JSON", "DadosNovos_JSON"]
+    obrigatorio: true
+
+  - id: "RN-AUD-015"
+    descricao: >
+      Alertas de Retention Expirando - Job semanal verifica registros cuja retenção expira em
+      30 dias e envia alerta para compliance/auditoria. Permite decisão antes da exclusão
+      automática: estender retenção (caso específico), exportar para arquivo externo, ou deixar
+      expirar. Dashboard "Retenção" mostra próximas expirações ordenadas por data.
+    tipo: "regra_negocio"
+    campos_afetados: ["RetentionDate", "Tipo"]
+    obrigatorio: true
+
+estados:
+  observacao: >
+    RF004 não gerencia entidades com estados. Registros de auditoria são eventos imutáveis
+    (append-only) criados uma vez e nunca alterados. Não há transições de estado. Apenas
+    flag Arquivado=true quando movido para cold storage após 1 ano.
+
+transicoes:
+  permitidas: []
+  observacao: "Não aplicável - auditoria não tem ciclo de vida com transições."
+
+permissoes:
+  - codigo: "SYS.AUDITORIA.READ"
+    descricao: "Visualizar registros de auditoria (query básica, filtros simples)"
+    perfis: ["Super Admin", "Auditor", "Gerente Operações", "Admin Sistema", "Desenvolvedor"]
+
+  - codigo: "SYS.AUDITORIA.SEARCH"
+    descricao: "Buscar com filtros avançados (usuário, entidade, período, tipo, texto full-text)"
+    perfis: ["Super Admin", "Auditor", "Gerente Operações", "Admin Sistema"]
+
+  - codigo: "SYS.AUDITORIA.EXPORT"
+    descricao: "Exportar relatórios de compliance (CSV/JSON) para auditoria externa (LGPD, SOX, ISO)"
+    perfis: ["Super Admin", "Auditor", "Gerente Operações"]
+
+  - codigo: "SYS.AUDITORIA.TIMELINE"
+    descricao: "Visualizar timeline completa de entidade (histórico de mudanças, snapshots)"
+    perfis: ["Super Admin", "Auditor", "Gerente Operações", "Admin Sistema"]
+
+  - codigo: "SYS.AUDITORIA.COMPLIANCE"
+    descricao: "Acessar relatórios de compliance (LGPD, SOX, violações, anomalias)"
+    perfis: ["Super Admin", "Auditor"]
+
+  - codigo: "SYS.AUDITORIA.ANALYTICS"
+    descricao: "Visualizar dashboards analíticos (top usuários, top entidades, padrões)"
+    perfis: ["Super Admin", "Auditor", "Gerente Operações"]
+
+  - codigo: "SYS.AUDITORIA.READ_OWN"
+    descricao: "Visualizar apenas registros de auditoria do próprio usuário (self-service)"
+    perfis: ["Usuário Final"]
+
+integracoes:
+  internas:
+    - nome: "MediatR Interceptor (AuditingBehaviour)"
+      descricao: >
+        Pipeline de auditoria automática registra todas operações Commands/Queries que
+        alteram dados. Intercepta request antes de executar, captura snapshot before,
+        executa operação, captura snapshot after, calcula diff, salva auditoria.
+      obrigatoria: true
+
+    - nome: "Multi-Tenancy"
+      descricao: >
+        Todo registro de auditoria inclui Tenant_Id/EmpresaId para isolamento entre clientes.
+        Queries filtram automaticamente por tenant do usuário logado. Admin pode ver todos
+        tenants se tiver permissão SYS.AUDITORIA.READ_ALL_TENANTS.
+      obrigatoria: true
+
+    - nome: "Autenticacao"
+      descricao: >
+        Auditoria captura UserId de usuário autenticado (se request autenticado). Para operações
+        não autenticadas (webhooks, jobs), registra "SYSTEM" ou "JOB:{nome}". Campo Usuario
+        armazena email/username para facilitar busca.
+      obrigatoria: true
+
+    - nome: "RF-003 (Logs Técnicos)"
+      descricao: >
+        Auditoria (RF-004) complementa Logs (RF-003). Correlation ID permite correlacionar
+        registro de auditoria com logs técnicos. Exemplo: auditoria mostra "Fatura aprovada",
+        logs mostram API calls, SQL queries, performance. Juntos fornecem visão completa.
+      obrigatoria: true
+
+  externas:
+    - sistema: "Azure Blob Storage"
+      tipo: "Cold Storage"
+      descricao: "Arquivamento de registros > 1 ano (tier Cold) para compliance 7 anos com custo reduzido"
+      obrigatoria: false
+
+    - sistema: "Power BI / Tableau"
+      tipo: "Analytics"
+      descricao: "Dashboards executivos de compliance (LGPD, SOX, anomalias, tendências)"
+      obrigatoria: false
+
+    - sistema: "SIEM (Splunk / QRadar)"
+      tipo: "Security Analytics"
+      descricao: "Integração com SIEM para correlação de eventos de segurança e detecção de ataques"
+      obrigatoria: false
+
+catalog:
+  observacoes:
+    - id: "OBS-AUD-01"
+      title: "RF004 não tem CRUD tradicional"
+      description: >
+        Auditoria não permite criar, editar ou deletar registros manualmente. Registros são
+        gerados automaticamente pelo AuditingBehaviour<TRequest, TResponse> e purgados
+        automaticamente por job conforme política de retenção. Operações permitidas: listar,
+        buscar, visualizar timeline, exportar, validar integridade.
+      required: true
+
+    - id: "OBS-AUD-02"
+      title: "Diferença RF-003 vs RF-004"
+      description: >
+        RF-003 (Logs Técnicos): Logs de aplicação, performance, erros. Armazenamento Seq/Elasticsearch.
+        Retenção 90 dias padrão. Público: Desenvolvedores, DevOps.
+        RF-004 (Auditoria de Negócio): Ações de usuários, mudanças de dados. Armazenamento SQL Server.
+        Retenção 7 anos obrigatório. Público: Auditores, Compliance.
+      required: true
+
+    - id: "OBS-AUD-03"
+      title: "10 Categorias de Auditoria"
+      description: >
+        CRUD (7 anos), AUTH (1 ano), EXPORT (7 anos), ACCESS (7 anos), CONFIG (7 anos),
+        LGPD (7 anos), FINANCIAL (7 anos), SECURITY (7 anos), ADMIN (1 ano), PRINT (1 ano).
+        Categoria define retenção, criticidade, alertas, dashboards.
+      required: true
+
+    - id: "OBS-AUD-04"
+      title: "50+ milhões de registros em produção"
+      description: >
+        Sistema já está implementado e em produção com 50+ milhões de registros. Arquivamento
+        automático (> 1 ano → Azure Blob) é crítico para performance. Índices otimizados
+        em Tenant_Id, Usuario, Entidade, EntidadeId, DataHora, Tipo.
+      required: true
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00"  # Listar Registros de Auditoria
+    - "UC01"  # Buscar com Filtros Avançados
+    - "UC02"  # Visualizar Timeline de Entidade
+    - "UC03"  # Exportar Relatórios de Compliance (LGPD/SOX/ISO)
+    - "UC04"  # Visualizar Dashboards Analíticos
+    - "UC05"  # Detectar e Visualizar Anomalias
+    - "UC06"  # Validar Integridade (Hash SHA-256)
+    - "UC07"  # Visualizar Detalhes de Registro (Snapshot, Diff, Contexto)
+
+categorias_auditoria:
+  - codigo: "CRUD"
+    nome: "Criar, Ler, Atualizar, Deletar"
+    retencao_anos: 7
+    exemplos: ["Usuario criado", "Empresa editada", "Fatura deletada"]
+
+  - codigo: "AUTH"
+    nome: "Autenticação e Autorização"
+    retencao_anos: 1
+    exemplos: ["Login realizado", "Logout", "Senha alterada", "2FA habilitado"]
+
+  - codigo: "EXPORT"
+    nome: "Exportação de Dados"
+    retencao_anos: 7
+    exemplos: ["Relatório exportado CSV", "Lista de clientes exportada", "Backup manual"]
+
+  - codigo: "ACCESS"
+    nome: "Acesso a Dados Sensíveis"
+    retencao_anos: 7
+    exemplos: ["CPF consultado", "Dados financeiros visualizados", "Relatório acessado"]
+
+  - codigo: "CONFIG"
+    nome: "Configuração de Sistema"
+    retencao_anos: 7
+    exemplos: ["Parâmetro alterado", "Feature flag ativada", "Configuração SMTP modificada"]
+
+  - codigo: "LGPD"
+    nome: "Operações LGPD"
+    retencao_anos: 7
+    exemplos: ["Consentimento aceito", "Dados excluídos (direito ao esquecimento)", "Portabilidade solicitada"]
+
+  - codigo: "FINANCIAL"
+    nome: "Transações Financeiras"
+    retencao_anos: 7
+    exemplos: ["Fatura aprovada", "Pagamento processado", "Nota fiscal emitida"]
+
+  - codigo: "SECURITY"
+    nome: "Segurança"
+    retencao_anos: 7
+    exemplos: ["Permissão concedida", "Acesso bloqueado", "Tentativa de login falha", "Token revogado"]
+
+  - codigo: "ADMIN"
+    nome: "Administração"
+    retencao_anos: 1
+    exemplos: ["Job executado", "Cache limpo", "Índice recriado"]
+
+  - codigo: "PRINT"
+    nome: "Impressão"
+    retencao_anos: 1
+    exemplos: ["Relatório impresso", "Etiqueta gerada", "PDF baixado"]
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-29"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: >
+      Versão inicial estruturada em YAML. Migração de RF004.md v2.0 (440 linhas) para nova
+      governança v2.0 com separação estrita RF (contrato moderno) / RL (referência ao legado).
+      15 regras de negócio, 7 permissões RBAC, 10 categorias de auditoria com retenção
+      diferenciada (7 anos compliance, 1 ano operacional), 7-8 UCs esperados para cobertura 100%.
+      Sistema crítico para compliance LGPD/SOX/ISO 27001 com 50+ milhões de registros em produção.

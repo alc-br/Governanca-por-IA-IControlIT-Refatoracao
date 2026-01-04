@@ -1,0 +1,859 @@
+# Template de Referência ao Legado (RL-RF004.yaml)
+# Versão: 2.0 (Adequação para Automação e Rastreabilidade)
+# Data: 2025-12-29
+
+rf_id: RF004
+titulo: "Sistema de Auditoria e Logs do Sistema"
+
+legado:
+  sistema: "Tabela Auditoria Simples (VB.NET + ASP.NET Web Forms)"
+  versao: "IControlIT v1.0"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server (tabela Auditoria simples)"
+  multi_tenant: false
+  auditoria: "partial"  # Auditoria rudimentar (apenas texto livre sem snapshot)
+  configuracoes: "Nenhuma - auditoria não configurável"
+  criptografia: "none"
+  versionamento: "none"
+  cache: "none"
+  estrutura: "tabela_simples"  # 4 campos (Id, Usuario, Acao, Data)
+  compliance: "none"  # Não atendia LGPD, SOX, ISO 27001
+
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+referencias:
+  - id: "LEG-RF004-001"
+    tipo: "componente"
+    nome: "Tabela Auditoria (Id, Usuario VARCHAR(200), Acao VARCHAR(500), Data DATETIME)"
+    caminho: "Database/dbo.Auditoria"
+    descricao: |
+      Tabela SQL simples onde sistema legado registrava auditoria.
+      Estrutura:
+      ```sql
+      CREATE TABLE Auditoria (
+          Id INT IDENTITY(1,1) PRIMARY KEY,
+          Usuario VARCHAR(200),
+          Acao VARCHAR(500),
+          Data DATETIME DEFAULT GETDATE()
+      );
+      ```
+
+      Exemplo de dados reais:
+      ```
+      Id  | Usuario           | Acao                       | Data
+      1234| admin@test.com    | Empresa editada: Acme Corp | 2023-10-15 14:23:45
+      1235| admin@test.com    | Usuario criado: joao.silva | 2023-10-15 14:25:12
+      1236| admin@test.com    | Fatura aprovada: 12345     | 2023-10-15 14:27:33
+      ```
+
+      Problemas críticos (8 gaps):
+      1. ❌ Sem estrutura - Texto livre VARCHAR(500) não estruturado
+      2. ❌ Sem snapshot - Não armazenava estado antes/depois da entidade
+      3. ❌ Sem IP/User-Agent - Não rastreava origem do request
+      4. ❌ Sem retenção configurável - Registros nunca eram deletados
+      5. ❌ Sem imutabilidade - Permitia UPDATE/DELETE (adulteração possível)
+      6. ❌ Sem diff - Impossível saber QUAIS campos foram alterados
+      7. ❌ Sem categorização - Tudo era "Ação" genérica
+      8. ❌ Sem compliance - Não atendia LGPD, SOX, ISO 27001
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por Sistema_Auditoria estruturado (15+ campos):
+      - Snapshot completo antes/depois (DadosAnteriores_JSON, DadosNovos_JSON)
+      - Diff estruturado JSON Patch RFC 6902 (Diff_JSON)
+      - Contexto completo (IP, UserAgent, CorrelationId, Tenant_Id, RequestId, SessionId)
+      - 10 categorias (CRUD, AUTH, EXPORT, ACCESS, CONFIG, LGPD, FINANCIAL, SECURITY, ADMIN, PRINT)
+      - Retenção diferenciada (7 anos LGPD/SOX, 1 ano CRUD)
+      - Imutabilidade garantida (trigger bloqueia UPDATE/DELETE)
+      - Assinatura digital SHA-256 para registros críticos
+      - Detecção anomalias (exportações excessivas, acesso multi-tenant)
+      - Timeline de entidade (histórico cronológico completo)
+      - Arquivamento automático cold storage (Azure Blob > 1 ano)
+
+      Impacto:
+      - Eliminação de 8 problemas críticos de compliance
+      - Compliance LGPD Art. 37/38/46 (retenção, snapshot, auditoria operações)
+      - Compliance SOX Seção 404 (imutabilidade, retenção 7 anos, segregação funções)
+      - Compliance ISO 27001 (integridade verificável, assinatura digital)
+      - Capacidade forense (reconstruir estado histórico qualquer momento)
+      - 50M+ registros em produção migrados para novo modelo
+
+    rf_item_relacionado: "RN-AUD-001, RN-AUD-002, RN-AUD-003, RN-AUD-004, RN-AUD-005, RN-AUD-006"
+    uc_relacionado: "UC00, UC01, UC02, UC03, UC07"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF004-002"
+    tipo: "regra_negocio"
+    nome: "RegistrarAuditoria(usuario As String, acao As String) - Escrita manual sem snapshot"
+    caminho: "ic1_legado/IControlIT/App_Code/**/*.vb (code-behind)"
+    descricao: |
+      Método VB.NET para registrar auditoria manualmente (sem automação).
+
+      Código legado:
+      ```vb.net
+      Public Sub RegistrarAuditoria(usuario As String, acao As String)
+          Dim sql As String = "INSERT INTO Auditoria (Usuario, Acao, Data) VALUES (@Usuario, @Acao, GETDATE())"
+          Dim cmd As New SqlCommand(sql, connection)
+          cmd.Parameters.AddWithValue("@Usuario", usuario)
+          cmd.Parameters.AddWithValue("@Acao", acao)
+          cmd.ExecuteNonQuery()
+      End Sub
+
+      ' Uso típico (SEM SNAPSHOT!)
+      Try
+          Dim empresaNome As String = txtNome.Text
+          Dim sql As String = "UPDATE Empresa SET Nome = @Nome WHERE Id = @Id"
+          ' ... executa UPDATE
+          RegistrarAuditoria(Session("UserEmail"), "Empresa editada: " & empresaNome)
+      Catch ex As Exception
+          ' ... erro
+      End Try
+      ```
+
+      Problemas:
+      - Auditoria manual (alto risco de esquecer)
+      - Sem snapshot antes/depois (impossível reconstruir histórico)
+      - Sem diff (impossível saber QUAIS campos foram alterados)
+      - Sem IP/User-Agent (sem rastreabilidade origem)
+      - Sem correlation ID (sem correlação com logs técnicos RF-003)
+      - Sem categorização (tudo genérico)
+      - Sem validação de permissão (qualquer código podia auditar)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por AuditingBehaviour<TRequest, TResponse> (MediatR interceptor):
+      - Auditoria automática (intercepta todos Commands/Queries)
+      - Snapshot automático (captura estado before/after via reflection)
+      - Diff automático (JSON Patch RFC 6902 calculado)
+      - Contexto automático (IP, User-Agent, CorrelationId injetados via middleware)
+      - Categorização automática (baseada em tipo de operação)
+      - Fire-and-forget com retry (não bloqueia operação principal)
+      - Thread-safe por design (MediatR pipeline)
+      - Redução 100% risco de esquecer auditoria
+
+      Compatibilidade:
+      - Wrapper temporário RegistrarAuditoria() chama AuditService (30 dias)
+      - Permitir migração gradual código legado
+      - Remover wrapper após validação completa
+
+    rf_item_relacionado: "RN-AUD-001, RN-AUD-002, RN-AUD-003, RN-AUD-010"
+    uc_relacionado: "UC00, UC07"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF004-003"
+    tipo: "regra_negocio"
+    nome: "Sem Snapshot Antes/Depois (Impossível Reconstruir Histórico)"
+    caminho: "Database/dbo.Auditoria (comportamento sistêmico)"
+    descricao: |
+      Sistema legado NÃO armazenava snapshot do estado anterior/posterior.
+      Apenas texto livre descrevendo ação: "Empresa editada: Acme Corp".
+
+      Exemplo problema real:
+      - Registro auditoria: "Empresa editada: Acme Corp"
+      - QUAIS dados foram alterados? Desconhecido
+      - Qual era o valor ANTES? Desconhecido
+      - Qual é o valor DEPOIS? Desconhecido
+      - Compliance LGPD Art. 37 violado (registro incompleto)
+      - Investigação forense impossível
+
+      Impacto em compliance:
+      - LGPD Art. 37: controlador deve registrar operações completas
+      - SOX Seção 404: controles internos devem permitir auditoria completa
+      - ISO 27001: evidências devem permitir reconstrução de eventos
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por snapshot completo (DadosAnteriores_JSON, DadosNovos_JSON):
+      - Before: estado completo ANTES da operação (JSON serializado)
+      - After: estado completo DEPOIS da operação (JSON serializado)
+      - Formato: Entity Framework state tracking serializado
+      - Permite reconstruir estado de entidade em qualquer momento
+      - Permite responder: "Qual era o CNPJ da empresa em 15/10/2023?"
+
+      Para CREATE:
+      - Before = null
+      - After = entidade completa
+
+      Para UPDATE:
+      - Before = estado antigo
+      - After = estado novo
+
+      Para DELETE:
+      - Before = entidade completa
+      - After = null
+
+      Compliance alcançado:
+      - LGPD Art. 37 (registro operações completo)
+      - SOX Seção 404 (auditoria completa para compliance)
+      - ISO 27001 (reconstrução de eventos possível)
+
+    rf_item_relacionado: "RN-AUD-002"
+    uc_relacionado: "UC02, UC07"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF004-004"
+    tipo: "regra_negocio"
+    nome: "Sem Diff (Impossível Saber Quais Campos Mudaram)"
+    caminho: "Database/dbo.Auditoria (comportamento sistêmico)"
+    descricao: |
+      Sistema legado NÃO calculava diff entre estados.
+      Impossível queries como "quem alterou o CPF?" ou "qual campo foi modificado mais vezes?".
+
+      Exemplo problema real:
+      - Empresa tem 50 campos (Nome, CNPJ, Email, Telefone, etc.)
+      - Registro auditoria: "Empresa editada: Acme Corp"
+      - QUAIS dos 50 campos foram alterados? Desconhecido
+      - Query "listar mudanças no campo CNPJ" = impossível
+      - Auditoria inútil para investigação direcionada
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por diff estruturado (JSON Patch RFC 6902):
+      - Formato padrão: [{"op":"replace","path":"/Nome","value":"Novo Nome"}]
+      - Query SQL possível: "quem alterou campo X?"
+      - Dashboard: "campos mais modificados"
+      - Auditoria direcionada: "todas mudanças em CPF/CNPJ"
+
+      Exemplo diff real:
+      ```json
+      [
+        {"op": "replace", "path": "/Nome", "value": "Acme Corp"},
+        {"op": "replace", "path": "/Email", "value": "comercial@acme.com"}
+      ]
+      ```
+
+      Permite queries SQL:
+      - `WHERE Diff_JSON LIKE '%/CNPJ%'` → mudanças em CNPJ
+      - `WHERE Diff_JSON LIKE '%/Email%'` → mudanças em Email
+      - Índice full-text otimizado para buscas
+
+    rf_item_relacionado: "RN-AUD-003, RN-AUD-014"
+    uc_relacionado: "UC01, UC02, UC07"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF004-005"
+    tipo: "regra_negocio"
+    nome: "Sem Categorização (Tudo é Ação Genérica)"
+    caminho: "Database/dbo.Auditoria (comportamento sistêmico)"
+    descricao: |
+      Sistema legado NÃO categorizava auditoria.
+      Tudo era "Ação" genérica sem tipo definido.
+
+      Problemas:
+      - Impossível retenção diferenciada (LGPD 90 dias, SOX 7 anos)
+      - Impossível priorização (FINANCIAL vs CRUD)
+      - Impossível relatórios compliance (LGPD, SOX, ISO)
+      - Violação LGPD Art. 38 (retenção proporcional à finalidade)
+
+      Exemplo problema real:
+      - Fatura aprovada = ação genérica (deveria ser FINANCIAL 7 anos SOX)
+      - Login realizado = ação genérica (deveria ser AUTH 1 ano)
+      - Dados excluídos LGPD = ação genérica (deveria ser LGPD 7 anos)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por 10 categorias com retenção diferenciada:
+
+      Categorias críticas (7 anos):
+      - FINANCIAL: transações financeiras (SOX Seção 404)
+      - LGPD: operações dados pessoais (LGPD Art. 37/38/46)
+      - SECURITY: acesso, autenticação (ISO 27001)
+      - EXPORT: exportações dados (compliance)
+      - ACCESS: acesso dados sensíveis (LGPD)
+      - CONFIG: configurações sistema (rastreabilidade)
+      - CRUD: operações normais (troubleshooting)
+
+      Categorias normais (1 ano):
+      - AUTH: login, logout, senha
+      - ADMIN: jobs, cache, índices
+      - PRINT: impressões, PDFs
+
+      Compliance alcançado:
+      - LGPD Art. 38 (retenção proporcional)
+      - SOX Seção 404 (financeiro 7 anos)
+      - ISO 27001 (segurança 7 anos)
+
+      Dashboards:
+      - Relatório LGPD (apenas categoria LGPD)
+      - Relatório SOX (apenas categoria FINANCIAL)
+      - Relatório ISO 27001 (apenas categoria SECURITY)
+
+    rf_item_relacionado: "RN-AUD-004, RN-AUD-008"
+    uc_relacionado: "UC03, UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF004-006"
+    tipo: "regra_negocio"
+    nome: "Sem Imutabilidade (Adulteração Possível)"
+    caminho: "Database/dbo.Auditoria (comportamento sistêmico)"
+    descricao: |
+      Tabela legado permitia UPDATE e DELETE.
+      Auditoria NÃO era append-only (imutável).
+
+      Riscos críticos:
+      - Admin malicioso pode deletar registros comprometedores
+      - UPDATE pode adulterar evidências forenses
+      - Violação ISO 27001 (evidências devem ser imutáveis)
+      - Violação SOX (auditoria financeira deve ser inviolável)
+      - Investigações forenses sem validade legal
+
+      Exemplo cenário real:
+      - Admin deleta registros de auditoria antes de investigação
+      - Registros financeiros críticos adulterados
+      - Compliance SOX violado (multas SEC)
+      - Processo judicial sem evidências válidas
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por imutabilidade garantida (trigger SQL):
+      ```sql
+      CREATE TRIGGER TR_Sistema_Auditoria_Immutable
+      ON Sistema_Auditoria
+      FOR UPDATE, DELETE
+      AS
+      BEGIN
+          RAISERROR('Registros de auditoria são imutáveis (append-only). UPDATE/DELETE bloqueados.', 16, 1);
+          ROLLBACK TRANSACTION;
+      END;
+      ```
+
+      Proteção técnica:
+      - Trigger bloqueia UPDATE/DELETE mesmo via SQL direto (SSMS)
+      - Apenas INSERT/SELECT permitidos
+      - Arquivamento move para cold storage (não deleta)
+      - Retenção expirando move para arquivo ZIP (não deleta da auditoria principal)
+
+      Compliance alcançado:
+      - ISO 27001 (evidências imutáveis)
+      - SOX Seção 404 (auditoria financeira inviolável)
+      - LGPD Art. 46 (segurança dados)
+      - Validade legal em processos judiciais
+
+    rf_item_relacionado: "RN-AUD-005"
+    uc_relacionado: "UC06"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF004-007"
+    tipo: "regra_negocio"
+    nome: "Sem Retenção Configurável (Compliance LGPD/SOX Violado)"
+    caminho: "Database/dbo.Auditoria (comportamento sistêmico)"
+    descricao: |
+      Sistema legado NÃO tinha retenção automática.
+      Registros nunca eram deletados (crescimento indefinido).
+
+      Problemas críticos:
+      - Violação LGPD Art. 15/16 (reter dados além do necessário)
+      - Violação SOX Seção 404 (financeiro deve reter 7 anos, não menos, não mais)
+      - Custos crescentes (50M+ registros)
+      - Performance degradada (queries lentas)
+      - Backup lento (terabytes históricos)
+
+      Exemplo problema real:
+      - Registros de 2015 ainda presentes (9 anos)
+      - LGPD exige deletar dados não críticos após 90 dias
+      - Custo SQL Server: $5k/mês (tabela enorme)
+      - Query "últimos 30 dias" leva 15 segundos (scan completo)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por retenção diferenciada automática (job diário):
+
+      Retenção por categoria:
+      - CRUD: 7 anos (troubleshooting + compliance)
+      - AUTH: 1 ano (segurança recente)
+      - EXPORT: 7 anos (compliance LGPD)
+      - ACCESS: 7 anos (compliance LGPD)
+      - CONFIG: 7 anos (rastreabilidade)
+      - LGPD: 7 anos (LGPD Art. 37/38/46)
+      - FINANCIAL: 7 anos (SOX Seção 404)
+      - SECURITY: 7 anos (ISO 27001)
+      - ADMIN: 1 ano (operacional)
+      - PRINT: 1 ano (não crítico)
+
+      Arquivamento automático:
+      - Registros > 1 ano → Azure Blob Storage (tier Cold)
+      - Compressão GZIP (redução 80% tamanho)
+      - Custo reduzido 70% (cold storage vs SQL Server)
+      - Consulta via Azure Blob quando necessário
+      - Mantém compliance sem explodir custos
+
+      Alertas:
+      - 30 dias antes expiração → email compliance/auditoria
+      - Permite decisão: estender retenção caso específico ou deixar expirar
+
+      Compliance alcançado:
+      - LGPD Art. 15/16 (reter apenas necessário)
+      - SOX Seção 404 (financeiro 7 anos exatos)
+      - ISO 27001 (segurança 7 anos)
+
+      ROI:
+      - Economia $3.5k/mês (cold storage vs SQL Server)
+      - Performance 90% melhor (tabela menor)
+
+    rf_item_relacionado: "RN-AUD-004, RN-AUD-011, RN-AUD-015"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF004-008"
+    tipo: "regra_negocio"
+    nome: "Sem Contexto (IP, User-Agent, Correlation ID)"
+    caminho: "Database/dbo.Auditoria (comportamento sistêmico)"
+    descricao: |
+      Sistema legado NÃO capturava contexto do request.
+      Apenas Usuario e Acao (sem IP, User-Agent, Correlation ID, etc.).
+
+      Problemas investigação:
+      - Impossível rastrear origem geográfica (IP)
+      - Impossível correlacionar com logs técnicos (RF-003)
+      - Impossível identificar navegador/app (User-Agent)
+      - Impossível rastrear multi-tenant (Tenant_Id)
+      - Investigação de fraude ineficaz
+
+      Exemplo problema real:
+      - Registro: "Usuario admin@test.com editou Empresa"
+      - De qual IP? Desconhecido
+      - Qual navegador? Desconhecido
+      - Qual tenant (multi-tenancy)? Desconhecido
+      - Qual request (correlation ID)? Desconhecido
+      - Investigação fraude impossível
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por contexto enriquecido completo:
+      - IP: origem do request (IPv4/IPv6)
+      - UserAgent: navegador/app (Mozilla/5.0, mobile, etc.)
+      - CorrelationId: GUID para correlacionar com logs RF-003
+      - Tenant_Id: multi-tenancy (isolamento entre clientes)
+      - RequestId: rastreamento interno ASP.NET
+      - SessionId: sessão do usuário (múltiplos requests)
+
+      Exemplo registro completo:
+      ```json
+      {
+        "Usuario": "admin@test.com",
+        "UserId": "user-guid",
+        "Tenant_Id": "tenant-123",
+        "IP": "192.168.1.100",
+        "UserAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "CorrelationId": "corr-123-456-789",
+        "RequestId": "req-abc-def-ghi",
+        "SessionId": "sess-xyz-123-456"
+      }
+      ```
+
+      Capacidades investigação:
+      - Rastrear origem geográfica (IP → GeoIP lookup)
+      - Correlacionar com logs técnicos (CorrelationId)
+      - Identificar dispositivo (UserAgent parsing)
+      - Filtrar por tenant (multi-tenancy)
+      - Detectar padrões (mesmo IP, múltiplos usuários = suspeito)
+      - Compliance LGPD (rastreabilidade completa)
+
+    rf_item_relacionado: "RN-AUD-010"
+    uc_relacionado: "UC01, UC02, UC05, UC07"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# Telas Legadas
+telas:
+  - id: "LEG-RF004-TELA-001"
+    nome: "INEXISTENTE"
+    caminho: null
+    responsabilidade: "Sistema legado NÃO tinha interface web para visualizar auditoria"
+    campos: []
+    comportamentos_implicitos:
+      - "Acesso via SQL Server Management Studio (SSMS) obrigatório"
+      - "Queries SQL manuais: SELECT * FROM Auditoria WHERE Usuario LIKE '%admin%'"
+      - "Sem autenticação específica (qualquer admin banco podia ler)"
+      - "Sem auditoria de quem consultou auditoria (meta-auditoria zero)"
+      - "Sem filtros interativos (data range, usuário, entidade)"
+      - "Sem timeline de entidade"
+      - "Sem export CSV/JSON (copy/paste manual)"
+
+# WebServices Legados
+servicos:
+  - id: "LEG-RF004-SVC-001"
+    nome: "INEXISTENTE"
+    localizacao: null
+    responsabilidade: "Sistema legado não expunha API para visualização de auditoria"
+    notas: "Auditoria lida diretamente via queries SQL em SSMS"
+
+# Tabelas Legadas
+tabelas:
+  - nome: "Auditoria"
+    finalidade: "Registrar ações de usuários em texto livre"
+    problemas:
+      - "Estrutura simples (4 campos apenas: Id, Usuario, Acao, Data)"
+      - "Sem snapshot antes/depois"
+      - "Sem diff estruturado"
+      - "Sem IP/User-Agent"
+      - "Sem categorização (tudo genérico)"
+      - "Sem retenção configurável (crescimento indefinido)"
+      - "Sem imutabilidade (permitia UPDATE/DELETE)"
+      - "Sem assinatura digital (sem validação integridade)"
+      - "Sem compliance (LGPD, SOX, ISO 27001)"
+
+# Regras de Negócio Implícitas (não documentadas no legado)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      Auditoria era registrada manualmente (cada tela chamava RegistrarAuditoria explicitamente).
+      Alto risco de esquecer auditoria em novas funcionalidades.
+    fonte: "Análise code-behind VB.NET (*.aspx.vb)"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Formato auditoria era fixo: `{Usuario} - {Acao} - {Data}`.
+      Não estruturado, impossível parsear campos.
+    fonte: "Método RegistrarAuditoria() em App_Code/**/*.vb"
+
+  - id: "RL-RN-003"
+    descricao: |
+      Não havia snapshot do estado anterior (impossível reconstruir histórico).
+      Violação LGPD Art. 37 (registro incompleto).
+    fonte: "Análise tabela Auditoria (apenas campo Acao VARCHAR(500))"
+
+  - id: "RL-RN-004"
+    descricao: |
+      Não havia diff (impossível saber QUAIS campos foram alterados).
+      Auditoria inútil para investigação direcionada.
+    fonte: "Análise tabela Auditoria (sem campo Diff)"
+
+  - id: "RL-RN-005"
+    descricao: |
+      Não havia IP ou User-Agent (impossível rastrear origem de ações suspeitas).
+      Investigação de fraude ineficaz.
+    fonte: "Análise tabela Auditoria (sem campos IP/UserAgent)"
+
+  - id: "RL-RN-006"
+    descricao: |
+      Não havia categorização (CRUD, AUTH, EXPORT, FINANCIAL, LGPD, etc.).
+      Impossível retenção diferenciada (compliance LGPD/SOX violado).
+    fonte: "Análise tabela Auditoria (sem campo Tipo/Categoria)"
+
+  - id: "RL-RN-007"
+    descricao: |
+      Não havia retenção automática (registros nunca eram deletados).
+      Violação LGPD Art. 15/16 (reter dados além do necessário).
+    fonte: "Análise registros históricos (dados de 2015 ainda presentes)"
+
+  - id: "RL-RN-008"
+    descricao: |
+      Não havia imutabilidade garantida (permitia UPDATE/DELETE na tabela).
+      Adulteração de evidências forenses possível.
+    fonte: "Análise DDL tabela Auditoria (sem trigger imutabilidade)"
+
+  - id: "RL-RN-009"
+    descricao: |
+      Não havia assinatura digital (sem validação de integridade).
+      Impossível detectar adulteração de registros críticos.
+    fonte: "Análise tabela Auditoria (sem campo Hash_SHA256)"
+
+  - id: "RL-RN-010"
+    descricao: |
+      Não havia auditoria de operações LGPD (acesso, exportação, consentimento, exclusão).
+      Compliance LGPD Art. 37/38 violado.
+    fonte: "Análise registros auditoria (sem tipos LGPD_ACCESS, LGPD_EXPORT, etc.)"
+
+  - id: "RL-RN-011"
+    descricao: |
+      Não havia timeline de entidade (impossível ver histórico cronológico).
+      Troubleshooting de problemas históricos ineficaz.
+    fonte: "Análise tabela Auditoria (sem índice Entidade+EntidadeId+Data)"
+
+  - id: "RL-RN-012"
+    descricao: |
+      Não havia detecção de anomalias (exportações excessivas, acesso multi-tenant).
+      Vazamentos de dados não detectados proativamente.
+    fonte: "Análise código VB.NET (sem regras de detecção)"
+
+  - id: "RL-RN-013"
+    descricao: |
+      Não havia segregação de funções (SOX violations não eram detectadas).
+      Exemplo: mesmo usuário cria E aprova fatura (SOX violado).
+    fonte: "Análise código VB.NET (sem validação segregação)"
+
+  - id: "RL-RN-014"
+    descricao: |
+      Não havia arquivamento (custos crescentes com milhões de registros).
+      SQL Server caro para 50M+ registros (sem cold storage).
+    fonte: "Análise custo SQL Server ($5k/mês tabela enorme)"
+
+  - id: "RL-RN-015"
+    descricao: |
+      Não havia alertas de retenção expirando (compliance reativo, não proativo).
+      Registros deletados automaticamente sem revisão prévia.
+    fonte: "Análise processo compliance (manual, reativo)"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Estrutura auditoria"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: texto livre VARCHAR(500). Moderno: JSON snapshots before/after"
+
+  - item: "Diff estruturado"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem diff. Moderno: JSON Patch RFC 6902"
+
+  - item: "IP/User-Agent/Correlation ID"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem contexto. Moderno: contexto completo (IP, UserAgent, CorrelationId, Tenant, Request, Session)"
+
+  - item: "Categorização"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem categorias. Moderno: 10 categorias (CRUD, AUTH, EXPORT, ACCESS, CONFIG, LGPD, FINANCIAL, SECURITY, ADMIN, PRINT)"
+
+  - item: "Retenção configurável"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: indefinida (nunca deletado). Moderno: diferenciada (7 anos LGPD/SOX, 1 ano CRUD)"
+
+  - item: "Imutabilidade"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: permitia UPDATE/DELETE. Moderno: append-only (trigger bloqueia)"
+
+  - item: "Assinatura digital"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem hash. Moderno: SHA-256 para registros críticos"
+
+  - item: "Timeline entidade"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem timeline. Moderno: histórico cronológico completo"
+
+  - item: "Exportação compliance"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: copy/paste SSMS. Moderno: CSV/JSON via API"
+
+  - item: "Detecção anomalias"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem detecção. Moderno: alertas automáticos (>100 exports/h, >50 tenants/dia)"
+
+  - item: "Segregação funções SOX"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem detecção. Moderno: detecta violações (mesmo usuário cria+aprova)"
+
+  - item: "Arquivamento cold storage"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem arquivamento. Moderno: Azure Blob > 1 ano (reduz custo 70%)"
+
+  - item: "Auditoria LGPD"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem tipos LGPD. Moderno: LGPD_ACCESS, LGPD_EXPORT, LGPD_CONSENT, LGPD_DELETION, LGPD_PORTABILITY"
+
+  - item: "Interface web"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: SSMS queries manuais. Moderno: interface web com filtros, timeline, dashboards"
+
+  - item: "Busca full-text"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: SQL LIKE manual. Moderno: índice full-text otimizado"
+
+  - item: "Alertas retention"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem alertas. Moderno: alerta 30 dias antes expiração"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Tabela Sistema_Auditoria estruturada (JSON snapshots + diff)"
+    motivo: |
+      Compliance LGPD/SOX exige snapshot completo antes/depois.
+      Diff estruturado permite queries "quem alterou o CPF?".
+      Timeline permite reconstruir estado entidade qualquer momento.
+    impacto: "alto"
+    data: "2025-11-04"
+
+  - decisao: "AuditingBehaviour<TRequest, TResponse> (MediatR interceptor)"
+    motivo: |
+      Auditoria automática elimina risco esquecer.
+      Snapshot automático captura estado without código manual.
+      DRY: lógica centralizada (não repetida em cada tela).
+    impacto: "medio"
+    data: "2025-11-04"
+
+  - decisao: "10 categorias de auditoria (CRUD, AUTH, EXPORT, etc.)"
+    motivo: |
+      Retenção diferenciada: LGPD/SOX/Financial = 7 anos, CRUD/Admin = 1 ano.
+      Compliance LGPD exige tipos específicos (LGPD_ACCESS, LGPD_EXPORT, etc.).
+      Dashboards categorização permite relatórios executivos.
+    impacto: "baixo"
+    data: "2025-11-04"
+
+  - decisao: "Imutabilidade garantida (trigger SQL)"
+    motivo: |
+      Proteção forense: auditoria não pode ser adulterada.
+      Compliance ISO 27001: evidências devem ser imutáveis.
+      SOX: registros financeiros não podem ser modificados.
+    impacto: "baixo"
+    data: "2025-11-04"
+
+  - decisao: "Assinatura digital SHA-256"
+    motivo: |
+      Validação integridade: detectar adulteração registros críticos.
+      Compliance ISO 27001: evidências devem ter integridade verificável.
+      Auditoria forense: provar que registro não foi modificado.
+    impacto: "baixo"
+    data: "2025-11-04"
+
+  - decisao: "Arquivamento automático (Azure Blob cold storage)"
+    motivo: |
+      Custos: SQL Server caro para 50M+ registros (redução 70% com cold storage).
+      Performance: tabela menor = queries mais rápidas.
+      Compliance: manter retenção 7 anos sem explodir custos.
+    impacto: "medio"
+    data: "2025-11-04"
+
+  - decisao: "Detecção anomalias automática"
+    motivo: |
+      Segurança proativa: detectar exportações excessivas antes vazamento.
+      LGPD: monitorar acesso dados pessoais (compliance Art. 46).
+      Fraude: detectar padrões suspeitos (acesso 50+ empresas/dia).
+    impacto: "medio"
+    data: "2025-11-04"
+
+  - decisao: "Segregação de funções (SOX)"
+    motivo: |
+      Compliance SOX Seção 404: mesmo usuário não pode criar E aprovar.
+      Auditoria: detectar violações automaticamente.
+      Governança: dashboard "Violações SOX" para compliance.
+    impacto: "medio"
+    data: "2025-11-04"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Migração dados históricos (50M+ registros legado)"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      Não migrar dados históricos (legado mantido read-only para consulta).
+      Sistema novo começa limpo (geração progressiva).
+      Export legado para arquivo ZIP (backup compliance).
+
+  - risco: "Snapshots grandes (JSON) consumirem espaço"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Arquivamento automático > 1 ano (Azure Blob comprimido GZIP 80%).
+      Retenção diferenciada (1 ano CRUD, 7 anos LGPD/SOX).
+      Monitoramento custos Azure (alertas se > budget).
+
+  - risco: "Overhead performance (snapshot + diff)"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      Auditoria assíncrona (fire-and-forget).
+      Não bloqueia operação principal (MediatR pipeline).
+      Testes carga antes PRD (validar latência P95 < 3s).
+
+  - risco: "Hash SHA-256 aumentar latência"
+    impacto: "baixo"
+    probabilidade: "baixa"
+    mitigacao: |
+      Calcular hash apenas categorias críticas (FINANCIAL, SECURITY, LGPD, CONFIG).
+      Não calcular para CRUD/AUTH/ADMIN/PRINT (overhead desnecessário).
+
+  - risco: "Detecção anomalias gerar falsos positivos"
+    impacto: "baixo"
+    probabilidade: "media"
+    mitigacao: |
+      Calibrar thresholds: >100 exports/h (não 10/h).
+      Alertas configuráveis por categoria.
+      Período observação 30 dias antes ativar alertas PRD.
+
+  - risco: "Retenção 7 anos custar caro"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Cold storage (Azure Blob tier Cold) após 1 ano reduz custo 70%+.
+      Compressão GZIP (redução 80% tamanho).
+      Apenas categorias críticas 7 anos (LGPD, SOX, FINANCIAL, SECURITY).
+
+  - risco: "Falta auditoria durante deploy"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      Circuit breaker: se auditoria falhar, logar localmente + retry + alerta.
+      Não bloquear operação principal (fire-and-forget).
+      Validação completa DEV/HOM antes PRD.
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "Tabela Auditoria (Id, Usuario, Acao, Data)"
+    referencia_rf: "RN-AUD-001, RN-AUD-002, RN-AUD-003, RN-AUD-004, RN-AUD-005, RN-AUD-006"
+    referencia_uc: "UC00, UC01, UC02, UC03, UC07"
+    status: "migrado"
+
+  - elemento_legado: "RegistrarAuditoria(usuario, acao)"
+    referencia_rf: "RN-AUD-001, RN-AUD-002, RN-AUD-003, RN-AUD-010"
+    referencia_uc: "UC00, UC07"
+    status: "migrado"
+
+  - elemento_legado: "Sem snapshot antes/depois"
+    referencia_rf: "RN-AUD-002"
+    referencia_uc: "UC02, UC07"
+    status: "migrado"
+
+  - elemento_legado: "Sem diff"
+    referencia_rf: "RN-AUD-003, RN-AUD-014"
+    referencia_uc: "UC01, UC02, UC07"
+    status: "migrado"
+
+  - elemento_legado: "Sem categorização"
+    referencia_rf: "RN-AUD-004, RN-AUD-008"
+    referencia_uc: "UC03, UC04"
+    status: "migrado"
+
+  - elemento_legado: "Sem imutabilidade"
+    referencia_rf: "RN-AUD-005"
+    referencia_uc: "UC06"
+    status: "migrado"
+
+  - elemento_legado: "Sem retenção configurável"
+    referencia_rf: "RN-AUD-004, RN-AUD-011, RN-AUD-015"
+    referencia_uc: "UC03"
+    status: "migrado"
+
+  - elemento_legado: "Sem contexto (IP, User-Agent, Correlation ID)"
+    referencia_rf: "RN-AUD-010"
+    referencia_uc: "UC01, UC02, UC05, UC07"
+    status: "migrado"
+
+# Changelog
+changelog:
+  - versao: "2.0"
+    data: "2025-12-29"
+    descricao: "Documentação completa estruturada YAML - 8 referências legado com destino definido, gap analysis 16 itens, 8 decisões modernização, 7 riscos migração, rastreabilidade completa. Sistema crítico compliance LGPD/SOX/ISO 27001 com 50M+ registros produção."
+    autor: "Agência ALC - alc.dev.br"
+
+  - versao: "1.0"
+    data: "2025-11-04"
+    descricao: "Versão inicial (DESCONTINUADA)"
+    autor: "Equipe Projeto"

@@ -1,0 +1,639 @@
+rf_id: RF031
+rf_code: RF-031
+versao: "2.0"
+data_versao: "2025-12-30"
+titulo: "Gestão de Plano de Contas Contábil Multi-Dimensional"
+epic: EPIC006-FIN-Financeiro-Base
+fase: "Fase 3 - Financeiro I - Base Contábil"
+autor: "Agência ALC - alc.dev.br"
+prioridade: ALTA
+complexidade: ALTA
+estimativa_horas: 120
+
+objetivo: |
+  Prover sistema completo de gestão de plano de contas contábil multi-dimensional que permita
+  classificação, rateio e análise financeira de despesas de Telecom e TI, eliminando re-trabalho
+  manual de classificação (de 120h/mês para 5h/mês), garantindo conformidade fiscal com
+  rastreabilidade total para auditorias externas e fornecendo visibilidade multi-dimensional de
+  custos para tomada de decisão estratégica.
+
+impacto_negocio:
+  reducao_tempo_classificacao: "96% (120h/mês → 5h/mês)"
+  economia_anual_rh: "R$ 67.000"
+  reducao_erros: "18% → <2%"
+  economia_anual_retrabalho: "R$ 95.000"
+  roi_meses: 4
+  conformidade_fiscal: "100% rastreável"
+
+escopo:
+  funcionalidades:
+    - hierarquia_7_niveis_configuravel
+    - builder_visual_drag_drop
+    - centros_custo_hierarquia_organizacional
+    - dimensoes_customizaveis_ilimitadas
+    - regras_classificacao_automatica
+    - importacao_multi_layout_erp
+    - exportacao_lancamentos_de
+    - relatorios_dre_multi_dimensionais
+    - orcamento_vs_realizado
+    - auditoria_completa_versionada
+    - validacao_contabil_20_regras
+    - reconciliacao_fuzzy_matching
+    - integracao_bidirecional_erp
+    - isolamento_multi_tenant
+    - soft_delete_versionado
+
+  fora_escopo:
+    - interface_visual_especifica
+    - tecnologia_implementacao
+    - layout_ux_ui
+    - estrategia_deploy
+    - modelo_ml_especifico
+    - formato_arquivo_especifico
+
+regras_negocio:
+  - id: RN-RF031-01
+    titulo: "Estrutura Hierárquica Configurável até 7 Níveis"
+    descricao: "Sistema DEVE suportar estrutura de plano de contas hierárquica com até 7 níveis configuráveis por Cliente"
+    prioridade: CRITICA
+    niveis_padrao:
+      - nivel: 1
+        nome: "Classe"
+        exemplo: "1-Ativo, 5-Despesas"
+      - nivel: 2
+        nome: "Grupo"
+        exemplo: "5.1-Despesas Administrativas"
+      - nivel: 3
+        nome: "Subgrupo"
+        exemplo: "5.1.2-Despesas Gerais"
+      - nivel: 4
+        nome: "Conta"
+        exemplo: "5.1.2.01-Despesas Telecom"
+      - nivel: 5
+        nome: "Subconta"
+        exemplo: "5.1.2.01.001-Telefonia Móvel"
+      - nivel: 6
+        nome: "Item"
+        exemplo: "5.1.2.01.001.01-Linhas Executivos"
+      - nivel: 7
+        nome: "Detalhe"
+        exemplo: "5.1.2.01.001.01.001-Vivo Plano Controle"
+    validacoes:
+      - "Código contábil único dentro do ClienteId"
+      - "Herança de propriedades do pai"
+      - "Máximo 7 níveis de profundidade"
+    criterios_aceite:
+      - "Criar conta níveis 1-7 → aceitar"
+      - "Código duplicado → HTTP 400"
+      - "Nível > 7 → HTTP 400"
+
+  - id: RN-RF031-02
+    titulo: "Builder Visual com Preview de Impacto"
+    descricao: "Interface DEVE permitir reorganização via drag-and-drop com preview impacto"
+    prioridade: ALTA
+    operacoes:
+      - criar_conta
+      - mover_conta
+      - excluir_conta
+      - renomear_conta
+    preview_obrigatorio:
+      - qtd_lancamentos_afetados
+      - relatorios_impactados
+      - usuarios_regras_afetados
+    validacoes:
+      - "Detectar loop circular"
+      - "Aprovação Controller/CFO para níveis 1-3"
+    criterios_aceite:
+      - "Mover conta → exibir preview"
+      - "Loop circular → HTTP 400"
+
+  - id: RN-RF031-03
+    titulo: "Centros de Custo com Hierarquia Organizacional"
+    descricao: "Integrar centros custo com hierarquia permitindo rateio automático multi-nível"
+    prioridade: ALTA
+    rateio_cascata: true
+    hierarquia:
+      - Cliente
+      - Conglomerado
+      - Empresa
+      - Filial
+      - Departamento
+      - Setor
+    validacoes:
+      - "Soma percentuais = 100% em cada nível"
+      - "Versionamento de mudanças com data vigência"
+    criterios_aceite:
+      - "Configurar rateio → validar soma 100%"
+      - "Soma ≠ 100% → HTTP 400"
+
+  - id: RN-RF031-04
+    titulo: "Dimensões Customizáveis Ilimitadas"
+    descricao: "Suportar dimensões customizadas além de centros custo padrão"
+    prioridade: ALTA
+    tipos_dimensao:
+      - Projeto
+      - Produto
+      - Cliente
+      - Regiao
+      - Canal_Venda
+    tipos_alocacao:
+      - Percentual
+      - Absoluto
+      - Unitario
+    criterios_aceite:
+      - "Criar dimensão customizada → aceitar"
+      - "Dimensão obrigatória sem alocação → HTTP 400"
+
+  - id: RN-RF031-05
+    titulo: "Regras de Classificação Automática"
+    descricao: "Classificar lançamentos automaticamente via regras configuráveis"
+    prioridade: ALTA
+    templates_pre_definidos: 50
+    builder_visual: true
+    operadores:
+      - igual
+      - diferente
+      - maior_que
+      - menor_que
+      - contem
+      - nao_contem
+      - comeca_com
+      - termina_com
+      - regex
+    meta_match: ">95%"
+    criterios_aceite:
+      - "Criar regra customizada → aplicar"
+      - "Simular regra → exibir impacto"
+
+  - id: RN-RF031-06
+    titulo: "Importação Multi-Layout de ERPs"
+    descricao: "Importar plano contas de múltiplos ERPs com templates configuráveis"
+    prioridade: ALTA
+    erps_suportados:
+      - SAP_FI_CO
+      - TOTVS_Protheus_12
+      - Oracle_Financials
+      - Sankhya
+      - Conta_Azul
+      - Omie
+    validacoes_pre_importacao:
+      - formato_correto
+      - encoding_detectado
+      - campos_obrigatorios
+      - codigos_nao_duplicados
+      - hierarquia_sem_loops
+    preview_linhas: 10
+    criterios_aceite:
+      - "Importar SAP válido → sucesso"
+      - "Formato inválido → HTTP 400"
+      - "Código duplicado → HTTP 409"
+
+  - id: RN-RF031-07
+    titulo: "Exportação Lançamentos D-E (Débito-Crédito)"
+    descricao: "Gerar arquivo contábil com validação partida dobrada"
+    prioridade: CRITICA
+    formatos:
+      - TXT_delimitado
+      - CSV
+      - XML
+      - JSON
+    validacao_partida_dobrada: true
+    tolerancia_arredondamento: 0.01
+    preview_obrigatorio: true
+    criterios_aceite:
+      - "Exportar → validar partida dobrada"
+      - "Débitos ≠ créditos → HTTP 400"
+      - "Conta inválida → HTTP 422"
+
+  - id: RN-RF031-08
+    titulo: "Relatórios DRE Multi-Dimensionais"
+    descricao: "Gerar DRE com filtros multi-dimensionais e drill-down ilimitado"
+    prioridade: ALTA
+    filtros:
+      - Periodo
+      - Centro_Custo
+      - Projeto
+      - Departamento
+      - Regiao
+      - Comparacao_MoM_YoY_Orcado
+    estrutura_dre:
+      - Receita_Bruta
+      - Receita_Liquida
+      - Lucro_Bruto
+      - EBITDA
+      - EBIT
+      - LAIR
+      - Lucro_Liquido
+    drill_down: ilimitado
+    analises:
+      - vertical
+      - horizontal
+    criterios_aceite:
+      - "Gerar DRE filtrado → exibir dados filtrados"
+      - "Drill-down → listar lançamentos"
+
+  - id: RN-RF031-09
+    titulo: "Orçamento vs. Realizado com Alertas"
+    descricao: "Cadastrar orçamento anual com comparação real x orçado tempo real"
+    prioridade: ALTA
+    alertas_automaticos:
+      - nivel: amarelo
+        gatilho: "80% orçado com >5 dias úteis"
+        acao: email
+      - nivel: vermelho
+        gatilho: "100% orçado"
+        acao: email_push
+      - nivel: critico
+        gatilho: ">110% orçado"
+        acao: escala_controller
+    forecast_ml: true
+    criterios_aceite:
+      - "Conta atingir 100% → disparar alerta"
+      - "Orçamento sem valor obrigatório → HTTP 400"
+      - "Sem permissão aprovar → HTTP 403"
+
+  - id: RN-RF031-10
+    titulo: "Auditoria Completa com Trilha de Mudanças"
+    descricao: "Manter histórico completo de alterações com versionamento"
+    prioridade: CRITICA
+    eventos_auditados:
+      - criacao_conta
+      - edicao_conta
+      - exclusao_conta
+      - mudanca_hierarquia
+      - alteracao_centro_custo
+      - alteracao_regras
+      - importacao_exportacao
+      - alteracao_orcamento
+      - aprovacao_workflows
+    campos_trilha:
+      - EventoId
+      - Tipo
+      - Usuario
+      - DataHora
+      - IP
+      - ValorAnterior
+      - ValorNovo
+      - Justificativa
+      - AprovadorId
+      - Status
+    retencao_anos: 7
+    imutabilidade: true
+    criterios_aceite:
+      - "Alteração estrutural → gerar registro auditoria"
+      - "Consultar auditoria → listar eventos"
+      - "Retenção 7 anos → preservar"
+
+  - id: RN-RF031-11
+    titulo: "Validação Contábil com 20+ Regras Fiscais"
+    descricao: "Executar validações contábeis automáticas pré-save"
+    prioridade: CRITICA
+    qtd_regras: 20
+    regras_principais:
+      - lancamento_apenas_analitica
+      - partida_dobrada
+      - data_periodo_aberto
+      - codigo_existe_ativo
+      - centro_custo_obrigatorio
+      - valor_positivo
+      - historico_minimo_10_chars
+      - documento_unico
+      - hierarquia_valida
+      - dimensao_obrigatoria
+    severidades:
+      - Bloqueante
+      - Advertencia
+      - Informativa
+    criterios_aceite:
+      - "Lançamento conta Sintética → HTTP 400"
+      - "Validação falhar → lista detalhada erros"
+
+  - id: RN-RF031-12
+    titulo: "Reconciliação Automática com Fuzzy Matching"
+    descricao: "Reconciliar lançamentos importados com contas usando fuzzy matching"
+    prioridade: ALTA
+    algoritmos:
+      - match_exato: 100%
+      - fuzzy_nome: "≥85%"
+      - historico_fornecedor: true
+      - machine_learning: true
+    status:
+      - conciliado: "100%"
+      - sugestao: "85-99%"
+      - nao_conciliado: "<85%"
+    aprendizado: true
+    meta_sucesso: ">90%"
+    criterios_aceite:
+      - "Match exato → conciliar automático"
+      - "Match 90% → sugerir confirmação"
+
+  - id: RN-RF031-13
+    titulo: "Integração Bidirecional com ERP Financeiro"
+    descricao: "Integrar com ERPs via API REST ou batch files"
+    prioridade: ALTA
+    fluxos:
+      - direcao: ERP_para_IControlIT
+        frequencia: diario_03h_UTC
+        conteudo: estrutura_plano_contas
+      - direcao: IControlIT_para_ERP
+        trigger: aprovacao_usuario
+        conteudo: lancamentos_de
+    autenticacao: OAuth2_refresh_token
+    storage_secrets: Azure_Key_Vault
+    retry_policy:
+      tentativas: 3
+      delays: [2s, 4s, 8s]
+    criterios_aceite:
+      - "Job diário sucesso → atualizar estrutura"
+      - "Falha 3x → email TI + desativar job"
+
+  - id: RN-RF031-14
+    titulo: "Isolamento Multi-Tenant com Row-Level Security"
+    descricao: "Filtrar todas queries por ClienteId do JWT token"
+    prioridade: CRITICA
+    filtro_obrigatorio: ClienteId
+    mecanismo: EF_Core_Query_Filter
+    indice_otimizado: "(ClienteId, Codigo_Contabil)"
+    criterios_aceite:
+      - "Cliente A acessar conta Cliente B → HTTP 404"
+      - "Todas queries → incluir filtro ClienteId"
+
+  - id: RN-RF031-15
+    titulo: "Soft Delete com Histórico Versionado"
+    descricao: "Nunca DELETE físico, apenas lógico com versionamento"
+    prioridade: CRITICA
+    motivo: auditoria_fiscal_7_anos
+    mecanismo: FlExcluido_TRUE
+    query_filter: "WHERE FlExcluido = 0"
+    restauracao: admin_com_justificativa
+    versionamento: snapshot_json
+    criterios_aceite:
+      - "Excluir conta → marcar FlExcluido=TRUE"
+      - "Listar contas → não exibir excluídas"
+      - "Admin restaurar → FlExcluido=FALSE"
+
+estados_entidade:
+  PlanoContaContabil:
+    - estado: Ativo
+      descricao: "Conta criada e disponível para uso"
+    - estado: Inativo
+      descricao: "Temporariamente desabilitada, não aceita lançamentos"
+    - estado: Excluido
+      descricao: "Soft delete (FlExcluido=TRUE)"
+
+transicoes_estado:
+  - de: Ativo
+    para: Inativo
+    condicao: "Permissão Edit"
+  - de: Inativo
+    para: Ativo
+    condicao: "Permissão Edit"
+  - de: Ativo
+    para: Excluido
+    condicao: "Permissão Delete + sem lançamentos"
+  - de: Inativo
+    para: Excluido
+    condicao: "Permissão Delete"
+  - de: Excluido
+    para: Ativo
+    condicao: "Admin + permissão RestoreDeleted + justificativa"
+
+eventos_dominio:
+  - evento: PlanoContaCriada
+    quando: "Após criação de nova conta"
+    payload:
+      - ContaId
+      - Codigo
+      - Nome
+      - ClienteId
+  - evento: PlanoContaAtualizada
+    quando: "Após edição de conta"
+    payload:
+      - ContaId
+      - CamposAlterados
+      - UsuarioId
+  - evento: PlanoContaMovida
+    quando: "Após drag-drop hierarquia"
+    payload:
+      - ContaId
+      - PaiAnteriorId
+      - PaiNovoId
+  - evento: PlanoContaExcluida
+    quando: "Após soft delete"
+    payload:
+      - ContaId
+      - UsuarioId
+      - Motivo
+  - evento: PlanoContaRestaurada
+    quando: "Após restauração"
+    payload:
+      - ContaId
+      - AprovadorId
+  - evento: ClassificacaoAutomaticaExecutada
+    quando: "Após aplicar regras em lote"
+    payload:
+      - QtdLancamentos
+      - TaxaMatch
+  - evento: OrcamentoAprovado
+    quando: "Após aprovação orçamento"
+    payload:
+      - Ano
+      - AprovadorId
+  - evento: AlertaVariacaoOrcamento
+    quando: "Conta atinge limite"
+    payload:
+      - ContaId
+      - Percentual
+      - Valor
+
+permissoes_rbac:
+  prefixo: "GES.PLANO_CONTAS"
+  grupos:
+    visualizacao:
+      - VIEW
+      - VIEW_DETAILS
+    gestao_contas:
+      - CREATE
+      - EDIT
+      - DELETE
+      - MOVE
+    centros_custo:
+      - MANAGE_CENTRO_CUSTO
+      - EDIT_RATEIO
+    dimensoes:
+      - MANAGE_DIMENSOES
+    regras:
+      - VIEW_REGRAS
+      - MANAGE_REGRAS
+      - EXECUTE_CLASSIFICACAO
+    import_export:
+      - IMPORT
+      - EXPORT
+      - IMPORT_ERP
+      - EXPORT_LANCAMENTOS
+    relatorios:
+      - VIEW_DRE
+      - VIEW_ORCAMENTO
+      - MANAGE_ORCAMENTO
+      - APPROVE_ORCAMENTO
+    auditoria:
+      - VIEW_AUDIT
+      - RESTORE_DELETED
+    administracao:
+      - MANAGE_TEMPLATES
+      - APPROVE_STRUCTURE_CHANGE
+
+matriz_permissoes:
+  - perfil: Controller_CFO
+    permissoes: ALL
+  - perfil: Gerente_Financeiro
+    permissoes:
+      - VIEW
+      - CREATE
+      - EDIT
+      - DELETE
+      - MANAGE_REGRAS
+      - IMPORT_EXPORT
+      - MANAGE_ORCAMENTO
+      - VIEW_AUDIT
+    aprovacao_obrigatoria:
+      - MOVE
+  - perfil: Analista_Contabil
+    permissoes:
+      - VIEW
+      - CREATE
+      - EDIT
+      - DELETE
+      - MANAGE_REGRAS
+      - IMPORT_EXPORT
+      - VIEW_AUDIT
+  - perfil: Consulta
+    permissoes:
+      - VIEW
+
+dependencias:
+  obrigatorias:
+    - rf_id: RF030
+      titulo: "Cliente Multi-Tenant"
+      motivo: "Fornece ClienteId para isolamento"
+    - rf_id: RF024
+      titulo: "Gestão Departamentos"
+      motivo: "Hierarquia organizacional para centros custo"
+    - rf_id: RF026
+      titulo: "Gestão Faturas"
+      motivo: "Fonte de lançamentos para classificar"
+  opcionais:
+    - rf_id: RF022
+      titulo: "Gestão Fornecedores"
+      motivo: "Regras classificação por fornecedor"
+    - rf_id: RF023
+      titulo: "Gestão Contratos"
+      motivo: "Vincula despesas a projetos/contratos"
+
+dependentes:
+  - rf_id: RF040
+    titulo: "Relatórios Gerenciais"
+    motivo: "Usa estrutura plano contas para DRE"
+  - rf_id: RF041
+    titulo: "Dashboards Executivos"
+    motivo: "Consome dados classificados"
+  - rf_id: RF042
+    titulo: "Business Intelligence"
+    motivo: "Análises multi-dimensionais"
+
+integracoes_obrigatorias:
+  - sistema: Central_Funcionalidades
+    tipo: RBAC
+    descricao: "Permissões completas"
+  - sistema: i18n_Transloco
+    tipo: Traducao
+    descricao: "pt-BR, en-US, es-ES"
+  - sistema: Auditoria
+    tipo: Logging
+    descricao: "CREATE/UPDATE/DELETE/MOVE auditados"
+  - sistema: Multi_Tenancy
+    tipo: Isolamento
+    descricao: "ClienteId em todas queries"
+
+artefatos_derivados:
+  - tipo: UC
+    arquivo: UC-RF031.md
+    descricao: "Casos de Uso (UC00-UC09)"
+  - tipo: MD
+    arquivo: MD-RF031.md
+    descricao: "Modelo de Dados com DDL"
+  - tipo: WF
+    arquivo: WF-RF031.md
+    descricao: "Wireframes e fluxos"
+  - tipo: TC
+    arquivo: TC-RF031-BACKEND.yaml
+    descricao: "Casos Teste Backend"
+  - tipo: TC
+    arquivo: TC-RF031-FRONTEND.yaml
+    descricao: "Casos Teste Frontend"
+  - tipo: TC
+    arquivo: TC-RF031-SEGURANCA.yaml
+    descricao: "Casos Teste Segurança"
+  - tipo: TC
+    arquivo: TC-RF031-E2E.yaml
+    descricao: "Casos Teste E2E"
+  - tipo: MT
+    arquivo: MT-RF031.yaml
+    descricao: "Massas de Teste"
+
+criterios_globais_aceite:
+  - "Isolamento tenant (ClienteId) inviolável"
+  - "Todas regras negócio aplicadas"
+  - "Erros previsíveis e rastreáveis"
+  - "Auditoria quem/quando/o_que (7 anos retenção)"
+  - "Soft delete obrigatório (nunca DELETE físico)"
+  - "Validações contábeis pré-save"
+  - "Partida dobrada validada (Σ débitos = Σ créditos)"
+  - "Import/Export múltiplos layouts ERP"
+  - "DRE drill-down ilimitado"
+  - "Classificação automática >95% match"
+  - "Reconciliação fuzzy >90% sucesso"
+
+kpis:
+  - nome: Taxa_Classificacao_Automatica
+    meta: ">95%"
+    medicao: "Percentual lançamentos classificados automaticamente"
+  - nome: Taxa_Reconciliacao
+    meta: ">90%"
+    medicao: "Percentual lançamentos reconciliados automaticamente"
+  - nome: Reducao_Tempo_Classificacao
+    meta: "96%"
+    medicao: "De 120h/mês para 5h/mês"
+  - nome: Reducao_Erros
+    meta: "<2%"
+    medicao: "De 18% para <2%"
+  - nome: Tempo_Fechamento_Contabil
+    meta: "3 dias"
+    medicao: "De 12 dias para 3 dias úteis"
+
+alertas_criticos:
+  - condicao: "Backend aceita lançamento em conta Sintética"
+    severidade: BLOQUEANTE
+    acao: "Rejeitar HTTP 400"
+  - condicao: "Partida dobrada inválida (débitos ≠ créditos)"
+    severidade: BLOQUEANTE
+    acao: "Rejeitar HTTP 400"
+  - condicao: "Tentativa acesso cross-tenant"
+    severidade: CRITICA
+    acao: "Retornar HTTP 404 + log segurança"
+  - condicao: "Orçamento >110%"
+    severidade: ALTA
+    acao: "Escalar Controller/CFO"
+  - condicao: "Integração ERP falha 3x"
+    severidade: ALTA
+    acao: "Email TI + desativar job"
+
+changelog:
+  - versao: "2.0"
+    data: "2025-12-30"
+    descricao: "Migração v1.0→v2.0: separação RF/RL, remoção legado, estrutura canônica YAML"
+    autor: "Agência ALC - alc.dev.br"
+  - versao: "1.0"
+    data: "2024-12-17"
+    descricao: "Versão inicial com legado mesclado"
+    autor: "Equipe IControlIT"

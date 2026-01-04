@@ -1,0 +1,444 @@
+rf:
+  id: RF013
+  nome: Gestão de Perfis de Acesso (RBAC)
+  versao: '2.0'
+  data: '2025-12-30'
+  fase: Fase 1 - Sistema Base
+  epic: EPIC002-CAD-Cadastros-Sistema
+  status: em_desenvolvimento
+descricao:
+  objetivo: 'Implementar um sistema completo de Gestão de Perfis de Acesso baseado em RBAC (Role-Based Access Control)
+
+    para controlar o que cada usuário pode fazer no sistema IControlIT através de perfis (roles) e permissões granulares.
+
+    '
+  problema_resolvido: 'Controlar acesso ao sistema de forma granular, garantindo que usuários tenham apenas as permissões
+    necessárias
+
+    para suas funções, com auditoria completa e isolamento multi-tenant.
+
+    '
+  publico_afetado: Administradores de sistema, gestores, todos os usuários do sistema
+escopo:
+  incluso:
+  - Criação de perfis de acesso (roles)
+  - Atualização de perfis existentes
+  - Listagem de perfis com filtros
+  - Exclusão lógica de perfis
+  - Validações funcionais e regras de negócio
+  - Controle de acesso e isolamento por tenant (multi-tenancy)
+  - Auditoria automática de operações
+  - Gestão de permissões granulares (atribuir/remover)
+  - Catálogo centralizado de permissões
+  - Validação de permissões em runtime (middleware)
+  - Cache de permissões para performance
+  - Perfis pré-definidos de sistema
+  - Duplicação de perfis existentes
+  - Visualização de usuários por perfil
+  - Interface Angular moderna
+  - API RESTful com CQRS
+  fora:
+  - Interface visual específica (layout/UX)
+  - Tecnologia, framework ou linguagem de implementação
+  - Estratégia de deploy ou infraestrutura
+  - Herança de permissões entre perfis
+  - Permissões temporárias com expiração
+  - Segregação de Funções (SoD - Separation of Duties)
+  - Limite de usuários por perfil
+  - Revisão periódica automática de perfis
+entidades:
+- nome: Role
+  descricao: Perfil de acesso que agrupa permissões
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: Permission
+  descricao: Permissão granular de acesso a recursos
+  multi_tenant: false
+  soft_delete: false
+  auditoria: true
+- nome: RolePermission
+  descricao: Relacionamento entre perfil e permissões
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+regras_negocio:
+- id: RN-RF013-01
+  descricao: Nome do perfil deve ser único dentro do tenant (conglomerado)
+  tipo: unicidade
+  campos_afetados:
+  - Nome
+  - TenantId
+  obrigatorio: true
+  validacao: UNIQUE INDEX UQ_Perfil_Nome_Tenant (Nome, TenantId) WHERE Fl_Ativo = 1
+  criterio_aceite:
+  - Tentativa de criar perfil com nome duplicado no mesmo tenant → HTTP 400
+  - Mesmo nome em tenants diferentes → permitido
+  - Validação case-insensitive
+- id: RN-RF013-02
+  descricao: Perfis de Sistema são não-editáveis (nome/descrição)
+  tipo: regra_negocio
+  campos_afetados:
+  - Nome
+  - Descricao
+  - IsSystemRole
+  obrigatorio: true
+  perfis_sistema:
+  - Super Administrador
+  - Administrador
+  - Gestor
+  - Operador
+  - Visualizador
+  criterio_aceite:
+  - Tentativa de editar nome/descrição de perfil de sistema → HTTP 400
+  - Edição de permissões de perfil de sistema → permitido
+  - Exclusão de perfil de sistema sem usuários vinculados → permitido
+- id: RN-RF013-03
+  descricao: Super Admin tem acesso total irrestrito (bypassa validações)
+  tipo: seguranca
+  campos_afetados:
+  - Fl_Super_Admin
+  obrigatorio: true
+  criterio_aceite:
+  - Super Admin pode executar qualquer operação sem validação de permissão específica
+  - Bypass ocorre antes da validação de permissões no middleware
+  - Auditoria registra operações de Super Admin normalmente
+- id: RN-RF013-04
+  descricao: Formato de permissão padronizado (modulo:recurso:acao)
+  tipo: validacao
+  campos_afetados:
+  - Codigo
+  obrigatorio: true
+  regex: ^[a-z]+:[a-z]+:(create|read|update|delete|approve|import|export|view|view_any)$
+  exemplos:
+  - usuarios:usuario:create
+  - contratos:contrato:approve
+  - faturas:fatura:import
+  - perfis:perfil:delete
+  criterio_aceite:
+  - Permissão que não segue formato → rejeição
+  - 'Ações permitidas: create, read, update, delete, approve, import, export, view, view_any'
+- id: RN-RF013-05
+  descricao: Alterações em permissões críticas exigem auditoria detalhada com justificativa
+  tipo: auditoria
+  campos_afetados:
+  - Fl_Critica
+  obrigatorio: true
+  permissoes_criticas:
+  - usuarios:usuario:create
+  - usuarios:usuario:update
+  - usuarios:usuario:delete
+  - perfis:perfil:create
+  - perfis:perfil:update
+  - perfis:perfil:delete
+  - contratos:contrato:approve
+  - faturas:fatura:import
+  criterio_aceite:
+  - Atribuir permissão crítica sem justificativa → HTTP 400
+  - 'Auditoria deve registrar: usuário, timestamp, permissão, justificativa, IP'
+  - Notificação automática para gestor quando permissão crítica é atribuída
+- id: RN-RF013-06
+  descricao: Middleware valida permissões em TODA requisição à API (exceto endpoints públicos)
+  tipo: seguranca
+  campos_afetados: []
+  obrigatorio: true
+  criterio_aceite:
+  - Requisição sem token JWT → HTTP 401
+  - Requisição sem permissão necessária → HTTP 403
+  - Super Admin bypassa validação
+  - Log de tentativas de acesso negado (auditoria)
+- id: RN-RF013-07
+  descricao: Permissões do usuário são cacheadas por 5 minutos
+  tipo: performance
+  campos_afetados: []
+  obrigatorio: true
+  cache_key: permissions:{userId}
+  ttl: 5 minutos
+  criterio_aceite:
+  - Cache TTL de 5 minutos
+  - Invalidação automática ao alterar perfil ou permissões do usuário
+  - Invalidação manual via endpoint (Admin)
+- id: RN-RF013-08
+  descricao: Perfil com usuários vinculados não pode ser deletado
+  tipo: validacao
+  campos_afetados: []
+  obrigatorio: true
+  criterio_aceite:
+  - Tentativa de deletar perfil com usuários vinculados → HTTP 400
+  - Mensagem deve indicar quantidade de usuários vinculados
+  - Esta regra se aplica TAMBÉM a Perfis de Sistema
+- id: RN-RF013-09
+  descricao: Auditoria automática de alterações via BaseAuditableEntity
+  tipo: auditoria
+  campos_afetados:
+  - Created
+  - CreatedBy
+  - LastModified
+  - LastModifiedBy
+  obrigatorio: true
+  criterio_aceite:
+  - Campos de auditoria preenchidos automaticamente via interceptor EF Core
+  - Timestamps em UTC
+  - CreatedBy/LastModifiedBy preenchidos com ID do usuário autenticado
+  - Valores não podem ser alterados manualmente
+- id: RN-RF013-10
+  descricao: Uso de Fl_Ativo (BIT) ao invés de Fl_Desativado (INT)
+  tipo: padrao
+  campos_afetados:
+  - Fl_Ativo
+  obrigatorio: true
+  justificativa:
+  - Clareza semântica
+  - Economia de espaço (BIT 1 byte vs INT 4 bytes)
+  - Padrão da indústria
+  criterio_aceite:
+  - Campo Fl_Ativo BIT NOT NULL DEFAULT 1
+  - 0 = Inativo, 1 = Ativo
+  - Soft delete atualiza Fl_Ativo para 0
+estados:
+- id: ativo
+  descricao: Perfil em uso normal
+  valor_fl_ativo: 1
+- id: inativo
+  descricao: Perfil desativado (soft delete)
+  valor_fl_ativo: 0
+transicoes:
+  permitidas:
+  - de: ativo
+    para: inativo
+    condicao: Sem usuários vinculados OU desativação forçada (move usuários)
+  - de: inativo
+    para: ativo
+    condicao: Usuário com permissão adequada
+permissoes:
+- codigo: perfis:perfil:view_any
+  descricao: Listar perfis
+  critica: false
+- codigo: perfis:perfil:view
+  descricao: Visualizar perfil
+  critica: false
+- codigo: perfis:perfil:create
+  descricao: Criar perfil
+  critica: true
+- codigo: perfis:perfil:update
+  descricao: Atualizar perfil
+  critica: true
+- codigo: perfis:perfil:delete
+  descricao: Excluir perfil
+  critica: true
+- codigo: perfis:perfil:duplicate
+  descricao: Duplicar perfil
+  critica: false
+- codigo: perfis:permissao:view_any
+  descricao: Listar permissões
+  critica: false
+- codigo: perfis:permissao:assign
+  descricao: Atribuir permissão a perfil
+  critica: true
+- codigo: perfis:permissao:revoke
+  descricao: Remover permissão de perfil
+  critica: true
+- codigo: usuarios:usuario:create
+  descricao: Criar usuário
+  critica: true
+- codigo: usuarios:usuario:update
+  descricao: Atualizar usuário
+  critica: true
+- codigo: usuarios:usuario:delete
+  descricao: Excluir usuário
+  critica: true
+integracoes:
+  internas:
+  - nome: 'RF-004: Auditoria e Logs'
+    tipo: Auditoria
+    descricao: Todas as alterações em perfis/permissões são auditadas
+    obrigatoria: true
+  - nome: 'RF-005: Internacionalização (i18n)'
+    tipo: i18n
+    descricao: Nomes de perfis e descrições traduzidos
+    obrigatoria: true
+  - nome: 'RF-008: Gestão de Usuários'
+    tipo: Relacionamento
+    descricao: Perfis são atribuídos aos usuários
+    obrigatoria: true
+  - nome: Sistema de Notificações
+    tipo: Eventos
+    descricao: Notificações ao atribuir permissões críticas
+    obrigatoria: false
+  externas: []
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacoes_obrigatorias:
+  - JWT Bearer Token válido
+  - Usuário autenticado com perfil ativo
+  - Permissão específica para cada operação
+  - Não permitir atribuir permissões maiores que as próprias (exceto Super Admin)
+  - Justificativa obrigatória para permissões críticas
+  protecoes:
+  - Rate limiting (10 req/min)
+  - Log de acesso negado
+  - Bloqueio após 5 tentativas de escalação de privilégios
+  - 2FA obrigatório para Super Admin
+rastreabilidade:
+  ucs_esperados:
+  - UC00 - Visão Geral
+  - UC01 - Criar Perfil
+  - UC02 - Editar Perfil
+  - UC03 - Listar Perfis
+  - UC04 - Excluir Perfil
+  artefatos_derivados:
+  - UC-RF013.md
+  - MD-RF013.yaml
+  - MT-RF013.yaml
+  - TC-RF013-BACKEND.md
+  - TC-RF013-FRONTEND.md
+  - TC-RF013-SEGURANCA.md
+  - TC-RF013-E2E.md
+catalog:
+  crud:
+  - id: RF013-CRUD-01
+    title: Criar perfil
+    required: true
+  - id: RF013-CRUD-02
+    title: Listar perfis
+    required: true
+  - id: RF013-CRUD-03
+    title: Visualizar perfil
+    required: true
+  - id: RF013-CRUD-04
+    title: Atualizar perfil
+    required: true
+  - id: RF013-CRUD-05
+    title: Excluir perfil (soft delete)
+    required: true
+  - id: RF013-CRUD-06
+    title: Duplicar perfil
+    required: true
+  validacoes:
+  - id: RF013-VAL-01
+    title: Validar nome único por tenant
+    required: true
+  - id: RF013-VAL-02
+    title: Validar formato de permissão
+    required: true
+  - id: RF013-VAL-03
+    title: Validar perfis de sistema não-editáveis
+    required: true
+  - id: RF013-VAL-04
+    title: Validar não deletar perfil com usuários
+    required: true
+  - id: RF013-VAL-05
+    title: Validar justificativa para permissões críticas
+    required: true
+  seguranca:
+  - id: RF013-SEC-01
+    title: Isolamento de tenant
+    required: true
+  - id: RF013-SEC-02
+    title: Permissões RBAC
+    required: true
+  - id: RF013-SEC-03
+    title: Cache de permissões
+    required: true
+  - id: RF013-SEC-04
+    title: Middleware de validação
+    required: true
+  - id: RF013-SEC-05
+    title: Super Admin bypass
+    required: true
+  funcionalidades:
+  - id: RF013-FUNC-01
+    title: Gestão de permissões (atribuir/remover)
+    required: true
+  - id: RF013-FUNC-02
+    title: Catálogo de permissões
+    required: true
+  - id: RF013-FUNC-03
+    title: Perfis pré-definidos
+    required: true
+  - id: RF013-FUNC-04
+    title: Visualizar usuários por perfil
+    required: true
+  - id: RF013-FUNC-05
+    title: Dashboard de métricas
+    required: false
+eventos_dominio:
+- evento: perfil.criado
+  quando: Após criação de perfil
+  acoes:
+  - Auditoria
+  - Notificação (se crítico)
+- evento: perfil.atualizado
+  quando: Após atualização de perfil
+  acoes:
+  - Auditoria
+  - Invalidação de cache
+- evento: perfil.desativado
+  quando: Após desativação (soft delete)
+  acoes:
+  - Auditoria
+  - Invalidação de cache
+- evento: perfil.permissao_atribuida
+  quando: Após atribuir permissão
+  acoes:
+  - Auditoria
+  - Invalidação de cache
+  - Notificação (se crítica)
+- evento: perfil.permissao_removida
+  quando: Após remover permissão
+  acoes:
+  - Auditoria
+  - Invalidação de cache
+kpis:
+- id: KPI-RF013-01
+  titulo: Total de Perfis Ativos
+  descricao: Contagem de perfis com Fl_Ativo = 1
+  tipo: contador
+- id: KPI-RF013-02
+  titulo: Total de Usuários por Perfil
+  descricao: Gráfico de distribuição de usuários por perfil
+  tipo: distribuicao
+- id: KPI-RF013-03
+  titulo: Permissões Mais Usadas
+  descricao: Top 10 permissões atribuídas
+  tipo: ranking
+- id: KPI-RF013-04
+  titulo: Perfis de Sistema vs. Personalizados
+  descricao: Comparativo percentual
+  tipo: comparativo
+alertas:
+- id: ALERT-RF013-01
+  severidade: critico
+  descricao: Perfil com 0 usuários há mais de 90 dias
+  acao_recomendada: Desativar perfil
+- id: ALERT-RF013-02
+  severidade: importante
+  descricao: Permissão crítica atribuída sem justificativa adequada
+  acao_recomendada: Revisar auditoria
+- id: ALERT-RF013-03
+  severidade: info
+  descricao: Tentativas de acesso negado acima de 10 nas últimas 24h
+  acao_recomendada: Investigar possível ataque
+exclusions:
+  rf_items:
+  - id: EX-RF013-01
+    justificativa: Herança de permissões entre perfis
+  - id: EX-RF013-02
+    justificativa: Permissões temporárias com expiração
+  - id: EX-RF013-03
+    justificativa: Segregação de Funções (SoD)
+  - id: EX-RF013-04
+    justificativa: Limite de usuários por perfil
+  - id: EX-RF013-05
+    justificativa: Revisão periódica automática
+historico:
+- versao: '2.0'
+  data: '2025-12-30'
+  autor: Agência ALC - alc.dev.br
+  descricao: Migração para formato v2.0 - separação RF/RL, estrutura canônica com sincronização RF.md
+- versao: '1.0'
+  data: '2025-11-15'
+  autor: Agência ALC - alc.dev.br
+  descricao: Versão inicial (misturada RF + RL)

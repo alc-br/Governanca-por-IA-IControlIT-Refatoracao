@@ -1,0 +1,782 @@
+# =============================================
+# RF084 - Upload e Importação de Arquivos
+# Versão: 2.0 (Governança v2.0)
+# Data: 2025-12-31
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF084"
+  nome: "Upload e Importação de Arquivos"
+  versao: "2.0"
+  data: "2025-12-31"
+  fase: "Fase 2 - Cadastros e Serviços Transversais"
+  epic: "EPIC003-CAD-Cadastros-Base"
+  status: "aprovado" # draft | aprovado | em_desenvolvimento | concluido
+  versao_governanca: "2.0"
+
+descricao:
+  objetivo: "Prover serviço seguro e escalável de upload e importação de arquivos em diversos formatos com validação prévia, processamento assíncrono e auditoria completa"
+  problema_resolvido: "Permitir carga de dados em massa de forma segura, rastreável e escalável para todos os módulos do sistema"
+  publico_afetado: "Todos os módulos que necessitam importação de dados (inventário, contratos, faturas, etc.)"
+
+escopo:
+  incluso:
+    - "Upload em chunks retomáveis (até 500MB)"
+    - "Validação de tipo MIME (CSV, Excel, XML, JSON)"
+    - "Scan antivírus obrigatório (ClamAV)"
+    - "Armazenamento seguro encriptado (Azure Blob)"
+    - "Validação de estrutura (schema)"
+    - "Preview de dados (100 primeiras linhas)"
+    - "Processamento assíncrono (Hangfire)"
+    - "Progresso em tempo real (SignalR)"
+    - "Importação transacional com rollback"
+    - "Relatórios de erros detalhados"
+    - "Controle de acesso RBAC"
+    - "Isolamento multi-tenant"
+    - "Auditoria completa (7 anos)"
+  fora:
+    - "Interface visual específica"
+    - "Transformação de dados (ETL complexo)"
+    - "Conversão entre formatos"
+    - "Agendamento de importações"
+    - "Integração direta com sistemas externos"
+
+entidades:
+  - nome: "Upload"
+    descricao: "Metadados do arquivo enviado"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "SessionId (GUID)"
+      - "FileName (string)"
+      - "FileSize (long)"
+      - "MimeType (string)"
+      - "Status (enum)"
+      - "TenantId (GUID)"
+      - "UserId (GUID)"
+
+  - nome: "UploadChunk"
+    descricao: "Fragmento do arquivo enviado"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+    campos_principais:
+      - "UploadId (GUID, FK)"
+      - "ChunkIndex (int)"
+      - "Data (byte[])"
+      - "Hash (string)"
+
+  - nome: "ImportJob"
+    descricao: "Job de processamento assíncrono"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+    campos_principais:
+      - "JobId (string, Hangfire)"
+      - "UploadId (GUID, FK)"
+      - "Status (enum)"
+      - "Progress (int)"
+      - "TotalLines (int)"
+      - "ProcessedLines (int)"
+      - "ErrorLines (int)"
+
+  - nome: "ImportError"
+    descricao: "Erros encontrados durante importação"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+    campos_principais:
+      - "UploadId (GUID, FK)"
+      - "LineNumber (int)"
+      - "ColumnName (string)"
+      - "ErrorMessage (string)"
+      - "Value (string)"
+
+  - nome: "ImportSchema"
+    descricao: "Definição de estrutura por tipo de importação"
+    multi_tenant: false
+    soft_delete: false
+    auditoria: true
+    campos_principais:
+      - "ImportType (string)"
+      - "ColumnDefinitions (JSON)"
+      - "ValidationRules (JSON)"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF084-001"
+    titulo: "Limite de Tamanho de Arquivo"
+    descricao: "Arquivos maiores que 500MB devem ser rejeitados"
+    tipo: "validacao"
+    criticidade: "ALTA"
+    campos_afetados: ["FileSize"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "range"
+      mensagem_erro: "Arquivo excede o limite de 500MB (tamanho: {size}MB)"
+      http_code: 413
+
+  - id: "RN-RF084-002"
+    titulo: "Whitelist de Tipos MIME"
+    descricao: "Apenas tipos MIME permitidos (CSV, Excel, XML, JSON)"
+    tipo: "validacao"
+    criticidade: "CRÍTICA"
+    campos_afetados: ["MimeType"]
+    obrigatorio: true
+    valores_permitidos:
+      - "text/csv"
+      - "text/plain"
+      - "application/vnd.ms-excel"
+      - "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      - "application/xml"
+      - "text/xml"
+      - "application/json"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "whitelist"
+      mensagem_erro: "Tipo de arquivo não permitido"
+      http_code: 415
+
+  - id: "RN-RF084-003"
+    titulo: "Validação de Extensão Consistente"
+    descricao: "Extensão do arquivo deve corresponder ao tipo MIME declarado"
+    tipo: "validacao"
+    criticidade: "ALTA"
+    campos_afetados: ["FileName", "MimeType"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "formato"
+      mensagem_erro: "Extensão {ext} incompatível com tipo MIME {mime}"
+      http_code: 400
+
+  - id: "RN-RF084-004"
+    titulo: "Scan Antivírus Obrigatório"
+    descricao: "Todo arquivo deve ser escaneado por ClamAV antes do processamento"
+    tipo: "seguranca"
+    criticidade: "CRÍTICA"
+    campos_afetados: ["File"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "servico_externo"
+      mensagem_erro: "Arquivo contém malware: {threat}"
+      http_code: 400
+
+  - id: "RN-RF084-005"
+    titulo: "Separação Upload e Importação"
+    descricao: "Upload e importação são operações distintas e sequenciais"
+    tipo: "regra_negocio"
+    criticidade: "ALTA"
+    campos_afetados: ["Status"]
+    obrigatorio: true
+    fluxo_obrigatorio:
+      - "Upload → Recebe uploadId"
+      - "Validação/Preview → Recebe resultado"
+      - "Confirmação → Processamento inicia"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+
+  - id: "RN-RF084-006"
+    titulo: "Validação de Schema Obrigatória"
+    descricao: "Arquivo deve conter todas colunas obrigatórias definidas no schema"
+    tipo: "validacao"
+    criticidade: "ALTA"
+    campos_afetados: ["Schema"]
+    obrigatorio: true
+    validacoes_schema:
+      - "Colunas obrigatórias presentes"
+      - "Tipos de dados compatíveis"
+      - "Headers únicos"
+      - "Nomes conforme esperado (case-insensitive)"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "schema"
+      mensagem_erro: "Colunas obrigatórias faltando: {columns}"
+      http_code: 400
+
+  - id: "RN-RF084-007"
+    titulo: "Validação de Dados por Linha"
+    descricao: "Cada linha validada contra regras de negócio do tipo de importação"
+    tipo: "validacao"
+    criticidade: "ALTA"
+    campos_afetados: ["LineData"]
+    obrigatorio: true
+    validacoes_aplicadas:
+      - "Campos obrigatórios não vazios"
+      - "Valores numéricos em ranges permitidos"
+      - "Formatos de data válidos"
+      - "Foreign Keys existentes"
+      - "Unicidade conforme domínio"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+
+  - id: "RN-RF084-008"
+    titulo: "Processamento Assíncrono Automático"
+    descricao: "Arquivos > 10MB processados em background job (Hangfire)"
+    tipo: "regra_negocio"
+    criticidade: "MÉDIA"
+    campos_afetados: ["FileSize", "ProcessingMode"]
+    obrigatorio: true
+    threshold: 10485760  # 10 MB em bytes
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+
+  - id: "RN-RF084-009"
+    titulo: "Progresso em Tempo Real"
+    descricao: "Cliente recebe atualizações via SignalR durante processamento"
+    tipo: "regra_negocio"
+    criticidade: "MÉDIA"
+    campos_afetados: ["Progress"]
+    obrigatorio: true
+    eventos_notificados:
+      - "upload.progress"
+      - "validation.progress"
+      - "import.progress"
+      - "import.completed"
+    frequencia_notificacao: "5% ou 1000 linhas"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+
+  - id: "RN-RF084-010"
+    titulo: "Rollback Transacional"
+    descricao: "Importação em transação SQL única. Erro causa rollback completo"
+    tipo: "regra_negocio"
+    criticidade: "CRÍTICA"
+    campos_afetados: ["TransactionStatus"]
+    obrigatorio: true
+    comportamento:
+      sucesso: "COMMIT da transação"
+      erro: "ROLLBACK completo"
+      dados_parciais: false
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+
+  - id: "RN-RF084-011"
+    titulo: "Isolamento Multi-Tenant"
+    descricao: "Upload e importação respeitam isolamento de tenant"
+    tipo: "seguranca"
+    criticidade: "CRÍTICA"
+    campos_afetados: ["TenantId"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "tenant_isolation"
+      mensagem_erro: "Acesso negado ao recurso de outro tenant"
+      http_code: 403
+
+  - id: "RN-RF084-012"
+    titulo: "Auditoria Completa"
+    descricao: "Todas operações de upload e importação são auditadas"
+    tipo: "regra_negocio"
+    criticidade: "ALTA"
+    campos_afetados: ["AuditLog"]
+    obrigatorio: true
+    operacoes_auditadas:
+      - "UPLOADS_UPLOAD_START"
+      - "UPLOADS_UPLOAD_COMPLETE"
+      - "UPLOADS_ANTIVIRUS_SCAN"
+      - "UPLOADS_PREVIEW_GENERATED"
+      - "UPLOADS_IMPORT_START"
+      - "UPLOADS_IMPORT_COMPLETE"
+      - "UPLOADS_IMPORT_ERROR"
+      - "UPLOADS_FILE_DELETE"
+      - "UPLOADS_ERROR_REPORT_DOWNLOAD"
+    retencao: "7 anos"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+
+# ==============================================================================
+# ESTADOS E TRANSIÇÕES
+# ==============================================================================
+
+estados:
+  - id: "uploading"
+    descricao: "Chunks sendo recebidos"
+  - id: "uploaded"
+    descricao: "Todos chunks recebidos, arquivo montado"
+  - id: "validating"
+    descricao: "Scan antivírus e validação de schema em progresso"
+  - id: "validated"
+    descricao: "Arquivo validado, preview disponível"
+  - id: "importing"
+    descricao: "Processamento de importação em execução"
+  - id: "completed"
+    descricao: "Importação concluída com sucesso"
+  - id: "failed"
+    descricao: "Importação falhou (com rollback)"
+  - id: "cancelled"
+    descricao: "Upload cancelado pelo usuário"
+  - id: "deleted"
+    descricao: "Arquivo removido do storage"
+
+transicoes:
+  permitidas:
+    - de: "uploading"
+      para: "uploaded"
+    - de: "uploaded"
+      para: "validating"
+    - de: "validating"
+      para: "validated"
+    - de: "validating"
+      para: "failed"
+      condicao: "Scan detectou malware"
+    - de: "validated"
+      para: "importing"
+    - de: "importing"
+      para: "completed"
+    - de: "importing"
+      para: "failed"
+    - de: "uploading"
+      para: "cancelled"
+    - de: "uploaded"
+      para: "cancelled"
+    - de: "validated"
+      para: "cancelled"
+    - de: "completed"
+      para: "deleted"
+    - de: "failed"
+      para: "deleted"
+  proibidas:
+    - de: "completed"
+      para: "uploading"
+      motivo: "Não é possível re-iniciar upload concluído"
+    - de: "deleted"
+      para: "qualquer"
+      motivo: "Arquivo deletado não pode ser recuperado"
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes:
+  - codigo: "uploads.file.upload"
+    descricao: "Fazer upload de arquivo"
+    roles_autorizadas:
+      - "Analista"
+      - "Gerente"
+      - "Admin"
+
+  - codigo: "uploads.file.preview"
+    descricao: "Visualizar preview antes de importar"
+    roles_autorizadas:
+      - "Analista"
+      - "Gerente"
+      - "Admin"
+
+  - codigo: "uploads.file.import"
+    descricao: "Confirmar e processar importação"
+    roles_autorizadas:
+      - "Gerente"
+      - "Admin"
+
+  - codigo: "uploads.file.retry"
+    descricao: "Reprocessar importação falhada"
+    roles_autorizadas:
+      - "Gerente"
+      - "Admin"
+
+  - codigo: "uploads.file.delete"
+    descricao: "Excluir arquivo de upload"
+    roles_autorizadas:
+      - "Admin"
+
+  - codigo: "uploads.history.read"
+    descricao: "Visualizar histórico de importações"
+    roles_autorizadas:
+      - "Analista"
+      - "Gerente"
+      - "Admin"
+
+  - codigo: "uploads.errors.download"
+    descricao: "Baixar relatório de erros"
+    roles_autorizadas:
+      - "Analista"
+      - "Gerente"
+      - "Admin"
+
+  - codigo: "uploads.config.manage"
+    descricao: "Configurar tipos de importação e schemas"
+    roles_autorizadas:
+      - "Admin"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  # Gerenciamento de Upload
+  - method: "POST"
+    route: "/api/uploads"
+    descricao: "Iniciar upload (retorna sessionId)"
+    autenticacao: true
+    authorization_policy: "UploadsFileUpload"
+    permission_required: "uploads.file.upload"
+    request_dto: "InitiateUploadCommand"
+    response_dto: "InitiateUploadResponse (sessionId)"
+    http_status: 201
+
+  - method: "POST"
+    route: "/api/uploads/{sessionId}/chunks"
+    descricao: "Enviar chunk do arquivo"
+    autenticacao: true
+    authorization_policy: "UploadsFileUpload"
+    permission_required: "uploads.file.upload"
+    request_dto: "UploadChunkCommand"
+    response_dto: "UploadChunkResponse (progress)"
+    http_status: 202
+
+  - method: "GET"
+    route: "/api/uploads/{uploadId}"
+    descricao: "Obter metadados do upload"
+    autenticacao: true
+    authorization_policy: "UploadsHistoryRead"
+    permission_required: "uploads.history.read"
+    request_dto: null
+    response_dto: "UploadDto"
+    http_status: 200
+
+  - method: "GET"
+    route: "/api/uploads"
+    descricao: "Listar uploads (paginado)"
+    autenticacao: true
+    authorization_policy: "UploadsHistoryRead"
+    permission_required: "uploads.history.read"
+    request_dto: "GetUploadsQuery (pageNumber, pageSize)"
+    response_dto: "PaginatedListDto<UploadDto>"
+    http_status: 200
+
+  - method: "DELETE"
+    route: "/api/uploads/{uploadId}"
+    descricao: "Excluir upload"
+    autenticacao: true
+    authorization_policy: "UploadsFileDelete"
+    permission_required: "uploads.file.delete"
+    request_dto: null
+    response_dto: null
+    http_status: 204
+
+  # Validação e Preview
+  - method: "POST"
+    route: "/api/uploads/{uploadId}/validate"
+    descricao: "Validar estrutura (schema + antivírus)"
+    autenticacao: true
+    authorization_policy: "UploadsFilePreview"
+    permission_required: "uploads.file.preview"
+    request_dto: "ValidateUploadCommand"
+    response_dto: "ValidationResult"
+    http_status: 200
+
+  - method: "GET"
+    route: "/api/uploads/{uploadId}/preview"
+    descricao: "Obter preview (primeiras 100 linhas)"
+    autenticacao: true
+    authorization_policy: "UploadsFilePreview"
+    permission_required: "uploads.file.preview"
+    request_dto: null
+    response_dto: "PreviewDto"
+    http_status: 200
+
+  - method: "GET"
+    route: "/api/uploads/{uploadId}/errors"
+    descricao: "Listar linhas com erro do preview"
+    autenticacao: true
+    authorization_policy: "UploadsFilePreview"
+    permission_required: "uploads.file.preview"
+    request_dto: null
+    response_dto: "List<ImportErrorDto>"
+    http_status: 200
+
+  # Importação e Processamento
+  - method: "POST"
+    route: "/api/uploads/{uploadId}/import"
+    descricao: "Confirmar e iniciar importação"
+    autenticacao: true
+    authorization_policy: "UploadsFileImport"
+    permission_required: "uploads.file.import"
+    request_dto: "ImportUploadCommand"
+    response_dto: "ImportJobResponse (jobId)"
+    http_status: 202
+
+  - method: "GET"
+    route: "/api/uploads/{uploadId}/status"
+    descricao: "Obter status da importação"
+    autenticacao: true
+    authorization_policy: "UploadsHistoryRead"
+    permission_required: "uploads.history.read"
+    request_dto: null
+    response_dto: "ImportStatusDto"
+    http_status: 200
+
+  - method: "POST"
+    route: "/api/uploads/{uploadId}/retry"
+    descricao: "Reprocessar importação falhada"
+    autenticacao: true
+    authorization_policy: "UploadsFileRetry"
+    permission_required: "uploads.file.retry"
+    request_dto: "RetryImportCommand"
+    response_dto: "ImportJobResponse (jobId)"
+    http_status: 202
+
+  - method: "GET"
+    route: "/api/uploads/{uploadId}/report"
+    descricao: "Baixar relatório de erros (JSON/CSV)"
+    autenticacao: true
+    authorization_policy: "UploadsErrorsDownload"
+    permission_required: "uploads.errors.download"
+    request_dto: "format (query param: json|csv)"
+    response_dto: "FileResult"
+    http_status: 200
+
+  # Configuração (Admin)
+  - method: "GET"
+    route: "/api/uploads/config/types"
+    descricao: "Listar tipos de importação disponíveis"
+    autenticacao: true
+    authorization_policy: "UploadsConfigManage"
+    permission_required: "uploads.config.manage"
+    request_dto: null
+    response_dto: "List<ImportTypeDto>"
+    http_status: 200
+
+  - method: "GET"
+    route: "/api/uploads/config/types/{type}/schema"
+    descricao: "Obter schema de um tipo"
+    autenticacao: true
+    authorization_policy: "UploadsConfigManage"
+    permission_required: "uploads.config.manage"
+    request_dto: null
+    response_dto: "ImportSchemaDto"
+    http_status: 200
+
+  - method: "PUT"
+    route: "/api/uploads/config/types/{type}/schema"
+    descricao: "Atualizar schema de um tipo"
+    autenticacao: true
+    authorization_policy: "UploadsConfigManage"
+    permission_required: "uploads.config.manage"
+    request_dto: "UpdateSchemaCommand"
+    response_dto: "ImportSchemaDto"
+    http_status: 200
+
+# ==============================================================================
+# INTEGRAÇÕES
+# ==============================================================================
+
+integracoes:
+  internas:
+    - nome: "Autenticação"
+      obrigatoria: true
+      tipo: "JWT Bearer Token"
+    - nome: "Multi-Tenancy"
+      obrigatoria: true
+      tipo: "Row-Level Security"
+    - nome: "Auditoria"
+      obrigatoria: true
+      tipo: "AuditInterceptor"
+    - nome: "SignalR"
+      obrigatoria: true
+      tipo: "Notificações em Tempo Real"
+    - nome: "Hangfire"
+      obrigatoria: true
+      tipo: "Processamento Assíncrono"
+
+  externas:
+    - sistema: "ClamAV"
+      tipo: "Antivírus Daemon"
+      obrigatoria: true
+      porta: 3310
+      fallback: "Bloquear uploads se indisponível"
+    - sistema: "Azure Blob Storage"
+      tipo: "Object Storage"
+      obrigatoria: true
+      encriptacao: "AES-256"
+    - sistema: "Feature Flags (Central de Funcionalidades)"
+      tipo: "API"
+      obrigatoria: true
+      feature_key: "UPLOADS_IMPORT"
+
+# ==============================================================================
+# SEGURANÇA
+# ==============================================================================
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacoes_obrigatorias:
+    - "Whitelist MIME Types"
+    - "Validação de Extensão"
+    - "Scan Antivírus"
+    - "Limite de Tamanho"
+    - "Isolamento Multi-Tenant"
+  protecoes_implementadas:
+    - "HTTPS obrigatório (TLS 1.2+)"
+    - "Rate Limiting (10 uploads/min por usuário)"
+    - "CSRF Protection"
+    - "SQL Injection Prevention (Parametrized Queries)"
+    - "XSS Prevention"
+    - "Encriptação em Repouso (Azure)"
+
+# ==============================================================================
+# RASTREABILIDADE
+# ==============================================================================
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00" # Listar uploads
+    - "UC01" # Iniciar upload
+    - "UC02" # Validar e gerar preview
+    - "UC03" # Confirmar importação
+    - "UC04" # Consultar status
+    - "UC05" # Baixar relatório de erros
+    - "UC06" # Configurar schemas (Admin)
+
+  md_relacionado: "MD-RF084-Upload-Importacao-Arquivos.md"
+  wf_relacionado: "WF-RF084-Upload-Importacao-Arquivos.md"
+
+  dependencias_upstream:
+    - "RF001: Autenticação e Autorização"
+    - "RF002: Multi-tenancy"
+    - "RF003: Auditoria"
+
+  dependencias_downstream:
+    - "RF085: Importação de Dados Específicos"
+    - "RF086: Migração de Dados Legado"
+    - "RF087: Integração com ERPs"
+
+# ==============================================================================
+# CATÁLOGO DE FUNCIONALIDADES
+# ==============================================================================
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Iniciar upload"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar uploads"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar metadados de upload"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Excluir upload"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar tamanho máximo (500MB)"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar tipo MIME (whitelist)"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar extensão consistente"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Scan antivírus (ClamAV)"
+      required: true
+    - id: "RF-VAL-05"
+      title: "Validar schema de importação"
+      required: true
+    - id: "RF-VAL-06"
+      title: "Validar dados por linha"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria completa (7 anos)"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Encriptação em repouso"
+      required: true
+
+  processamento:
+    - id: "RF-PROC-01"
+      title: "Upload em chunks retomáveis"
+      required: true
+    - id: "RF-PROC-02"
+      title: "Processamento assíncrono (Hangfire)"
+      required: true
+    - id: "RF-PROC-03"
+      title: "Progresso em tempo real (SignalR)"
+      required: true
+    - id: "RF-PROC-04"
+      title: "Rollback transacional"
+      required: true
+    - id: "RF-PROC-05"
+      title: "Preview de dados"
+      required: true
+    - id: "RF-PROC-06"
+      title: "Relatório de erros"
+      required: true
+
+# ==============================================================================
+# HISTÓRICO
+# ==============================================================================
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0: Separação RF/RL, estruturado em YAML"
+
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Claude Code"
+    descricao: "Versão inicial com 10 RN, integrações, endpoints e segurança"

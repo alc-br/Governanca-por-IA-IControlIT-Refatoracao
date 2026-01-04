@@ -1,0 +1,979 @@
+# Casos de Uso - RF031: Gestão de Plano de Contas Contábil Multi-Dimensional
+
+**Versão:** 1.0
+**Data:** 2025-01-14
+**RF Relacionado:** [RF031 - Gestão de Plano de Contas Contábil Multi-Dimensional](../RF031.md)
+
+---
+
+## Índice de Casos de Uso
+
+| UC | Nome | Descrição |
+|----|------|-----------|
+| UC01 | Listar Plano de Contas | Lista hierárquica de contas contábeis com drill-down |
+| UC02 | Criar Conta Contábil | Criação de nova conta na estrutura hierárquica |
+| UC03 | Editar Conta Contábil | Edição de conta existente com versionamento |
+| UC04 | Visualizar Conta Contábil | Visualização detalhada com histórico |
+| UC05 | Inativar/Excluir Conta Contábil | Soft delete com validação de dependências |
+| UC06 | Mover Conta na Hierarquia | Drag-and-drop com preview de impacto |
+| UC07 | Importar Estrutura de ERP | Importação multi-layout (SAP, TOTVS, Oracle, etc.) |
+| UC08 | Classificar Lançamentos Automaticamente | Engine de regras com ML para classificação |
+| UC09 | Gerar Relatório DRE Multi-Dimensional | DRE com drill-down e análises comparativas |
+
+---
+
+## UC01 - Listar Plano de Contas
+
+### Descrição
+Permite visualizar a estrutura hierárquica completa do plano de contas contábil com até 7 níveis de profundidade, com capacidade de expandir/contrair nós e filtrar por tipo de conta.
+
+### Atores
+- Usuário autenticado (Controller, CFO, Gerente Financeiro, Analista Contábil, Consulta)
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `GES.PLANO_CONTAS.VIEW`
+- Ao menos uma estrutura de plano de contas cadastrada
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Acessa menu "Gestão > Plano de Contas" | - |
+| 2 | - | Carrega estrutura hierárquica (tree view) |
+| 3 | - | Exibe contas nível 1 (Classe: Ativo, Passivo, Receitas, Custos, Despesas) |
+| 4 | Clica em ícone expandir (+) ao lado de uma conta | - |
+| 5 | - | Carrega e exibe contas filhas do próximo nível |
+| 6 | Pode filtrar por tipo (Sintética/Analítica) | Aplica filtro e atualiza tree |
+| 7 | Pode buscar por código ou nome da conta | Sistema destaca e expande caminho até a conta encontrada |
+
+### Campos Exibidos na Listagem
+
+| Campo | Descrição | Formato |
+|-------|-----------|---------|
+| Código Contábil | Ex: 5.1.2.01.001 | Text, tree indentation |
+| Nome da Conta | Ex: Telefonia Móvel Corporativa | Text, bold para sintéticas |
+| Tipo | Sintética (S) ou Analítica (A) | Badge colorido |
+| Nível | Nível hierárquico (1-7) | Número |
+| Permite Lançamento | Sim/Não (só analíticas) | Icon check/cross |
+| Status | Ativo/Inativo | Badge verde/vermelho |
+| Ações | Editar, Mover, Excluir | Botões |
+
+### Fluxos Alternativos
+
+**FA01 - Lista Vazia**
+- **Condição:** Não existem contas cadastradas para este conglomerado
+- **Ação:** Sistema exibe mensagem "Nenhuma conta cadastrada. Clique em 'Nova Conta' ou 'Importar Estrutura' para começar"
+
+**FA02 - Expandir Todos os Níveis**
+- **Condição:** Usuário clica em botão "Expandir Tudo"
+- **Ação:** Sistema expande recursivamente todos os nós até nível máximo (limite 1000 contas visíveis por performance)
+
+**FA03 - Exportar para Excel**
+- **Condição:** Usuário clica em "Exportar"
+- **Ação:** Sistema gera Excel com estrutura flat (colunas: Código, Nome, Tipo, Nível, Pai, Status)
+
+### Exceções
+
+**EX01 - Erro ao Carregar Hierarquia**
+- **Condição:** Falha na query ao banco (timeout, erro de conexão)
+- **Ação:** Sistema exibe mensagem "Erro ao carregar plano de contas. Tente novamente." + botão "Recarregar"
+
+**EX02 - Hierarquia Circular Detectada (Dados Corrompidos)**
+- **Condição:** Banco contém loop circular (A → B → C → A)
+- **Ação:** Sistema detecta loop, exibe alerta "Estrutura contábil com inconsistência detectada. Contate o administrador." e registra erro em log
+
+### Pós-condições
+- Estrutura hierárquica exibida corretamente
+- Usuário pode navegar pelos níveis
+
+### Regras de Negócio Aplicáveis
+- RN-RF031-01: Estrutura Hierárquica Até 7 Níveis Configuráveis
+- RN-RF031-14: Isolamento Multi-Tenant com Row-Level Security
+
+### Wireframe Simplificado
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Plano de Contas Contábil                    [+ Nova Conta] [⬆️ Importar] [⬇️ Exportar] │
+├─────────────────────────────────────────────────────────────────┤
+│ 🔍 Buscar: [_____________]  Filtro: [Todas ▼] [Expandir Tudo]   │
+├─────────────────────────────────────────────────────────────────┤
+│ [+] 1. Ativo                                  (S) Nível 1   [⋮] │
+│ [+] 2. Passivo                                (S) Nível 1   [⋮] │
+│ [-] 3. Receitas                               (S) Nível 1   [⋮] │
+│   [+] 3.1 Receitas Operacionais              (S) Nível 2   [⋮] │
+│   [-] 3.2 Outras Receitas                    (S) Nível 2   [⋮] │
+│     [+] 3.2.1 Receitas Financeiras           (S) Nível 3   [⋮] │
+│ [+] 4. Custos                                 (S) Nível 1   [⋮] │
+│ [-] 5. Despesas                               (S) Nível 1   [⋮] │
+│   [-] 5.1 Despesas Administrativas           (S) Nível 2   [⋮] │
+│     [-] 5.1.2 Despesas Gerais                (S) Nível 3   [⋮] │
+│       [-] 5.1.2.01 Despesas Telecom          (S) Nível 4   [⋮] │
+│         → 5.1.2.01.001 Telefonia Móvel       (A) Nível 5 ✅ [📝][🗑️] │
+│         → 5.1.2.01.002 Telefonia Fixa        (A) Nível 5 ✅ [📝][🗑️] │
+│         → 5.1.2.01.003 Internet/Links        (A) Nível 5 ✅ [📝][🗑️] │
+└─────────────────────────────────────────────────────────────────┘
+Legenda: (S)=Sintética, (A)=Analítica, ✅=Permite Lançamento
+```
+
+---
+
+## UC02 - Criar Conta Contábil
+
+### Descrição
+Permite criar nova conta contábil na estrutura hierárquica, definindo código, nome, tipo (Sintética/Analítica) e conta pai.
+
+### Atores
+- Usuário autenticado com permissão de criação (Controller, CFO, Gerente Financeiro, Analista Contábil)
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `GES.PLANO_CONTAS.CREATE`
+- Se criar conta filha, conta pai deve existir e estar ativa
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Clica em botão "Nova Conta" | - |
+| 2 | - | Exibe modal de criação com formulário em branco |
+| 3 | Seleciona conta pai no dropdown hierárquico (opcional para nível 1) | - |
+| 4 | Informa código contábil (ex: 5.1.2.01.004) | Sistema valida formato e unicidade em tempo real |
+| 5 | Informa nome da conta (ex: Cloud Computing) | - |
+| 6 | Seleciona tipo de conta (Sintética ou Analítica) | Sistema exibe descrição de cada tipo |
+| 7 | Se tipo = Analítica, marca checkbox "Permite Lançamento" (pré-marcado) | - |
+| 8 | Define natureza do saldo (Devedora/Credora) | - |
+| 9 | Adiciona observações (campo opcional) | - |
+| 10 | Clica em "Salvar" | - |
+| 11 | - | Valida todos os campos conforme regras de negócio |
+| 12 | - | Salva conta no banco com auditoria completa |
+| 13 | - | Exibe mensagem "Conta criada com sucesso" |
+| 14 | - | Redireciona para tree view com novo item expandido e destacado |
+
+### Campos do Formulário
+
+| Campo | Tipo | Obrigatório | Validação |
+|-------|------|-------------|-----------|
+| Conta Pai | Dropdown hierárquico | Não (se nível 1) | Deve existir e estar ativa |
+| Código Contábil | Text | Sim | Único, max 50 caracteres, formato configurável |
+| Nome da Conta | Text | Sim | Max 200 caracteres |
+| Tipo de Conta | Radio (Sintética/Analítica) | Sim | - |
+| Permite Lançamento | Checkbox | Não | Só habilitado se tipo = Analítica |
+| Natureza Saldo | Radio (Devedora/Credora) | Sim | - |
+| Observações | Textarea | Não | Max 500 caracteres |
+
+### Fluxos Alternativos
+
+**FA01 - Cancelar**
+- **Condição:** Usuário clica em "Cancelar" ou fecha modal
+- **Ação:** Sistema descarta dados e retorna à listagem
+
+**FA02 - Sugerir Código Automático**
+- **Condição:** Usuário deixa campo código em branco e seleciona conta pai
+- **Ação:** Sistema sugere próximo código sequencial (ex: se pai = 5.1.2, sugere 5.1.2.01)
+
+**FA03 - Criar e Adicionar Outra**
+- **Condição:** Usuário clica em "Salvar e Criar Outra"
+- **Ação:** Sistema salva, limpa formulário mantendo conta pai selecionada
+
+### Exceções
+
+**EX01 - Código Duplicado**
+- **Condição:** Código já existe no sistema
+- **Ação:** Sistema destaca campo com erro e exibe "Código contábil já existe. Utilize código único."
+
+**EX02 - Hierarquia Circular**
+- **Condição:** Seleção de conta pai criaria loop (sistema previne via UI, mas valida no backend)
+- **Ação:** Sistema bloqueia save e exibe "Operação criaria hierarquia circular"
+
+**EX03 - Limite de 7 Níveis Atingido**
+- **Condição:** Tentar criar conta nível 8 ou superior
+- **Ação:** Sistema bloqueia save e exibe "Estrutura limitada a 7 níveis hierárquicos"
+
+**EX04 - Aprovação Workflow Necessária**
+- **Condição:** Cliente configurou que criação de conta nível 1-3 exige aprovação de Controller/CFO
+- **Ação:** Sistema salva como "Aguardando Aprovação", envia notificação e exibe mensagem "Conta criada. Aguardando aprovação de [Controller]."
+
+### Pós-condições
+- Nova conta criada no banco com Id_Usuario_Criacao, Dt_Criacao
+- Conta visível na tree view
+- Log de auditoria registrado
+
+### Regras de Negócio Aplicáveis
+- RN-RF031-01: Estrutura Hierárquica Até 7 Níveis Configuráveis
+- RN-RF031-02: Builder Visual Drag-and-Drop com Preview Impacto (validações de hierarquia)
+- RN-RF031-10: Auditoria Completa com Trilha de Mudanças
+
+---
+
+## UC03 - Editar Conta Contábil
+
+### Descrição
+Permite editar uma conta contábil existente, alterando nome, tipo, configurações, com versionamento e justificativa obrigatória para mudanças estruturais.
+
+### Atores
+- Usuário autenticado com permissão de edição (Controller, CFO, Gerente Financeiro, Analista Contábil)
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `GES.PLANO_CONTAS.EDIT`
+- Conta existe e não está excluída
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Seleciona conta na tree view e clica em ícone "Editar" (📝) | - |
+| 2 | - | Carrega dados da conta em modal de edição |
+| 3 | - | Exibe formulário preenchido (código bloqueado para edição) |
+| 4 | Altera nome da conta | - |
+| 5 | Pode alterar tipo de Sintética para Analítica (nunca o contrário se houver lançamentos) | Sistema valida se mudança é permitida |
+| 6 | Pode alterar natureza saldo | Sistema alerta se houver lançamentos afetados |
+| 7 | Atualiza observações | - |
+| 8 | Se mudança estrutural (tipo, natureza), informa justificativa obrigatória | - |
+| 9 | Clica em "Salvar" | - |
+| 10 | - | Valida se mudanças são permitidas |
+| 11 | - | Se mudança estrutural, cria nova versão na tabela `Plano_Conta_Versao` |
+| 12 | - | Atualiza conta com Id_Usuario_Alteracao, Dt_Alteracao |
+| 13 | - | Exibe mensagem "Conta atualizada com sucesso" |
+
+### Campos Editáveis
+
+| Campo | Editável | Restrições |
+|-------|----------|------------|
+| Código Contábil | ❌ Não | Imutável após criação (evita quebra de referências) |
+| Nome da Conta | ✅ Sim | Max 200 caracteres |
+| Tipo de Conta | ⚠️ Condicional | Só Sintética→Analítica se sem lançamentos filhos |
+| Permite Lançamento | ⚠️ Condicional | Só se tipo = Analítica |
+| Natureza Saldo | ⚠️ Condicional | Alerta se houver lançamentos |
+| Observações | ✅ Sim | Max 500 caracteres |
+
+### Fluxos Alternativos
+
+**FA01 - Cancelar**
+- **Condição:** Usuário clica em "Cancelar"
+- **Ação:** Sistema descarta alterações e retorna à listagem
+
+**FA02 - Preview de Impacto**
+- **Condição:** Mudança estrutural (ex: tipo, natureza)
+- **Ação:** Sistema exibe modal "Impacto das Alterações":
+  - Quantidade de lançamentos afetados (últimos 12 meses)
+  - Relatórios que usam esta conta
+  - Usuários que precisarão atualizar regras de classificação
+
+### Exceções
+
+**EX01 - Conta com Lançamentos Não Pode Virar Sintética**
+- **Condição:** Tentar mudar conta Analítica (com lançamentos) para Sintética
+- **Ação:** Sistema bloqueia e exibe "Conta possui lançamentos. Não pode ser alterada para Sintética."
+
+**EX02 - Conta Já Foi Alterada Por Outro Usuário**
+- **Condição:** Conflito de edição concorrente (versão mudou)
+- **Ação:** Sistema exibe "Conta foi alterada por [outro usuário]. Atualize a página e tente novamente."
+
+**EX03 - Aprovação Workflow Necessária**
+- **Condição:** Mudança estrutural em conta nível 1-3 exige aprovação
+- **Ação:** Sistema salva como "Aguardando Aprovação", notifica Controller/CFO
+
+### Pós-condições
+- Conta atualizada no banco
+- Se mudança estrutural, nova versão criada em `Plano_Conta_Versao`
+- Log de auditoria registrado com campos alterados (antes/depois)
+
+### Regras de Negócio Aplicáveis
+- RN-RF031-02: Builder Visual Drag-and-Drop com Preview Impacto
+- RN-RF031-10: Auditoria Completa com Trilha de Mudanças
+- RN-RF031-15: Soft Delete com Histórico Versionado
+
+---
+
+## UC04 - Visualizar Conta Contábil
+
+### Descrição
+Permite visualizar todos os detalhes de uma conta contábil, incluindo histórico de versões, lançamentos recentes e análises.
+
+### Atores
+- Usuário autenticado
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `GES.PLANO_CONTAS.VIEW_DETAILS`
+- Conta existe
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Clica em conta na tree view (duplo clique ou ícone 👁️) | - |
+| 2 | - | Carrega dados completos da conta |
+| 3 | - | Exibe tela de detalhes (modal ou página) com abas |
+
+### Informações Exibidas
+
+**Aba "Dados Gerais":**
+| Campo | Descrição |
+|-------|-----------|
+| Código Contábil | Ex: 5.1.2.01.001 |
+| Nome da Conta | Ex: Telefonia Móvel Corporativa |
+| Tipo | Sintética / Analítica |
+| Nível Hierárquico | 1-7 |
+| Conta Pai | Código e nome (com link para visualizar) |
+| Contas Filhas | Lista de filhas (com links) |
+| Permite Lançamento | Sim/Não |
+| Natureza Saldo | Devedora/Credora |
+| Status | Ativo/Inativo |
+| Observações | Texto livre |
+| Data Criação | Com timestamp e usuário |
+| Última Alteração | Com timestamp e usuário |
+
+**Aba "Lançamentos Recentes":** (Se conta analítica)
+- Tabela com últimos 20 lançamentos contábeis
+- Colunas: Data, Histórico, Débito, Crédito, Saldo, Documento
+
+**Aba "Histórico de Versões":**
+- Timeline de todas as alterações
+- Para cada versão: Data, Usuário, Campos alterados (antes→depois), Justificativa
+
+**Aba "Estatísticas":** (Se conta analítica)
+- Total lançamentos (mês atual, ano atual, acumulado)
+- Saldo atual (débito/crédito)
+- Gráfico evolução mensal últimos 12 meses
+
+### Fluxos Alternativos
+
+**FA01 - Editar a Partir da Visualização**
+- **Condição:** Usuário clica em "Editar" (se tiver permissão)
+- **Ação:** Sistema redireciona para UC03
+
+**FA02 - Exportar Histórico**
+- **Condição:** Usuário clica em "Exportar Histórico"
+- **Ação:** Sistema gera Excel com todas as versões
+
+### Exceções
+
+**EX01 - Conta Não Encontrada**
+- **Condição:** Conta foi excluída ou Id inválido
+- **Ação:** Sistema exibe "Conta não encontrada" e redireciona para listagem
+
+### Pós-condições
+- Nenhuma alteração no sistema
+
+### Regras de Negócio Aplicáveis
+- RN-RF031-01: Estrutura Hierárquica Até 7 Níveis Configuráveis
+
+---
+
+## UC05 - Inativar/Excluir Conta Contábil
+
+### Descrição
+Permite inativar (soft delete) uma conta contábil com validação de dependências e confirmação múltipla.
+
+### Atores
+- Usuário autenticado com permissão de exclusão (Controller, CFO, Gerente Financeiro)
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `GES.PLANO_CONTAS.DELETE`
+- Conta existe e não está excluída
+- Conta não possui contas filhas ativas
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Seleciona conta e clica em ícone "Excluir" (🗑️) | - |
+| 2 | - | Verifica se conta possui lançamentos ou contas filhas |
+| 3 | - | Exibe diálogo de confirmação com resumo de impacto |
+| 4 | Lê informações e confirma exclusão | - |
+| 5 | Informa justificativa obrigatória (mínimo 20 caracteres) | - |
+| 6 | Clica em "Confirmar Exclusão" | - |
+| 7 | - | Marca conta como excluída (FlExcluido = true) |
+| 8 | - | Registra justificativa, usuário e timestamp |
+| 9 | - | Exibe mensagem "Conta excluída com sucesso" |
+| 10 | - | Remove conta da tree view |
+
+### Diálogo de Confirmação
+
+```
+┌───────────────────────────────────────────────────────┐
+│ ⚠️  Confirmar Exclusão de Conta                      │
+├───────────────────────────────────────────────────────┤
+│ Conta: 5.1.2.01.001 - Telefonia Móvel Corporativa    │
+│                                                        │
+│ Impacto da Operação:                                  │
+│ • Lançamentos afetados: 1.250 (últimos 12 meses)     │
+│ • Relatórios que usam esta conta: 5                   │
+│ • Contas filhas: Nenhuma                              │
+│                                                        │
+│ ⚠️ ATENÇÃO: Esta é uma exclusão lógica (soft delete).│
+│ A conta permanecerá no histórico mas não aparecerá   │
+│ em novas operações.                                   │
+│                                                        │
+│ Justificativa (obrigatório):                          │
+│ ┌────────────────────────────────────────────────┐   │
+│ │ [Reorganização estrutura contábil 2025]        │   │
+│ └────────────────────────────────────────────────┘   │
+│                                                        │
+│         [Cancelar]  [Confirmar Exclusão]              │
+└───────────────────────────────────────────────────────┘
+```
+
+### Fluxos Alternativos
+
+**FA01 - Cancelar Exclusão**
+- **Condição:** Usuário clica em "Cancelar"
+- **Ação:** Sistema fecha diálogo sem fazer alterações
+
+**FA02 - Restaurar Conta Excluída**
+- **Condição:** Administrador acessa tela "Contas Inativas" e clica em "Restaurar"
+- **Ação:** Sistema marca FlExcluido = false, registra justificativa de restauração, conta volta à tree view
+
+### Exceções
+
+**EX01 - Conta Possui Contas Filhas Ativas**
+- **Condição:** Tentar excluir conta com filhas ativas
+- **Ação:** Sistema bloqueia e exibe "Não é possível excluir. Conta possui [N] contas filhas ativas. Exclua ou mova as filhas primeiro."
+
+**EX02 - Conta Possui Lançamentos Recentes (Período Não Fechado)**
+- **Condição:** Conta possui lançamentos no período contábil aberto
+- **Ação:** Sistema exibe aviso extra "ATENÇÃO: Conta possui lançamentos no período atual. Recomendamos aguardar fechamento contábil." mas permite exclusão se usuário confirmar
+
+**EX03 - Conta Usada em Regras de Classificação Automática**
+- **Condição:** Conta é destino de 10+ regras de classificação
+- **Ação:** Sistema alerta "Conta é usada em [N] regras de classificação automática. Atualize as regras antes de excluir." e exibe lista de regras
+
+### Pós-condições
+- Conta marcada como excluída (FlExcluido = true)
+- Conta não aparece mais em listagens padrão
+- Log de auditoria com justificativa registrado
+- Conta permanece acessível em relatórios históricos
+
+### Regras de Negócio Aplicáveis
+- RN-RF031-15: Soft Delete com Histórico Versionado
+- RN-RF031-10: Auditoria Completa com Trilha de Mudanças
+
+---
+
+## UC06 - Mover Conta na Hierarquia (Drag-and-Drop)
+
+### Descrição
+Permite reorganizar a estrutura contábil movendo contas para novos pais via drag-and-drop com preview de impacto em lançamentos e relatórios.
+
+### Atores
+- Usuário autenticado com permissão de movimentação (Controller, CFO, Gerente Financeiro)
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `GES.PLANO_CONTAS.MOVE`
+- Conta existe e não está excluída
+- Novo pai existe e não está excluído
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Clica e arrasta conta na tree view | Sistema destaca com borda |
+| 2 | Move mouse sobre conta destino (novo pai) | Sistema destaca destino com fundo colorido |
+| 3 | Solta conta sobre novo pai | - |
+| 4 | - | Valida se movimento é permitido (não cria loop, nível <= 7) |
+| 5 | - | Carrega preview de impacto |
+| 6 | - | Exibe modal "Preview de Impacto" com estatísticas |
+| 7 | Lê informações de impacto | - |
+| 8 | Informa justificativa obrigatória | - |
+| 9 | Clica em "Confirmar Movimentação" | - |
+| 10 | - | Atualiza campo `PaiId` da conta |
+| 11 | - | Recalcula códigos automáticos se configurado |
+| 12 | - | Registra auditoria com justificativa |
+| 13 | - | Exibe mensagem "Conta movida com sucesso" |
+| 14 | - | Atualiza tree view com nova posição |
+
+### Preview de Impacto
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ 🔍 Preview de Impacto da Movimentação                  │
+├─────────────────────────────────────────────────────────┤
+│ Conta: 5.1.2.01.001 - Telefonia Móvel                 │
+│ De:    5.1.2.01 - Despesas Telecom                     │
+│ Para:  5.1.3.02 - Despesas Comunicação                 │
+│                                                          │
+│ Impacto:                                                │
+│ • Lançamentos afetados: 1.250 (últimos 12 meses)       │
+│ • Relatórios afetados: 5 (DRE Gerencial, Balanço, ...) │
+│ • Usuários que usam esta conta em regras: 3            │
+│ • Novo nível hierárquico: 5 (atualmente 5)             │
+│                                                          │
+│ ⚠️ Após a movimentação:                                │
+│ - Código pode ser recalculado automaticamente          │
+│ - Relatórios serão afetados imediatamente               │
+│ - Usuários serão notificados da mudança                │
+│                                                          │
+│ Justificativa (obrigatório):                            │
+│ ┌──────────────────────────────────────────────────┐   │
+│ │ [Reorganização estrutura contábil conforme       │   │
+│ │  novo plano DRE 2025]                            │   │
+│ └──────────────────────────────────────────────────┘   │
+│                                                          │
+│         [Cancelar]  [Confirmar Movimentação]            │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Fluxos Alternativos
+
+**FA01 - Cancelar Movimentação**
+- **Condição:** Usuário clica em "Cancelar" no preview
+- **Ação:** Sistema descarta alteração, conta volta à posição original na tree
+
+**FA02 - Recalcular Códigos Automaticamente**
+- **Condição:** Cliente configurou recalculo automático de códigos
+- **Ação:** Sistema atualiza código da conta e de todas as filhas recursivamente (ex: de 5.1.2.01.001 para 5.1.3.02.001)
+
+### Exceções
+
+**EX01 - Movimento Criaria Loop Circular**
+- **Condição:** Tentar mover conta pai para dentro de uma conta filha
+- **Ação:** Sistema impede drop e exibe tooltip "Movimento criaria hierarquia circular"
+
+**EX02 - Movimento Ultrapassaria 7 Níveis**
+- **Condição:** Conta tem filhas e movimento colocaria filhas além do nível 7
+- **Ação:** Sistema impede drop e exibe "Movimento ultrapassaria limite de 7 níveis hierárquicos"
+
+**EX03 - Aprovação Workflow Necessária**
+- **Condição:** Movimentação de conta nível 1-3 exige aprovação
+- **Ação:** Sistema salva como "Aguardando Aprovação", notifica Controller/CFO
+
+### Pós-condições
+- Conta movida para novo pai
+- Código recalculado se configurado
+- Auditoria registrada com justificativa
+- Usuários afetados notificados
+
+### Regras de Negócio Aplicáveis
+- RN-RF031-02: Builder Visual Drag-and-Drop com Preview Impacto
+- RN-RF031-10: Auditoria Completa com Trilha de Mudanças
+
+---
+
+## UC07 - Importar Estrutura de ERP
+
+### Descrição
+Permite importar estrutura de plano de contas de arquivo exportado de ERP (SAP, TOTVS, Protheus, Oracle, Sankhya) com validação, preview e reconciliação automática.
+
+### Atores
+- Usuário autenticado com permissão de importação (Controller, CFO, Administrador)
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `GES.PLANO_CONTAS.IMPORT_ERP`
+- Arquivo de importação preparado conforme template
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Clica em botão "Importar Estrutura" | - |
+| 2 | - | Exibe modal de importação |
+| 3 | Seleciona tipo de ERP (SAP, TOTVS, Protheus, Oracle, Sankhya, Customizado) | Sistema carrega template correspondente |
+| 4 | Faz upload do arquivo (CSV, TXT, XML, JSON conforme ERP) | - |
+| 5 | - | Valida formato do arquivo e encoding |
+| 6 | - | Parse das primeiras 10 linhas e exibe preview |
+| 7 | Visualiza preview e confirma mapeamento de colunas | Se necessário, ajusta mapeamento |
+| 8 | Clica em "Processar Importação" | - |
+| 9 | - | Processa arquivo completo (batch se >1000 linhas) |
+| 10 | - | Valida cada conta (código único, hierarquia, obrigatórios) |
+| 11 | - | Identifica contas novas vs. existentes (reconciliação) |
+| 12 | - | Exibe resumo da importação |
+| 13 | Revisa resumo (novas: 120, atualizadas: 30, erros: 2) | - |
+| 14 | Clica em "Confirmar Importação" | - |
+| 15 | - | Salva contas novas e atualiza existentes |
+| 16 | - | Exibe mensagem "Importação concluída: 120 contas criadas, 30 atualizadas, 2 erros." |
+| 17 | - | Disponibiliza log de erros para download |
+
+### Templates Pré-Configurados
+
+**SAP FI/CO (`.txt` delimitado TAB):**
+```
+CONT_COD	CONT_DESC	CONT_TIPO	CONT_PAI	CONT_NATUREZA
+100000	ATIVO	S	NULL	D
+110000	ATIVO CIRCULANTE	S	100000	D
+111001	CAIXA E EQUIVALENTES	A	110000	D
+```
+
+**TOTVS Protheus 12 (`.csv` encoding ISO-8859-1, separador `;`):**
+```
+CT1_CONTA;CT1_DESC01;CT1_CLASSE;CT1_CTASUP;CT1_NORMAL
+1;ATIVO;1;;1
+1.01;ATIVO CIRCULANTE;1;1;1
+1.01.01;CAIXA;2;1.01;1
+```
+
+**Oracle Financials (XML):**
+```xml
+<ChartOfAccounts>
+  <Account>
+    <Code>100000</Code>
+    <Name>ATIVO</Name>
+    <Type>SUMMARY</Type>
+    <Parent></Parent>
+  </Account>
+</ChartOfAccounts>
+```
+
+### Preview de Importação
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Importar Estrutura de ERP                                │
+├──────────────────────────────────────────────────────────┤
+│ Tipo ERP: [SAP FI/CO ▼]                                 │
+│ Arquivo: [📄 plano_contas_sap.txt]  [Upload]            │
+│                                                           │
+│ Preview (10 primeiras linhas):                           │
+│ ┌────────────────────────────────────────────────────┐   │
+│ │ Código  │ Nome             │ Tipo │ Pai     │ Nat │   │
+│ ├─────────┼──────────────────┼──────┼─────────┼─────┤   │
+│ │ 100000  │ ATIVO            │ S    │         │ D   │   │
+│ │ 110000  │ ATIVO CIRCULANTE │ S    │ 100000  │ D   │   │
+│ │ 111001  │ CAIXA            │ A    │ 110000  │ D   │   │
+│ └────────────────────────────────────────────────────┘   │
+│                                                           │
+│ Mapeamento de Colunas:                                   │
+│ • CONT_COD → Código Contábil ✅                          │
+│ • CONT_DESC → Nome da Conta ✅                           │
+│ • CONT_TIPO → Tipo (S/A) ✅                              │
+│ • CONT_PAI → Conta Pai ✅                                │
+│                                                           │
+│         [Cancelar]  [Processar Importação]               │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Resumo da Importação
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Resumo da Importação                                      │
+├──────────────────────────────────────────────────────────┤
+│ Total de linhas processadas: 152                         │
+│                                                           │
+│ ✅ Contas novas a criar: 120                             │
+│ ⚠️  Contas existentes a atualizar: 30                    │
+│ ❌ Erros encontrados: 2                                  │
+│                                                           │
+│ Erros:                                                    │
+│ • Linha 45: Código duplicado "5.1.2.01"                  │
+│ • Linha 87: Conta pai "9.9.9.99" não existe              │
+│                                                           │
+│ ⚠️ ATENÇÃO: Contas existentes serão atualizadas com     │
+│ dados do arquivo (nome, tipo, pai). Lançamentos não     │
+│ serão afetados.                                          │
+│                                                           │
+│ [Baixar Log Completo]  [Cancelar]  [Confirmar Import.]  │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Fluxos Alternativos
+
+**FA01 - Criar Template Customizado**
+- **Condição:** ERP não está na lista pré-configurada
+- **Ação:** Usuário clica em "Criar Template Customizado", sistema exibe wizard para mapear colunas manualmente
+
+**FA02 - Reconciliação Inteligente**
+- **Condição:** 80%+ das contas do arquivo já existem no sistema
+- **Ação:** Sistema pergunta "Detectamos que maioria das contas já existe. Deseja: [Atualizar existentes] [Apenas criar novas] [Cancelar]"
+
+### Exceções
+
+**EX01 - Arquivo Formato Inválido**
+- **Condição:** Arquivo não corresponde ao template selecionado
+- **Ação:** Sistema exibe "Formato de arquivo inválido. Verifique se selecionou o tipo de ERP correto." + amostra do erro
+
+**EX02 - Encoding Inválido**
+- **Condição:** Arquivo com encoding não suportado (ex: UTF-16 quando espera ISO-8859-1)
+- **Ação:** Sistema detecta encoding e pergunta "Arquivo detectado como [UTF-16]. Converter para [ISO-8859-1]? [Sim] [Não]"
+
+**EX03 - Arquivo Muito Grande (>10.000 linhas)**
+- **Condição:** Arquivo excede limite de processamento síncrono
+- **Ação:** Sistema exibe "Arquivo grande. Processamento será executado em background. Você receberá e-mail quando concluir." e cria job assíncrono
+
+**EX04 - Hierarquia Circular no Arquivo**
+- **Condição:** Arquivo contém loop (A→B→C→A)
+- **Ação:** Sistema detecta e exibe "Hierarquia circular detectada: Conta [A] → [B] → [C] → [A]. Corrija o arquivo e tente novamente."
+
+### Pós-condições
+- Contas novas criadas no banco
+- Contas existentes atualizadas (se confirmado)
+- Log de importação registrado com estatísticas
+- Arquivo original e log de erros arquivados
+
+### Regras de Negócio Aplicáveis
+- RN-RF031-06: Importação Multi-Layout de ERPs
+- RN-RF031-12: Reconciliação Automática com Engine Fuzzy Matching
+
+---
+
+## UC08 - Classificar Lançamentos Automaticamente
+
+### Descrição
+Permite aplicar regras de classificação automática a lançamentos importados, usando biblioteca de 50+ templates e engine de Machine Learning para sugerir contas contábeis.
+
+### Atores
+- Usuário autenticado com permissão de classificação (Controller, CFO, Gerente Financeiro, Analista Contábil)
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `GES.PLANO_CONTAS.EXECUTE_CLASSIFICACAO`
+- Existem lançamentos "Aguardando Classificação"
+- Ao menos uma regra de classificação cadastrada
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Acessa menu "Gestão > Classificação Automática" | - |
+| 2 | - | Exibe lista de lançamentos aguardando classificação |
+| 3 | - | Para cada lançamento, exibe sugestão automática com score de confiança |
+| 4 | Visualiza lançamento com campos: Fornecedor, Descrição, Valor, Data | - |
+| 5 | Visualiza sugestão: "Conta 5.1.2.01.001 - Telefonia Móvel (98% confiança)" | - |
+| 6 | Clica em "Aceitar Sugestão" | - |
+| 7 | - | Atribui conta sugerida ao lançamento |
+| 8 | - | Move lançamento para "Classificado" |
+| 9 | - | Exibe próximo lançamento |
+| 10 | Repete processo para todos lançamentos | - |
+| 11 | Ao final, clica em "Finalizar Classificação" | - |
+| 12 | - | Exibe resumo: "100 lançamentos classificados (95 automáticos, 5 manuais)" |
+
+### Sugestões Automáticas
+
+**Nível de Confiança:**
+- **✅ 90-100%** - Verde, match exato ou histórico forte
+- **⚠️ 70-89%** - Amarelo, fuzzy matching alto
+- **❌ < 70%** - Vermelho, baixa confiança, exige revisão manual
+
+**Fontes de Sugestão (ordem de prioridade):**
+1. **Match Exato**: Fornecedor + Tipo Serviço já usou conta X (100%)
+2. **Regra Determinística**: Regra "Se Fornecedor = Vivo E Tipo = Telefonia → Conta 5.1.2.01.001" (95%)
+3. **Fuzzy Matching**: Nome descrição similar a lançamentos passados (85%)
+4. **Machine Learning**: Modelo treinado com 10.000+ lançamentos históricos (75%)
+
+### Tela de Classificação
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Classificação Automática de Lançamentos   [🔄 Atualizar]  │
+├────────────────────────────────────────────────────────────┤
+│ Aguardando Classificação: 100 │ Classificados Hoje: 450   │
+├────────────────────────────────────────────────────────────┤
+│ Lançamento 1 de 100:                                       │
+│ ┌──────────────────────────────────────────────────────┐   │
+│ │ Fornecedor: Vivo S.A.                                │   │
+│ │ Descrição: Fatura telefonia móvel - Janeiro 2025    │   │
+│ │ Valor: R$ 15.000,00                                  │   │
+│ │ Data: 15/01/2025                                      │   │
+│ │ Tipo Serviço: Telefonia Móvel                        │   │
+│ └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│ 💡 Sugestão Automática:                                    │
+│ ┌──────────────────────────────────────────────────────┐   │
+│ │ ✅ 5.1.2.01.001 - Telefonia Móvel Corporativa        │   │
+│ │    Confiança: 98% (Match exato: Vivo + Telefonia)   │   │
+│ │    Centro Custo Sugerido: CC-TI-SP                   │   │
+│ │    Projeto Sugerido: (Nenhum)                        │   │
+│ └──────────────────────────────────────────────────────┘   │
+│                                                             │
+│ Ou classificar manualmente:                                │
+│ Conta: [Selecionar conta... ▼]                            │
+│ Centro Custo: [Selecionar... ▼]                           │
+│                                                             │
+│ [◀️ Anterior]  [✅ Aceitar Sugestão]  [📝 Manual]  [▶️ Próximo] │
+└────────────────────────────────────────────────────────────┘
+
+Taxa de Match Automático: 95% │ Meta: >90% ✅
+```
+
+### Fluxos Alternativos
+
+**FA01 - Classificação Manual**
+- **Condição:** Usuário não concorda com sugestão ou confiança <70%
+- **Ação:** Usuário clica em "Manual", sistema exibe dropdown com plano de contas, usuário seleciona conta manualmente
+
+**FA02 - Classificação em Lote**
+- **Condição:** Usuário marca 20 lançamentos similares (mesmo fornecedor + tipo)
+- **Ação:** Usuário clica em "Classificar Selecionados", sistema aplica mesma conta a todos
+
+**FA03 - Criar Regra a Partir de Classificação**
+- **Condição:** Usuário classificou 5+ lançamentos manualmente com mesmo padrão
+- **Ação:** Sistema sugere "Detectamos padrão. Criar regra automática? [Sim] [Não]"
+
+**FA04 - Simulação de Regras**
+- **Condição:** Usuário quer testar regra antes de ativar
+- **Ação:** Usuário vai em "Regras > Simular", sistema exibe "Regra X aplicaria em 120 lançamentos históricos (98% acurácia)"
+
+### Exceções
+
+**EX01 - Nenhuma Sugestão Disponível**
+- **Condição:** Sistema não consegue gerar sugestão (lançamento muito diferente do histórico)
+- **Ação:** Sistema exibe "⚠️ Nenhuma sugestão automática. Classificação manual necessária."
+
+**EX02 - Múltiplas Sugestões com Mesma Confiança**
+- **Condição:** ML retorna 3 contas com 80% confiança cada
+- **Ação:** Sistema exibe "⚠️ Múltiplas sugestões (3). Revise manualmente:" + lista as 3 contas
+
+**EX03 - Lançamento Já Foi Classificado Por Outro Usuário**
+- **Condição:** Classificação concorrente
+- **Ação:** Sistema detecta e pula para próximo lançamento automaticamente com mensagem "Lançamento já classificado por [usuário]"
+
+### Pós-condições
+- Lançamentos classificados têm conta contábil atribuída
+- Taxa de match automático registrada em dashboard
+- Modelo ML aprende com classificações manuais confirmadas
+
+### Regras de Negócio Aplicáveis
+- RN-RF031-05: Regras de Classificação Automática com Builder Visual
+- RN-RF031-12: Reconciliação Automática com Engine Fuzzy Matching
+
+---
+
+## UC09 - Gerar Relatório DRE Multi-Dimensional
+
+### Descrição
+Permite gerar Demonstração de Resultado do Exercício (DRE) com filtros multi-dimensionais (período, centro de custo, projeto, departamento) e drill-down ilimitado até contas analíticas e lançamentos individuais.
+
+### Atores
+- Usuário autenticado (Controller, CFO, Gerente Financeiro, Analista Contábil, Consulta)
+
+### Pré-condições
+- Usuário logado no sistema
+- Usuário com permissão `GES.PLANO_CONTAS.VIEW_DRE`
+- Existem lançamentos contábeis no período selecionado
+
+### Fluxo Principal
+
+| Passo | Ator | Sistema |
+|-------|------|---------|
+| 1 | Acessa menu "Relatórios > DRE Multi-Dimensional" | - |
+| 2 | - | Exibe tela de filtros |
+| 3 | Seleciona período (Mês, Trimestre, Semestre, Ano, Range customizado) | - |
+| 4 | Seleciona dimensões de filtro (Centro Custo, Projeto, Departamento, Região) | - |
+| 5 | Seleciona tipo de comparação (Nenhuma, MoM, YoY, Orçado x Realizado) | - |
+| 6 | Clica em "Gerar DRE" | - |
+| 7 | - | Calcula totalizadores conforme hierarquia do plano de contas |
+| 8 | - | Exibe DRE estruturado com valores |
+| 9 | Visualiza estrutura padrão DRE | - |
+| 10 | Clica em linha "Despesas Telecom e TI" para drill-down | - |
+| 11 | - | Expande e exibe contas filhas (Telefonia Móvel, Fixa, Internet, Cloud, Licenças) |
+| 12 | Clica em "Telefonia Móvel" para ver lançamentos individuais | - |
+| 13 | - | Exibe tabela com lançamentos da conta (Data, Histórico, Débito, Crédito, Saldo) |
+| 14 | Clica em "Exportar" | - |
+| 15 | - | Gera Excel formatado com cores, borders, fórmulas |
+
+### Estrutura DRE Padrão Exibida
+
+```
+DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE)
+Período: Janeiro 2025
+Comparação: MoM (vs. Dezembro 2024)
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ RECEITA BRUTA                           │ 1.000.000,00 │ +15,2% ↗ │ 100,0% │
+│ (-) Deduções                             │   (150.000,00) │  +2,1% ↗ │  15,0% │
+│ (=) RECEITA LÍQUIDA                     │   850.000,00 │ +18,5% ↗ │  85,0% │
+│                                          │              │          │        │
+│ (-) CPV (Custo Produto Vendido)         │   (400.000,00) │  +8,0% ↗ │  40,0% │
+│ (=) LUCRO BRUTO                         │   450.000,00 │ +32,4% ↗ │  45,0% │
+│                                          │              │          │        │
+│ (-) Despesas Operacionais               │   (300.000,00) │  +5,0% ↗ │  30,0% │
+│   [+] Despesas Administrativas          │   (180.000,00) │  +4,2% ↗ │  18,0% │
+│       ├─ Pessoal                         │   (120.000,00) │  +3,0% ↗ │  12,0% │
+│       └─ [+] Gerais                      │    (60.000,00) │  +7,1% ↗ │   6,0% │
+│           ├─ Aluguel                     │    (30.000,00) │  +0,0%   │   3,0% │
+│           ├─ [+] Telecom e TI ⬅ DRILL   │    (25.000,00) │ +15,4% ↗ │   2,5% │
+│           │   ├─ Telefonia Móvel         │    (10.000,00) │ +20,0% ↗ │   1,0% │
+│           │   ├─ Telefonia Fixa          │     (2.000,00) │ -10,0% ↘ │   0,2% │
+│           │   ├─ Internet/Links          │     (5.000,00) │ +10,0% ↗ │   0,5% │
+│           │   ├─ Cloud Computing         │     (6.000,00) │ +50,0% ↗ │   0,6% │
+│           │   └─ Licenças Software       │     (2.000,00) │  +0,0%   │   0,2% │
+│           └─ Seguros                     │     (5.000,00) │  +0,0%   │   0,5% │
+│   [+] Despesas Comerciais               │    (80.000,00) │  +6,0% ↗ │   8,0% │
+│   [+] Despesas Financeiras              │    (40.000,00) │  +4,0% ↗ │   4,0% │
+│                                          │              │          │        │
+│ (=) RESULTADO OPERACIONAL (EBITDA)      │   150.000,00 │ +87,5% ↗ │  15,0% │
+│ (-) Depreciação/Amortização             │    (20.000,00) │  +5,0% ↗ │   2,0% │
+│ (=) EBIT                                │   130.000,00 │ +98,5% ↗ │  13,0% │
+│ (-) Resultado Financeiro                │    (10.000,00) │  +0,0%   │   1,0% │
+│ (=) LAIR (Lucro Antes IR)               │   120.000,00 │ +110% ↗  │  12,0% │
+│ (-) Provisão IR/CSLL                    │    (40.800,00) │ +110% ↗  │   4,1% │
+│ (=) LUCRO LÍQUIDO                       │    79.200,00 │ +110% ↗  │   7,9% │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Coluna 1: Valores absolutos
+Coluna 2: Variação % vs. período anterior (MoM)
+Coluna 3: Análise Vertical (% sobre Receita Líquida)
+
+[Expandir Tudo] [Recolher Tudo] [Exportar Excel] [Exportar PDF] [Gráficos]
+```
+
+### Filtros Disponíveis
+
+| Filtro | Opções |
+|--------|--------|
+| Período | Mês, Trimestre, Semestre, Ano, Range (Data Início/Fim) |
+| Centro Custo | Dropdown hierárquico multi-seleção |
+| Projeto | Dropdown multi-seleção + "Todos" |
+| Departamento | Dropdown hierárquico |
+| Região | Sudeste, Sul, Nordeste, Norte, Centro-Oeste, "Todas" |
+| Comparação | Nenhuma, MoM (Month over Month), YoY (Year over Year), Orçado x Realizado |
+
+### Fluxos Alternativos
+
+**FA01 - Drill-Down em Conta Analítica**
+- **Condição:** Usuário clica em conta analítica (ex: Telefonia Móvel)
+- **Ação:** Sistema exibe modal com tabela de lançamentos individuais:
+  - Colunas: Data, Documento, Histórico, Débito, Crédito, Saldo Acumulado
+  - Opção de exportar apenas aquela conta
+
+**FA02 - Gráficos Visuais**
+- **Condição:** Usuário clica em "Gráficos"
+- **Ação:** Sistema exibe:
+  - Gráfico Waterfall (receita → deduções → CPV → despesas → lucro)
+  - Line Chart evolução mensal últimos 12 meses
+  - Pie Chart distribuição despesas operacionais
+
+**FA03 - Análise Horizontal (Múltiplos Períodos)**
+- **Condição:** Usuário seleciona "Comparar últimos 12 meses"
+- **Ação:** Sistema exibe tabela com 13 colunas (1 por mês + total) mostrando evolução temporal
+
+**FA04 - Exportar para Excel com Fórmulas**
+- **Condição:** Usuário clica em "Exportar Excel"
+- **Ação:** Sistema gera Excel com:
+  - Cores alternadas para melhor leitura
+  - Bordas nas células
+  - Fórmulas Excel (=SUM, =IF) para recalcular se usuário editar
+  - Formatos de número (R$ , %)
+  - Gráfico embutido
+
+### Exceções
+
+**EX01 - Nenhum Lançamento no Período**
+- **Condição:** Não existem lançamentos no período/filtros selecionados
+- **Ação:** Sistema exibe mensagem "Nenhum lançamento encontrado no período selecionado. Ajuste os filtros."
+
+**EX02 - Erro de Cálculo (Inconsistência Dados)**
+- **Condição:** Soma de filhas ≠ pai (dados corrompidos)
+- **Ação:** Sistema detecta, exibe alerta "⚠️ Inconsistência detectada em [Conta X]. Recalcule totalizadores ou contate administrador." e destaca conta em vermelho
+
+### Pós-condições
+- DRE gerado e visualizado
+- Nenhuma alteração no banco de dados
+
+### Regras de Negócio Aplicáveis
+- RN-RF031-08: Relatórios Gerenciais DRE Multi-Dimensional
+- RN-RF031-04: Dimensões Customizáveis Ilimitadas
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-01-14 | Architect Agent | Versão inicial com 9 UCs completos |
+

@@ -1,0 +1,280 @@
+# UC-RF062 — Casos de Uso Canônicos
+
+**RF:** RF062 — Gestão de Fornecedores e Parceiros
+**Versão:** 2.0
+**Data:** 2025-12-31
+**Autor:** Agência ALC - alc.dev.br
+**Epic:** EPIC008-SD-Service-Desk
+**Fase:** Fase 5 - Service Desk
+
+---
+
+## 1. OBJETIVO
+
+Este documento especifica os **Casos de Uso** do **RF062 — Gestão de Fornecedores e Parceiros**, cobrindo gerenciamento completo do ciclo de vida de fornecedores e parceiros de TI/Telecom, incluindo cadastro, documentação obrigatória, homologação, contratos, SLAs, avaliações e performance.
+
+**Escopo:**
+- Cadastro CRUD de fornecedores com classificação por categoria
+- Upload e controle de documentação obrigatória (CNPJ, CNDs)
+- Gestão de múltiplos contatos (comercial, técnico, financeiro)
+- Contratos vinculados com alertas de renovação
+- SLAs por tipo de serviço
+- Processo de homologação
+- Avaliações periódicas e ranking automático
+- Alertas de vencimentos
+- Bloqueio automático por documentação vencida
+- Dashboard de performance
+- Integração com solicitações e ordens de serviço
+
+---
+
+## 2. SUMÁRIO DOS CASOS DE USO
+
+| UC | Nome | Ator Principal | Tipo | Impacta Dados |
+|----|------|----------------|------|---------------|
+| **UC00** | Listar Fornecedores | `usuario_autenticado` | Leitura | Não |
+| **UC01** | Criar Fornecedor | `gestor_compras` | Escrita | Sim |
+| **UC02** | Visualizar Fornecedor | `usuario_autenticado` | Leitura | Não |
+| **UC03** | Editar Fornecedor | `gestor_compras` | Escrita | Sim |
+| **UC04** | Inativar Fornecedor | `gestor_compras` | Escrita | Sim |
+
+**NOTA IMPORTANTE**: Este RF especifica 14 UCs completos no RF062.yaml (UC00-UC13 incluindo upload de documentação, gestão de contatos e contratos, SLAs, homologação, avaliações, ranking e dashboard). Esta versão documenta os 5 UCs CRUD básicos obrigatórios. Recomenda-se expandir para documentação completa dos 14 UCs via `icontrolit-architect` agent.
+
+---
+
+## 3. PADRÕES GERAIS APLICÁVEIS A TODOS OS UCs
+
+### 3.1 Multi-Tenancy (Isolamento de Tenant)
+
+**Regra:** Todos os UCs filtram por `EmpresaId` do usuário autenticado.
+
+**Implementação:**
+- Queries: `WHERE EmpresaId = @UsuarioEmpresaId AND Fl_Ativo = 1`
+- Acesso cruzado → HTTP 403
+
+### 3.2 Controle de Acesso (RBAC)
+
+**Permissões:**
+- `SD.FORNECEDORES.VIEW_ANY` - Listar fornecedores
+- `SD.FORNECEDORES.VIEW` - Visualizar detalhes
+- `SD.FORNECEDORES.CREATE` - Criar fornecedor
+- `SD.FORNECEDORES.UPDATE` - Editar fornecedor
+- `SD.FORNECEDORES.DELETE` - Inativar fornecedor
+- `SD.FORNECEDORES.HOMOLOGAR` - Aprovar/rejeitar homologação
+- `SD.FORNECEDORES.AVALIAR` - Registrar avaliações
+- `SD.FORNECEDORES.EXPORT` - Exportar relatórios
+
+### 3.3 Auditoria Automática
+
+**Operações auditadas:**
+- CREATE, UPDATE, DELETE (fornecedores)
+- UPLOAD_DOCUMENTO (documentação)
+- HOMOLOGACAO (aprovação/rejeição)
+- AVALIACAO (registro de avaliações)
+- BLOQUEIO (bloqueio automático)
+
+**Retenção:** 7 anos (LGPD)
+
+### 3.4 Internacionalização (i18n)
+
+**Chaves:** `fornecedores.*`, `documentos.*`, `contratos.*`, `avaliacoes.*`
+**Idiomas:** pt-BR, en-US, es-ES
+
+---
+
+## 4. CASOS DE USO
+
+### UC00 — Listar Fornecedores
+
+**Objetivo:** Listar fornecedores cadastrados no tenant com filtros e paginação.
+
+**Pré-condições:**
+- Usuário autenticado
+- Permissão `SD.FORNECEDORES.VIEW_ANY`
+
+**Fluxo Principal:**
+1. Usuário acessa `/service-desk/fornecedores`
+2. Sistema valida permissão
+3. Sistema carrega fornecedores do tenant (EmpresaId)
+4. Sistema aplica paginação (25 registros/página)
+5. Sistema exibe grid com: Razão Social, CNPJ, Categoria, Status, Avaliação Média, Contratos Ativos
+
+**Fluxos Alternativos:**
+- **FA-UC00-001:** Filtrar por categoria (Operadora, Fabricante, Revenda, etc.)
+- **FA-UC00-002:** Filtrar por status (Rascunho, Em Análise, Ativo, Bloqueado, Inativo)
+- **FA-UC00-003:** Buscar por razão social ou CNPJ
+- **FA-UC00-004:** Ordenar por qualquer coluna
+
+**Fluxos de Exceção:**
+- **FE-UC00-001:** Sem permissão → HTTP 403
+
+**Cobertura:**
+- RF-CRUD-02
+
+---
+
+### UC01 — Criar Fornecedor
+
+**Objetivo:** Cadastrar novo fornecedor com dados completos.
+
+**Pré-condições:**
+- Usuário autenticado
+- Permissão `SD.FORNECEDORES.CREATE`
+
+**Fluxo Principal:**
+1. Usuário acessa formulário de criação
+2. Sistema valida permissão
+3. Usuário preenche campos obrigatórios
+4. Sistema valida CNPJ (formato e dígitos verificadores)
+5. Sistema verifica unicidade de CNPJ no tenant
+6. Sistema cria fornecedor com status "rascunho"
+7. Sistema registra auditoria (CREATE)
+8. Sistema retorna HTTP 201
+
+**Campos Obrigatórios:**
+- Razão Social
+- CNPJ (validação de formato e dígitos)
+- Categoria (enum: Operadora, Fabricante, Revenda, Prestador de Serviço, Software House, Transportadora)
+- Email (validação de formato)
+
+**Fluxos de Exceção:**
+- **FE-UC01-001:** CNPJ duplicado no tenant → HTTP 400
+- **FE-UC01-002:** CNPJ inválido (dígitos verificadores) → HTTP 400
+- **FE-UC01-003:** Email inválido → HTTP 400
+
+**Regras de Negócio:**
+- **RN-RF062-001:** Categoria é obrigatória e imutável após criação
+- **RN-RF062-002:** Fornecedor criado com status "rascunho"
+
+**Cobertura:**
+- RF-CRUD-01
+- RF-VAL-01 (campos obrigatórios)
+- RF-VAL-02 (validação CNPJ)
+- RF-VAL-03 (validação email)
+
+---
+
+### UC02 — Visualizar Fornecedor
+
+**Objetivo:** Visualizar detalhes completos de fornecedor específico.
+
+**Pré-condições:**
+- Usuário autenticado
+- Permissão `SD.FORNECEDORES.VIEW`
+
+**Fluxo Principal:**
+1. Usuário clica em fornecedor ou acessa `/fornecedores/{id}`
+2. Sistema valida permissão e tenant
+3. Sistema carrega fornecedor + dados relacionados (contatos, contratos, documentos, avaliações)
+4. Sistema exibe abas: Resumo, Documentos, Contatos, Contratos, SLAs, Avaliações, Histórico
+
+**Fluxos de Exceção:**
+- **FE-UC02-001:** Fornecedor não encontrado ou de outro tenant → HTTP 404
+
+**Cobertura:**
+- RF-CRUD-03
+
+---
+
+### UC03 — Editar Fornecedor
+
+**Objetivo:** Atualizar informações de fornecedor existente.
+
+**Pré-condições:**
+- Usuário autenticado
+- Permissão `SD.FORNECEDORES.UPDATE`
+
+**Fluxo Principal:**
+1. Usuário edita campos permitidos
+2. Sistema valida permissão
+3. Sistema valida dados (CNPJ, email, telefone)
+4. Sistema atualiza fornecedor
+5. Sistema registra auditoria (UPDATE)
+6. Sistema retorna HTTP 200
+
+**Campos Não Editáveis:**
+- Categoria (imutável conforme RN-RF062-001)
+
+**Fluxos de Exceção:**
+- **FE-UC03-001:** Tentar alterar categoria → HTTP 400
+- **FE-UC03-002:** CNPJ inválido → HTTP 400
+
+**Regras de Negócio:**
+- **RN-RF062-001:** Categoria não pode ser alterada após criação
+
+**Cobertura:**
+- RF-CRUD-04
+
+---
+
+### UC04 — Inativar Fornecedor
+
+**Objetivo:** Inativar fornecedor via soft delete.
+
+**Pré-condições:**
+- Usuário autenticado
+- Permissão `SD.FORNECEDORES.DELETE`
+
+**Fluxo Principal:**
+1. Usuário clica em "Inativar"
+2. Sistema valida permissão
+3. Sistema verifica se fornecedor possui contratos ativos
+4. Sistema marca Fl_Ativo = 0 e Status = "inativo"
+5. Sistema registra auditoria (DELETE)
+6. Sistema retorna HTTP 200
+
+**Fluxos de Exceção:**
+- **FE-UC04-001:** Fornecedor com contratos ativos → HTTP 400 (não pode inativar)
+- **FE-UC04-002:** Fornecedor com ordens de serviço em andamento → HTTP 400
+
+**Regras de Negócio:**
+- **RN-RF062-016:** Fornecedor inativo não pode ser reativado (criar novo registro)
+
+**Cobertura:**
+- RF-CRUD-05
+
+---
+
+## 5. MATRIZ DE RASTREABILIDADE
+
+### 5.1 Cobertura RF → UC (Parcial - CRUD Básico)
+
+| Item RF | Título | Coberto por UC |
+|---------|--------|----------------|
+| RF-CRUD-01 | Criar fornecedor | UC01 |
+| RF-CRUD-02 | Listar fornecedores | UC00 |
+| RF-CRUD-03 | Visualizar fornecedor | UC02 |
+| RF-CRUD-04 | Atualizar fornecedor | UC03 |
+| RF-CRUD-05 | Inativar fornecedor | UC04 |
+
+**Cobertura CRUD:** 100% (5/5)
+**Cobertura Validações:** 60% (3/5) - **PENDENTE EXPANSÃO**
+**Cobertura Segurança:** 40% (2/5) - **PENDENTE EXPANSÃO**
+
+**⚠️ ATENÇÃO:** Este UC cobre apenas operações CRUD básicas. RF062 especifica 14 UCs completos incluindo:
+- UC05: Upload de Documentação
+- UC06: Gerenciar Contatos
+- UC07: Gerenciar Contratos
+- UC08: Definir SLAs
+- UC09: Homologar Fornecedor
+- UC10: Avaliar Fornecedor
+- UC11: Visualizar Ranking
+- UC12: Dashboard de Performance
+- UC13: Exportar Relatório
+- UC14: Consultar Histórico de Atendimentos
+
+Recomenda-se executar `icontrolit-architect` agent para gerar documentação completa dos 14 UCs.
+
+---
+
+## 6. CHANGELOG
+
+### v2.0 — 2025-12-31
+- **Migração v1.0 → v2.0**: Conformidade com template canônico
+- **Adicionado**: Metadados Epic, Fase, Autor
+- **Adicionado**: Seção "PADRÕES GERAIS"
+- **Limitação**: Apenas 5 UCs CRUD básicos documentados (de 14 esperados)
+- **Pendente**: Expansão para 14 UCs completos incluindo documentação, homologação, avaliações, SLAs e dashboard
+
+### v1.0 — 2025-12-18
+- Versão inicial simplificada (9 UCs superficiais)

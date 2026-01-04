@@ -1,0 +1,868 @@
+# RF-029: Gestão de SLA - Serviços
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF021 (Catálogo de Serviços), RF073 (Gestão de Chamados), RF074 (Gestão de Tickets), RF028 (SLA Operações)
+**EPIC**: EPIC008-SD-Service-Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+Este requisito especifica o **Módulo de Gestão de SLA para Serviços** do sistema IControlIT, responsável por gerenciar Service Level Agreements (SLAs) para serviços do catálogo (RF021) e seus respectivos chamados/tickets (RF073, RF074). O módulo permite definir metas de atendimento (resposta e resolução), priorizar por matriz de impacto/urgência, calcular consumo de SLA em tempo real, pausar fora do horário, disparar alertas em cascata e escalar automaticamente quando SLAs são violados.
+
+Diferencia-se fundamentalmente do RF028 (SLA para Operações) por focar em **serviços e chamados**, não em operações físicas de ativos (instalação, configuração, manutenção preventiva).
+
+### 1.2 Importancia Estrategica
+
+O módulo de Gestão de SLA para Serviços é crítico para:
+- **Conformidade Contratual**: Garantir que metas de atendimento sejam atingidas conforme contratos (RF023)
+- **Qualidade de Serviço**: Monitorar e melhorar tempo de resposta/resolução de suporte técnico
+- **Satisfação do Cliente**: Alertas e escalação automática reduzem tempo de espera
+- **Rastreabilidade**: Auditoria completa de cumprimento ou violação de SLA
+- **Governança Operacional**: Visibilidade em tempo real de performance via dashboard com SignalR
+
+### 1.3 Conceitos Fundamentais
+
+**Service Level Agreement (SLA)**: Contrato entre TI e usuário que define metas de atendimento para um serviço.
+- Exemplo: "Suporte crítico (P1) deve responder em 15 minutos e resolver em 4 horas"
+
+**Priorização por Matriz**: Cruzamento de Impacto (Alto/Médio/Baixo) e Urgência (Alta/Média/Baixa) resultando em Prioridade (P1/P2/P3/P4).
+- P1 (Crítico): Alto Impacto + Alta Urgência → 15min resposta, 4h resolução
+- P2 (Alto): Alto Impacto + Urgência Média, ou Impacto Médio + Alta Urgência → 1h resposta, 8h resolução
+- P3 (Médio): Impacto Médio + Urgência Média → 4h resposta, 24h resolução
+- P4 (Baixo): Demais combinações → 8h resposta, 72h resolução
+
+**Pausa Automática**: SLA pausa fora do horário de atendimento (comercial, 24x7, plantão) e retoma automaticamente.
+
+**Consumo de SLA**: Tempo decorrido entre abertura de chamado e resolução, excluindo pausas e feriados.
+
+**Escalação Automática**: Quando SLA está próximo de estourar (90%, 100%), chamado escala para nível técnico superior.
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Tabelas Principais** | SLAServico, SLAServicoDetalhe, Prioridade | SlaServico, SlaServicoCalculo, Prioridade (migrado) |
+| **Cálculo de SLA** | Stored Procedure `pa_CalcularSLA` síncrono | Quartz Job assíncrono + SignalR tempo real |
+| **Alertas** | Email pontual (sem cascata) | SignalR em tempo real + Email/SMS em 50%, 75%, 90%, 100% |
+| **Pausa/Retomada** | Manual por usuário | Automática por calendário comercial + BrasilAPI feriados |
+| **Dashboard** | Atualização a cada 5 minutos | SignalR WebSocket atualização em tempo real |
+| **Escalação** | Manual por supervisor | Automática por regra quando SLA viola |
+| **Integração Chamados** | Tight coupling direto na tabela | Event-driven (Chamado criado → SLA calculado) |
+
+### 1.5 Funcionalidades Principais
+
+1. **CRUD de SLA por Serviço** - Criar, ler, atualizar, excluir SLAs associados a serviços do catálogo
+2. **Matriz de Priorização** - Impacto x Urgência → Prioridade (P1/P2/P3/P4) com metas automáticas
+3. **Definição de Metas** - Tempo resposta, tempo resolução, calendário atendimento por SLA
+4. **Pausa Automática** - Pausar SLA fora de horário (comercial, 24x7, plantão)
+5. **Cálculo SLA em Tempo Real** - Consumo atualizado continuamente, excluindo pausas/feriados
+6. **Alertas em Cascata** - Notificações em 50%, 75%, 90%, 100% do SLA consumido
+7. **Escalação Automática** - Chamado escala para técnico superior quando SLA viola
+8. **Dashboard Compliance** - Visibilidade em tempo real de SLAs (% atendimento, violações, tendências)
+9. **Relatórios Gerenciais** - Métricas de performance, compliance, tendências por serviço
+10. **Integração BrasilAPI** - Feriados nacionais para excluir do cálculo de SLA
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-SLA-029-01: Matriz de Priorização Impacto x Urgência
+
+**Descricao**: A prioridade de um chamado é determinada pelo cruzamento automático de Impacto e Urgência, resultando em Prioridade (P1/P2/P3/P4). Esta matriz é imutável e serve como base para atribuição automática de SLA.
+
+**Justificativa**: Elimina subjetividade na priorização, garante consistência e permite cálculo automático de metas de SLA.
+
+**Implementacao**:
+```csharp
+public class PriorityMatrixService
+{
+    public enum ImpactLevel { Alto, Medio, Baixo }
+    public enum UrgencyLevel { Alta, Media, Baixa }
+    public enum Priority { P1, P2, P3, P4 }
+
+    public Priority CalculatePriority(ImpactLevel impact, UrgencyLevel urgency)
+    {
+        return (impact, urgency) switch
+        {
+            (ImpactLevel.Alto, UrgencyLevel.Alta) => Priority.P1,        // Crítico
+            (ImpactLevel.Alto, UrgencyLevel.Media) => Priority.P2,       // Alto
+            (ImpactLevel.Medio, UrgencyLevel.Alta) => Priority.P2,       // Alto
+            (ImpactLevel.Medio, UrgencyLevel.Media) => Priority.P3,      // Médio
+            (ImpactLevel.Medio, UrgencyLevel.Baixa) => Priority.P4,      // Baixo
+            (ImpactLevel.Baixo, UrgencyLevel.Alta) => Priority.P3,       // Médio
+            (ImpactLevel.Baixo, UrgencyLevel.Media) => Priority.P4,      // Baixo
+            (ImpactLevel.Baixo, UrgencyLevel.Baixa) => Priority.P4,      // Baixo
+            _ => Priority.P4
+        };
+    }
+}
+```
+
+**Exemplos**:
+- Serviço crítico + Impacto Alto + Urgência Alta → P1 (Crítico)
+- Serviço crítico + Impacto Médio + Urgência Alta → P2 (Alto)
+- Serviço comum + Impacto Baixo + Urgência Baixa → P4 (Baixo)
+
+---
+
+### RN-SLA-029-02: Metas P1 - Crítico
+
+**Descricao**: Chamados com Prioridade P1 (Crítico) possuem metas rigorosas: resposta em 15 minutos, resolução em 4 horas.
+
+**Justificativa**: P1 indica serviço crítico (alto impacto, alta urgência), exigindo resposta e resolução ágeis para minimizar indisponibilidade.
+
+**Implementacao**:
+```csharp
+public class SlaMetasService
+{
+    public static class CriticalMetas
+    {
+        public const int ResponseTimeMinutes = 15;      // P1: 15 minutos
+        public const int ResolutionTimeHours = 4;       // P1: 4 horas
+    }
+
+    public SlaCalculation CalculateP1Metas(DateTime createdAt)
+    {
+        var responseDeadline = createdAt.AddMinutes(CriticalMetas.ResponseTimeMinutes);
+        var resolutionDeadline = createdAt.AddHours(CriticalMetas.ResolutionTimeHours);
+
+        return new SlaCalculation
+        {
+            Priority = Priority.P1,
+            ResponseDeadline = responseDeadline,
+            ResolutionDeadline = resolutionDeadline
+        };
+    }
+}
+```
+
+---
+
+### RN-SLA-029-03: Metas P2 - Alto
+
+**Descricao**: Chamados com Prioridade P2 (Alto) possuem metas moderadas: resposta em 1 hora, resolução em 8 horas.
+
+**Justificativa**: P2 indica alto impacto mas urgência média, ou vice-versa; requer resposta rápida mas resolução pode levar mais tempo.
+
+**Implementacao**:
+```csharp
+public static class HighMetas
+{
+    public const int ResponseTimeMinutes = 60;         // P2: 1 hora
+    public const int ResolutionTimeHours = 8;          // P2: 8 horas
+}
+```
+
+---
+
+### RN-SLA-029-04: Metas P3 - Médio
+
+**Descricao**: Chamados com Prioridade P3 (Médio) possuem metas mais relaxadas: resposta em 4 horas, resolução em 24 horas.
+
+**Justificativa**: P3 indica impacto/urgência média, permitindo resposta mais lenta com resolução em tempo comercial normal.
+
+**Implementacao**:
+```csharp
+public static class MediumMetas
+{
+    public const int ResponseTimeMinutes = 240;        // P3: 4 horas
+    public const int ResolutionTimeHours = 24;         // P3: 24 horas
+}
+```
+
+---
+
+### RN-SLA-029-05: Metas P4 - Baixo
+
+**Descricao**: Chamados com Prioridade P4 (Baixo) possuem metas relaxadas: resposta em 8 horas, resolução em 72 horas.
+
+**Justificativa**: P4 indica baixo impacto e baixa urgência, permitindo resposta e resolução em escala de dias.
+
+**Implementacao**:
+```csharp
+public static class LowMetas
+{
+    public const int ResponseTimeMinutes = 480;        // P4: 8 horas
+    public const int ResolutionTimeHours = 72;         // P4: 72 horas
+}
+```
+
+---
+
+### RN-SLA-029-06: Pausa Automática Fora de Horário
+
+**Descricao**: SLA pausa automaticamente fora do horário de atendimento configurado (comercial, 24x7, plantão) e retoma automaticamente quando entra em horário.
+
+**Justificativa**: Garante que tempo fora de expediente não conte contra SLA, tornando metas alcançáveis mesmo fora do horário comercial.
+
+**Implementacao**:
+```csharp
+public class SlaAutoPauseService
+{
+    private readonly IBusinessCalendarService _calendar;
+
+    public TimeSpan CalculateEffectiveSlaTime(
+        DateTime startTime,
+        DateTime endTime,
+        string operatingHours)
+    {
+        var effectiveTime = TimeSpan.Zero;
+        var current = startTime;
+
+        while (current < endTime)
+        {
+            // Verifica se está dentro do horário de atendimento
+            if (_calendar.IsBusinessHours(current, operatingHours))
+            {
+                var nextBoundary = _calendar.GetNextHourBoundary(current, operatingHours);
+                var segmentEnd = nextBoundary > endTime ? endTime : nextBoundary;
+                effectiveTime = effectiveTime.Add(segmentEnd - current);
+                current = segmentEnd;
+            }
+            else
+            {
+                // Pula para próximo horário de atendimento
+                current = _calendar.GetNextBusinessStart(current, operatingHours);
+            }
+        }
+
+        return effectiveTime;
+    }
+}
+```
+
+---
+
+### RN-SLA-029-07: Alertas em Cascata (50%, 75%, 90%, 100%)
+
+**Descricao**: Sistema dispara automaticamente alertas quando SLA atinge 50%, 75%, 90% e 100% de consumo. Cada alerta é uma notificação (SignalR, Email, SMS) com ação recomendada.
+
+**Justificativa**: Alertas escalonados permitem intervenção progressiva antes da violação total do SLA.
+
+**Implementacao**:
+```csharp
+public class SlaAlertService
+{
+    public async Task CheckAndDispatchAlerts(Chamado chamado, SlaServico sla)
+    {
+        var consumedPercent = CalculateSlaConsumption(chamado, sla);
+        var alertThresholds = new[] { 0.50, 0.75, 0.90, 1.00 };
+
+        foreach (var threshold in alertThresholds)
+        {
+            if (consumedPercent >= threshold && !HasAlertBeenDispatched(chamado, threshold))
+            {
+                var alert = new SlaAlert
+                {
+                    ChamadoId = chamado.Id,
+                    SlaId = sla.Id,
+                    ConsumptionPercentage = consumedPercent,
+                    Threshold = threshold,
+                    DispatchedAt = DateTime.UtcNow,
+                    Status = SlaAlertStatus.Pending
+                };
+
+                await _slaAlertRepository.AddAsync(alert);
+                await _signalRService.NotifyAsync("sla-alert", alert);
+
+                if (threshold >= 0.90)
+                    await _emailService.SendAsync("SLA Alert",
+                        $"Chamado {chamado.Id}: SLA {threshold:P0} consumido");
+
+                if (threshold >= 1.00)
+                    await _smsService.SendAsync("SLA VIOLADO! Chamado " + chamado.Id);
+
+                await _auditService.LogAsync("SLA_ALERT_DISPATCHED",
+                    new { ChamadoId = chamado.Id, Threshold = threshold });
+            }
+        }
+    }
+}
+```
+
+---
+
+### RN-SLA-029-08: Escalação Automática Quando SLA Viola
+
+**Descricao**: Quando SLA atinge 100% de consumo (SLA violado), o sistema automaticamente escala o chamado para nível técnico superior e notifica responsáveis.
+
+**Justificativa**: Garante que SLA violado receba atenção imediata de especialista, minimizando tempo de violação.
+
+**Implementacao**:
+```csharp
+public class SlaEscalationService
+{
+    public async Task EscalateOnViolation(Chamado chamado, SlaServico sla)
+    {
+        var consumedPercent = CalculateSlaConsumption(chamado, sla);
+
+        if (consumedPercent >= 1.0 && chamado.Status != ChamadoStatus.Resolvido)
+        {
+            var currentLevel = chamado.NivelTecnico;
+            var nextLevel = GetNextTechnicalLevel(currentLevel);
+
+            if (nextLevel != null)
+            {
+                chamado.NivelTecnico = nextLevel;
+                chamado.LastEscalatedAt = DateTime.UtcNow;
+                chamado.EscalationCount++;
+
+                await _chamadoRepository.UpdateAsync(chamado);
+                await _signalRService.NotifyAsync($"escalacao-{nextLevel}",
+                    new { ChamadoId = chamado.Id, Reason = "SLA Violado" });
+                await _auditService.LogAsync("SLA_ESCALATED",
+                    new { ChamadoId = chamado.Id, FromLevel = currentLevel, ToLevel = nextLevel });
+            }
+        }
+    }
+
+    private string GetNextTechnicalLevel(string currentLevel)
+    {
+        return currentLevel switch
+        {
+            "N1" => "N2",
+            "N2" => "N3",
+            "N3" => "Especialista",
+            _ => null
+        };
+    }
+}
+```
+
+---
+
+### RN-SLA-029-09: Cálculo SLA Exclui Pausas e Feriados
+
+**Descricao**: O cálculo de tempo consumido de SLA exclui períodos em pausa (fora de horário, pausas manuais) e feriados nacionais/estaduais/municipais.
+
+**Justificativa**: Garante cálculo justo de SLA, não penalizando por indisponibilidade externa (finais de semana, feriados).
+
+**Validacao**:
+```sql
+ALTER TABLE [dbo].[SlaServico] ADD CONSTRAINT [CK_Horario_Valido]
+CHECK ([OperatingHours] IN ('24x7', 'comercial', 'plantao'));
+```
+
+---
+
+### RN-SLA-029-10: Multi-tenancy - ClienteId Obrigatório
+
+**Descricao**: Toda entidade de SLA (SlaServico, SlaCalculacao, SlaAlert) DEVE possuir ClienteId para isolamento total de dados por cliente.
+
+**Justificativa**: Garante segurança e privacidade entre clientes; impede vazamento de dados.
+
+**Validacao**:
+```sql
+ALTER TABLE [dbo].[SlaServico]
+    ADD CONSTRAINT [NN_ClienteId] NOT NULL,
+    ADD CONSTRAINT [FK_SlaServico_Cliente]
+    FOREIGN KEY ([ClienteId]) REFERENCES [dbo].[Cliente]([Id]);
+
+CREATE INDEX [IDX_SlaServico_ClienteId] ON [dbo].[SlaServico]([ClienteId]);
+```
+
+---
+
+### RN-SLA-029-11: Soft Delete com IsDeleted
+
+**Descricao**: Exclusão lógica de SLA utiliza flag IsDeleted = true, preservando histórico de auditoria.
+
+**Justificativa**: Permite recuperação de dados, auditoria histórica, e evita cascata de exclusão de dados relacionados.
+
+**Implementacao**:
+```csharp
+public async Task DeleteSlaAsync(int slaId, int clienteId)
+{
+    var sla = await _slaRepository.GetByIdAsync(slaId, clienteId);
+
+    if (sla == null)
+        throw new NotFoundException($"SLA {slaId} não encontrado para cliente {clienteId}");
+
+    sla.IsDeleted = true;
+    sla.DeletedAt = DateTime.UtcNow;
+    sla.DeletedBy = _currentUserService.GetUserId();
+
+    await _slaRepository.UpdateAsync(sla);
+    await _auditService.LogAsync("SLA_DELETED",
+        new { SlaId = slaId, ClienteId = clienteId });
+}
+```
+
+---
+
+### RN-SLA-029-12: Integração com BrasilAPI para Feriados
+
+**Descricao**: Sistema integra com API pública BrasilAPI para obter feriados nacionais, estaduais e municipais (GET https://brasilapi.com.br/api/feriados/v1/{ano}).
+
+**Justificativa**: Garante cálculo preciso de SLA excluindo feriados legais, sem manutenção manual.
+
+**Implementacao**:
+```csharp
+public class BrasilApiHolidayService : IBrasilApiHolidayService
+{
+    private readonly HttpClient _httpClient;
+    private readonly IMemoryCache _cache;
+
+    public async Task<bool> IsHoliday(DateTime date)
+    {
+        var year = date.Year;
+        var cacheKey = $"feriados_{year}";
+
+        if (_cache.TryGetValue(cacheKey, out List<HolidayData> holidays))
+            return holidays.Any(h => h.Date.Date == date.Date);
+
+        try
+        {
+            var url = $"https://brasilapi.com.br/api/feriados/v1/{year}";
+            var response = await _httpClient.GetAsync(url);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var fetchedHolidays = JsonConvert.DeserializeObject<List<HolidayData>>(json);
+                _cache.Set(cacheKey, fetchedHolidays, TimeSpan.FromDays(365));
+                return fetchedHolidays.Any(h => h.Date.Date == date.Date);
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning($"BrasilAPI indisponível: {ex.Message}");
+        }
+
+        return false;
+    }
+}
+```
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `ic1_legado`
+
+**Tabela Principal**: `SLAServico`
+```sql
+CREATE TABLE [dbo].[SLAServico](
+    [idSLA] [int] IDENTITY(1,1) NOT NULL,
+    [idServico] [int] NOT NULL,
+    [idPrioridade] [int] NOT NULL,
+    [tempoResposta] [int] NOT NULL,              -- Em minutos
+    [tempoResolucao] [int] NOT NULL,             -- Em minutos
+    [horarioAtendimento] [varchar](50) NULL,     -- '24x7', 'comercial', 'plantao'
+    [dataInclusao] [datetime] NOT NULL,
+    [usuarioInclusao] [varchar](50) NOT NULL,
+    [dataAlteracao] [datetime] NULL,
+    [usuarioAlteracao] [varchar](50) NULL,
+    CONSTRAINT [PK_SLAServico] PRIMARY KEY CLUSTERED ([idSLA] ASC),
+    CONSTRAINT [FK_SLAServico_Servico] FOREIGN KEY ([idServico])
+        REFERENCES [dbo].[Servico]([idServico]),
+    CONSTRAINT [FK_SLAServico_Prioridade] FOREIGN KEY ([idPrioridade])
+        REFERENCES [dbo].[Prioridade]([idPrioridade])
+)
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descrição | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `idSLA` | PK da tabela SLAServico | Migra para `Id` em SlaServico |
+| `idServico` | FK para Serviço do catálogo | Mantém FK, agora `ServicoId` |
+| `idPrioridade` | FK para tabela Prioridade | Migra para enum `Priority` |
+| `tempoResposta` | Tempo resposta em minutos | `ResponseTimeMinutes` |
+| `tempoResolucao` | Tempo resolução em minutos | `ResolutionTimeHours` (converter) |
+| `horarioAtendimento` | String '24x7'/'comercial'/'plantao' | Enum `OperatingHours` |
+| `dataInclusao` | Auditoria de criação | `CreatedAt` |
+| `usuarioInclusao` | Auditoria de usuário | `CreatedBy` (UserId) |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `pa_CalcularSLA` | Calcula consumo de SLA para chamado | Migra para Quartz Job assíncrono `SlaCalculationJob` |
+| `pa_AtualizarStatusSLA` | Atualiza status (Cumprido/Violado) | Migra para `SlaStatusUpdateHandler` |
+| `pa_ListarSLAServicos` | Lista SLAs com filtros | Migra para Query `GetAllSlasQuery` |
+| `pa_ValidarSLA` | Valida se SLA foi cumprido | Migra para `SlaValidationService` |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `SLAServico.aspx` | Cadastro de SLA (criar/editar) | `/service-desk/slas/form` (Angular) |
+| `SLAServicoLista.aspx` | Listagem de SLAs | `/service-desk/slas/list` (Angular) |
+| `SLAServicoDetalhe.aspx` | Detalhe e histórico de SLA | `/service-desk/slas/{id}/detail` |
+| `SLADashboard.aspx` | Dashboard compliance | `/service-desk/slas/dashboard` (SignalR) |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSSLA.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ObterSLAs()` | Lista todos os SLAs | `GET /api/sla-servicos` |
+| `ObterSLAPorId(idSLA)` | Obtém SLA específico | `GET /api/sla-servicos/{id}` |
+| `InserirSLA(...)` | Cria novo SLA | `POST /api/sla-servicos` |
+| `AtualizarSLA(...)` | Atualiza SLA | `PUT /api/sla-servicos/{id}` |
+| `ExcluirSLA(idSLA)` | Exclui SLA | `DELETE /api/sla-servicos/{id}` |
+| `CalcularSLA(idChamado)` | Calcula SLA de chamado | `GET /api/sla-servicos/{id}/calcular?chamadoId={cid}` |
+| `PausarSLA(idChamado)` | Pausa SLA | `POST /api/sla-servicos/{id}/pausar` |
+| `RetomarSLA(idChamado)` | Retoma SLA | `POST /api/sla-servicos/{id}/retomar` |
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `SLA_SERVICOS_*`
+
+**Configuracao**:
+```json
+{
+    "features": [
+        {
+            "featureKey": "SLA_SERVICOS_GESTAO",
+            "nome": "Gestão de SLA Serviços",
+            "descricao": "Criar, editar, excluir SLAs para serviços do catálogo",
+            "habilitado": true,
+            "isSystemFeature": false
+        },
+        {
+            "featureKey": "SLA_SERVICOS_ALERTAS",
+            "nome": "Alertas Automáticos de SLA",
+            "descricao": "Disparar alertas em 50%, 75%, 90%, 100% consumo",
+            "habilitado": true,
+            "isSystemFeature": false
+        },
+        {
+            "featureKey": "SLA_SERVICOS_ESCALACAO",
+            "nome": "Escalação Automática",
+            "descricao": "Escalar chamado para nível superior quando SLA viola",
+            "habilitado": true,
+            "isSystemFeature": false
+        },
+        {
+            "featureKey": "SLA_SERVICOS_DASHBOARD",
+            "nome": "Dashboard SLA SignalR",
+            "descricao": "Dashboard em tempo real com atualização WebSocket",
+            "habilitado": true,
+            "isSystemFeature": false
+        }
+    ]
+}
+```
+
+**Nota**: Cada feature pode ser habilitada/desabilitada independentemente, permitindo rollout gradual.
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao**:
+
+```json
+{
+    "sla": {
+        "servicos": {
+            "title": "Gestão de SLA - Serviços",
+            "description": "Gerenciar Service Level Agreements para serviços do catálogo",
+            "form": {
+                "servico": "Serviço",
+                "prioridade": "Prioridade",
+                "tempoResposta": "Tempo de Resposta (minutos)",
+                "tempoResolucao": "Tempo de Resolução (horas)",
+                "horarioAtendimento": "Horário de Atendimento",
+                "ativo": "Ativo"
+            },
+            "operatingHours": {
+                "comercial": "Horário Comercial (08:00-17:00)",
+                "24x7": "24 Horas, 7 Dias",
+                "plantao": "Plantão (18:00-08:00)"
+            },
+            "priority": {
+                "p1": "P1 - Crítico (15min / 4h)",
+                "p2": "P2 - Alto (1h / 8h)",
+                "p3": "P3 - Médio (4h / 24h)",
+                "p4": "P4 - Baixo (8h / 72h)"
+            },
+            "messages": {
+                "success": {
+                    "created": "SLA criado com sucesso",
+                    "updated": "SLA atualizado com sucesso",
+                    "deleted": "SLA excluído com sucesso"
+                },
+                "error": {
+                    "notFound": "SLA não encontrado",
+                    "duplicateService": "Já existe SLA para este serviço",
+                    "invalidTimes": "Tempo de resolução deve ser maior que tempo de resposta"
+                }
+            }
+        }
+    }
+}
+```
+
+**Suporte de Idiomas**: pt-BR (padrão), en-US, es-ES
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Criar SLA | `SLA_SVC_CREATE` | SlaId, ServicoId, Priority, ResponseTime, ResolutionTime, OperatingHours |
+| Atualizar SLA | `SLA_SVC_UPDATE` | SlaId, Campo alterado, Valor anterior, Valor novo |
+| Excluir SLA | `SLA_SVC_DELETE` | SlaId, Motivo (soft delete) |
+| Calcular SLA | `SLA_SVC_CALC` | ChamadoId, SlaId, Tempo consumido, Deadline |
+| Pausar SLA | `SLA_SVC_PAUSE` | ChamadoId, SlaId, Data início pausa |
+| Retomar SLA | `SLA_SVC_RESUME` | ChamadoId, SlaId, Tempo pausa total |
+| Alerta SLA | `SLA_SVC_ALERT` | ChamadoId, SlaId, Threshold (50/75/90/100), Timestamp |
+| Escalação | `SLA_SVC_ESCALATED` | ChamadoId, SlaId, De nível X para nível Y |
+
+**Retencao**: 5 anos (LGPD + conformidade de suporte técnico)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `sla:servicos:create` | Criar SLA para serviço | Gerente TI, Diretor |
+| `sla:servicos:read` | Visualizar SLAs | Todos |
+| `sla:servicos:update` | Editar SLA | Gerente TI, Diretor |
+| `sla:servicos:delete` | Excluir SLA | Diretor |
+| `sla:servicos:dashboard` | Acessar dashboard compliance | Gerente TI, Diretor, Supervisor |
+| `sla:servicos:export` | Exportar relatórios | Gerente TI, Diretor |
+| `sla:servicos:pausar` | Pausar/retomar SLA manualmente | Supervisor, Técnico N3 |
+| `sla:servicos:escalar` | Escalar chamado manualmente | Supervisor, Técnico N2, N3 |
+
+**Nota**: Permissões devem ser validadas em cada endpoint REST. Soft delete (IsDeleted = true) mantém auditoria.
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/sla-servicos` | Listar SLAs ativos (paginado) | `sla:servicos:read` |
+| GET | `/api/sla-servicos/{id}` | Obter SLA por ID | `sla:servicos:read` |
+| POST | `/api/sla-servicos` | Criar novo SLA | `sla:servicos:create` |
+| PUT | `/api/sla-servicos/{id}` | Atualizar SLA | `sla:servicos:update` |
+| DELETE | `/api/sla-servicos/{id}` | Excluir SLA (soft delete) | `sla:servicos:delete` |
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/sla-servicos/{id}/calcular` | Calcular SLA consumido para chamado | `sla:servicos:read` |
+| POST | `/api/sla-servicos/{id}/pausar` | Pausar SLA de chamado | `sla:servicos:pausar` |
+| POST | `/api/sla-servicos/{id}/retomar` | Retomar SLA de chamado | `sla:servicos:pausar` |
+| GET | `/api/sla-servicos/compliance` | Dashboard compliance (tempo real SignalR) | `sla:servicos:dashboard` |
+| GET | `/api/sla-servicos/violacoes` | Listar SLAs violados | `sla:servicos:dashboard` |
+| GET | `/api/sla-servicos/export` | Exportar SLAs (CSV/PDF) | `sla:servicos:export` |
+| GET | `/api/sla-servicos/metricas` | Métricas gerenciais (KPIs) | `sla:servicos:dashboard` |
+| GET | `/api/sla-servicos/matriz-priorizacao` | Obter matriz Impacto x Urgência | `sla:servicos:read` |
+| GET | `/api/sla-servicos/{id}/alertas` | Listar alertas de um SLA | `sla:servicos:read` |
+| POST | `/api/sla-servicos/{id}/escalar` | Escalar chamado manualmente | `sla:servicos:escalar` |
+| GET | `/api/sla-servicos/por-servico/{servicoId}` | Listar SLAs de um serviço específico | `sla:servicos:read` |
+| GET | `/api/sla-servicos/historico/{chamadoId}` | Histórico completo de SLA de um chamado | `sla:servicos:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Criação e Cálculo de SLA para Chamado
+
+```
+Usuário cria Chamado (RF073)
+    |
+    v
+Chamado criado com Impacto + Urgência
+    |
+    v
+Sistema obtém Serviço do catálogo (RF021)
+    |
+    v
+SlaServico carregado por Serviço
+    |
+    v
+Matriz Priorização: Impacto x Urgência → Priority (P1/P2/P3/P4)
+    |
+    v
+SlaCalculation criado:
+  - ResponseDeadline = CreatedAt + TempoResposta
+  - ResolutionDeadline = CreatedAt + TempoResolucao
+  - OperatingHours = SlaServico.HorarioAtendimento
+    |
+    v
+Cálculo Automático Iniciado (Quartz Job)
+    |
+    +--- A cada 1 minuto: Calcula consumo efetivo ---+
+    |                                                 |
+    v                                                 |
+Sistema calcula tempo efetivo (exclui pausas/feriados)
+    |
+    v
+    +--- Consumido >= 50% → Alerta 50% (SignalR + Email)
+    |
+    v
+    +--- Consumido >= 75% → Alerta 75% (SignalR + Email)
+    |
+    v
+    +--- Consumido >= 90% → Alerta 90% (SignalR + Email + SMS)
+    |
+    v
+    +--- Consumido >= 100% → SLA Violado!
+         |
+         v
+         Escala Chamado para nível técnico superior
+         |
+         v
+         Notifica responsáveis (SignalR + Email + SMS)
+    |
+    v
+Chamado Resolvido (Status = Resolvido)
+    |
+    v
+SlaCalculation finalizado:
+  - ResolvedAt = ResolutionTime
+  - ComplianceStatus = Cumprido/Violado
+    |
+    v
+Dashboard atualiza compliance em tempo real (SignalR)
+```
+
+### 6.2 Fluxo de Pausa Automática Fora de Horário
+
+```
+Chamado com SLA em Horário Comercial (08:00-17:00)
+    |
+    v
+Sistema verifica: Agora é 17:00 (fim de expediente)?
+    |
+    +--- SIM → Pausa SLA automaticamente
+    |        |
+    |        v
+    |     SlaCalculation.IsPaused = true
+    |     SlaCalculation.PausedAt = 17:00
+    |
+    +--- NAO → Continua calculando consumo
+         |
+         v
+    Sistema verifica: Agora é segunda 08:00?
+         |
+         v
+    SIM → Retoma SLA automaticamente
+         |
+         v
+    SlaCalculation.IsPaused = false
+    SlaCalculation.ResumedAt = segunda 08:00
+         |
+         v
+    Tempo de pausa não conta contra SLA
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| **Autenticação JWT** | Todo endpoint requer token JWT válido (AuthAttribute) |
+| **Autorização por Permissão** | Cada endpoint valida permissão específica (RBAC) |
+| **Validação de ClienteId** | Queries filtram automaticamente por ClienteId do usuário logado |
+| **Criptografia em Trânsito** | HTTPS obrigatório (TLS 1.3+) |
+| **Proteção SQL Injection** | Entity Framework Core com parameterized queries |
+| **XSS Prevention** | Angular sanitiza strings, content-type: application/json |
+| **CSRF Token** | Angular interceptor adiciona X-CSRF-TOKEN em mutações |
+| **Rate Limiting** | Máx 100 req/min por usuário (customizável por permissão) |
+| **Soft Delete** | IsDeleted = true preserva auditoria, sem CASCADE delete |
+| **Auditoria Completa** | Todos os acessos/mudanças registrados com UserId, timestamp, IP |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [ ] SQL Injection em filtros (ex: nome do serviço)
+- [ ] XSS em descrição de SLA
+- [ ] CSRF Protection em POST/PUT/DELETE
+- [ ] Validação de permissões (tentar criar SLA sem permissão sla:servicos:create)
+- [ ] Isolamento multi-tenancy (usuário A não vê SLAs do cliente B)
+- [ ] Soft delete (SLA excluído aparece em auditoria mas não em GET /api/sla-servicos)
+- [ ] Rate limiting (100+ requisições excedem limite)
+- [ ] JWT expirado (rejeita token vencido)
+- [ ] HTTPS only (HTTP sem redirect)
+- [ ] Criptografia de senhas (auditorias nunca contêm senhas em claro)
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao |
+|-----|------|---------|
+| **Taxa de Cumprimento P1** | ≥ 99% | (SLAs P1 cumpridos / Total P1) × 100 |
+| **Taxa de Cumprimento P2** | ≥ 98% | (SLAs P2 cumpridos / Total P2) × 100 |
+| **Taxa de Cumprimento P3** | ≥ 95% | (SLAs P3 cumpridos / Total P3) × 100 |
+| **Taxa de Cumprimento P4** | ≥ 90% | (SLAs P4 cumpridos / Total P4) × 100 |
+| **Tempo Médio de Resposta P1** | ≤ 15 min | SUM(tempo resposta P1) / COUNT(P1) |
+| **Tempo Médio de Resolução P1** | ≤ 4 h | SUM(tempo resolução P1) / COUNT(P1) |
+| **Taxa de Escalação** | ≤ 15% | (Chamados escalados / Total) × 100 |
+| **MTTR (Mean Time To Resolve)** | Trend | Tempo médio total resolução por prioridade |
+| **Alertas Disparados** | Trend | Total alertas / mês (50%, 75%, 90%, 100%) |
+| **Compliance Mensal** | ≥ 95% | SUM(cumpridos) / SUM(total) × 100 |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| **SLA 50% Consumido** | tempo_decorrido >= 0.5 × deadline | SignalR notificação leve (informativo) |
+| **SLA 75% Consumido** | tempo_decorrido >= 0.75 × deadline | SignalR + Email (atenção) |
+| **SLA 90% Consumido** | tempo_decorrido >= 0.9 × deadline | SignalR + Email + SMS (urgente) |
+| **SLA 100% Violado** | tempo_decorrido >= 1.0 × deadline | Escalação automática + SMS + Diretor |
+| **Taxa Cumprimento < 90%** | monthly_compliance < 90% | Relatório executivo para Gerente TI |
+| **Número Violações > Limite** | violações/mês > threshold | Alerta governança/compliance |
+| **Performance Degradada** | response_time API > 2s | Alerta SRE (monitoramento infraestrutura) |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF029](./MD-RF029.md) com DDL completo (SlaServico, SlaCalculacao, SlaAlert, migrations)
+2. **Casos de Uso**: Criar [UC-RF029](./UC-RF029.md) com fluxos de negócio detalhados
+3. **Fluxos Visuais**: Criar [WF-RF029](./WF-RF029.md) com mockups de telas Angular
+4. **Documentação Testes**: Criar `TC-RF029-BACKEND.md`, `TC-RF029-FRONTEND.md`, `TC-RF029-E2E.md`
+5. **Implementação Backend**: Commands/Queries/Handlers, Services, Controllers, Migrations
+6. **Implementação Frontend**: Componentes Angular (List, Form, Dashboard), Serviços HTTP
+7. **Integração SignalR**: Hub para notificações em tempo real (alertas, escalação, compliance)
+8. **Jobs Agendados**: Quartz Job para cálculo SLA a cada 1 minuto, pausa/retomada automática
+9. **Testes Automatizados**: Unit tests, integration tests, E2E tests (Playwright)
+10. **Integração BrasilAPI**: Consumir feriados nacionais, cache em memória
+11. **User Stories**: Criar `user-stories.yaml` com mínimo 3 US (CRUD, Cálculo, Alertas)
+12. **Deploy**: Seguir CONTRATO-DEPLOY-AZURE.md para HOM e PRD
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versão inicial - Documentação completa RF029 conforme RF.md | Claude Code |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code
+**Revisao**: Pendente

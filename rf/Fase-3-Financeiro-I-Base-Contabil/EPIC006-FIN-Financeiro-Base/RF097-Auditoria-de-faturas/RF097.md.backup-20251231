@@ -1,0 +1,1349 @@
+# RF-097: Auditoria de Faturas
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF032 (Gestão de Notas Fiscais), RF089 (Conciliação de Faturas) | **EPIC**: EPIC006-FIN-Financeiro-Base
+**Fase**: Fase 3 - Financeiro I Base Contábil
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o módulo de **Auditoria de Faturas** do sistema IControlIT, responsável por validação fiscal completa, detecção de inconsistências, conformidade com legislação tributária (SPED Fiscal, SEFAZ, NF-e) e análise de fraudes em operações de faturamento.
+
+O módulo integra-se com:
+- **RF032**: Gestão de Notas Fiscais e Faturas (fonte de dados)
+- **RF089**: Conciliação e Auditoria de Faturas (validação financeira)
+- **RF001**: Parâmetros e Configurações (validações fiscais por empresa)
+- **SEFAZ API**: Validação de NF-e em tempo real
+- **Azure ML**: Detecção de padrões suspeitos (fraude)
+
+O módulo fornece validações automáticas, relatórios de conformidade e alertas de divergências, permitindo que auditors e CFOs identifiquem, corrijam e documentem inconsistências antes que impactem demonstrações fiscais.
+
+### 1.2 Importância Estratégica
+
+O módulo de Auditoria de Faturas é crítico para:
+
+- **Conformidade Regulatória**: Garantir conformidade com SPED Fiscal, EFD-ICMS/IPI, SEFAZ e legislação tributária brasileira
+- **Mitigação de Riscos**: Detectar fraudes, duplicatas, divergências e operações suspeitas em tempo real
+- **Precisão Fiscal**: Validar alíquotas (ICMS, IPI, PIS, COFINS, ISS), bases de cálculo e retenções
+- **Controle Financeiro**: Reconciliar valores fiscais com contabilidade, identificar discrepâncias de impostos
+- **Eficiência Operacional**: Automatizar validações que antes exigiam revisão manual, reduzindo tempo de auditoria
+- **Segurança de Dados**: Validar integridade de XMLs NF-e via assinatura digital, detectar manipulações
+
+### 1.3 Conceitos Fundamentais
+
+**NF-e (Nota Fiscal Eletrônica)**: Documento fiscal eletrônico, padronizado e obrigatório no Brasil desde 2006. Identificado por chave de acesso de 44 dígitos.
+- Estrutura XML assinada digitalmente com certificado digital
+- Validações de CFOP (Código Fiscal de Operação), NCM (Nomenclatura Comum do MERCOSUL)
+- Consulta de status no SEFAZ (Sistema de Autorização e Informações Fiscais)
+
+**SPED Fiscal (Sistema Público de Escrituração Digital)**: Obrigação de transmissão mensal de escrituração contábil e fiscal em formato eletrônico.
+- Livro Fiscal (apuração de ICMS, IPI, PIS, COFINS)
+- Integração de NF-e com registros contábeis
+- Validações de coerência entre operações e impostos
+
+**Validações Fiscais**: Conjunto de regras de negócio que garantem:
+- Alíquotas corretas por operação (CFOP vs. cliente vs. produto)
+- Bases de cálculo válidas (valor total, descontos, frete, seguros)
+- Retenções obrigatórias (IRRF, CSLL, ISS, INSS)
+- Integridade de documentos (assinatura digital, certificado válido)
+
+**Divergências Fiscais**: Discrepâncias entre dados da NF-e e registros contábeis:
+- Valor total diferente
+- Quantidade de itens inconsistente
+- Base de cálculo incorreta
+- Impostos incorretos ou ausentes
+- Data de operação fora da série esperada
+
+**Detecção de Fraude**: Identificação de padrões anômalos via ML:
+- Múltiplas NF-e para mesmo fornecedor/produto em curto período
+- Valores ou alíquotas fora do padrão histórico
+- Operações com entidades fictícias ou desativadas
+- Variação suspeita de CFOP ou NCM
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET / ASPX) | Modernizado (.NET 10 + Angular 19) |
+|---------|------------------------|-----------------------------------|
+| **Validação NF-e** | Validação XML manual via WebService SEFAZ | Integração automática com SEFAZ API v2.0 (async) |
+| **Consulta SEFAZ** | Síncrono, timeout 30s, sem retry | Fila de jobs (Hangfire), retry exponencial, timeout 120s |
+| **Detecção de Fraude** | Regras hardcoded em procedures SQL | Azure ML (modelo treinado em histórico de fraudes) |
+| **Relatórios Fiscais** | Crystal Reports em ASPX | Relatórios dinâmicos via Angular + APIs REST |
+| **Alertas** | Email manual, sem persistência | Dashboard em tempo real com notificações push + persistência |
+| **Multi-tenancy** | Banco por cliente | Schema único com ClienteId (row-level security) |
+| **Performance** | N+1 queries, sem índices fiscais | Query otimizada, índices em Chave Acesso + CNPJ, cache distribuído |
+| **Auditoria** | Log simples em arquivo txt | EF Core + Shadow Properties, trilha completa de alterações |
+
+### 1.5 Funcionalidades Principais
+
+1. **Validação Fiscal Completa** - Validar NF-e contra SEFAZ, certificados, assinaturas digitais e regras tributárias (CFOP, NCM, alíquotas)
+2. **Verificação de Integridade** - Validar assinatura digital de XML NF-e, detectar manipulações pós-emissão
+3. **Consulta SEFAZ Automática** - Sincronizar status de NF-e com SEFAZ (autorizado, cancelado, denegado, pendente)
+4. **Detecção de Duplicatas** - Identificar chaves de acesso repetidas, CNPJs de fornecedores duplicados
+5. **Validação de Impostos** - Verificar alíquotas (ICMS, IPI, PIS, COFINS, ISS), bases de cálculo, retenções (IRRF, CSLL, INSS)
+6. **Análise de Divergências** - Comparar valor, quantidade, base de cálculo, impostos entre NF-e e contabilidade (RF089)
+7. **Detecção de Fraudes** - Machine Learning para identificar padrões anômalos, operações suspeitas
+8. **Conformidade SPED** - Gerar validações para escrituração fiscal (EFD-ICMS/IPI), identificar gaps de conformidade
+9. **Dashboards Fiscais** - KPIs de volume de NF-e, valores, impostos, alertas, tendências
+10. **Relatórios Analíticos** - Livro Fiscal, Apuração ICMS, Análise por Fornecedor, Análise por CFOP/NCM
+11. **Alertas Inteligentes** - Notificações em tempo real de inconsistências, fraudes, não-conformidades
+12. **Integração Contábil** - Exportação de dados para contabilidade, reconciliação automática
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-AUF-097-01: Validação Obrigatória de Chave de Acesso NF-e
+
+**Descrição**: Toda NF-e importada ou registrada deve ter uma chave de acesso válida (44 dígitos, formato numérico), validada via algoritmo de verificação de dígito (módulo 11).
+
+**Justificativa**: A chave de acesso é o identificador único da NF-e no SEFAZ. Uma chave inválida impede a auditoria fiscal, consulta no SEFAZ e reconciliação.
+
+**Implementacao**:
+```csharp
+public class ValidarChaveAcessoNFe : IValidationRule
+{
+    public ValidationResult Validar(NotaFiscalAuditoria nfe)
+    {
+        string chave = nfe.ChaveAcesso;
+
+        // Validar formato: 44 dígitos
+        if (!Regex.IsMatch(chave, @"^\d{44}$"))
+            return ValidationResult.Invalid("Chave de acesso deve conter exatamente 44 dígitos");
+
+        // Validar dígito verificador (módulo 11)
+        int dv = CalcularDigitoVerificador(chave.Substring(0, 43));
+        if (int.Parse(chave[43].ToString()) != dv)
+            return ValidationResult.Invalid("Dígito verificador da chave inválido");
+
+        // Validar sequência: UF (2) + AAAA (4) + MM (2) + CNPJ Emitente (8) + ...
+        string uf = chave.Substring(0, 2);
+        if (!new[] { "11", "12", "13", /* ... */ "35" }.Contains(uf)) // COD_UF válidos
+            return ValidationResult.Invalid($"UF inválido: {uf}");
+
+        return ValidationResult.Valid();
+    }
+
+    private int CalcularDigitoVerificador(string chave)
+    {
+        int[] multiplicadores = { 2, 3, 4, 5, 6, 7, 8, 9 };
+        int soma = 0;
+
+        for (int i = 0; i < chave.Length; i++)
+            soma += int.Parse(chave[i].ToString()) * multiplicadores[i % 8];
+
+        int resto = soma % 11;
+        return resto == 0 ? 0 : 11 - resto;
+    }
+}
+```
+
+**Exemplos**:
+- Válida: `35210127944662000160550010000000021623586383`
+- Inválida: `35210127944662000160550010000000021623586380` (DV errado)
+- Inválida: `3521012794466200016055001000000002162358638` (43 dígitos)
+
+---
+
+### RN-AUF-097-02: Consulta Obrigatória de Status SEFAZ para NF-e Autorizada
+
+**Descrição**: Para toda NF-e com chave válida, deve-se consultar o status no SEFAZ no prazo de 24 horas após recebimento. O resultado deve ser armazenado em auditoria (status: AUTORIZADO, CANCELADO, DENEGADO, PENDENTE).
+
+**Justificativa**: Garante que a NF-e foi realmente autorizada pela autoridade fiscal. NF-e não autorizado não pode ser contabilizado nem incluído em SPED.
+
+**Implementacao**:
+```csharp
+public class ConsultarStatusSEFAZCommand : ICommand
+{
+    public string ChaveAcesso { get; set; }
+    public int ClienteId { get; set; }
+}
+
+public class ConsultarStatusSEFAZHandler : ICommandHandler<ConsultarStatusSEFAZCommand>
+{
+    private readonly ISEFAZService _sefazService;
+    private readonly INotaFiscalAuditoriaRepository _auditoriaRepository;
+    private readonly IJobQueue _jobQueue;
+
+    public async Task Handle(ConsultarStatusSEFAZCommand command)
+    {
+        var nfe = await _auditoriaRepository.ObterPorChaveAcesso(
+            command.ChaveAcesso, command.ClienteId);
+
+        try
+        {
+            // Consultar SEFAZ com retry exponencial
+            var statusSEFAZ = await _sefazService.ConsultarStatusComRetry(
+                chaveAcesso: command.ChaveAcesso,
+                cnpjEmitente: nfe.CnpjEmitente,
+                timeout: TimeSpan.FromSeconds(120),
+                maxRetries: 3);
+
+            // Mapear resposta SEFAZ
+            nfe.StatusSEFAZ = statusSEFAZ.Status; // "100" = autorizado
+            nfe.DataConsultaSEFAZ = DateTime.UtcNow;
+            nfe.ProtocoloAutorizacao = statusSEFAZ.Protocolo;
+            nfe.MensagemSEFAZ = statusSEFAZ.Mensagem;
+
+            // Marcar como auditado
+            nfe.AuditoriaStatus = AuditoriaStatus.Auditado;
+            nfe.DataAuditoria = DateTime.UtcNow;
+
+            await _auditoriaRepository.SaveAsync(nfe);
+
+            // Gerar alerta se não autorizado
+            if (statusSEFAZ.Status != "100")
+            {
+                await _jobQueue.EnqueueAsync(
+                    new GerarAlertaNaoAutorizadoJob
+                    {
+                        ChaveAcesso = command.ChaveAcesso,
+                        Status = statusSEFAZ.Status
+                    });
+            }
+        }
+        catch (SefazTimeoutException ex)
+        {
+            nfe.AuditoriaStatus = AuditoriaStatus.ErroSEFAZ;
+            nfe.MensagemErro = $"Timeout ao consultar SEFAZ: {ex.Message}";
+            await _auditoriaRepository.SaveAsync(nfe);
+
+            // Reagendar consulta
+            await _jobQueue.EnqueueAsync(
+                new ConsultarStatusSEFAZJob
+                {
+                    ChaveAcesso = command.ChaveAcesso
+                },
+                delaySeconds: 3600); // Reagendar em 1h
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Status 100: Autorizado (sucesso)
+- Status 101: Cancelado (deve-se marcar NF-e como cancelada)
+- Status 102: Denegado (rejeição definitiva, avaliar motivo)
+- Status 103: Pendente (aguardar próxima consulta)
+
+---
+
+### RN-AUF-097-03: Validação de Alíquota ICMS Conforme CFOP
+
+**Descrição**: A alíquota de ICMS informada na NF-e deve estar conforme o CFOP (Código Fiscal de Operação) e regime de apuração da empresa (ICMS Completo, Simples Nacional, MEI, etc.).
+
+**Justificativa**: Evita impostos calculados incorretamente, que causariam inconsistências em SPED Fiscal e pagamento a menor/maior de impostos.
+
+**Implementacao**:
+```csharp
+public class ValidarAliquotaICMSCommand : ICommand
+{
+    public decimal AliquotaICMS { get; set; }
+    public string CFOP { get; set; }
+    public int ClienteId { get; set; }
+    public DateTime DataOperacao { get; set; }
+}
+
+public class ValidarAliquotaICMSHandler : ICommandHandler<ValidarAliquotaICMSCommand>
+{
+    private readonly IParametroService _parametroService;
+    private readonly ITabelaAliquotasRepository _aliquotasRepository;
+
+    public async Task Handle(ValidarAliquotaICMSCommand command)
+    {
+        // Obter regime de apuração da empresa
+        var empresa = await _parametroService.ObterEmpresaAsync(command.ClienteId);
+
+        // Obter alíquotas válidas para CFOP + regime
+        var aliquotasValidas = await _aliquotasRepository
+            .ObterPorCFOPeRegimeAsync(
+                cfop: command.CFOP,
+                regimeApuracao: empresa.RegimeApuracao,
+                dataVigencia: command.DataOperacao);
+
+        if (!aliquotasValidas.Any(a => Math.Abs(a.Aliquota - command.AliquotaICMS) < 0.01m))
+        {
+            // Alíquota não consta na tabela de alíquotas válidas
+            throw new AuditariaException(
+                $"Alíquota ICMS {command.AliquotaICMS} não é válida para CFOP {command.CFOP} " +
+                $"em regime {empresa.RegimeApuracao}");
+        }
+    }
+}
+
+// Exemplo de tabela de alíquotas
+// CFOP 5102 (Venda próprio produto) + Regime ICMS Completo
+// Alíquota válida: 18%, 12%, 7%, 0%, subst. tributária, isento
+```
+
+**Exemplos**:
+- CFOP 5102 (venda próprio produto) + SC: alíquota válida 12% (ICMS SC) ou 18% (ICMS UF origem)
+- CFOP 6102 (compra) + Simples Nacional: alíquota 0% (não recolhe ICMS, já incluído)
+- CFOP 5933 (venda para outro Estado) + ST: alíquota 0% (substituído tributário)
+
+---
+
+### RN-AUF-097-04: Detecção de NF-e Cancelada com Movimentação Posterior
+
+**Descrição**: Se uma NF-e for consultada como CANCELADA no SEFAZ, mas houver registros contábeis (RF089) ou estoque (RF011) posteriores ao cancelamento, gerar alerta crítico de inconsistência.
+
+**Justificativa**: Uma NF-e cancelada não deveria gerar movimento. Se há movimento após cancelamento, indica contabilização indevida ou fraude.
+
+**Implementacao**:
+```csharp
+public class ValidarMovimentacaoPosCanelamentoCommand : ICommand
+{
+    public string ChaveAcesso { get; set; }
+    public DateTime DataCancelamento { get; set; }
+    public int ClienteId { get; set; }
+}
+
+public class ValidarMovimentacaoPosCanelamentoHandler :
+    ICommandHandler<ValidarMovimentacaoPosCanelamentoCommand>
+{
+    private readonly INotaFiscalRepository _nfeRepository;
+    private readonly IConciliacaoFaturaRepository _conciliacaoRepository;
+
+    public async Task Handle(ValidarMovimentacaoPosCanelamentoCommand command)
+    {
+        // Verificar se há lançamentos contábeis após data de cancelamento
+        var lancamentos = await _conciliacaoRepository
+            .ObterPorChaveAcessoEDataMinima(
+                command.ChaveAcesso,
+                command.DataCancelamento.AddSeconds(1),
+                command.ClienteId);
+
+        if (lancamentos.Any())
+        {
+            // Gerar alerta crítico
+            var alerta = new AlertaAuditoria
+            {
+                TipoAlerta = TipoAlerta.InconsistenciaCancelamento,
+                Severidade = NivelSeveridade.Critico,
+                ChaveAcesso = command.ChaveAcesso,
+                Descricao = $"NF-e {command.ChaveAcesso} cancelada em " +
+                    $"{command.DataCancelamento:yyyy-MM-dd}, mas há {lancamentos.Count} " +
+                    $"lançamentos posteriores",
+                DataGeracao = DateTime.UtcNow,
+                ClienteId = command.ClienteId
+            };
+
+            await _alertasRepository.SaveAsync(alerta);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- NF-e cancelada em 15/12, lançamento em contabilidade em 16/12: ALERTA CRÍTICO
+- NF-e cancelada em 15/12, nenhum lançamento posterior: OK
+
+---
+
+### RN-AUF-097-05: Validação de Integridade de Assinatura Digital (XML NF-e)
+
+**Descrição**: Todo arquivo XML da NF-e deve ter assinatura digital válida, emitida por certificado digital ativo (válido na data da emissão). Qualquer alteração posterior do XML invalida a assinatura.
+
+**Justificativa**: Garante autenticidade e não-repúdio do documento fiscal. XML alterado pós-emissão é considerado adulterado.
+
+**Implementacao**:
+```csharp
+public class ValidarAssinaturaXmlCommand : ICommand
+{
+    public string XmlContent { get; set; }
+    public int ClienteId { get; set; }
+}
+
+public class ValidarAssinaturaXmlHandler : ICommandHandler<ValidarAssinaturaXmlCommand>
+{
+    public async Task Handle(ValidarAssinaturaXmlCommand command)
+    {
+        var xmlDoc = new XmlDocument();
+        xmlDoc.LoadXml(command.XmlContent);
+
+        // Obter nó de assinatura
+        var signatureNode = xmlDoc.GetElementsByTagName("Signature")[0];
+        if (signatureNode == null)
+            throw new AuditariaException("XML não contém assinatura digital");
+
+        // Validar assinatura
+        var certs = new X509Certificate2Collection();
+        var xmlSignature = new SignedXml(xmlDoc);
+        xmlSignature.LoadXml((XmlElement)signatureNode);
+
+        bool isValid = xmlSignature.CheckSignature();
+        if (!isValid)
+            throw new AuditariaException("Assinatura digital inválida ou XML foi alterado");
+
+        // Extrair certificado
+        var keyInfo = xmlSignature.KeyInfo;
+        X509Certificate2 cert = null;
+
+        foreach (KeyInfoClause clause in keyInfo)
+        {
+            if (clause is KeyInfoX509Data x509Data)
+            {
+                if (x509Data.Certificates.Count > 0)
+                    cert = (X509Certificate2)x509Data.Certificates[0];
+            }
+        }
+
+        // Validar certificado
+        if (cert == null)
+            throw new AuditariaException("Certificado digital não encontrado em assinatura");
+
+        // Validar datas de vigência
+        DateTime dataEmissao = ExtrarDataEmissaoXml(xmlDoc);
+        if (cert.NotBefore > dataEmissao)
+            throw new AuditariaException($"Certificado não era válido em {dataEmissao}");
+
+        if (cert.NotAfter < dataEmissao)
+            throw new AuditariaException($"Certificado estava expirado em {dataEmissao}");
+
+        // Registrar resultado em auditoria
+        var auditoria = new AssinaturaDigitalAuditoria
+        {
+            ChaveAcesso = ExtrarChaveAcessoXml(xmlDoc),
+            ValorAssinatura = true,
+            DataValidacao = DateTime.UtcNow,
+            CertificadoCNPJ = cert.Subject,
+            ClienteId = command.ClienteId
+        };
+
+        await _assinaturaRepository.SaveAsync(auditoria);
+    }
+}
+```
+
+**Exemplos**:
+- XML com assinatura válida e certificado em vigência: OK
+- XML alterado após assinatura: FALHA (hash não bate)
+- Certificado expirado na data da emissão: FALHA
+
+---
+
+### RN-AUF-097-06: Validação de Base de Cálculo e Impostos
+
+**Descrição**: A base de cálculo de impostos deve ser consistente: valor total - (descontos não tributários) + (frete + seguro + outros gastos). Impostos (ICMS, IPI, PIS, COFINS) devem ser = base * alíquota (permitindo até 2 casas decimais de arredondamento).
+
+**Justificativa**: Erros na base de cálculo levam a pagamento incorreto de impostos, inconsistências em SPED Fiscal e possíveis autuações fiscais.
+
+**Implementacao**:
+```csharp
+public class ValidarBaseCalculoImpostosCommand : ICommand
+{
+    public decimal ValorTotal { get; set; }
+    public decimal Desconto { get; set; }
+    public decimal Frete { get; set; }
+    public decimal Seguro { get; set; }
+    public decimal OutrosGastos { get; set; }
+    public decimal AliquotaICMS { get; set; }
+    public decimal ValorICMS { get; set; }
+    public int ClienteId { get; set; }
+}
+
+public class ValidarBaseCalculoImpostosHandler :
+    ICommandHandler<ValidarBaseCalculoImpostosCommand>
+{
+    public async Task Handle(ValidarBaseCalculoImpostosCommand command)
+    {
+        // Calcular base conforme lei (ver RN de base de cálculo)
+        decimal baseCalculada =
+            command.ValorTotal
+            - command.Desconto
+            + command.Frete
+            + command.Seguro
+            + command.OutrosGastos;
+
+        // Calcular ICMS esperado
+        decimal icmsEsperado = baseCalculada * command.AliquotaICMS;
+
+        // Validar com tolerância de 2 casas decimais
+        decimal tolerancia = 0.01m;
+        if (Math.Abs(command.ValorICMS - icmsEsperado) > tolerancia)
+        {
+            throw new AuditariaException(
+                $"ICMS inconsistente: " +
+                $"esperado {icmsEsperado:C}, informado {command.ValorICMS:C}");
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Valor Total: R$ 1.000,00 | Desconto: R$ 100,00 | Frete: R$ 50,00
+- Base Calculada: R$ 1.000 - R$ 100 + R$ 50 = R$ 950,00
+- ICMS (18%): R$ 950 × 0,18 = R$ 171,00 ✓
+- Se NF-e informar R$ 170,00: ERRO (diferença > R$ 0,01)
+
+---
+
+### RN-AUF-097-07: Detecção de Duplicatas (Mesma Chave ou CNPJ Duplicado)
+
+**Descrição**: Não deve haver duas NF-e ativas com a mesma chave de acesso na mesma empresa. Além disso, se houver múltiplas NF-e do mesmo fornecedor com mesmo produto em período curto (< 7 dias), gerar alerta de suspeita de duplicata.
+
+**Justificativa**: Evita contabilização dupla, pagamentos duplicados, inconsistências em SPED e possível fraude.
+
+**Implementacao**:
+```csharp
+public class ValidarDuplicataCommand : ICommand
+{
+    public string ChaveAcesso { get; set; }
+    public string CnpjFornecedor { get; set; }
+    public int CodigoProduto { get; set; }
+    public DateTime DataEmissao { get; set; }
+    public int ClienteId { get; set; }
+}
+
+public class ValidarDuplicataHandler : ICommandHandler<ValidarDuplicataCommand>
+{
+    private readonly INotaFiscalAuditoriaRepository _nfeRepository;
+    private readonly IAleratasRepository _alertasRepository;
+
+    public async Task Handle(ValidarDuplicataCommand command)
+    {
+        // Buscar NF-e com mesma chave (não cancelada)
+        var nfeDuplicada = await _nfeRepository
+            .ObterPorChaveAcessoAtivaAsync(command.ChaveAcesso, command.ClienteId);
+
+        if (nfeDuplicada != null)
+        {
+            throw new AuditariaException(
+                $"Já existe NF-e com chave {command.ChaveAcesso} " +
+                $"ativa em {nfeDuplicada.DataEmissao:yyyy-MM-dd}");
+        }
+
+        // Buscar NF-e do mesmo fornecedor + produto em últimos 7 dias
+        var nfesRecentes = await _nfeRepository
+            .ObterPorFornecedorProdutoDataAsync(
+                cnpj: command.CnpjFornecedor,
+                codigoProduto: command.CodigoProduto,
+                dataInicio: command.DataEmissao.AddDays(-7),
+                dataFim: command.DataEmissao,
+                clienteId: command.ClienteId);
+
+        if (nfesRecentes.Count() >= 2)
+        {
+            // Gerar alerta de suspeita duplicata
+            var alerta = new AlertaAuditoria
+            {
+                TipoAlerta = TipoAlerta.SuspeitaDuplicata,
+                Severidade = NivelSeveridade.Aviso,
+                ChaveAcesso = command.ChaveAcesso,
+                Descricao = $"Detectadas {nfesRecentes.Count()} NF-e do fornecedor " +
+                    $"{command.CnpjFornecedor} com mesmo produto em 7 dias",
+                DataGeracao = DateTime.UtcNow,
+                ClienteId = command.ClienteId
+            };
+
+            await _alertasRepository.SaveAsync(alerta);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Mesma chave detectada 2x: ERRO (blocar)
+- Fornecedor A, Produto X, em 10/12 e 11/12: ALERTA (possível duplicata)
+
+---
+
+### RN-AUF-097-08: Validação de Conformidade SPED Fiscal (EFD-ICMS/IPI)
+
+**Descrição**: Toda NF-e auditada deve estar conforme com SPED Fiscal: registros R01 (inventário), 1100 (NF-e), 1120 (dados de NF-e), 1160 (complemento impostos) completos e coerentes.
+
+**Justificativa**: SPED Fiscal é obrigatório; falhas geram autuações do Fisco. Validação prévia evita erros em envio.
+
+**Implementacao**:
+```csharp
+public class ValidarSPEDFiscalCommand : ICommand
+{
+    public string ChaveAcesso { get; set; }
+    public int ClienteId { get; set; }
+}
+
+public class ValidarSPEDFiscalHandler : ICommandHandler<ValidarSPEDFiscalCommand>
+{
+    private readonly INotaFiscalAuditoriaRepository _nfeRepository;
+    private readonly ISPEDFiscalService _spedService;
+
+    public async Task Handle(ValidarSPEDFiscalCommand command)
+    {
+        var nfe = await _nfeRepository.ObterPorChaveAcessoAsync(
+            command.ChaveAcesso, command.ClienteId);
+
+        // Validar registros obrigatórios
+        var errosSPED = new List<string>();
+
+        // Registros 0150 (Informações do Estabelecimento)
+        if (string.IsNullOrEmpty(nfe.CnpjEmitente))
+            errosSPED.Add("Falta CNPJ do emitente (0150)");
+
+        // Registros 1100 (NF-e)
+        if (string.IsNullOrEmpty(nfe.ChaveAcesso) || nfe.NumeroNota == 0)
+            errosSPED.Add("Falta número ou chave da NF-e (1100)");
+
+        // Registros 1120 (Dados Complementares)
+        if (string.IsNullOrEmpty(nfe.CFOP))
+            errosSPED.Add("Falta CFOP (1120)");
+
+        // Registros 1160 (Impostos)
+        if (nfe.ValorICMS == 0 && nfe.AliquotaICMS > 0)
+            errosSPED.Add("ICMS informado como 0 mas alíquota > 0 (1160)");
+
+        if (errosSPED.Any())
+        {
+            throw new AuditariaException(
+                $"Inconsistências SPED Fiscal: {string.Join(", ", errosSPED)}");
+        }
+    }
+}
+```
+
+**Exemplos**:
+- NF-e com todos os registros SPED: CONFORME
+- NF-e sem CFOP: NÃO CONFORME (erro 1120)
+
+---
+
+### RN-AUF-097-09: Validação de Retenções Obrigatórias (IRRF, CSLL, ISS, INSS)
+
+**Descrição**: Operações sujeitas a retenção (serviços, fornecedor MEI, PJ internacional) devem ter retenções calculadas corretamente. IRRF 15%, CSLL 1%, ISS conforme município, INSS conforme alíquota contratual.
+
+**Justificativa**: Retenções incorretas implicam débitos fiscais, atuações do Fisco e inconsistências em DARF/GNRE.
+
+**Implementacao**:
+```csharp
+public class ValidarRetencaoCommand : ICommand
+{
+    public string CFOP { get; set; }
+    public decimal ValorServico { get; set; }
+    public string TipoPrestador { get; set; } // "Pessoa Jurídica", "MEI", "Física"
+    public string CodigoMunicipio { get; set; }
+    public decimal ValorIRRF { get; set; }
+    public decimal ValorISS { get; set; }
+    public int ClienteId { get; set; }
+}
+
+public class ValidarRetencaoHandler : ICommandHandler<ValidarRetencaoCommand>
+{
+    private readonly IParametroService _parametroService;
+
+    public async Task Handle(ValidarRetencaoCommand command)
+    {
+        // Validar se operação está sujeita a retenção
+        if (command.CFOP.StartsWith("6") && // Compra/Importação
+            command.TipoPrestador == "Pessoa Jurídica" &&
+            command.ValorServico > 0)
+        {
+            // Validar IRRF
+            decimal irrrfEsperado = command.ValorServico * 0.15m; // 15%
+            if (Math.Abs(command.ValorIRRF - irrrfEsperado) > 0.01m)
+            {
+                throw new AuditariaException(
+                    $"IRRF inconsistente: esperado {irrrfEsperado:C}, " +
+                    $"informado {command.ValorIRRF:C}");
+            }
+        }
+
+        // Validar ISS se serviço
+        if (command.CFOP == "5933") // Serviço
+        {
+            var aliquotaISS = await _parametroService
+                .ObterAliquotaISSPorMunicipioAsync(command.CodigoMunicipio);
+
+            decimal issEsperado = command.ValorServico * aliquotaISS;
+            if (Math.Abs(command.ValorISS - issEsperado) > 0.01m)
+            {
+                throw new AuditariaException(
+                    $"ISS inconsistente: esperado {issEsperado:C}, " +
+                    $"informado {command.ValorISS:C}");
+            }
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Serviço de PJ, R$ 1.000, IRRF 15% = R$ 150 ✓
+- Serviço, SP (São Paulo), alíquota ISS 5% = R$ 50 ✓
+
+---
+
+### RN-AUF-097-10: Detecção de Operações Anômalaas via Machine Learning
+
+**Descrição**: Operações que desviem do padrão histórico (valores, frequência, fornecedor, produto) devem ser sinalizadas para revisão manual. O modelo ML treina em 2 anos de histórico.
+
+**Justificativa**: Detecta fraudes, operações suspeitas e irregularidades que não são capturadas por validações determinísticas.
+
+**Implementacao**:
+```csharp
+public class DetectarAnomaliaCommand : ICommand
+{
+    public string ChaveAcesso { get; set; }
+    public string CnpjFornecedor { get; set; }
+    public decimal Valor { get; set; }
+    public int CodigoProduto { get; set; }
+    public DateTime DataEmissao { get; set; }
+    public int ClienteId { get; set; }
+}
+
+public class DetectarAnomaliaHandler : ICommandHandler<DetectarAnomaliaCommand>
+{
+    private readonly IAzureMLService _azureML;
+    private readonly INotaFiscalAuditoriaRepository _nfeRepository;
+
+    public async Task Handle(DetectarAnomaliaCommand command)
+    {
+        // Buscar histórico (últimos 2 anos)
+        var historico = await _nfeRepository.ObterHistoricoAsync(
+            cnpjFornecedor: command.CnpjFornecedor,
+            codigoProduto: command.CodigoProduto,
+            dataInicio: command.DataEmissao.AddYears(-2),
+            dataFim: command.DataEmissao,
+            clienteId: command.ClienteId);
+
+        // Preparar features para ML
+        var features = new
+        {
+            ValorMedio = historico.Average(x => x.Valor),
+            ValorDesvio = CalcularDesvio(historico.Select(x => x.Valor)),
+            Frequencia = historico.Count() / 24.0, // ops por mês
+            HorarioMedio = CalcularHorarioMedio(historico.Select(x => x.DataEmissao)),
+            FornecedorNovo = historico.Count() < 3,
+            command.Valor,
+            command.DataEmissao.Hour,
+            command.DataEmissao.DayOfWeek
+        };
+
+        // Invocar modelo Azure ML
+        var risco = await _azureML.PredizirRiscoFraudeAsync(features);
+
+        // Se risco alto, gerar alerta
+        if (risco.Score > 0.7)
+        {
+            var alerta = new AlertaAuditoria
+            {
+                TipoAlerta = TipoAlerta.AnomaliaDetectada,
+                Severidade = NivelSeveridade.Critico,
+                ChaveAcesso = command.ChaveAcesso,
+                Descricao = $"Anomalia detectada (score: {risco.Score:P}). " +
+                    $"Desvio: {CalcularDesvioPercentual(command.Valor, features.ValorMedio):P} " +
+                    $"acima da média",
+                DataGeracao = DateTime.UtcNow,
+                ClienteId = command.ClienteId
+            };
+
+            await _alertasRepository.SaveAsync(alerta);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Histórico: fornecedor X vende R$ 1.000/mês, nova NF-e de R$ 50.000: ALERTA (5x acima)
+- Histórico: operações 09:00-17:00, nova NF-e 23:45: ALERTA (horário atípico)
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `ic1_legado` (SQL Server 2019+)
+
+**Tabelas Principais**:
+
+```sql
+-- Tabela de Notas Fiscais
+CREATE TABLE [dbo].[NotaFiscal](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [ChaveAcesso] [varchar](44) NOT NULL,
+    [NumeroNota] [int] NOT NULL,
+    [SerieNota] [varchar](3) NOT NULL,
+    [DataEmissao] [datetime] NOT NULL,
+    [DataSaidaEntrada] [datetime] NULL,
+    [CnpjEmitente] [varchar](14) NOT NULL,
+    [CnpjDestinatario] [varchar](14) NULL,
+    [RazaoSocial] [varchar](255) NULL,
+    [ValorTotal] [decimal](18,2) NOT NULL,
+    [ValorICMS] [decimal](18,2) DEFAULT 0,
+    [ValorIPI] [decimal](18,2) DEFAULT 0,
+    [ValorPIS] [decimal](18,2) DEFAULT 0,
+    [ValorCOFINS] [decimal](18,2) DEFAULT 0,
+    [CFOP] [varchar](4) NOT NULL,
+    [StatusSEFAZ] [varchar](3) NULL,
+    [DataConsultaSEFAZ] [datetime] NULL,
+    [ProtocoloAutorizacao] [varchar](100) NULL,
+    [XmlContent] [ntext] NULL,
+    [DataCancelamento] [datetime] NULL,
+    [MotivoCancelamento] [varchar](500) NULL,
+    [ClienteId] [int] NOT NULL,
+    [DataCriacao] [datetime] DEFAULT GETUTCDATE(),
+    [DataAtualizacao] [datetime] DEFAULT GETUTCDATE(),
+    CONSTRAINT [PK_NotaFiscal] PRIMARY KEY CLUSTERED ([Id] ASC),
+    CONSTRAINT [UQ_ChaveAcesso_Cliente] UNIQUE ([ChaveAcesso], [ClienteId]),
+    CONSTRAINT [FK_NotaFiscal_Cliente] FOREIGN KEY ([ClienteId])
+        REFERENCES [dbo].[Cliente]([Id])
+) ON [PRIMARY]
+
+-- Índices importantes
+CREATE NONCLUSTERED INDEX [IX_NotaFiscal_ChaveAcesso]
+ON [dbo].[NotaFiscal]([ChaveAcesso] ASC)
+INCLUDE ([StatusSEFAZ], [DataConsultaSEFAZ])
+
+CREATE NONCLUSTERED INDEX [IX_NotaFiscal_CnpjEmitente_Data]
+ON [dbo].[NotaFiscal]([CnpjEmitente], [DataEmissao])
+INCLUDE ([ValorTotal], [ValorICMS])
+
+-- Tabela de Itens de Nota Fiscal
+CREATE TABLE [dbo].[NotaFiscalItem](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [NotaFiscalId] [int] NOT NULL,
+    [CodigoProduto] [varchar](50) NOT NULL,
+    [DescricaoProduto] [varchar](500) NULL,
+    [NCM] [varchar](8) NOT NULL,
+    [Quantidade] [decimal](18,4) NOT NULL,
+    [ValorUnitario] [decimal](18,2) NOT NULL,
+    [ValorTotal] [decimal](18,2) NOT NULL,
+    [AliquotaICMS] [decimal](5,2) NOT NULL,
+    [ValorICMS] [decimal](18,2) NOT NULL,
+    [AliquotaIPI] [decimal](5,2) DEFAULT 0,
+    [ValorIPI] [decimal](18,2) DEFAULT 0,
+    [BasePIS] [decimal](18,2) NULL,
+    [AliquotaPIS] [decimal](5,2) DEFAULT 0,
+    [ValorPIS] [decimal](18,2) DEFAULT 0,
+    [BaseCOFINS] [decimal](18,2) NULL,
+    [AliquotaCOFINS] [decimal](5,2) DEFAULT 0,
+    [ValorCOFINS] [decimal](18,2) DEFAULT 0,
+    [ClienteId] [int] NOT NULL,
+    CONSTRAINT [PK_NotaFiscalItem] PRIMARY KEY CLUSTERED ([Id] ASC),
+    CONSTRAINT [FK_NotaFiscalItem_NotaFiscal] FOREIGN KEY ([NotaFiscalId])
+        REFERENCES [dbo].[NotaFiscal]([Id]) ON DELETE CASCADE
+) ON [PRIMARY]
+
+-- Tabela de Auditoria de Faturas
+CREATE TABLE [dbo].[AuditoriaFatura](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [ChaveAcesso] [varchar](44) NOT NULL,
+    [StatusAuditoria] [varchar](50) NOT NULL,
+    [DataAuditoria] [datetime] NULL,
+    [ValidacoesExecutadas] [int] DEFAULT 0,
+    [ValidacoesFalhadas] [int] DEFAULT 0,
+    [Alertas] [int] DEFAULT 0,
+    [MensagensErro] [ntext] NULL,
+    [ResultadoJSON] [ntext] NULL,
+    [UsuarioAuditoria] [varchar](255) NULL,
+    [ClienteId] [int] NOT NULL,
+    [DataCriacao] [datetime] DEFAULT GETUTCDATE(),
+    CONSTRAINT [PK_AuditoriaFatura] PRIMARY KEY CLUSTERED ([Id] ASC),
+    CONSTRAINT [FK_AuditoriaFatura_Cliente] FOREIGN KEY ([ClienteId])
+        REFERENCES [dbo].[Cliente]([Id])
+) ON [PRIMARY]
+
+-- Tabela de Alertas
+CREATE TABLE [dbo].[AlertaFatura](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [ChaveAcesso] [varchar](44) NOT NULL,
+    [TipoAlerta] [varchar](100) NOT NULL,
+    [NivelSeveridade] [varchar](20) NOT NULL,
+    [Descricao] [nvarchar](max) NULL,
+    [DataGeracao] [datetime] DEFAULT GETUTCDATE(),
+    [Resolvido] [bit] DEFAULT 0,
+    [DataResolucao] [datetime] NULL,
+    [UsuarioResolucao] [varchar](255) NULL,
+    [ClienteId] [int] NOT NULL,
+    CONSTRAINT [PK_AlertaFatura] PRIMARY KEY CLUSTERED ([Id] ASC)
+) ON [PRIMARY]
+
+-- Tabela de Histórico de Consultas SEFAZ
+CREATE TABLE [dbo].[ConsultaSEFAZ](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [ChaveAcesso] [varchar](44) NOT NULL,
+    [StatusSEFAZ] [varchar](3) NOT NULL,
+    [Protocolo] [varchar](100) NULL,
+    [Mensagem] [nvarchar](max) NULL,
+    [DataConsulta] [datetime] DEFAULT GETUTCDATE(),
+    [TempoResposta] [int] NULL, -- milliseconds
+    [Ativo] [bit] DEFAULT 1,
+    [ClienteId] [int] NOT NULL,
+    CONSTRAINT [PK_ConsultaSEFAZ] PRIMARY KEY CLUSTERED ([Id] ASC)
+) ON [PRIMARY]
+```
+
+**Mapeamento de Campos**:
+
+| Campo Legado | Tipo | Descrição | Uso no Modernizado |
+|--------------|------|-----------|-------------------|
+| `NotaFiscal.ChaveAcesso` | varchar(44) | Identificador único NF-e | PK em AuditoriaFatura, índice |
+| `NotaFiscal.StatusSEFAZ` | varchar(3) | "100" (aut), "101" (can), etc | Validação automática |
+| `NotaFiscal.XmlContent` | ntext | XML assinado da NF-e | Validar assinatura, extrair dados |
+| `NotaFiscalItem.NCM` | varchar(8) | Nomenclatura Comum MERCOSUL | Validação de alíquotas |
+| `NotaFiscalItem.AliquotaICMS` | decimal(5,2) | Alíquota ICMS % | Validação base × alíquota |
+| `AuditoriaFatura.StatusAuditoria` | varchar(50) | "Pendente", "Auditado", "Erro" | Estado da auditoria |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migracao |
+|-----------|-----------|----------|
+| `sp_ConsultarStatusSEFAZ` | Consulta status NF-e no SEFAZ via WebService | Migrar para SefazService (HttpClient + retry exponencial) |
+| `sp_ValidarAliquotaICMS` | Valida alíquota conforme CFOP e regime | Migrar para ValidarAliquotaICMSHandler (Commands) |
+| `sp_VerificarDuplicatas` | Busca NF-e com mesma chave | Migrar para ValidarDuplicataHandler |
+| `sp_GerarRelatorioFiscal` | Gera livro fiscal, apuração ICMS | Migrar para relatórios via Angular + API REST |
+| `sp_AlertarInconsistencias` | Dispara alertas por email | Migrar para AlertaService + Hangfire jobs |
+
+### 3.3 Telas ASPX (Sistema Legado)
+
+| Página | Descrição | Rota Moderna (Angular) |
+|--------|-----------|------------------------|
+| `AuditoriaFatura.aspx` | Consulta auditoria de NF-e | `/financeiro/auditoria-faturas` |
+| `ConsultaSEFAZ.aspx` | Consulta status NF-e | `/financeiro/consulta-sefaz` |
+| `RelatorioFiscal.aspx` | Gera livro fiscal, SPED | `/financeiro/relatorios-fiscais` |
+| `AlertasFatura.aspx` | Exibe alertas de inconsistência | `/financeiro/alertas-auditoria` |
+| `DashboardFiscal.aspx` | Dashboard com KPIs fiscais | `/financeiro/dashboard-fiscal` |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSAuditoriaFatura.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|------------------|
+| `ConsultarStatusSEFAZ(chaveAcesso, cnpj)` | Consulta SEFAZ | `GET /api/auditoria-faturas/consulta-sefaz/{chaveAcesso}` |
+| `ValidarNFe(xmlContent, clienteId)` | Valida XML NF-e | `POST /api/auditoria-faturas/validar` |
+| `GerarRelatorioFiscal(dataInicio, dataFim)` | Gera relatório fiscal | `GET /api/auditoria-faturas/relatorios` |
+| `ListarAlertas(clienteId)` | Lista alertas | `GET /api/auditoria-faturas/alertas` |
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `AUF_AUDITORIA_FATURAS`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "AUF_AUDITORIA_FATURAS",
+    "nome": "Auditoria de Faturas",
+    "descricao": "Validação fiscal automática, detecção de fraudes e conformidade SPED",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "modulo": "Financeiro",
+    "permissaoRequerida": "fin:auditoria:read"
+}
+```
+
+**Features Complementares**:
+```json
+{
+    "featureKey": "AUF_CONSULTA_SEFAZ",
+    "nome": "Consulta SEFAZ Automática",
+    "descricao": "Sincroniza status de NF-e com SEFAZ em tempo real",
+    "habilitado": true,
+    "isSystemFeature": false
+},
+{
+    "featureKey": "AUF_DETECCAO_FRAUDE",
+    "nome": "Detecção de Fraude (ML)",
+    "descricao": "Usa Azure ML para detectar padrões anômalos",
+    "habilitado": false,
+    "isSystemFeature": false,
+    "modulo": "Financeiro"
+},
+{
+    "featureKey": "AUF_ALERTAS_TEMPO_REAL",
+    "nome": "Alertas em Tempo Real",
+    "descricao": "Notificações push e email para inconsistências críticas",
+    "habilitado": true,
+    "isSystemFeature": false
+}
+```
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Arquivo**: `D:\IC2\frontend\src\assets\i18n\pt-BR\financeiro.auditoria-faturas.json`
+
+```json
+{
+    "financeiro": {
+        "auditoria_faturas": {
+            "title": "Auditoria de Faturas",
+            "subtitle": "Validação Fiscal, Detecção de Fraudes e Conformidade SPED",
+            "tabs": {
+                "auditoria": "Auditoria",
+                "consulta_sefaz": "Consulta SEFAZ",
+                "alertas": "Alertas",
+                "relatorios": "Relatórios",
+                "dashboard": "Dashboard"
+            },
+            "form": {
+                "chave_acesso": "Chave de Acesso",
+                "cnpj_fornecedor": "CNPJ Fornecedor",
+                "data_emissao": "Data Emissão",
+                "valor_total": "Valor Total",
+                "cfop": "CFOP",
+                "status_sefaz": "Status SEFAZ"
+            },
+            "buttons": {
+                "auditar": "Auditar NF-e",
+                "consultar_sefaz": "Consultar SEFAZ",
+                "gerar_relatorio": "Gerar Relatório",
+                "resolver_alerta": "Resolver Alerta"
+            },
+            "messages": {
+                "auditoria_iniciada": "Auditoria iniciada com sucesso",
+                "auditoria_concluida": "Auditoria concluída",
+                "validacao_sucesso": "NF-e válida",
+                "validacao_erro": "NF-e contém inconsistências"
+            },
+            "validation": {
+                "chave_obrigatoria": "Chave de acesso é obrigatória",
+                "chave_invalida": "Formato de chave inválido (44 dígitos)",
+                "cnpj_invalido": "CNPJ inválido"
+            },
+            "errors": {
+                "erro_sefaz": "Erro ao consultar SEFAZ",
+                "timeout_sefaz": "Timeout na consulta SEFAZ",
+                "nfe_cancelada": "NF-e foi cancelada",
+                "duplicata_detectada": "Duplicata detectada",
+                "assinatura_invalida": "Assinatura digital inválida"
+            },
+            "alerts": {
+                "critico": "Crítico",
+                "aviso": "Aviso",
+                "informacao": "Informação"
+            },
+            "relatorios": {
+                "livro_fiscal": "Livro Fiscal",
+                "apuracao_icms": "Apuração ICMS",
+                "sped_fiscal": "SPED Fiscal",
+                "analise_fornecedor": "Análise por Fornecedor",
+                "analise_cfop": "Análise por CFOP"
+            }
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Iniciar auditoria NF-e | `FIN_AUDITORIA_START` | ChaveAcesso, ClienteId, DataHora, UsuarioId |
+| Concluir auditoria | `FIN_AUDITORIA_COMPLETE` | ChaveAcesso, ResultadosValidacao, AlertasGerados |
+| Consultar SEFAZ | `FIN_SEFAZ_CONSULTA` | ChaveAcesso, StatusRetornado, Protocolo, DataConsulta |
+| Gerar alerta | `FIN_ALERTA_GERADO` | TipoAlerta, Severidade, Descricao, ChaveAcesso |
+| Resolver alerta | `FIN_ALERTA_RESOLVIDO` | AlertaId, UsuarioResolucao, Observacoes |
+| Gerar relatório | `FIN_RELATORIO_GERADO` | TipoRelatorio, Periodo, QtdRegistros |
+
+**Retenção**: 5 anos (conforme SPED Fiscal exigências)
+
+**Campos de Auditoria Shadow** (EF Core):
+- `AuditoriaFatura.CriadoPor` (UserId)
+- `AuditoriaFatura.DataCriacao` (DateTime UTC)
+- `AuditoriaFatura.AlteradoPor` (UserId)
+- `AuditoriaFatura.DataAlteracao` (DateTime UTC)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `fin:auditoria:read` | Visualizar auditoria de faturas | Auditor, Contador, CFO, Admin |
+| `fin:auditoria:create` | Iniciar auditoria manual | Auditor, CFO, Admin |
+| `fin:auditoria:sefaz` | Consultar SEFAZ | Auditor, Admin, IntegracaoFiscal |
+| `fin:auditoria:alertas:resolve` | Resolver alertas | Auditor, CFO, Admin |
+| `fin:auditoria:relatorios` | Gerar relatórios fiscais | Contador, CFO, Admin |
+| `fin:auditoria:alertas:delete` | Deletar alertas | Admin, UsuarioAuditoria |
+| `fin:auditoria:export` | Exportar dados de auditoria | Contador, CFO, Admin |
+
+**Policy-Based Authorization** (IMPORTANTE):
+```csharp
+// Verificar se usuário pode auditar faturas de seu cliente
+authorizationService.AuthorizeAsync(user, nfe, "CanAuditNfe");
+
+// Policy: usuário só acessa dados de seu ClienteId
+services.AddAuthorizationBuilder()
+    .AddPolicy("ClienteDataPolicy", policy =>
+        policy.Requirements.Add(new ClienteDataRequirement()));
+```
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao | Status HTTP |
+|--------|----------|-----------|-----------|-------------|
+| GET | `/api/auditoria-faturas` | Listar auditorias (paginadas) | `fin:auditoria:read` | 200 / 403 |
+| GET | `/api/auditoria-faturas/{id}` | Obter auditoria por ID | `fin:auditoria:read` | 200 / 404 / 403 |
+| POST | `/api/auditoria-faturas` | Iniciar auditoria NF-e | `fin:auditoria:create` | 201 / 400 / 403 |
+| PUT | `/api/auditoria-faturas/{id}` | Atualizar resultado auditoria | `fin:auditoria:create` | 200 / 404 / 400 / 403 |
+| DELETE | `/api/auditoria-faturas/{id}` | Deletar auditoria | `fin:auditoria:delete` | 204 / 404 / 403 |
+
+**Estrutura de Request/Response**:
+
+```csharp
+// POST /api/auditoria-faturas
+public class IniciarAuditoriaRequest
+{
+    [Required(ErrorMessage = "Chave de acesso é obrigatória")]
+    [StringLength(44, MinimumLength = 44)]
+    public string ChaveAcesso { get; set; }
+
+    [Required]
+    public int ClienteId { get; set; } // Multi-tenancy
+
+    public bool IncluirConsultaSEFAZ { get; set; } = true;
+    public bool IncluirValidacaoAssinatura { get; set; } = true;
+}
+
+public class IniciarAuditoriaResponse
+{
+    public int AuditoriaId { get; set; }
+    public string ChaveAcesso { get; set; }
+    public string Status { get; set; } // "Iniciada", "EmProcessamento", "Concluida"
+    public DateTime DataInicio { get; set; }
+    public List<string> ValidacoesEmExecucao { get; set; }
+}
+```
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao | Status HTTP |
+|--------|----------|-----------|-----------|-------------|
+| POST | `/api/auditoria-faturas/{id}/consultar-sefaz` | Consultar SEFAZ para NF-e | `fin:auditoria:sefaz` | 200 / 404 / 408 / 403 |
+| POST | `/api/auditoria-faturas/{id}/validar-assinatura` | Validar assinatura digital XML | `fin:auditoria:create` | 200 / 400 / 403 |
+| GET | `/api/auditoria-faturas/{id}/alertas` | Listar alertas de auditoria | `fin:auditoria:read` | 200 / 404 / 403 |
+| POST | `/api/auditoria-faturas/alertas/{alertaId}/resolver` | Resolver alerta | `fin:auditoria:alertas:resolve` | 200 / 404 / 403 |
+| GET | `/api/auditoria-faturas/relatorios/livro-fiscal` | Gerar livro fiscal | `fin:auditoria:relatorios` | 200 / 400 / 403 |
+| GET | `/api/auditoria-faturas/relatorios/apuracao-icms` | Gerar apuração ICMS | `fin:auditoria:relatorios` | 200 / 400 / 403 |
+| GET | `/api/auditoria-faturas/dashboard` | Dashboard com KPIs fiscais | `fin:auditoria:read` | 200 / 403 |
+| POST | `/api/auditoria-faturas/exportar` | Exportar dados para contabilidade | `fin:auditoria:export` | 200 (arquivo) / 400 / 403 |
+| GET | `/api/auditoria-faturas/consultar-sefaz-historico` | Histórico de consultas SEFAZ | `fin:auditoria:read` | 200 / 403 |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Auditoria Completa de NF-e
+
+```
+Usuario abre /financeiro/auditoria-faturas
+    |
+    v
+Seleciona NF-e ou carrega por Chave Acesso
+    |
+    v
+Clica "Auditar NF-e"
+    |
+    +---> [Validar Formato Chave]
+    |         |
+    |         v
+    |     Valido? SIM --> Continua
+    |     Valido? NAO --> ERRO: Mostrar mensagem
+    |
+    +---> [Consultar SEFAZ] (paralelo, async)
+    |         |
+    |         v
+    |     Status 100 (Autorizado)? SIM --> Continua
+    |     Status Outro? --> Gerar Alerta
+    |
+    +---> [Validar Assinatura Digital]
+    |         |
+    |         v
+    |     Assinado corretamente? SIM --> Continua
+    |     Assinado corretamente? NAO --> ERRO CRITICO
+    |
+    +---> [Validar Aliquota ICMS]
+    |         |
+    |         v
+    |     Conforme CFOP? SIM --> Continua
+    |     Conforme CFOP? NAO --> ALERTA
+    |
+    +---> [Validar Base Calculo]
+    |         |
+    |         v
+    |     Base OK? SIM --> Continua
+    |     Base OK? NAO --> ALERTA
+    |
+    +---> [Detectar Duplicatas]
+    |         |
+    |         v
+    |     Chave duplicada? NAO --> Continua
+    |     Chave duplicada? SIM --> ERRO CRITICO
+    |
+    +---> [Deteccao Fraude - ML]
+    |         |
+    |         v
+    |     Score < 0.7? SIM --> OK
+    |     Score >= 0.7? --> ALERTA
+    |
+    v
+[Auditoria Concluida]
+    |
+    v
+Exibir Resultado:
+    - Validacoes Executadas: 8/8
+    - Validacoes Falhadas: 0
+    - Alertas Gerados: 2 (Aviso)
+    - Status Final: AUDITADO COM SUCESSO
+```
+
+### 6.2 Fluxo de Consulta SEFAZ com Retry
+
+```
+Usuario clica "Consultar SEFAZ"
+    |
+    v
+Valida ChaveAcesso + CNPJ Emitente
+    |
+    v
+[Tentatica 1: Consultar SEFAZ]
+    |
+    +--- Timeout / Erro? ---> [Aguardar 5s, Tentar novamente]
+    |                             |
+    |                             v
+    |                         [Tentatica 2]
+    |                             |
+    |                         Timeout? ---> [Aguardar 30s, Tentar novamente]
+    |                                        |
+    |                                        v
+    |                                    [Tentatica 3]
+    |                                        |
+    |                                        Falha? ---> ERRO: "Timeout SEFAZ"
+    |
+    +--- Status 100? ---> Autorizado (sucesso)
+    +--- Status 101? ---> Cancelado (alerta)
+    +--- Status 102? ---> Denegado (erro)
+    v
+[Registrar Consulta]
+    |
+    v
+[Exibir Resultado]
+```
+
+### 6.3 Fluxo de Resolucao de Alerta
+
+```
+Usuario visualiza Alerta Critico na tela
+    |
+    v
+Clica "Resolver Alerta"
+    |
+    v
+Caixa de dialogo: "Selecione acao"
+    |
+    +--- "Ignorar" ---> Marca Resolvido = false, Usuario = null
+    |
+    +--- "Corrigir" ---> Redireciona para formulario de edicao RF032
+    |
+    +--- "Documentar" ---> Abre campo para obs + Marca Resolvido = true
+    |
+    v
+[Registrar Resolucao em Auditoria]
+    |
+    v
+[Enviar Notificacao ao CFO]
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| **SQL Injection** | Usar EF Core (parameterized queries), validar entrada sempre |
+| **XSS** | Angular (sanitização automática), validar output em API |
+| **CSRF** | Token CSRF em headers (X-CSRF-TOKEN) |
+| **Data Leakage** | Row-level security (ClienteId em WHERE), nunca retornar dados de outro cliente |
+| **Certificado Digital** | Validar certificado antes de confiar em assinatura (NotBefore, NotAfter, CA raiz) |
+| **Timeout API** | 120s para SEFAZ (timeout < infinite), 30s para operações locais |
+| **Rate Limiting** | Max 100 requisições/min por cliente (Hangfire + Redis) |
+| **Audit Trail** | Log completo de quem fez o quê, quando, com sucesso/falha |
+| **Segregação RBAC** | Auditor não pode deletar alertas, CFO não pode consultar SEFAZ sem Auditor |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [ ] SQL Injection em ChaveAcesso (teste com `'; DROP TABLE...`)
+- [ ] XSS em DescricaoProduto (teste com `<script>alert(1)</script>`)
+- [ ] CSRF em POST /api/auditoria-faturas (request sem token)
+- [ ] Validacao ClienteId (usuario cliente A não acessa dados cliente B)
+- [ ] Assinatura digital inválida é rejeitada
+- [ ] Certificado expirado é rejeitado
+- [ ] Timeout SEFAZ retorna 408, não trava a app
+- [ ] Rate limiting bloqueia após 100 req/min
+- [ ] Logs de auditoria registram todas as operações
+- [ ] Apenas CFO pode gerar relatório SPED
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao | Frequencia |
+|-----|------|---------|-----------|
+| **Taxa Auditoria Automática** | >= 95% | (NFe auditadas) / (NFe totais) | Diaria |
+| **Tempo Médio Auditoria** | < 5s | SUM(tempo_auditoria) / COUNT | Horaria |
+| **Disponibilidade SEFAZ** | >= 99% | uptime SEFAZ API | Diaria |
+| **Taxa Detecção Fraude** | >= 85% | fraudes_detectadas / fraudes_reais | Mensal |
+| **Alertas Criticos** | < 1% | COUNT(sever=critico) / COUNT(total) | Diaria |
+| **Conformidade SPED** | 100% | nfe_conforme_sped / nfe_total | Mensal |
+| **Resolução Alertas** | < 48h | tempo_medio_resolucao | Semanal |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao | Destinatario |
+|--------|----------|------|--------------|
+| **NF-e Não Autorizada** | StatusSEFAZ != 100 | Notificar + Enviar email | Auditor, CFO |
+| **Assinatura Inválida** | ValidacaoAssinatura = false | Blocar + Alerta crítico | CFO |
+| **Duplicata Detectada** | Chave duplicada | Alerta crítico + Blocar | Auditor, Contador |
+| **Fraude Detectada** | Score ML > 0.8 | Alerta crítico + Notificar | CFO, Auditor |
+| **Alíquota Inconsistente** | Alíquota != esperada | Alerta + Permitir override | Auditor |
+| **SEFAZ Indisponível** | Timeout > 120s por 10 min | Alerta + Retry posterior | DevOps, CFO |
+| **Retenção Incorreta** | Retenção != esperada | Alerta + Recomendação | Contador |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Casos de Uso**: Criar [UC-RF097](./UC-RF097-Auditoria-de-Faturas.md)
+2. **Modelo de Dados**: Criar [MD-RF097](./MD-RF097-Auditoria-de-Faturas.md)
+3. **Fluxos de Tela**: Criar [WF-RF097](./WF-RF097-Auditoria-de-Faturas.md)
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml)
+5. **Testes**: Criar [TC-RF097-BACKEND.md](./TC-RF097-BACKEND.md), [TC-RF097-FRONTEND.md](./TC-RF097-FRONTEND.md)
+6. **Implementacao Backend**: Commands, Queries, Services, Repositories
+7. **Implementacao Frontend**: Componentes Angular, Telas, Dashboards
+8. **Integracao SEFAZ**: Configurar certificado digital, endpoints SEFAZ
+9. **Integracao Azure ML**: Treinar modelo de detecção de fraudes
+10. **Testes E2E**: Validar fluxos completos com dados reais
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial - RF097 Auditoria de Faturas | Claude Code |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code
+**Revisao**: Pendente

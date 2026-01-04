@@ -1,0 +1,1884 @@
+# RF-079: Gestão de Políticas e Compliance
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF-080, RF-095, RF-096, RF-098 | **EPIC**: EPIC008-SD-Service-Desk
+**Fase**: Fase 5 - Service Desk (Operações, Governance e Conformidade)
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+Este requisito especifica o **Módulo de Gestão de Políticas e Compliance** do sistema IControlIT, responsável por centralizar, versionizar e rastrear o cumprimento de políticas corporativas em toda a organização.
+
+O módulo permite que administradores corporativos:
+- Criem e mantenham políticas corporativas (uso de ativos, telecom, TI, segurança)
+- Gerenciem versões e histórico de mudanças
+- Implementem workflows de aprovação (elaboração → revisão → aprovação → publicação)
+- Obriguem aceites de políticas por usuários
+- Monitorem conformidade em tempo real
+- Gerem alertas automáticos de não-conformidade
+- Produzam relatórios de auditoria de compliance
+
+---
+
+### 1.2 Importancia Estrategica
+
+O módulo de Gestão de Políticas e Compliance é crítico para:
+
+- **Conformidade Regulatória**: Atende requisitos LGPD, SOX, ISO 27001, ISO 20000, ITIL v4, garantindo que políticas de segurança, privacidade e governança sejam documentadas e auditáveis
+- **Mitigação de Risco**: Reduz risco de violação de políticas detectando não-conformidade automaticamente (ex: usuário usando ativo além do período permitido)
+- **Governança Corporativa**: Centraliza definição de normas, elimina políticas contraditórias, facilita auditoria em órgãos reguladores
+- **Eficiência Operacional**: Automatiza aceite de políticas, libera tempo de compliance para análise em vez de coleta manual de assinaturas
+- **Rastreabilidade Completa**: Auditoria de quem leu, aceitou, violou cada política (LGPD obriga comprovação)
+- **Aceitação Corporativa**: Dashboard visual da taxa de conformidade por área/usuário motiva cumprimento e identifica resistências
+
+---
+
+### 1.3 Conceitos Fundamentais
+
+**Política Corporativa**: Documento normalizado que define regras obrigatórias (ex: "Máximo 2 linhas móveis por colaborador", "Notebooks devem ter criptografia de disco")
+- Versões sequenciais (v1.0, v1.1, v2.0)
+- Estados: Elaboração → Revisão → Aprovada → Publicada → Obsoleta
+- Categorias: Segurança, Financeiro, Operacional, Legal
+
+**Conformidade**: Estado de cumprimento de uma política por um usuário, departamento ou empresa
+- Conformidade Positiva: Usuário aceita política explicitamente
+- Conformidade Negativa: Sistema detecta violação automática (validação de regra)
+- Status: Em conformidade, Não-conformista, Exceção aprovada
+
+**Aceitação (Aceite)**: Ato de um usuário reconhecer e concordar com política
+- Obrigatória (usuario não avança sem marcar "Li e concordo")
+- Rastreada com timestamp, IP, User-Agent
+- Gera evento de auditoria (RF095: auditoria de acesso)
+
+**Matriz de Compliance**: Mapeamento entre políticas corporativas (linhas) e regulamentações (colunas: LGPD, SOX, ISO 27001, ITIL)
+- Indica qual política controla qual requisito regulatório
+- Facilita demonstração de conformidade em auditorias externas
+
+**Exceção de Conformidade**: Aprovação temporária de violação (ex: "Usuário XYZ autorizado usar notebook de 8 anos por 6 meses")
+- Requer aprovador específico
+- Tem data de expiração
+- Gera alerta de expiração
+
+**Verificação Automática**: Regras configuráveis que detectam violação sem necessidade de aceite manual
+- Exemplos: "Se notebook > 5 anos E sem plano de substituição → Alert"
+- Baseada em dados de outros RFs (Ativos, Linhas, Contratos)
+
+---
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Armazenamento de Políticas** | Documentos em pasta compartilhada (\\servidor\politicas) | Banco de dados com versionamento automático (EF Core migrations) |
+| **Aceites de Usuários** | Emails com checkbox, armazenados em planilhas Excel | Sistema integrado, obrigatorio na tela de login, rastreado em AuditLog |
+| **Rastreamento** | Logs de auditoria dispersos em múltiplos bancos (Auditoria.sql, IC1.sql) | Tabela centralizada Auditoria com índices otimizados, correlationId |
+| **Notificações** | Emails ad-hoc via script SQL | SignalR (real-time), email via SendGrid, in-app via Notification service |
+| **Busca em Políticas** | LIKE %texto% em SQL Server (lento) | ElasticSearch com relevância, full-text indexing, faceted search |
+| **Matriz de Compliance** | Excel manual | Tela interativa com matriz (políticas x regulamentações) |
+| **Relatórios** | SQL Server Reporting Services | API REST + frontend Angular (gráficos com Chart.js) |
+
+---
+
+### 1.5 Funcionalidades Principais
+
+1. **CRUD de Políticas Corporativas** - Criar, ler, editar, publicar políticas com versionamento automático
+2. **Workflow de Aprovação Configurável** - Definir etapas (elaboração, revisão, aprovação, publicação) com papéis específicos
+3. **Aceite Obrigatório por Usuário** - Bloquear acesso à funcionalidade até aceitar política publicada
+4. **Versionamento e Histórico** - Manter histórico completo de alterações (quando, quem, o que mudou)
+5. **Verificação Automática de Conformidade** - Validações periódicas baseadas em regras configuráveis
+6. **Dashboard de Compliance** - Taxa de conformidade por política, área, usuário; visualização de exceções
+7. **Gestão de Exceções** - Aprovar violações temporárias com prazo de expiração
+8. **Matriz de Compliance** - Mapeamento entre políticas e regulamentações (LGPD, SOX, ISO 27001)
+9. **Notificações Automáticas** - Email/in-app quando política é publicada, exceção expira, ou violação detectada
+10. **Busca Full-Text em Políticas** - ElasticSearch para buscar rápido por palavra-chave
+11. **Categorização de Políticas** - Segurança, Financeiro, Operacional, Legal (com icons e cores)
+12. **Multi-idioma** - Suporte a pt-BR, en-US, es-ES (i18n com Transloco)
+13. **Relatórios de Auditoria** - Evidências de quem leu, aceitou, violou cada política
+14. **Integração com Auditoria (RF095, RF096, RF098)** - Todos os eventos geram registros auditáveis
+15. **Integração com Controle de Acesso (RF012, RF013)** - Bloqueio de acesso até aceite de política
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-POL-079-01: Versionamento Automático de Políticas
+
+**Descricao**: Cada alteração em uma política em estado "Elaboração" ou "Revisão" incrementa automaticamente o número de versão e cria registro histórico imutável.
+
+**Justificativa**: LGPD, SOX e ISO 27001 exigem rastreabilidade completa de políticas. Sem versionamento, é impossível provar qual versão um usuário aceitou.
+
+**Implementacao**:
+```csharp
+public class Politica : BaseAuditableGuidEntity, IMultiTenantEntity
+{
+    public string Titulo { get; set; }
+    public string Descricao { get; set; }
+    public string Versao { get; set; } // "1.0", "1.1", "2.0"
+    public PoliticaStatus Status { get; set; } // Elaboracao, Revisao, Aprovada, Publicada, Obsoleta
+    public DateTime? DataPublicacao { get; set; }
+    public DateTime? DataObsolescencia { get; set; }
+    public PoliticaCategoria Categoria { get; set; } // Seguranca, Financeiro, Operacional, Legal
+
+    public List<PoliticaHistorico> Historico { get; set; } = new();
+}
+
+public class PoliticaHistorico : BaseAuditableGuidEntity
+{
+    public Guid PoliticaId { get; set; }
+    public Politica Politica { get; set; }
+    public string Versao { get; set; }
+    public string TituloAntigo { get; set; }
+    public string TituloNovo { get; set; }
+    public string DescricaoAntiga { get; set; }
+    public string DescricaoNova { get; set; }
+    public PoliticaStatus StatusAntigo { get; set; }
+    public PoliticaStatus StatusNovo { get; set; }
+    public string AlteradoPor { get; set; }
+}
+
+public class UpdatePoliticaCommandHandler : IRequestHandler<UpdatePoliticaCommand, Guid>
+{
+    private readonly IApplicationDbContext _context;
+
+    public async Task<Guid> Handle(UpdatePoliticaCommand request, CancellationToken cancellationToken)
+    {
+        var politica = await _context.Politicas.FindAsync(new object[] { request.Id }, cancellationToken: cancellationToken);
+
+        if (politica == null)
+            throw new EntityNotFoundException("Politica", request.Id);
+
+        // Registrar histórico ANTES de alterar
+        var historico = new PoliticaHistorico
+        {
+            PoliticaId = politica.Id,
+            Versao = politica.Versao,
+            TituloAntigo = politica.Titulo,
+            TituloNovo = request.Titulo,
+            DescricaoAntiga = politica.Descricao,
+            DescricaoNova = request.Descricao,
+            StatusAntigo = politica.Status,
+            StatusNovo = politica.Status,
+            AlteradoPor = request.UserId
+        };
+
+        // Incrementar versão se houver mudança significativa
+        if (politica.Titulo != request.Titulo || politica.Descricao != request.Descricao)
+        {
+            politica.Versao = IncrementarVersao(politica.Versao);
+        }
+
+        politica.Titulo = request.Titulo;
+        politica.Descricao = request.Descricao;
+
+        _context.PoliticasHistorico.Add(historico);
+        _context.Politicas.Update(politica);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return politica.Id;
+    }
+
+    private string IncrementarVersao(string versao)
+    {
+        var partes = versao.Split('.');
+        int minor = int.Parse(partes[1]);
+        return $"{partes[0]}.{minor + 1}";
+    }
+}
+```
+
+**Exemplos**:
+- Usuário cria "Política de Uso de Notebooks" versão 1.0 em estado Elaboração
+- Altera descrição → versão passa para 1.1
+- Altera novamente → versão passa para 1.2
+- Envia para revisão (status = Revisão, versão congelada em 1.2)
+- Revisor aprova → status = Aprovada, versão = 1.2
+- Publica → status = Publicada, DataPublicacao = today, usuários agora devem aceitar v1.2
+
+---
+
+### RN-POL-079-02: Aceite Obrigatório de Políticas Publicadas
+
+**Descricao**: Todo usuário deve aceitar explicitamente política publicada antes de poder continuar usando certas funcionalidades. Aceite é registrado com timestamp, IP e User-Agent.
+
+**Justificativa**: LGPD, ISO 27001 e SOX exigem comprovação documentada de que usuário foi notificado e concordou com políticas. Isso reduz riscos legais em casos de violação.
+
+**Implementacao**:
+```csharp
+public class AceitePolitica : BaseAuditableGuidEntity, IMultiTenantEntity
+{
+    public Guid PoliticaId { get; set; }
+    public Politica Politica { get; set; }
+    public string UsuarioId { get; set; }
+    public Usuario Usuario { get; set; }
+    public DateTime DataAceite { get; set; } = DateTime.UtcNow;
+    public string IpAddress { get; set; }
+    public string UserAgent { get; set; }
+    public bool Aceito { get; set; } = true;
+    public DateTime? DataProximoAceite { get; set; } // Se política exigir re-aceite periodico
+}
+
+[ApiController]
+[Route("api/politicas")]
+public class PoliticasController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    [HttpGet("{id}/requer-aceite")]
+    public async Task<ActionResult<bool>> RequereAceite(Guid id)
+    {
+        var query = new VerificarRequerAceitePoliticaQuery { PoliticaId = id };
+        var resultado = await _mediator.Send(query);
+        return Ok(resultado);
+    }
+
+    [HttpPost("{id}/aceitar")]
+    public async Task<ActionResult> AceitarPolitica(Guid id, [FromBody] AceitarPoliticaCommand command)
+    {
+        command.PoliticaId = id;
+        command.IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        command.UserAgent = Request.Headers["User-Agent"];
+
+        var resultado = await _mediator.Send(command);
+        return Ok(new { message = "Política aceita com sucesso", data = resultado });
+    }
+}
+
+public class AceitarPoliticaCommandHandler : IRequestHandler<AceitarPoliticaCommand, Guid>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
+
+    public async Task<Guid> Handle(AceitarPoliticaCommand request, CancellationToken cancellationToken)
+    {
+        var politica = await _context.Politicas
+            .FirstOrDefaultAsync(p => p.Id == request.PoliticaId && p.Status == PoliticaStatus.Publicada, cancellationToken);
+
+        if (politica == null)
+            throw new EntityNotFoundException("Política publicada", request.PoliticaId);
+
+        var aceiteLikeType = await _context.AceitePoliticas
+            .FirstOrDefaultAsync(a => a.PoliticaId == request.PoliticaId && a.UsuarioId == _currentUserService.UserId && !a.FlExcluido, cancellationToken);
+
+        if (aceiteLikeType != null)
+            return aceiteLikeType.Id; // Já aceitou
+
+        var aceite = new AceitePolitica
+        {
+            PoliticaId = request.PoliticaId,
+            UsuarioId = _currentUserService.UserId,
+            DataAceite = DateTime.UtcNow,
+            IpAddress = request.IpAddress,
+            UserAgent = request.UserAgent,
+            Aceito = true
+        };
+
+        _context.AceitePoliticas.Add(aceite);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // Publicar evento de domínio
+        var @event = new PoliticaAceitaEvent
+        {
+            PoliticaId = politica.Id,
+            UsuarioId = _currentUserService.UserId,
+            DataAceite = aceite.DataAceite
+        };
+
+        return aceite.Id;
+    }
+}
+```
+
+**Exemplos**:
+- Validação 1: Usuário tenta acessar módulo de Ativos → API verifica se há política "Uso de Ativos" publicada não aceita por esse usuário → bloqueia com popup "Você deve aceitar a Política XYZ antes de continuar"
+- Validação 2: Login detecta política nova publicada desde último login → força aceite antes de dar acesso ao dashboard
+- Registro: AceitePolitica criada com UsuarioId=João, DataAceite=2025-12-28T10:30:00Z, IpAddress=192.168.1.100, UserAgent=Mozilla/5.0
+
+---
+
+### RN-POL-079-03: Workflow de Aprovação Multi-Nível
+
+**Descricao**: Política segue estados obrigatórios (Elaboração → Revisão → Aprovada → Publicada). Cada transição de estado exige aprovador com perfil específico.
+
+**Justificativa**: ISO 27001 e ITIL v4 exigem que políticas de segurança e operacionais sejam revisadas por especialista antes de publicação. Sem workflow, políticas contraditórias podem ser publicadas.
+
+**Implementacao**:
+```csharp
+public enum PoliticaStatus
+{
+    Elaboracao = 1,    // Criador edita livremente
+    Revisao = 2,       // Revisor(es) analisam
+    Aprovada = 3,      // Aprovador(es) validaram
+    Publicada = 4,     // Usuários devem aceitar
+    Obsoleta = 5       // Política desativada
+}
+
+public class TransicaoPoliticaAprovacao : BaseAuditableGuidEntity, IMultiTenantEntity
+{
+    public Guid PoliticaId { get; set; }
+    public Politica Politica { get; set; }
+    public PoliticaStatus StatusDe { get; set; }
+    public PoliticaStatus StatusPara { get; set; }
+    public string AprovadorRequerido { get; set; } // Perfil, ex: "Revisor de Segurança"
+    public string AprovadoPor { get; set; } // UserId quem aprovou
+    public DateTime DataAprovacao { get; set; }
+    public string Comentario { get; set; }
+}
+
+public class DefinirWorkflowAprovacaoPoliticaCommand : IRequest<Guid>
+{
+    public Guid PoliticaId { get; set; }
+    public PoliticaStatus NovoStatus { get; set; }
+    public string Comentario { get; set; }
+}
+
+public class DefinirWorkflowAprovacaoPoliticaCommandHandler : IRequestHandler<DefinirWorkflowAprovacaoPoliticaCommand, Guid>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
+
+    public async Task<Guid> Handle(DefinirWorkflowAprovacaoPoliticaCommand request, CancellationToken cancellationToken)
+    {
+        var politica = await _context.Politicas.FindAsync(new object[] { request.PoliticaId }, cancellationToken: cancellationToken);
+
+        if (politica == null)
+            throw new EntityNotFoundException("Política", request.PoliticaId);
+
+        // Validar transição permitida
+        var transicao = await _context.TransicoesPoliticasAprovacao
+            .FirstOrDefaultAsync(t => t.StatusDe == politica.Status && t.StatusPara == request.NovoStatus, cancellationToken);
+
+        if (transicao == null)
+            throw new InvalidOperationException($"Transição de {politica.Status} para {request.NovoStatus} não permitida");
+
+        // Validar permissão do aprovador
+        var usuarioAtual = await _context.Usuarios.FindAsync(new object[] { _currentUserService.UserId }, cancellationToken: cancellationToken);
+        var temPermissao = usuarioAtual.Perfil.Nome == transicao.AprovadorRequerido;
+
+        if (!temPermissao)
+            throw new ForbiddenAccessException($"Apenas {transicao.AprovadorRequerido} pode aprovar esta transição");
+
+        // Registrar aprovação
+        var aprovacao = new TransicaoPoliticaAprovacao
+        {
+            PoliticaId = politica.Id,
+            StatusDe = politica.Status,
+            StatusPara = request.NovoStatus,
+            AprovadorRequerido = transicao.AprovadorRequerido,
+            AprovadoPor = _currentUserService.UserId,
+            DataAprovacao = DateTime.UtcNow,
+            Comentario = request.Comentario
+        };
+
+        _context.TransicoesPoliticasAprovacao.Add(aprovacao);
+
+        // Alterar status
+        politica.Status = request.NovoStatus;
+        if (request.NovoStatus == PoliticaStatus.Publicada)
+        {
+            politica.DataPublicacao = DateTime.UtcNow;
+        }
+
+        _context.Politicas.Update(politica);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return politica.Id;
+    }
+}
+```
+
+**Exemplos**:
+- Fluxo: Elaboração (criador edita) → Revisão (revisor técnico valida) → Aprovada (diretor aprova) → Publicada (usuários devem aceitar)
+- Rejeição: Revisor pode rejeitar e voltar para Elaboração com comentário "Título ambíguo"
+- Bloqueio: Se usuário tenta mudar status direto de Elaboração para Publicada sem ser o aprovador → erro "Apenas Diretor pode publicar"
+
+---
+
+### RN-POL-079-04: Matriz de Compliance (Políticas x Regulamentações)
+
+**Descricao**: Cada política publicada deve estar mapeada a uma ou mais regulamentações (LGPD, SOX, ISO 27001, ISO 20000, ITIL v4). Este mapeamento permite demonstrar ao auditor externo que cada requisito regulatório está coberto.
+
+**Justificativa**: Auditorias de compliance (SOX, LGPD) exigem rastreabilidade: "Qual política controla este requisito?" Sem matriz, empresa não consegue responder e falha na auditoria.
+
+**Implementacao**:
+```csharp
+public enum RegulamenticaoTipo
+{
+    LGPD = 1,          // Lei Geral de Proteção de Dados
+    SOX = 2,           // Sarbanes-Oxley
+    ISO27001 = 3,      // Segurança da Informação
+    ISO20000 = 4,      // Gestão de Serviços TI
+    ITILV4 = 5         // ITIL versão 4
+}
+
+public class MatrizCompliance : BaseAuditableGuidEntity, IMultiTenantEntity
+{
+    public Guid PoliticaId { get; set; }
+    public Politica Politica { get; set; }
+    public RegulamenticaoTipo Regulamentacao { get; set; }
+    public string RequisitoCodigo { get; set; } // Ex: "LGPD-5.1", "SOX-404"
+    public string RequisitoDescricao { get; set; }
+    public string StatusConformidade { get; set; } // Em Conformidade, Não-conformista, Exceção Aprovada
+    public DateTime? DataUltimaValidacao { get; set; }
+}
+
+[ApiController]
+[Route("api/compliance")]
+public class MatrizComplianceController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    [HttpGet("matriz")]
+    public async Task<ActionResult<IEnumerable<MatrizComplianceDto>>> ObterMatriz(
+        [FromQuery] RegulamenticaoTipo? regulamentacao = null,
+        [FromQuery] string politicaTitulo = null)
+    {
+        var query = new ObterMatrizComplianceQuery
+        {
+            Regulamentacao = regulamentacao,
+            PoliticaTitulo = politicaTitulo
+        };
+        var resultado = await _mediator.Send(query);
+        return Ok(resultado);
+    }
+
+    [HttpPost("matriz")]
+    public async Task<ActionResult> AdicionarMatriz([FromBody] CriarMatrizComplianceCommand command)
+    {
+        var resultado = await _mediator.Send(command);
+        return CreatedAtAction(nameof(ObterMatriz), new { id = resultado });
+    }
+}
+```
+
+**Exemplos**:
+- Matriz linha 1: Política "Uso de Notebooks", Regulamentação "ISO 27001", Requisito "5.1 - Seleção de pessoal" → Status "Em Conformidade"
+- Matriz linha 2: Política "Retenção de Dados", Regulamentação "LGPD", Requisito "Art. 16 - Direito de apagamento" → Status "Em Conformidade"
+- Auditoria: Auditor SOX pergunta "Qual política controla segregação de funções?" → Sistema retorna matriz com "Política de Segregação de Funções" mapeada a "SOX-404"
+
+---
+
+### RN-POL-079-05: Detecção Automática de Não-Conformidade
+
+**Descricao**: Sistema periodicamente verifica conformidade com base em regras configuráveis. Se usuário/departamento não está em conformidade (não aceitou política ou violou regra), gera alerta e registra em auditoria.
+
+**Justificativa**: Conformidade manual é impossível com centenas de usuários e políticas. Verificação automática permite identificar violações rapidamente e aplicar remediação antes que se tornem problemas de auditoria.
+
+**Implementacao**:
+```csharp
+public class VerificacaoConformidade : BaseAuditableGuidEntity, IMultiTenantEntity
+{
+    public Guid PoliticaId { get; set; }
+    public Politica Politica { get; set; }
+    public string UsuarioId { get; set; }
+    public Usuario Usuario { get; set; }
+    public bool EmConformidade { get; set; }
+    public string MotivoDeSconformidade { get; set; } // "Não aceitou política", "Notebook > 5 anos"
+    public DateTime DataUltimaVerificacao { get; set; }
+}
+
+public class RegraConformidadeAutomatica : BaseAuditableGuidEntity, IMultiTenantEntity
+{
+    public Guid PoliticaId { get; set; }
+    public Politica Politica { get; set; }
+    public string RegraCodigo { get; set; } // Ex: "NOTEBOOK_IDADE"
+    public string RegraNome { get; set; }
+    public string CondicaoSQL { get; set; } // Query que valida
+    public string MensagemViolacao { get; set; }
+    public bool Ativa { get; set; }
+}
+
+[Service]
+public class VerificadorConformidadeAutomaticaService
+{
+    private readonly IApplicationDbContext _context;
+    private readonly ILogger<VerificadorConformidadeAutomaticaService> _logger;
+    private readonly IMediator _mediator;
+
+    public async Task VerificarConformidadeAsync(Guid clienteId, CancellationToken cancellationToken)
+    {
+        // 1. Verificar aceites
+        var politicasPublicadas = await _context.Politicas
+            .Where(p => p.ClienteId == clienteId && p.Status == PoliticaStatus.Publicada && !p.FlExcluido)
+            .ToListAsync(cancellationToken);
+
+        foreach (var politica in politicasPublicadas)
+        {
+            var usuariosCliente = await _context.Usuarios
+                .Where(u => u.ClienteId == clienteId && !u.FlExcluido)
+                .ToListAsync(cancellationToken);
+
+            foreach (var usuario in usuariosCliente)
+            {
+                var aceitePorUsuario = await _context.AceitePoliticas
+                    .FirstOrDefaultAsync(a => a.PoliticaId == politica.Id && a.UsuarioId == usuario.Id && !a.FlExcluido, cancellationToken);
+
+                var verificacao = new VerificacaoConformidade
+                {
+                    ClienteId = clienteId,
+                    PoliticaId = politica.Id,
+                    UsuarioId = usuario.Id,
+                    EmConformidade = aceitePorUsuario != null,
+                    MotivoDeSconformidade = aceitePorUsuario == null ? "Não aceitou política publicada" : null,
+                    DataUltimaVerificacao = DateTime.UtcNow
+                };
+
+                _context.VerificacoesConformidade.Add(verificacao);
+            }
+        }
+
+        // 2. Verificar regras automáticas
+        var regras = await _context.RegrasConformidadeAutomatica
+            .Where(r => r.ClienteId == clienteId && r.Ativa && !r.FlExcluido)
+            .ToListAsync(cancellationToken);
+
+        foreach (var regra in regras)
+        {
+            try
+            {
+                var violadores = await _context.Database
+                    .SqlQueryRaw<dynamic>(regra.CondicaoSQL + " AND ClienteId = @ClienteId",
+                        new SqlParameter("@ClienteId", clienteId))
+                    .ToListAsync(cancellationToken);
+
+                foreach (var violador in violadores)
+                {
+                    var alertaEvent = new ViolacaoPoliticaDetectadaEvent
+                    {
+                        PoliticaId = regra.PoliticaId,
+                        UsuarioId = violador.UsuarioId,
+                        RegraCodigo = regra.RegraCodigo,
+                        MensagemViolacao = regra.MensagemViolacao,
+                        DataDeteccao = DateTime.UtcNow
+                    };
+
+                    await _mediator.Publish(alertaEvent, cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao executar regra de conformidade {RegraId}", regra.Id);
+            }
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+}
+
+// Job do Hangfire
+public class VerificacaoConformidadeBackgroundJob
+{
+    private readonly VerificadorConformidadeAutomaticaService _verificador;
+
+    [DisableConcurrentExecution(timeoutInSeconds: 300)]
+    public async Task ExecutarVerificacaoAsync(Guid clienteId)
+    {
+        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        await _verificador.VerificarConformidadeAsync(clienteId, cts.Token);
+    }
+}
+
+// Registrar job no startup
+public static IServiceCollection AddComplianceJobs(this IServiceCollection services)
+{
+    services.AddHangfire(config => config.UseSqlServerStorage("DefaultConnection"));
+    services.AddHangfireServer();
+
+    // Job executado diariamente às 02:00 UTC
+    RecurringJob.AddOrUpdate<VerificacaoConformidadeBackgroundJob>(
+        "verificacao-conformidade",
+        x => x.ExecutarVerificacaoAsync(default),
+        Cron.Daily(2));
+
+    return services;
+}
+```
+
+**Exemplos**:
+- Regra 1: "Notebook sem aceite de Política de Uso" → Verifica quem não aceitou → Gera alerta se > 30 dias sem aceite
+- Regra 2: "Notebook com SO > 5 anos" → Query procura Ativos com DataFabricacao < 2020 → Gera alerta "Dispositivo fora de ciclo"
+- Verificação 3: "Exceção de conformidade vencida" → Verifica se exceção tem DataExpiracao < hoje → Gera alerta "Exceção expirou"
+
+---
+
+### RN-POL-079-06: Gestão de Exceções de Conformidade
+
+**Descricao**: Permite aprovador autorizado conceder exceção temporária para usuário/departamento violar política por período definido (ex: "Notebook fora de ciclo autorizado por 6 meses").
+
+**Justificativa**: Conformidade absoluta é rara. Negócio precisa flexibilidade para exceções temporárias (ex: funcionário novo chegando, espera equipamento), mas com controle (aprovação, prazo, auditoria).
+
+**Implementacao**:
+```csharp
+public class ExcecaoConformidade : BaseAuditableGuidEntity, IMultiTenantEntity
+{
+    public Guid PoliticaId { get; set; }
+    public Politica Politica { get; set; }
+    public Guid VerificacaoConformidadeId { get; set; }
+    public VerificacaoConformidade VerificacaoConformidade { get; set; }
+    public string UsuarioId { get; set; }
+    public Usuario Usuario { get; set; }
+    public string MotivoExcecao { get; set; } // "Notebook em repair"
+    public DateTime DataAprovacao { get; set; }
+    public string AprovadoPor { get; set; }
+    public DateTime DataExpiracao { get; set; }
+    public bool Ativa => !FlExcluido && DateTime.UtcNow < DataExpiracao;
+}
+
+public class CriarExcecaoConformidadeCommand : IRequest<Guid>
+{
+    public Guid PoliticaId { get; set; }
+    public string UsuarioId { get; set; }
+    public string MotivoExcecao { get; set; }
+    public int DiasValidade { get; set; }
+}
+
+public class CriarExcecaoConformidadeCommandHandler : IRequestHandler<CriarExcecaoConformidadeCommand, Guid>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
+
+    public async Task<Guid> Handle(CriarExcecaoConformidadeCommand request, CancellationToken cancellationToken)
+    {
+        // Validar permissão (apenas aprovador de exceções)
+        var usuarioAtual = await _context.Usuarios.FindAsync(new object[] { _currentUserService.UserId }, cancellationToken: cancellationToken);
+        if (!usuarioAtual.Perfil.Permissoes.Contains("conformidade:exceção:criar"))
+            throw new ForbiddenAccessException("Sem permissão para criar exceções");
+
+        var verificacao = await _context.VerificacoesConformidade
+            .FirstOrDefaultAsync(v => v.PoliticaId == request.PoliticaId && v.UsuarioId == request.UsuarioId, cancellationToken);
+
+        if (verificacao == null)
+            throw new EntityNotFoundException("Verificação de conformidade", request.PoliticaId);
+
+        var excecao = new ExcecaoConformidade
+        {
+            PoliticaId = request.PoliticaId,
+            VerificacaoConformidadeId = verificacao.Id,
+            UsuarioId = request.UsuarioId,
+            MotivoExcecao = request.MotivoExcecao,
+            DataAprovacao = DateTime.UtcNow,
+            AprovadoPor = _currentUserService.UserId,
+            DataExpiracao = DateTime.UtcNow.AddDays(request.DiasValidade)
+        };
+
+        _context.ExcecoesConformidade.Add(excecao);
+
+        // Publicar evento para auditoria
+        var @event = new ExcecaoConformidadeAprovadaEvent
+        {
+            ExcecaoId = excecao.Id,
+            PoliticaId = request.PoliticaId,
+            UsuarioId = request.UsuarioId,
+            DataExpiracao = excecao.DataExpiracao
+        };
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return excecao.Id;
+    }
+}
+
+[ApiController]
+[Route("api/conformidade/excecoes")]
+public class ExcecoesConformidadeController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    [HttpPost]
+    [Authorize(Policy = "conformidade:exceção:criar")]
+    public async Task<ActionResult> CriarExcecao([FromBody] CriarExcecaoConformidadeCommand command)
+    {
+        var resultado = await _mediator.Send(command);
+        return CreatedAtAction(nameof(CriarExcecao), new { id = resultado });
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<ExcecaoConformidadeDto>>> ListarExcecoes([FromQuery] Guid? politicaId)
+    {
+        var query = new ListarExcecoesConformidadeQuery { PoliticaId = politicaId };
+        var resultado = await _mediator.Send(query);
+        return Ok(resultado);
+    }
+}
+```
+
+**Exemplos**:
+- Exceção 1: Usuário "João Silva" não aceitou "Política de Segurança" → Gerente aprova exceção por 30 dias (motivo: "Aguardando onboarding completo")
+- Exceção 2: Notebook de "Maria Santos" tem 6 anos (fora do ciclo) → Diretor aprova exceção por 6 meses (motivo: "Aguardando aprovação de budget para renovação")
+- Expiração: Sistema detecta exceção vencida → Envia notificação "Exceção expirada: voltamos ao status de não-conformidade"
+
+---
+
+### RN-POL-079-07: Dashboard de Compliance em Tempo Real
+
+**Descricao**: Painel visual mostrando taxa de conformidade geral (%), conformidade por política, por departamento, por usuário. Cores: verde (>90%), amarelo (70-90%), vermelho (<70%).
+
+**Justificativa**: Gestores e diretores precisam visibilidade rápida para tomar decisões. Sem dashboard, compliance fica invisível até auditoria.
+
+**Implementacao**:
+```csharp
+public class DashboardComplianceViewModel
+{
+    public decimal TaxaConformidadeGeral { get; set; } // 0-100%
+    public int TotalPoliticas { get; set; }
+    public int TotalUsuarios { get; set; }
+    public int UsuariosEmConformidade { get; set; }
+    public int UsuariosSconformidades { get; set; }
+    public List<ConformidadePorPoliticaDto> ConformidadePorPolitica { get; set; }
+    public List<ConformidadePorDepartamentoDto> ConformidadePorDepartamento { get; set; }
+    public List<ViolacaoRecenteDto> ViolacoesRecentes { get; set; }
+    public List<ExcecaoProximaExpirarDto> ExcecoesProximasExpirar { get; set; }
+}
+
+public class ConformidadePorPoliticaDto
+{
+    public Guid PoliticaId { get; set; }
+    public string PoliticaTitulo { get; set; }
+    public string PoliticaCategoria { get; set; }
+    public decimal TaxaConformidade { get; set; }
+    public int UsuariosEmConformidade { get; set; }
+    public int UsuariosSconformidades { get; set; }
+}
+
+[ApiController]
+[Route("api/compliance")]
+public class DashboardComplianceController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    [HttpGet("dashboard")]
+    [Authorize(Policy = "conformidade:view")]
+    public async Task<ActionResult<DashboardComplianceViewModel>> ObterDashboard()
+    {
+        var query = new ObterDashboardComplianceQuery();
+        var resultado = await _mediator.Send(query);
+        return Ok(resultado);
+    }
+}
+
+public class ObterDashboardComplianceQueryHandler : IRequestHandler<ObterDashboardComplianceQuery, DashboardComplianceViewModel>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUserService;
+
+    public async Task<DashboardComplianceViewModel> Handle(ObterDashboardComplianceQuery request, CancellationToken cancellationToken)
+    {
+        var clienteId = _currentUserService.ClienteId;
+
+        // Total de verificações
+        var verificacoes = await _context.VerificacoesConformidade
+            .Where(v => v.ClienteId == clienteId && !v.FlExcluido)
+            .ToListAsync(cancellationToken);
+
+        var usuariosEmConformidade = verificacoes.Count(v => v.EmConformidade);
+        var usuariosSconformidades = verificacoes.Count(v => !v.EmConformidade);
+        var taxaGeral = verificacoes.Count > 0 ? (usuariosEmConformidade * 100m) / verificacoes.Count : 0;
+
+        // Por política
+        var porPolitica = await _context.Politicas
+            .Where(p => p.ClienteId == clienteId && p.Status == PoliticaStatus.Publicada && !p.FlExcluido)
+            .Select(p => new ConformidadePorPoliticaDto
+            {
+                PoliticaId = p.Id,
+                PoliticaTitulo = p.Titulo,
+                PoliticaCategoria = p.Categoria.ToString(),
+                UsuariosEmConformidade = _context.VerificacoesConformidade
+                    .Count(v => v.PoliticaId == p.Id && v.EmConformidade && !v.FlExcluido),
+                UsuariosSconformidades = _context.VerificacoesConformidade
+                    .Count(v => v.PoliticaId == p.Id && !v.EmConformidade && !v.FlExcluido)
+            })
+            .ToListAsync(cancellationToken);
+
+        porPolitica.ForEach(pp =>
+        {
+            var total = pp.UsuariosEmConformidade + pp.UsuariosSconformidades;
+            pp.TaxaConformidade = total > 0 ? (pp.UsuariosEmConformidade * 100m) / total : 0;
+        });
+
+        // Violações recentes (últimas 7 dias)
+        var violacoesRecentes = await _context.VerificacoesConformidade
+            .Where(v => v.ClienteId == clienteId && !v.EmConformidade && !v.FlExcluido &&
+                   v.DataUltimaVerificacao >= DateTime.UtcNow.AddDays(-7))
+            .OrderByDescending(v => v.DataUltimaVerificacao)
+            .Take(10)
+            .Select(v => new ViolacaoRecenteDto
+            {
+                UsuarioId = v.UsuarioId,
+                PoliticaTitulo = v.Politica.Titulo,
+                MotivoDeSconformidade = v.MotivoDeSconformidade,
+                DataDeteccao = v.DataUltimaVerificacao
+            })
+            .ToListAsync(cancellationToken);
+
+        // Exceções próximas de expirar (próximos 7 dias)
+        var excecoesProximasExpirar = await _context.ExcecoesConformidade
+            .Where(e => e.ClienteId == clienteId && !e.FlExcluido &&
+                   e.DataExpiracao >= DateTime.UtcNow && e.DataExpiracao <= DateTime.UtcNow.AddDays(7))
+            .OrderBy(e => e.DataExpiracao)
+            .Select(e => new ExcecaoProximaExpirarDto
+            {
+                ExcecaoId = e.Id,
+                PoliticaTitulo = e.Politica.Titulo,
+                UsuarioId = e.UsuarioId,
+                DataExpiracao = e.DataExpiracao,
+                DiasRestantes = (int)(e.DataExpiracao - DateTime.UtcNow).TotalDays
+            })
+            .ToListAsync(cancellationToken);
+
+        var dashboard = new DashboardComplianceViewModel
+        {
+            TaxaConformidadeGeral = taxaGeral,
+            TotalPoliticas = porPolitica.Count,
+            TotalUsuarios = verificacoes.Select(v => v.UsuarioId).Distinct().Count(),
+            UsuariosEmConformidade = usuariosEmConformidade,
+            UsuariosSconformidades = usuariosSconformidades,
+            ConformidadePorPolitica = porPolitica,
+            ViolacoesRecentes = violacoesRecentes,
+            ExcecoesProximaExpirar = excecoesProximasExpirar
+        };
+
+        return dashboard;
+    }
+}
+```
+
+**Exemplos**:
+- Card 1: "Taxa geral: 87%" (amarelo) - 2 políticas em verde (100%), 1 em amarelo (75%)
+- Card 2: "Departamento TI: 92% em conformidade" (verde) vs "Departamento Vendas: 62%" (vermelho)
+- Card 3: "Última violação: João Silva não aceitou Política de Segurança há 5 dias"
+
+---
+
+### RN-POL-079-08: Notificações de Atualização e Violação
+
+**Descricao**: Quando política é publicada ou violação detectada, sistema envia notificação (email via SendGrid, in-app via SignalR, SMS opcional). Usuário recebe notificação com link para aceitar/remediar.
+
+**Justificativa**: Usuário não lembra de políticas se não for lembrado. Email + in-app + optional SMS aumenta taxa de aceite e conformidade.
+
+**Implementacao**:
+```csharp
+public interface INotificadorComplianceService
+{
+    Task NotificarPoliticaPublicadaAsync(Guid politicaId, CancellationToken cancellationToken);
+    Task NotificarViolacaoDetectadaAsync(Guid verificacaoId, CancellationToken cancellationToken);
+    Task NotificarExcecaoProximaExpirarAsync(Guid excecaoId, CancellationToken cancellationToken);
+}
+
+[Service]
+public class NotificadorComplianceService : INotificadorComplianceService
+{
+    private readonly IApplicationDbContext _context;
+    private readonly ISendGridService _sendGrid;
+    private readonly IHubContext<NotificacaoHub> _hubContext;
+    private readonly ILogger<NotificadorComplianceService> _logger;
+
+    public async Task NotificarPoliticaPublicadaAsync(Guid politicaId, CancellationToken cancellationToken)
+    {
+        var politica = await _context.Politicas
+            .Include(p => p.Categoria)
+            .FirstOrDefaultAsync(p => p.Id == politicaId, cancellationToken);
+
+        if (politica == null) return;
+
+        var usuariosCliente = await _context.Usuarios
+            .Where(u => u.ClienteId == politica.ClienteId && !u.FlExcluido)
+            .ToListAsync(cancellationToken);
+
+        var tarefas = usuariosCliente.Select(async usuario =>
+        {
+            // Email
+            var emailSubject = $"Nova Política Publicada: {politica.Titulo}";
+            var emailBody = $@"
+                <h1>{politica.Titulo}</h1>
+                <p>{politica.Descricao}</p>
+                <p>Você precisa aceitar esta política para continuar usando o sistema.</p>
+                <a href='https://app.icontrolit.com/compliance/aceitar/{politica.Id}'>Aceitar Política</a>
+            ";
+
+            await _sendGrid.SendEmailAsync(usuario.Email, emailSubject, emailBody);
+
+            // In-app
+            await _hubContext.Clients.User(usuario.Id)
+                .SendAsync("NotificacaoCompliance", new
+                {
+                    Tipo = "PoliticaPublicada",
+                    PoliticaId = politica.Id,
+                    Titulo = politica.Titulo,
+                    DataPublicacao = politica.DataPublicacao
+                }, cancellationToken);
+
+            _logger.LogInformation("Notificação de política publicada enviada para {UserId}", usuario.Id);
+        });
+
+        await Task.WhenAll(tarefas);
+    }
+
+    public async Task NotificarViolacaoDetectadaAsync(Guid verificacaoId, CancellationToken cancellationToken)
+    {
+        var verificacao = await _context.VerificacoesConformidade
+            .Include(v => v.Politica)
+            .Include(v => v.Usuario)
+            .FirstOrDefaultAsync(v => v.Id == verificacaoId, cancellationToken);
+
+        if (verificacao == null) return;
+
+        // Email ao usuário
+        var emailSubject = $"Alerta de Conformidade: {verificacao.Politica.Titulo}";
+        var emailBody = $@"
+            <h1>Alerta de Não-Conformidade</h1>
+            <p>Detectamos que você não está em conformidade com a política: <strong>{verificacao.Politica.Titulo}</strong></p>
+            <p>Motivo: {verificacao.MotivoDeSconformidade}</p>
+            <p>Por favor, remedie esta situação em até 48 horas.</p>
+            <a href='https://app.icontrolit.com/compliance/meus-aceites'>Ir para Compliance</a>
+        ";
+
+        await _sendGrid.SendEmailAsync(verificacao.Usuario.Email, emailSubject, emailBody);
+
+        // Email ao gestor do usuário
+        var gestor = await _context.Usuarios
+            .FirstOrDefaultAsync(u => u.Id == verificacao.Usuario.GestorId, cancellationToken);
+
+        if (gestor != null)
+        {
+            var emailGestorSubject = $"Alerta: Colaborador {verificacao.Usuario.Nome} em Não-Conformidade";
+            var emailGestorBody = $@"
+                <h1>Relatório de Não-Conformidade</h1>
+                <p>Seu colaborador <strong>{verificacao.Usuario.Nome}</strong> está em não-conformidade com a política: {verificacao.Politica.Titulo}</p>
+                <p>Motivo: {verificacao.MotivoDeSconformidade}</p>
+                <p>Recomendamos ação imediata.</p>
+            ";
+
+            await _sendGrid.SendEmailAsync(gestor.Email, emailGestorSubject, emailGestorBody);
+        }
+
+        // In-app
+        await _hubContext.Clients.User(verificacao.UsuarioId)
+            .SendAsync("NotificacaoCompliance", new
+            {
+                Tipo = "ViolacaoDetectada",
+                VerificacaoId = verificacao.Id,
+                PoliticaTitulo = verificacao.Politica.Titulo,
+                MotivoDeSconformidade = verificacao.MotivoDeSconformidade
+            }, cancellationToken);
+    }
+
+    public async Task NotificarExcecaoProximaExpirarAsync(Guid excecaoId, CancellationToken cancellationToken)
+    {
+        var excecao = await _context.ExcecoesConformidade
+            .Include(e => e.Politica)
+            .Include(e => e.Usuario)
+            .FirstOrDefaultAsync(e => e.Id == excecaoId, cancellationToken);
+
+        if (excecao == null) return;
+
+        var diasRestantes = (int)(excecao.DataExpiracao - DateTime.UtcNow).TotalDays;
+
+        var emailSubject = $"Exceção de Conformidade Vencendo em {diasRestantes} Dias";
+        var emailBody = $@"
+            <h1>Exceção Vencendo</h1>
+            <p>Sua exceção para a política <strong>{excecao.Politica.Titulo}</strong> vence em <strong>{diasRestantes} dias</strong>.</p>
+            <p>Data de expiração: {excecao.DataExpiracao:dd/MM/yyyy}</p>
+            <p>Após esta data, você voltará a estar em não-conformidade.</p>
+        ";
+
+        await _sendGrid.SendEmailAsync(excecao.Usuario.Email, emailSubject, emailBody);
+    }
+}
+
+// Consumidor de eventos de domínio
+public class PoliticaPublicadaEventHandler : INotificationHandler<PoliticaPublicadaEvent>
+{
+    private readonly INotificadorComplianceService _notificador;
+    private readonly IMediator _mediator;
+
+    public async Task Handle(PoliticaPublicadaEvent notification, CancellationToken cancellationToken)
+    {
+        await _notificador.NotificarPoliticaPublicadaAsync(notification.PoliticaId, cancellationToken);
+    }
+}
+
+// Registrar event handlers
+public static IServiceCollection AddComplianceServices(this IServiceCollection services)
+{
+    services.AddScoped<INotificadorComplianceService, NotificadorComplianceService>();
+    services.AddScoped<INotificationHandler<PoliticaPublicadaEvent>, PoliticaPublicadaEventHandler>();
+    services.AddScoped<INotificationHandler<ViolacaoPoliticaDetectadaEvent>, ViolacaoPoliticaDetectadaEventHandler>();
+    return services;
+}
+```
+
+**Exemplos**:
+- Evento: "Política de Segurança publicada" → Email enviado para 500 usuários + notificação in-app + alerta no dashboard do gestor
+- Evento: "Notebook de João detectado com 7 anos de idade" → Email a João + Email ao gestor de João + notificação in-app em tempo real
+- Evento: "Exceção de Maria expira em 3 dias" → Email de lembrete para Maria
+
+---
+
+### RN-POL-079-09: Busca Full-Text em Políticas com ElasticSearch
+
+**Descricao**: Usuários podem buscar políticas por palavra-chave (ex: "segurança", "laptop") usando ElasticSearch. Busca é rápida, relevante, com facets por categoria.
+
+**Justificativa**: Com centenas de políticas, busca LIKE %% em SQL é lenta. ElasticSearch permite busca relevante (relevância por frequência de termo) em < 200ms.
+
+**Implementacao**:
+```csharp
+public interface IBuscadorPoliticasService
+{
+    Task<BuscaPoliticasResultadoDto> BuscarPoliticasAsync(string termo, int skip = 0, int take = 10, CancellationToken cancellationToken = default);
+}
+
+[Service]
+public class BuscadorPoliticasElasticSearchService : IBuscadorPoliticasService
+{
+    private readonly IElasticClient _elasticClient;
+    private readonly ILogger<BuscadorPoliticasElasticSearchService> _logger;
+
+    public async Task<BuscaPoliticasResultadoDto> BuscarPoliticasAsync(string termo, int skip = 0, int take = 10, CancellationToken cancellationToken = default)
+    {
+        var searchResponse = await _elasticClient.SearchAsync<PoliticaIndexModel>(s => s
+            .Index("politicas")
+            .Query(q => q
+                .MultiMatch(m => m
+                    .Query(termo)
+                    .Fields(f => f
+                        .Field(p => p.Titulo, boost: 2)  // Título tem peso maior
+                        .Field(p => p.Descricao)
+                        .Field(p => p.Conteudo)
+                    )
+                    .Fuzziness(Fuzziness.Auto)  // Tolera typos
+                )
+            )
+            .Aggregations(a => a
+                .Terms("categoria", t => t
+                    .Field(p => p.Categoria)
+                )
+            )
+            .Skip(skip)
+            .Size(take)
+        );
+
+        if (!searchResponse.IsValid)
+        {
+            _logger.LogError("Erro ElasticSearch: {Error}", searchResponse.DebugInformation);
+            throw new InvalidOperationException("Erro ao buscar políticas");
+        }
+
+        var resultados = searchResponse.Documents
+            .Select(d => new BuscaPoliticaItemDto
+            {
+                PoliticaId = d.PoliticaId,
+                Titulo = d.Titulo,
+                Descricao = d.Descricao,
+                Categoria = d.Categoria,
+                Relevancia = searchResponse.Hits.FirstOrDefault(h => h.Source.PoliticaId == d.PoliticaId)?.Score ?? 0
+            })
+            .ToList();
+
+        var facets = searchResponse.Aggregations
+            .Terms("categoria")
+            .Buckets
+            .Select(b => new BuscaFacetDto
+            {
+                Nome = b.Key,
+                Quantidade = b.DocCount ?? 0
+            })
+            .ToList();
+
+        return new BuscaPoliticasResultadoDto
+        {
+            Total = searchResponse.Total,
+            Resultados = resultados,
+            Facets = facets
+        };
+    }
+}
+
+[ApiController]
+[Route("api/politicas")]
+public class PoliticasSearchController : ControllerBase
+{
+    private readonly IBuscadorPoliticasService _buscador;
+
+    [HttpGet("buscar")]
+    public async Task<ActionResult<BuscaPoliticasResultadoDto>> Buscar(
+        [FromQuery] string termo,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 10)
+    {
+        if (string.IsNullOrWhiteSpace(termo))
+            return BadRequest("Termo de busca é obrigatório");
+
+        var resultado = await _buscador.BuscarPoliticasAsync(termo, skip, take);
+        return Ok(resultado);
+    }
+}
+
+// Indexar político no ElasticSearch quando publicada
+public class PoliticaPublicadaIndexHandler : INotificationHandler<PoliticaPublicadaEvent>
+{
+    private readonly IElasticClient _elasticClient;
+
+    public async Task Handle(PoliticaPublicadaEvent notification, CancellationToken cancellationToken)
+    {
+        // Aqui obtém a política do banco e indexa no ES
+        var indexResponse = await _elasticClient.IndexAsync(new PoliticaIndexModel
+        {
+            PoliticaId = notification.PoliticaId,
+            Titulo = notification.Titulo,
+            Descricao = notification.Descricao,
+            Categoria = notification.Categoria,
+            Conteudo = notification.Conteudo,
+            DataIndexacao = DateTime.UtcNow
+        }, idx => idx.Index("politicas"), cancellationToken);
+    }
+}
+```
+
+**Exemplos**:
+- Busca: usuário digita "segurança" → ElasticSearch retorna 15 resultados em ordem de relevância: "Política de Segurança da Informação" (score 10), "Política de Segurança de Senhas" (score 8), etc.
+- Facets: Mostra quantas políticas de cada categoria (Segurança: 12, Financeiro: 5, Operacional: 3)
+- Typo: Usuário digita "segurança" → sistema encontra também "segurança" (mesmo com typo fuzzy)
+
+---
+
+### RN-POL-079-10: Integração com Auditoria (RF095, RF096, RF098)
+
+**Descricao**: Todos os eventos de políticas e conformidade são registrados em tabela Auditoria com código de operação padronizado, usuário, timestamp, IP, dados antes/depois.
+
+**Justificativa**: LGPD, SOX, ISO 27001 exigem que mudanças em políticas sejam auditáveis. Sem integração com auditoria, empresa não consegue provar quem alterou o quê e quando.
+
+**Implementacao**:
+```csharp
+public enum OperacaoAuditoriaPolitica
+{
+    POL_CRIAR = 1,
+    POL_ATUALIZAR = 2,
+    POL_PUBLICAR = 3,
+    POL_ARQUIVAR = 4,
+    POL_ACEITE = 5,
+    POL_VIOLACAO_DETECTADA = 6,
+    POL_EXCECAO_APROVADA = 7,
+    POL_EXCECAO_EXPIRADA = 8
+}
+
+// Registrar auditoria em cada comando
+public class CriarPoliticaCommandHandler : IRequestHandler<CriarPoliticaCommand, Guid>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly IAuditoriaService _auditoria;
+    private readonly ICurrentUserService _currentUserService;
+
+    public async Task<Guid> Handle(CriarPoliticaCommand request, CancellationToken cancellationToken)
+    {
+        var politica = new Politica
+        {
+            ClienteId = _currentUserService.ClienteId,
+            Titulo = request.Titulo,
+            Descricao = request.Descricao,
+            Status = PoliticaStatus.Elaboracao,
+            Categoria = request.Categoria,
+            Versao = "1.0"
+        };
+
+        _context.Politicas.Add(politica);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // Registrar auditoria
+        await _auditoria.RegistrarAsync(new AuditoriaRegistro
+        {
+            ClienteId = _currentUserService.ClienteId,
+            OperacaoCodigo = "POL_CRIAR",
+            EntidadeTipo = "Politica",
+            EntidadeId = politica.Id.ToString(),
+            DadoAntigo = null,
+            DadoNovo = JsonConvert.SerializeObject(new { politica.Titulo, politica.Descricao, politica.Categoria }),
+            UsuarioId = _currentUserService.UserId,
+            IpAddress = _currentUserService.IpAddress,
+            UserAgent = _currentUserService.UserAgent,
+            DataOperacao = DateTime.UtcNow
+        }, cancellationToken);
+
+        return politica.Id;
+    }
+}
+
+// Tabela compartilhada com RF095, RF096, RF098
+public class Auditoria : BaseGuidEntity
+{
+    public Guid ClienteId { get; set; }
+    public string OperacaoCodigo { get; set; } // POL_CRIAR, POL_PUBLICAR, etc.
+    public string EntidadeTipo { get; set; } // "Politica", "Usuario", "Ativo"
+    public string EntidadeId { get; set; }
+    public string DadoAntigo { get; set; } // JSON
+    public string DadoNovo { get; set; } // JSON
+    public string UsuarioId { get; set; }
+    public string IpAddress { get; set; }
+    public string UserAgent { get; set; }
+    public DateTime DataOperacao { get; set; } = DateTime.UtcNow;
+}
+```
+
+**Exemplos**:
+- Auditoria 1: POL_CRIAR | PoliticaId=xxx | DadoNovo={Titulo="Política de Segurança"} | UsuarioId=admin | IP=192.168.1.1 | 2025-12-28T10:00:00Z
+- Auditoria 2: POL_ACEITE | PoliticaId=xxx | UsuarioId=joao | IP=192.168.1.50 | 2025-12-28T10:30:00Z
+- Auditoria 3: POL_VIOLACAO_DETECTADA | PoliticaId=xxx | UsuarioId=maria | MotivoDeSconformidade="Notebook > 5 anos"
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `ic1_legado` (SQL Server 2019+)
+
+**Tabelas Relacionadas a Políticas e Compliance**:
+
+```sql
+CREATE TABLE [dbo].[Auditoria](
+    [Id] [uniqueidentifier] NOT NULL PRIMARY KEY,
+    [ClienteId] [uniqueidentifier] NOT NULL,
+    [OperacaoCodigo] [varchar](50) NOT NULL,
+    [EntidadeTipo] [varchar](100),
+    [EntidadeId] [varchar](50),
+    [DadoAntigo] [nvarchar](max),
+    [DadoNovo] [nvarchar](max),
+    [UsuarioId] [varchar](128),
+    [IpAddress] [varchar](45),
+    [UserAgent] [nvarchar](max),
+    [DataOperacao] [datetime2] NOT NULL,
+    CONSTRAINT [FK_Auditoria_ClienteId] FOREIGN KEY ([ClienteId])
+        REFERENCES [dbo].[Cliente]([Id])
+)
+
+CREATE TABLE [dbo].[Notificacao](
+    [Id] [uniqueidentifier] NOT NULL PRIMARY KEY,
+    [ClienteId] [uniqueidentifier] NOT NULL,
+    [UsuarioId] [varchar](128) NOT NULL,
+    [Tipo] [varchar](50) NOT NULL, -- "PoliticaPublicada", "ViolacaoDetectada"
+    [Titulo] [varchar](200),
+    [Mensagem] [nvarchar](max),
+    [Dados] [nvarchar](max),
+    [Lida] [bit] NOT NULL DEFAULT 0,
+    [DataCriacao] [datetime2] NOT NULL,
+    [DataLeitura] [datetime2],
+    CONSTRAINT [FK_Notificacao_ClienteId] FOREIGN KEY ([ClienteId])
+        REFERENCES [dbo].[Cliente]([Id]),
+    CONSTRAINT [FK_Notificacao_UsuarioId] FOREIGN KEY ([UsuarioId])
+        REFERENCES [dbo].[AspNetUsers]([Id])
+)
+
+CREATE TABLE [dbo].[SistemaConfiguracao](
+    [Id] [uniqueidentifier] NOT NULL PRIMARY KEY,
+    [ClienteId] [uniqueidentifier] NOT NULL,
+    [ConfiguracaoCodigo] [varchar](100) NOT NULL, -- "compliance.verificacao.frequencia"
+    [ConfiguracaoValor] [nvarchar](max),
+    [ConfiguracaoTipo] [varchar](50), -- "int", "bool", "string"
+    [DataAlteracao] [datetime2],
+    [AlteradoPor] [varchar](128),
+    CONSTRAINT [FK_SistemaConfiguracao_ClienteId] FOREIGN KEY ([ClienteId])
+        REFERENCES [dbo].[Cliente]([Id])
+)
+```
+
+**Campos Importantes Legado**:
+
+| Campo Legado | Descricao | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `Auditoria.OperacaoCodigo` | Código padronizado (ex: "POLICY_CREATE") | Mantém-se como OperacaoCodigo |
+| `Auditoria.DadoAntigo` | JSON antes da mudança | Mantém-se para auditoria |
+| `Auditoria.DadoNovo` | JSON depois da mudança | Mantém-se para auditoria |
+| `Notificacao.Tipo` | Tipo de notificação | Expandido para suportar políticas |
+
+---
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descricao | Migracao |
+|-----------|-----------|----------|
+| `pa_Auditoria_Inserir` | Insere registro de auditoria | Substituir por AuditInterceptor (EF Core) |
+| `pa_Notificacao_ObterPorUsuario` | Lista notificações do usuário | Manter como Query de leitura |
+| `pa_SistemaConfiguracao_ObterValor` | Obtém valor de configuração | Substituir por SistemaConfiguracaoService |
+
+---
+
+### 3.3 Telas ASPX Legado
+
+| Pagina | Descricao | Tela Moderna |
+|--------|-----------|--------------|
+| `Administrativo/Auditoria.aspx` | Logs de auditoria | `/admin/auditoria` (Angular) |
+| `Administrativo/Notificacoes.aspx` | Gerenciar notificações | `/admin/notificacoes` (Angular) |
+| `Administrativo/Configuracoes.aspx` | Configurações do sistema | `/admin/configuracoes` (Angular) |
+
+---
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSAuditoria.asmx.vb`
+
+| Metodo | Descricao | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ObterAuditoriaPorPeriodo()` | Lista auditorias de data X a Y | `GET /api/auditoria/periodo` |
+| `ExportarAuditoriaExcel()` | Exporta auditoria em Excel | `GET /api/auditoria/export` |
+| `SincronizarNotificacoes()` | Sincroniza notificações para cliente | `GET /api/notificacoes/sincronizar` (usando SignalR) |
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `COMPLIANCE_POLITICAS`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "COMPLIANCE_POLITICAS",
+    "nome": "Gestão de Políticas e Compliance",
+    "descricao": "Permite criar, publicar e rastrear aceites de políticas corporativas",
+    "habilitado": true,
+    "isSystemFeature": true
+}
+```
+
+**Feature Keys Adicionais**:
+```json
+[
+    {
+        "featureKey": "COMPLIANCE_VERIFICACAO_AUTOMATICA",
+        "nome": "Verificação Automática de Conformidade",
+        "habilitado": true
+    },
+    {
+        "featureKey": "COMPLIANCE_ELASTICSEARCH",
+        "nome": "Busca Full-Text em Políticas",
+        "habilitado": true
+    },
+    {
+        "featureKey": "COMPLIANCE_NOTIFICACOES",
+        "nome": "Notificações de Policies",
+        "habilitado": true
+    },
+    {
+        "featureKey": "COMPLIANCE_DASHBOARD",
+        "nome": "Dashboard de Compliance",
+        "habilitado": true
+    }
+]
+```
+
+**Nota**: Desabilitar `COMPLIANCE_POLITICAS` desativa o módulo inteiro. Flags granulares permitem rollout gradual de funcionalidades.
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao**:
+
+```json
+{
+    "compliance": {
+        "politicas": {
+            "titulo": "Políticas Corporativas",
+            "titulo_en": "Corporate Policies",
+            "titulo_es": "Políticas Corporativas",
+            "descricao": "Gestão centralizada de políticas corporativas e conformidade",
+            "descricao_en": "Centralized management of corporate policies and compliance",
+            "descricao_es": "Gestión centralizada de políticas corporativas y cumplimiento",
+            "forms": {
+                "titulo": "Título da Política",
+                "titulo_en": "Policy Title",
+                "titulo_es": "Título de la Política",
+                "descricao": "Descrição",
+                "descricao_en": "Description",
+                "categoria": "Categoria",
+                "categoria_en": "Category",
+                "versao": "Versão",
+                "versao_en": "Version",
+                "status": "Status",
+                "status_en": "Status"
+            },
+            "messages": {
+                "politica_criada": "Política criada com sucesso",
+                "politica_criada_en": "Policy created successfully",
+                "politica_publicada": "Política publicada com sucesso",
+                "politica_publicada_en": "Policy published successfully",
+                "aceite_registrado": "Seu aceite foi registrado",
+                "aceite_registrado_en": "Your acceptance has been recorded",
+                "violacao_detectada": "Violação de política detectada",
+                "violacao_detectada_en": "Policy violation detected",
+                "erro_aceitar": "Erro ao aceitar política",
+                "erro_aceitar_en": "Error accepting policy"
+            },
+            "validation": {
+                "titulo_obrigatorio": "Título da política é obrigatório",
+                "titulo_obrigatorio_en": "Policy title is required",
+                "descricao_obrigatoria": "Descrição é obrigatória",
+                "categoria_obrigatoria": "Categoria é obrigatória"
+            },
+            "status": {
+                "elaboracao": "Elaboração",
+                "elaboracao_en": "Draft",
+                "revisao": "Revisão",
+                "revisao_en": "Under Review",
+                "aprovada": "Aprovada",
+                "aprovada_en": "Approved",
+                "publicada": "Publicada",
+                "publicada_en": "Published",
+                "obsoleta": "Obsoleta",
+                "obsoleta_en": "Obsolete"
+            },
+            "categorias": {
+                "seguranca": "Segurança",
+                "seguranca_en": "Security",
+                "financeiro": "Financeiro",
+                "financeiro_en": "Financial",
+                "operacional": "Operacional",
+                "operacional_en": "Operational",
+                "legal": "Legal",
+                "legal_en": "Legal"
+            }
+        },
+        "dashboard": {
+            "titulo": "Dashboard de Compliance",
+            "taxa_conformidade": "Taxa de Conformidade Geral",
+            "usuarios_conformes": "Usuários em Conformidade",
+            "usuarios_nao_conformes": "Usuários Não-Conformes",
+            "violacoes_recentes": "Violações Recentes",
+            "excecoes_proximas": "Exceções Próximas de Expirar"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Criar Política | `POL_CRIAR` | Título, Descrição, Categoria, Versão 1.0 |
+| Atualizar Política | `POL_ATUALIZAR` | Campo antigo, campo novo, versão |
+| Publicar Política | `POL_PUBLICAR` | ID política, data publicação, publicado por |
+| Aceitar Política | `POL_ACEITE` | ID política, usuário, IP, timestamp |
+| Detectar Violação | `POL_VIOLACAO` | ID política, usuário, motivo, tipo regra |
+| Aprovar Exceção | `POL_EXCECAO_CRIAR` | ID política, usuário, motivo, data expiração, aprovado por |
+| Expirar Exceção | `POL_EXCECAO_EXPIRADA` | ID exceção, data expiração, ação recomendada |
+
+**Retencao**: 7 anos (conforme LGPD)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `compliance:politica:create` | Criar política | Compliance Officer, Diretor |
+| `compliance:politica:read` | Visualizar políticas | Todos os usuários |
+| `compliance:politica:update` | Editar política | Compliance Officer, Revisor, Aprovador |
+| `compliance:politica:delete` | Excluir política | Compliance Officer, Diretor |
+| `compliance:politica:publicar` | Publicar política | Aprovador (conforme workflow) |
+| `compliance:aceite:view` | Ver histórico de aceites | Compliance Officer, Gestor |
+| `compliance:excepcao:criar` | Criar exceção de conformidade | Gerente de Compliance, Diretor |
+| `compliance:excepcao:aprovar` | Aprovar exceção | Diretor |
+| `compliance:dashboard:view` | Ver dashboard de compliance | Compliance Officer, Gestor, Diretor |
+| `compliance:auditoria:view` | Ver logs de auditoria | Compliance Officer, Diretor, Auditor Externo |
+| `compliance:exportar` | Exportar relatórios | Compliance Officer, Diretor |
+
+**Nota**: Usuário comum pode aceitar políticas publicadas (sem necessidade de permissão especial).
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/politicas` | Listar todas as políticas | `compliance:politica:read` |
+| GET | `/api/politicas/{id}` | Obter política por ID | `compliance:politica:read` |
+| POST | `/api/politicas` | Criar nova política | `compliance:politica:create` |
+| PUT | `/api/politicas/{id}` | Atualizar política | `compliance:politica:update` |
+| DELETE | `/api/politicas/{id}` | Excluir (soft delete) política | `compliance:politica:delete` |
+
+**Exemplos de Payloads**:
+
+```csharp
+// POST /api/politicas
+{
+    "titulo": "Política de Segurança da Informação",
+    "descricao": "Define diretrizes de segurança...",
+    "categoria": "Seguranca",
+    "conteudo": "...",
+    "dataEfetivacao": "2025-12-28"
+}
+
+// PUT /api/politicas/{id}
+{
+    "titulo": "Política de Segurança da Informação (v2)",
+    "descricao": "Atualizado com novos requisitos...",
+    "categoria": "Seguranca"
+}
+
+// Response (GET /api/politicas/{id})
+{
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "titulo": "Política de Segurança da Informação",
+    "descricao": "...",
+    "categoria": "Seguranca",
+    "versao": "1.0",
+    "status": "Publicada",
+    "dataPublicacao": "2025-12-28T10:00:00Z",
+    "clienteId": "123e4567-e89b-12d3-a456-426614174000",
+    "createdBy": "admin@company.com",
+    "created": "2025-12-28T09:00:00Z"
+}
+```
+
+---
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| POST | `/api/politicas/{id}/publicar` | Publicar política (transição Aprovada → Publicada) | `compliance:politica:publicar` |
+| POST | `/api/politicas/{id}/aceitar` | Usuário aceita política | Usuário logado |
+| GET | `/api/politicas/{id}/aceites` | Listar quem aceitou esta política | `compliance:aceite:view` |
+| GET | `/api/politicas/{id}/historico` | Ver histórico de versões | `compliance:politica:read` |
+| POST | `/api/politicas/{id}/transicao-status` | Transicionar status (Elaboração → Revisão → Aprovada) | Conforme workflow |
+| GET | `/api/compliance/dashboard` | Obter dashboard de compliance | `compliance:dashboard:view` |
+| GET | `/api/compliance/matriz` | Obter matriz de compliance (politicas x regulamentações) | `compliance:dashboard:view` |
+| POST | `/api/conformidade/excecoes` | Criar exceção de conformidade | `compliance:excepcao:criar` |
+| GET | `/api/conformidade/excecoes` | Listar exceções | `compliance:excepcao:view` |
+| POST | `/api/politicas/buscar` | Busca full-text em políticas | `compliance:politica:read` |
+| GET | `/api/politicas/export` | Exportar políticas em PDF/Excel | `compliance:exportar` |
+| GET | `/api/auditoria/operacao/POL_*` | Listar eventos de auditoria de políticas | `compliance:auditoria:view` |
+
+**Exemplos de Payloads**:
+
+```csharp
+// POST /api/politicas/{id}/publicar
+{
+    "comentario": "Aprovado após revisão de 2 semanas"
+}
+// Response: 200 OK + PolicyId
+
+// POST /api/politicas/{id}/aceitar
+{}
+// Response: 200 OK { "message": "Política aceita com sucesso" }
+
+// GET /api/compliance/dashboard
+// Response:
+{
+    "taxaConformidadeGeral": 87.5,
+    "totalPoliticas": 12,
+    "totalUsuarios": 250,
+    "usuariosEmConformidade": 218,
+    "usuariosNaoConformes": 32,
+    "conformidadePorPolitica": [
+        {
+            "politicaId": "xxx",
+            "politicaTitulo": "Política de Segurança",
+            "taxaConformidade": 92.0,
+            "usuariosEmConformidade": 230
+        }
+    ],
+    "violacoesRecentes": [
+        {
+            "usuarioId": "user123",
+            "politicaTitulo": "Política de Uso de Notebooks",
+            "motivo": "Não aceitou",
+            "dataDeteccao": "2025-12-28T10:30:00Z"
+        }
+    ]
+}
+
+// POST /api/politicas/buscar
+{
+    "termo": "segurança",
+    "skip": 0,
+    "take": 10
+}
+// Response:
+{
+    "total": 15,
+    "resultados": [
+        {
+            "politicaId": "xxx",
+            "titulo": "Política de Segurança da Informação",
+            "descricao": "...",
+            "categoria": "Seguranca",
+            "relevancia": 10.5
+        }
+    ],
+    "facets": [
+        { "nome": "Seguranca", "quantidade": 12 },
+        { "nome": "Legal", "quantidade": 3 }
+    ]
+}
+
+// POST /api/conformidade/excecoes
+{
+    "politicaId": "550e8400-e29b-41d4-a716-446655440000",
+    "usuarioId": "user123",
+    "motivoExcecao": "Notebook em repair, aguardando substituição",
+    "diasValidade": 30
+}
+// Response: 201 Created { "excecaoId": "xxx" }
+```
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Criação e Publicação de Política
+
+```
+Compliance Officer acessa /compliance/politicas/novo
+    |
+    v
+Preenche: Título, Descrição, Categoria, Conteúdo
+    |
+    v
+Clica "Salvar"
+    |
+    v
+Sistema cria Política (status=Elaboracao, versao=1.0)
+    |
+    v
+Compliance Officer edita mais vezes (cada edição incrementa versão: 1.0 → 1.1 → 1.2)
+    |
+    v
+Compliance Officer clica "Enviar para Revisão"
+    |
+    v
+Sistema transiciona status: Elaboracao → Revisao
+    |
+    v
+Revisor Técnico recebe notificação (email + in-app + SignalR)
+    |
+    v
+Revisor Técnico acessa política, analisa, deixa comentário "OK"
+    |
+    v
+Sistema envia para Aprovação (status=Revisao → status=Aprovada)
+    |
+    v
+Diretor recebe notificação
+    |
+    v
+Diretor aprova → clica "Publicar"
+    |
+    v
+Sistema: status=Publicada, DataPublicacao=now, versao congelada em 1.2
+    |
+    v
+Notificação automática enviada para todos os usuários do cliente
+    |
+    v
+Cada usuário recebe email + notificação in-app: "Você deve aceitar Política XYZ antes de continuar"
+    |
+    v
+Usuário aceita → AceitePolitica criada com timestamp, IP, UserAgent
+    |
+    v
+Dashboard mostra taxa de aceites em tempo real
+```
+
+### 6.2 Fluxo de Aceitação Obrigatória na Funcionalidade
+
+```
+Usuário tenta acessar módulo Ativos
+    |
+    v
+Frontend faz GET /api/politicas/requer-aceite (lista políticas publicadas não aceitas)
+    |
+    v
+Se houver política não aceita → bloqueia acesso
+    |
+    v
+Mostra modal "Você deve aceitar a Política de Uso de Ativos"
+    |
+    v
+Usuário marca checkbox "Li e concordo"
+    |
+    v
+Clica "Aceitar"
+    |
+    v
+Frontend faz POST /api/politicas/{id}/aceitar
+    |
+    v
+Backend registra AceitePolitica + evento de auditoria
+    |
+    v
+Frontend libera acesso ao módulo Ativos
+```
+
+### 6.3 Fluxo de Verificação Automática de Conformidade
+
+```
+Job Hangfire executado diariamente às 02:00 UTC
+    |
+    v
+Sistema itera todas as políticas publicadas
+    |
+    v
+Para cada usuário: verifica se aceitou política → registra VerificacaoConformidade
+    |
+    v
+Sistema itera todas as regras de conformidade ativas
+    |
+    v
+Para cada regra: executa query SQL configurada
+    |
+    v
+Se query retornar violadores → publica ViolacaoPoliticaDetectadaEvent
+    |
+    v
+Evento dispara handlers:
+    ├─ EmailHandler → envia email ao usuário e gestor
+    ├─ NotificacaoHandler → envia notificação in-app via SignalR
+    └─ AuditoriaHandler → registra em tabela Auditoria
+    |
+    v
+Dashboard atualiza com violações detectadas
+```
+
+### 6.4 Fluxo de Exceção de Conformidade
+
+```
+Gerente detecta usuário em não-conformidade (dashboard)
+    |
+    v
+Clica "Criar Exceção" na linha do usuário
+    |
+    v
+Preenche: Motivo, Dias de Validade (ex: 30 dias)
+    |
+    v
+Envia para aprovação do Diretor (POST /api/conformidade/excecoes)
+    |
+    v
+Diretor recebe notificação
+    |
+    v
+Diretor aprova → ExcecaoConformidade criada com DataExpiracao=today+30dias
+    |
+    v
+Usuário recebe notificação: "Sua exceção de conformidade foi aprovada até DD/MM/YYYY"
+    |
+    v
+Job diário verifica exceções vencendo (DataExpiracao < today+7dias)
+    |
+    v
+Job dispara NotificarExcecaoProximaExpirarAsync
+    |
+    v
+Usuário recebe email: "Sua exceção expira em 3 dias"
+    |
+    v
+Na data de expiração: exceção marcada como FlExcluido=true
+    |
+    v
+Próxima verificação de conformidade: usuário volta a estar em não-conformidade
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| **JWT Bearer Token** | Todos os endpoints autenticados exigem JWT válido |
+| **RBAC (Role-Based Access Control)** | Cada endpoint valida permissão específica do usuário |
+| **Row-Level Security (ClienteId)** | Query Filter automático garante isolamento multi-tenant |
+| **Soft Delete com FlExcluido** | Políticas excluídas nunca são removidas do banco, apenas marcadas |
+| **Auditoria Completa** | Todas as operações registradas em tabela imutável (append-only) |
+| **Hash de Versão** | Histórico de versões usa hash para detectar alteração não autorizada |
+| **IP Whitelisting (opcional)** | Pode configurar IPs permitidos para certos endpoints |
+| **Rate Limiting** | API Gateway limita 100 requests/min por usuário |
+| **HTTPS TLS 1.3** | Todos os dados em transporte criptografados |
+| **Validação de Entrada** | FluentValidation em todos os Commands |
+| **SQL Injection Prevention** | EF Core parametrizado (NEVER string concatenation) |
+| **XSS Prevention** | Angular sanitiza automaticamente, backend não retorna HTML raw |
+
+---
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [ ] SQL Injection: Tentar injetar SQL em campo de busca (ex: `"; DROP TABLE Politicas; --`)
+- [ ] XSS: Tentar injetar script em título de política (ex: `<img src=x onerror=alert(1)>`)
+- [ ] CSRF Protection: POST sem CSRF token deve ser rejeitado
+- [ ] Validacao de permissoes: Usuário sem `compliance:politica:create` não consegue criar política
+- [ ] Multi-tenancy: Usuário do Cliente A não consegue ver políticas do Cliente B
+- [ ] Soft Delete: Política excluída não aparece em listagens, mas existe auditoria
+- [ ] Timestamp Tampering: Usuário não consegue alterar DataAceite retroativamente
+- [ ] Concurrent Modification: Dois usuários editando mesma política simultaneamente → último vence, histórico completo
+- [ ] Escalacao de Privilégio: Usuário comum não consegue publicar política (só aprovador)
+- [ ] Session Hijacking: JWT com IP/UserAgent diferente deve ser rejeitado (optional hardening)
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao |
+|-----|------|---------|
+| Taxa de Conformidade Geral | > 90% | (Usuários em conformidade / Total) * 100 |
+| Taxa de Aceite de Novas Políticas | > 95% em 30 dias | (Aceites / Usuários-alvo) * 100 |
+| Tempo Médio de Publicação | < 5 dias | (Data publicação - Data criação) |
+| Violações Detectadas / Mês | Rastrear | COUNT(*) WHERE status=não-conforme |
+| Exceções Aprovadas / Mês | < 5% | (Exceções aprovadas / Usuários) * 100 |
+| Taxa de Leitura de Dashboard | > 80% | (Cliques únicos em /compliance/dashboard) / (Usuários ativos) |
+| Performance de Busca | < 200ms P95 | ElasticSearch response time |
+| Uptime de API | > 99.9% | (Requests 2xx+3xx) / Total requests |
+
+---
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| Taxa de Conformidade Crítica | < 70% | Notificar Diretor + Compliance Officer |
+| Política não tem Revisor Designado | Status=Revisao por > 5 dias | Email ao Responsável de Compliance |
+| Exceção Vence Amanhã | DataExpiracao = today+1 | Email ao usuário + gestor |
+| Violação Crítica Detectada | Regra com severidade=Alta | Notificação urgente (SMS + email + in-app) |
+| Falha no Job de Verificação | Job falha 3x consecutivas | Alert em Application Insights + email ao DevOps |
+| ElasticSearch Offline | Health check falha | Fallback para busca SQL + alerta DevOps |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-079](./MD-RF079-Gestao-Politicas-Compliance.md)
+2. **Casos de Uso**: Criar [UC-079](./UC-RF079-Gestao-Politicas-Compliance.md)
+3. **Fluxos e Wireframes**: Criar [WF-079](./WF-RF079-Gestao-Politicas-Compliance.md)
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml)
+5. **Implementacao Backend**: Commands/Queries/Handlers em Clean Architecture
+6. **Implementacao Frontend**: Telas Angular com Fuse Template
+7. **Testes**: Executar cenarios documentados (TC-RF079-*.md)
+8. **Integração com RF095, RF096, RF098**: Garantir auditoria completa
+9. **Deploy**: HOM → PRD com validação de conformidade
+10. **Documentação de Usuário**: Guias passo-a-passo para compliance officers
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial com 10 regras de negócio, 15 endpoints, fluxos e segurança | Claude Code |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code (IA do IControlIT)
+**Revisao**: Pendente de Aprovação Técnica

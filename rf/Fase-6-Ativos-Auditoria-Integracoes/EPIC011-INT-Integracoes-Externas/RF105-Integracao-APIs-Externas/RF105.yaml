@@ -1,0 +1,570 @@
+# RF105.yaml - Integração com APIs Externas e WebServices (Governança 2.0)
+# Versão: 2.0
+# Data: 2025-12-31
+# Contrato Moderno (SEM referências ao legado)
+
+rf_id: RF105
+rf_code: RF105
+title: "Integração com APIs Externas e WebServices"
+module: "Integrações Externas"
+epic: EPIC011-INT-Integracoes-Externas
+fase: Fase-6-Ativos-Auditoria-Integracoes
+version: 2.0
+status: EM_DESENVOLVIMENTO
+
+# Objetivo e Escopo
+objetivo: |
+  Criar plataforma unificada de integração com APIs externas e WebServices de terceiros,
+  permitindo registro, autenticação, monitoramento, cache, retry automático e governança
+  centralizada de todas as integrações do IControlIT.
+
+escopo:
+  incluido:
+    - Registro de APIs externas (REST/SOAP/GraphQL)
+    - Gestão de credenciais criptografadas (OAuth2, API Key, Basic Auth, JWT)
+    - Validação HMAC para integridade de payloads
+    - Rate limiting e controle de quotas
+    - Circuit breaker automático para falhas recorrentes
+    - Cache inteligente de respostas
+    - Retry com backoff exponencial
+    - Monitoramento em tempo real (latência, disponibilidade, taxa de erro)
+    - Auditoria completa de requests/responses
+    - Webhooks para notificações de eventos
+    - Simulação de APIs (sandbox/mock)
+    - Versionamento de contratos de API
+  excluido:
+    - Desenvolvimento de APIs próprias (escopo de outros RFs)
+    - Integração com sistemas internos legados (escopo RF-Migracao-Dados)
+    - Transformação de dados complexa (usar ETL dedicado)
+
+# Conceitos de Domínio
+conceitos:
+  api_externa:
+    descricao: "Serviço web de terceiros registrado no sistema"
+    atributos:
+      - nome
+      - tipo (REST/SOAP/GraphQL)
+      - url_base
+      - versao_contrato
+      - autenticacao_tipo
+      - credenciais_criptografadas
+      - quota_requests_dia
+      - timeout_segundos
+      - retry_maximo
+      - cache_ttl_segundos
+
+  endpoint:
+    descricao: "Operação específica de uma API externa"
+    atributos:
+      - metodo_http (GET/POST/PUT/DELETE)
+      - path
+      - descricao
+      - request_schema_json
+      - response_schema_json
+      - headers_obrigatorios
+      - rate_limit_por_minuto
+
+  credencial:
+    descricao: "Credenciais de autenticação criptografadas"
+    tipos:
+      - oauth2 (client_id, client_secret, token_endpoint)
+      - api_key (header_name, key_encrypted)
+      - basic_auth (username_encrypted, password_encrypted)
+      - jwt (token_encrypted, refresh_token_encrypted)
+
+  circuit_breaker:
+    descricao: "Proteção contra falhas recorrentes"
+    estados:
+      - CLOSED (operação normal)
+      - OPEN (bloqueio temporário após threshold falhas)
+      - HALF_OPEN (teste gradual de recuperação)
+
+  auditoria_request:
+    descricao: "Log completo de request/response"
+    atributos:
+      - timestamp
+      - usuario_id
+      - api_externa_id
+      - endpoint_id
+      - request_headers
+      - request_body_hash
+      - response_status_code
+      - response_body_hash
+      - latencia_ms
+      - erro_mensagem
+
+# Funcionalidades (agrupadas por UC)
+funcionalidades:
+  uc00_listar_apis:
+    descricao: "Listagem de APIs externas registradas"
+    filtros:
+      - nome
+      - tipo (REST/SOAP/GraphQL)
+      - status (ativa/inativa)
+      - autenticacao_tipo
+    ordenacao:
+      - nome ASC/DESC
+      - data_criacao ASC/DESC
+      - total_requests DESC (últimos 30 dias)
+    paginacao:
+      tamanho_padrao: 20
+      maximo: 100
+
+  uc01_criar_api:
+    descricao: "Registro de nova API externa"
+    validacoes_obrigatorias:
+      - nome único no conglomerado
+      - url_base válida (https obrigatório em PRD)
+      - tipo em [REST, SOAP, GraphQL]
+      - autenticacao_tipo definido
+      - credenciais criptografadas com AES-256
+      - quota_requests_dia > 0
+      - timeout_segundos entre 5 e 300
+    acoes_automaticas:
+      - teste de conectividade (health check)
+      - validação de credenciais
+      - criação de registro em AuditLog
+      - inicialização de métricas (latência, disponibilidade)
+
+  uc02_visualizar_api:
+    descricao: "Detalhamento de API externa"
+    informacoes_exibidas:
+      - dados cadastrais
+      - credenciais (mascaradas, nunca em plain text)
+      - endpoints cadastrados
+      - métricas últimos 7 dias (requests, latência média, taxa erro)
+      - histórico de falhas (circuit breaker)
+      - cache stats (hit rate, tamanho)
+      - últimas 50 execuções (AuditLog)
+
+  uc03_editar_api:
+    descricao: "Atualização de API externa"
+    campos_editaveis:
+      - nome
+      - url_base
+      - versao_contrato
+      - credenciais (re-criptografia obrigatória)
+      - quota_requests_dia
+      - timeout_segundos
+      - retry_maximo
+      - cache_ttl_segundos
+    campos_nao_editaveis:
+      - id
+      - tipo (REST/SOAP/GraphQL) - imutável
+      - id_conglomerado
+    validacoes:
+      - se mudar credenciais, executar teste de conectividade
+      - se mudar url_base, invalidar cache
+      - não permitir edição se circuit breaker = OPEN
+
+  uc04_inativar_api:
+    descricao: "Inativação lógica de API externa"
+    comportamento:
+      - soft delete (fl_excluido = TRUE)
+      - manter auditoria histórica
+      - bloquear novos requests
+      - manter cache por 30 dias (compliance)
+      - notificar sistemas dependentes (webhook)
+    restricoes:
+      - não permitir se houver jobs agendados ativos
+      - não permitir se houver webhooks ativos
+
+# Regras de Negócio (12 regras)
+regras_negocio:
+  - id: RN-RF105-001
+    titulo: "Criptografia de Credenciais Obrigatória"
+    descricao: |
+      Todas as credenciais (API keys, tokens, passwords) DEVEM ser armazenadas criptografadas
+      com AES-256-GCM. A chave de criptografia DEVE ser armazenada em Azure Key Vault (PRD)
+      ou User Secrets (DEV). Credenciais NUNCA podem ser exibidas em plain text na UI.
+    justificativa: "Compliance com LGPD e ISO 27001"
+    implementacao: "CredentialEncryptionService + Azure Key Vault integration"
+    exemplo: "API Key 'abc123' armazenada como 'encrypted:AES256:jkl890xyz'"
+
+  - id: RN-RF105-002
+    titulo: "Validação HMAC para Integridade de Payload"
+    descricao: |
+      Requests críticos (POST/PUT/DELETE) DEVEM incluir header HMAC-SHA256 calculado
+      sobre o body concatenado com timestamp. O servidor DEVE validar HMAC antes de
+      processar o request. Timestamp NÃO pode estar defasado mais que 5 minutos.
+    justificativa: "Proteção contra replay attacks e man-in-the-middle"
+    implementacao: "HmacValidationMiddleware + timestamp drift validation"
+    exemplo: "X-Signature: HMAC-SHA256(body + timestamp, secret_key)"
+
+  - id: RN-RF105-003
+    titulo: "Rate Limiting por API e Usuário"
+    descricao: |
+      Cada API externa DEVE ter rate limit configurável (requests/minuto e requests/dia).
+      Sistema DEVE bloquear requests excedentes com HTTP 429 (Too Many Requests).
+      Rate limit DEVE ser contabilizado por combinação (API + Usuário).
+    justificativa: "Proteção contra abuso e controle de custos"
+    implementacao: "RateLimitingMiddleware + Redis para contadores distribuídos"
+    exemplo: "API Correios: 100 req/min, 5000 req/dia por usuário"
+
+  - id: RN-RF105-004
+    titulo: "Circuit Breaker Automático"
+    descricao: |
+      Se uma API falhar 5 vezes consecutivas ou 50% em 1 minuto, Circuit Breaker
+      DEVE abrir (OPEN) e bloquear novos requests por 60 segundos. Após 60s,
+      entrar em HALF_OPEN e permitir 1 request de teste. Se sucesso, voltar CLOSED.
+    justificativa: "Evitar cascata de falhas e sobrecarga de APIs instáveis"
+    implementacao: "Polly CircuitBreakerPolicy + métricas em MemoryCache"
+    exemplo: "API ViaCEP com 6 falhas → OPEN por 60s → teste HALF_OPEN → CLOSED"
+
+  - id: RN-RF105-005
+    titulo: "Retry com Backoff Exponencial"
+    descricao: |
+      Requests com falha temporária (HTTP 5xx, timeout, network error) DEVEM ser
+      re-tentados automaticamente até retry_maximo (padrão: 3 tentativas).
+      Intervalo entre retries: 2^tentativa segundos (1s, 2s, 4s, 8s...).
+    justificativa: "Resiliência contra falhas temporárias sem sobrecarregar API"
+    implementacao: "Polly WaitAndRetryAsync com exponential backoff"
+    exemplo: "Tentativa 1 falha → aguarda 2s → Tentativa 2 falha → aguarda 4s → Tentativa 3"
+
+  - id: RN-RF105-006
+    titulo: "Cache Inteligente de Respostas"
+    descricao: |
+      Respostas de endpoints GET DEVEM ser cacheadas por cache_ttl_segundos
+      (padrão: 300s). Cache key = HASH(url + query_params + headers_relevantes).
+      Cache DEVE ser invalidado se API for editada ou inativada.
+    justificativa: "Redução de latência e economia de quota de APIs pagas"
+    implementacao: "IMemoryCache + Redis (distribuído) + cache invalidation events"
+    exemplo: "GET /api/correios/cep/01310100 cacheado por 5 minutos"
+
+  - id: RN-RF105-007
+    titulo: "Auditoria Completa de Requests"
+    descricao: |
+      TODO request a API externa DEVE gerar registro em AuditLog com:
+      timestamp, usuário, API, endpoint, request_hash, response_status, latência.
+      Request/Response body DEVE ser armazenado hasheado (SHA-256) para compliance.
+      Retenção: 90 dias em banco quente, 7 anos em blob storage (LGPD).
+    justificativa: "Rastreabilidade, compliance LGPD e troubleshooting"
+    implementacao: "AuditInterceptor + BlobStorageService para archiving"
+    exemplo: "User123 → POST /api/sms/send → 200 OK → 1.2s → hash:abc123"
+
+  - id: RN-RF105-008
+    titulo: "Multi-Tenancy Estrito"
+    descricao: |
+      Credenciais e configurações de API DEVEM ser isoladas por Id_Conglomerado.
+      Um conglomerado NUNCA pode acessar credenciais de outro, mesmo que seja
+      a mesma API externa. Validação obrigatória em TODOS os queries.
+    justificativa: "Segurança e isolamento de dados entre clientes"
+    implementacao: "Global query filter no EF Core + TenantContext validation"
+    exemplo: "Conglomerado A vê apenas suas credenciais da API Correios"
+
+  - id: RN-RF105-009
+    titulo: "Timeout Configurável com Padrão Seguro"
+    descricao: |
+      Cada API DEVE ter timeout_segundos configurável entre 5 e 300 segundos.
+      Padrão: 30 segundos. Requests que excederem timeout DEVEM ser cancelados
+      com CancellationToken e retornar HTTP 504 (Gateway Timeout).
+    justificativa: "Evitar requests infinitos e travamento de threads"
+    implementacao: "HttpClient.Timeout + CancellationTokenSource"
+    exemplo: "API lenta com timeout 10s → após 10s cancela e retorna 504"
+
+  - id: RN-RF105-010
+    titulo: "Webhooks para Eventos de Integração"
+    descricao: |
+      Sistema DEVE permitir registro de webhooks para eventos:
+      API_CRIADA, API_INATIVADA, CIRCUIT_BREAKER_ABERTO, QUOTA_90_PORCENTO.
+      Webhooks DEVEM ser chamados de forma assíncrona (Hangfire) com retry.
+    justificativa: "Notificação proativa de eventos críticos"
+    implementacao: "WebhookService + Hangfire background jobs + retry policy"
+    exemplo: "Circuit breaker abre → POST https://monitor.com/webhook com payload"
+
+  - id: RN-RF105-011
+    titulo: "Simulação de APIs (Sandbox/Mock)"
+    descricao: |
+      Sistema DEVE permitir criar versão MOCK de API externa com respostas
+      pré-definidas (JSON). Útil para testes, desenvolvimento e ambientes sem
+      conectividade. MOCK deve respeitar schema de response da API real.
+    justificativa: "Facilitar testes e desenvolvimento sem dependência externa"
+    implementacao: "MockApiService + JSON response templates + schema validation"
+    exemplo: "API ViaCEP MOCK retorna sempre CEP 01310-100 com dados fixos"
+
+  - id: RN-RF105-012
+    titulo: "Versionamento de Contratos de API"
+    descricao: |
+      Cada API externa DEVE ter versão de contrato registrada (ex: v1.0, v2.3).
+      Se API externa mudar contrato (breaking change), criar NOVO registro
+      com nova versão. Manter versões antigas ativas durante período de transição.
+    justificativa: "Evitar quebra inesperada de integrações"
+    implementacao: "Versionamento em campo versao_contrato + deprecation warnings"
+    exemplo: "API Correios v1.0 → v2.0 (breaking) → ambas ativas por 90 dias"
+
+# Estados e Transições
+estados:
+  api_externa:
+    - RASCUNHO (credenciais incompletas)
+    - ATIVA (operacional)
+    - INATIVA (soft delete)
+    - FALHA (circuit breaker permanentemente aberto)
+
+  circuit_breaker:
+    - CLOSED (normal)
+    - OPEN (bloqueado)
+    - HALF_OPEN (teste de recuperação)
+
+  request:
+    - PENDENTE (na fila)
+    - PROCESSANDO
+    - SUCESSO (2xx)
+    - FALHA_TEMPORARIA (5xx, retry)
+    - FALHA_PERMANENTE (4xx)
+    - TIMEOUT
+
+transicoes:
+  api_externa:
+    - RASCUNHO → ATIVA (quando credenciais completas + teste conectividade)
+    - ATIVA → INATIVA (soft delete manual)
+    - ATIVA → FALHA (threshold falhas excedido)
+    - FALHA → ATIVA (recuperação manual após correção)
+
+  circuit_breaker:
+    - CLOSED → OPEN (5 falhas consecutivas OU 50% falhas em 1min)
+    - OPEN → HALF_OPEN (após 60 segundos)
+    - HALF_OPEN → CLOSED (1 sucesso)
+    - HALF_OPEN → OPEN (1 falha)
+
+# Integrações Obrigatórias
+integracoes:
+  i18n:
+    chaves_obrigatorias:
+      - apis.title
+      - apis.list.title
+      - apis.list.empty
+      - apis.create.title
+      - apis.create.success
+      - apis.create.error.connection_failed
+      - apis.edit.title
+      - apis.edit.success
+      - apis.delete.confirm
+      - apis.delete.success
+      - apis.fields.nome
+      - apis.fields.tipo
+      - apis.fields.url_base
+      - apis.fields.autenticacao_tipo
+      - apis.fields.quota_requests_dia
+      - apis.fields.timeout_segundos
+      - apis.validations.nome_required
+      - apis.validations.url_invalid
+      - apis.validations.credenciais_required
+      - apis.errors.rate_limit_exceeded
+      - apis.errors.circuit_breaker_open
+      - apis.errors.timeout
+      - apis.errors.hmac_invalid
+    idiomas_suportados:
+      - pt-BR (principal)
+      - en-US
+      - es-ES
+
+  auditoria:
+    operacoes_auditadas:
+      - CREATE_API (criação de API externa)
+      - UPDATE_API (edição de configurações)
+      - DELETE_API (inativação)
+      - VIEW_API_CREDENTIALS (visualização de credenciais mascaradas)
+      - EXECUTE_REQUEST (execução de request a API)
+      - CIRCUIT_BREAKER_OPEN (abertura de circuit breaker)
+      - RATE_LIMIT_EXCEEDED (bloqueio por rate limit)
+    retencao: "7 anos (LGPD) em blob storage archiving"
+
+  rbac:
+    permissoes:
+      - INT.APIS.VIEW (visualizar APIs cadastradas)
+      - INT.APIS.CREATE (criar nova API)
+      - INT.APIS.EDIT (editar configurações)
+      - INT.APIS.DELETE (inativar API)
+      - INT.APIS.VIEW_CREDENTIALS (ver credenciais mascaradas)
+      - INT.APIS.EXECUTE (executar requests)
+      - INT.APIS.MANAGE_WEBHOOKS (gerenciar webhooks)
+      - INT.APIS.VIEW_METRICS (visualizar métricas)
+    matriz_perfis:
+      super_admin: [todas]
+      admin_ti: [VIEW, CREATE, EDIT, DELETE, VIEW_CREDENTIALS, EXECUTE, MANAGE_WEBHOOKS, VIEW_METRICS]
+      desenvolvedor: [VIEW, EXECUTE, VIEW_METRICS]
+      usuario_negocio: [VIEW, EXECUTE]
+
+  central_funcionalidades:
+    registro_obrigatorio: true
+    modulo: "Integrações"
+    categoria: "APIs Externas"
+    peso_menu: 110
+    icone: "heroicons_outline:link"
+
+# Endpoints da API (Backend)
+endpoints:
+  listar:
+    metodo: GET
+    path: /api/integracoes/apis-externas
+    query_params:
+      - nome (string, opcional)
+      - tipo (string, opcional, enum: REST|SOAP|GraphQL)
+      - status (string, opcional, enum: ATIVA|INATIVA)
+      - page (int, padrão: 1)
+      - pageSize (int, padrão: 20, max: 100)
+    response: "ApiExternaListDto[] + PaginationMetadata"
+    permissao: INT.APIS.VIEW
+
+  criar:
+    metodo: POST
+    path: /api/integracoes/apis-externas
+    request_body: CreateApiExternaCommand
+    validacoes:
+      - nome único no conglomerado
+      - url_base formato válido
+      - credenciais criptografadas
+      - teste de conectividade
+    response: "Guid (id da API criada)"
+    permissao: INT.APIS.CREATE
+
+  visualizar:
+    metodo: GET
+    path: /api/integracoes/apis-externas/{id}
+    response: ApiExternaDetailDto
+    includes:
+      - endpoints
+      - metricas_7_dias
+      - ultimas_execucoes (50)
+    permissao: INT.APIS.VIEW
+
+  editar:
+    metodo: PUT
+    path: /api/integracoes/apis-externas/{id}
+    request_body: UpdateApiExternaCommand
+    validacoes:
+      - id existe e pertence ao conglomerado
+      - se mudar credenciais, re-testar conectividade
+      - não permitir se circuit_breaker = OPEN
+    response: "void (204 No Content)"
+    permissao: INT.APIS.EDIT
+
+  inativar:
+    metodo: DELETE
+    path: /api/integracoes/apis-externas/{id}
+    validacoes:
+      - não permitir se houver jobs agendados ativos
+      - não permitir se houver webhooks ativos
+    comportamento: "Soft delete (fl_excluido = TRUE)"
+    response: "void (204 No Content)"
+    permissao: INT.APIS.DELETE
+
+  executar_request:
+    metodo: POST
+    path: /api/integracoes/apis-externas/{id}/execute
+    request_body:
+      endpoint_id: Guid
+      metodo_http: string (GET/POST/PUT/DELETE)
+      path: string
+      headers: Dictionary<string, string>
+      body: string (JSON)
+    validacoes:
+      - API ativa
+      - Circuit breaker não OPEN
+      - Rate limit não excedido
+      - HMAC válido (se POST/PUT/DELETE)
+    response: ApiExecutionResultDto
+    permissao: INT.APIS.EXECUTE
+
+  metricas:
+    metodo: GET
+    path: /api/integracoes/apis-externas/{id}/metrics
+    query_params:
+      - periodo (enum: ULTIMAS_24H | ULTIMOS_7_DIAS | ULTIMOS_30_DIAS)
+    response:
+      total_requests: int
+      taxa_sucesso: decimal (0-100%)
+      latencia_media_ms: decimal
+      latencia_p95_ms: decimal
+      total_erros: int
+      circuit_breaker_estado: string
+      cache_hit_rate: decimal (0-100%)
+    permissao: INT.APIS.VIEW_METRICS
+
+# Dependências
+dependencias:
+  frontend:
+    - Central de Funcionalidades (registro do módulo)
+    - Sistema de Tradução (i18n)
+    - Componentes Fuse (FuseCard, tables, forms)
+
+  backend:
+    - ApplicationDbContext (EF Core)
+    - IMemoryCache / Redis (cache distribuído)
+    - Polly (circuit breaker + retry)
+    - Hangfire (webhooks assíncronos)
+    - Azure Key Vault (armazenamento de chaves de criptografia)
+    - HttpClientFactory (requests a APIs externas)
+
+  outros_rfs:
+    - RF-Central-Funcionalidades (registro obrigatório)
+    - RF-Auditoria (log de operações)
+    - RF-Permissoes-RBAC (controle de acesso)
+    - RF-i18n (traduções)
+
+# KPIs e Métricas
+kpis:
+  - nome: "Total de APIs Externas Ativas"
+    calculo: "COUNT(apis WHERE status = ATIVA)"
+    meta: "> 10 APIs cadastradas (maturidade de integração)"
+
+  - nome: "Taxa de Sucesso Geral"
+    calculo: "(requests com 2xx / total requests) * 100"
+    meta: "> 95% (SLA de integração)"
+
+  - nome: "Latência Média de Integrações"
+    calculo: "AVG(latencia_ms) dos últimos 7 dias"
+    meta: "< 500ms (experiência de usuário)"
+
+  - nome: "Circuit Breaker - Abertura por Mês"
+    calculo: "COUNT(eventos WHERE tipo = CIRCUIT_BREAKER_OPEN AND mes atual)"
+    meta: "< 5 eventos/mês (estabilidade)"
+
+  - nome: "Cache Hit Rate"
+    calculo: "(cache hits / total requests GET) * 100"
+    meta: "> 70% (eficiência de cache)"
+
+  - nome: "Economia de Requests por Cache"
+    calculo: "cache_hits * custo_medio_request_api"
+    meta: "> R$ 1.000/mês economizados"
+
+# Alertas e Notificações
+alertas:
+  - tipo: CIRCUIT_BREAKER_ABERTO
+    condicao: "Circuit breaker muda para OPEN"
+    destinatarios: [admin_ti, desenvolvedor_responsavel]
+    canal: [email, webhook]
+    urgencia: ALTA
+
+  - tipo: QUOTA_90_PORCENTO
+    condicao: "API atinge 90% da quota diária"
+    destinatarios: [admin_ti]
+    canal: [email]
+    urgencia: MEDIA
+
+  - tipo: TAXA_ERRO_ALTA
+    condicao: "Taxa de erro > 20% em 1 hora"
+    destinatarios: [admin_ti, devops]
+    canal: [email, webhook, sms]
+    urgencia: ALTA
+
+  - tipo: LATENCIA_ALTA
+    condicao: "Latência média > 2 segundos em 10 minutos"
+    destinatarios: [devops]
+    canal: [webhook]
+    urgencia: MEDIA
+
+  - tipo: CREDENCIAIS_EXPIRADAS
+    condicao: "Credenciais OAuth2 expirando em 7 dias"
+    destinatarios: [admin_ti]
+    canal: [email]
+    urgencia: MEDIA
+
+# Metadados
+metadata:
+  criado_em: "2025-12-31"
+  criado_por: "IControlIT Architect Agent"
+  versao_governanca: "2.0"
+  separacao_rf_rl: true
+  contrato_tipo: "MODERNO"
+  legado_separado: true

@@ -1,0 +1,1714 @@
+# RF085: Importação de Dados
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF084 (Upload/Importação), RF086 (Carga de Faturas/Consumo) | **EPIC**: EPIC003-CAD-Cadastros-Base
+**Fase**: Fase 2 - Cadastros e Serviços Transversais
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+O módulo **Importação de Dados** é responsável pelo processamento, mapeamento, transformação e validação de dados provenientes de arquivos carregados (CSV, Excel, XML, JSON, EDI). Este módulo resolve o problema de integração de dados heterogêneos, permitindo:
+
+- Mapeamento dinâmico entre campos de origem e destino
+- Transformação de dados com conversão de tipos e formatação
+- Validação contra regras de negócio complexas
+- Detecção e tratamento inteligente de duplicatas
+- Importação incremental (apenas novos) vs full (reprocessa tudo)
+- Agendamento recorrente de importações automáticas
+- Histórico completo com rollback por importação
+
+Este é um serviço crítico de ETL (Extract, Transform, Load) que suporta migração de dados legados, integrações com sistemas terceiros (ERPs, operadoras telecom, fornecedores) e cargas diárias automatizadas de informações essenciais.
+
+### 1.2 Importância Estratégica
+
+O módulo de importação de dados é crítico para:
+
+- **Migração de Sistemas**: Transição ordenada de dados de VB.NET legado → .NET 10 modernizado sem perda de informação
+- **Integrações B2B**: Recebimento de dados de ERPs (SAP, Oracle), operadoras de telecom (Vivo, Claro, TIM), fornecedores (faturas EDI)
+- **Automatização de Processos**: Agendamento de importações recorrentes (diárias, semanais) reduzindo trabalho manual
+- **Conformidade Legal**: Auditoria completa de cada importação (quem, quando, quantos registros, erros) com retenção 7 anos (LGPD)
+- **Qualidade de Dados**: Validação rigorosa garante apenas dados corretos são inseridos; erros são documentados para correção
+- **Recuperação de Falhas**: Histórico de importações permite identificar problema e re-importar ou reverter
+
+### 1.3 Conceitos Fundamentais
+
+**Mapeamento de Campos (Field Mapping)**: Configuração que define como colunas do arquivo de origem correspondem aos campos de destino no banco de dados.
+- Mapeamento 1:1 (coluna origem → campo destino)
+- Mapeamento com transformação (origin1 + origin2 → destino, ex: concatenar nome/sobrenome)
+- Mapeamento condicional (IF origem.tipo = 'X' THEN destino.tipo = 'Y')
+- Mapeamento hierárquico para dados aninhados (JSON/XML)
+
+**Transformação de Dados (Data Transformation)**: Processo de converter dados de um formato/tipo para outro conforme regras definidas.
+- Conversão de tipos: String "123.45" → Decimal 123.45
+- Formatação: "01/01/2025" (BR) → "2025-01-01" (ISO 8601)
+- Normalização: "SÃO PAULO" → "São Paulo"
+- Cálculos: "UnitPrice * Quantity → Total"
+- Lookup: "Codigo do Fornecedor" → "ID do Fornecedor (FK)"
+
+**Validação de Dados (Data Validation)**: Verificação de conformidade contra regras de negócio antes de inserir.
+- Validação estrutural: Campo obrigatório presente? Tipo correto? Length válido?
+- Validação semântica: Email válido? Data no futuro? Status permitido?
+- Validação referencial: FK existe? Cliente ativo? Fornecedor aprovado?
+- Validação de regras de negócio: Preço > 0? Quantidade inteira? Datas sem sobreposição?
+
+**Detecção de Duplicatas (Duplicate Detection)**: Identificação de registros que já existem (para evitar inserir 2x).
+- Duplicata exata: Todos os campos iguais
+- Duplicata por chave natural: CPF já existe? Email já existe?
+- Duplicata semelhante: Mesmo nome mas escrita diferente ("São Paulo" vs "Sao Paulo")
+- Estratégia de resolução: Ignorar, substituir, ou reportar erro
+
+**Importação Incremental vs Full**:
+- **Incremental**: Importa apenas registros novos (não atualizados desde última importação). Rápido, ideal para cargas diárias.
+- **Full**: Reprocessa todos os registros (útil para dados que são deletados após importação, ou para re-sincronizar estado)
+
+**Agendamento Recorrente (Job Scheduling)**: Importações automáticas via Hangfire em horários predefinidos.
+- Cron expressions: "0 2 * * *" = 2h da manhã todo dia
+- Alertas de falha: Email se importação falhar
+- Histórico de execuções: Log de cada agendamento executado
+
+**Histórico com Rollback (Import History)**: Rastreamento completo de cada importação com capacidade de reverter.
+- Quantidade de registros inseridos/atualizados/deletados
+- Erros encontrados e rejeitados
+- Timestamp e usuário que executou
+- Rollback: Desfazer importação volta a estado anterior
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Mapeamento de Campos** | Hardcoded no aspx.vb | Interface dinâmica + BD de mapeamentos |
+| **Transformação** | Scripts SQL manuais | Pipeline de transformações reutilizável |
+| **Validação** | Básica (type-checking) | Regras complexas + custom validators |
+| **Duplicatas** | Nenhuma detecção | Detecção automática + múltiplas estratégias |
+| **Incremental** | Reprocessa tudo | Detecta novo vs existente automaticamente |
+| **Agendamento** | Task Scheduler do Windows | Hangfire (persistente, distribuído) |
+| **Histórico** | Arquivo texto em pasta | Tabelas de auditoria com rollback |
+| **Tratamento de Erros** | Bloqueia tudo ou processa com falha | Para na primeira linha ruim, relata erro |
+| **Formatos** | XLS, CSV | CSV, Excel, XML, JSON, EDI |
+| **Concorrência** | 1 importação por vez | Múltiplas importações paralelas |
+
+### 1.5 Funcionalidades Principais
+
+1. **Mapeamento Dinâmico de Campos** - Criar/editar templates de mapeamento campo origem → campo destino com transformações opcionais
+2. **Transformação de Dados com Regras** - Parser flexível suportando conversão de tipos, formatação de datas, normalização de strings, lookups em tabelas
+3. **Validação Multi-Camadas** - Estrutural (tipos, obrigatoriedade), semântica (ranges, enums), referencial (FKs), negócio (regras customizadas)
+4. **Detecção de Duplicatas Inteligente** - Identificação por chave natural, similaridade fuzzy, com opções de ignorar/substituir/rejeitar
+5. **Importação Incremental** - Apenas novos registros são processados (via timestamp ou sequencial)
+6. **Importação Full com Delta Detection** - Reprocessa tudo mas detecta mudanças reais antes de UPDATE
+7. **Agendamento Recorrente (Hangfire)** - Jobs automáticos com cron expressions, retry automático em falha
+8. **Histórico Completo de Importações** - Log de execução com quantidade de registros, erros, usuário, timestamp
+9. **Rollback por Importação** - Reverter para estado anterior se necessário (transação ou delete + re-insert)
+10. **Relatório de Erros com Sugestões** - Lista detalhada de linhas rejeitadas com motivo, linha original e sugestão de correção
+11. **Preview de Dados antes de Importar** - Mostra mapeamento + transformação + validação das primeiras 100 linhas
+12. **Processamento Assíncrono (Hangfire + SignalR)** - Jobs em background com notificações em tempo real
+13. **API de Consulta de Status** - GET /api/imports/{id}/status com progresso e ETA
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-IMP-085-01: Mapeamento de Campos Obrigatório
+
+**Descrição**: Toda importação deve usar um template de mapeamento que define explicitamente qual coluna de origem mapeia para qual campo de destino. Nenhuma coluna deve ser ignorada silenciosamente.
+
+**Justificativa**: Evita surpresas onde dados importantes são perdidos. Força o usuário a ser explícito sobre o mapeamento.
+
+**Implementação**:
+```csharp
+public class FieldMapping
+{
+    public int Id { get; set; }
+    public int ImportTemplateId { get; set; }
+    public string SourceColumnName { get; set; } // "Nome do Cliente"
+    public string DestinationFieldName { get; set; } // "NomeCliente"
+    public DataType DestinationType { get; set; } // String, Int, Decimal, DateTime
+    public bool IsRequired { get; set; }
+    public string TransformationRule { get; set; } // "UPPER({0})" or null
+    public string ValidationRule { get; set; } // Regex ou expressão customizada
+}
+
+public class ImportValidator
+{
+    public ValidationResult ValidateMapping(IEnumerable<string> sourceColumns, FieldMapping[] mapping)
+    {
+        var mappedColumns = mapping.Select(m => m.SourceColumnName).ToHashSet();
+        var unmappedColumns = sourceColumns.Except(mappedColumns).ToList();
+
+        if (unmappedColumns.Any())
+            return ValidationResult.Fail($"Colunas não mapeadas: {string.Join(", ", unmappedColumns)}. Todas as colunas devem ser mapeadas (ou explicitamente ignoradas).");
+
+        return ValidationResult.Success();
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Template mapeia: "Código" → Id_Fornecedor, "Nome" → Nome_Fornecedor, "Email" → Email_Fornecedor
+- ✗ Template mapeia só "Código" e "Nome" mas arquivo tem coluna "Telefone": Erro "Coluna 'Telefone' não está mapeada"
+
+---
+
+### RN-IMP-085-02: Transformação de Dados Conforme Template
+
+**Descrição**: Todas as transformações aplicadas (conversão de tipos, formatação) devem estar documentadas no template. Transformação não documentada = erro na importação.
+
+**Justificativa**: Auditoria e rastreabilidade. Garante que mesmo um mês depois sabemos como cada campo foi transformado.
+
+**Implementação**:
+```csharp
+public enum DataType { String, Integer, Decimal, DateTime, Boolean, Enum }
+
+public class FieldTransformer
+{
+    public object Transform(object sourceValue, FieldMapping mapping)
+    {
+        if (sourceValue == null)
+            return mapping.IsRequired ? throw new RequiredFieldNullException(mapping.DestinationFieldName) : null;
+
+        var transformed = sourceValue;
+
+        // 1. Aplica transformação customizada se definida
+        if (!string.IsNullOrEmpty(mapping.TransformationRule))
+            transformed = ApplyTransformationRule(transformed, mapping.TransformationRule);
+
+        // 2. Converte para tipo destino
+        transformed = ConvertToType(transformed, mapping.DestinationType);
+
+        // 3. Valida resultado
+        if (!string.IsNullOrEmpty(mapping.ValidationRule))
+            ValidateAgainstRule(transformed, mapping.ValidationRule);
+
+        return transformed;
+    }
+
+    private object ApplyTransformationRule(object value, string rule)
+    {
+        // Suporta templates como:
+        // - "UPPER({0})" → UPPER(value)
+        // - "TRIM({0})" → TRIM(value)
+        // - "FORMAT_DATE({0}, 'dd/MM/yyyy', 'yyyy-MM-dd')" → Parse dd/MM/yyyy e formata como yyyy-MM-dd
+        // - "LOOKUP(fornecedor.csv, 'codigo', {0}, 'id')" → Busca ID do fornecedor por código
+
+        var ruleTemplate = new RuleExpressionBuilder(rule);
+        return ruleTemplate.Evaluate(value);
+    }
+
+    private object ConvertToType(object value, DataType targetType)
+    {
+        return targetType switch
+        {
+            DataType.String => value?.ToString() ?? null,
+            DataType.Integer => int.Parse(value?.ToString() ?? "0"),
+            DataType.Decimal => decimal.Parse(value?.ToString() ?? "0"),
+            DataType.DateTime => DateTime.Parse(value?.ToString() ?? throw new InvalidCastException()),
+            DataType.Boolean => bool.Parse(value?.ToString() ?? "false"),
+            _ => value
+        };
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Template: SourceColumn="Data" → DestinationField="DataCriacao", Transform="FORMAT_DATE({0}, 'dd/MM/yyyy', 'yyyy-MM-dd')" → Input "01/01/2025" → Output DateTime(2025,1,1)
+- ✓ Template: SourceColumn="Valor" → DestinationField="ValorUnitario", Transform="TRIM({0})" → Input "  123.45  " → Output Decimal 123.45
+- ✗ Coluna "Nascimento" tem valor "01/01/2025" mas DestinationType=Integer e sem Transform: Erro "Cannot convert '01/01/2025' to Integer"
+
+---
+
+### RN-IMP-085-03: Validação de Dados Contra Regras de Negócio
+
+**Descrição**: Cada campo deve ser validado contra regras de negócio antes de ser inserido. Se qualquer validação falhar, a linha é rejeitada com detalhamento do erro.
+
+**Justificativa**: Garante integridade de dados. Banco de dados recebe apenas dados válidos segundo critérios de negócio.
+
+**Implementação**:
+```csharp
+public class ValidationRule
+{
+    public int Id { get; set; }
+    public string FieldName { get; set; }
+    public RuleType Type { get; set; } // Required, MinLength, MaxLength, Regex, Range, Custom
+    public string Parameters { get; set; } // JSON: {"min": 0, "max": 100} ou {"pattern": "^[A-Z0-9]+$"}
+    public string ErrorMessage { get; set; }
+    public int Priority { get; set; } // 1=crítico, 2=importante, 3=aviso
+}
+
+public enum RuleType { Required, MinLength, MaxLength, Regex, Range, Custom, ForeignKey, Unique }
+
+public class DataValidator
+{
+    public List<ValidationError> ValidateRow(Dictionary<string, object> rowData, List<ValidationRule> rules)
+    {
+        var errors = new List<ValidationError>();
+
+        foreach (var rule in rules)
+        {
+            var fieldValue = rowData.ContainsKey(rule.FieldName) ? rowData[rule.FieldName] : null;
+
+            var error = rule.Type switch
+            {
+                RuleType.Required => ValidateRequired(rule, fieldValue),
+                RuleType.MinLength => ValidateMinLength(rule, fieldValue),
+                RuleType.MaxLength => ValidateMaxLength(rule, fieldValue),
+                RuleType.Regex => ValidateRegex(rule, fieldValue),
+                RuleType.Range => ValidateRange(rule, fieldValue),
+                RuleType.ForeignKey => ValidateForeignKey(rule, fieldValue),
+                RuleType.Unique => ValidateUnique(rule, fieldValue),
+                RuleType.Custom => ValidateCustom(rule, fieldValue),
+                _ => null
+            };
+
+            if (error != null)
+                errors.Add(error);
+        }
+
+        return errors;
+    }
+
+    private ValidationError ValidateRequired(ValidationRule rule, object value)
+    {
+        if (value == null || (value is string s && string.IsNullOrWhiteSpace(s)))
+            return new ValidationError(rule.FieldName, rule.ErrorMessage ?? $"{rule.FieldName} é obrigatório", rule.Priority);
+        return null;
+    }
+
+    private ValidationError ValidateForeignKey(ValidationRule rule, object value)
+    {
+        var fkTable = JObject.Parse(rule.Parameters)["table"].Value<string>();
+        var fkColumn = JObject.Parse(rule.Parameters)["column"].Value<string>();
+
+        // Consulta: SELECT COUNT(*) FROM fkTable WHERE fkColumn = value
+        // Se Count = 0, erro
+        var exists = _db.Database.ExecuteSqlRaw($"SELECT COUNT(*) FROM {fkTable} WHERE {fkColumn} = @v", new SqlParameter("@v", value)) > 0;
+
+        if (!exists)
+            return new ValidationError(rule.FieldName, $"Valor '{value}' não existe em {fkTable}.{fkColumn}", RuleType.ForeignKey, rule.Priority);
+
+        return null;
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Campo "Email" com regra Regex "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$" → Input "joao@empresa.com.br" → Válido
+- ✗ Campo "Email" com mesma regra → Input "joao@" → Erro "Email inválido"
+- ✗ Campo "Id_Fornecedor" (FK) → Input "999" mas fornecedor com ID 999 não existe → Erro "Fornecedor não encontrado"
+
+---
+
+### RN-IMP-085-04: Detecção de Duplicatas por Chave Natural
+
+**Descrição**: Sistema detecta automaticamente se um registro (parcial ou total) já existe no banco antes de inserir. Estratégia: ignorar, substituir ou rejeitar.
+
+**Justificativa**: Evita duplicação de dados. Importante em importações repetidas (daily sync).
+
+**Implementação**:
+```csharp
+public enum DuplicateStrategy { Ignore, Replace, Reject, MarkAsUpdate }
+
+public class DuplicateDetector
+{
+    public DuplicateCheckResult CheckForDuplicates(Dictionary<string, object> newRecord,
+                                                    List<string> naturalKeys,
+                                                    DbContext dbContext)
+    {
+        // Extrai valores da chave natural
+        var keyValues = naturalKeys.ToDictionary(k => k, k => newRecord[k]);
+
+        // Monta query dinamicamente
+        var queryParts = naturalKeys.Select((k, i) => $"{k} = @key{i}").ToList();
+        var whereClause = string.Join(" AND ", queryParts);
+
+        var parameters = naturalKeys.Select((k, i) =>
+            new SqlParameter($"@key{i}", keyValues[k])).ToArray();
+
+        // Exemplo: SELECT * FROM Fornecedor WHERE CPF = @key0 AND RazaoSocial = @key1
+        var existingRecord = dbContext.Set<Fornecedor>()
+            .FromSqlInterpolated($"SELECT * FROM Fornecedor WHERE {whereClause}", parameters)
+            .FirstOrDefault();
+
+        if (existingRecord == null)
+            return new DuplicateCheckResult { IsDuplicate = false };
+
+        return new DuplicateCheckResult
+        {
+            IsDuplicate = true,
+            ExistingRecordId = existingRecord.Id,
+            ExistingRecordData = existingRecord,
+            SimilarityScore = CalculateSimilarity(newRecord, existingRecord)
+        };
+    }
+
+    private decimal CalculateSimilarity(Dictionary<string, object> newRecord, object existingRecord)
+    {
+        // Usa distância Levenshtein para campos de texto
+        // Se > 95% similar, é considerado duplicata semelhante
+        var similarFields = newRecord.Count(kv =>
+            existingRecord.GetType().GetProperty(kv.Key)?.GetValue(existingRecord)?.ToString()
+            == kv.Value?.ToString());
+
+        return (decimal)similarFields / newRecord.Count;
+    }
+}
+
+public class ImportProcessor
+{
+    public async Task<ImportResult> ProcessImportWithDuplicateHandling(
+        List<Dictionary<string, object>> rows,
+        List<string> naturalKeys,
+        DuplicateStrategy strategy)
+    {
+        var results = new ImportResult();
+        var duplicateDetector = new DuplicateDetector();
+
+        foreach (var (index, row) in rows.WithIndex())
+        {
+            var dupCheck = duplicateDetector.CheckForDuplicates(row, naturalKeys, _dbContext);
+
+            if (dupCheck.IsDuplicate)
+            {
+                switch (strategy)
+                {
+                    case DuplicateStrategy.Ignore:
+                        results.SkippedRecords++;
+                        break;
+
+                    case DuplicateStrategy.Replace:
+                        // UPDATE o registro existente
+                        await _dbContext.Entry(dupCheck.ExistingRecordData).CurrentValues.SetValues(row);
+                        results.UpdatedRecords++;
+                        break;
+
+                    case DuplicateStrategy.Reject:
+                        results.Errors.Add(new ImportError
+                        {
+                            LineNumber = index + 1,
+                            ErrorMessage = $"Duplicata detectada: Registro com chave {string.Join(", ", naturalKeys)} já existe (ID: {dupCheck.ExistingRecordId})",
+                            SourceData = row
+                        });
+                        results.RejectedRecords++;
+                        break;
+
+                    case DuplicateStrategy.MarkAsUpdate:
+                        row["_IsUpdate"] = true; // Marca para processamento diferenciado
+                        results.UpdatedRecords++;
+                        break;
+                }
+            }
+            else
+            {
+                // Insere novo registro
+                results.InsertedRecords++;
+            }
+        }
+
+        return results;
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Template usa natureza key = [CPF, RazaoSocial]. Importa fornecedor com CPF=11111111111111, RazaoSocial="Empresa A" 2x com strategy=Ignore → Insere 1x, ignora 2a
+- ✓ Mesma situação com strategy=Replace → Insere 1a vez, 2a vez atualiza
+- ✗ Mesma situação com strategy=Reject → Insere 1a, 2a é rejeitada com erro "Duplicata detectada"
+
+---
+
+### RN-IMP-085-05: Importação Incremental (Delta Detection)
+
+**Descrição**: Se importação está configurada como "Incremental", sistema processa apenas registros novos ou modificados desde última execução. Reduz reprocessamento.
+
+**Justificativa**: Performance. Arquivos grandes processados diariamente ganham muito em velocidade.
+
+**Implementação**:
+```csharp
+public enum ImportMode { Full, Incremental }
+
+public class ImportTemplate
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public ImportMode Mode { get; set; } // Full ou Incremental
+    public string DeltaDetectionColumn { get; set; } // Campo para detectar novos (ex: "LastModifiedDate")
+    public DateTime LastFullImportDate { get; set; } // Quando foi feita última importação full
+}
+
+public class IncrementalImporter
+{
+    public async Task<List<Dictionary<string, object>>> GetDeltaRecords(
+        List<Dictionary<string, object>> sourceRecords,
+        ImportTemplate template)
+    {
+        if (template.Mode == ImportMode.Full)
+            return sourceRecords; // Processa tudo
+
+        // Incremental: filtra apenas novos/modificados desde última importação
+        var deltaColumn = template.DeltaDetectionColumn;
+        var lastImportDate = template.LastFullImportDate;
+
+        var deltaRecords = sourceRecords
+            .Where(r =>
+            {
+                if (!r.TryGetValue(deltaColumn, out var deltaValue))
+                    return false; // Sem coluna delta, não inclui
+
+                if (DateTime.TryParse(deltaValue?.ToString(), out var recordDate))
+                    return recordDate > lastImportDate;
+
+                return false;
+            })
+            .ToList();
+
+        return deltaRecords;
+    }
+}
+
+public class ImportService
+{
+    public async Task<ImportResult> ExecuteImport(int templateId, Stream fileStream)
+    {
+        var template = await _db.ImportTemplates.FindAsync(templateId);
+        var sourceRecords = await ParseFileAsync(fileStream, template.FileFormat);
+
+        // Se incremental, filtra delta
+        var recordsToProcess = await _incrementalImporter.GetDeltaRecords(sourceRecords, template);
+
+        // Log
+        _logger.LogInformation($"Modo: {template.Mode}. Total de registros: {sourceRecords.Count}. " +
+                             $"A processar: {recordsToProcess.Count}");
+
+        var result = await ProcessAndInsertRecords(recordsToProcess, template);
+
+        // Atualiza timestamp se sucesso
+        if (result.IsSuccessful)
+        {
+            template.LastFullImportDate = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+
+        return result;
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Template de fornecedores em modo Incremental com deltaDetectionColumn="DataModificacao". Última importação 2025-01-01. Novo arquivo tem 1000 registros mas apenas 50 têm DataModificacao > 2025-01-01 → Processa 50
+- ✗ Mesmo cenário mas modo Full → Processa todos os 1000
+
+---
+
+### RN-IMP-085-06: Agendamento Recorrente com Hangfire
+
+**Descrição**: Importações podem ser agendadas para executar automaticamente em horários específicos (diárias, semanais) via Hangfire. Sistema retenta automaticamente se falhar.
+
+**Justificativa**: Automação. ERPs, operadoras e fornecedores enviam dados periodicamente; não precisa execução manual.
+
+**Implementação**:
+```csharp
+public class ScheduledImport
+{
+    public int Id { get; set; }
+    public int ImportTemplateId { get; set; }
+    public string CronExpression { get; set; } // "0 2 * * *" = 2h todo dia
+    public string SourceUrl { get; set; } // URL para baixar arquivo (SFTP, S3, etc)
+    public bool IsActive { get; set; }
+    public int RetryCount { get; set; } // Quantas vezes retry em caso de falha
+    public DateTime? LastExecutionDate { get; set; }
+    public ImportResult LastExecutionResult { get; set; }
+}
+
+public class ScheduledImportService
+{
+    private readonly IBackgroundJobClient _jobClient;
+    private readonly IRecurringJobManager _recurringJobManager;
+
+    public async Task<int> CreateScheduledImport(CreateScheduledImportCommand cmd)
+    {
+        var scheduledImport = new ScheduledImport
+        {
+            ImportTemplateId = cmd.TemplateId,
+            CronExpression = cmd.CronExpression,
+            SourceUrl = cmd.SourceUrl,
+            IsActive = true,
+            RetryCount = cmd.RetryCount ?? 3
+        };
+
+        _db.ScheduledImports.Add(scheduledImport);
+        await _db.SaveChangesAsync();
+
+        // Registra job recorrente no Hangfire
+        _recurringJobManager.AddOrUpdate(
+            $"import-{scheduledImport.Id}",
+            () => ExecuteScheduledImport(scheduledImport.Id),
+            scheduledImport.CronExpression
+        );
+
+        return scheduledImport.Id;
+    }
+
+    [AutomaticRetry(Attempts = 3)] // Hangfire retenta 3x automaticamente
+    public async Task ExecuteScheduledImport(int scheduledImportId)
+    {
+        var scheduledImport = await _db.ScheduledImports
+            .Include(s => s.ImportTemplate)
+            .FirstOrDefaultAsync(s => s.Id == scheduledImportId);
+
+        if (scheduledImport == null || !scheduledImport.IsActive)
+            return;
+
+        try
+        {
+            // Baixa arquivo de sourceUrl (SFTP, S3, etc)
+            var fileStream = await DownloadFileAsync(scheduledImport.SourceUrl);
+
+            // Executa importação normal
+            var result = await _importService.ExecuteImport(scheduledImport.ImportTemplateId, fileStream);
+
+            // Log resultado
+            scheduledImport.LastExecutionDate = DateTime.UtcNow;
+            scheduledImport.LastExecutionResult = result;
+
+            await _db.SaveChangesAsync();
+
+            // Alerta se erros
+            if (!result.IsSuccessful)
+            {
+                await _alertingService.SendAlert($"Importação agendada #{scheduledImportId} falhou",
+                    $"Erros: {result.ErrorCount}, Rejeitados: {result.RejectedRecords}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Erro ao executar importação agendada #{scheduledImportId}");
+            throw; // Hangfire retenta
+        }
+    }
+
+    public async Task DeleteScheduledImport(int id)
+    {
+        var scheduledImport = await _db.ScheduledImports.FindAsync(id);
+        if (scheduledImport != null)
+        {
+            _recurringJobManager.RemoveIfExists($"import-{id}");
+            _db.ScheduledImports.Remove(scheduledImport);
+            await _db.SaveChangesAsync();
+        }
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Cron "0 2 * * *" = executa 2h todo dia. Cron "0 9 * * 1" = executa 9h toda segunda-feira
+- ✓ Importação falha às 2h → Hangfire retenta 3x automaticamente com backoff (5min, 10min, 20min)
+- ✓ Após 3 tentativas falhar → Email de alerta para administrador
+
+---
+
+### RN-IMP-085-07: Histórico de Importações com Rollback
+
+**Descrição**: Cada importação é registrada em tabela de auditoria. Dados sobre importação (usuário, timestamp, quantidade de registros, erros) podem ser consultados. Rollback permite desfazer uma importação específica.
+
+**Justificativa**: Rastreabilidade e recuperação. Se importação foi errada, podem reverter.
+
+**Implementação**:
+```csharp
+public class ImportHistory
+{
+    public int Id { get; set; }
+    public int TemplateId { get; set; }
+    public int ClienteId { get; set; }
+    public int UserId { get; set; }
+    public DateTime ExecutionDate { get; set; }
+    public ImportMode Mode { get; set; } // Full, Incremental
+
+    // Resultados
+    public int TotalRecordsProcessed { get; set; }
+    public int InsertedRecords { get; set; }
+    public int UpdatedRecords { get; set; }
+    public int SkippedRecords { get; set; }
+    public int RejectedRecords { get; set; }
+    public int DeletedRecords { get; set; } // Se rollback foi executado
+
+    // Dados para rollback
+    public string BackupFileName { get; set; } // Arquivo .bak em Azure
+    public bool CanRollback { get; set; } // Ainda é possível desfazer?
+
+    // Erros
+    public int ErrorCount { get; set; }
+    public string ErrorSummary { get; set; } // JSON com lista de erros
+
+    public bool IsSuccessful => ErrorCount == 0;
+}
+
+public class ImportHistoryService
+{
+    public async Task<ImportResult> ExecuteAndRecord(int templateId, Stream fileStream, int userId)
+    {
+        var history = new ImportHistory
+        {
+            TemplateId = templateId,
+            UserId = userId,
+            ExecutionDate = DateTime.UtcNow,
+            ClienteId = _tenantContext.ClienteId
+        };
+
+        _db.ImportHistories.Add(history);
+        await _db.SaveChangesAsync();
+
+        try
+        {
+            // Executa importação em transação
+            var result = await _importService.ExecuteImport(templateId, fileStream);
+
+            // Atualiza histórico com resultados
+            history.TotalRecordsProcessed = result.TotalRecords;
+            history.InsertedRecords = result.InsertedRecords;
+            history.UpdatedRecords = result.UpdatedRecords;
+            history.SkippedRecords = result.SkippedRecords;
+            history.RejectedRecords = result.RejectedRecords;
+            history.ErrorCount = result.Errors.Count;
+            history.ErrorSummary = JsonConvert.SerializeObject(result.Errors);
+            history.CanRollback = result.IsSuccessful; // Só permite rollback se sucesso
+
+            // Cria backup dos registros inseridos em caso de rollback futuro
+            history.BackupFileName = await CreateBackupAsync(history.Id, result.InsertedRecordIds);
+
+            await _db.SaveChangesAsync();
+            return result;
+        }
+        catch (Exception ex)
+        {
+            history.ErrorCount = 1;
+            history.ErrorSummary = ex.Message;
+            history.CanRollback = false;
+            await _db.SaveChangesAsync();
+            throw;
+        }
+    }
+
+    public async Task<RollbackResult> RollbackImport(int historyId)
+    {
+        var history = await _db.ImportHistories.FindAsync(historyId);
+
+        if (history == null)
+            throw new NotFoundException($"Histórico de importação #{historyId} não encontrado");
+
+        if (!history.CanRollback)
+            throw new InvalidOperationException($"Importação #{historyId} não pode ser revertida");
+
+        // Deleta registros inseridos
+        var sqlDelete = $"DELETE FROM {GetTargetTableName(history.TemplateId)} WHERE Id IN (SELECT Id FROM backup_{history.Id})";
+        var deleteCount = await _db.Database.ExecuteSqlRawAsync(sqlDelete);
+
+        // Atualiza histórico
+        history.DeletedRecords = deleteCount;
+        history.CanRollback = false;
+        await _db.SaveChangesAsync();
+
+        return new RollbackResult
+        {
+            Success = true,
+            DeletedRecords = deleteCount,
+            Message = $"Rollback realizado. {deleteCount} registros deletados."
+        };
+    }
+
+    public async Task<List<ImportHistory>> GetImportHistory(int templateId, int limit = 50)
+    {
+        return await _db.ImportHistories
+            .Where(h => h.TemplateId == templateId && h.ClienteId == _tenantContext.ClienteId)
+            .OrderByDescending(h => h.ExecutionDate)
+            .Take(limit)
+            .ToListAsync();
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Importação de 100 fornecedores bem-sucedida às 14:30 por João Silva → Registrado em ImportHistory com InsertedRecords=100
+- ✓ Às 15:00 percebem erro nos dados → Chamam RollbackImport(12) → 100 registros são deletados, CanRollback=false
+- ✗ Importação falha com 50 erros → ErrorCount=50, IsSuccessful=false, CanRollback=false (não permite rollback de falha)
+
+---
+
+### RN-IMP-085-08: Validação Transacional (Tudo ou Nada)
+
+**Descrição**: Importação é executada dentro de uma transação SQL. Se qualquer linha falhar na validação ou inserção, TODA a transação é revertida. Garante consistência.
+
+**Justificativa**: Evita estado parcial. Melhor falhar tudo do que inserir metade dos dados.
+
+**Implementação**:
+```csharp
+public class TransactionalImportProcessor
+{
+    public async Task<ImportResult> ExecuteImportWithTransaction(
+        int templateId,
+        List<Dictionary<string, object>> rows)
+    {
+        var result = new ImportResult();
+
+        // Inicia transação explícita
+        using (var transaction = await _db.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted))
+        {
+            try
+            {
+                // Valida todos os registros ANTES de inserir nada
+                var validationErrors = new List<(int LineNumber, List<ValidationError> Errors)>();
+
+                foreach (var (index, row) in rows.WithIndex())
+                {
+                    var errors = await ValidateRow(row, templateId);
+                    if (errors.Any())
+                        validationErrors.Add((index + 1, errors));
+                }
+
+                // Se houver erros, já falha sem inserir nada
+                if (validationErrors.Any())
+                {
+                    await transaction.RollbackAsync();
+
+                    result.IsSuccessful = false;
+                    result.RejectedRecords = validationErrors.Count;
+                    result.Errors = validationErrors
+                        .SelectMany(ve => ve.Errors.Select(e => new ImportError
+                        {
+                            LineNumber = ve.LineNumber,
+                            ErrorMessage = e.Message,
+                            SourceData = rows[ve.LineNumber - 1]
+                        }))
+                        .ToList();
+
+                    return result;
+                }
+
+                // Insere registros
+                foreach (var (index, row) in rows.WithIndex())
+                {
+                    try
+                    {
+                        var entity = await CreateEntityFromRow(row, templateId);
+                        _db.Add(entity);
+                        result.InsertedRecords++;
+                    }
+                    catch (Exception ex)
+                    {
+                        await transaction.RollbackAsync();
+
+                        result.IsSuccessful = false;
+                        result.Errors.Add(new ImportError
+                        {
+                            LineNumber = index + 1,
+                            ErrorMessage = ex.Message,
+                            SourceData = row
+                        });
+
+                        return result;
+                    }
+                }
+
+                // Comita se tudo OK
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                result.IsSuccessful = true;
+                result.TotalRecords = rows.Count;
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+
+                result.IsSuccessful = false;
+                result.Errors.Add(new ImportError
+                {
+                    LineNumber = -1,
+                    ErrorMessage = $"Erro crítico na importação: {ex.Message}"
+                });
+
+                return result;
+            }
+        }
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Importa 100 fornecedores. Validação passa para todos. INSERT é executado → 100 registros inseridos
+- ✗ Importa 100 fornecedores. Validação falha na linha 50 (email inválido) → Transação ROLLBACK, nenhum registro é inserido
+- ✗ INSERT falha na linha 75 (violação de UNIQUE) → Transação ROLLBACK, registros 1-74 são desfeitos
+
+---
+
+### RN-IMP-085-09: API de Status de Importação em Tempo Real
+
+**Descrição**: Endpoint GET /api/imports/{id}/status retorna progresso de importação em execução (percentual, registros processados, ETA), atualizado via SignalR.
+
+**Justificativa**: UX. Usuário acompanha importação grande sem UI congelada.
+
+**Implementação**:
+```csharp
+public class ImportProgressHub : Hub
+{
+    public async Task SubscribeToImport(int importId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"import-{importId}");
+    }
+
+    public async Task UnsubscribeFromImport(int importId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"import-{importId}");
+    }
+}
+
+public class ImportProcessor
+{
+    private readonly IHubContext<ImportProgressHub> _hubContext;
+
+    public async Task ProcessImportWithProgress(int importId, List<Dictionary<string, object>> rows)
+    {
+        var startTime = DateTime.UtcNow;
+        var totalRows = rows.Count;
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            // Processa linha
+            await ProcessRow(rows[i]);
+
+            // Calcula progresso
+            var processed = i + 1;
+            var percentComplete = (decimal)processed / totalRows * 100;
+            var elapsed = (DateTime.UtcNow - startTime).TotalSeconds;
+            var ratePerSecond = processed / elapsed;
+            var remainingRecords = totalRows - processed;
+            var estimatedSecondsRemaining = remainingRecords / ratePerSecond;
+            var eta = DateTime.UtcNow.AddSeconds(estimatedSecondsRemaining);
+
+            // Envia atualização via SignalR
+            await _hubContext.Clients.Group($"import-{importId}").SendAsync("ImportProgress", new
+            {
+                ImportId = importId,
+                ProcessedRecords = processed,
+                TotalRecords = totalRows,
+                PercentComplete = percentComplete,
+                EstimatedSecondsRemaining = estimatedSecondsRemaining,
+                EstimatedCompletionTime = eta,
+                Status = "Processing"
+            });
+        }
+
+        await _hubContext.Clients.Group($"import-{importId}").SendAsync("ImportProgress", new
+        {
+            ImportId = importId,
+            ProcessedRecords = totalRows,
+            TotalRecords = totalRows,
+            PercentComplete = 100,
+            EstimatedSecondsRemaining = 0,
+            Status = "Completed"
+        });
+    }
+}
+
+[ApiController]
+[Route("api/imports")]
+public class ImportController : ControllerBase
+{
+    [HttpGet("{id}/status")]
+    [Authorize(Policy = "imp:read")]
+    public async Task<IActionResult> GetImportStatus(int id)
+    {
+        var import = await _db.Imports.FindAsync(id);
+        if (import == null)
+            return NotFound();
+
+        return Ok(new
+        {
+            import.Id,
+            import.TemplateId,
+            import.Status, // Pending, Processing, Completed, Failed
+            import.ProgressPercentage,
+            import.ProcessedRecords,
+            import.TotalRecords,
+            import.EstimatedCompletionTime,
+            import.InsertedRecords,
+            import.UpdatedRecords,
+            import.RejectedRecords,
+            import.Errors = import.Errors.Take(10).ToList() // Primeiros 10 erros
+        });
+    }
+}
+```
+
+**Exemplos**:
+- ✓ GET /api/imports/42/status durante importação de 10.000 fornecedores → Retorna {"ProcessedRecords": 5234, "PercentComplete": 52.34, "EstimatedSecondsRemaining": 45, "Status": "Processing"}
+- ✓ Frontend assinado em SignalR recebe atualizações a cada 100 linhas
+
+---
+
+### RN-IMP-085-10: Relatório Detalhado de Erros com Sugestões
+
+**Descrição**: Quando importação falha com validações, sistema gera relatório detalhado listando cada linha rejeitada com: número da linha, valor original, erro específico, sugestão de correção.
+
+**Justificativa**: Facilita correção. Usuário sabe exatamente o que arrumar.
+
+**Implementação**:
+```csharp
+public class ImportErrorReport
+{
+    public int ImportId { get; set; }
+    public List<DetailedError> Errors { get; set; }
+    public int TotalErrors { get; set; }
+    public string HtmlReport { get; set; } // Para download HTML
+    public string CsvReport { get; set; } // Para re-import no Excel
+}
+
+public class DetailedError
+{
+    public int LineNumber { get; set; }
+    public string ErrorCode { get; set; } // VALIDATION_REQUIRED, VALIDATION_EMAIL_INVALID, etc
+    public string FieldName { get; set; }
+    public string ActualValue { get; set; }
+    public string ExpectedFormat { get; set; }
+    public string ValidationRule { get; set; }
+    public string Suggestion { get; set; } // Ex: "Remova espaços em branco"
+    public string OriginalRowJson { get; set; } // Dados originais da linha inteira
+}
+
+public class ErrorReportGenerator
+{
+    public ImportErrorReport GenerateReport(int importId, List<ValidationError> errors, List<Dictionary<string, object>> sourceRows)
+    {
+        var report = new ImportErrorReport
+        {
+            ImportId = importId,
+            Errors = errors.Select(e => new DetailedError
+            {
+                LineNumber = e.LineNumber,
+                ErrorCode = e.ErrorCode,
+                FieldName = e.FieldName,
+                ActualValue = sourceRows[e.LineNumber - 1][e.FieldName]?.ToString(),
+                ExpectedFormat = e.ExpectedFormat,
+                ValidationRule = e.ValidationRule,
+                Suggestion = GenerateSuggestion(e),
+                OriginalRowJson = JsonConvert.SerializeObject(sourceRows[e.LineNumber - 1])
+            }).ToList(),
+            TotalErrors = errors.Count
+        };
+
+        report.HtmlReport = GenerateHtmlReport(report);
+        report.CsvReport = GenerateCsvReport(report);
+
+        return report;
+    }
+
+    private string GenerateSuggestion(ValidationError error)
+    {
+        return error.ErrorCode switch
+        {
+            "VALIDATION_REQUIRED" => $"Campo '{error.FieldName}' é obrigatório. Adicione um valor.",
+            "VALIDATION_EMAIL_INVALID" => $"Email '{error.ActualValue}' é inválido. Use formato: usuario@dominio.com.br",
+            "VALIDATION_RANGE" => $"Valor '{error.ActualValue}' está fora do intervalo {error.ExpectedFormat}. Ajuste para o intervalo permitido.",
+            "VALIDATION_DATE_FORMAT" => $"Data '{error.ActualValue}' tem formato inválido. Use formato: {error.ExpectedFormat}",
+            "FOREIGN_KEY_NOT_FOUND" => $"Referência '{error.ActualValue}' não existe no sistema. Verifique se o registro pai foi criado.",
+            "DUPLICATE_DETECTED" => $"Registro com chave '{error.ActualValue}' já existe. Use modo Replace se desejar atualizar.",
+            _ => "Verifique o valor conforme regra de validação."
+        };
+    }
+
+    private string GenerateHtmlReport(ImportErrorReport report)
+    {
+        var html = new StringBuilder();
+        html.AppendLine("<html><head><meta charset='utf-8'><style>");
+        html.AppendLine("table { border-collapse: collapse; width: 100%; }");
+        html.AppendLine("th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }");
+        html.AppendLine("th { background-color: #f2f2f2; }");
+        html.AppendLine(".error { color: red; }");
+        html.AppendLine("</style></head><body>");
+
+        html.AppendLine($"<h1>Relatório de Erros - Importação #{report.ImportId}</h1>");
+        html.AppendLine($"<p><strong>Total de Erros:</strong> {report.TotalErrors}</p>");
+
+        html.AppendLine("<table>");
+        html.AppendLine("<tr><th>Linha</th><th>Campo</th><th>Valor Atual</th><th>Erro</th><th>Sugestão</th></tr>");
+
+        foreach (var error in report.Errors)
+        {
+            html.AppendLine("<tr>");
+            html.AppendLine($"<td>{error.LineNumber}</td>");
+            html.AppendLine($"<td>{error.FieldName}</td>");
+            html.AppendLine($"<td>{error.ActualValue}</td>");
+            html.AppendLine($"<td class='error'>{error.ValidationRule}</td>");
+            html.AppendLine($"<td>{error.Suggestion}</td>");
+            html.AppendLine("</tr>");
+        }
+
+        html.AppendLine("</table></body></html>");
+
+        return html.ToString();
+    }
+
+    private string GenerateCsvReport(ImportErrorReport report)
+    {
+        var csv = new StringBuilder();
+        csv.AppendLine("Linha,Campo,Valor_Atual,Erro,Sugestão");
+
+        foreach (var error in report.Errors)
+        {
+            csv.AppendLine($"{error.LineNumber},\"{error.FieldName}\",\"{error.ActualValue}\",\"{error.ValidationRule}\",\"{error.Suggestion}\"");
+        }
+
+        return csv.ToString();
+    }
+}
+
+[ApiController]
+[Route("api/imports")]
+public class ImportController : ControllerBase
+{
+    [HttpGet("{id}/errors")]
+    [Authorize(Policy = "imp:read")]
+    public async Task<IActionResult> GetImportErrors(int id)
+    {
+        var import = await _db.Imports
+            .Include(i => i.Errors)
+            .FirstOrDefaultAsync(i => i.Id == id);
+
+        if (import == null)
+            return NotFound();
+
+        var report = _errorReportGenerator.GenerateReport(id, import.Errors, import.SourceData);
+
+        return Ok(report);
+    }
+
+    [HttpGet("{id}/errors/download")]
+    [Authorize(Policy = "imp:read")]
+    public async Task<IActionResult> DownloadErrorReport(int id, [FromQuery] string format = "html")
+    {
+        var import = await _db.Imports
+            .Include(i => i.Errors)
+            .FirstOrDefaultAsync(i => i.Id == id);
+
+        if (import == null)
+            return NotFound();
+
+        var report = _errorReportGenerator.GenerateReport(id, import.Errors, import.SourceData);
+
+        if (format == "csv")
+            return File(Encoding.UTF8.GetBytes(report.CsvReport), "text/csv", $"import-{id}-errors.csv");
+
+        return File(Encoding.UTF8.GetBytes(report.HtmlReport), "text/html", $"import-{id}-errors.html");
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Importação de 100 clientes falha em 5 linhas → GET /api/imports/42/errors retorna:
+  ```
+  Erro linha 23: Campo "Email" = "joao@" é inválido. Sugestão: "Use formato usuario@dominio.com.br"
+  Erro linha 45: Campo "Data_Criacao" = "01-01-2025" tem formato errado. Sugestão: "Use formato yyyy-MM-dd ou dd/MM/yyyy"
+  Erro linha 67: Campo "Id_Fornecedor" = "999" não existe. Sugestão: "Verifique se fornecedor com ID 999 foi criado"
+  ```
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IControlIT_Legado` (SQL Server)
+
+**Tabela Principal**: `[dbo].[tb_ImportacaoDados]`
+
+```sql
+CREATE TABLE [dbo].[tb_ImportacaoDados](
+    [Id_Importacao] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Cliente] [int] NOT NULL,
+    [Nm_Arquivo] [varchar](255) NOT NULL,
+    [Caminho_Arquivo] [varchar](500) NULL,
+    [Tipo_Importacao] [varchar](50) NOT NULL, -- 'Clientes', 'Fornecedores', 'Ativos', 'Faturas'
+    [Data_Importacao] [datetime] NOT NULL,
+    [Usuario_Importacao] [varchar](100) NOT NULL,
+    [Total_Registros] [int] NOT NULL,
+    [Registros_Sucesso] [int] NOT NULL,
+    [Registros_Erro] [int] NOT NULL,
+    [Status_Importacao] [varchar](20) NOT NULL, -- 'Sucesso', 'Erro', 'Parcial'
+    [Descricao_Erro] [varchar](max) NULL,
+    [Fl_Ativo] [bit] NOT NULL DEFAULT 1,
+    CONSTRAINT [PK_tb_ImportacaoDados] PRIMARY KEY CLUSTERED ([Id_Importacao] ASC)
+)
+```
+
+**Tabela de Detalhes**: `[dbo].[tb_ImportacaoDados_Detalhe]`
+
+```sql
+CREATE TABLE [dbo].[tb_ImportacaoDados_Detalhe](
+    [Id_Detalhe] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Importacao] [int] NOT NULL,
+    [Numero_Linha] [int] NOT NULL,
+    [Dados_Original] [varchar](max) NOT NULL,
+    [Campo_Erro] [varchar](255) NULL,
+    [Descricao_Erro] [varchar](max) NULL,
+    [Status_Linha] [varchar](20) NOT NULL, -- 'OK', 'ERRO'
+    CONSTRAINT [PK_tb_ImportacaoDados_Detalhe] PRIMARY KEY CLUSTERED ([Id_Detalhe] ASC),
+    CONSTRAINT [FK_Detalhe_Importacao] FOREIGN KEY ([Id_Importacao]) REFERENCES [tb_ImportacaoDados]([Id_Importacao])
+)
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descrição | Mapeamento Modernizado |
+|--------------|-----------|------------------------|
+| `[Id_Importacao]` | PK sequencial | `Import.Id` |
+| `[Nm_Arquivo]` | Nome do arquivo enviado | `Import.FileName` |
+| `[Tipo_Importacao]` | 'Clientes', 'Fornecedores', etc | `ImportTemplate.EntityType` |
+| `[Data_Importacao]` | Timestamp da importação | `Import.ExecutionDate` |
+| `[Usuario_Importacao]` | Login do usuário | `Import.UserId` (FK para User) |
+| `[Total_Registros]` | Quantidade total | `Import.TotalRecordsProcessed` |
+| `[Registros_Sucesso]` | Inseridos com sucesso | `Import.InsertedRecords` |
+| `[Registros_Erro]` | Rejeitados | `Import.RejectedRecords` |
+| `[Status_Importacao]` | 'Sucesso', 'Erro' | `Import.Status` (enum: Pending, Processing, Completed, Failed) |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migracao |
+|-----------|-----------|----------|
+| `sp_ImportarClientes` | Importa clientes de arquivo CSV para tb_Clientes | Refatorada em C# com validações modernas |
+| `sp_ImportarFornecedores` | Importa fornecedores | Refatorada em C# com validators |
+| `sp_ValidarDadosImportacao` | Valida dados antes de inserir | Substituída por pipeline de validators |
+| `sp_DesfazerImportacao` | Deleta registros de uma importação | Refatorada como método RollbackImport() |
+| `sp_ListarImportacoes` | Lista histórico de importações | Substituída por Query CQRS |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `ImportacaoDados.aspx` | Formulário para upload e importação manual | `/imports/create` (Angular) |
+| `ListaImportacoes.aspx` | Lista histórico de importações | `/imports/history` (Angular com table) |
+| `DetalheImportacao.aspx` | Detalhe de uma importação com erros | `/imports/{id}` (Angular com tabs) |
+| `ConfiguracaoImportacao.aspx` | Configurar mapeamento de campos | `/imports/templates` (Angular form) |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSImportacao.asmx.vb`
+
+| Metodo | Descricao | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ImportarArquivo(arquivo, tipo)` | Upload e processa arquivo | `POST /api/imports` |
+| `ListarImportacoes(clienteId)` | Retorna histórico | `GET /api/imports?templateId={id}` |
+| `DesfazerImportacao(idImportacao)` | Executa rollback | `POST /api/imports/{id}/rollback` |
+| `ValidarMapeamento(templateId, primeirasLinhas)` | Valida schema | `POST /api/imports/preview` |
+| `ObterErrosImportacao(idImportacao)` | Retorna erros | `GET /api/imports/{id}/errors` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `IMP_IMPORTACAO_DADOS`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "IMP_IMPORTACAO_DADOS",
+    "nome": "Importação de Dados",
+    "descricao": "Módulo de importação de dados com mapeamento, transformação e validação",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "subFeatures": {
+        "IMP_INCREMENTAL": "Importação incremental (delta detection)",
+        "IMP_AGENDAMENTO": "Agendamento recorrente de importações",
+        "IMP_PREVIEW": "Preview de dados antes de confirmar",
+        "IMP_ROLLBACK": "Reversão de importações"
+    }
+}
+```
+
+**Nota**: Feature pode ser desabilitada por cliente se necessário (ex: cliente legado que não quer usar novo módulo).
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Traducao**:
+
+```json
+{
+    "import": {
+        "page": {
+            "title": "Importação de Dados",
+            "subtitle": "Carregue e processe dados de múltiplas fontes",
+            "tabs": {
+                "manual": "Importação Manual",
+                "template": "Templates",
+                "scheduled": "Agendado",
+                "history": "Histórico"
+            }
+        },
+        "form": {
+            "selectTemplate": "Selecione um Template",
+            "selectFile": "Selecione o Arquivo",
+            "selectMode": "Modo de Importação",
+            "modeLabel": "Modo",
+            "modeHelp": "Incremental: apenas novos/modificados. Full: reprocessa tudo.",
+            "duplicateStrategy": "Estratégia para Duplicatas",
+            "strategyIgnore": "Ignorar duplicatas",
+            "strategyReplace": "Substituir existentes",
+            "strategyReject": "Rejeitar duplicatas",
+            "previewButton": "Visualizar Dados",
+            "importButton": "Importar Agora",
+            "scheduleButton": "Agendar Importação",
+            "cronExpression": "Expressão Cron",
+            "cronHelp": "Ex: '0 2 * * *' = 2h todo dia, '0 9 * * 1' = 9h segunda-feira"
+        },
+        "messages": {
+            "uploadSuccess": "Arquivo enviado com sucesso",
+            "validationSuccess": "Todos os {count} registros passaram na validação",
+            "importStarted": "Importação iniciada. Acompanhe o progresso abaixo.",
+            "importCompleted": "Importação concluída com sucesso",
+            "importFailed": "Importação falhou. Verifique os erros abaixo.",
+            "rollbackSuccess": "Importação #{id} foi revertida com sucesso",
+            "rollbackFailed": "Não foi possível reverter importação #{id}"
+        },
+        "validation": {
+            "fileRequired": "Arquivo é obrigatório",
+            "templateRequired": "Template é obrigatório",
+            "fileTooLarge": "Arquivo excede limite de 500MB",
+            "invalidFileType": "Tipo de arquivo não suportado",
+            "invalidMimeType": "MIME type não permitido",
+            "malwareDetected": "Arquivo contém malware e foi bloqueado",
+            "noRecords": "Arquivo não contém registros válidos",
+            "allRecordsRejected": "Todos os {count} registros foram rejeitados por erros de validação"
+        },
+        "errors": {
+            "required": "Campo obrigatório",
+            "invalidEmail": "Email inválido",
+            "invalidDate": "Data inválida. Use formato {format}",
+            "outOfRange": "Valor fora do intervalo {min}-{max}",
+            "foreignKeyNotFound": "Referência não existe no sistema",
+            "duplicateDetected": "Registro duplicado",
+            "invalidFormat": "Formato inválido"
+        },
+        "table": {
+            "columnLine": "Linha",
+            "columnField": "Campo",
+            "columnValue": "Valor",
+            "columnError": "Erro",
+            "columnStatus": "Status",
+            "statusSuccess": "OK",
+            "statusError": "ERRO",
+            "statusWarning": "AVISO"
+        },
+        "progress": {
+            "processing": "Processando...",
+            "processed": "{current} de {total} registros",
+            "percentComplete": "{percent}% concluído",
+            "estimatedTime": "Tempo estimado: {eta}",
+            "ratePerSecond": "{rate} registros/segundo"
+        },
+        "history": {
+            "columnDate": "Data",
+            "columnUser": "Usuário",
+            "columnTemplate": "Template",
+            "columnTotal": "Total",
+            "columnSuccess": "Sucesso",
+            "columnError": "Erros",
+            "columnStatus": "Status",
+            "viewDetails": "Ver Detalhes",
+            "downloadErrors": "Baixar Erros",
+            "rollback": "Reverter"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Criação de Template | `IMP_TEMPLATE_CREATE` | Template ID, Nome, Mapeamentos, Validações |
+| Alteração de Template | `IMP_TEMPLATE_UPDATE` | Template ID, Campos alterados (before/after) |
+| Exclusão de Template | `IMP_TEMPLATE_DELETE` | Template ID, Nome, Mapeamentos |
+| Upload de Arquivo | `IMP_FILE_UPLOAD` | Arquivo ID, Nome, Tamanho, Hash, Timestamp |
+| Scan Antivírus | `IMP_ANTIVIRUS_SCAN` | Arquivo ID, Resultado (Clean/Threat), Threat Name |
+| Execução de Importação | `IMP_EXECUTION_START` | Import ID, Template ID, Mode, Usuario, Timestamp |
+| Conclusão de Importação | `IMP_EXECUTION_COMPLETE` | Import ID, Total, Inseridos, Atualizados, Erros |
+| Detecção de Duplicata | `IMP_DUPLICATE_DETECTED` | Chave, Valor, Estratégia aplicada |
+| Erro de Validação | `IMP_VALIDATION_ERROR` | Linha, Campo, Valor, Regra, Erro |
+| Agendamento Criado | `IMP_SCHEDULE_CREATE` | Schedule ID, Cron, Source URL |
+| Agendamento Executado | `IMP_SCHEDULE_EXECUTED` | Schedule ID, Status, Resultado |
+| Rollback Executado | `IMP_ROLLBACK_EXECUTED` | Import ID, Registros deletados, Timestamp |
+
+**Retencao**: 7 anos (conforme LGPD)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `imp:template:create` | Criar template de importação | Admin, Gestor Financeiro, TI |
+| `imp:template:read` | Visualizar templates | Todos os usuários autenticados |
+| `imp:template:update` | Editar template | Admin, Gestor Financeiro |
+| `imp:template:delete` | Deletar template | Admin |
+| `imp:import:create` | Executar importação manual | Admin, Gestor Financeiro, TI, Analista Dados |
+| `imp:import:read` | Visualizar importações | Todos os usuários autenticados |
+| `imp:import:preview` | Visualizar preview de dados | Admin, Gestor Financeiro, Analista Dados |
+| `imp:import:rollback` | Reverter importação | Admin (apenas) |
+| `imp:schedule:create` | Criar importação agendada | Admin, TI |
+| `imp:schedule:read` | Visualizar importações agendadas | Admin, Gestor Financeiro, TI |
+| `imp:schedule:update` | Editar agendamento | Admin, TI |
+| `imp:schedule:delete` | Deletar agendamento | Admin |
+| `imp:import:export_errors` | Exportar relatório de erros | Admin, Gestor Financeiro, Analista Dados |
+
+**Policy Baseada em Features**:
+
+```csharp
+// Ao solicitar recurso de rollback, verifica se feature IMP_ROLLBACK está habilitada
+[Authorize(Policy = "imp:import:rollback")]
+[FeatureGate("IMP_ROLLBACK")]
+public async Task<IActionResult> RollbackImport(int id)
+{
+    // ...
+}
+```
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD de Templates
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/imports/templates` | Listar templates | `imp:template:read` |
+| GET | `/api/imports/templates/{id}` | Obter template por ID | `imp:template:read` |
+| POST | `/api/imports/templates` | Criar novo template | `imp:template:create` |
+| PUT | `/api/imports/templates/{id}` | Atualizar template | `imp:template:update` |
+| DELETE | `/api/imports/templates/{id}` | Deletar template | `imp:template:delete` |
+| POST | `/api/imports/templates/{id}/clone` | Clonar template | `imp:template:create` |
+
+### 5.2 Operacoes de Importacao
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| POST | `/api/imports` | Executar importação manual | `imp:import:create` |
+| GET | `/api/imports/{id}` | Obter detalhe de importação | `imp:import:read` |
+| GET | `/api/imports/{id}/status` | Obter status em tempo real | `imp:import:read` |
+| GET | `/api/imports/{id}/errors` | Obter erros de importação | `imp:import:read` |
+| GET | `/api/imports/{id}/errors/download` | Baixar relatório de erros (HTML/CSV) | `imp:import:export_errors` |
+| POST | `/api/imports/{id}/rollback` | Reverter importação | `imp:import:rollback` |
+| POST | `/api/imports/preview` | Visualizar preview dos dados | `imp:import:preview` |
+
+### 5.3 Agendamentos
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/imports/scheduled` | Listar agendamentos | `imp:schedule:read` |
+| GET | `/api/imports/scheduled/{id}` | Obter agendamento | `imp:schedule:read` |
+| POST | `/api/imports/scheduled` | Criar agendamento | `imp:schedule:create` |
+| PUT | `/api/imports/scheduled/{id}` | Atualizar agendamento | `imp:schedule:update` |
+| DELETE | `/api/imports/scheduled/{id}` | Deletar agendamento | `imp:schedule:delete` |
+| POST | `/api/imports/scheduled/{id}/execute` | Executar agendamento manual | `imp:schedule:create` |
+| POST | `/api/imports/scheduled/{id}/disable` | Desabilitar agendamento | `imp:schedule:update` |
+
+### 5.4 Historico
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/imports/history` | Listar histórico de importações | `imp:import:read` |
+| GET | `/api/imports/history?templateId={id}&limit=50` | Filtrar por template | `imp:import:read` |
+| GET | `/api/imports/history/{id}` | Detalhe de uma importação no histórico | `imp:import:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Importação Manual (Usuário)
+
+```
+Usuario acessa /imports/create
+    |
+    v
+    [Seleciona Template de Importação]
+    |
+    v
+    [Faz Upload de Arquivo]
+    |
+    +---> [Validacao de arquivo: tamanho, tipo MIME, extensao]
+    |          |
+    |          +---> [OK] --> continua
+    |          |
+    |          +---> [FALHA] --> Erro: "Arquivo invalido"
+    |
+    v
+    [Sistema Scan: ClamAV]
+    |
+    +---> [Malware detectado?]
+    |          |
+    |          +---> [SIM] --> Erro: "Arquivo contem malware"
+    |          |
+    |          +---> [NAO] --> continua
+    |
+    v
+    [Parse do arquivo conforme tipo (CSV, Excel, etc)]
+    |
+    v
+    [Mostra PREVIEW das primeiras 100 linhas]
+    |  (Mapeamento + Transformacao aplicados)
+    |
+    v
+    [Usuario clica "Importar"]
+    |
+    v
+    [Validacao completa de TODAS as linhas]
+    |
+    +---> [Alguma linha com erro?]
+    |          |
+    |          +---> [SIM] --> Mostra erros, pede correcao
+    |          |
+    |          +---> [NAO] --> continua
+    |
+    v
+    [Inicia Job em background (Hangfire)]
+    |
+    +---> Processamento assincronico com SignalR em tempo real
+    |
+    v
+    [Importacao em TRANSACAO SQL]
+    |
+    +---> [Tudo OK?]
+    |          |
+    |          +---> [SIM] --> COMMIT
+    |          |                |
+    |          |                v
+    |          |        [Sucesso: X registros inseridos]
+    |          |
+    |          +---> [NAO] --> ROLLBACK
+    |                   |
+    |                   v
+    |            [Erro: Nenhum registro foi inserido]
+    |
+    v
+    [Registra resultado em ImportHistory]
+    |
+    v
+    [Notifica usuario via SignalR/Email]
+    |
+    v
+    [FIM]
+```
+
+### 6.2 Fluxo de Importacao Agendada (Hangfire)
+
+```
+[Hangfire: Cron trigger "0 2 * * *"]
+    |
+    v
+    [Inicia job: ExecuteScheduledImport(scheduledImportId)]
+    |
+    v
+    [Valida se agendamento esta ativo]
+    |
+    v
+    [Baixa arquivo de sourceUrl (SFTP, S3, Azure Blob)]
+    |
+    +---> [Arquivo disponivel?]
+    |          |
+    |          +---> [NAO] --> Alerta: "Arquivo nao encontrado", Retry
+    |          |
+    |          +---> [SIM] --> continua
+    |
+    v
+    [Executa importacao como modo INCREMENTAL por padrao]
+    |
+    v
+    [Detecta apenas novos/modificados desde ultima execucao]
+    |
+    v
+    [Processa registros em background]
+    |
+    v
+    [Se sucesso: atualiza LastExecutionDate]
+    |
+    v
+    [Se erro: Envia email de alerta para Admin]
+    |
+    v
+    [Hangfire retenta 3x se falhar com backoff exponencial]
+    |
+    v
+    [FIM]
+```
+
+### 6.3 Fluxo de Deteccao de Duplicata e Resolucao
+
+```
+[Linha do arquivo sendo processada]
+    |
+    v
+    [Sistema detecta chave natural: CPF + RazaoSocial]
+    |
+    v
+    [Consulta banco: SELECT * FROM Fornecedor WHERE CPF=X AND RazaoSocial=Y]
+    |
+    +---> [Registro existe?]
+    |          |
+    |          +---> [NAO] --> Insere novo
+    |          |                |
+    |          |                v
+    |          |        [InsertedRecords++]
+    |          |
+    |          +---> [SIM] --> Duplicata detectada
+    |                   |
+    |                   v
+    |            [Aplica DuplicateStrategy]
+    |            |
+    |            +--- [IGNORE] --> SkippedRecords++
+    |            |
+    |            +--- [REPLACE] --> UPDATE do registro existente
+    |            |                   |
+    |            |                   v
+    |            |                  UpdatedRecords++
+    |            |
+    |            +--- [REJECT] --> Adiciona erro
+    |                                |
+    |                                v
+    |                       RejectedRecords++, relata erro
+    |
+    v
+    [Proxima linha]
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao | Implementacao |
+|----------|-----------|----------------|
+| **Validacao de Arquivo** | Verifica tipo MIME, extensao, tamanho | Whitelist de tipos, max 500MB |
+| **Scan Antivírus** | ClamAV em tempo real | Stream scan antes de salvar |
+| **Isolamento de Tenant** | ClienteId obrigatório em queries | Query filters do EF Core |
+| **Autorizacao por RBAC** | Permissoes especificas por recurso | [Authorize(Policy="imp:...")] |
+| **SQL Injection** | Parametrizacao de queries | EF Core + SP com @params |
+| **XSS em Valores** | HTML escape de dados do arquivo | Angular automatic escaping |
+| **CSRF Protection** | Token CSRF em POST | Middleware .NET |
+| **Encriptacao em Transit** | HTTPS obrigatório | TLS 1.2+ |
+| **Encriptacao em Rest** | Arquivo no Azure Blob encriptado | Server-side encryption |
+| **Auditoria Completa** | Todas operacoes registradas | AuditLog com 7 anos retenção |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [ ] SQL Injection: Tentar injetar SQL em campo de mapeamento
+- [ ] XSS: Arquivo com <script>alert('xss')</script> no campo de dados
+- [ ] CSRF: POST sem CSRF token é rejeitado
+- [ ] Autenticacao: Endpoint sem token retorna 401
+- [ ] Autorizacao: Usuário sem permissao retorna 403
+- [ ] Multi-tenancy: Usuario do cliente A nao consegue importar dados do cliente B
+- [ ] File Upload: Tentar upload de .exe, .dll, .bat, etc
+- [ ] Rate Limiting: > 10 imports/min é throttled
+- [ ] Integridade de Dados: Rollback restaura estado anterior com sucesso
+- [ ] Validacao de Entrada: Campo obrigatório vazio é rejeitado
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao |
+|-----|------|---------|
+| **Taxa de Sucesso de Importacao** | > 95% | (ImportacoesComSucesso / TotalImportacoes) * 100 |
+| **Tempo Medio de Importacao** | < 5 min | Media dos TempoDuracao de todas importacoes |
+| **Taxa de Erros de Validacao** | < 2% | (RegistrosRejeitados / TotalProcessados) * 100 |
+| **Taxa de Deteccao de Duplicatas** | 10-20% | (DuplicatasDetectadas / TotalImportados) * 100 |
+| **Disponibilidade do Servico** | > 99.5% | (TempoOperacional / TempoTotal) * 100 |
+| **Throughput** | > 1000 reg/seg | RegistrosProcessados / TempoProcessamento |
+| **Taxa de Rollback** | < 1% | (ImportacoesRevertidas / TotalImportacoes) * 100 |
+| **Utilizacao de Espaco** | Monitorado | Tamanho total em Azure Blob Storage |
+| **Taxa de Erros de Rede** | < 0.5% | (FailurasRede / TotalOperacoes) * 100 |
+| **Tempo Maximo de Processamento** | < 30 min | MAX(TempoDuracao) |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| **Importacao com Erro** | ImportResult.IsSuccessful = false | Email para admin + Slack |
+| **Taxa de Erros Alta** | RejectedRecords > 10% do total | Email com relatorio detalhado |
+| **Agendamento Falhou** | ScheduledImport nao completou em 1h | Alerta + retry automatico |
+| **Espaco em Disco Baixo** | Azure Blob > 80% quota | Email para DevOps |
+| **Throughput Degradado** | < 500 reg/seg | Investigar query lenta |
+| **Malware Detectado** | ClamAV positivo | Email urgente para seguranca |
+| **Tempo de Processamento Longo** | > 20 min | Log com query execution plans |
+| **Permissoes Negadas** | > 5 tentativas 403 em 1 min | Alerta de possivel ataque |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF085](./MD-RF085-Importacao-de-Dados.md) com DDL completo (ImportTemplate, FieldMapping, Import, ImportHistory, ScheduledImport, ValidationRule, etc.)
+
+2. **Casos de Uso**: Criar [UC-RF085](./UC-RF085-Importacao-de-Dados.md) com 5 casos:
+   - UC00: Listar templates de importação
+   - UC01: Criar/editar template de mapeamento
+   - UC02: Executar importação manual
+   - UC03: Visualizar histórico e erros
+   - UC04: Agendar importações recorrentes
+
+3. **Documentacao de Testes**: Criar [TC-RF085-BACKEND.md](./TC-RF085-BACKEND.md) com testes de:
+   - Validacao de arquivo (tamanho, tipo, extensão)
+   - Transformacao de dados (conversão de tipos, formatação)
+   - Deteccao de duplicatas
+   - Agendamento com Hangfire
+   - Rollback transacional
+   - Endpoints da API (200, 400, 403, 500)
+
+4. **Implementacao Backend**: .NET 10 com
+   - Entities: ImportTemplate, FieldMapping, Import, ImportHistory, ScheduledImport, ValidationRule
+   - Commands: CreateImport, RollbackImport, CreateScheduledImport
+   - Queries: GetImportHistory, GetImportErrors, GetImportStatus
+   - Handlers com validators
+   - DbContext com Query Filters
+   - Hangfire jobs
+   - SignalR hubs
+
+5. **Implementacao Frontend**: Angular 19 com
+   - Componentes: TemplateForm, FileUpload, PreviewTable, ErrorReport, HistoryList
+   - Formularios reativos com validacoes
+   - SignalR client para progress em tempo real
+   - Drag-and-drop para upload
+   - Pagination e sorting em tabelas
+
+6. **Testes E2E**: Playwright com cenarios:
+   - Upload arquivo CSV 100MB
+   - Validacao com erros
+   - Preview + preview + importar
+   - Agendar importacao
+   - Consultar status em tempo real
+   - Reverter importacao
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial com 10 regras, 13 endpoints, fluxos, seguranca, metricas | Claude |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code (IControlIT Architect)
+**Revisao**: Pendente de aprovacao técnica

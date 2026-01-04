@@ -1,0 +1,620 @@
+rf_id: RF111
+rf_title: "Backup, Recuperação e Disaster Recovery"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+epic: "EPIC008-SD-Service-Desk"
+fase: "Fase 5 - Service Desk"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF111-001"
+    titulo: "Backup Completo Diário em Horário de Baixa Demanda"
+    descricao: |
+      Backup completo do banco de dados deve ser executado automaticamente
+      todos os dias em horário de baixa demanda operacional (tipicamente madrugada).
+    justificativa: |
+      Minimiza impacto na performance do sistema durante execução do backup.
+      Garante ponto de restauração diário garantido.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Backup agendado para horário configurável de baixa demanda"
+      - "Execução automática sem intervenção manual"
+      - "Falha após 3 tentativas consecutivas deve gerar alerta crítico"
+
+  - id: "RN-RF111-002"
+    titulo: "Backup Incremental Periódico"
+    descricao: |
+      Backup incremental deve ser executado automaticamente em intervalos regulares
+      (padrão: a cada 6 horas), capturando apenas dados alterados desde o último backup.
+    justificativa: |
+      Estabelece RPO de 6 horas. Reduz tempo de execução e espaço de armazenamento
+      comparado com backups completos.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Frequência de backup incremental configurável (padrão: 6 horas)"
+      - "Apenas dados alterados desde último backup devem ser copiados"
+      - "Backup incremental depende de backup completo anterior válido"
+
+  - id: "RN-RF111-003"
+    titulo: "Política de Retenção Configurável"
+    descricao: |
+      Backups devem ser mantidos conforme política configurável: padrão de 7 dias
+      para backups diários, 4 semanas para semanais e 12 meses para mensais.
+    justificativa: |
+      Equilibra disponibilidade de pontos de restauração com custo de armazenamento.
+      12 meses atende conformidade regulatória.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Política de retenção configurável por tipo de backup"
+      - "Remoção automática de backups expirados"
+      - "Backups críticos podem ser marcados como permanentes"
+
+  - id: "RN-RF111-004"
+    titulo: "Criptografia Obrigatória com Chaves Gerenciadas"
+    descricao: |
+      Todos os backups devem ser criptografados com algoritmo forte (mínimo AES-256)
+      antes de serem enviados para armazenamento remoto.
+    justificativa: |
+      Protege contra acesso não autorizado a backups. Atende conformidade LGPD
+      e padrões de segurança federais.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Criptografia obrigatória para todos os backups"
+      - "Algoritmo mínimo: AES-256"
+      - "Chaves armazenadas em cofre de chaves"
+      - "Backup sem criptografia deve ser rejeitado"
+
+  - id: "RN-RF111-005"
+    titulo: "Validação de Integridade Obrigatória"
+    descricao: |
+      Toda restauração de backup deve validar integridade através de checksum
+      criptográfico (mínimo SHA-256) antes de prosseguir.
+    justificativa: |
+      Detecta corrupção de dados. Previne restauração de dados corrompidos
+      que poderiam piorar o cenário de falha.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Checksum calculado no momento da criação do backup"
+      - "Validação automática antes de qualquer restauração"
+      - "Restauração abortada se checksums diferirem"
+
+  - id: "RN-RF111-006"
+    titulo: "Garantia de RPO (Recovery Point Objective)"
+    descricao: |
+      Sistema deve garantir que, em cenário de falha, no máximo 6 horas
+      de transações sejam perdidas.
+    justificativa: |
+      Equilibrio entre frequência de backup (que impacta performance) e
+      proteção de dados.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Tempo desde último backup não pode exceder 6 horas"
+      - "Violação de RPO deve gerar alerta crítico"
+      - "Backup imediato deve ser tentado se RPO for violado"
+
+  - id: "RN-RF111-007"
+    titulo: "Garantia de RTO (Recovery Time Objective)"
+    descricao: |
+      Sistema deve ser capaz de ser restaurado completamente em no máximo 4 horas.
+    justificativa: |
+      Atende SLA comercial e permite continuidade de operações com
+      interrupção limitada.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Tempo total de restauração deve ser <= 4 horas"
+      - "Testes de restauração periódicos devem validar RTO"
+      - "Falha em atingir RTO deve gerar revisão do plano de DR"
+
+  - id: "RN-RF111-008"
+    titulo: "Failover Automático em Caso de Indisponibilidade"
+    descricao: |
+      Se ambiente primário fica indisponível por mais de 15 minutos, sistema
+      deve automaticamente iniciar failover para ambiente secundário.
+    justificativa: |
+      15 minutos diferencia falha transitória de falha real. Failover
+      automático reduz RTO significativamente.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Monitoramento contínuo de saúde do ambiente primário"
+      - "Aguardar 15 minutos antes de iniciar failover"
+      - "Failover deve ser automático"
+      - "Notificação crítica enviada aos administradores"
+
+  - id: "RN-RF111-009"
+    titulo: "Teste de Disaster Recovery Obrigatório"
+    descricao: |
+      Teste completo de plano de DR deve ser executado automaticamente
+      a cada trimestre (4 testes por ano).
+    justificativa: |
+      Valida que DR funciona na prática. Detecta problemas antes de
+      cenário real de desastre.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Teste trimestral obrigatório"
+      - "Teste deve executar em ambiente isolado"
+      - "Validar: failover, integridade de dados, funcionalidade"
+      - "Falha no teste gera alerta crítico e investigação"
+
+  - id: "RN-RF111-010"
+    titulo: "Auditoria Completa de Operações"
+    descricao: |
+      Cada operação de backup ou restore deve ser registrada em trilha
+      de auditoria com dados completos.
+    justificativa: |
+      Oferece rastreabilidade, detecta atividades suspeitas, atende
+      conformidade regulatória.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Registro de todas as operações"
+      - "Dados: usuário, timestamp, tipo, tamanho, checksum, status"
+      - "Trilha de auditoria imutável (append-only)"
+      - "Retenção de auditoria: mínimo 12 meses"
+
+  - id: "RN-RF111-011"
+    titulo: "Isolamento por Tenant"
+    descricao: |
+      Em ambientes multi-tenant, backups devem ser isolados por tenant.
+      Um usuário só pode acessar backups do seu próprio tenant.
+    justificativa: |
+      Previne vazamento de dados entre clientes. Atende conformidade LGPD.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Backups devem incluir identificador do tenant"
+      - "Restauração valida que usuário pertence ao tenant"
+      - "Acesso cruzado deve ser rejeitado e auditado"
+
+  - id: "RN-RF111-012"
+    titulo: "Notificações de Falha e Sucesso"
+    descricao: |
+      Sistema deve notificar administradores sobre eventos críticos e
+      informativos relacionados a backup/restore.
+    justificativa: |
+      Permite reação rápida a problemas. Mantém administradores informados.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Notificações para eventos críticos"
+      - "Notificações para eventos informativos"
+      - "Canais configuráveis (email, SMS, Slack)"
+      - "Alertas críticos exigem confirmação"
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "SD.BACKUP.CREATE"
+    descricao: "Criar backup manual"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Operador de Backup"
+    endpoint: "POST /api/backup"
+
+  - permission_code: "SD.BACKUP.VIEW"
+    descricao: "Visualizar backups"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Operador de Backup"
+      - "Auditor"
+    endpoint: "GET /api/backup"
+
+  - permission_code: "SD.BACKUP.VIEW_ANY"
+    descricao: "Visualizar backups de todos os tenants"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Auditor"
+    endpoint: "GET /api/backup/all"
+
+  - permission_code: "SD.BACKUP.RESTORE"
+    descricao: "Executar restauração de backup"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "DBA"
+    endpoint: "POST /api/backup/{id}/restore"
+
+  - permission_code: "SD.BACKUP.DELETE"
+    descricao: "Deletar backup"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "DELETE /api/backup/{id}"
+
+  - permission_code: "SD.BACKUP.SCHEDULE"
+    descricao: "Agendar backups automáticos"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "POST /api/backup/schedule"
+
+  - permission_code: "SD.DR.MANAGE"
+    descricao: "Gerenciar plano de Disaster Recovery"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "PUT /api/dr/plan"
+
+  - permission_code: "SD.DR.TEST"
+    descricao: "Executar testes de DR"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Operador de Backup"
+    endpoint: "POST /api/dr/test"
+
+  - permission_code: "SD.DR.FAILOVER"
+    descricao: "Iniciar failover manual"
+    roles_autorizadas:
+      - "Super Admin"
+    endpoint: "POST /api/dr/failover"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  - method: "GET"
+    route: "/api/backup"
+    descricao: "Listar backups com paginação e filtros"
+    autenticacao: true
+    authorization_policy: "BackupRead"
+    request_dto: "GetBackupsQuery"
+    response_dto: "PaginatedListDto<BackupDto>"
+
+  - method: "GET"
+    route: "/api/backup/{id}"
+    descricao: "Obter detalhes de backup específico"
+    autenticacao: true
+    authorization_policy: "BackupRead"
+    request_dto: null
+    response_dto: "BackupDto"
+
+  - method: "POST"
+    route: "/api/backup"
+    descricao: "Criar novo backup manual"
+    autenticacao: true
+    authorization_policy: "BackupCreate"
+    request_dto: "CreateBackupCommand"
+    response_dto: "Guid"
+
+  - method: "POST"
+    route: "/api/backup/schedule"
+    descricao: "Agendar backup automático"
+    autenticacao: true
+    authorization_policy: "BackupCreate"
+    request_dto: "ScheduleBackupCommand"
+    response_dto: "Guid"
+
+  - method: "POST"
+    route: "/api/backup/{id}/restore"
+    descricao: "Restaurar a partir de backup"
+    autenticacao: true
+    authorization_policy: "BackupRestore"
+    request_dto: "RestoreBackupCommand"
+    response_dto: "Result"
+
+  - method: "POST"
+    route: "/api/backup/pitr"
+    descricao: "Restaurar para ponto específico no tempo"
+    autenticacao: true
+    authorization_policy: "BackupRestore"
+    request_dto: "RestorePointInTimeCommand"
+    response_dto: "Result"
+
+  - method: "POST"
+    route: "/api/backup/{id}/validate"
+    descricao: "Validar integridade do backup via checksum"
+    autenticacao: true
+    authorization_policy: "BackupRead"
+    request_dto: null
+    response_dto: "ValidateBackupResult"
+
+  - method: "DELETE"
+    route: "/api/backup/{id}"
+    descricao: "Deletar backup"
+    autenticacao: true
+    authorization_policy: "BackupDelete"
+    request_dto: null
+    response_dto: "Result"
+
+  - method: "GET"
+    route: "/api/backup/retention"
+    descricao: "Obter políticas de retenção"
+    autenticacao: true
+    authorization_policy: "BackupRead"
+    request_dto: null
+    response_dto: "RetentionPolicyDto"
+
+  - method: "PUT"
+    route: "/api/backup/retention"
+    descricao: "Atualizar políticas de retenção"
+    autenticacao: true
+    authorization_policy: "BackupManage"
+    request_dto: "UpdateRetentionPolicyCommand"
+    response_dto: "Result"
+
+  - method: "GET"
+    route: "/api/dr/plan"
+    descricao: "Obter configuração do plano de DR"
+    autenticacao: true
+    authorization_policy: "DrManage"
+    request_dto: null
+    response_dto: "DrPlanDto"
+
+  - method: "PUT"
+    route: "/api/dr/plan"
+    descricao: "Atualizar plano de DR"
+    autenticacao: true
+    authorization_policy: "DrManage"
+    request_dto: "UpdateDrPlanCommand"
+    response_dto: "Result"
+
+  - method: "POST"
+    route: "/api/dr/test"
+    descricao: "Executar teste de DR"
+    autenticacao: true
+    authorization_policy: "DrTest"
+    request_dto: "ExecuteDrTestCommand"
+    response_dto: "DrTestResultDto"
+
+  - method: "POST"
+    route: "/api/dr/failover"
+    descricao: "Iniciar failover manual para região secundária"
+    autenticacao: true
+    authorization_policy: "DrFailover"
+    request_dto: "InitiateFailoverCommand"
+    response_dto: "Result"
+
+  - method: "POST"
+    route: "/api/dr/failback"
+    descricao: "Retornar para região primária"
+    autenticacao: true
+    authorization_policy: "DrManage"
+    request_dto: "InitiateFailbackCommand"
+    response_dto: "Result"
+
+  - method: "GET"
+    route: "/api/dr/status"
+    descricao: "Obter status atual do ambiente de DR"
+    autenticacao: true
+    authorization_policy: "DrManage"
+    request_dto: null
+    response_dto: "DrStatusDto"
+
+  - method: "GET"
+    route: "/api/backup/statistics"
+    descricao: "Obter estatísticas de backups"
+    autenticacao: true
+    authorization_policy: "BackupRead"
+    request_dto: null
+    response_dto: "BackupStatisticsDto"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Disponibilidade de Backups"
+    descricao: "Percentual de backups bem-sucedidos"
+    meta: ">= 99.9%"
+    calculo: "Backups bem-sucedidos / Total de backups agendados"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Backup Full"
+    descricao: "Tempo médio de execução de backup completo"
+    meta: "<= 2 horas"
+    calculo: "Média de tempo desde início até conclusão"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Restauração"
+    descricao: "Tempo médio de restauração completa"
+    meta: "<= 4 horas"
+    calculo: "Tempo desde início até conclusão da restauração"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Sucesso de Teste de DR"
+    descricao: "Percentual de testes trimestrais que passam"
+    meta: "100%"
+    calculo: "Testes DR aprovados / Total de testes DR"
+    log_obrigatorio: true
+
+  - nome: "RPO Compliance"
+    descricao: "Percentual de tempo com RPO respeitado"
+    meta: "100%"
+    calculo: "Tempo com backup < 6h / Tempo total"
+    log_obrigatorio: true
+
+  - nome: "RTO Compliance"
+    descricao: "Percentual de restaurações dentro de RTO"
+    meta: "100%"
+    calculo: "Restaurações <= 4h / Total de restaurações"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "Falha de Backup"
+    threshold: "> 3 falhas consecutivas"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "sms"
+      - "slack"
+
+  - evento: "Violação de RPO"
+    threshold: "Último backup > 6 horas"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "sms"
+      - "slack"
+
+  - evento: "Violação de RTO"
+    threshold: "Restauração > 4 horas"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+  - evento: "Espaço de Armazenamento Baixo"
+    threshold: "< 10% disponível"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+  - evento: "Falha de Validação de Integridade"
+    threshold: "Checksum não coincide"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "sms"
+      - "slack"
+
+  - evento: "Falha de Failover Automático"
+    threshold: "Failover não completou em 30 min"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "sms"
+      - "slack"
+
+  - evento: "Falha de Teste de DR"
+    threshold: "Qualquer falha em teste trimestral"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+  - evento: "Tentativa de Acesso Não Autorizado"
+    threshold: "> 5 tentativas em 10 minutos"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "sms"
+      - "slack"
+
+# ==============================================================================
+# CENTRAL DE FUNCIONALIDADES
+# ==============================================================================
+
+central_funcionalidades:
+  - feature_key: "BACKUP_AUTOMATED"
+    nome: "Backup Automático"
+    descricao: "Ativa backup automático de banco de dados"
+    modulo: "Service Desk"
+    i18n_titulo: "backup.features.automated.title"
+    i18n_descricao: "backup.features.automated.description"
+    habilitado_padrao: true
+
+  - feature_key: "BACKUP_FILE_STORAGE"
+    nome: "Backup de Arquivos"
+    descricao: "Ativa backup automático de arquivos em storage"
+    modulo: "Service Desk"
+    i18n_titulo: "backup.features.fileStorage.title"
+    i18n_descricao: "backup.features.fileStorage.description"
+    habilitado_padrao: true
+
+  - feature_key: "BACKUP_PITR"
+    nome: "Point-in-Time Recovery"
+    descricao: "Ativa capacidade de restaurar para ponto específico no tempo"
+    modulo: "Service Desk"
+    i18n_titulo: "backup.features.pitr.title"
+    i18n_descricao: "backup.features.pitr.description"
+    habilitado_padrao: true
+
+  - feature_key: "DR_FAILOVER"
+    nome: "Failover Automático"
+    descricao: "Ativa failover automático para DR"
+    modulo: "Service Desk"
+    i18n_titulo: "dr.features.failover.title"
+    i18n_descricao: "dr.features.failover.description"
+    habilitado_padrao: true
+
+  - feature_key: "DR_TEST"
+    nome: "Testes de DR"
+    descricao: "Ativa testes periódicos de disaster recovery"
+    modulo: "Service Desk"
+    i18n_titulo: "dr.features.test.title"
+    i18n_descricao: "dr.features.test.description"
+    habilitado_padrao: true
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_regras_negocio: 12
+  total_endpoints: 17
+  total_permissoes: 9
+  total_kpis: 6
+  total_alertas: 8
+  total_features: 5
+  completude: "100%"
+  sincronizado_com_md: true

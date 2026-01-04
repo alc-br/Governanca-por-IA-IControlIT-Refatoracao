@@ -1,0 +1,369 @@
+# =============================================
+# RF040 - Gestão de Troncos Telefônicos
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# Data: 2025-12-30
+# =============================================
+
+rf:
+  id: "RF040"
+  nome: "Gestão de Troncos Telefônicos"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 6 - Ativos, Auditoria e Integrações"
+  epic: "EPIC010-AUD"
+  status: "aprovado" # draft | aprovado | em_desenvolvimento | concluido
+
+descricao:
+  objetivo: "Implementar sistema completo de gerenciamento de troncos telefônicos (SIP, E1/R2, analógicos), incluindo monitoramento de disponibilidade em tempo real, análise de capacidade versus utilização, detecção automática de falhas, balanceamento de carga, custeio detalhado por tronco, integração com PABX/gateways e relatórios de QoS (Quality of Service)."
+  problema_resolvido: "Garantir alta disponibilidade de telefonia (99,9% uptime SLA), otimizar custos operacionais, detectar falhas proativamente e melhorar a experiência do usuário final por meio de monitoramento contínuo e automação de failover."
+  publico_afetado: "Gestores de TI, equipe de infraestrutura, NOC (Network Operations Center), administradores de telefonia, departamento financeiro (custeio), usuários finais (qualidade de chamadas)."
+
+escopo:
+  incluso:
+    - "Cadastro e configuração de troncos telefônicos (SIP, E1/R2, analógicos)"
+    - "Monitoramento contínuo de status em tempo real (polling 30 segundos)"
+    - "Coleta e cálculo de métricas de QoS (jitter, latência, packet loss, MOS score)"
+    - "Detecção automática de falhas e degradação de qualidade"
+    - "Failover automático para troncos backup (<5 segundos)"
+    - "Balanceamento de carga com algoritmo Least Call Count"
+    - "Análise de capacidade versus utilização mensal"
+    - "Custeio detalhado por tronco com rateio por centro de custo"
+    - "Integração com PABX via API REST e SNMP"
+    - "Dashboard de QoS em tempo real com gráficos históricos"
+    - "Relatórios de disponibilidade (% uptime) e métricas MTBF/MTTR"
+    - "Simulador de economia para migração SIP versus E1"
+    - "Detecção de loops e chamadas anômalas"
+    - "Análise comparativa de TCO por tecnologia (E1, SIP, analógico)"
+    - "Integração com gestão de bilhetes telefônicos (RF039)"
+    - "Sistema de alertas escalonados (SMS, e-mail, push, chamada)"
+    - "Controle de acesso granular e isolamento multi-tenant"
+    - "Auditoria completa de falhas, failovers e alterações de configuração"
+  fora:
+    - "Interface de configuração de PABX (gerenciado externamente)"
+    - "Gravação de chamadas (escopo de RF039)"
+    - "Tarifação de chamadas (escopo de RF039)"
+    - "Interface visual específica (definida por WF-RF040)"
+    - "Tecnologia, framework ou linguagem (decisão de implementação)"
+    - "Layout, UX ou identidade visual (definido em WF-RF040)"
+    - "Estratégia de deploy ou infraestrutura"
+
+entidades:
+  - nome: "Tronco"
+    descricao: "Linha telefônica física ou virtual que conecta o PABX à rede pública ou operadora"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "MetricaQoS"
+    descricao: "Métricas de qualidade de serviço (jitter, latência, packet loss, MOS) coletadas em tempo real"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "EventoFailover"
+    descricao: "Registro de eventos de failover automático (tronco origem, destino, timestamp, duração)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "HistoricoDisponibilidade"
+    descricao: "Histórico mensal de disponibilidade de cada tronco (% uptime, SLA, créditos)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "SimulacaoEconomia"
+    descricao: "Simulação de ROI para migração entre tecnologias de troncos"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF040-01"
+    descricao: "Monitoramento contínuo de troncos a cada 30 segundos usando protocolos apropriados (SIP OPTIONS, SNMP GET, API REST)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "UltimaVerificacao", "TentativasFalha"]
+    obrigatorio: true
+
+  - id: "RN-RF040-02"
+    descricao: "Cálculo automático de MOS score usando algoritmo E-Model (ITU-T G.107) baseado em jitter, latência e packet loss"
+    tipo: "regra_negocio"
+    campos_afetados: ["Jitter", "Latencia", "PacketLoss", "MOSScore"]
+    obrigatorio: true
+
+  - id: "RN-RF040-03"
+    descricao: "Failover automático em menos de 5 segundos após 3 falhas consecutivas (90 segundos)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "TroncoBackupId", "UltimoFailover"]
+    obrigatorio: true
+
+  - id: "RN-RF040-04"
+    descricao: "Balanceamento de carga com algoritmo Least Call Count (menor número de chamadas ativas)"
+    tipo: "regra_negocio"
+    campos_afetados: ["ChamadasAtivas", "Utilizacao"]
+    obrigatorio: true
+
+  - id: "RN-RF040-05"
+    descricao: "Alerta de congestionamento se utilização >80% por >5 minutos consecutivos"
+    tipo: "regra_negocio"
+    campos_afetados: ["Utilizacao", "TempoCongestionamento"]
+    obrigatorio: true
+
+  - id: "RN-RF040-06"
+    descricao: "Análise de capacidade versus utilização mensal com classificação (Ocioso <30%, Adequado 30-80%, Congestionado >80%)"
+    tipo: "regra_negocio"
+    campos_afetados: ["CapacidadeCanais", "UtilizacaoMedia"]
+    obrigatorio: true
+
+  - id: "RN-RF040-07"
+    descricao: "Custeio detalhado por tronco com rateio por centro de custo baseado em minutos utilizados"
+    tipo: "regra_negocio"
+    campos_afetados: ["CustoFixo", "CustoVariavel", "MinutosUtilizados"]
+    obrigatorio: true
+
+  - id: "RN-RF040-08"
+    descricao: "Cálculo de MTBF (Mean Time Between Failures) e MTTR (Mean Time To Repair) para análise de confiabilidade"
+    tipo: "regra_negocio"
+    campos_afetados: ["QuantidadeFalhas", "TempoInatividade"]
+    obrigatorio: true
+
+  - id: "RN-RF040-09"
+    descricao: "Relatório mensal de disponibilidade com comparação SLA (99,9% típico) e cálculo de créditos"
+    tipo: "regra_negocio"
+    campos_afetados: ["MinutosDisponiveis", "MinutosIndisponiveis", "SLAContratado"]
+    obrigatorio: true
+
+  - id: "RN-RF040-10"
+    descricao: "Integração com PABX via API REST e SNMP para controle de roteamento e coleta de métricas"
+    tipo: "integracao"
+    campos_afetados: ["EndpointAPI", "CredenciaisAPI", "ConfiguracaoSNMP"]
+    obrigatorio: true
+
+  - id: "RN-RF040-11"
+    descricao: "Dashboard de QoS atualizado a cada 30 segundos via SignalR com histórico de 90 dias"
+    tipo: "regra_negocio"
+    campos_afetados: ["Jitter", "Latencia", "PacketLoss", "MOSScore"]
+    obrigatorio: true
+
+  - id: "RN-RF040-12"
+    descricao: "Simulador de economia para migração SIP vs E1 com cálculo de ROI e break-even point"
+    tipo: "regra_negocio"
+    campos_afetados: ["CustoFixo", "CustoVariavel", "InvestimentoInicial"]
+    obrigatorio: false
+
+  - id: "RN-RF040-13"
+    descricao: "Detecção de loops (>10 chamadas mesmo número em <5 min) e chamadas anômalas com bloqueio automático"
+    tipo: "seguranca"
+    campos_afetados: ["NumeroDestino", "QuantidadeChamadas", "ScoreAnomalia"]
+    obrigatorio: true
+
+  - id: "RN-RF040-14"
+    descricao: "Análise comparativa de TCO (Total Cost of Ownership) por tecnologia (E1, SIP, analógico) em 3 anos"
+    tipo: "regra_negocio"
+    campos_afetados: ["TipoTronco", "CustoAquisicao", "CustoOperacional"]
+    obrigatorio: false
+
+  - id: "RN-RF040-15"
+    descricao: "Integração com gestão de bilhetes telefônicos (RF039) para análise cruzada de custo e qualidade"
+    tipo: "integracao"
+    campos_afetados: ["BilheteId", "TroncoUtilizado", "CustoTotal"]
+    obrigatorio: true
+
+estados:
+  - id: "disponivel"
+    descricao: "Tronco operacional e pronto para receber chamadas"
+  - id: "ocupado"
+    descricao: "Tronco com chamadas ativas (não atingiu capacidade máxima)"
+  - id: "indisponivel"
+    descricao: "Tronco com falha, não responde a verificações"
+  - id: "congestionado"
+    descricao: "Tronco com utilização >80% por >5 minutos"
+  - id: "manutencao"
+    descricao: "Tronco temporariamente desativado para manutenção programada"
+  - id: "inativo"
+    descricao: "Tronco desativado administrativamente (exclusão lógica)"
+
+transicoes:
+  permitidas:
+    - de: "disponivel"
+      para: "ocupado"
+      condicao: "Chamada ativa iniciada"
+    - de: "ocupado"
+      para: "disponivel"
+      condicao: "Todas as chamadas finalizadas"
+    - de: "disponivel"
+      para: "indisponivel"
+      condicao: "3 falhas consecutivas de monitoramento"
+    - de: "indisponivel"
+      para: "disponivel"
+      condicao: "2 verificações consecutivas OK + 5 min estabilidade"
+    - de: "disponivel"
+      para: "congestionado"
+      condicao: "Utilização >80% por >5 min"
+    - de: "congestionado"
+      para: "disponivel"
+      condicao: "Utilização <80%"
+    - de: "disponivel"
+      para: "manutencao"
+      condicao: "Ação administrativa"
+    - de: "manutencao"
+      para: "disponivel"
+      condicao: "Manutenção concluída"
+    - de: "disponivel"
+      para: "inativo"
+      condicao: "Exclusão lógica"
+    - de: "inativo"
+      para: "disponivel"
+      condicao: "Reativação administrativa"
+  proibidas:
+    - de: "indisponivel"
+      para: "congestionado"
+      motivo: "Tronco com falha não pode estar congestionado"
+    - de: "inativo"
+      para: "ocupado"
+      motivo: "Tronco inativo não pode receber chamadas"
+
+permissoes:
+  - codigo: "GES.TRONCOS.VISUALIZAR"
+    descricao: "Visualizar status de troncos"
+  - codigo: "GES.TRONCOS.CONFIGURAR"
+    descricao: "Configurar troncos e roteamento"
+  - codigo: "GES.TRONCOS.MONITORAR"
+    descricao: "Acessar dashboard de monitoramento"
+  - codigo: "GES.TRONCOS.DASHBOARD"
+    descricao: "Acessar dashboard de QoS"
+  - codigo: "GES.TRONCOS.RELATORIOS"
+    descricao: "Gerar relatórios gerenciais"
+  - codigo: "GES.TRONCOS.FAILOVER_MANUAL"
+    descricao: "Executar failover manual"
+
+integracoes:
+  internas:
+    - "Autenticacao"
+    - "Multi-Tenancy (Id_Conglomerado)"
+    - "Auditoria (eventos de falha, failover, alterações)"
+    - "Permissões RBAC"
+    - "Central de Funcionalidades (GES.TRONCOS)"
+    - "Internacionalização i18n"
+    - "RF039 - Gestão de Bilhetes Telefônicos"
+  externas:
+    - sistema: "PABX (Asterisk, FreePBX, Elastix, 3CX)"
+      tipo: "API REST + SNMP"
+      obrigatoria: true
+    - sistema: "Gateway VoIP"
+      tipo: "SIP + SNMP"
+      obrigatoria: true
+    - sistema: "ERP (SAP, TOTVS)"
+      tipo: "API REST (custeio)"
+      obrigatoria: false
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacoes_obrigatorias:
+    - "Validação de entrada (prevenir SQL Injection, XSS)"
+    - "Proteção contra injeção em comandos PABX"
+    - "API Key + IP Whitelist para integração PABX"
+    - "Criptografia de credenciais de troncos"
+    - "Rate limiting em endpoints de monitoramento"
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00 - Listar Troncos"
+    - "UC01 - Criar Configuração de Tronco"
+    - "UC02 - Visualizar Dashboard de Monitoramento"
+    - "UC03 - Executar Failover Manual"
+    - "UC04 - Gerar Relatório de Disponibilidade"
+    - "UC05 - Configurar Alertas de QoS"
+    - "UC06 - Simular Migração SIP vs E1"
+    - "UC07 - Analisar TCO por Tecnologia"
+    - "UC08 - Visualizar Métricas de QoS Históricas"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar tronco"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar troncos"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar detalhes de tronco"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar configuração de tronco"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Inativar tronco (exclusão lógica)"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar campos obrigatórios (nome, tipo, capacidade)"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar unicidade de nome de tronco por tenant"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar configuração de tronco backup (deve estar disponível)"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar credenciais de integração PABX"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant (Id_Conglomerado)"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC (6 permissões granulares)"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Criptografia de credenciais de troncos"
+      required: true
+    - id: "RF-SEC-04"
+      title: "API Key + IP Whitelist para PABX"
+      required: true
+
+  monitoramento:
+    - id: "RF-MON-01"
+      title: "Polling a cada 30 segundos"
+      required: true
+    - id: "RF-MON-02"
+      title: "Coleta de métricas de QoS (jitter, latência, packet loss)"
+      required: true
+    - id: "RF-MON-03"
+      title: "Cálculo de MOS score (E-Model ITU-T G.107)"
+      required: true
+    - id: "RF-MON-04"
+      title: "Detecção de falhas (3 tentativas consecutivas)"
+      required: true
+
+  automacao:
+    - id: "RF-AUT-01"
+      title: "Failover automático (<5 segundos)"
+      required: true
+    - id: "RF-AUT-02"
+      title: "Balanceamento de carga (Least Call Count)"
+      required: true
+    - id: "RF-AUT-03"
+      title: "Alertas escalonados (SMS, e-mail, push, chamada)"
+      required: true
+    - id: "RF-AUT-04"
+      title: "Redistribuição automática de carga em congestionamento"
+      required: true
+
+exclusions:
+  rf_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração para Governança v2.0 - Separação estrita RF/RL, remoção de referências ao legado, contrato funcional moderno estruturado"
+  - versao: "1.0"
+    data: "2025-01-14"
+    autor: "Architect Agent"
+    descricao: "Versão inicial com 5 seções obrigatórias e 15 regras de negócio"

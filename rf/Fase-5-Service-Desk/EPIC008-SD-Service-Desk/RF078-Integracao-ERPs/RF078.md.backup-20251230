@@ -1,0 +1,946 @@
+# RF078: Integração com ERPs
+
+**Versão**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF021 (Catálogo), RF032 (Notas Fiscais), RF023 (Contratos)
+**EPIC**: EPIC008-SD-Service-Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+O módulo de **Integração com ERPs** do IControlIT estabelece a comunicação bidirecional e em tempo real com sistemas de gestão empresarial (SAP, TOTVS Protheus, Oracle EBS), permitindo sincronização de dados mestres, operações transacionais e auditoria de conformidade fiscal.
+
+Este requisito especifica como o IControlIT se conecta com ERPs corporativos para eliminar silos de dados, garantir conformidade com legislação contábil/fiscal (SOX, NF-e) e implementar fluxos de negócio integrados entre TI e gestão financeira.
+
+### 1.2 Importância Estratégica
+
+O módulo de Integração é crítico para:
+
+- **Conformidade Fiscal**: Exportação de custos de TI para centros de custo contábeis, eliminando divergências entre sistemas
+- **Automação Operacional**: Sincronização de catálogos de serviços, departamentos, fornecedores reduz entrada manual de dados
+- **Rastreabilidade SOX**: Auditoria completa de quem alterou o quê, quando e com que propósito em integrações
+- **Conciliação Financeira**: Automação na reconciliação de faturas telecom com contas a pagar do ERP
+- **Eficiência de Processos**: Eliminação de reconciliações manuais e correções ad-hoc entre sistemas
+
+### 1.3 Conceitos Fundamentais
+
+**ERP (Enterprise Resource Planning)**: Sistema integrado que gerencia processos de negócio (contabilidade, compras, RH, estoque, suprimentos)
+- No contexto IControlIT, referem-se a SAP, TOTVS Protheus e Oracle EBS
+
+**Sincronização Bidirecional**: Dados fluem em ambas as direções (IControlIT ↔ ERP) com tratamento de conflitos
+- Exemplo: Centro de Custo criado no ERP importado para IControlIT, departamento criado em IControlIT exportado para ERP
+
+**Transformação de Dados**: Conversão entre formatos (JSON ↔ XML ↔ EDI) e schemas diferentes entre sistemas
+- Inclui mapping de campos, tratamento de valores nulos, validação de domínios
+
+**Webhook**: Notificação automática disparada quando um evento ocorre (mudança de status, criação de registro)
+- Reduz latência: em vez de polling a cada 5 min, ERP notifica IControlIT imediatamente
+
+**Retry com Backoff Exponencial**: Mecanismo de recuperação para falhas transientes (timeout de rede, indisponibilidade temporária do ERP)
+- Exemplo: tenta em 2s, depois 4s, 8s, 16s com máximo de 5 tentativas
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Integração com SAP** | RFC ABAP manual, sem autenticação criptografada | RFC + OAuth 2.0 via Azure Service Bus |
+| **Sincronização de Dados** | Import/export batch diário via SFTP | Webhooks em tempo real + polling com deduplicação |
+| **Tratamento de Erros** | Log em arquivo, sem retry automático | Retry com backoff exponencial, DLQ (Dead Letter Queue) |
+| **Conformidade Audit** | Logs não estruturados em texto plano | Auditoria estruturada em tabela central, 7 anos retenção |
+| **Transformação de Dados** | Parsing manual de XML em VB.NET | Bibliotecas JSON/XML padronizadas, validação de schema |
+| **Dashboard de Status** | Relatório manual via SQL Server | Dashboard em tempo real com status de cada integração |
+| **Segurança de Credenciais** | Hardcoded em web.config | Azure Key Vault, rotação automática a cada 90 dias |
+
+### 1.5 Funcionalidades Principais
+
+1. **Integração Multi-ERP** - Suporte simultâneo para SAP, TOTVS Protheus, Oracle EBS
+2. **Sincronização de Centros de Custo** - Importação automática de estrutura organizacional do ERP
+3. **Sincronização de Departamentos/Colaboradores** - Mapeamento entre estrutura IControlIT e RH do ERP
+4. **Exportação de Custos de TI** - Envio de custos de serviços para contabilização no ERP (integração com RF032)
+5. **Importação de Compras** - Recebimento de ordens de compra, notas fiscais do ERP
+6. **Conciliação de Faturas** - Matching automático de contas a pagar do ERP com faturas de telecom do IControlIT
+7. **Webhooks para Eventos** - Notificação em tempo real de mudanças de status, criação de registros
+8. **Retry Automático com Backoff** - Mecanismo de recuperação de falhas com exponential backoff
+9. **Transformação de Dados** - Mapping bidirecional entre schemas de JSON, XML e EDI
+10. **Dashboard de Integrações** - Visualização em tempo real do status, logs e métricas de cada integração
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-ERP-078-01: Sincronização de Centros de Custo deve ser bidirecional
+
+**Descrição**: Centros de custo podem ser criados ou alterados tanto no IControlIT quanto no ERP, e as mudanças devem ser sincronizadas automaticamente em ambas as direções.
+
+**Justificativa**: Estrutura organizacional é muitas vezes definida no ERP (SAP), mas pode sofrer ajustes em IControlIT. Sem sincronização bidirecional, divergências comprometem auditoria e conformidade fiscal.
+
+**Implementação**:
+```csharp
+public class CentroCustoSyncHandler
+{
+    public async Task SincronizarFromERP(CentroCustoDTO dto)
+    {
+        var existente = await _repo.BuscarPorCodigoERP(dto.CodigoERP);
+
+        if (existente == null)
+        {
+            // Criar novo
+            var novo = new CentroCusto(dto.Codigo, dto.Descricao, dto.CodigoERP);
+            await _repo.Adicionar(novo);
+        }
+        else
+        {
+            // Atualizar existente
+            existente.Atualizar(dto.Descricao);
+            await _repo.Atualizar(existente);
+        }
+
+        // Registrar auditoria
+        await _auditService.Registrar("ERP_CC_SYNC", dto.CodigoERP, "IMPORT");
+    }
+}
+```
+
+**Exemplos**:
+- Centro de Custo "TI-001" criado no SAP → sincronizado automaticamente para IControlIT
+- Centro de Custo "TI-002" desativado em IControlIT → exporte para SAP marca como inativo
+
+---
+
+### RN-ERP-078-02: Credenciais de ERP devem ser armazenadas em Azure Key Vault com rotação automática
+
+**Descrição**: Senhas, tokens de API e certificados RFC devem ser armazenados criptografado em Azure Key Vault, nunca em código ou arquivo de config.
+
+**Justificativa**: Conformidade com SOX, LGPD e boas práticas de segurança. Credenciais hardcoded em repositório ou config files são vulnerabilidades críticas.
+
+**Implementação**:
+```csharp
+public class ERPCredentialService
+{
+    private readonly IKeyVaultService _vault;
+
+    public async Task<string> ObterCredencial(string nomeERP, string tipo)
+    {
+        // Busca em Key Vault com rotação automática
+        string chave = $"erp-{nomeERP.ToLower()}-{tipo}";
+        var credential = await _vault.GetSecretAsync(chave);
+
+        if (credential.ExpiraEm < DateTime.UtcNow.AddDays(7))
+        {
+            // Rotacionar antes de expirar
+            await RotacionarCredencial(nomeERP, tipo);
+        }
+
+        return credential.Valor;
+    }
+}
+```
+
+**Exemplos**:
+- Cliente="SAP", Tipo="RFC_PASSWORD" → busca em Key Vault, rotaciona a cada 90 dias
+- Cliente="ORACLE", Tipo="OAUTH_TOKEN" → renova token 7 dias antes do vencimento
+
+---
+
+### RN-ERP-078-03: Integrações com falha devem registrar na Dead Letter Queue e notificar administrador
+
+**Descrição**: Quando uma integração falha após 5 tentativas com backoff exponencial, a mensagem é movida para Dead Letter Queue (DLQ) e um alerta é disparado para o administrador de integrações.
+
+**Justificativa**: Garantir que nenhuma integração seja silenciosamente perdida. DLQ permite investigação posterior sem bloquear o fluxo normal.
+
+**Implementação**:
+```csharp
+public class IntegrationRetryHandler
+{
+    public async Task ProcessarComRetry(IntegracaoDTO integracao)
+    {
+        int tentativa = 0;
+        const int maxTentativas = 5;
+
+        while (tentativa < maxTentativas)
+        {
+            try
+            {
+                await _erpClient.Executar(integracao);
+                await _auditService.Registrar("INTEG_SUCCESS", integracao.Id, "");
+                return;
+            }
+            catch (Exception ex)
+            {
+                tentativa++;
+                int delayMs = (int)Math.Pow(2, tentativa) * 1000; // 2s, 4s, 8s, 16s, 32s
+
+                if (tentativa < maxTentativas)
+                {
+                    await Task.Delay(delayMs);
+                }
+                else
+                {
+                    // Mover para DLQ
+                    await _serviceBus.MoverParaDLQ(integracao);
+                    await _alertService.Notificar(
+                        "INTEG_FALHA_DLQ",
+                        $"Integração {integracao.Id} falhou após 5 tentativas",
+                        AlertNivel.CRITICO);
+
+                    await _auditService.Registrar("INTEG_FAILED_DLQ", integracao.Id, ex.Message);
+                    throw;
+                }
+            }
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Integração de Nota Fiscal falha 5x → movida para DLQ, email enviado para gestor
+- Sincronização de RH falha temporariamente → retry automático resolve em 2ª tentativa
+
+---
+
+### RN-ERP-078-04: Exportação de custos de TI para ERP deve respeitar centro de custo e período contábil
+
+**Descrição**: Custos são exportados apenas para centros de custo válidos no ERP e apenas para períodos contábeis abertos ou atuais.
+
+**Justificativa**: Evitar contabilização de custos em centros inexistentes ou períodos fechados, que causariam erro no ERP e inconsistência fiscal.
+
+**Implementação**:
+```csharp
+public class ExportacaoCustosService
+{
+    public async Task ExportarCustosParaERP(int mes, int ano)
+    {
+        var periodo = await _erpClient.ValidarPeriodoAberto(mes, ano);
+        if (!periodo.EstaAberto)
+            throw new PeriodoFechadoException($"Período {mes}/{ano} está fechado no ERP");
+
+        var custos = await _repo.ObterCustosPorCentroCusto(mes, ano);
+
+        foreach (var grupo in custos.GroupBy(c => c.IdCentroCusto))
+        {
+            var cc = await _repo.ObterCentroCusto(grupo.Key);
+            if (string.IsNullOrEmpty(cc.CodigoERP))
+            {
+                await _auditService.Registrar(
+                    "EXPORT_CUSTO_SKIP",
+                    cc.Id.ToString(),
+                    $"Sem mapeamento para ERP");
+                continue; // Pula centros sem mapeamento
+            }
+
+            var totalCusto = grupo.Sum(c => c.Valor);
+            await _erpClient.ContabilizarCusto(cc.CodigoERP, totalCusto, mes, ano);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Centro de Custo "TI-INFRAESTRUTURA" com CodigoERP="1000" → exportar custos normalmente
+- Centro de Custo "TI-TEMP" sem CodigoERP → pular exportação, registrar no log
+
+---
+
+### RN-ERP-078-05: Cada mensagem integrada deve ter identificador único (UUID) para deduplicação
+
+**Descrição**: Todas as mensagens enviadas ou recebidas em integrações possuem UUID único. Se a mesma mensagem for reprocessada, ela é identificada como duplicata.
+
+**Justificativa**: Evitar processamento duplicado em caso de retry. Exemplo: se Nota Fiscal é enviada para ERP, falha, retry reprocessa, sem UUID teríamos duplicação de registro.
+
+**Implementação**:
+```csharp
+public class IntegracaoMessage
+{
+    public string MessageId { get; set; } = Guid.NewGuid().ToString();
+    public DateTime DataCriacao { get; set; } = DateTime.UtcNow;
+    public string TipoIntegracao { get; set; } // "NF_IMPORT", "CC_SYNC", etc
+    public object Payload { get; set; }
+
+    public async Task Processar(IIntegrationHandler handler)
+    {
+        // Verifica se já foi processada
+        if (await _repo.JaProcessada(this.MessageId))
+        {
+            await _auditService.Registrar("INTEG_DUPLICATA", MessageId, "Ignorada");
+            return;
+        }
+
+        await handler.Processar(this);
+        await _repo.MarcarComoProcessada(this.MessageId);
+    }
+}
+```
+
+**Exemplos**:
+- Nota Fiscal com MessageId="abc-123" enviada, timeout, retry reprocessa → detecta como duplicata
+- Dois webhooks do SAP com mesmo MessageId → processa apenas uma vez
+
+---
+
+### RN-ERP-078-06: Transformação de dados deve validar schema e tipo de campo antes de processar
+
+**Descrição**: Todo dado recebido do ERP (JSON, XML, EDI) é validado contra um schema JSON Schema v7 ou XSD antes de ser processado.
+
+**Justificativa**: Dados malformados ou com tipos incorretos causam erros silenciosos ou crashes. Validação preventiva garante qualidade dos dados.
+
+**Implementação**:
+```csharp
+public class DataTransformationService
+{
+    public async Task<TDestino> TransformarComValidacao<TOrigem, TDestino>(
+        TOrigem origem,
+        string schemaPath)
+    {
+        // Validar schema
+        var schema = await _schemaLoader.CarregarSchema(schemaPath);
+        var validacao = JsonSchemaValidator.Validar(origem, schema);
+
+        if (!validacao.Valido)
+        {
+            await _auditService.Registrar(
+                "TRANSFORM_VALIDATION_FAIL",
+                origem.Id.ToString(),
+                string.Join(", ", validacao.Erros));
+            throw new DataValidationException(validacao.Erros);
+        }
+
+        // Transformar
+        var destino = _mapper.Map<TDestino>(origem);
+        return destino;
+    }
+}
+```
+
+**Exemplos**:
+- XML de Nota Fiscal recebido → valida contra XSD, campos obrigatórios, tipos → transforma em DTO C#
+- JSON de Centro de Custo do TOTVS → valida contra JSON Schema, aplica regras de negócio → importa
+
+---
+
+### RN-ERP-078-07: Logs de integração devem registrar entrada, saída e erro em tabela estruturada com retenção de 7 anos
+
+**Descrição**: Todas as operações de integração (sync, import, export) registram dados estruturados em tabela `IntegrationAudit` com retenção de 7 anos por conformidade LGPD.
+
+**Justificativa**: Conformidade regulatória, forensics, troubleshooting, compliance reporting. Logs em arquivo de texto não são auditáveis.
+
+**Implementação**:
+```sql
+CREATE TABLE [dbo].[IntegrationAudit] (
+    [Id] [bigint] IDENTITY(1,1) PRIMARY KEY,
+    [MessageId] [varchar](36) NOT NULL,
+    [TipoIntegracao] [varchar](50) NOT NULL, -- NF_IMPORT, CC_SYNC, EXPORT_CUSTOS
+    [DirecaoFluxo] [varchar](10) NOT NULL, -- INBOUND, OUTBOUND
+    [StatusExecucao] [varchar](20) NOT NULL, -- SUCESSO, ERRO, DLQ
+    [DadosEntrada] [nvarchar](max) NULL, -- JSON com dados originais
+    [DadosSaida] [nvarchar](max) NULL, -- JSON com resultado
+    [MensagemErro] [nvarchar](max) NULL,
+    [UsuarioExecucao] [varchar](50) NULL,
+    [DataHora] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    [TempoExecucao_ms] [int] NULL,
+    [IdConglomerado] [int] NOT NULL,
+    CONSTRAINT [FK_IntegrationAudit_Conglomerado]
+        FOREIGN KEY ([IdConglomerado]) REFERENCES [dbo].[Conglomerado]([Id])
+);
+
+-- Índice para busca rápida
+CREATE INDEX [IX_IntegrationAudit_MessageId]
+ON [dbo].[IntegrationAudit]([MessageId]);
+
+CREATE INDEX [IX_IntegrationAudit_DataHora]
+ON [dbo].[IntegrationAudit]([DataHora] DESC);
+```
+
+**Exemplos**:
+- Import de Nota Fiscal → registra em IntegrationAudit com dados originais XML, resultado inserido, tempo execução
+- Export de Custo falha → registra erro completo na tabela, mantido por 7 anos para auditoria
+
+---
+
+### RN-ERP-078-08: Webhooks de ERP devem validar assinatura HMAC-SHA256 antes de processar
+
+**Descrição**: Mensagens webhook recebidas do ERP devem incluir assinatura HMAC-SHA256 que é validada contra chave secreta armazenada em Key Vault.
+
+**Justificativa**: Prevenir spoofing de webhook. Sem validação, qualquer um poderia disparar integrações falsas causando dados corrompidos.
+
+**Implementação**:
+```csharp
+public class WebhookValidationFilter : IAsyncActionFilter
+{
+    public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+    {
+        var request = context.HttpContext.Request;
+        var signature = request.Headers["X-Hub-Signature"];
+
+        if (string.IsNullOrEmpty(signature))
+        {
+            context.Result = new UnauthorizedResult();
+            return;
+        }
+
+        var body = await new StreamReader(request.Body).ReadToEndAsync();
+        var chaveSecreta = await _vault.GetSecretAsync("erp-webhook-secret");
+
+        using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(chaveSecreta)))
+        {
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(body));
+            var computada = "sha256=" + Convert.ToHexString(hash);
+
+            if (!signature.ToString().Equals(computada, StringComparison.OrdinalIgnoreCase))
+            {
+                context.Result = new ForbidResult();
+                return;
+            }
+        }
+
+        request.Body.Position = 0;
+        await next();
+    }
+}
+```
+
+**Exemplos**:
+- Webhook do SAP com assinatura válida → processa
+- Webhook sem assinatura ou com assinatura inválida → rejeita com 403 Forbidden
+
+---
+
+### RN-ERP-078-09: Dados sensíveis (salários, valores de contrato) devem ser criptografados em campo específico na auditoria
+
+**Descrição**: Valores financeiros, salários, valores de contrato são armazenados criptografados em campos específicos da auditoria e nunca em logs de texto.
+
+**Justificativa**: Conformidade LGPD e proteção de dados sensíveis. Mesmo em auditoria, não devemos expor valores financeiros em texto plano.
+
+**Implementação**:
+```csharp
+public class SensitiveDataEncryption
+{
+    public async Task<string> EncriptarValorSensivel(decimal valor)
+    {
+        var chaveEncriptacao = await _vault.GetSecretAsync("encryption-key-sensivel");
+        using (var cipher = new AesManaged())
+        {
+            cipher.Key = Encoding.UTF8.GetBytes(chaveEncriptacao);
+            cipher.GenerateIV();
+
+            using (var encryptor = cipher.CreateEncryptor())
+            {
+                var buffer = Encoding.UTF8.GetBytes(valor.ToString());
+                var encrypted = encryptor.TransformFinalBlock(buffer, 0, buffer.Length);
+
+                // Armazenar IV + dados criptografados
+                return Convert.ToBase64String(cipher.IV.Concat(encrypted).ToArray());
+            }
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Salário de colaborador importado → armazenado criptografado em IntegrationAudit
+- Valor de contrato exportado para ERP → registrado criptografado em auditoria
+
+---
+
+### RN-ERP-078-10: Reconciliação de faturas telecom com contas a pagar do ERP deve considerar tolerância de diferença de 0,5%
+
+**Descrição**: Ao fazer matching entre faturas telecom (IControlIT) e contas a pagar (ERP), tolera-se diferença de até 0,5% no valor total para absorver variações cambiais e juros.
+
+**Justificativa**: Faturas telecom podem ter variações de moeda ou juros não previstos. Reconciliação muito rígida gera divergências que precisam ajuste manual.
+
+**Implementação**:
+```csharp
+public class ReconciliacaoFaturasService
+{
+    public async Task<bool> VerificaMatching(FaturaTelecom fatura, ContaPagar conta)
+    {
+        decimal diferenca = Math.Abs(fatura.ValorTotal - conta.Valor);
+        decimal percentualDiferenca = (diferenca / fatura.ValorTotal) * 100;
+
+        // Tolerância de 0,5%
+        if (percentualDiferenca <= 0.5m)
+        {
+            // Match encontrado
+            fatura.IdContaPagarERP = conta.Id;
+            fatura.StatusReconciliacao = ReconciliaoStatus.RECONCILIADO;
+            await _repo.Atualizar(fatura);
+
+            await _auditService.Registrar(
+                "RECONCILIACAO_FATURA",
+                fatura.Id.ToString(),
+                $"Matched com {conta.Id}, diferença {percentualDiferenca:F2}%");
+
+            return true;
+        }
+
+        return false;
+    }
+}
+```
+
+**Exemplos**:
+- Fatura Telecom: R$ 1.000,00 vs Conta a Pagar ERP: R$ 1.004,50 (0,45% diferença) → reconcilia automaticamente
+- Fatura Telecom: R$ 1.000,00 vs Conta a Pagar ERP: R$ 1.010,00 (1% diferença) → não reconcilia, requer ajuste manual
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IControlIT_Legado`
+
+**Tabelas Relacionadas**:
+
+```sql
+-- Tabela de centros de custo legados (origem para sync)
+CREATE TABLE [dbo].[tbCentroCusto](
+    [id] [int] IDENTITY(1,1) PRIMARY KEY,
+    [codigo] [varchar](20) NOT NULL UNIQUE,
+    [descricao] [varchar](100) NOT NULL,
+    [ativo] [bit] DEFAULT 1,
+    [codigoErp] [varchar](20) NULL, -- Mapeamento para SAP
+    [dataCriacao] [datetime] DEFAULT GETDATE()
+);
+
+-- Tabela de integrações legadas
+CREATE TABLE [dbo].[tbIntegracaoERP](
+    [id] [int] IDENTITY(1,1) PRIMARY KEY,
+    [tipoErp] [varchar](20), -- 'SAP', 'TOTVS', 'ORACLE'
+    [tipoOperacao] [varchar](50), -- 'IMPORT_NF', 'EXPORT_CUSTO', 'SYNC_RH'
+    [dataExecucao] [datetime],
+    [status] [varchar](20), -- 'SUCESSO', 'ERRO'
+    [mensagemErro] [nvarchar](max) NULL,
+    [quantidadeRegistros] [int],
+    [tempoExecucaoMs] [int]
+);
+
+-- Tabela de credenciais legadas (DEPRECATED - migrar para Key Vault)
+CREATE TABLE [dbo].[tbCredencialERP](
+    [id] [int] IDENTITY(1,1) PRIMARY KEY,
+    [nomeErp] [varchar](20),
+    [usuario] [varchar](100),
+    [senha] [varchar](max), -- DEPRECATED: mover para Key Vault
+    [hostRFC] [varchar](50),
+    [portaRFC] [int],
+    [ativa] [bit]
+);
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descrição | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `codigoErp` | Identificador do registro no ERP (SAP, TOTVS) | Mapeamento bidirecional entre IControlIT e ERP |
+| `tipoOperacao` | Tipo de operação (IMPORT, EXPORT, SYNC) | Classificação de integrações em dashboard |
+| `tempoExecucaoMs` | Tempo de execução em milissegundos | Cálculo de SLA e alertas de performance |
+| `mensagemErro` | Descrição do erro | Investigação de falhas em DLQ |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `pa_ImportarNotaFiscalERP` | Importa notas fiscais do ERP para IControlIT | Refatorar como Command/Handler em .NET 10 |
+| `pa_ExportarCustosTI` | Exporta custos de TI para contabilização no ERP | Implementar como MediatR Command |
+| `pa_SincronizarRH` | Sincroniza dados de RH (departamentos, colaboradores) | Usar webhooks do ERP, eliminar batch diário |
+| `pa_RegistrarIntegracao` | Registra logs de integração em tabela | Migrar para estrutura de IntegrationAudit em auditoria |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `frmIntegracaoERP.aspx` | Dashboard de integrações com SAP/TOTVS | `/dashboard/integracoes` (Angular) |
+| `frmConfiguracaoERP.aspx` | Configuração de credenciais e endpoints do ERP | `/admin/integracao/configuracao` (requer role ADMIN_INTEGRACAO) |
+| `frmLogIntegracao.aspx` | Visualização de logs de integração | `/admin/integracao/logs` com filtros e export |
+| `frmReconciliacao.aspx` | Reconciliação manual de faturas vs contas a pagar | `/financeiro/reconciliacao` (integração com RF032) |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSIntegracaoERP.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ImportarNotaFiscal(xmlNF)` | Importa NF-e do ERP (SAP RFC) | `POST /api/v1/integracao/nota-fiscal/import` |
+| `ExportarCustosTI(mes, ano)` | Exporta custos para contabilização | `POST /api/v1/integracao/custos/exportar` |
+| `ValidarSincronizacao(tipo)` | Valida status de sincronização | `GET /api/v1/integracao/status/{tipo}` |
+| `ObterLogIntegracao(idIntegracao)` | Retorna logs detalhados de uma execução | `GET /api/v1/integracao/logs/{id}` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `INTEGRACAO_ERP_*`
+
+**Configuração**:
+```json
+{
+    "featureKey": "INTEGRACAO_ERP_SAP_RFC",
+    "nome": "Integração RFC com SAP",
+    "descricao": "Habilita sincronização em tempo real com SAP via RFC",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "clienteId": null // Global para todos os clientes
+}
+```
+
+**Nota**: Flags podem ser desabilitadas para clientes específicos durante troubleshooting de integrações.
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Tradução**:
+
+```json
+{
+    "integracao": {
+        "dashboard": {
+            "title": "Dashboard de Integrações",
+            "sap": "SAP",
+            "totvs": "TOTVS Protheus",
+            "oracle": "Oracle EBS",
+            "status": "Status",
+            "ultimaSincronizacao": "Última Sincronização",
+            "mensagens_fila": "Mensagens na Fila",
+            "erros_dlq": "Erros em DLQ"
+        },
+        "mensagens": {
+            "sincronizacao_iniciada": "Sincronização iniciada com sucesso",
+            "sincronizacao_concluida": "Sincronização concluída",
+            "erro_conexao": "Erro ao conectar com ERP",
+            "erro_autenticacao": "Falha na autenticação com ERP",
+            "webhook_recebido": "Webhook recebido e processado",
+            "fatura_reconciliada": "Fatura reconciliada automaticamente",
+            "fatura_manual_requerida": "Reconciliação manual requerida - diferença fora da tolerância"
+        },
+        "validacao": {
+            "campo_obrigatorio": "Campo obrigatório",
+            "formato_invalido": "Formato inválido",
+            "codigoErp_invalido": "Código ERP não encontrado no sistema",
+            "periodo_fechado": "Período contábil está fechado no ERP"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|----------|--------|-------------------|
+| Importação de Centro de Custo | `ERP_CC_IMPORT` | CodigoERP, Descricao, Status |
+| Exportação de Custo | `ERP_CUSTO_EXPORT` | IdCentroCusto, Valor, MesAno, Status |
+| Sincronização RH | `ERP_RH_SYNC` | QuantidadeDepartamentos, QuantidadeColaboradores, Status |
+| Importação de Nota Fiscal | `ERP_NF_IMPORT` | NumeroNF, CNPJ, Valor, Status |
+| Webhook Recebido | `ERP_WEBHOOK_RECEIVED` | TipoWebhook, MessageId, Status |
+| Falha de Integração | `ERP_INTEG_FAILURE` | TipoIntegracao, MensagemErro, TentativaRequisicao |
+
+**Retenção**: 7 anos (conforme LGPD)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis |
+|-----------|-----------|--------|
+| `integracao:leitura` | Visualizar dashboard e logs de integrações | GERENTE_TI, GERENTE_FINANCEIRO, ADMIN |
+| `integracao:configuracao` | Alterar credenciais e endpoints do ERP | ADMIN_INTEGRACAO |
+| `integracao:export_custos` | Executar exportação de custos para ERP | GERENTE_FINANCEIRO, ADMIN |
+| `integracao:reconciliacao_manual` | Executar reconciliação manual | ANALISTA_FINANCEIRO, ADMIN |
+| `integracao:retry_dlq` | Reprocessar mensagens da Dead Letter Queue | ADMIN_INTEGRACAO |
+| `integracao:delete_logs` | Deletar logs de integração (compliance) | ADMIN |
+
+**Nota**: Acesso a credenciais do ERP é restrito a ADMIN_INTEGRACAO e auditado a cada leitura.
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD e Operações Principais
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/v1/integracao/status` | Obter status de todas as integrações | `integracao:leitura` |
+| GET | `/api/v1/integracao/status/{tipo}` | Obter status de um tipo específico (SAP, TOTVS, ORACLE) | `integracao:leitura` |
+| GET | `/api/v1/integracao/logs` | Listar logs de integrações (paginado, filtros) | `integracao:leitura` |
+| GET | `/api/v1/integracao/logs/{messageId}` | Obter detalhes de um log específico | `integracao:leitura` |
+| GET | `/api/v1/integracao/dlq` | Listar mensagens em Dead Letter Queue | `integracao:leitura` |
+| POST | `/api/v1/integracao/dlq/{messageId}/retry` | Reprocessar mensagem da DLQ | `integracao:retry_dlq` |
+| POST | `/api/v1/integracao/custos/exportar` | Exportar custos de TI para ERP | `integracao:export_custos` |
+| POST | `/api/v1/integracao/sincronizar/{tipo}` | Forçar sincronização manual | `integracao:configuracao` |
+| POST | `/api/v1/integracao/webhook/sap` | Receber webhook do SAP (assinatura HMAC validada) | Público (validação HMAC) |
+| POST | `/api/v1/integracao/webhook/totvs` | Receber webhook do TOTVS | Público (validação HMAC) |
+| GET | `/api/v1/integracao/reconciliacao/pendentes` | Listar faturas pendentes de reconciliação | `integracao:reconciliacao_manual` |
+| POST | `/api/v1/integracao/reconciliacao/{idFatura}/{idContaPagar}` | Reconciliar manualmente fatura com conta a pagar | `integracao:reconciliacao_manual` |
+| DELETE | `/api/v1/integracao/reconciliacao/{idFatura}` | Desfazer reconciliação | `integracao:reconciliacao_manual` |
+
+### 5.2 Configuração (Admin)
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/v1/integracao/admin/configuracao` | Obter configuração de ERPs (sem credenciais) | `integracao:configuracao` |
+| PUT | `/api/v1/integracao/admin/configuracao/{nomeErp}` | Atualizar configuração de ERP (credenciais para Key Vault) | `integracao:configuracao` |
+| POST | `/api/v1/integracao/admin/teste-conexao/{nomeErp}` | Testar conexão com ERP | `integracao:configuracao` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Sincronização de Centro de Custo (Bidirecional)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      WEBHOOK DO ERP                             │
+│         (SAP notifica: Centro de Custo alterado)                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              v
+              ┌──────────────────────────────┐
+              │  Validar Assinatura HMAC-256 │
+              │    (Rejeitar se inválida)    │
+              └──────────────────────────────┘
+                              │
+                              v
+              ┌──────────────────────────────┐
+              │  Gerar UUID Único (MessageId) │
+              │  para Deduplicação           │
+              └──────────────────────────────┘
+                              │
+                              v
+              ┌──────────────────────────────┐
+              │  Validar Schema JSON/XSD     │
+              │  Campos Obrigatórios         │
+              └──────────────────────────────┘
+                              │
+                              v
+              ┌──────────────────────────────┐
+              │ Verificar se já processada   │
+              │ (MessageId em IntegrationAudit)
+              └──────────────────────────────┘
+                              │
+                    ┌─────────┴─────────┐
+                    │ (Sim)             │ (Não)
+                    v                   v
+              ┌──────────┐     ┌────────────────────┐
+              │ Registrar│     │ Buscar Centro de   │
+              │ Duplicata│     │ Custo em IControlIT│
+              └──────────┘     │ pelo CodigoERP     │
+                               └────────────────────┘
+                                       │
+                             ┌─────────┴─────────┐
+                             │(Existe)           │(Não existe)
+                             v                   v
+                        ┌─────────┐      ┌──────────────┐
+                        │Atualizar│      │Criar Novo    │
+                        │Registro │      │Centro de Custo
+                        └─────────┘      └──────────────┘
+                             │                   │
+                             └───────┬───────────┘
+                                     v
+                        ┌──────────────────────────┐
+                        │ Registrar em              │
+                        │ IntegrationAudit         │
+                        │ (Status: SUCESSO)        │
+                        └──────────────────────────┘
+                                     │
+                                     v
+                        ┌──────────────────────────┐
+                        │ Marcar MessageId como    │
+                        │ Processada               │
+                        └──────────────────────────┘
+```
+
+### 6.2 Fluxo de Exportação de Custos de TI para ERP
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│     Usuário: POST /api/v1/integracao/custos/exportar        │
+│              (Mês/Ano contábil)                             │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              v
+              ┌──────────────────────────────┐
+              │ Validar Permissão            │
+              │ (integracao:export_custos)   │
+              └──────────────────────────────┘
+                              │
+                              v
+              ┌──────────────────────────────┐
+              │ Validar Período Aberto       │
+              │ no ERP (SAP/TOTVS)           │
+              └──────────────────────────────┘
+                              │
+                    ┌─────────┴──────────┐
+                    │(Aberto)            │(Fechado)
+                    v                    v
+              ┌──────────┐         ┌─────────────┐
+              │ Continua │         │ Erro 400:   │
+              └──────────┘         │ Período fechado
+                    │              └─────────────┘
+                    v
+    ┌──────────────────────────────────────────┐
+    │ Agrupar Custos por Centro de Custo       │
+    │ (Soma de todos os serviços por CC)       │
+    └──────────────────────────────────────────┘
+                    │
+                    v
+    ┌──────────────────────────────────────────┐
+    │ Para Cada Centro de Custo:               │
+    │  - Validar CodigoERP preenchido          │
+    │  - Validar Código existe no ERP          │
+    │  - Preparar payload para SAP/TOTVS       │
+    └──────────────────────────────────────────┘
+                    │
+                    v
+    ┌──────────────────────────────────────────┐
+    │ Enviar para ERP com Retry + Backoff      │
+    │ (até 5 tentativas: 2s, 4s, 8s, 16s, 32s)│
+    └──────────────────────────────────────────┘
+                    │
+          ┌─────────┴──────────┐
+          │(Sucesso)           │(Falha após 5x)
+          v                    v
+    ┌──────────┐         ┌─────────────┐
+    │Registrar │         │Mover para   │
+    │SUCESSO em│         │DLQ, Notif.  │
+    │IntegAudit│         │Admin, Erro  │
+    └──────────┘         │Response 500 │
+                         └─────────────┘
+```
+
+### 6.3 Fluxo de Reconciliação Automática de Faturas
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Job Agendado: Reconciliação Automática (diária às 22h)     │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              v
+    ┌─────────────────────────────────────────┐
+    │ Buscar Faturas Telecom Não Reconciliadas│
+    │ Status = PENDENTE_RECONCILIACAO         │
+    └─────────────────────────────────────────┘
+                              │
+                              v
+    ┌─────────────────────────────────────────┐
+    │ Para Cada Fatura:                       │
+    │  1. Buscar Contas a Pagar ERP (periodo)│
+    │  2. Tentar Matching por CNPJ + Data    │
+    │  3. Calcular diferença de valor        │
+    └─────────────────────────────────────────┘
+                              │
+                    ┌─────────┴──────────┐
+                    │(Diferença ≤ 0,5%)  │ (Diferença > 0,5%)
+                    v                    v
+              ┌──────────┐         ┌─────────────┐
+              │Reconciliar│        │Marcar como  │
+              │Automaticamente      │REQUER_MANUAL│
+              │Status: RECONCILIADO │Notificar    │
+              └──────────┘         │Financeiro   │
+                    │              └─────────────┘
+                    v
+        ┌──────────────────────┐
+        │ Registrar em         │
+        │ IntegrationAudit     │
+        │ Salvar Link com      │
+        │ IdContaPagarERP      │
+        └──────────────────────┘
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição |
+|----------|-----------|
+| **Validação de Assinatura HMAC-SHA256** | Webhooks do ERP incluem assinatura que é validada antes de processar |
+| **Criptografia de Credenciais** | Senhas, tokens, certificados RFC armazenados em Azure Key Vault com rotação automática |
+| **Validação de Schema** | Dados recebidos do ERP validados contra JSON Schema/XSD antes de processamento |
+| **Controle de Acesso (RBAC)** | Cada operação requer permissão específica (integracao:configuracao, etc) |
+| **Auditoria Estruturada** | Todas as integrações registradas em tabela com retenção 7 anos |
+| **Criptografia de Dados Sensíveis** | Salários, valores de contrato criptografados em auditoria |
+| **Dead Letter Queue (DLQ)** | Mensagens com falha movidas para DLQ, não perdidas silenciosamente |
+| **Deduplicação com UUID** | MessageId único previne reprocessamento duplicado |
+| **Rate Limiting** | APIs limitadas a 100 req/min por client para evitar abuse |
+| **Logging Estruturado** | Logs em JSON com contexto, não permitem SQL injection |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] SQL Injection em payloads de integração (XML, JSON, EDI)
+- [ ] XSS em mensagens de erro de integração exibidas no dashboard
+- [ ] CSRF Protection em endpoints POST de configuração
+- [ ] Validação de permissões RBAC em todos os endpoints
+- [ ] Validação de assinatura HMAC de webhooks (webhook falso deve ser rejeitado)
+- [ ] Teste de rejeição de credenciais expiradas no Key Vault
+- [ ] Teste de conformidade: dados sensíveis não aparecem em logs de texto plano
+- [ ] Teste de rate limiting: >100 req/min deve retornar 429 Too Many Requests
+- [ ] Teste de expiração de token OAuth e renovação automática
+- [ ] Teste de isolamento multi-tenancy: cliente A não acessa integrações do cliente B
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medição |
+|-----|------|---------|
+| **Disponibilidade de Integrações** | 99,5% | Uptime total / tempo total |
+| **Latência de Sincronização** | < 5 min | Tempo webhook → processamento completo |
+| **Taxa de Sucesso** | > 99% | (Total sucesso / total tentativas) × 100 |
+| **Tempo de Resolução de Erro** | < 24h | Tempo alerta → investigação → correção |
+| **Reconciliação Automática** | > 95% | (Faturas auto-reconciliadas / total) × 100 |
+| **DLQ Backlog** | < 10 mensagens | Mensagens pendentes na Dead Letter Queue |
+| **Tempo de Retry** | < 2 min total | Backoff exponencial não deve ultrapassar 2 min |
+| **Conformidade de Auditoria** | 100% | Operações registradas / total operações |
+| **Taxa de Deduplicação** | > 0,1% | Duplicatas detectadas evitam reprocessamento |
+| **Cobertura de Testes** | > 90% | Linhas de código cobertas por testes |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| **Integração Indisponível** | ERP não responde por > 5 min | Notificar ADMIN_INTEGRACAO, ativar fallback |
+| **DLQ Crescendo** | > 50 mensagens na DLQ | Notificar GERENTE_TI, investigar falhas |
+| **Taxa de Erro Alta** | > 5% de falhas em 1h | Notificar ADMIN_INTEGRACAO, revisar logs |
+| **Latência Excessiva** | Sincronização > 10 min | Notificar GERENTE_TI, investigar performance |
+| **Credencial Vencendo** | < 7 dias para vencimento | Notificar ADMIN_INTEGRACAO, renovar |
+| **Reconciliação Manual Pendente** | > 20 faturas > 7 dias | Notificar GERENTE_FINANCEIRO |
+| **Período Fechado Erro** | Tentativa export em período fechado | Notificar usuário, bloquear operação |
+| **Webhook Assinatura Inválida** | Webhook sem/com assinatura inválida | Log de segurança, rejeitar com 403 |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-078](./MD-078-Integracao-ERPs.md) com tabelas de integração, auditoria, webhook log
+2. **Casos de Uso**: Criar [UC-078](./UC-078-Integracao-ERPs.md) com 5 UCs (sincronizar CC, exportar custos, import NF, reconciliar, webhook)
+3. **Fluxos e Wireframes**: Criar [WF-078](./WF-078-Integracao-ERPs.md) com telas do dashboard de integrações
+4. **Implementação Backend**: Commands/Handlers para sincronização, exportação, reconciliação
+5. **Implementação Frontend**: Dashboard Angular com status em tempo real, logs, reconciliação manual
+6. **Testes Automatizados**: TDD para validação de schema, retry logic, deduplicação
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versão inicial com 10 regras de negócio, 13 endpoints, 3 fluxos | Claude Code |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: Claude Code (IControlIT Architect Agent)
+**Revisão**: Pendente de aprovação técnica

@@ -1,0 +1,443 @@
+# =============================================
+# RL-RF038 - Referência ao Legado (Gestão de SLA Solicitações)
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF038
+titulo: "Gestão de SLA Solicitações"
+
+legado:
+  sistema: "IControlIT v1.0 (VB.NET + ASP.NET Web Forms)"
+  versao: "1.0 (2010-2024)"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2014"
+  multi_tenant: false
+  auditoria: "partial"  # Apenas tabelas de log específicas, sem padronização
+
+# ==============================================================================
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+# ==============================================================================
+
+referencias:
+  # ----------------------------------------------------------------------------
+  # TELAS ASPX
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF038-001"
+    tipo: "tela"
+    nome: "Configuracao_SLA.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/Configuracao_SLA.aspx"
+    descricao: |
+      Tela para configurar SLA por tipo de solicitação.
+      Campos: Tipo, Horas (prazo), Email 2º Nível, Flag Desativado.
+
+      Limitações:
+      - SLA fixo por tipo (não considera prioridade)
+      - Prazo apenas em horas corridas (não horário comercial)
+      - Apenas 1 email de supervisor
+      - Percentuais de alerta fixos no código (50%, 80%, 100%)
+    destino: "substituido"
+    justificativa: |
+      Modelo simplificado demais. Sistema moderno permite:
+      - SLA por tipo + prioridade
+      - Cálculo em horas úteis
+      - Múltiplos níveis de escalação
+      - Horário de atendimento customizado (8x5, 12x5, 24x7, custom)
+    rf_item_relacionado: "RN-RF038-001"
+    uc_relacionado: "UC01-criar-sla"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF038-002"
+    tipo: "tela"
+    nome: "Dashboard_SLA.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/Dashboard_SLA.aspx"
+    descricao: |
+      Dashboard para visualizar solicitações em andamento com status de SLA.
+      Exibe grid com: Nr_Solicitacao, Tipo, Data_Abertura, Prazo_Limite, Tempo_Restante, Percentual, Status_Visual.
+
+      Limitações:
+      - Grid atualiza APENAS ao recarregar página (sem SignalR/polling)
+      - Cores fixas: verde (0-50%), amarelo (50-80%), vermelho (80-100%)
+      - SEM indicação visual de breach (>100%)
+      - Sem filtro por prioridade, tipo ou atendente
+      - Sem ordenação automática (prazo mais próximo primeiro)
+    destino: "substituido"
+    justificativa: |
+      Dashboard estático obsoleto. Sistema moderno usa:
+      - SignalR para push automático
+      - Filtros avançados (tipo, prioridade, atendente, status)
+      - Ordenação inteligente (prazo mais próximo primeiro)
+      - Indicador de breach com cor preta
+      - Auto-refresh a cada 60 segundos
+    rf_item_relacionado: "RN-RF038-008"
+    uc_relacionado: "UC07-monitorar-dashboard"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF038-003"
+    tipo: "tela"
+    nome: "Pausa_SLA.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/Pausa_SLA.aspx"
+    descricao: |
+      Tela para pausar e retomar SLA de solicitação.
+      Campos: Nr_Solicitacao, Motivo (textarea), botões Pausar/Retomar.
+
+      BUGS GRAVES:
+      - Pausa NÃO registra timestamp exato (apenas flag Fl_SLA_Pausado = 1)
+      - Ao retomar, NÃO recalcula prazo (não subtrai tempo pausado)
+      - Sem histórico de pausas/retomadas (apenas último estado)
+      - Permitia múltiplas pausas simultâneas (bug de concorrência)
+      - Sem validação de permissão RBAC (apenas verifica login)
+    destino: "substituido"
+    justificativa: |
+      Lógica com bugs graves corrigidos no sistema moderno:
+      - Registra histórico completo com timestamps
+      - Recalcula prazo automaticamente ao retomar
+      - Valida permissões RBAC (sla.pausar, sla.retomar)
+      - Previne pausas simultâneas
+      - Exige motivo com mínimo 10 caracteres
+    rf_item_relacionado: "RN-RF038-004"
+    uc_relacionado: "UC08-pausar-retomar-sla"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICES ASMX
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF038-004"
+    tipo: "webservice"
+    nome: "SlaService.asmx"
+    caminho: "ic1_legado/IControlIT/WebServices/SlaService.asmx"
+    descricao: |
+      WebService para cálculo de prazo e envio de alertas.
+
+      Métodos:
+      - CalcularPrazoSLA(idSolicitacao): calcula prazo (Data_Abertura + Horas)
+      - EnviarAlerta50Porcento(): envia emails para solicitações em 50%
+      - EnviarAlerta80Porcento(): envia emails para solicitações em 80%
+      - EnviarAlerta100Porcento(): envia emails para breach (100%)
+
+      Limitações:
+      - Cálculo simplificado (não considera fins de semana ou feriados)
+      - Alertas NÃO automáticos (requer chamada manual via task)
+      - Alertas duplicados não prevenidos
+      - Mensagens de email hard-coded (sem templates)
+      - NÃO registra envio de alerta no banco
+    destino: "substituido"
+    justificativa: |
+      Substituído por arquitetura moderna:
+      - CQRS Handlers para cálculo de prazo
+      - Hangfire jobs recorrentes para alertas automáticos
+      - Templates de email via RF064
+      - Registro de todos os alertas em tabela SlaAlert
+      - Prevenção de duplicação com flag LastAlertSentAt
+    rf_item_relacionado: "RN-RF038-001, RN-RF038-002"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF038-005"
+    tipo: "stored_procedure"
+    nome: "sp_Solicitacao_SLA_Calcula_Prazo"
+    caminho: "ic1_legado/Database/Procedures/sp_Solicitacao_SLA_Calcula_Prazo.sql"
+    descricao: |
+      Calcula prazo de SLA somando horas diretamente à data de abertura.
+
+      Parâmetros:
+      - @Id_Solicitacao INT
+      - @Id_Tipo_Solicitacao INT
+      - @Data_Limite DATETIME OUTPUT
+
+      Lógica:
+      Busca prazo em horas da tabela Solicitacao_SLA, soma à data de abertura.
+      Retorna: Data_Abertura + Horas.
+
+      Problema: NÃO considera horário comercial ou feriados.
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Application Layer (CQRS Handler).
+      Implementação moderna:
+      - CreateSolicitacaoCommandHandler.cs
+      - SlaCalculationService.cs (considera calendário, feriados, horário de atendimento)
+    rf_item_relacionado: "RN-RF038-001"
+    uc_relacionado: "UC01-criar-sla"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF038-006"
+    tipo: "stored_procedure"
+    nome: "sp_Solicitacao_SLA_Lista_Alertas"
+    caminho: "ic1_legado/Database/Procedures/sp_Solicitacao_SLA_Lista_Alertas.sql"
+    descricao: |
+      Lista solicitações que atingiram percentual de alerta (50%, 80%, 100%).
+
+      Parâmetros:
+      - @Percentual INT (50, 80 ou 100)
+
+      Lógica:
+      Calcula: (DATEDIFF(HOUR, Data_Abertura, GETDATE()) * 100.0) / Horas_SLA
+      Retorna solicitações onde percentual >= @Percentual AND percentual < (@Percentual + 10).
+
+      Problemas:
+      - NÃO marca alertas enviados (pode retornar mesma solicitação múltiplas vezes)
+      - NÃO considera pausas de SLA
+      - Cálculo em HOURS direto (não horário comercial)
+    destino: "substituido"
+    justificativa: |
+      Substituído por Hangfire Job que executa a cada 15 minutos.
+      Implementação moderna:
+      - SlaMonitoringJob.cs (job recorrente)
+      - SlaAlertService.cs (registra alertas na tabela SlaAlert)
+      - Previne duplicação com timestamp LastAlertSentAt
+    rf_item_relacionado: "RN-RF038-002"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF038-007"
+    tipo: "tabela"
+    nome: "Solicitacao_SLA"
+    caminho: "ic1_legado/Database/Tables/Solicitacao_SLA.sql"
+    descricao: |
+      Tabela de configuração de SLA por tipo de solicitação.
+
+      Estrutura:
+      - Id_Solicitacao_SLA (PK, IDENTITY)
+      - Nm_Solicitacao_SLA (varchar(50), NOT NULL)
+      - Horas (int, NOT NULL) - Prazo em horas
+      - Email_2_Nivel (varchar(50), NOT NULL) - Email de supervisor
+      - Fl_Desativado (int, NOT NULL) - Flag ativo/inativo
+
+      Problemas:
+      - Falta FK para validar Id_Tipo_Solicitacao
+      - Falta campo de prioridade (SLA único por tipo)
+      - Sem auditoria (Created, Modified)
+      - Sem multi-tenancy (Id_Conglomerado)
+      - Prazo apenas em horas (não permite 2 dias + 4 horas)
+      - Apenas 1 email (não suporta múltiplos destinatários)
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com:
+      - Multi-tenancy (TenantId)
+      - Auditoria completa (Created, Modified)
+      - Campo de prioridade (PriorityId)
+      - Horário de atendimento configurável (WorkingHoursType enum)
+      - Múltiplos níveis de escalação (tabela SlaEscalation)
+      - Prazo em dias + horas (DeadlineDays, DeadlineHours)
+    rf_item_relacionado: "RF038 - Seção 7 (Modelo de Dados)"
+    uc_relacionado: "UC01-criar-sla"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF038-008"
+    tipo: "tabela"
+    nome: "Solicitacao (campos relacionados a SLA)"
+    caminho: "ic1_legado/Database/Tables/Solicitacao.sql"
+    descricao: |
+      Tabela de solicitações com campos relacionados a SLA.
+
+      Campos:
+      - Id_Solicitacao_SLA (FK para Solicitacao_SLA)
+      - Dt_Abertura (datetime) - Data de criação
+      - Fl_SLA_Pausado (bit) - Flag de pausa (sem timestamp)
+      - Dt_Encerramento (datetime) - Data de finalização
+
+      Problemas:
+      - Falta campo Data_Limite_SLA (prazo calculado on-the-fly)
+      - Falta campo Percentual_Decorrido (recalcula em toda consulta)
+      - Flag de pausa sem histórico (não sabe quando foi pausado/retomado)
+      - Sem rastreamento de alertas enviados
+    destino: "substituido"
+    justificativa: |
+      Sistema moderno cria tabela separada SlaTracking com:
+      - DeadlineAt (data/hora limite precalculada)
+      - PercentageElapsed (percentual decorrido cacheado)
+      - LastAlertSentAt (timestamp do último alerta)
+      - Histórico em tabela SlaHistory (pausas, retomadas, extensões)
+    rf_item_relacionado: "RF038 - Seção 7 (Modelo de Dados)"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF038-009"
+    tipo: "regra_negocio"
+    nome: "Percentuais de Alerta Fixos"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/Dashboard_SLA.aspx.vb - Linha 127"
+    descricao: |
+      Alertas enviados em 3 níveis fixos: 50%, 80% e 100% do prazo.
+      Não há configuração para ajustar percentuais.
+      Código VB.NET hard-coded com constantes ALERT_50, ALERT_80, ALERT_100.
+    destino: "assumido"
+    justificativa: |
+      Percentuais mantidos no sistema moderno como padrão (50%, 80%, 100%).
+      Adicionado nível de breach (>100%) com cor preta e escalação automática.
+    rf_item_relacionado: "RN-RF038-002"
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF038-010"
+    tipo: "regra_negocio"
+    nome: "Cálculo de Prazo em Horas Corridas"
+    caminho: "ic1_legado/Database/Procedures/sp_Solicitacao_SLA_Calcula_Prazo.sql - Linha 14"
+    descricao: |
+      Prazo calculado somando horas diretamente à data de abertura, sem considerar horário comercial.
+      Exemplo: Solicitação criada 16h sexta com SLA 8h → prazo limite 00h sábado (incorreto).
+      Causava breaches indevidos em finais de semana e feriados.
+    destino: "substituido"
+    justificativa: |
+      Regra INCORRETA que causava breaches indevidos.
+      Sistema moderno calcula prazo considerando:
+      - Horário de atendimento (8x5, 12x5, 24x7, customizado)
+      - Feriados (Nacional, Estadual, Municipal, Corporativo)
+      - Apenas horas úteis são contabilizadas
+    rf_item_relacionado: "RN-RF038-001, RN-RF038-005"
+    uc_relacionado: "UC01-criar-sla"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF038-011"
+    tipo: "regra_negocio"
+    nome: "Envio de Email para Supervisor Fixo"
+    caminho: "ic1_legado/IControlIT/WebServices/SlaService.asmx.vb - Linha 89"
+    descricao: |
+      Alertas enviados apenas para 1 email de supervisor configurado em Solicitacao_SLA.Email_2_Nivel.
+      Não há suporte a múltiplos destinatários ou níveis hierárquicos.
+      Código hard-coded: SmtpClient.Send(Email_2_Nivel, assunto, corpo)
+    destino: "substituido"
+    justificativa: |
+      Limitação removida. Sistema moderno usa:
+      - Matriz de escalação (tabela SlaEscalation) com múltiplos níveis
+      - Notificações via SignalR push + email (template RF064)
+      - Destinatários configuráveis por nível hierárquico
+    rf_item_relacionado: "RN-RF038-003, RN-RF038-010"
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF038-012"
+    tipo: "regra_negocio"
+    nome: "Pausa de SLA Sem Recálculo de Prazo (BUG)"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/Pausa_SLA.aspx.vb - Linha 63"
+    descricao: |
+      Ao pausar SLA, sistema apenas seta flag Fl_SLA_Pausado = 1.
+      Ao retomar, NÃO recalcula prazo estendendo pelo tempo pausado.
+      Resultado: Solicitações pausadas sempre entravam em breach indevidamente.
+
+      Exemplo do bug:
+      - Criada: 14/01 10:00 | SLA: 16h | Prazo: 15/01 18:00
+      - Pausada: 14/01 14:00 (4h decorridas, 12h restantes)
+      - Retomada: 16/01 09:00
+      - Prazo NO LEGADO: 15/01 18:00 (ERRADO - breach indevido)
+      - Prazo CORRETO: 16/01 09:00 + 12h = 17/01 13:00
+    destino: "substituido"
+    justificativa: |
+      BUG CRÍTICO corrigido no sistema moderno.
+      Implementação moderna em ResumeSlaCommandHandler.cs:
+      - Calcula tempo pausado: TimeSpan = PausedAt - ResumedAt
+      - Estende prazo: DeadlineAt += TimeSpan pausado
+      - Registra histórico completo em SlaHistory
+    rf_item_relacionado: "RN-RF038-004"
+    uc_relacionado: "UC08-pausar-retomar-sla"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF038-013"
+    tipo: "regra_negocio"
+    nome: "Feriados Nacionais Hard-Coded"
+    caminho: "ic1_legado/IControlIT/Helpers/FeriadosHelper.vb - Linha 8-32"
+    descricao: |
+      Sistema considera apenas 12 feriados nacionais fixos hard-coded em VB.NET:
+      1. Ano Novo (01/01)
+      2. Carnaval (calculado)
+      3. Sexta-feira Santa (calculada)
+      4. Tiradentes (21/04)
+      5. Dia do Trabalho (01/05)
+      6. Corpus Christi (calculado)
+      7. Independência (07/09)
+      8. Nossa Senhora Aparecida (12/10)
+      9. Finados (02/11)
+      10. Proclamação da República (15/11)
+      11. Consciência Negra (20/11)
+      12. Natal (25/12)
+
+      Não permite cadastrar feriados estaduais, municipais ou corporativos.
+    destino: "substituido"
+    justificativa: |
+      Hard-coding removido. Sistema moderno permite:
+      - Cadastrar feriados de 4 tipos (Nacional, Estadual, Municipal, Corporativo)
+      - Tabela SlaHoliday com campos: Data, Tipo, Abrangencia, Nome, Recorrente
+      - Importação de calendários externos (Google Calendar, Outlook via iCal)
+    rf_item_relacionado: "RN-RF038-006"
+    uc_relacionado: "UC06-gerenciar-feriados"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF038-014"
+    tipo: "regra_negocio"
+    nome: "Extensão de Prazo Sem Aprovação"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/Solicitacao_Detalhes.aspx.vb - Linha 201"
+    descricao: |
+      Supervisor pode estender prazo de SLA sem aprovação de gerente ou diretor.
+      Não há limite de extensões.
+      Código VB: UPDATE Solicitacao SET Prazo_Limite = txtNovoPrazo WHERE Id = @Id
+      Sem workflow de aprovação ou registro de justificativa.
+    destino: "substituido"
+    justificativa: |
+      Risco de compliance. Sistema moderno exige:
+      - Workflow de aprovação (SlaExtensionApprovalService.cs)
+      - Justificativa obrigatória (mínimo 20 caracteres)
+      - Aprovação de gerente/diretor (permissão sla.extensao.aprovar)
+      - Limite de 2 extensões por solicitação (validação em CreateSlaExtensionCommandValidator)
+      - Histórico completo de extensões em SlaHistory
+    rf_item_relacionado: "RN-RF038-007"
+    uc_relacionado: "UC09-solicitar-extensao-prazo, UC10-aprovar-extensao"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+# ==============================================================================
+# METADADOS DE RASTREABILIDADE
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 14
+  itens_assumidos: 1
+  itens_substituidos: 13
+  itens_descartados: 0
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+
+# ==============================================================================
+# CHANGELOG
+# ==============================================================================
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Criação do documento de referência ao legado com 14 itens rastreados, 100% com destinos definidos"
+    autor: "Agência ALC - alc.dev.br"

@@ -1,0 +1,231 @@
+# ==============================================================================
+# RL-RF071 - Referência ao Legado: Pesquisa de Satisfação
+# ==============================================================================
+
+rf_id: RF071
+rf_title: "Pesquisa de Satisfação"
+versao_governanca: "2.0"
+data_criacao: "2025-12-30"
+status: "Híbrido (Legado Parcial)"
+
+# ==============================================================================
+# METADADOS DA REFERÊNCIA AO LEGADO
+# ==============================================================================
+
+metadados:
+  sistema_legado_existe: true
+  tipo_legado: "parcial"
+  motivo: |
+    O RF071 possui correspondente PARCIAL no IControlIT legado.
+    O legado implementava pesquisas básicas, mas SEM métricas padronizadas (NPS/CSAT/CES),
+    SEM anonimização LGPD, SEM throttling, SEM NLP e com fórmulas INCORRETAS.
+  total_referencias_legado: 17
+  total_itens_com_destino: 17
+  cobertura_destino: "100%"
+
+# ==============================================================================
+# REFERÊNCIAS AO LEGADO (17 itens mapeados)
+# ==============================================================================
+
+referencias:
+  # TABELAS (2)
+  - id: "RL-RF071-DB-001"
+    tipo: "tela"
+    nome: "tbl_Pesquisa_Satisfacao"
+    caminho: "ic1_legado/IControlIT/Database/tbl_Pesquisa_Satisfacao"
+    descricao: "Tabela principal de pesquisas - sem multi-tenancy, auditoria, tipo métrica, anonimização"
+    destino: "substituido"
+    mapeamento_moderno: "TemplatePesquisa"
+    justificativa: "Schema incompatível - requer multi-tenancy, auditoria completa, tipo de métrica"
+
+  - id: "RL-RF071-DB-002"
+    tipo: "tela"
+    nome: "tbl_Resposta_Pesquisa"
+    caminho: "ic1_legado/IControlIT/Database/tbl_Resposta_Pesquisa"
+    descricao: "Tabela respostas - escala 1-5 (incorreta), sem NLP, sem token anonimizado"
+    destino: "substituido"
+    mapeamento_moderno: "RespostaPesquisa"
+    justificativa: "Escala incorreta + ausência de NLP + violação LGPD"
+
+  # STORED PROCEDURES (4)
+  - id: "RL-RF071-SP-001"
+    tipo: "stored_procedure"
+    nome: "pa_Calcular_Media_Satisfacao"
+    caminho: "ic1_legado/IControlIT/Database/StoredProcedures/pa_Calcular_Media_Satisfacao.sql"
+    descricao: "CRÍTICO: Fórmula NPS INCORRETA (AVG em vez de % Promotores - % Detratores)"
+    destino: "descartado"
+    mapeamento_moderno: "CalculadoraNPSService"
+    justificativa: "Fórmula incorreta - substituída por implementação com fórmula Bain & Company"
+
+  - id: "RL-RF071-SP-002"
+    tipo: "stored_procedure"
+    nome: "pa_Listar_Respostas_Pesquisa"
+    caminho: "ic1_legado/IControlIT/Database/StoredProcedures/pa_Listar_Respostas_Pesquisa.sql"
+    descricao: "CRÍTICO LGPD: SEMPRE retorna Nome + Email (violação Art. 12)"
+    destino: "substituido"
+    mapeamento_moderno: "GetRespostasPesquisaQuery (CQRS)"
+    justificativa: "Violação LGPD + ausência de anonimização + sem paginação"
+
+  - id: "RL-RF071-SP-003"
+    tipo: "stored_procedure"
+    nome: "pa_Gerar_Relatorio_Satisfacao"
+    caminho: "ic1_legado/IControlIT/Database/StoredProcedures/pa_Gerar_Relatorio_Satisfacao.sql"
+    descricao: "Relatório básico - sem filtros data, agrupamento, métrica incorreta"
+    destino: "substituido"
+    mapeamento_moderno: "DashboardPesquisaQuery"
+    justificativa: "Evoluído com filtros avançados, métricas corretas (NPS/CSAT/CES), exportação"
+
+  - id: "RL-RF071-SP-004"
+    tipo: "stored_procedure"
+    nome: "pa_Enviar_Email_Pesquisa"
+    caminho: "ic1_legado/IControlIT/Database/StoredProcedures/pa_Enviar_Email_Pesquisa.sql"
+    descricao: "Envio síncrono xp_sendmail - sem throttling, sem retry"
+    destino: "substituido"
+    mapeamento_moderno: "EnviarPesquisaJob (Hangfire)"
+    justificativa: "Evoluído para assíncrono + throttling (RN-RF071-001) + SendGrid + retry"
+
+  # TELAS ASPX (4)
+  - id: "RL-RF071-ASPX-001"
+    tipo: "tela"
+    nome: "PesquisaSatisfacao.aspx"
+    caminho: "ic1_legado/IControlIT/PesquisaSatisfacao.aspx"
+    descricao: "Gerenciamento pesquisas - SQL Injection vulnerável, sem validação"
+    destino: "substituido"
+    mapeamento_moderno: "template-pesquisa-form.component.ts (Angular 19)"
+    justificativa: "Vulnerabilidades segurança + ausência validação + VB.NET obsoleto"
+
+  - id: "RL-RF071-ASPX-002"
+    tipo: "tela"
+    nome: "ResponderPesquisa.aspx"
+    caminho: "ic1_legado/IControlIT/ResponderPesquisa.aspx"
+    descricao: "Interface pública - sem validação token, sem expiração link, escala 1-5"
+    destino: "substituido"
+    mapeamento_moderno: "responder-pesquisa.component.ts"
+    justificativa: "Evoluído com token JWT, expiração 7 dias (RN-RF071-007), escala 0-10"
+
+  - id: "RL-RF071-ASPX-003"
+    tipo: "tela"
+    nome: "RelatorioPesquisa.aspx"
+    caminho: "ic1_legado/IControlIT/RelatorioPesquisa.aspx"
+    descricao: "Relatório resultados - gráfico estático, sem filtros, sem exportação"
+    destino: "substituido"
+    mapeamento_moderno: "dashboard-pesquisa.component.ts"
+    justificativa: "Evoluído com SignalR (RN-RF071-012), Chart.js moderno, exportação"
+
+  - id: "RL-RF071-ASPX-004"
+    tipo: "tela"
+    nome: "ConfiguracaoEnvio.aspx"
+    caminho: "ic1_legado/IControlIT/ConfiguracaoEnvio.aspx"
+    descricao: "Configuração envio - sem agendamento, sem lote, timeout listas grandes"
+    destino: "substituido"
+    mapeamento_moderno: "agendador-pesquisa.component.ts"
+    justificativa: "Evoluído com Hangfire cron (diário/semanal/mensal), envio lote SendGrid"
+
+  # WEBSERVICES (4 métodos)
+  - id: "RL-RF071-WS-001"
+    tipo: "webservice"
+    nome: "WSPesquisa.asmx.vb - CriarPesquisa"
+    caminho: "ic1_legado/IControlIT/App_Code/WSPesquisa.asmx.vb"
+    descricao: "Criar pesquisa - sem autenticação, retorna ID direto, SQL no código"
+    destino: "substituido"
+    mapeamento_moderno: "POST /api/pesquisas/templates"
+    justificativa: "SOAP → REST, autenticação JWT, CQRS, DTO tipado"
+
+  - id: "RL-RF071-WS-002"
+    tipo: "webservice"
+    nome: "WSPesquisa.asmx.vb - EnviarPesquisa"
+    caminho: "ic1_legado/IControlIT/App_Code/WSPesquisa.asmx.vb"
+    descricao: "Enviar pesquisa - síncrono (timeout lotes), For Each loop lento, sem retry"
+    destino: "substituido"
+    mapeamento_moderno: "POST /api/pesquisas/{id}/enviar"
+    justificativa: "Evoluído para Hangfire Job assíncrono, SendGrid bulk, retry 3x"
+
+  - id: "RL-RF071-WS-003"
+    tipo: "webservice"
+    nome: "WSPesquisa.asmx.vb - ObterResultados"
+    caminho: "ic1_legado/IControlIT/App_Code/WSPesquisa.asmx.vb"
+    descricao: "Obter resultados - retorna DataTable (incompatível JSON), sem paginação"
+    destino: "substituido"
+    mapeamento_moderno: "GET /api/pesquisas/{id}/respostas"
+    justificativa: "REST com DTO tipado, paginação, filtros, formato JSON"
+
+  - id: "RL-RF071-WS-004"
+    tipo: "webservice"
+    nome: "WSPesquisa.asmx.vb - CalcularNPS"
+    caminho: "ic1_legado/IControlIT/App_Code/WSPesquisa.asmx.vb"
+    descricao: "CRÍTICO: Fórmula NPS INCORRETA (AVG * 10 - sem sentido)"
+    destino: "descartado"
+    mapeamento_moderno: "GET /api/pesquisas/{id}/nps"
+    justificativa: "Fórmula incorreta descartada - substituída por CalculadoraNPSService"
+
+  # REGRAS DE NEGÓCIO (4)
+  - id: "RL-RF071-RN-001"
+    tipo: "regra_negocio"
+    nome: "Validação título obrigatório"
+    caminho: "ic1_legado/IControlIT/PesquisaSatisfacao.aspx.vb"
+    descricao: "Pesquisa só pode ser enviada se tiver título"
+    destino: "assumido"
+    mapeamento_moderno: "RN-RF071-006 (Validação taxa resposta mínima)"
+    justificativa: "Regra preservada - título continua obrigatório"
+
+  - id: "RL-RF071-RN-002"
+    tipo: "regra_negocio"
+    nome: "Uma resposta por usuário por pesquisa"
+    caminho: "ic1_legado/IControlIT/Database/tbl_Resposta_Pesquisa"
+    descricao: "Usuário pode responder apenas 1 vez por pesquisa"
+    destino: "assumido"
+    mapeamento_moderno: "RN-RF071-009 (Correlação com chamado)"
+    justificativa: "Regra preservada - continua 1 resposta por usuário por pesquisa"
+
+  - id: "RL-RF071-RN-003"
+    tipo: "regra_negocio"
+    nome: "Escala notas 1-5"
+    caminho: "ic1_legado/IControlIT/ResponderPesquisa.aspx"
+    descricao: "Nota de satisfação entre 1-5 (incompatível com NPS)"
+    destino: "descartado"
+    mapeamento_moderno: "RN-RF071-002 (Cálculo NPS escala 0-10)"
+    justificativa: "Escala incompatível - NPS padrão é 0-10 (não 1-5)"
+
+  - id: "RL-RF071-RN-004"
+    tipo: "regra_negocio"
+    nome: "Comentário opcional"
+    caminho: "ic1_legado/IControlIT/ResponderPesquisa.aspx"
+    descricao: "Campo de texto livre opcional"
+    destino: "assumido"
+    mapeamento_moderno: "RN-RF071-010 (Limite caracteres 10-2000)"
+    justificativa: "Regra preservada e evoluída - continua opcional mas com limites"
+
+# ==============================================================================
+# OBSERVAÇÕES
+# ==============================================================================
+
+observacoes:
+  problemas_criticos:
+    - "Violação LGPD Art. 12 (sempre expõe dados pessoais - sem anonimização)"
+    - "Fórmula NPS completamente incorreta (AVG em vez de % Promotores - % Detratores)"
+    - "SQL Injection vulnerável em ASPX code-behind VB.NET"
+    - "Escala 1-5 incompatível com padrão NPS (0-10)"
+
+  ausencias_criticas:
+    - "Sem throttling anti-fadiga (RN-RF071-001 - 1 pesquisa a cada 7 dias)"
+    - "Sem follow-up automático para detratores (RN-RF071-003 - <2h)"
+    - "Sem análise de sentimento NLP (RN-RF071-005 - Azure Cognitive Services)"
+    - "Sem multi-canal (apenas e-mail - falta SMS/WhatsApp)"
+    - "Sem dashboard tempo real (RN-RF071-012 - SignalR)"
+
+  estrategia_transicao:
+    - "Big Bang (substituição total ao go-live)"
+    - "Migrar respostas históricas (recalcular NPS com fórmula correta)"
+    - "NÃO migrar configurações de envio (obsoletas)"
+    - "Desativar legado em D+7 após go-live"
+
+# ==============================================================================
+# VALIDAÇÃO DE GOVERNANÇA
+# ==============================================================================
+
+validacao_governanca:
+  separacao_rf_rl_completa: true
+  rl_documenta_legado_completo: true
+  rf_limpo_sem_legado: true
+  referencias_todas_com_destino: true
+  validador_deve_aceitar: true

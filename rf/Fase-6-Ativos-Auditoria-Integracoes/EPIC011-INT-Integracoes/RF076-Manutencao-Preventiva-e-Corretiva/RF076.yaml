@@ -1,0 +1,319 @@
+# =============================================
+# RF076 - Manutenção Preventiva e Corretiva
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF076"
+  nome: "Manutenção Preventiva e Corretiva"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 6 - Ativos, Auditoria e Integrações"
+  epic: "EPIC011-INT-Integracoes"
+  status: "aprovado"
+
+descricao:
+  objetivo: "Prover capacidade de gerenciamento completo do ciclo de vida das manutenções de ativos (preventivas e corretivas), permitindo agendamento automático, execução de ordens de serviço, controle de peças/materiais, workflow de aprovação e cálculo de indicadores de confiabilidade (MTBF) e eficiência (MTTR)."
+  problema_resolvido: "Automação e rastreabilidade de manutenções de ativos, reduzindo downtime, aumentando confiabilidade e permitindo controle de custos detalhado."
+  publico_afetado: "Gerentes de manutenção, técnicos, aprovadores, administradores e gestores de ativos."
+
+escopo:
+  incluso:
+    - "Criação e gestão de planos de manutenção preventiva"
+    - "Agendamento automático de ordens de manutenção preventiva"
+    - "Criação de ordens de serviço corretivas"
+    - "Workflow de aprovação de ordens"
+    - "Registro de peças e materiais utilizados"
+    - "Controle de custos (materiais + mão de obra)"
+    - "Cálculo automático de MTBF"
+    - "Cálculo automático de MTTR"
+    - "Alertas de manutenções vencidas"
+    - "Integração com RF028 (Gestão de Ativos)"
+    - "Relatórios de custos e histórico"
+    - "Controle de acesso RBAC"
+    - "Auditoria completa"
+    - "Isolamento multi-tenant"
+  fora:
+    - "Interface visual específica"
+    - "Gestão de contratos com fornecedores (RF023)"
+    - "Gestão de inventário de peças"
+    - "Agendamento de equipes técnicas"
+
+entidades:
+  - nome: "PlanoManutencao"
+    descricao: "Plano de manutenção preventiva com periodicidade e checklist"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "OrdemServico"
+    descricao: "Ordem de serviço de manutenção (preventiva ou corretiva)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "OrdemServicoItem"
+    descricao: "Peça ou material utilizado em uma ordem de serviço"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF076-01"
+    descricao: "Plano de manutenção deve ter periodicidade (dias, horas ou km) e checklist com mínimo 1 atividade"
+    tipo: "validacao"
+    campos_afetados: ["NomePlano", "IntervaloDias", "IntervaloHoras", "IntervaloKm", "Checklist"]
+    obrigatorio: true
+
+  - id: "RN-RF076-02"
+    descricao: "Ao ativar plano, primeira ordem é criada imediatamente; subsequentes seguem periodicidade"
+    tipo: "regra_negocio"
+    campos_afetados: ["Ativo", "Agendamento"]
+    obrigatorio: true
+
+  - id: "RN-RF076-03"
+    descricao: "Ordem de serviço passa por estados: Agendada → Aprovada → EmExecucao → Concluida → Fechada"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status"]
+    obrigatorio: true
+
+  - id: "RN-RF076-04"
+    descricao: "Peça/material deve ter quantidade > 0, custo >= 0 e descrição obrigatória"
+    tipo: "validacao"
+    campos_afetados: ["Quantidade", "CustoUnitario", "Descricao"]
+    obrigatorio: true
+
+  - id: "RN-RF076-05"
+    descricao: "MTBF calculado automaticamente ao fechar ordem corretiva (Total Horas Operação / Número Falhas)"
+    tipo: "regra_negocio"
+    campos_afetados: ["MTBF"]
+    obrigatorio: true
+
+  - id: "RN-RF076-06"
+    descricao: "MTTR calculado automaticamente ao fechar ordem corretiva (Total Horas Reparo / Número Falhas)"
+    tipo: "regra_negocio"
+    campos_afetados: ["MTTR"]
+    obrigatorio: true
+
+  - id: "RN-RF076-07"
+    descricao: "Alerta gerado se ordem preventiva não executada 7 dias após data prevista"
+    tipo: "regra_negocio"
+    campos_afetados: ["DataPrevista", "Status"]
+    obrigatorio: true
+
+  - id: "RN-RF076-08"
+    descricao: "Ordem em execução muda status de ativo para EmManutencao; concluída volta para Operacional"
+    tipo: "regra_negocio"
+    campos_afetados: ["StatusAtivo"]
+    obrigatorio: true
+
+  - id: "RN-RF076-09"
+    descricao: "Operações requerem permissões específicas (man:ordem:*, man:plano:*, man:relatorio:read)"
+    tipo: "seguranca"
+    campos_afetados: ["Permissoes"]
+    obrigatorio: true
+
+  - id: "RN-RF076-10"
+    descricao: "Usuário só acessa ordens/planos do seu próprio tenant"
+    tipo: "seguranca"
+    campos_afetados: ["ClienteId", "EmpresaId"]
+    obrigatorio: true
+
+estados:
+  ordem_servico:
+    - id: "Agendada"
+      descricao: "Ordem criada, aguardando aprovação ou execução"
+    - id: "Aprovada"
+      descricao: "Ordem aprovada por aprovador, aguarda execução"
+    - id: "Rejeitada"
+      descricao: "Ordem negada por aprovador (estado final)"
+    - id: "EmExecucao"
+      descricao: "Ordem sendo executada por técnico"
+    - id: "Concluida"
+      descricao: "Ordem executada, aguarda fechamento"
+    - id: "Fechada"
+      descricao: "Ordem finalizada e auditada (estado final)"
+
+  plano_manutencao:
+    - id: "Ativo"
+      descricao: "Plano gerando ordens automaticamente"
+    - id: "Inativo"
+      descricao: "Plano não gera novas ordens"
+
+transicoes:
+  permitidas:
+    - de: "Agendada"
+      para: "Aprovada"
+      permissao: "man:ordem:approve"
+    - de: "Agendada"
+      para: "Rejeitada"
+      permissao: "man:ordem:approve"
+    - de: "Aprovada"
+      para: "EmExecucao"
+      permissao: "man:ordem:execute"
+    - de: "EmExecucao"
+      para: "Concluida"
+      permissao: "man:ordem:execute"
+    - de: "Concluida"
+      para: "Fechada"
+      permissao: "man:ordem:close"
+  proibidas:
+    - de: "Rejeitada"
+      para: "*"
+    - de: "Fechada"
+      para: "*"
+
+permissoes:
+  - codigo: "man:ordem:read"
+    descricao: "Visualizar ordem de serviço"
+  - codigo: "man:ordem:create"
+    descricao: "Criar ordem de serviço"
+  - codigo: "man:ordem:update"
+    descricao: "Atualizar ordem de serviço"
+  - codigo: "man:ordem:approve"
+    descricao: "Aprovar ordem de serviço"
+  - codigo: "man:ordem:execute"
+    descricao: "Executar ordem de serviço"
+  - codigo: "man:ordem:close"
+    descricao: "Fechar ordem de serviço"
+  - codigo: "man:ordem:delete"
+    descricao: "Excluir ordem de serviço"
+  - codigo: "man:plano:read"
+    descricao: "Visualizar plano de manutenção"
+  - codigo: "man:plano:create"
+    descricao: "Criar plano de manutenção"
+  - codigo: "man:plano:update"
+    descricao: "Atualizar plano de manutenção"
+  - codigo: "man:plano:activate"
+    descricao: "Ativar/desativar plano de manutenção"
+  - codigo: "man:plano:delete"
+    descricao: "Excluir plano de manutenção"
+  - codigo: "man:relatorio:read"
+    descricao: "Visualizar relatórios de manutenção"
+
+integracoes:
+  internas:
+    - "Autenticacao"
+    - "Multi-Tenancy"
+    - "Auditoria"
+    - "RF028 - Gestão de Ativos"
+  externas:
+    - sistema: "Hangfire"
+      tipo: "Agendamento Recorrente"
+      obrigatoria: true
+    - sistema: "Inventário de Peças"
+      tipo: "Integração"
+      obrigatoria: false
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_entrada: true
+  protecao_sql_injection: true
+  protecao_xss: true
+  csrf_token: true
+  rate_limiting: true
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-listar-planos"
+    - "UC01-criar-plano"
+    - "UC02-visualizar-plano"
+    - "UC03-editar-plano"
+    - "UC04-inativar-plano"
+    - "UC05-listar-ordens"
+    - "UC06-criar-ordem"
+    - "UC07-aprovar-ordem"
+    - "UC08-executar-ordem"
+    - "UC09-fechar-ordem"
+    - "UC10-calcular-mtbf-mttr"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar plano de manutenção"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar planos de manutenção"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar plano de manutenção"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar plano de manutenção"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Ativar/desativar plano de manutenção"
+      required: true
+    - id: "RF-CRUD-06"
+      title: "Criar ordem de serviço"
+      required: true
+    - id: "RF-CRUD-07"
+      title: "Listar ordens de serviço"
+      required: true
+    - id: "RF-CRUD-08"
+      title: "Visualizar ordem de serviço"
+      required: true
+    - id: "RF-CRUD-09"
+      title: "Atualizar ordem de serviço"
+      required: true
+    - id: "RF-CRUD-10"
+      title: "Aprovar ordem de serviço"
+      required: true
+    - id: "RF-CRUD-11"
+      title: "Executar ordem de serviço"
+      required: true
+    - id: "RF-CRUD-12"
+      title: "Fechar ordem de serviço"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar campos obrigatórios"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar transições de estado"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar permissões RBAC"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar isolamento multi-tenant"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria completa"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Proteção SQL Injection"
+      required: true
+    - id: "RF-SEC-05"
+      title: "Proteção XSS"
+      required: true
+    - id: "RF-SEC-06"
+      title: "CSRF Token"
+      required: true
+
+exclusions:
+  rf_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0: Separação RF/RL completa, 0% conteúdo legado, estrutura canônica"
+
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Claude Architect"
+    descricao: "Versão inicial com 10 regras, 13 endpoints, 4 integrações obrigatórias"

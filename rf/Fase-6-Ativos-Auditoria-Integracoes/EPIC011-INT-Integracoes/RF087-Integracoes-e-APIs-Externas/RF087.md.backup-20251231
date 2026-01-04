@@ -1,0 +1,236 @@
+# RF-NPV-002 - Gestão de Integrações
+
+**Versão:** 1.0
+**Data:** 2025-01-19
+**Status:** Documentação Reversa
+**Fase:** Não Previsto Inicialmente
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição
+
+O módulo de Gestão de Integrações permite configurar, gerenciar e monitorar integrações com sistemas externos no IControlIT. O sistema suporta múltiplos tipos de integração (REST API, SOAP, GraphQL, Webhooks, FTP/SFTP, LDAP) com diferentes métodos de autenticação e recursos avançados como Circuit Breaker, Rate Limiting e filas de processamento.
+
+### 1.2 Funcionalidades Principais
+
+1. **Listagem de Integrações** - Visualização paginada com filtros e busca
+2. **Criação de Integração** - Configuração completa com credenciais e endpoints
+3. **Edição de Integração** - Atualização de parâmetros e configurações
+4. **Visualização de Detalhes** - Estatísticas, endpoints e circuit breaker
+5. **Ativação/Desativação** - Controle de estado da integração
+6. **Execução Manual** - Teste de conexão e execução de endpoints
+7. **Monitoramento** - Estatísticas de execução (sucesso, erro, tempo médio)
+8. **Circuit Breaker** - Proteção contra falhas em cascata
+9. **Rate Limiting** - Controle de requisições por período
+10. **Webhooks** - Recebimento e envio de notificações
+11. **Filas** - Processamento assíncrono com retentativas
+
+### 1.3 Contexto no Sistema
+
+Esta funcionalidade é fundamental para conectar o IControlIT com sistemas externos como ERPs, sistemas de RH, plataformas de cloud, etc. Permite automação de processos e sincronização de dados entre sistemas.
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-NPV-002-01: Código Único de Integração
+- **Descrição:** Cada integração deve ter um código único no sistema
+- **Regra:** O campo `codigo` deve ser único, validado no backend antes de criar/editar
+- **Validação:** Retornar erro 409 (Conflict) se código já existir
+
+### RN-NPV-002-02: Tipos de Integração Suportados
+- **Descrição:** O sistema suporta tipos específicos de integração
+- **Regra:** Valores permitidos: REST_API, SOAP, GRAPHQL, WEBHOOK_IN, WEBHOOK_OUT, FTP, SFTP, LDAP
+- **Validação:** Rejeitar tipos não suportados com erro 400
+
+### RN-NPV-002-03: Métodos de Autenticação
+- **Descrição:** Diferentes métodos de autenticação conforme o tipo de integração
+- **Regra:** Valores permitidos: NONE, BASIC, BEARER, API_KEY, OAUTH2, MTLS
+- **Validação:** Credenciais devem ser compatíveis com o método escolhido
+
+### RN-NPV-002-04: Credenciais Criptografadas
+- **Descrição:** Credenciais sensíveis devem ser armazenadas de forma segura
+- **Regra:** Campo `credenciaisJson` deve ser criptografado no banco de dados
+- **Validação:** Nunca expor credenciais em logs ou respostas de API
+
+### RN-NPV-002-05: Timeout Padrão
+- **Descrição:** Requisições devem ter timeout para evitar travamentos
+- **Regra:** Timeout padrão de 30 segundos, configurável de 1 a 300 segundos
+- **Validação:** Valores fora do range devem ser rejeitados
+
+### RN-NPV-002-06: Circuit Breaker
+- **Descrição:** Proteção contra falhas em cascata
+- **Regra:** Após N falhas consecutivas (threshold), abrir o circuito por X segundos
+- **Validação:** Estados: CLOSED (normal), OPEN (bloqueado), HALF_OPEN (testando)
+
+### RN-NPV-002-07: Rate Limiting
+- **Descrição:** Limitar quantidade de requisições por período
+- **Regra:** Máximo de N requisições em X segundos, configurável por integração
+- **Validação:** Requisições excedentes retornam erro 429 (Too Many Requests)
+
+### RN-NPV-002-08: Retry com Backoff
+- **Descrição:** Retentativas automáticas em caso de falha
+- **Regra:** Máximo de 3 tentativas com delay exponencial (padrão: 1000ms)
+- **Validação:** Registrar cada tentativa para auditoria
+
+### RN-NPV-002-09: Validação de URL Base
+- **Descrição:** URL base deve ser válida e acessível
+- **Regra:** Formato válido de URL com protocolo (http/https)
+- **Validação:** Testar conectividade ao salvar (opcional)
+
+### RN-NPV-002-10: Certificados SSL
+- **Descrição:** Opção para aceitar certificados inválidos (apenas desenvolvimento)
+- **Regra:** Flag `aceitarCertificadoInvalido` disponível apenas para ambientes não-produtivos
+- **Validação:** Bloquear em produção para segurança
+
+### RN-NPV-002-11: Endpoints Configuráveis
+- **Descrição:** Cada integração pode ter múltiplos endpoints
+- **Regra:** Endpoints herdam configurações da integração pai
+- **Validação:** Path deve ser relativo à baseUrl
+
+### RN-NPV-002-12: Estatísticas de Execução
+- **Descrição:** Manter métricas de uso de cada integração
+- **Regra:** Contabilizar total, sucesso, erro, timeout, tempo médio/min/max
+- **Validação:** Atualizar após cada execução
+
+### RN-NPV-002-13: Webhooks com Segredo
+- **Descrição:** Webhooks devem ser protegidos por secret
+- **Regra:** Validar assinatura HMAC do payload recebido
+- **Validação:** Rejeitar webhooks com assinatura inválida
+
+### RN-NPV-002-14: Filas de Processamento
+- **Descrição:** Processamento assíncrono para operações longas
+- **Regra:** Máximo de retentativas configurável por integração
+- **Validação:** Mover para dead-letter queue após esgotar tentativas
+
+### RN-NPV-002-15: Auditoria de Execuções
+- **Descrição:** Registrar todas as execuções para rastreabilidade
+- **Regra:** Log de request/response, duração, status, erros
+- **Validação:** Manter histórico por período configurável
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Sistema Legado
+
+O sistema legado IControlIT v1 não possui funcionalidade equivalente de gestão de integrações. Esta é uma funcionalidade nova desenvolvida para o IControlIT v2.
+
+### 3.2 Migração
+
+Não há dados a migrar do sistema legado para esta funcionalidade.
+
+---
+
+## 4. BANCO DE DADOS
+
+### 4.1 Tabela Principal: Integracao
+
+A tabela `Integracao` armazena as configurações de cada integração externa.
+
+**Campos principais:**
+- `Id` (GUID) - Identificador único
+- `EmpresaId` (GUID, FK) - Multi-tenancy
+- `Codigo` (VARCHAR 50) - Código único da integração
+- `Nome` (VARCHAR 200) - Nome descritivo
+- `Descricao` (VARCHAR 1000) - Descrição detalhada
+- `Tipo` (VARCHAR 20) - Tipo de integração (enum)
+- `BaseUrl` (VARCHAR 500) - URL base do serviço
+- `AutenticacaoTipo` (VARCHAR 20) - Método de autenticação
+- `CredenciaisJson` (TEXT) - Credenciais criptografadas
+- `TimeoutSegundos` (INT) - Timeout de conexão
+- `RetryTentativas` (INT) - Número de retentativas
+- `RetryDelayMs` (INT) - Delay entre tentativas
+- `CircuitBreakerThreshold` (INT) - Limite para abrir circuito
+- `CircuitBreakerDuracaoSegundos` (INT) - Tempo com circuito aberto
+- `RateLimitRequisicoes` (INT) - Limite de requisições
+- `RateLimitPeriodoSegundos` (INT) - Período do rate limit
+- `AceitarCertificadoInvalido` (BIT) - Flag para certificados
+- `HeadersCustomizados` (TEXT) - Headers adicionais JSON
+- `HabilitarWebhook` (BIT) - Habilitar webhooks
+- `WebhookUrl` (VARCHAR 500) - URL do webhook
+- `WebhookSecret` (VARCHAR 200) - Secret para validação
+- `HabilitarFila` (BIT) - Habilitar processamento em fila
+- `FilaMaxRetentativas` (INT) - Máximo de retentativas na fila
+- `Tags` (VARCHAR 500) - Tags para categorização
+- `Ativo` (BIT) - Status ativo/inativo
+
+**Campos de auditoria:** Created, CreatedBy, LastModified, LastModifiedBy
+
+### 4.2 Tabela: IntegracaoEndpoint
+
+Armazena os endpoints configurados para cada integração.
+
+**Campos:** Id, IntegracaoId (FK), Path, Metodo, Descricao, HeadersCustomizados, Ativo
+
+### 4.3 Tabela: IntegracaoExecucao
+
+Log de execuções para auditoria e estatísticas.
+
+**Campos:** Id, IntegracaoId, EndpointId, DataExecucao, DuracaoMs, HttpStatusCode, Sucesso, ErrorMessage, RequestBody, ResponseBody
+
+### 4.4 Índices
+
+- IX_Integracao_EmpresaId_Codigo (UNIQUE)
+- IX_Integracao_EmpresaId_Ativo
+- IX_IntegracaoExecucao_IntegracaoId_DataExecucao
+
+---
+
+## 5. INTEGRAÇÕES E DEPENDÊNCIAS
+
+### 5.1 Central de Funcionalidades
+
+**Feature Code:** `INTEGRACOES`
+
+**Permissões:**
+- `INTEGRACOES.VIEW` - Visualizar integrações
+- `INTEGRACOES.CREATE` - Criar integração
+- `INTEGRACOES.EDIT` - Editar integração
+- `INTEGRACOES.DELETE` - Excluir integração
+- `INTEGRACOES.EXECUTE` - Executar integração
+- `INTEGRACOES.ADMIN` - Administrar todas as integrações
+
+### 5.2 Internacionalização (i18n)
+
+**Chaves de tradução (prefixo `integracoes.`):**
+- integracoes.title
+- integracoes.list.title
+- integracoes.create.title
+- integracoes.edit.title
+- integracoes.form.codigo
+- integracoes.form.nome
+- integracoes.form.tipo
+- integracoes.form.baseUrl
+- integracoes.form.autenticacao
+- integracoes.status.ativo
+- integracoes.status.inativo
+- integracoes.circuitbreaker.open
+- integracoes.circuitbreaker.closed
+- integracoes.messages.created
+- integracoes.messages.updated
+- integracoes.messages.executed
+- integracoes.errors.duplicateCode
+
+### 5.3 Auditoria
+
+Todas as operações são registradas automaticamente:
+- Criação de integração
+- Edição de integração
+- Ativação/Desativação
+- Execução manual
+- Alteração de credenciais
+
+### 5.4 Multi-tenancy
+
+Integrações são isoladas por empresa (EmpresaId). Usuários só visualizam e gerenciam integrações da sua empresa.
+
+---
+
+## Histórico de Versões
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-01-19 | Claude | Documentação reversa inicial |

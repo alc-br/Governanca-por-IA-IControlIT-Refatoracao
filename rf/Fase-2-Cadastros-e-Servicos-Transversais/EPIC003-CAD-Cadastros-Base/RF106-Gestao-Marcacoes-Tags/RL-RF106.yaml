@@ -1,0 +1,761 @@
+# RL-RF106.yaml - Referência ao Legado (Gestão de Marcações e Tags)
+# Versão: 2.0
+# Data: 2025-12-31
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF106
+titulo: "Gestão de Marcações e Tags"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "IControlIT v1.x"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server (múltiplos bancos: Branco + SC_<OPERADORA>_<CLIENTE>)"
+  multi_tenant: false  # Multi-tenancy via bancos separados
+  auditoria: "partial"  # Tabelas Auditoria_* limitadas
+
+# ===============================================
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+# Cada item DEVE ter campo "destino" preenchido
+# ===============================================
+referencias:
+  # =========== TELAS ASPX (3 itens) ===========
+  - id: "LEG-RF106-001"
+    tipo: "tela"
+    nome: "Cadastro de Marcações"
+    caminho: "ic1_legado/IControlIT/Cadastro/Marcacao.aspx"
+    descricao: |
+      Tela WebForms para CRUD básico de marcações. Campos:
+      - txtNome (TextBox, máximo 50 chars)
+      - txtDescricao (TextBox, máximo 200 chars)
+      - ddlTipo (DropDownList referência a Marcacao_Tipo)
+      - chkAtivo (CheckBox, flag ativo/inativo)
+
+      Problemas:
+      - Não validava duplicatas no front (apenas constraint do banco, erro genérico)
+      - Não validava comprimento máximo no front (erro ao salvar)
+      - Sem feedback visual de tags mais usadas
+      - GridView com ViewState pesado
+      - Sem busca ou filtro
+
+    destino: "substituido"
+    justificativa: |
+      Tela legada WebForms substituída por componente Angular moderno com:
+      - Validação FluentValidation no backend (duplicatas, comprimento)
+      - Auto-complete com ElasticSearch (< 200ms)
+      - Feedback visual de tags mais usadas
+      - Paginação leve (sem ViewState)
+      - Busca incremental
+      Interface moderna não mantém comportamento legado (descartado).
+
+    rf_item_relacionado: "RN-RF106-01"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF106-002"
+    tipo: "tela"
+    nome: "Consultas com Filtro de Marcação (Ativos, Contratos, Chamados)"
+    caminho: "ic1_legado/IControlIT/Consulta/*.aspx"
+    descricao: |
+      Múltiplas telas de consulta (Ativos, Contratos, Chamados) com filtro de marcação via CheckBoxList.
+      Campos:
+      - chkListMarcacoes (CheckBoxList pré-carregada com TODAS as marcações)
+      - btnFiltrar (Button para aplicar filtro)
+
+      Problemas:
+      - Pré-carga completa de TODAS as marcações (sem paginação, problema com > 100)
+      - Scroll infinito se muitas marcações
+      - Filtro apenas OR (sem opção AND)
+      - Postback completo a cada filtro (ViewState pesado, lento)
+
+    destino: "substituido"
+    justificativa: |
+      CheckBoxList legado substituído por:
+      - Auto-complete incremental (ElasticSearch, < 200ms)
+      - Paginação de marcações
+      - Filtro AND + OR explícito (RN-RF106-09)
+      - Sem postback (Angular SPA)
+      Comportamento legado não preservado (descartado).
+
+    rf_item_relacionado: "RN-RF106-09"
+    uc_relacionado: "UC07"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  # =========== TABELAS SQL SERVER (5 itens) ===========
+  - id: "LEG-RF106-003"
+    tipo: "tabela"
+    nome: "Marcacao"
+    caminho: "Database/dbo.Marcacao"
+    descricao: |
+      Tabela principal de marcações (tags).
+      Campos:
+      - Id_Marcacao (INT IDENTITY)
+      - Nm_Marcacao (VARCHAR 50, UNIQUE)
+      - Descricao (NVARCHAR 200)
+      - Fl_Excluido (BIT, default 0)
+      - Dt_Incluido (DATETIME, default GETDATE())
+      - Dt_Alterado (DATETIME)
+
+      Problemas:
+      - ID INT (conflitos ao migrar entre bancos SC_*)
+      - Sem ClienteId (multi-tenancy via bancos separados)
+      - UNIQUE sem case-insensitive (permitia "Crítico" e "crítico")
+      - VARCHAR(50) muito restrito
+      - Sem HexColor, IconClass, ParentTagId, UsageCount
+
+    destino: "assumido"
+    justificativa: |
+      Estrutura base assumida com mudanças substanciais:
+      - ID INT → Id UNIQUEIDENTIFIER (GUID)
+      - +ClienteId (UNIQUEIDENTIFIER) para multi-tenancy
+      - UNIQUE case-insensitive
+      - VARCHAR(50) → NVARCHAR(100)
+      - +HexColor (VARCHAR 7), IconClass (VARCHAR 50), ParentTagId (GUID), UsageCount (INT)
+      Soft delete preservado (Fl_Excluido).
+
+    rf_item_relacionado: "RN-RF106-01"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF106-004"
+    tipo: "tabela"
+    nome: "Marcacao_Tipo"
+    caminho: "Database/dbo.Marcacao_Tipo"
+    descricao: |
+      Tabela de tipos de marcações (ex: "Urgente", "Projeto", "Manutenção").
+      Campos:
+      - Id_Marcacao_Tipo (INT IDENTITY)
+      - Nm_Tipo (VARCHAR 50)
+      - Fl_Excluido (BIT, default 0)
+
+      Problemas:
+      - Raramente utilizada (< 5% de marcações com tipo)
+      - Sem FK explícita em Marcacao (campo no código sem constraint)
+      - Estrutura redundante
+
+    destino: "descartado"
+    justificativa: |
+      Tabela descartada por baixo uso e redundância.
+      Funcionalidade equivalente via:
+      - Hierarquia de tags (tag pai "Tipo: Urgente", filhas "Projeto X")
+      - Cor/ícone personalizado (tags vermelhas = urgente)
+      Dados migrados para hierarquia antes de descarte.
+
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF106-005"
+    tipo: "tabela"
+    nome: "Rl_Marcacao_Ativo"
+    caminho: "Database/dbo.Rl_Marcacao_Ativo"
+    descricao: |
+      Relacionamento entre marcação e ativo.
+      Campos:
+      - Id_Marcacao (INT, FK para Marcacao)
+      - Id_Ativo (INT, FK para Ativo)
+      - Dt_Inclusao (DATETIME, default GETDATE())
+
+      Problemas:
+      - Tabela por entidade (Rl_Marcacao_Contrato, Rl_Marcacao_Chamado, etc - 5+ tabelas)
+      - Sem ClienteId (multi-tenancy)
+      - Sem CriadoPor (não registra quem aplicou)
+      - Sem auditoria de aplicação/remoção
+
+    destino: "substituido"
+    justificativa: |
+      Consolidada em tabela EntityTag polimórfica:
+      - EntityType (VARCHAR 50): "Ativo", "Contrato", "Chamado", etc
+      - EntityId (UNIQUEIDENTIFIER): ID da entidade
+      - +ClienteId (GUID), CriadoPor (NVARCHAR 450), CriadoEm (DATETIME2)
+      Vantagens: Único ponto de auditoria, queries simplificadas, extensível.
+      Dados migrados de Rl_Marcacao_Ativo, Rl_Marcacao_Contrato, etc para EntityTag.
+
+    rf_item_relacionado: "RN-RF106-06"
+    uc_relacionado: "UC05"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF106-006"
+    tipo: "tabela"
+    nome: "Rl_Marcacao_Contrato"
+    caminho: "Database/dbo.Rl_Marcacao_Contrato"
+    descricao: |
+      Relacionamento entre marcação e contrato (estrutura idêntica a Rl_Marcacao_Ativo).
+
+    destino: "substituido"
+    justificativa: |
+      Consolidada em EntityTag polimórfica (ver LEG-RF106-005).
+
+    rf_item_relacionado: "RN-RF106-06"
+    uc_relacionado: "UC05"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF106-007"
+    tipo: "tabela"
+    nome: "Rl_Marcacao_Chamado"
+    caminho: "Database/dbo.Rl_Marcacao_Chamado"
+    descricao: |
+      Relacionamento entre marcação e chamado (estrutura idêntica a Rl_Marcacao_Ativo).
+
+    destino: "substituido"
+    justificativa: |
+      Consolidada em EntityTag polimórfica (ver LEG-RF106-005).
+
+    rf_item_relacionado: "RN-RF106-06"
+    uc_relacionado: "UC05"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # =========== WEBSERVICES VB.NET (3 itens) ===========
+  - id: "LEG-RF106-008"
+    tipo: "webservice"
+    nome: "Marcacao_Listar (SOAP)"
+    caminho: "ic1_legado/IControlIT/Services/WSCadastro.asmx.vb"
+    descricao: |
+      WebMethod SOAP que lista todas as marcações ativas.
+      Código esperado:
+      SELECT * FROM Marcacao WHERE Fl_Excluido = 0 ORDER BY Nm_Marcacao
+      Retorna DataSet com todas as marcações.
+
+      Problemas:
+      - Retorna TODAS de uma vez (sem paginação)
+      - DataSet pesado
+      - SOAP lento
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST:
+      GET /api/tags?page=1&pageSize=20&sort=name&order=asc
+      Vantagens: Paginação obrigatória, JSON leve, REST rápido.
+      Facade temporária mantida (wrapper SOAP → REST) para deprecação gradual.
+
+    rf_item_relacionado: "RN-RF106-01"
+    uc_relacionado: "UC00"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF106-009"
+    tipo: "webservice"
+    nome: "Marcacao_Inserir (SOAP)"
+    caminho: "ic1_legado/IControlIT/Services/WSCadastro.asmx.vb"
+    descricao: |
+      WebMethod SOAP que insere marcação.
+      Código esperado:
+      INSERT INTO Marcacao (Nm_Marcacao, Descricao, Dt_Incluido, Fl_Excluido)
+      VALUES (@Nm_Marcacao, @Descricao, GETDATE(), 0)
+      RETURN @@IDENTITY (ID INT)
+
+      Problemas:
+      - Não valida duplicata (espera constraint do banco)
+      - Retorna INT IDENTITY (não GUID)
+      - Sem validação de formato
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST:
+      POST /api/tags
+      Vantagens: Validação FluentValidation, retorna GUID, mensagens amigáveis.
+
+    rf_item_relacionado: "RN-RF106-01"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF106-010"
+    tipo: "webservice"
+    nome: "Ativo_Por_Marcacao (SOAP)"
+    caminho: "ic1_legado/IControlIT/Services/WSCadastro.asmx.vb"
+    descricao: |
+      WebMethod SOAP que retorna ativos de uma marcação.
+      Código esperado:
+      SELECT a.* FROM Ativo a
+      INNER JOIN Rl_Marcacao_Ativo rm ON a.Id_Ativo = rm.Id_Ativo
+      WHERE rm.Id_Marcacao = @Id_Marcacao AND a.Fl_Excluido = 0
+
+      Problemas:
+      - Queries N+1 se chamar para múltiplas marcações
+      - Sem filtro AND/OR
+      - Sem paginação
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST:
+      GET /api/ativos?tags=ID1,ID2&tagLogic=AND&page=1&pageSize=20
+      Vantagens: Filtro AND/OR, paginação, evita N+1 com LINQ Include.
+
+    rf_item_relacionado: "RN-RF106-09"
+    uc_relacionado: "UC07"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  # =========== REGRAS IMPLÍCITAS (5 itens) ===========
+  - id: "LEG-RF106-011"
+    tipo: "regra_negocio"
+    nome: "Unicidade de Nome (Implícita via Constraint)"
+    caminho: "Database/dbo.Marcacao (constraint UQ_Marcacao_Nome)"
+    descricao: |
+      Nome de marcação não podia duplicar devido a constraint UNIQUE no banco.
+      Não havia validação no front-end.
+      Usuário só descobria ao clicar "Salvar" e receber erro genérico:
+      "Violation of UNIQUE KEY constraint 'UQ_Marcacao_Nome'"
+
+    destino: "assumido"
+    justificativa: |
+      Regra assumida com validação explícita:
+      - FluentValidation no backend (RN-RF106-01)
+      - Mensagem amigável: "Já existe uma tag com este nome"
+      - Validação case-insensitive
+
+    rf_item_relacionado: "RN-RF106-01"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF106-012"
+    tipo: "regra_negocio"
+    nome: "Soft Delete Silencioso"
+    caminho: "ic1_legado/IControlIT/Cadastro/Marcacao.aspx.vb (btnExcluir_Click)"
+    descricao: |
+      Exclusão de marcação marcava Fl_Excluido = 1.
+      Não havia auditoria de quem/quando excluiu.
+      Tags excluídas desapareciam de listas sem rastro.
+      Código esperado:
+      UPDATE Marcacao SET Fl_Excluido = 1, Dt_Alterado = GETDATE() WHERE Id_Marcacao = @Id
+
+    destino: "assumido"
+    justificativa: |
+      Soft delete assumido com auditoria completa:
+      - Marca FlExcluido = 1 (RN-RF106-05)
+      - Registra em TagAudit (RN-RF106-10): quem, quando, IP, ação DELETE
+      - Shadow properties EF Core (valores antigos/novos)
+      Rastreabilidade completa adicionada.
+
+    rf_item_relacionado: "RN-RF106-05"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF106-013"
+    tipo: "comportamento"
+    nome: "Pré-carga Total em Dropdown"
+    caminho: "ic1_legado/IControlIT/Consulta/*.aspx.vb (Page_Load)"
+    descricao: |
+      Dropdowns de marcação carregavam TODAS as marcações ativas:
+      SELECT * FROM Marcacao WHERE Fl_Excluido = 0
+      ddlMarcacoes.DataSource = dt
+      Com > 100 marcações, página ficava lenta (ViewState pesado).
+
+    destino: "substituido"
+    justificativa: |
+      Pré-carga total substituída por auto-complete incremental:
+      - ElasticSearch query com query_string (RN-RF106-07)
+      - Resposta < 200ms (p95)
+      - Máximo 10 resultados
+      - Sem ViewState (Angular SPA)
+      Comportamento legado descartado (não preservado).
+
+    rf_item_relacionado: "RN-RF106-07"
+    uc_relacionado: "UC07"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF106-014"
+    tipo: "comportamento"
+    nome: "Filtro Apenas OR"
+    caminho: "ic1_legado/IControlIT/Consulta/*.aspx.vb (btnFiltrar_Click)"
+    descricao: |
+      Ao selecionar múltiplas marcações em CheckBoxList, filtro aplicava OR:
+      WHERE Id_Marcacao IN (@Id1, @Id2, @Id3)
+      Não havia opção para AND (todas as marcações simultaneamente).
+
+    destino: "assumido"
+    justificativa: |
+      Comportamento OR assumido e expandido:
+      - Operador OR: WHERE TagId IN (ID1, ID2)
+      - +Operador AND: WHERE TagId = ID1 AND TagId = ID2 (via query aninhadas)
+      - Parâmetro explícito: tagLogic=AND|OR (RN-RF106-09)
+      Funcionalidade expandida além do legado.
+
+    rf_item_relacionado: "RN-RF106-09"
+    uc_relacionado: "UC07"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF106-015"
+    tipo: "comportamento"
+    nome: "Sem Auditoria de Aplicação de Marcação"
+    caminho: "Database/dbo.Rl_Marcacao_* (estrutura sem CriadoPor)"
+    descricao: |
+      Ao aplicar marcação a ativo/contrato/chamado, registrava apenas Dt_Inclusao.
+      Não registrava quem aplicou, IP, contexto.
+      INSERT INTO Rl_Marcacao_Ativo (Id_Marcacao, Id_Ativo, Dt_Inclusao)
+      VALUES (@IdMarcacao, @IdAtivo, GETDATE())
+
+    destino: "assumido"
+    justificativa: |
+      Auditoria de aplicação assumida e expandida:
+      - EntityTag.CriadoPor (NVARCHAR 450) - quem aplicou
+      - EntityTag.CriadoEm (DATETIME2) - quando aplicou
+      - TagAudit registra ação ENTITYTAG_CREATE (RN-RF106-10)
+      - Shadow properties: IP, contexto, valores antes/depois
+      Rastreabilidade completa adicionada.
+
+    rf_item_relacionado: "RN-RF106-10"
+    uc_relacionado: "UC05"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+# ===============================================
+# SEÇÃO COMPLEMENTAR: Estruturas Detalhadas
+# ===============================================
+telas:
+  - id: "LEG-RF106-001"
+    nome: "Cadastro de Marcações"
+    caminho: "ic1_legado/IControlIT/Cadastro/Marcacao.aspx"
+    responsabilidade: "CRUD básico de marcações"
+    campos:
+      - nome: "txtNome"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Máximo 50 caracteres (sem validação no front)"
+      - nome: "txtDescricao"
+        tipo: "TextBox"
+        obrigatorio: false
+        validacao: "Máximo 200 caracteres (sem validação no front)"
+      - nome: "ddlTipo"
+        tipo: "DropDownList"
+        obrigatorio: false
+        validacao: "Referência a Marcacao_Tipo (raramente usada)"
+    comportamentos_implicitos:
+      - "Não validava duplicatas no front (apenas constraint banco)"
+      - "Não validava comprimento máximo no front (erro ao salvar)"
+      - "Sem feedback visual de tags mais usadas"
+      - "GridView com ViewState pesado"
+
+servicos:
+  - id: "LEG-RF106-008"
+    nome: "Marcacao_Listar"
+    localizacao: "WSCadastro.asmx.vb"
+    responsabilidade: "Listar todas as marcações ativas (SOAP)"
+    notas: "Retorna TODAS de uma vez, sem paginação, DataSet pesado"
+
+  - id: "LEG-RF106-009"
+    nome: "Marcacao_Inserir"
+    localizacao: "WSCadastro.asmx.vb"
+    responsabilidade: "Inserir marcação (SOAP)"
+    notas: "Não valida duplicata, retorna INT IDENTITY"
+
+  - id: "LEG-RF106-010"
+    nome: "Ativo_Por_Marcacao"
+    localizacao: "WSCadastro.asmx.vb"
+    responsabilidade: "Listar ativos de uma marcação (SOAP)"
+    notas: "Queries N+1 se múltiplas marcações, sem paginação"
+
+tabelas:
+  - nome: "Marcacao"
+    finalidade: "Armazenar marcações (tags) genéricas"
+    problemas:
+      - "ID INT (conflitos ao migrar entre bancos SC_*)"
+      - "Sem ClienteId (multi-tenancy via bancos separados)"
+      - "UNIQUE sem case-insensitive"
+      - "Sem HexColor, IconClass, ParentTagId, UsageCount"
+
+  - nome: "Marcacao_Tipo"
+    finalidade: "Categorizar tipos de marcações"
+    problemas:
+      - "Raramente utilizada (< 5% uso)"
+      - "Sem FK explícita em Marcacao"
+      - "Estrutura redundante"
+
+  - nome: "Rl_Marcacao_*"
+    finalidade: "Relacionamento marcação-entidade (5+ tabelas)"
+    problemas:
+      - "Tabela por entidade (redundância)"
+      - "Sem ClienteId, CriadoPor"
+      - "Sem auditoria de aplicação/remoção"
+
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: "Unicidade de nome via constraint UNIQUE (sem validação front)"
+    fonte: "Database/dbo.Marcacao (constraint UQ_Marcacao_Nome)"
+    destino_rf: "RN-RF106-01"
+
+  - id: "RL-RN-002"
+    descricao: "Soft delete silencioso (sem auditoria quem/quando)"
+    fonte: "ic1_legado/IControlIT/Cadastro/Marcacao.aspx.vb (linha 150-160)"
+    destino_rf: "RN-RF106-05"
+
+  - id: "RL-RN-003"
+    descricao: "Pré-carga total em dropdown (SELECT * sem paginação)"
+    fonte: "ic1_legado/IControlIT/Consulta/*.aspx.vb (Page_Load)"
+    destino_rf: "RN-RF106-07"
+
+  - id: "RL-RN-004"
+    descricao: "Filtro apenas OR (sem opção AND)"
+    fonte: "ic1_legado/IControlIT/Consulta/*.aspx.vb (btnFiltrar_Click)"
+    destino_rf: "RN-RF106-09"
+
+  - id: "RL-RN-005"
+    descricao: "Sem auditoria de aplicação de marcação"
+    fonte: "Database/dbo.Rl_Marcacao_* (estrutura sem CriadoPor)"
+    destino_rf: "RN-RF106-10"
+
+# ===============================================
+# GAP ANALYSIS
+# ===============================================
+gap_analysis:
+  - item: "Hierarquia de Tags (Pai/Filho)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Legado não suportava taxonomias. Moderno permite 3 níveis."
+
+  - item: "Auto-complete"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Legado usava DropdownList pré-carregada. Moderno ElasticSearch < 200ms."
+
+  - item: "Sugestões ML"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Legado sem IA. Moderno integra Azure ML ou sklearn."
+
+  - item: "Nuvem de Tags"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Legado apenas relatórios tabulares. Moderno Chart.js."
+
+  - item: "Fusão de Tags"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Legado acumulava duplicatas. Moderno consolida sem perda."
+
+  - item: "Renomeação em Lote"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Legado apenas edição individual."
+
+  - item: "Dashboard de Uso"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Legado sem métricas agregadas. Moderno estatísticas real-time."
+
+  - item: "Exportação CSV/Excel"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Legado sem exportação estruturada."
+
+  - item: "Cor e Ícone Personalizados"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Legado apenas texto. Moderno HexColor + IconClass FontAwesome."
+
+  - item: "Multi-tenancy via ClienteId"
+    existe_legado: false
+    existe_moderno: true
+    notas: "SUBSTITUÍDO - Legado bancos separados (SC_*). Moderno ClienteId GUID."
+
+  - item: "Auditoria Completa"
+    existe_legado: false
+    existe_moderno: true
+    notas: "SUBSTITUÍDO - Legado Auditoria_* limitado. Moderno TagAudit shadow properties."
+
+  - item: "Soft Delete"
+    existe_legado: true
+    existe_moderno: true
+    notas: "ASSUMIDO - Ambos Fl_Excluido=1. Moderno com auditoria detalhada."
+
+  - item: "Permissões RBAC"
+    existe_legado: false
+    existe_moderno: true
+    notas: "SUBSTITUÍDO - Legado role genérico. Moderno 10 permissões granulares."
+
+  - item: "Busca AND/OR"
+    existe_legado: false
+    existe_moderno: true
+    notas: "EXPANDIDO - Legado apenas OR. Moderno AND + OR explícito."
+
+  - item: "Sincronização Assíncrona"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Legado síncrono (bloqueava HTTP). Moderno event-driven MediatR."
+
+# ===============================================
+# DECISÕES DE MODERNIZAÇÃO
+# ===============================================
+decisoes_modernizacao:
+  - decisao: "Consolidar tabelas Rl_Marcacao_* em EntityTag polimórfica"
+    motivo: |
+      Legado tinha 5+ tabelas (Rl_Marcacao_Ativo, Rl_Marcacao_Contrato, etc) causando:
+      - Redundância de estrutura
+      - Complexidade de queries (JOIN múltiplo)
+      - Dificuldade de auditoria centralizada
+      Moderno usa EntityTag com EntityType + EntityId (polimórfico).
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Migrar de INT para GUID (UNIQUEIDENTIFIER)"
+    motivo: |
+      Legado INT IDENTITY causava:
+      - Conflitos ao migrar entre bancos SC_*
+      - Impossibilidade de distribuição
+      - Dificuldade sincronização multi-datacenter
+      Moderno GUID: geração local sem conflitos, padrão cloud-native.
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "Descartar tabela Marcacao_Tipo"
+    motivo: |
+      Raramente utilizada (< 5% marcações com tipo).
+      Funcionalidade equivalente via hierarquia de tags ou cor/ícone.
+      Remove estrutura redundante.
+    impacto: "baixo"
+    data: "2025-12-31"
+
+  - decisao: "ElasticSearch como componente opcional (Feature Flag)"
+    motivo: |
+      Auto-complete < 200ms é crítico, mas ES adiciona complexidade/custo.
+      Feature Flag TAGS_ELASTICSEARCH permite fallback LIKE em SQL (degradado).
+      Ambientes restritos continuam operando.
+    impacto: "medio"
+    data: "2025-12-31"
+
+# ===============================================
+# RISCOS DE MIGRAÇÃO
+# ===============================================
+riscos_migracao:
+  - risco: "Perda de marcações durante migração INT → GUID"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: "Script de migração com backup, validação integridade referencial, testes sandbox"
+
+  - risco: "Performance degradada com LIKE (fallback ES)"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: "Índices otimizados SQL Server, caching queries frequentes, monitoramento latência"
+
+  - risco: "Resistência usuários a auto-complete (acostumados dropdown)"
+    impacto: "baixo"
+    probabilidade: "media"
+    mitigacao: "Treinamento, onboarding tooltips, período transição com ambos"
+
+  - risco: "Dados duplicados (tags similares 'Crítico', 'crítico', 'Critico')"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: "Script consolidação pré-migração, validação case-insensitive, ferramenta fusão"
+
+  - risco: "Auditoria incompleta (dados históricos sem rastreabilidade)"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: "Aceitar limitação, documentar gap, auditoria completa apenas pós-migração"
+
+  - risco: "Quebra integrações WebServices legadas"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: "Manter WSCadastro.asmx como facade temporária (wrapper SOAP → REST), deprecação gradual"
+
+# ===============================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# ===============================================
+rastreabilidade:
+  # Telas → UC
+  - elemento_legado: "Cadastro/Marcacao.aspx (Tela ASPX)"
+    referencia_rf: "RN-RF106-01"
+    referencia_uc: "UC01"
+    status: "substituido"
+
+  - elemento_legado: "Consulta/*.aspx (Filtros CheckBoxList)"
+    referencia_rf: "RN-RF106-09"
+    referencia_uc: "UC07"
+    status: "substituido"
+
+  # Tabelas → Entidades
+  - elemento_legado: "Marcacao (Tabela SQL)"
+    referencia_rf: "RN-RF106-01 a 15"
+    referencia_uc: "UC01"
+    status: "assumido"
+
+  - elemento_legado: "Marcacao_Tipo (Tabela SQL)"
+    referencia_rf: null
+    referencia_uc: null
+    status: "descartado"
+
+  - elemento_legado: "Rl_Marcacao_* (5 tabelas SQL)"
+    referencia_rf: "RN-RF106-06"
+    referencia_uc: "UC05"
+    status: "substituido"
+
+  # WebServices → Endpoints
+  - elemento_legado: "Marcacao_Listar (SOAP)"
+    referencia_rf: "RN-RF106-01"
+    referencia_uc: "UC00"
+    status: "substituido"
+
+  - elemento_legado: "Marcacao_Inserir (SOAP)"
+    referencia_rf: "RN-RF106-01"
+    referencia_uc: "UC01"
+    status: "substituido"
+
+  - elemento_legado: "Ativo_Por_Marcacao (SOAP)"
+    referencia_rf: "RN-RF106-09"
+    referencia_uc: "UC07"
+    status: "substituido"
+
+  # Regras Implícitas → Regras Explícitas
+  - elemento_legado: "RL-RN-001 (Unicidade constraint)"
+    referencia_rf: "RN-RF106-01"
+    referencia_uc: "UC01"
+    status: "assumido"
+
+  - elemento_legado: "RL-RN-002 (Soft delete silencioso)"
+    referencia_rf: "RN-RF106-05"
+    referencia_uc: "UC04"
+    status: "assumido"
+
+  - elemento_legado: "RL-RN-003 (Pré-carga dropdown)"
+    referencia_rf: "RN-RF106-07"
+    referencia_uc: "UC07"
+    status: "substituido"
+
+  - elemento_legado: "RL-RN-004 (Filtro apenas OR)"
+    referencia_rf: "RN-RF106-09"
+    referencia_uc: "UC07"
+    status: "assumido"
+
+  - elemento_legado: "RL-RN-005 (Sem auditoria aplicação)"
+    referencia_rf: "RN-RF106-10"
+    referencia_uc: "UC05"
+    status: "assumido"
+
+# ===============================================
+# CHANGELOG
+# ===============================================
+changelog:
+  - versao: "2.0"
+    data: "2025-12-31"
+    descricao: |
+      Versão completa de rastreabilidade legado com 15 itens obrigatórios (100% com destino).
+      Análise de 2 telas ASPX, 5 tabelas SQL Server, 3 WebServices VB.NET, 5 regras implícitas.
+      Gap analysis com 15 itens. 4 decisões de modernização. 6 riscos identificados.
+      Rastreabilidade bidirecional completa (legado ↔ moderno).
+    autor: "Agência ALC - alc.dev.br"

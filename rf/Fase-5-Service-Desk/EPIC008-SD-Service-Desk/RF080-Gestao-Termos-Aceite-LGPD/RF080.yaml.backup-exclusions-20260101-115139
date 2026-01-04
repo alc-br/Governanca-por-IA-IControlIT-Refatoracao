@@ -1,0 +1,524 @@
+rf:
+  id: RF080
+  nome: Gestão de Termos de Aceite e LGPD
+  versao: '2.0'
+  data: '2025-12-31'
+  fase: Fase 5 - Service Desk e Governança
+  epic: EPIC008-SD-Service-Desk
+  status: draft
+descricao:
+  objetivo: 'Implementar módulo completo de Gestão de Termos de Aceite e LGPD que
+    permita ao sistema IControlIT
+
+    atender integralmente às exigências da LGPD (Lei 13.709/2018), GDPR e ISO 27701
+    através de versionamento
+
+    automático, aceite obrigatório, consentimentos granulares, revogação, portabilidade,
+    anonimização e
+
+    auditoria completa.
+
+    '
+  problema_resolvido: 'Conformidade regulatória obrigatória para processamento de
+    dados pessoais. Empresas sem sistema adequado
+
+    estão expostas a multas de até R$ 50 milhões ou 2% do faturamento. Sistema resolve:
+    (1) Aceite obrigatório
+
+    de termos, (2) Consentimento documentado, (3) Revogação a qualquer momento, (4)
+    Portabilidade de dados,
+
+    (5) Anonimização, (6) Auditoria de 5 anos.
+
+    '
+  publico_afetado: 'Todos os usuários do sistema (obrigatório aceitar termos), Administradores
+    e DPO (Data Protection Officer)
+
+    para gestão, Auditores para validação de conformidade, Reguladores (ANPD) em caso
+    de fiscalização.
+
+    '
+escopo:
+  incluso:
+  - Criação de termos de uso, políticas de privacidade, cookies e compartilhamento
+  - Versionamento automático com histórico completo e diff visual
+  - Aceite obrigatório no primeiro acesso com bloqueio até consentimento
+  - Re-aceite automático quando termo é atualizado
+  - 'Consentimentos granulares: Marketing, Analytics, Cookies, Compartilhamento'
+  - Revogação de consentimento a qualquer momento (LGPD Art. 18, IX)
+  - Portabilidade de dados em formato estruturado (JSON/CSV/XML)
+  - Anonimização irreversível de dados pessoais (LGPD Art. 16)
+  - Auditoria completa com IP, User-Agent, geolocalização e timestamp ISO 8601
+  - Dashboard de conformidade com métricas em tempo real
+  - 'Notificações multi-canal: e-mail, SMS e in-app (SignalR)'
+  - Integração com RF079 (Políticas Corporativas)
+  - Assinatura digital opcional com certificado A1/A3
+  - 'Multi-idioma: português, inglês e espanhol'
+  fora:
+  - Interface específica de usuário (definida em WF-080)
+  - Tecnologia, framework ou linguagem (implementação livre)
+  - Layout, cores ou identidade visual
+  - Estratégia de deploy ou infraestrutura
+  - Módulo de gestão de incidentes LGPD (será RF separado)
+entidades:
+- nome: termo
+  descricao: Documento legal (termo de uso, política de privacidade, cookies ou compartilhamento)
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: termo_versao
+  descricao: Versão histórica de um termo com diff das mudanças
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: termo_aceite
+  descricao: Registro de aceite de termo por usuário
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: consentimento_usuario
+  descricao: Consentimento granular por tipo de processamento
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: auditoria_consentimento
+  descricao: Log completo de todas as ações de consentimento
+  multi_tenant: true
+  soft_delete: false
+  auditoria: false
+regras_negocio:
+- id: RN-RF080-001
+  descricao: Aceite Obrigatório no Primeiro Acesso - Usuário bloqueado até aceitar
+    termo vigente
+  tipo: regra_negocio
+  campos_afetados:
+  - usuario_id
+  - termo_id
+  obrigatorio: true
+  fundamento_legal: LGPD Art. 8 - consentimento livre, informado e inequívoco
+- id: RN-RF080-002
+  descricao: Versionamento Automático de Termos - Alteração de conteúdo gera nova
+    versão
+  tipo: regra_negocio
+  campos_afetados:
+  - conteudo
+  - versao
+  obrigatorio: true
+  fundamento_legal: LGPD Art. 5 - transparência
+- id: RN-RF080-003
+  descricao: Consentimentos Granulares - Marketing, Analytics, Cookies, Compartilhamento
+    independentes
+  tipo: regra_negocio
+  campos_afetados:
+  - tipo_consentimento
+  - concedido
+  - fundamento_legal
+  obrigatorio: true
+  fundamento_legal: LGPD Art. 8 - consentimento específico e granular, GDPR Recital
+    32, ISO 27701 seção 5.2
+- id: RN-RF080-004
+  descricao: Revogação de Consentimento Imediata - Usuário pode revogar a qualquer
+    momento sem justificativa
+  tipo: regra_negocio
+  campos_afetados:
+  - data_revogacao
+  - ip_revogacao
+  - motivo
+  obrigatorio: true
+  fundamento_legal: LGPD Art. 18, IX - direito de revogar consentimento, Art. 7, §
+    5º
+- id: RN-RF080-005
+  descricao: Portabilidade de Dados - Exportação em formato estruturado (JSON/CSV/XML)
+  tipo: regra_negocio
+  campos_afetados:
+  - usuario_id
+  - formato
+  obrigatorio: true
+  fundamento_legal: LGPD Art. 18, V - direito de obter cópia dos dados
+- id: RN-RF080-006
+  descricao: Anonimização Irreversível - Remoção permanente de identificadores pessoais
+  tipo: regra_negocio
+  campos_afetados:
+  - usuario_id
+  - hash_anonimo
+  obrigatorio: true
+  fundamento_legal: LGPD Art. 16 - direito ao esquecimento
+- id: RN-RF080-007
+  descricao: Auditoria Completa de Consentimentos - Registro com timestamp ISO 8601,
+    IP, User-Agent, hash SHA256
+  tipo: regra_negocio
+  campos_afetados:
+  - data_acao
+  - ip_origem
+  - user_agent
+  - hash_documento
+  obrigatorio: true
+  fundamento_legal: LGPD Art. 5 - responsabilização, retenção de 5 anos (Art. 7, §
+    5º)
+- id: RN-RF080-008
+  descricao: Integração com RF079 - Termos vinculados a políticas corporativas
+  tipo: regra_negocio
+  campos_afetados:
+  - politica_corporativa_id
+  obrigatorio: true
+  fundamento_legal: Rastreabilidade entre política (decisão negócio) e termo (implementação)
+- id: RN-RF080-009
+  descricao: Notificações Multi-Canal - E-mail, SMS e in-app (SignalR) para atualização
+    de termos
+  tipo: regra_negocio
+  campos_afetados:
+  - email
+  - telefone
+  - preferencias_notificacao
+  obrigatorio: false
+  fundamento_legal: LGPD Art. 5 - transparência
+- id: RN-RF080-010
+  descricao: Multi-idioma - pt-BR, en-US, es-ES com fallback automático
+  tipo: validacao
+  campos_afetados:
+  - idioma_origem
+  - titulos
+  - conteudos
+  obrigatorio: true
+  fundamento_legal: LGPD Art. 5 - transparência
+- id: RN-RF080-011
+  descricao: Dashboard de Conformidade - Métricas em tempo real de aceites, revogações
+    e evolução
+  tipo: regra_negocio
+  campos_afetados: []
+  obrigatorio: false
+  fundamento_legal: LGPD Art. 5 - responsabilização
+- id: RN-RF080-012
+  descricao: Assinatura Digital Opcional - Certificado A1/A3 validado com AC Raiz
+    Brasileira
+  tipo: validacao
+  campos_afetados:
+  - assinatura_digital
+  - certificado_digital
+  - numero_certificado
+  obrigatorio: false
+  fundamento_legal: Lei 14.063/2020 - assinatura eletrônica
+- id: RN-RF080-013
+  descricao: Isolamento por Tenant - Termos e consentimentos isolados por empresa
+  tipo: seguranca
+  campos_afetados:
+  - tenant_id
+  obrigatorio: true
+  fundamento_legal: Segurança e compliance multi-tenant
+- id: RN-RF080-014
+  descricao: Validação de Campos Obrigatórios - Título, descrição, conteúdo, tipo
+    e idioma
+  tipo: validacao
+  campos_afetados:
+  - titulo
+  - descricao
+  - conteudo
+  - tipo
+  - idioma
+  obrigatorio: true
+  fundamento_legal: Integridade de dados para auditoria
+- id: RN-RF080-015
+  descricao: Proteção Contra XSS e Injeção - HTML sanitizado, escape de caracteres,
+    parameterized queries
+  tipo: seguranca
+  campos_afetados:
+  - conteudo
+  obrigatorio: true
+  fundamento_legal: OWASP Top 10, segurança da informação
+estados:
+- id: draft
+  descricao: Termo criado, aguardando revisão
+- id: active
+  descricao: Termo publicado e vigente
+- id: superseded
+  descricao: Termo substituído por versão mais nova
+- id: archived
+  descricao: Termo arquivado, não mais vigente
+transicoes:
+  permitidas:
+  - de: draft
+    para: active
+  - de: active
+    para: superseded
+  - de: superseded
+    para: archived
+  proibidas:
+  - de: archived
+    para: active
+    motivo: Termo arquivado não pode voltar a ativo
+  - de: superseded
+    para: active
+    motivo: Termo superseded não pode ser editado, criar nova versão
+eventos_dominio:
+- id: termo.criado
+  descricao: Após criação de novo termo
+  payload:
+  - termo_id
+  - titulo
+  - tipo
+  - criado_por
+- id: termo.atualizado
+  descricao: Após atualização (nova versão)
+  payload:
+  - termo_id
+  - versao_anterior
+  - versao_nova
+  - diff
+- id: termo.aceito
+  descricao: Após usuário aceitar termo
+  payload:
+  - usuario_id
+  - termo_id
+  - versao
+  - ip_origem
+  - timestamp
+- id: consentimento.concedido
+  descricao: Após consentimento granular
+  payload:
+  - usuario_id
+  - tipo_consentimento
+  - concedido
+  - fundamento_legal
+- id: consentimento.revogado
+  descricao: Após revogação
+  payload:
+  - usuario_id
+  - tipo_consentimento
+  - data_revogacao
+  - motivo
+- id: dados.exportados
+  descricao: Após portabilidade solicitada
+  payload:
+  - usuario_id
+  - formato
+  - registros_exportados
+  - url_blob
+- id: dados.anonimizados
+  descricao: Após anonimização concluída
+  payload:
+  - usuario_id
+  - motivo
+  - registros_mascarados
+  - irreversivel
+permissoes:
+- codigo: lgpd.termos.view_any
+  descricao: Listar todos os termos
+  perfis:
+  - Admin
+  - DPO
+  - Compliance
+- codigo: lgpd.termos.view
+  descricao: Visualizar termo específico
+  perfis:
+  - Usuário
+  - Admin
+  - DPO
+- codigo: lgpd.termos.create
+  descricao: Criar novo termo
+  perfis:
+  - Admin
+  - DPO
+- codigo: lgpd.termos.update
+  descricao: Atualizar termo (gera nova versão)
+  perfis:
+  - Admin
+  - DPO
+- codigo: lgpd.termos.delete
+  descricao: Arquivar termo
+  perfis:
+  - Admin
+- codigo: lgpd.termos.aceitar
+  descricao: Aceitar termo vigente
+  perfis:
+  - Usuário
+- codigo: lgpd.consentimentos.view
+  descricao: Visualizar consentimentos próprios
+  perfis:
+  - Usuário
+- codigo: lgpd.consentimentos.manage
+  descricao: Gerenciar consentimentos de usuários
+  perfis:
+  - Admin
+  - DPO
+- codigo: lgpd.consentimentos.revogar
+  descricao: Revogar consentimento próprio
+  perfis:
+  - Usuário
+- codigo: lgpd.portabilidade.request
+  descricao: Solicitar exportação de dados pessoais
+  perfis:
+  - Usuário
+- codigo: lgpd.anonimizacao.request
+  descricao: Solicitar anonimização de dados
+  perfis:
+  - Usuário
+- codigo: lgpd.dashboard.view
+  descricao: Acessar dashboard de conformidade
+  perfis:
+  - Admin
+  - DPO
+  - Compliance
+- codigo: lgpd.auditoria.view
+  descricao: Visualizar logs de auditoria
+  perfis:
+  - Admin
+  - DPO
+  - Compliance
+  - Auditor
+integracoes:
+  internas:
+  - Autenticação (JWT)
+  - Multi-Tenancy (Tenant Filter)
+  - Auditoria (AuditInterceptor)
+  - Notificações (SignalR Hub)
+  - E-mail Service
+  - SMS Service
+  - i18n (Transloco)
+  - RF079 - Políticas Corporativas
+  externas:
+  - sistema: AC Raiz Brasileira
+    tipo: API REST
+    obrigatoria: false
+    descricao: Validação de certificados digitais A1/A3
+  - sistema: GeoIP Service
+    tipo: API REST
+    obrigatoria: false
+    descricao: Inferência de geolocalização a partir de IP
+  - sistema: Azure Blob Storage
+    tipo: SDK
+    obrigatoria: true
+    descricao: Armazenamento de arquivos de exportação (portabilidade)
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: false
+  protecoes:
+  - tipo: SQL Injection
+    implementacao: Parameterized queries (Entity Framework Core)
+  - tipo: XSS
+    implementacao: HtmlSanitizer em conteúdo HTML
+  - tipo: CSRF
+    implementacao: Tokens anti-CSRF em POST/PUT/DELETE
+  - tipo: CRLF Injection
+    implementacao: Validação de entrada
+  - tipo: Anonimização Irreversível
+    implementacao: Hash SHA256 + salt, dados originais descartados
+  - tipo: Retenção de Auditoria
+    implementacao: Write-once storage por 5 anos
+  - tipo: TLS em Trânsito
+    implementacao: TLS 1.3 obrigatório
+  - tipo: Criptografia em Repouso
+    implementacao: TDE (Transparent Data Encryption) no PostgreSQL
+  - tipo: Integridade de Documentos
+    implementacao: Hash SHA256 do termo aceito
+  - tipo: Rate Limiting
+    implementacao: 10 aceites/min por IP, 5 exportações/dia por usuário
+rastreabilidade:
+  ucs_esperados:
+  - UC00 - Listar Termos
+  - UC01 - Criar Termo
+  - UC02 - Atualizar Termo (Versionamento)
+  - UC03 - Aceitar Termo
+  - UC04 - Gerenciar Consentimentos Granulares
+  - UC05 - Revogar Consentimento
+  - UC06 - Exportar Dados Pessoais (Portabilidade)
+  - UC07 - Solicitar Anonimização
+  - UC08 - Visualizar Dashboard de Conformidade
+  - UC09 - Consultar Auditoria de Consentimentos
+  - UC10 - Assinar Termo Digitalmente (A1/A3)
+catalog:
+  crud:
+  - id: RF-CRUD-01
+    title: Criar termo de uso ou política
+    required: true
+  - id: RF-CRUD-02
+    title: Listar termos com filtros
+    required: true
+  - id: RF-CRUD-03
+    title: Visualizar termo por ID
+    required: true
+  - id: RF-CRUD-04
+    title: Atualizar termo (gera nova versão)
+    required: true
+  - id: RF-CRUD-05
+    title: Arquivar termo
+    required: true
+  - id: RF-CRUD-06
+    title: Visualizar histórico de versões
+    required: true
+  - id: RF-CRUD-07
+    title: Comparar versões (diff visual)
+    required: true
+  validacoes:
+  - id: RF-VAL-01
+    title: Validar campos obrigatórios (título, conteúdo, tipo, idioma)
+    required: true
+  - id: RF-VAL-02
+    title: Validar unicidade de termo por tipo e idioma
+    required: false
+  - id: RF-VAL-03
+    title: Validar certificado digital A1/A3 com AC Raiz
+    required: false
+  - id: RF-VAL-04
+    title: Validar formato de exportação (JSON/CSV/XML)
+    required: true
+  seguranca:
+  - id: RF-SEC-01
+    title: Isolamento de tenant
+    required: true
+  - id: RF-SEC-02
+    title: Permissões RBAC
+    required: true
+  - id: RF-SEC-03
+    title: Sanitização HTML (HtmlSanitizer)
+    required: true
+  - id: RF-SEC-04
+    title: Rate limiting (aceites e exportações)
+    required: true
+  - id: RF-SEC-05
+    title: Anonimização irreversível (SHA256)
+    required: true
+  conformidade_lgpd:
+  - id: RF-LGPD-01
+    title: Aceite obrigatório no primeiro acesso
+    required: true
+    fundamento: LGPD Art. 8
+  - id: RF-LGPD-02
+    title: Versionamento automático com transparência
+    required: true
+    fundamento: LGPD Art. 5
+  - id: RF-LGPD-03
+    title: Consentimentos granulares
+    required: true
+    fundamento: LGPD Art. 8, GDPR Recital 32
+  - id: RF-LGPD-04
+    title: Revogação imediata de consentimento
+    required: true
+    fundamento: LGPD Art. 18, IX
+  - id: RF-LGPD-05
+    title: Portabilidade de dados (JSON/CSV/XML)
+    required: true
+    fundamento: LGPD Art. 18, V
+  - id: RF-LGPD-06
+    title: Anonimização irreversível
+    required: true
+    fundamento: LGPD Art. 16
+  - id: RF-LGPD-07
+    title: Auditoria completa com retenção de 5 anos
+    required: true
+    fundamento: LGPD Art. 5, Art. 7, § 5º
+exclusions:
+  rf_items:
+  - Interface específica de usuário (definida em WF-080)
+  - Tecnologia de implementação (livre escolha)
+  - Módulo de gestão de incidentes LGPD (RF separado)
+historico:
+- versao: '2.0'
+  data: '2025-12-31'
+  autor: Agência ALC - alc.dev.br
+  descricao: Versão modernizada - Separação RF/RL, limpo de código legado, 15 regras
+    de negócio em linguagem natural
+- versao: '1.0'
+  data: '2025-12-28'
+  autor: Claude Code
+  descricao: Versão inicial com código legado misturado

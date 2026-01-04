@@ -1,0 +1,1160 @@
+# RF-073: Gestão de Chamados e SLA
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: N/A | **EPIC**: EPIC008-SD-Service-Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+Este requisito especifica o módulo de **Gestão de Chamados (Tickets) e Gerenciamento de SLA** do sistema IControlIT, responsável pela abertura, acompanhamento, resolução e auditoria de solicitações de suporte técnico (chamados) em conformidade com Service Level Agreements (SLAs) contratuais. O módulo opera como ponto central de coordenação entre usuários (solicitantes), equipes de suporte (atendentes) e stakeholders, garantindo transparência, rastreabilidade e cumprimento de prazos de resposta e resolução.
+
+Funciona em sinergia com:
+- **RF028** (SLA de Operações) - Define regras operacionais de SLA
+- **RF029** (SLA de Serviços) - Define prazos contratuais
+- **RF023** (Gestão de Contratos) - Fornece contexto contratual
+- **RF012** (Gestão de Usuários) - Integração de equipes de atendimento
+
+### 1.2 Importancia Estrategica
+
+O módulo de Gestão de Chamados é crítico para:
+
+- **Conformidade Contratual**: Garante que 100% dos chamados sejam atendidos dentro dos prazos SLA (resposta e resolução) estabelecidos em contrato
+- **Disponibilidade de Serviços**: Rastreia e monitora tempo de parada (downtime) de ativos, necessário para cálculo de compensações e auditorias de custo
+- **Eficiência Operacional**: Otimiza alocação de recursos via skill-based routing e priorização inteligente (matriz Impacto x Urgência)
+- **Auditoria e Compliance**: Oferece rastreamento integral (audit trail) de todas as ações, integrando-se com RF004 (Auditoria)
+- **Satisfação do Cliente**: Notificações automáticas, transparência de status e feedback estruturado (NPS/pesquisa de satisfação)
+
+### 1.3 Conceitos Fundamentais
+
+**Chamado (Ticket)**: Solicitação de suporte técnico aberta por um usuário final, contendo descrição do problema, prioridade, ativos afetados e histórico de atendimento. Ciclo de vida: Novo → Atribuído → Em Andamento → Resolvido → Fechado/Reabertp.
+
+**SLA (Service Level Agreement)**: Contrato que define tempo máximo para resposta inicial (tempo de resposta) e tempo máximo para resolução (tempo de resolução). Pode ter múltiplas pausas (paradas de ativos, aguardando cliente) que suspendem o timer.
+
+**Prioridade**: Classificação derivada de matriz Impacto x Urgência:
+- P1 (Crítico): Alto impacto + Alta urgência → 1 hora resposta, 4 horas resolução
+- P2 (Alto): Alto impacto OU Alta urgência → 4 horas resposta, 8 horas resolução
+- P3 (Médio): Baixo impacto + Média urgência → 8 horas resposta, 24 horas resolução
+- P4 (Baixo): Baixo impacto + Baixa urgência → 24 horas resposta, 72 horas resolução
+
+**Categoria**: Classificação funcional do chamado (3 níveis):
+- Nível 1: Telefonia, Dados, Impressoras, Computadores, Software
+- Nível 2: Sub-categorias por Nível 1
+- Nível 3: Detalhes específicos (ex: Defeito de Hardware, Erro de Conectividade)
+
+**Fila de Atendimento**: Conjunto de técnicos agrupados por especialidade (skill set), recebendo chamados via roteamento automático baseado em competência e carga.
+
+**Data de Parada**: Período registrado entre Dt_Parada_Inicio e Dt_Parada_Fim onde um ativo não estava em operação. Suspende SLA durante este intervalo.
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Armazenamento** | SQL Server (tabela `Solicitacao`) com stored procedures `pa_*` | SQL Server (Entity Framework Core), migrations automáticas |
+| **API** | SOAP WebService (WSChamado.asmx) | REST API (.NET 10 + OpenAPI/Swagger) |
+| **Cálculo de SLA** | VB.NET + SQL (procedimentos ad-hoc) | Hangfire Job agendado (recálculo a cada 5 min) |
+| **Notificações** | Email via SMTP + polling de tela | SignalR (real-time) + Email + In-app notifications |
+| **Roteamento** | Manual ou lista de distribuição | Skill-based routing automático + load balancing |
+| **UI** | ASP.NET WebForms (aspx) + jQuery | Angular 19 Standalone Components + Reactive Forms |
+| **Auditoria** | Trigger em tabela de auditoria | Middleware de auditoria + tabela separada (soft delete) |
+| **Integração ServiceNow** | Handler SOAP + conversão XML manual | Rest Client + mapeamento automático de tipos |
+
+### 1.5 Funcionalidades Principais
+
+1. **CRUD de Chamados** - Criar novo chamado, visualizar lista paginada, editar campos permitidos, reabrir/encerrar
+2. **Cálculo Automático de SLA** - Job Hangfire recalcula status (No prazo/Risco/Vencido) a cada 5 minutos
+3. **Priorização Inteligente** - Matriz Impacto x Urgência com auto-classificação ou manual
+4. **Atribuição Skill-based** - Roteamento automático para fila/técnico baseado em competência
+5. **Categorização em 3 Níveis** - Nível 1 (tecnologia), Nível 2 (sub-grupo), Nível 3 (tipo específico)
+6. **Anexos e Comentários** - Upload de arquivos (Azure Blob Storage), comentários internos/externos
+7. **Rastreamento de Data de Parada** - Registro de período de downtime que suspende SLA
+8. **Pesquisa de Satisfação (NPS)** - Formulário enviado ao encerramento, agregação de scores
+9. **Notificações em Tempo Real** - SignalR para mudanças de status, Email para marcos importantes
+10. **Integração ServiceNow** - Sincronização bidirecional de chamados críticos (P1/P2)
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-CHA-073-01: Criação de Chamado Requer Contexto Válido
+
+**Descricao**: Todo novo chamado deve conter no mínimo: Solicitante (usuário autenticado), Descrição (mín 20 caracteres), Categoria (nível 1-3), Ativo(s) Afetado(s) ou Centro de Custo. Campos opcionais: Prioridade (default P3), Contrato (auto-detectado via ativo).
+
+**Justificativa**: Evita chamados vago ou incompletos que prejudicam análise e roteamento. Garante rastreabilidade para auditoria.
+
+**Implementacao**:
+```csharp
+public class CreateTicketCommand : IRequest<TicketDto>
+{
+    [Required(ErrorMessage = "RN-CHA-073-01: Descricao obrigatoria")]
+    [MinLength(20, ErrorMessage = "RN-CHA-073-01: Minimo 20 caracteres")]
+    public string Descricao { get; set; }
+
+    [Required]
+    public int CategoriaId { get; set; }
+
+    [Required]
+    public List<int> AtivoIds { get; set; } // Mínimo 1 ativo
+
+    public PriorityEnum? Prioridade { get; set; } = PriorityEnum.P3;
+}
+
+public class CreateTicketCommandHandler : IRequestHandler<CreateTicketCommand, TicketDto>
+{
+    public async Task<TicketDto> Handle(CreateTicketCommand request, CancellationToken ct)
+    {
+        if (!request.AtivoIds.Any())
+            throw new ValidationException("RN-CHA-073-01: Selecione pelo menos um ativo");
+
+        var ticket = new Ticket
+        {
+            Descricao = request.Descricao,
+            CategoriaId = request.CategoriaId,
+            Prioridade = request.Prioridade ?? PriorityEnum.P3,
+            DataCriacao = DateTime.UtcNow,
+            Status = TicketStatus.Novo
+        };
+
+        _context.Tickets.Add(ticket);
+        await _context.SaveChangesAsync(ct);
+        return _mapper.Map<TicketDto>(ticket);
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Válido: Descricao="Linhas do PABX não completam chamadas externas", Ativo=[PABX-Sala001]
+- ✗ Inválido: Descricao="Problema", AtivoIds=[] (vazio)
+
+---
+
+### RN-CHA-073-02: Prioridade Calculada Automaticamente via Matriz Impacto x Urgência
+
+**Descricao**: Se Prioridade não for definida pelo usuário, calcular automaticamente via matriz:
+- Alto Impacto (múltiplos usuários/ativos) + Alta Urgência (usuário crítico) = P1
+- Alto Impacto OU Alta Urgência = P2
+- Médio Impacto + Média Urgência = P3
+- Baixo em ambos = P4
+
+**Justificativa**: Padroniza classificação, evita viés humano, acelera priorização. Matriz ITIL v4.
+
+**Implementacao**:
+```csharp
+public static class PriorityCalculator
+{
+    public static PriorityEnum CalculatePriority(bool isHighImpact, bool isHighUrgency)
+    {
+        return (isHighImpact, isHighUrgency) switch
+        {
+            (true, true) => PriorityEnum.P1,      // Crítico
+            (true, false) or (false, true) => PriorityEnum.P2,  // Alto
+            (true, _) or (_, true) => PriorityEnum.P3, // Médio
+            _ => PriorityEnum.P4    // Baixo
+        };
+    }
+}
+
+// Uso em Handler:
+var isHighImpact = request.AtivoIds.Count > 3;  // Múltiplos ativos
+var isHighUrgency = _context.Usuarios
+    .Any(u => u.Id == request.SolicitanteId && u.Critico);
+ticket.Prioridade = PriorityCalculator.CalculatePriority(isHighImpact, isHighUrgency);
+```
+
+**Exemplos**:
+- ✓ P1: Impacto=Alto (5 servidores) + Urgência=Alta (CEO reportando)
+- ✓ P2: Impacto=Alto (setor administrativo) + Urgência=Média
+- ✓ P3: Impacto=Médio (1-2 usuários) + Urgência=Média
+- ✓ P4: Impacto=Baixo + Urgência=Baixa (teste, não crítico)
+
+---
+
+### RN-CHA-073-03: SLA de Resposta e Resolução Baseado em Prioridade e Contrato
+
+**Descricao**: Cada chamado recebe dois SLAs:
+- **SLA de Resposta**: Tempo máximo até primeiro contato técnico (atribuição + comentário inicial)
+- **SLA de Resolução**: Tempo máximo até fechamento
+
+Prazos padrão (podem ser sobrescritos via RF029 - SLA de Serviços):
+
+| Prioridade | Resp.Resposta | Resp.Resolução |
+|-----------|----------------|-----------------|
+| P1 | 1h | 4h |
+| P2 | 4h | 8h |
+| P3 | 8h | 24h |
+| P4 | 24h | 72h |
+
+**Justificativa**: Garante conformidade com contratos. Prazos variam por cliente e por tipo de serviço (RF029 sobrescreve padrão).
+
+**Implementacao**:
+```csharp
+public class SlaCalculator
+{
+    public SlaWindow CalculateSla(Ticket ticket, ContractSLA contractSla = null)
+    {
+        var baseSla = GetBaseSlaByPriority(ticket.Prioridade);
+
+        if (contractSla != null)
+        {
+            // Contrato específico sobrescreve padrão
+            baseSla = new SlaWindow
+            {
+                ResponseTime = contractSla.TempoResposta,
+                ResolutionTime = contractSla.TempoResolucao
+            };
+        }
+
+        return new SlaWindow
+        {
+            CreatedAt = DateTime.UtcNow,
+            ResponseDueDate = DateTime.UtcNow.AddHours(baseSla.ResponseTime),
+            ResolutionDueDate = DateTime.UtcNow.AddHours(baseSla.ResolutionTime)
+        };
+    }
+
+    private SlaWindow GetBaseSlaByPriority(PriorityEnum priority) => priority switch
+    {
+        PriorityEnum.P1 => new SlaWindow { ResponseTime = 1, ResolutionTime = 4 },
+        PriorityEnum.P2 => new SlaWindow { ResponseTime = 4, ResolutionTime = 8 },
+        PriorityEnum.P3 => new SlaWindow { ResponseTime = 8, ResolutionTime = 24 },
+        PriorityEnum.P4 => new SlaWindow { ResponseTime = 24, ResolutionTime = 72 },
+        _ => throw new InvalidOperationException()
+    };
+}
+```
+
+**Exemplos**:
+- P1: Criado às 10:00h → Resposta esperada 11:00h, Resolução esperada 14:00h
+- P3 + Contrato específico: Contrato define Resposta=12h, Resolução=48h → Sobrescreve P3 padrão
+
+---
+
+### RN-CHA-073-04: Parada de Ativo Suspende SLA
+
+**Descricao**: Quando um chamado tem Data de Parada registrada (Dt_Parada_Inicio até Dt_Parada_Fim), o timer de SLA é suspenso durante este período. O tempo suspenso não conta para cálculo de "Tempo em Andamento".
+
+**Justificativa**: Reflete realidade: se ativo foi desligado para manutenção, não deve contar como SLA vencido.
+
+**Implementacao**:
+```csharp
+public static class SlaElapsedCalculator
+{
+    public static TimeSpan CalculateElapsedTime(
+        Ticket ticket,
+        List<TicketDowntime> downtimes)
+    {
+        var totalElapsed = DateTime.UtcNow - ticket.DataCriacao;
+
+        foreach (var downtime in downtimes.Where(d => d.DataInicio <= DateTime.UtcNow))
+        {
+            var dtEnd = downtime.DataFim ?? DateTime.UtcNow;
+            var suspendedTime = dtEnd - downtime.DataInicio;
+            totalElapsed -= suspendedTime;
+        }
+
+        return totalElapsed;
+    }
+}
+
+// Uso:
+var slaStatus = SlaStatusCalculator.GetStatus(
+    elapsedTime: SlaElapsedCalculator.CalculateElapsedTime(ticket, ticket.Downtimes),
+    dueDate: ticket.SLA.ResolutionDueDate
+);
+```
+
+**Exemplos**:
+- Chamado criado 08:00h, SLA 24h → Vence 08:00h próximo dia
+- Se parada registrada 12:00-16:00h (4 horas), SLA move para 12:00h do próximo dia
+
+---
+
+### RN-CHA-073-05: Atribuição Automática via Skill-Based Routing
+
+**Descricao**: Quando um chamado é priorizado, deve ser automaticamente roteado para a **Fila de Atendimento** (skill set) mais apropriada:
+- Categoria=Telefonia → Fila_Telecom
+- Categoria=Dados → Fila_Rede
+- Categoria=Hardware → Fila_Suporte_Hardware
+- Etc.
+
+Dentro da fila, escolher técnico com: (1) competência compatível, (2) menor carga atual (load balancing).
+
+**Justificativa**: Reduz tempo de atribuição, melhora qualidade (especialista adequado), distribui carga.
+
+**Implementacao**:
+```csharp
+public class SkillBasedRouter
+{
+    public async Task<User> RouteToOptimalTechnician(Ticket ticket, CancellationToken ct)
+    {
+        var queueName = MapCategoryToQueue(ticket.CategoriaId);
+
+        var technicians = await _context.Users
+            .Where(u => u.QueueName == queueName && u.Status == UserStatus.Active)
+            .Select(u => new { u.Id, u.Name, LoadCount = u.AssignedTickets.Count })
+            .OrderBy(u => u.LoadCount)
+            .ToListAsync(ct);
+
+        if (!technicians.Any())
+            throw new BusinessException($"RN-CHA-073-05: Nenhum técnico disponível para fila {queueName}");
+
+        return technicians.First();
+    }
+
+    private string MapCategoryToQueue(int categoryId)
+    {
+        var category = _context.CategoriaChamados.Find(categoryId);
+        return category.Nivel1 switch
+        {
+            "Telefonia" => "QUEUE_TELECOM",
+            "Dados" => "QUEUE_REDE",
+            "Hardware" => "QUEUE_HARDWARE",
+            _ => "QUEUE_GERAL"
+        };
+    }
+}
+```
+
+**Exemplos**:
+- Categoria=Telefonia, 3 técnicos disponíveis (cargas: 5, 7, 3) → Atribuir ao 3º (menor carga)
+- Categoria=Dados + nenhum técnico disponível → Exceção (esperar disponibilidade)
+
+---
+
+### RN-CHA-073-06: Status de SLA: No Prazo / Risco / Vencido
+
+**Descricao**: Cada chamado em aberto tem status de SLA atualizado a cada 5 minutos (Job Hangfire):
+- **No Prazo**: Tempo restante > 20% do SLA total
+- **Risco**: Tempo restante entre 5% e 20% (amarelo/warning)
+- **Vencido**: Tempo restante < 5% OU tempo atual > devido (vermelho/crítico)
+
+Status calculado contra **Data de Resposta** enquanto em status "Novo", depois contra **Data de Resolução**.
+
+**Justificativa**: Alertas proativos (risco) evitam vencimentos surpresa.
+
+**Implementacao**:
+```csharp
+public class SlaStatusCalculator
+{
+    public SlaStatusEnum GetStatus(TimeSpan elapsedTime, DateTime dueDate)
+    {
+        var remaining = dueDate - DateTime.UtcNow;
+        var totalSla = dueDate - /* createdDate */;
+
+        if (remaining.TotalSeconds < 0)
+            return SlaStatusEnum.Vencido;
+
+        var percentageRemaining = remaining.TotalSeconds / totalSla.TotalSeconds;
+
+        return percentageRemaining switch
+        {
+            > 0.20m => SlaStatusEnum.NoPrazo,
+            > 0.05m => SlaStatusEnum.Risco,
+            _ => SlaStatusEnum.Vencido
+        };
+    }
+}
+
+// Job Hangfire:
+[AutomaticRetry(Attempts = 0)]
+public async Task RecalculateSlaStatusJob(IServiceProvider serviceProvider)
+{
+    using var scope = serviceProvider.CreateScope();
+    var handler = scope.ServiceProvider.GetRequiredService<ISlaRecalculationHandler>();
+    await handler.UpdateAllOpenTickets();
+}
+
+// Agendamento:
+public void ScheduleSlaRecalculation(IRecurringJobManager recurringJobs)
+{
+    recurringJobs.AddOrUpdate(
+        "sla-recalculation",
+        () => RecalculateSlaStatusJob(null),
+        Cron.MinuteInterval(5)  // A cada 5 minutos
+    );
+}
+```
+
+**Exemplos**:
+- SLA=24h, criado 10:00h, calculado 18:00h (8h decorridas)
+  - Tempo restante: 16h / 24h = 66% → Status: **No Prazo**
+  - 2h antes do vencimento: 2h / 24h = 8% → Status: **Risco**
+
+---
+
+### RN-CHA-073-07: Comentários Internos vs Externos
+
+**Descricao**: Comentários podem ser marcados como "Interno" (visível apenas à equipe) ou "Externo" (visível ao solicitante). Padrão é Externo. Campos de comentário devem indicar claramente qual é o tipo.
+
+**Justificativa**: Comunica-se com cliente apenas via comentários externos; internos são para coordenação da equipe.
+
+**Implementacao**:
+```csharp
+public enum CommentVisibilityEnum
+{
+    Internal,   // Apenas equipe
+    External    // Visível ao solicitante
+}
+
+public class AddCommentCommand : IRequest<CommentDto>
+{
+    [Required]
+    public int TicketId { get; set; }
+
+    [Required]
+    [MinLength(5)]
+    public string Text { get; set; }
+
+    public CommentVisibilityEnum Visibility { get; set; } = CommentVisibilityEnum.External;
+
+    [MaxFileSize(5 * 1024 * 1024)] // 5 MB
+    public IFormFile Attachement { get; set; }
+}
+
+// Regra de permissão:
+public class CommentQueryHandler : IRequestHandler<GetTicketCommentsQuery, List<CommentDto>>
+{
+    public async Task<List<CommentDto>> Handle(GetTicketCommentsQuery request, CancellationToken ct)
+    {
+        var comments = await _context.Comments
+            .Where(c => c.TicketId == request.TicketId)
+            .Where(c => c.Visibility == CommentVisibilityEnum.External
+                || _context.CurrentUser.IsStaff)  // Internos só para staff
+            .ToListAsync(ct);
+
+        return _mapper.Map<List<CommentDto>>(comments);
+    }
+}
+```
+
+**Exemplos**:
+- Internal: "Aguardando retorno do fabricante para peça" (coordenação)
+- External: "Seu chamado está em andamento. Próxima atualização até 17h." (cliente)
+
+---
+
+### RN-CHA-073-08: Reabertura de Chamado Fecha Original + Cria Novo
+
+**Descricao**: Se um chamado foi marcado como "Resolvido" mas o cliente relata problema continuado, não editar o chamado original. Em vez disso: (1) fechar o chamado original com status "Reabertp", (2) criar novo chamado linkado ao original (campo ParentTicketId), (3) recalcular SLA para novo chamado.
+
+**Justificativa**: Mantém auditoria/histórico completo; cada chamado tem seu próprio ciclo de SLA.
+
+**Implementacao**:
+```csharp
+public class ReopenTicketCommand : IRequest<TicketDto>
+{
+    [Required]
+    public int OriginalTicketId { get; set; }
+
+    [Required]
+    public string ReasaoReabertura { get; set; }
+}
+
+public class ReopenTicketHandler : IRequestHandler<ReopenTicketCommand, TicketDto>
+{
+    public async Task<TicketDto> Handle(ReopenTicketCommand request, CancellationToken ct)
+    {
+        var original = await _context.Tickets.FindAsync(request.OriginalTicketId, cancellationToken: ct);
+
+        original.Status = TicketStatus.Reabertp;  // Marcar como reabertp
+        original.DataFechamento = DateTime.UtcNow;
+
+        var novoTicket = new Ticket
+        {
+            Descricao = $"Reabertura: {request.ReasaoReabertura}",
+            ParentTicketId = request.OriginalTicketId,
+            CategoriaId = original.CategoriaId,
+            Prioridade = original.Prioridade,
+            DataCriacao = DateTime.UtcNow,
+            Status = TicketStatus.Novo
+        };
+
+        _context.Tickets.Add(novoTicket);
+        await _context.SaveChangesAsync(ct);
+
+        return _mapper.Map<TicketDto>(novoTicket);
+    }
+}
+```
+
+**Exemplos**:
+- Original: Ticket#001 marcado resolvido dia 10
+- Cliente dia 12: "Problema continua"
+- Sistema: Ticket#001 → status "Reabertp", cria Ticket#001-R (linked)
+
+---
+
+### RN-CHA-073-09: Auditoria de Todas as Mudanças
+
+**Descricao**: Toda alteração de campo em chamado (status, prioridade, atribuição, comentário) é auditada em tabela separada `TicketAuditLog` com: usuário, timestamp, campo anterior, campo novo, ação. Auditoria tem retenção mínima 7 anos (LGPD).
+
+**Justificativa**: Rastreabilidade total para compliance e investigações.
+
+**Implementacao**:
+```csharp
+[Auditable(AuditCode = "CHA_TICKET_UPDATE")]
+public class Ticket : BaseEntity
+{
+    [AuditField("Status")]
+    public TicketStatus Status { get; set; }
+
+    [AuditField("Prioridade")]
+    public PriorityEnum Prioridade { get; set; }
+
+    [AuditField("AssignedToUserId")]
+    public int? AssignedToUserId { get; set; }
+
+    // Cada mudança é interceptada pelo AuditInterceptor do EF Core
+}
+
+public class TicketAuditLog : BaseEntity
+{
+    public int TicketId { get; set; }
+    public string FieldName { get; set; }
+    public string OldValue { get; set; }
+    public string NewValue { get; set; }
+    public int ChangedByUserId { get; set; }
+    public DateTime ChangedAt { get; set; }
+    public string AuditCode { get; set; } // "CHA_TICKET_UPDATE"
+}
+
+// Configuração de retenção:
+public class AuditLogRetentionJob
+{
+    [DisableConcurrentExecution("audit-cleanup")]
+    public async Task DeleteExpiredAuditLogs(IServiceProvider sp)
+    {
+        var cutoffDate = DateTime.UtcNow.AddYears(-7);
+        var context = sp.GetRequiredService<AppDbContext>();
+
+        await context.TicketAuditLogs
+            .Where(log => log.CreatedAt < cutoffDate)
+            .ExecuteDeleteAsync();
+    }
+}
+```
+
+**Exemplos**:
+- 10:30h: Status "Novo" → "Atribuído" (por João)
+- 10:45h: Prioridade "P3" → "P2" (por Maria)
+- 11:00h: Comentário adicionado "Testando solução..." (por João)
+
+---
+
+### RN-CHA-073-10: Integração com ServiceNow para P1/P2
+
+**Descricao**: Chamados com Prioridade P1 ou P2 são automaticamente sincronizados com ServiceNow via integração bidirecional. Quando ticket muda de status em IControlIT, atualizar em ServiceNow; quando atualizado em ServiceNow, refletir em IControlIT.
+
+**Justificativa**: Alguns clientes operam ServiceNow como sistema de record; sincronização automática evita duplicação.
+
+**Implementacao**:
+```csharp
+[ServiceBusHandler("servicedesk.servicenow.update")]
+public class ServiceNowSyncHandler : IRequestHandler<SyncTicketToServiceNowCommand>
+{
+    public async Task Handle(SyncTicketToServiceNowCommand request, CancellationToken ct)
+    {
+        var ticket = await _context.Tickets
+            .Include(t => t.Comments)
+            .FirstOrDefaultAsync(t => t.Id == request.TicketId, ct);
+
+        if (ticket.Prioridade is not (PriorityEnum.P1 or PriorityEnum.P2))
+            return;  // Só sincroniza P1/P2
+
+        var snowPayload = MapIControlTicketToSnow(ticket);
+        var response = await _snowClient.UpdateIncident(snowPayload, ct);
+
+        ticket.ExternalTicketId = response.Id;  // Link bidirecional
+
+        await _context.SaveChangesAsync(ct);
+    }
+
+    private ServiceNowIncidentDto MapIControlTicketToSnow(Ticket ticket) => new()
+    {
+        Number = ticket.ExternalTicketId,
+        ShortDescription = ticket.Descricao,
+        Priority = MapPriority(ticket.Prioridade),
+        AssignmentGroup = ticket.AssignedQueue,
+        State = MapStatus(ticket.Status)
+    };
+}
+
+// Webhook de ServiceNow:
+[HttpPost("webhook/servicenow")]
+[AllowAnonymous]
+public async Task ReceiveServiceNowUpdate([FromBody] ServiceNowWebhook webhook)
+{
+    await _mediator.Send(new SyncTicketFromServiceNowCommand
+    {
+        IncidentNumber = webhook.Number,
+        Status = webhook.State,
+        AssignmentGroup = webhook.AssignmentGroup
+    });
+}
+```
+
+**Exemplos**:
+- P1 em IControlIT → Automático POST a ServiceNow (2 seg)
+- Status "Resolvido" em Snow → Webhook atualiza IControlIT (real-time)
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `SC_CLIENTE_NOME` (específico por cliente)
+
+**Tabela Principal**: `Solicitacao`
+```sql
+CREATE TABLE [dbo].[Solicitacao](
+    [Id_Solicitacao] [int] IDENTITY(1,1) NOT NULL,
+    [Cd_Conglomerado] [int] NOT NULL,
+    [Cd_Consumidor] [int] NULL,
+    [Cd_Usuario] [int] NOT NULL,
+    [Cd_Prioridade] [int] NOT NULL,
+    [Ds_Solicitacao] [varchar](max) NOT NULL,
+    [Dt_Criacao] [datetime] NOT NULL,
+    [Dt_Atribuicao] [datetime] NULL,
+    [Dt_Resolucao] [datetime] NULL,
+    [Dt_Encerramento] [datetime] NULL,
+    [St_Solicitacao] [varchar](20) NOT NULL, -- 'Novo','Atribuído','Resolvido','Fechado'
+    [Cd_Usuario_Atribuido] [int] NULL,
+    [Cd_Fila] [int] NULL,
+    [Fl_Excluido] [bit] NOT NULL DEFAULT 0,
+    [Dt_Criacao_SYS] [datetime] NOT NULL,
+    [Cd_Usuario_Criacao] [int] NOT NULL,
+    CONSTRAINT [PK_Solicitacao] PRIMARY KEY CLUSTERED ([Id_Solicitacao] ASC)
+)
+```
+
+**Tabelas Relacionadas**:
+
+```sql
+CREATE TABLE [dbo].[Solicitacao_Item](
+    [Id_Item] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Solicitacao] [int] NOT NULL,
+    [Cd_Ativo] [int] NULL,
+    [Ds_Item] [varchar](500) NULL,
+    CONSTRAINT [PK_Sol_Item] PRIMARY KEY ([Id_Item]),
+    CONSTRAINT [FK_Sol_Item] FOREIGN KEY ([Id_Solicitacao]) REFERENCES [Solicitacao]
+)
+
+CREATE TABLE [dbo].[Solicitacao_Tipo](
+    [Id_Tipo] [int] IDENTITY(1,1) NOT NULL,
+    [Nm_Tipo] [varchar](100) NOT NULL,
+    [Ds_Tipo] [varchar](500) NULL,
+    CONSTRAINT [PK_Sol_Tipo] PRIMARY KEY ([Id_Tipo])
+)
+
+CREATE TABLE [dbo].[Solicitacao_SLA](
+    [Id_SLA] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Solicitacao] [int] NOT NULL,
+    [Dt_Resposta_Esperada] [datetime] NOT NULL,
+    [Dt_Resolucao_Esperada] [datetime] NOT NULL,
+    [Dt_Resposta_Real] [datetime] NULL,
+    [Dt_Resolucao_Real] [datetime] NULL,
+    [St_SLA] [varchar](20) NOT NULL, -- 'NoPrazo','Risco','Vencido'
+    CONSTRAINT [PK_Sol_SLA] PRIMARY KEY ([Id_SLA]),
+    CONSTRAINT [FK_Sol_SLA] FOREIGN KEY ([Id_Solicitacao]) REFERENCES [Solicitacao]
+)
+
+CREATE TABLE [dbo].[Solicitacao_Fila_Atendimento](
+    [Id_Fila] [int] IDENTITY(1,1) NOT NULL,
+    [Nm_Fila] [varchar](100) NOT NULL,
+    [Ds_Fila] [varchar](500) NULL,
+    [Cd_Conglomerado] [int] NOT NULL,
+    CONSTRAINT [PK_Sol_Fila] PRIMARY KEY ([Id_Fila])
+)
+
+CREATE TABLE [dbo].[Solicitacao_Data_Parada](
+    [Id_Parada] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Solicitacao] [int] NOT NULL,
+    [Dt_Inicio] [datetime] NOT NULL,
+    [Dt_Fim] [datetime] NOT NULL,
+    [Ds_Motivo] [varchar](500) NULL,
+    CONSTRAINT [PK_Sol_Parada] PRIMARY KEY ([Id_Parada]),
+    CONSTRAINT [FK_Sol_Parada] FOREIGN KEY ([Id_Solicitacao]) REFERENCES [Solicitacao]
+)
+
+CREATE TABLE [dbo].[Solicitacao_Solucao](
+    [Id_Solucao] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Solicitacao] [int] NOT NULL,
+    [Ds_Solucao] [varchar](max) NOT NULL,
+    [Cd_Usuario_Resolver] [int] NOT NULL,
+    [Dt_Criacao] [datetime] NOT NULL,
+    CONSTRAINT [PK_Sol_Solucao] PRIMARY KEY ([Id_Solucao]),
+    CONSTRAINT [FK_Sol_Solucao] FOREIGN KEY ([Id_Solicitacao]) REFERENCES [Solicitacao]
+)
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descricao | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `Id_Solicitacao` | PK do chamado | `Ticket.Id` |
+| `Cd_Conglomerado` | Multi-tenancy | `Ticket.ClienteId` (FK) |
+| `Cd_Usuario` | Solicitante | `Ticket.SolicitanteId` (FK) |
+| `Cd_Prioridade` | Nível de urgência | `Ticket.Prioridade` (Enum) |
+| `Ds_Solicitacao` | Descrição | `Ticket.Descricao` |
+| `St_Solicitacao` | Status atual | `Ticket.Status` (Enum) |
+| `Cd_Usuario_Atribuido` | Técnico responsável | `Ticket.AssignedToUserId` (FK) |
+| `Fl_Excluido` | Soft delete | `Ticket.IsDeleted` |
+| `Dt_Criacao_SYS` | Data de criação (auditoria) | `Ticket.CreatedAt` |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descricao | Migracao |
+|-----------|-----------|----------|
+| `pa_Solicitacao_Incluir` | Cria novo chamado | Handler `CreateTicketCommand` |
+| `pa_Solicitacao_Atualizar` | Atualiza status/atribuição | Handler `UpdateTicketCommand` |
+| `pa_Solicitacao_SLA_Recalcular` | Recalcula SLA (batch) | Job Hangfire `SlaRecalculationJob` |
+| `pa_Solicitacao_Lista` | Lista paginada | Query `GetTicketsQuery` |
+| `pa_Solicitacao_Detalhes` | Obtém ticket + SLA + itens | Query `GetTicketDetailQuery` |
+| `pa_Solicitacao_Fila_Roteamento` | Atribui à fila | Handler `SkillBasedRouterService` |
+
+### 3.3 Telas ASPX
+
+| Pagina | Descricao | Tela Moderna |
+|--------|-----------|--------------|
+| `Chamado/Chamado.aspx` | Listagem de chamados com filtros | `/service-desk/tickets` (Angular) |
+| `Chamado/Chamado_Consulta.aspx` | Detalhes + histórico | `/service-desk/tickets/{id}` |
+| `Chamado/Chamado_SLA_Consulta.aspx` | Monitoramento SLA | `/service-desk/sla-dashboard` |
+| `Chamado/Chamado_Solicitacao.aspx` | Abrir novo chamado | `/service-desk/tickets/new` |
+| `Chamado/Chamado_Fila_Atendimento.aspx` | Gestão de filas | `/service-desk/admin/queues` |
+| `Chamado/Chamado_Data_Parada.aspx` | Registrar parada | `/service-desk/tickets/{id}/downtime` |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WS_IControlIT\WSChamado.asmx.vb`
+
+| Metodo | Descricao | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `Solicitacao_Incluir()` | Cria chamado via XML | `POST /api/tickets` |
+| `Solicitacao_Atualizar()` | Atualiza chamado | `PUT /api/tickets/{id}` |
+| `Solicitacao_Detalhes()` | Retorna DataSet | `GET /api/tickets/{id}` |
+| `Solicitacao_Lista()` | Retorna lista paginada (XML) | `GET /api/tickets?page=1&limit=10` |
+| `Solicitacao_SLA_Recalcular()` | Batch manual | Job Hangfire (automático) |
+| `Solicitacao_Atribuir_Fila()` | Atribui à fila | `POST /api/tickets/{id}/assign` |
+
+**Integração ServiceNow** (legado):
+- **Arquivo**: `D:\IC2\ic1_legado\WS_IControlIT\Connect\ServiceNow\Handler.asmx`
+- **Função**: Recebe XML de ServiceNow (Basic Auth) e cria/atualiza chamados em IControlIT
+- **Método**: `ProcessIncidentUpdate()` → chama `pa_Solicitacao_Incluir`
+- **Moderno**: REST Client com mapeamento automático de tipos
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKeys** (múltiplas flags para controlar rollout):
+
+```json
+{
+    "featureKey": "SERVICEDESK_TICKETS_ENABLED",
+    "nome": "Gestão de Chamados",
+    "descricao": "Módulo principal de gestão de chamados",
+    "habilitado": true,
+    "isSystemFeature": false
+},
+{
+    "featureKey": "SERVICEDESK_SKILLBASED_ROUTING",
+    "nome": "Roteamento por Competência",
+    "descricao": "Ativa roteamento automático skill-based em vez de distribuição manual",
+    "habilitado": true,
+    "isSystemFeature": false
+},
+{
+    "featureKey": "SERVICEDESK_SERVICENOW_SYNC",
+    "nome": "Sincronização com ServiceNow",
+    "descricao": "Ativa sincronização P1/P2 com ServiceNow",
+    "habilitado": false,  // Ativo apenas se cliente usa ServiceNow
+    "isSystemFeature": false
+},
+{
+    "featureKey": "SERVICEDESK_SLA_ALERTS",
+    "nome": "Alertas de SLA",
+    "descricao": "Envia notificações quando SLA entra em risco",
+    "habilitado": true,
+    "isSystemFeature": false
+}
+```
+
+**Nota**: Flags descentralizam o controle; diferentes clientes podem ter funcionalidades ativadas/desativadas.
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao** (pt-BR, en-US, es-ES):
+
+```json
+{
+    "servicedesk": {
+        "tickets": {
+            "title": "Gestão de Chamados",
+            "form": {
+                "descricao": "Descrição do Problema",
+                "categoria": "Categoria",
+                "prioridade": "Prioridade",
+                "ativos": "Ativos Afetados",
+                "solicitante": "Solicitante",
+                "contato": "Telefone/Email para Contato",
+                "attachments": "Anexar Arquivo"
+            },
+            "status": {
+                "novo": "Novo",
+                "atribuido": "Atribuído",
+                "emandamento": "Em Andamento",
+                "resolvido": "Resolvido",
+                "fechado": "Fechado",
+                "reabertp": "Reabertp"
+            },
+            "prioridade": {
+                "p1": "P1 - Crítico",
+                "p2": "P2 - Alto",
+                "p3": "P3 - Médio",
+                "p4": "P4 - Baixo"
+            },
+            "sla": {
+                "noprazo": "No Prazo",
+                "risco": "Em Risco",
+                "vencido": "Vencido"
+            },
+            "messages": {
+                "create_success": "Chamado criado com sucesso. Número: {{ticketNumber}}",
+                "update_success": "Chamado atualizado",
+                "comment_added": "Comentário adicionado com sucesso",
+                "attachment_uploaded": "Arquivo enviado",
+                "error_create": "Erro ao criar chamado: {{reason}}",
+                "error_sla_not_found": "Contrato sem SLA configurado",
+                "confirm_close": "Tem certeza que deseja fechar este chamado?"
+            },
+            "validation": {
+                "descricao_required": "Descrição é obrigatória",
+                "descricao_minlen": "Descrição deve ter no mínimo 20 caracteres",
+                "categoria_required": "Selecione uma categoria",
+                "ativos_required": "Selecione pelo menos um ativo",
+                "invalid_file_size": "Arquivo não pode exceder 5 MB"
+            },
+            "columns": {
+                "numero": "Número",
+                "descricao": "Descrição",
+                "status": "Status",
+                "prioridade": "Prioridade",
+                "sla": "SLA",
+                "atribuido_a": "Atribuído a",
+                "criado_em": "Criado em",
+                "vencimento": "Vencimento"
+            }
+        },
+        "sla": {
+            "title": "Monitoramento de SLA",
+            "dashboard": {
+                "total_tickets": "Total de Chamados",
+                "on_time": "No Prazo",
+                "at_risk": "Em Risco",
+                "overdue": "Vencidos",
+                "compliance": "Taxa de Conformidade"
+            }
+        },
+        "downtime": {
+            "title": "Registro de Parada",
+            "form": {
+                "data_inicio": "Data/Hora de Início",
+                "data_fim": "Data/Hora de Fim",
+                "motivo": "Motivo da Parada"
+            }
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Criar chamado | `CHA_TICKET_CREATE` | Solicitante, Descrição, Prioridade, Ativos, Categoria |
+| Atualizar chamado | `CHA_TICKET_UPDATE` | Campo anterior, Novo valor, Quem alterou |
+| Atribuir técnico | `CHA_TICKET_ASSIGN` | Técnico anterior, Novo técnico, Fila |
+| Alterar prioridade | `CHA_TICKET_PRIORITY_CHANGE` | Prioridade anterior, Nova prioridade, Motivo |
+| Registrar parada | `CHA_DOWNTIME_CREATE` | Período, Motivo da parada |
+| Adicionar comentário | `CHA_COMMENT_ADD` | Texto (resumido), Visibilidade (interno/externo) |
+| Fazer upload | `CHA_ATTACHMENT_UPLOAD` | Nome arquivo, Tamanho, Tipo MIME |
+| Fechar chamado | `CHA_TICKET_CLOSE` | Solução, Data fechamento |
+| Reabrir chamado | `CHA_TICKET_REOPEN` | Motivo reabertura, Link ticket original |
+
+**Retencao**: 7 anos (conforme LGPD + requisitos de contratos de longo prazo)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis | Condicao |
+|-----------|-----------|--------|----------|
+| `cha:ticket:create` | Criar novo chamado | Staff, Solicitante | Usuário autenticado |
+| `cha:ticket:read` | Visualizar chamado | Staff, Solicitante | Solicitante vê seus próprios; Staff vê todos |
+| `cha:ticket:update` | Editar chamado | Staff | Apenas status, prioridade, atribuição (não descrição original) |
+| `cha:ticket:comment` | Adicionar comentário | Staff, Solicitante | Visibilidade baseada em tipo (interno/externo) |
+| `cha:ticket:assign` | Atribuir técnico | Manager | Apenas para técnicos da mesma fila |
+| `cha:ticket:close` | Encerrar chamado | Staff | Somente staff; solicitante não pode fechar |
+| `cha:ticket:reopen` | Reabrir chamado | Staff, Solicitante | Solicitante pode reabrir seus próprios |
+| `cha:sla:admin` | Administrar SLA | Admin | Configurar contratos + prazos |
+| `cha:queue:admin` | Administrar filas | Admin | Criar/editar filas e skill sets |
+| `cha:servicenow:sync` | Sincronizar ServiceNow | Admin | Apenas se flag habilitada |
+
+**Matriz de Perfis**:
+
+| Perfil | Create | Read | Update | Comment | Assign | Close | Reopen |
+|--------|--------|------|--------|---------|--------|-------|--------|
+| **Solicitante** | Sim (próprio) | Sim (próprio) | Não | Sim (Ext) | Não | Não | Sim (próprio) |
+| **Técnico** | Não | Sim (atribuído) | Sim | Sim (Int/Ext) | Não | Sim | Não |
+| **Manager** | Não | Sim (fila) | Sim | Sim | Sim | Sim | Sim |
+| **Admin** | Não | Sim (todos) | Sim | Sim | Sim | Sim | Sim |
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao | Query Params |
+|--------|----------|-----------|-----------|--------------|
+| **GET** | `/api/tickets` | Listar chamados (paginado) | `cha:ticket:read` | `page=1`, `limit=20`, `status=`, `priority=`, `queue=` |
+| **GET** | `/api/tickets/{id}` | Obter detalhes + comentários + SLA | `cha:ticket:read` | - |
+| **POST** | `/api/tickets` | Criar novo chamado | `cha:ticket:create` | - |
+| **PUT** | `/api/tickets/{id}` | Atualizar chamado (status, prioridade) | `cha:ticket:update` | - |
+| **DELETE** | `/api/tickets/{id}` | Soft delete (marcar como excluído) | `cha:ticket:update` | - |
+| **POST** | `/api/tickets/{id}/reopen` | Reabrir chamado | `cha:ticket:reopen` | - |
+| **GET** | `/api/tickets/{id}/sla` | Status SLA detalhado | `cha:ticket:read` | - |
+| **POST** | `/api/tickets/{id}/comments` | Adicionar comentário + arquivo | `cha:ticket:comment` | - |
+| **GET** | `/api/tickets/{id}/comments` | Listar comentários (filtrado por visibilidade) | `cha:ticket:read` | - |
+| **POST** | `/api/tickets/{id}/downtime` | Registrar parada de ativo | `cha:ticket:update` | - |
+| **GET** | `/api/tickets/{id}/downtime` | Listar períodos de parada | `cha:ticket:read` | - |
+| **POST** | `/api/tickets/{id}/assign` | Atribuir técnico/fila | `cha:ticket:assign` | - |
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| **POST** | `/api/tickets/{id}/escalate` | Escalar chamado (aumentar prioridade) | `cha:ticket:assign` |
+| **GET** | `/api/tickets/export` | Exportar lista (CSV/Excel) | `cha:ticket:read` |
+| **POST** | `/api/tickets/{id}/survey` | Enviar pesquisa de satisfação (NPS) | `cha:ticket:read` |
+| **GET** | `/api/tickets/sla/dashboard` | Dashboard KPI de SLA | `cha:sla:admin` |
+| **POST** | `/api/queues` | Criar fila de atendimento | `cha:queue:admin` |
+| **GET** | `/api/queues` | Listar filas | `cha:queue:admin` |
+| **PUT** | `/api/queues/{id}` | Atualizar fila | `cha:queue:admin` |
+| **DELETE** | `/api/queues/{id}` | Excluir fila | `cha:queue:admin` |
+| **GET** | `/api/categories` | Listar categorias (3 níveis) | `cha:ticket:read` |
+| **GET** | `/api/sla/contracts` | Listar SLAs por contrato | `cha:sla:admin` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Criacao e Roteamento de Chamado
+
+```
+Usuario Acessa POST /api/tickets
+    |
+    v
+[Validar entrada (RN-CHA-073-01)]
+    |
+    +--- ERRO: Falta descrição/ativo ---> HTTP 400 + mensagem
+    |
+    v (OK)
+[Calcular Prioridade via Matriz (RN-CHA-073-02)]
+    |
+    v
+[Buscar Contrato + SLA padrão (RN-CHA-073-03)]
+    |
+    v
+[Criar Ticket com Status="Novo"]
+    |
+    v
+[Job Hangfire: Skill-Based Routing (RN-CHA-073-05)]
+    |
+    +--- Fila encontrada? [Sim] ---> Atribuir técnico de menor carga
+    |                    [Nao] ---> Fila = QUEUE_GERAL (aguarda disponibilidade)
+    v
+[Atualizar Status para "Atribuído"]
+    |
+    v
+[Job: Enviar notificação SignalR (tempo real) + Email]
+    |
+    v
+[Gravar auditoria (RN-CHA-073-09)]
+    |
+    v
+HTTP 201 + { id: 12345, numero: "CHD-2025-001", status: "Atribuído" }
+```
+
+### 6.2 Fluxo de Monitoramento e Recalculo de SLA
+
+```
+Job Hangfire dispara a cada 5 minutos
+    |
+    v
+[Buscar todos chamados com Status in ('Novo', 'Atribuído', 'EmAndamento')]
+    |
+    v
+Para cada chamado:
+    |
+    +--- Calcular tempo decorrido (RN-CHA-073-04, descontar pausas)
+    |
+    +--- Comparar com Data esperada (RN-CHA-073-03)
+    |
+    +--- Determinar novo status de SLA (RN-CHA-073-06):
+    |    - Tempo restante > 20% -----> No Prazo (verde)
+    |    - Tempo restante 5-20% -----> Risco (amarelo)
+    |    - Tempo restante < 5% -----> Vencido (vermelho)
+    |
+    +--- Se Risco OU Vencido:
+    |    |
+    |    +--- Enviar notificação SignalR + Email para Manager
+    |    |
+    |    +--- Se Vencido + P1:
+    |         Escalar para supervisor (nova fila?)
+    |
+    v
+[Commitar atualizacoes batch]
+```
+
+### 6.3 Fluxo de Reabertura de Chamado
+
+```
+Cliente comenta via POST /api/tickets/{id}/comments
+    |
+    "Status: Resolvido" + comentário "Problema continua"
+    |
+    v
+[Usuário ou Manager clica "Reabrir"]
+    |
+    v
+POST /api/tickets/{id}/reopen
+    |
+    v
+[Validar que Status atual = "Resolvido" (RN-CHA-073-08)]
+    |
+    +--- ERRO: Já está aberto ---> HTTP 409 Conflict
+    |
+    v (OK)
+[Fechar ticket original com Status="Reabertp"]
+    |
+    v
+[Criar novo ticket linked (ParentTicketId=12345)]
+    |
+    v
+[Recalcular SLA para novo ticket (RN-CHA-073-03)]
+    |
+    v
+[Re-rouear via skill-based (RN-CHA-073-05)]
+    |
+    v
+[Enviar notificação: "Chamado reabertp. Novo número: CHD-2025-002"]
+    |
+    v
+HTTP 200 + { newTicketId: 12346, linkedToId: 12345 }
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| **RBAC Baseado em Claims** | Apenas usuários com permissão `cha:ticket:read` podem visualizar; filtragem por ClienteId (multi-tenancy) |
+| **Validação de Entrada (FluentValidation)** | Descrição mín 20 chars, attachments máx 5MB, enum validation |
+| **SQL Injection Prevention** | Parametrizadas queries EF Core; jamais concatenar strings SQL |
+| **XSS Protection** | Angular XSS guard automático; comentários escapados no output |
+| **CSRF Token** | Angular intercepta automaticamente; token em cookie HttpOnly |
+| **Rate Limiting** | Hangfire protegido contra spam de sincronização; API com rate limit/minuto/IP |
+| **Soft Delete Obrigatório** | Nunca deletar fisicamente; sempre marcar `IsDeleted=true` (LGPD compliance) |
+| **Auditoria Completa** | Toda ação logged (RN-CHA-073-09); retenção 7 anos |
+| **Criptografia em Trânsito** | HTTPS obrigatório; TLS 1.2+ |
+| **Arquivos Seguros** | Antivírus scanning ao upload; arquivo armazenado em blob com nome aleatório |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [ ] Tentar criar chamado sem autenticação → HTTP 401
+- [ ] Usuário A tenta visualizar chamado de Usuário B → HTTP 403 (acesso negado)
+- [ ] Injetar SQL em campo descrição (ex: `'; DROP TABLE Solicitacao; --`) → Escapado automaticamente
+- [ ] XSS em comentário (ex: `<script>alert('xss')</script>`) → Renderizado como texto seguro
+- [ ] Fazer upload de arquivo `.exe` → Rejeitado (whitelist MIME types)
+- [ ] Acessar `/api/tickets/999999` (ID não existe) → HTTP 404 (não revelar existência)
+- [ ] Alterar attachment de 5MB para 10MB no cliente → Backend rejeita (max 5MB)
+- [ ] Simular chamada replay de webhook ServiceNow (header Authorization inexistente) → HTTP 401
+- [ ] Verificar que soft-deleted tickets não aparecem em listagens (Fl_Excluido=1)
+- [ ] Auditoria: confirmar que UPDATE não registra senha/dados sensíveis (apenas mudanças de negócio)
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao | Dono |
+|-----|------|---------|------|
+| **Taxa de Conformidade SLA** | ≥ 95% | (Chamados_Resolvidos_NoPrazo / Chamados_Fechados) * 100 | Manager |
+| **Tempo Médio de Resposta** | < Meta do SLA | AVG(Dt_Resposta_Real - Dt_Criacao) | Manager |
+| **Tempo Médio de Resolução** | < Meta do SLA | AVG(Dt_Resolucao_Real - Dt_Criacao) | Manager |
+| **Taxa de Reabertura** | < 5% | (Chamados_Reabertp / Chamados_Fechados) * 100 | QA/Manager |
+| **NPS (Net Promoter Score)** | ≥ 50 | (Promotores - Detratores) / Respondentes * 100 | Produto |
+| **Tempo de Atribuição** | < 5 min | AVG(Dt_Atribuicao - Dt_Criacao) | Infraestrutura |
+| **Carga por Técnico** | 5-10 chamados | COUNT(Tickets) por usuário | Manager |
+| **Taxa de Escalação** | < 10% | (Chamados_Escalados / Total) * 100 | Manager |
+| **Tempo de Parada Total/Cliente** | Relatório | SUM(Dt_Parada_Fim - Dt_Parada_Inicio) | Negócio |
+| **Satisfação com Suporte** | ≥ 80% | Survey espontâneo post-fechamento | Produto |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| **SLA em Risco** | Tempo restante < 20% | Notificar técnico + manager via SignalR |
+| **SLA Vencido** | Tempo atual > data esperada | Escalar P1-P2 para supervisor; P3-P4 para gerente |
+| **Técnico Sobrecarregado** | Carga > 15 chamados | Redirecionar novos para outra fila |
+| **Fila Vazia** | Nenhum técnico disponível | Alert admin; distribuir para fila genérica |
+| **Sincronização ServiceNow Falha** | API ServiceNow indisponível (5 min) | Log + retry automático; alerta após 30 min |
+| **Taxa de Reabertura Alta** | > 10% em 7 dias | Investigar qualidade de resoluções; treinar técnicos |
+| **Taxa de Conformidade Baixa** | < 85% em 30 dias | Review contratos; aumentar equipe ou reduzir throughput |
+| **NPS Negativo** | < 0 em 30 dias | Investigar causas; feedback estruturado com clientes |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF073](./MD-RF073-Gestao-Chamados-SLA.md)
+2. **Casos de Uso**: Criar [UC-RF073](./UC-RF073-Gestao-Chamados-SLA.md)
+3. **Implementacao Backend**: Commands/Queries + Handlers (.NET 10)
+4. **Implementacao Frontend**: Telas Angular 19 (list, create, detail, comments, SLA dashboard)
+5. **Integração Hangfire**: Job de recalculation de SLA + alertas
+6. **Integração SignalR**: Notificações real-time para mudanças de status
+7. **Testes**: Cenários CN, TCs, E2E com Playwright
+8. **Migração de Dados**: Script de migração legado Solicitacao → Ticket
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial - RF completo com 10 RNs, 4 integrações, endpoints, fluxos, segurança e métricas | IControlIT Architect |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: IControlIT Architect Agent
+**Revisao**: Pendente de Aprovação

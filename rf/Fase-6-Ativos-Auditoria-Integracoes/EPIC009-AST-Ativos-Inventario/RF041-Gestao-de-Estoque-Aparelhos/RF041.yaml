@@ -1,0 +1,413 @@
+metadata:
+  rf_id: RF041
+  versao: "2.0"
+  data_criacao: "2025-12-30"
+  fase: Fase-6-Ativos-Auditoria-Integracoes
+  epic: EPIC009-AST-Ativos-Inventario
+  titulo: Gestão de Estoque de Aparelhos
+  modulo: Gestão - Estoque Operacional
+  status: Em Elaboração
+
+visao_geral:
+  objetivo: Gerenciar operacionalmente o estoque de aparelhos e equipamentos incluindo entrada, saída, transferência entre almoxarifados, consultas de saldo, movimentações e rastreabilidade completa do ciclo de vida de cada item
+  importancia_estrategica:
+    - Controle Operacional (visibilidade em tempo real do saldo físico e disponível)
+    - Rastreabilidade (histórico imutável de cada movimentação)
+    - Integração automática com RF028 (criação de ativos na distribuição)
+    - Gestão Proativa (alertas automáticos de estoque mínimo/máximo)
+    - Compliance Fiscal (auditoria completa com retenção 7 anos)
+  escopo_incluido:
+    - Entrada de aparelhos (compra/devolução/transferência/ajuste)
+    - Saída de aparelhos (distribuição/venda/descarte/transferência/ajuste)
+    - Transferência entre almoxarifados com workflow aprovação
+    - Consulta de saldo com filtros avançados
+    - Histórico de movimentações imutável
+    - Reserva de aparelhos para distribuição futura
+    - Alertas estoque mínimo/máximo
+    - Rastreabilidade por IMEI/SN
+    - Integração RF028 (criação automática ativos)
+  escopo_excluido:
+    - Inventário cíclico (RF068)
+    - Cadastro categorias ativos (RF019)
+    - Cadastro marcas/modelos (RF104 não implementado)
+    - Gestão fornecedores (RF022)
+    - Recebimento notas fiscais (RF039 não implementado)
+
+funcionalidades:
+  - id: F-AST-041-01
+    nome: Entrada de Aparelhos
+    descricao: Registrar entrada de aparelhos com tipos específicos (compra/devolução/transferência/ajuste)
+    atores: [Almoxarife, Gestor de Estoque]
+    tipos_entrada: [Compra vinculada NF, Devolução vinculada Ativo, Transferência Recebida, Ajuste Manual com justificativa]
+    permissao: GES.ESTOQUE.ENTRADA.CREATE
+
+  - id: F-AST-041-02
+    nome: Saída de Aparelhos
+    descricao: Registrar saída com criação automática de ativo (se distribuição)
+    atores: [Almoxarife, Gestor de Estoque]
+    tipos_saida: [Distribuição cria Ativo RF028, Venda gera faturamento, Descarte com laudo, Transferência Enviada, Ajuste Manual]
+    permissao: GES.ESTOQUE.SAIDA.CREATE
+
+  - id: F-AST-041-03
+    nome: Transferência entre Almoxarifados
+    descricao: Workflow 3 etapas (solicitação + aprovação + envio + recebimento)
+    atores: [Almoxarife Origem, Gestor Origem, Almoxarife Destino]
+    permissoes: [GES.ESTOQUE.TRANSFERENCIA.CREATE, GES.ESTOQUE.TRANSFERENCIA.RECEIVE]
+    workflow_etapas:
+      - Solicitação (status Aguardando Aprovação)
+      - Aprovação gestor origem
+      - Confirmação envio (saldo deduzido, status Em Trânsito)
+      - Confirmação recebimento (saldo adicionado, status Concluída)
+    alerta_automatico: Transferência em trânsito > 15 dias
+
+  - id: F-AST-041-04
+    nome: Consulta Saldo e Movimentações
+    descricao: Consultas com filtros avançados e exportação Excel/PDF/CSV
+    atores: [Almoxarife, Gestor de Estoque, Auditor]
+    permissao: GES.ESTOQUE.CONSULTAR
+    tipos_consulta:
+      - Saldo por Almoxarifado
+      - Saldo por Categoria
+      - Saldo por Marca/Modelo
+      - Saldo Consolidado (todos almoxarifados)
+      - Histórico Movimentações (imutável)
+      - Rastreamento IMEI/SN (timeline completa)
+    exportacao: [Excel, PDF, CSV]
+    valor_total: Saldo físico × custo médio
+
+  - id: F-AST-041-05
+    nome: Reserva de Aparelhos
+    descricao: Bloqueio de saldo disponível para distribuição futura (sem alterar saldo físico)
+    atores: [Gestor de Estoque]
+    permissao: GES.ESTOQUE.RESERVA.CREATE
+    validade_maxima: 30 dias
+    consumo_automatico: Ao distribuir para destinatário
+    expiracao_automatica: Job noturno 02h00 libera saldo expirado
+    notificacao_expiracao: 3 dias antes da validade
+
+  - id: F-AST-041-06
+    nome: Alertas Estoque Mínimo/Máximo
+    descricao: Configuração de níveis e alertas automáticos via email + in-app
+    atores: [Gestor de Estoque]
+    permissao: GES.ESTOQUE.ALERTAS.CONFIG
+    job_verificacao: A cada 1 hora
+    tipos_alerta:
+      - Estoque Baixo (saldo = estoque_minimo)
+      - Estoque Crítico (saldo < 50% estoque_minimo)
+      - Estoque Excedente (saldo >= estoque_maximo)
+    canais: [Email, In-App via RF066]
+    regra_reenvio: Apenas após normalização e nova queda
+
+  - id: F-AST-041-07
+    nome: Rastreamento IMEI/SN
+    descricao: Timeline visual completa do ciclo de vida do aparelho
+    atores: [Almoxarife, Gestor de Estoque, Auditor]
+    permissao: GES.ESTOQUE.CONSULTAR
+    timeline_eventos:
+      - Entrada inicial (compra/devolução)
+      - Movimentações (transferências)
+      - Saída final (distribuição/venda/descarte)
+    link_ativo: Se distribuição, exibe link para RF028
+
+regras_negocio:
+  - id: RN-AST-041-01
+    titulo: Entrada Compra Vinculada NF
+    descricao: Entrada de compra DEVE ser vinculada a nota fiscal (RF039)
+    impacto: Campo Nota Fiscal obrigatório se tipo = Compra
+
+  - id: RN-AST-041-02
+    titulo: Entrada Devolução Vinculada Ativo
+    descricao: Entrada de devolução DEVE ser vinculada a ativo existente (RF028)
+    impacto: Campo Ativo obrigatório se tipo = Devolução
+
+  - id: RN-AST-041-03
+    titulo: Ajuste Manual Requer Justificativa
+    descricao: Ajuste manual REQUER justificativa obrigatória (mínimo 20 caracteres)
+    impacto: Campo Observações mínimo 20 chars se tipo = Ajuste Manual
+
+  - id: RN-AST-041-04
+    titulo: Ajuste >10 Unidades Requer Aprovação
+    descricao: Ajuste manual acima de 10 unidades REQUER aprovação de gestor
+    impacto: Workflow de aprovação se quantidade_ajuste > 10
+
+  - id: RN-AST-041-05
+    titulo: Auditoria Completa Movimentações
+    descricao: Todas as movimentações DEVEM ser auditadas com usuário, IP, timestamp
+    impacto: AuditInterceptor automático, retention 2555 dias (7 anos)
+
+  - id: RN-AST-041-06
+    titulo: Saída Não Excede Saldo Disponível
+    descricao: Saída NÃO pode exceder saldo disponível no almoxarifado
+    impacto: Backend valida quantidade_saida <= saldo_disponivel, HTTP 400 se inválido
+
+  - id: RN-AST-041-07
+    titulo: Distribuição Cria Ativo Automaticamente
+    descricao: Saída por distribuição DEVE criar ativo no RF028 automaticamente
+    impacto: Backend chama RF028, rollback de transação se criação falhar
+
+  - id: RN-AST-041-08
+    titulo: Descarte Requer Motivo e Laudo
+    descricao: Saída por descarte REQUER motivo obrigatório e anexo laudo (se aplicável)
+    impacto: Campo Motivo obrigatório, upload PDF laudo se tipo = Descarte
+
+  - id: RN-AST-041-09
+    titulo: Saída >10 Unidades Requer Aprovação
+    descricao: Saída acima de 10 unidades REQUER aprovação de gestor
+    impacto: Workflow de aprovação se quantidade_saida > 10
+
+  - id: RN-AST-041-10
+    titulo: Rastreáveis Devem Ter Saída Individual
+    descricao: Aparelhos rastreáveis (com IMEI/SN) DEVEM ter saída individual registrada
+    impacto: Campo IMEI/SN obrigatório se categoria = Rastreável, uma saída por aparelho
+
+  - id: RN-AST-041-11
+    titulo: Transferência Requer Aprovação Gestor Origem
+    descricao: Transferência DEVE ter aprovação do gestor do almoxarifado de origem
+    impacto: Status Aguardando Aprovação até aprovação, saldo deduzido apenas após aprovação
+
+  - id: RN-AST-041-12
+    titulo: Saldo Deduzido Após Confirmação Envio
+    descricao: Saldo NÃO é deduzido da origem até confirmação de envio
+    impacto: Status Aguardando Envio após aprovação, saldo deduzido ao clicar Confirmar Envio
+
+  - id: RN-AST-041-13
+    titulo: Saldo Adicionado Após Confirmação Recebimento
+    descricao: Saldo NÃO é adicionado ao destino até confirmação de recebimento
+    impacto: Saldo destino aumenta apenas ao clicar Confirmar Recebimento
+
+  - id: RN-AST-041-14
+    titulo: Alerta Transferência >15 Dias
+    descricao: Transferência em trânsito > 15 dias gera alerta automático
+    impacto: Job noturno notifica gestor origem e destino
+
+  - id: RN-AST-041-15
+    titulo: Recebimento Deve Conferir Quantidade
+    descricao: Recebimento DEVE conferir quantidade enviada (divergência requer justificativa)
+    impacto: Campo Justificativa Divergência obrigatório se quantidade_recebida ≠ quantidade_enviada
+
+  - id: RN-AST-041-16
+    titulo: Saldo Exibe Valor Total R$
+    descricao: Consulta de saldo DEVE exibir valor total em R$ baseado no custo médio
+    impacto: Coluna Valor Total = saldo_fisico × custo_medio
+
+  - id: RN-AST-041-17
+    titulo: Histórico Imutável
+    descricao: Histórico de movimentações é IMUTÁVEL (não pode ser editado/excluído)
+    impacto: Backend NÃO expõe UPDATE ou DELETE para tabela Estoque_Movimentacao
+
+  - id: RN-AST-041-18
+    titulo: Exportação Registrada Auditoria
+    descricao: Exportação de dados DEVE ser registrada em auditoria (compliance LGPD)
+    impacto: Auditoria de exportação com usuário, IP, timestamp, formato, filtros aplicados
+
+  - id: RN-AST-041-19
+    titulo: Rastreamento IMEI Timeline Completa
+    descricao: Consulta por IMEI/SN DEVE exibir timeline completa (entrada → movimentações → saída)
+    impacto: Tela de rastreamento exibe linha do tempo visual com todos os eventos
+
+  - id: RN-AST-041-20
+    titulo: Reserva Não Excede Saldo Disponível
+    descricao: Reserva NÃO pode exceder saldo disponível (não reservado)
+    impacto: Backend valida quantidade_reserva <= saldo_disponivel, HTTP 400 se inválido
+
+  - id: RN-AST-041-21
+    titulo: Reserva Validade Máxima 30 Dias
+    descricao: Reserva tem validade máxima de 30 dias
+    impacto: Backend valida data_validade <= data_criacao + 30 dias
+
+  - id: RN-AST-041-22
+    titulo: Reserva Expirada Libera Saldo
+    descricao: Reserva expirada automaticamente libera saldo após data de validade
+    impacto: Job noturno muda status para Expirada e libera saldo bloqueado
+
+  - id: RN-AST-041-23
+    titulo: Cancelamento Reserva Requer Justificativa
+    descricao: Cancelamento de reserva REQUER justificativa
+    impacto: Campo Motivo do Cancelamento mínimo 20 caracteres
+
+  - id: RN-AST-041-24
+    titulo: Job Noturno Reservas Expiradas
+    descricao: Job noturno verifica reservas expiradas e libera saldo automaticamente
+    impacto: Hangfire executa diariamente às 02h00
+
+  - id: RN-AST-041-25
+    titulo: Job Níveis Estoque Cada 1 Hora
+    descricao: Job agendado verifica níveis de estoque a cada 1 hora
+    impacto: Hangfire executa a cada 1 hora para comparar saldo com níveis configurados
+
+  - id: RN-AST-041-26
+    titulo: Alertas Email + In-App
+    descricao: Alertas são enviados por email + notificação no sistema (RF066)
+    impacto: Sistema envia via RF066 com canais Email E In-App
+
+  - id: RN-AST-041-27
+    titulo: Alerta Não Reenviado Até Normalização
+    descricao: Alerta NÃO é reenviado até que saldo seja normalizado e volte a cair
+    impacto: Sistema registra última data envio, só reenvia após normalização
+
+  - id: RN-AST-041-28
+    titulo: Configuração Níveis Permissão Gestor
+    descricao: Configuração de níveis de alerta REQUER permissão de gestor
+    impacto: Apenas permissão GES.ESTOQUE.ALERTAS.CONFIG pode configurar
+
+integracoes_obrigatorias:
+  central_funcionalidades:
+    codigo: GES.ESTOQUE
+    nome: Gestão de Estoque
+    descricao: Controle operacional de entrada, saída e movimentação de aparelhos
+    categoria: Gestão
+    icone: warehouse
+    rota: /gestao/estoque
+    ordem: 30
+    permissoes:
+      - GES.ESTOQUE.CONSULTAR
+      - GES.ESTOQUE.ENTRADA.CREATE
+      - GES.ESTOQUE.SAIDA.CREATE
+      - GES.ESTOQUE.TRANSFERENCIA.CREATE
+      - GES.ESTOQUE.TRANSFERENCIA.RECEIVE
+      - GES.ESTOQUE.RESERVA.CREATE
+      - GES.ESTOQUE.RESERVA.CANCEL
+      - GES.ESTOQUE.ALERTAS.CONFIG
+
+  auditoria:
+    todas_operacoes: true
+    retention_dias: 2555
+    campos: [Usuario, IP, DataHora, DadosAntes, DadosDepois, Acao]
+    historico_imutavel: true
+
+  multi_tenancy:
+    todas_tabelas_incluem: ClienteId ou Id_Empresa
+    queries_filtradas_por: CurrentClienteId
+    isolamento_total: true
+
+  rbac:
+    controle_granular: true
+    separacao_funcoes: [Almoxarife registra, Gestor aprova, Auditor consulta]
+    permissoes_especiais: [Ajustes manuais, Cancelamentos, Configuração alertas]
+
+  i18n:
+    idiomas: [pt-BR, en-US, es-ES]
+    fallback: pt-BR → en → es
+    chaves_organizadas: estoque.entrada.titulo, estoque.saida.mensagemSucesso
+
+  notificacoes_rf066:
+    alertas_estoque: [Email, In-App]
+    notificacoes_transferencia: [Solicitação, Aprovação, Envio, Recebimento]
+    notificacoes_reserva: [Criação, Expiração 3 dias, Cancelamento]
+    prioridade: Alta para alertas críticos, Normal para outros
+
+  integracao_rf028:
+    saida_distribuicao_cria_ativo: true
+    dados_ativo: [Categoria, Marca, Modelo, IMEI/SN, Usuário, Centro de custo]
+    status_inicial: Ativo ou Em Uso
+    vinculo_bidirecional: Ativo guarda ID da movimentação de saída
+
+  jobs_hangfire:
+    - nome: Reservas Expiradas
+      frequencia: Diária às 02h00
+      acao: Expirar reservas vencidas
+    - nome: Alertas Estoque
+      frequencia: A cada 1 hora
+      acao: Verificar níveis mínimo/máximo
+    - nome: Transferências em Trânsito
+      frequencia: Diária
+      acao: Alertar transferências > 15 dias
+
+impacto_dependencias:
+  rfs_dependentes:
+    - RF028: Recebe ativos criados automaticamente
+    - RF068: Audita saldo do RF041 periodicamente
+    - RF066: Envia alertas e notificações
+  rfs_necessarios:
+    - RF019: Categorias de aparelhos cadastradas
+    - RF022: Fornecedores cadastrados
+    - RF039: NFs cadastradas (se implementado)
+  dados_compartilhados:
+    - Categorias de Ativos (RF019)
+    - Marcas e Modelos (RF104 se implementado)
+    - Filiais (RF024)
+    - Usuários (sistema autenticação)
+
+metricas_kpis:
+  operacionais:
+    - nome: Taxa Rotatividade Estoque
+      calculo: Número de saídas / saldo médio (mensal)
+    - nome: Tempo Médio Transferência
+      calculo: Tempo entre envio e recebimento (dias)
+    - nome: Taxa Divergência Recebimentos
+      calculo: Percentual de recebimentos com quantidade diferente
+    - nome: Taxa Reservas Expiradas
+      calculo: Percentual de reservas que expiraram sem consumo
+  compliance:
+    - nome: Taxa Ajustes Manuais
+      meta: < 2%
+    - nome: Taxa Ajustes Aprovados
+      calculo: Percentual de ajustes aprovados pelo gestor
+    - nome: Tempo Médio Auditoria
+      calculo: Tempo médio para acessar histórico completo de aparelho
+  eficiencia:
+    - nome: Taxa Criação Automática Ativos
+      meta: 100%
+    - nome: Taxa Alertas Estoque Acionados
+      calculo: Quantidade de alertas enviados (mensal)
+    - nome: Taxa Resolução Alertas
+      calculo: Percentual de alertas que resultaram em reposição
+
+seguranca:
+  protecao_dados:
+    - Multi-tenancy obrigatório (filtragem por ClienteId)
+    - Auditoria completa (todas operações registradas)
+    - Histórico imutável (movimentações não podem ser editadas/excluídas)
+    - Exportação rastreada (registro em auditoria)
+  controle_acesso:
+    - RBAC granular por operação
+    - Aprovação de ajustes >10 unidades
+    - Aprovação de transferências
+    - Permissões especiais para configuração de alertas
+  validacoes_seguranca:
+    - Validação saldo disponível backend
+    - Vinculação obrigatória (Compra→NF, Devolução→Ativo)
+    - Justificativas obrigatórias (ajustes, descartes, cancelamentos)
+    - Prevenção fraude (aprovações gestor para operações >10 unidades)
+
+criterios_aceite:
+  funcionalidades:
+    - Entrada de Aparelhos (compra/devolução/transferência/ajuste)
+    - Saída de Aparelhos (distribuição/venda/descarte/transferência/ajuste)
+    - Transferência (workflow completo solicitação→aprovação→envio→recebimento)
+    - Consulta de Saldo (filtros + exportação Excel/PDF/CSV)
+    - Reserva (bloqueio saldo + consumo automático + expiração automática)
+    - Alertas (configuração níveis + alertas automáticos email+notificação)
+    - Rastreamento (busca IMEI/SN + timeline completa)
+  integracoes:
+    - RF028 (criação automática ativo na distribuição)
+    - RF066 (envio de alertas e notificações)
+    - Hangfire (jobs agendados)
+    - Auditoria (registro completo retention 7 anos)
+  qualidade:
+    - Multi-tenancy (isolamento total entre empresas)
+    - RBAC (permissões granulares funcionando)
+    - i18n (textos traduzidos pt-BR/en-US/es-ES)
+    - Validações (backend impede operações inválidas)
+    - Performance (consulta saldo <2s para 10.000 itens)
+    - Histórico imutável (movimentações não podem ser editadas/excluídas)
+
+anexos:
+  casos_uso:
+    - UC00: Consultar Saldo de Estoque
+    - UC01: Registrar Entrada de Aparelhos
+    - UC02: Registrar Saída de Aparelhos
+    - UC03: Transferir entre Almoxarifados
+    - UC04: Criar Reserva de Aparelhos
+  modelo_dados: MD-RF041.md
+  wireframes: WF-RF041.md
+  testes:
+    - Testes Backend
+    - Testes Sistema (E2E)
+    - Testes Outros
+
+observacoes:
+  - RF041 trata da gestão operacional diária do estoque
+  - RF068 trata da auditoria periódica do estoque
+  - São funcionalidades COMPLEMENTARES mas DISTINTAS
+  - RF041 registra movimentações, RF068 audita se saldos estão corretos

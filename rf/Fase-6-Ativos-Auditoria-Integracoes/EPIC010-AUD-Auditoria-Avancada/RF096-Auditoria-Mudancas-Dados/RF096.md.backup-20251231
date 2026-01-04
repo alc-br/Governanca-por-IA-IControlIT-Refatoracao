@@ -1,0 +1,1627 @@
+# RF096: Auditoria de Mudanças de Dados
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF095, RF098 | **EPIC**: EPIC010-AUD-Auditoria-Avancada
+**Fase**: Fase 6 - Ativos, Auditoria e Integrações
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+Este requisito especifica o módulo de **Auditoria de Mudanças de Dados** do sistema IControlIT, responsável por rastrear, registrar e auditorisar todas as alterações realizadas em dados críticos do sistema. O módulo implementa change tracking granular (campo a campo), captura de contexto de execução (usuário, IP, timestamp, user-agent) e oferece visualização de histórico completo com suporte a comparação entre versões e rollback controlado.
+
+O módulo funciona como camada transversal de compliance, integrando-se com o EF Core Change Tracker no backend e oferecendo APIs RESTful para consumo pelo frontend Angular 19. Todas as alterações são auditadas automaticamente sem necessidade de código adicional na entidade, seguindo padrão decorador `[Audited]`.
+
+### 1.2 Importancia Estrategica
+
+O módulo de Auditoria de Mudanças de Dados é crítico para:
+
+- **Conformidade Regulatória**: Compliance com LGPD Art. 5º (rastreabilidade) e Art. 48 (comunicação de incidentes de dados). Conformidade SOX 404 (controles gerenciais de TI). Retenção de histórico por período legal (mínimo 10 anos).
+
+- **Forense Digital e Investigação**: Capacidade de reconstruir estados anteriores de qualquer entidade. Análise de quem alterou, o quê, quando, de onde e por quê. Rastreamento de anomalias e padrões suspeitos de acesso.
+
+- **Governança de Dados**: Rastreamento de ciclo de vida de dados sensíveis. Detecção automática de mudanças em campos críticos (dados LGPD). Relatórios de conformidade para auditorias internas e externas.
+
+- **Continuidade de Negócio**: Capacidade de reverter mudanças acidentais (rollback de estado). Análise de impacto de alterações em cadeia. Restauração de dados de ponto de recuperação.
+
+- **Inteligência de Negócio**: Insights sobre padrões de alteração de dados. Identificação de entidades mais voláteis. Análise temporal de mudanças por período, usuário, entidade ou centro de custo.
+
+### 1.3 Conceitos Fundamentais
+
+**Change Tracking (Rastreamento de Mudanças)**: Mecanismo que captura todas as alterações em tempo real a nível de campo, registrando valor anterior (before), valor novo (after) e metadados da alteração (usuário, timestamp, tipo de operação).
+
+- EF Core Change Tracker: API nativa do Entity Framework Core que monitora estado de entidades e expõe mudanças via `ChangeTracker.Entries()`.
+- Decorador `[Audited]`: Atributo aplicado a entidades que ativa rastreamento automático sem código adicional no CRUD.
+
+**Audit Trail (Trilha de Auditoria)**: Sequência cronológica imutável de todos os eventos de mudança registrados para uma entidade, formando "árvore genealógica" completa do dado.
+
+- Imutabilidade: Registros de auditoria não podem ser modificados ou deletados (apenas adicionados).
+- Retenção: Período legal de manutenção (LGPD: mínimo 5 anos, SOX: 10 anos).
+
+**Soft Delete (Deleção Lógica)**: Entidades deletadas não são removidas fisicamente, mas marcadas como deletadas (flag `DeletedAt`), permitindo recuperação.
+
+- Cascata de Soft Delete: Deleções em cascata respeitam relacionamentos, mantendo integridade referencial.
+- Rastreamento de Deleção: Registro de quem deletou, quando e do quê.
+
+**Bulk Operations (Operações em Lote)**: Alterações afetando múltiplos registros em uma única operação. Cada registro alterado gera entrada separada na trilha de auditoria.
+
+- Detecção Automática: Sistema identifica automaticamente operações bulk e agrupa em "batch de mudanças".
+- Granularidade: Mesmo em bulk, cada campo é rastreado individualmente.
+
+**Compliance LGPD Art. 48**: Obrigatoriedade de comunicar incidentes de dados pessoais ao titular dentro de 72 horas.
+
+- Rastreamento de Acesso: Auditoria integrada com módulo de acesso (RF095) para identificar acessos suspeitos.
+- Alertas: Sistema gera alertas automáticos quando detecta mudanças em dados classificados como sensíveis LGPD.
+
+**Compliance SOX 404**: Controles gerenciais de TI que garantem integridade, confidencialidade e disponibilidade de dados financeiros.
+
+- Segregação de Funções: Usuários diferentes para criar, autorizar e alterar registros críticos.
+- Trilha Auditável: Todas as operações financeiras geram trilha auditável.
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Mecanismo de Rastreamento** | Stored procedures manuais (`pa_*`) que copiam valores para tabelas `*_log` | EF Core Change Tracker + decorador `[Audited]` automático |
+| **Granularidade** | Nível de registro (antes/depois da operação completa) | Nível de campo (each field tracked separately) |
+| **Contexto de Execução** | Usuário + Data/Hora apenas; IP não registrado | Usuário + IP + Timestamp UTC + User-Agent + ClienteId + EmpresaId |
+| **Armazenamento** | Tabelas específicas por entidade (`Ativo_log`, `Fatura_log`, etc) | Tabela central `AuditLog` com polimorfismo (EntityType + EntityId) |
+| **Visualização de Histórico** | Telas ASPX separadas por módulo | API REST única `/api/audit/history` com filtros avançados |
+| **Comparação de Versões** | Manual, comparando registro em tabela `*_log` | Endpoint `/api/audit/{id}/diff` com visualização lado-a-lado |
+| **Rollback** | Procedimento manual de restauração de dados | API `/api/audit/{id}/rollback` com transação e validação de integridade |
+| **Detecção de Anomalias** | Nenhuma | Hangfire jobs que analisam padrões de mudança em batch |
+| **Relatórios de Auditoria** | Relatórios SQL estáticos | Dashboards dinâmicos + exportação para CSV/Excel/PDF |
+| **Integração com SIEM** | Nenhuma | Envio automático de eventos críticos para Azure Sentinel |
+| **Alertas de Mudanças Críticas** | Nenhum | Alertas em tempo real para campos sensíveis LGPD |
+
+### 1.5 Funcionalidades Principais
+
+1. **CRUD de Rastreamento de Mudanças** - Captura automática de todas alterações (Create, Update, Delete) em nível de campo com before/after values.
+
+2. **Visualização de Histórico Temporal** - Timeline interativa exibindo todas mudanças de uma entidade em ordem cronológica, com contexto (usuário, IP, timestamp).
+
+3. **Comparação de Versões (Diff)** - Visualização lado-a-lado de valores entre duas versões, destacando campos alterados.
+
+4. **Rollback de Mudanças** - Restauração controlada de estado anterior de uma entidade com validação de integridade referencial.
+
+5. **Detecção de Operações em Lote** - Agrupamento automático de múltiplas alterações em única transação como "batch de mudanças".
+
+6. **Auditoria de Deleções** - Rastreamento completo de deleções lógicas (soft delete) com registro do deletado, de quem deletou e quando.
+
+7. **Relatórios de Auditoria** - Relatórios parametrizáveis por período, usuário, entidade, centro de custo, tipo de operação.
+
+8. **Dashboard de Mudanças** - KPI de volume de mudanças, entidades mais alteradas, usuários mais ativos, comparação temporal.
+
+9. **Alertas de Dados Sensíveis** - Notificações automáticas quando mudanças afetam campos classificados como LGPD.
+
+10. **Exportação para Forense** - Exportação de trilha auditável para análise forense em formatos CSV, Excel, JSON, PDF.
+
+11. **Integração com Azure Sentinel (SIEM)** - Envio automático de eventos críticos de mudança para plataforma de análise de segurança.
+
+12. **Sincronização com DevOps** - Rastreamento de mudanças de configuração (Feature Flags, parametrizações) com registro em Azure DevOps.
+
+13. **Busca Avançada de Auditoria** - Filtros por campo alterado, valor anterior, valor novo, período, usuário, IP, tipo de operação.
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-AUD-096-01: Rastreamento Automático de Todas as Operações CRUD
+
+**Descricao**: Toda entidade decorada com `[Audited]` deve ter rastreamento automático de Create, Update e Delete sem necessidade de código adicional no handler.
+
+**Justificativa**: Elimina código duplicado e reduz risco de negligência. Centraliza lógica de rastreamento em interceptor do EF Core. Garante cobertura 100% de operações.
+
+**Implementacao**:
+
+```csharp
+// Decorador em entidade
+[Audited]
+public class Ativo : AggregateRoot
+{
+    public string Nome { get; set; }
+    public string Patrimonio { get; set; }
+    // Campos rastreados automaticamente
+}
+
+// Interceptor do EF Core captura todas mudanças
+public class AuditInterceptor : SaveChangesInterceptor
+{
+    private readonly ICurrentUserService _userService;
+    private readonly ILogger<AuditInterceptor> _logger;
+
+    public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
+    {
+        var dbContext = eventData.Context;
+        var entries = dbContext?.ChangeTracker.Entries()
+            .Where(e => e.Entity.GetType().GetCustomAttribute<AuditedAttribute>() != null)
+            .ToList() ?? new List<EntityEntry>();
+
+        foreach (var entry in entries)
+        {
+            switch (entry.State)
+            {
+                case EntityState.Added:
+                    await LogCreation(entry, cancellationToken);
+                    break;
+                case EntityState.Modified:
+                    await LogModification(entry, cancellationToken);
+                    break;
+                case EntityState.Deleted:
+                    await LogDeletion(entry, cancellationToken);
+                    break;
+            }
+        }
+
+        return result;
+    }
+
+    private async Task LogCreation(EntityEntry entry, CancellationToken cancellationToken)
+    {
+        var entityType = entry.Entity.GetType().Name;
+        var entityId = entry.Entity.GetType()
+            .GetProperty("Id")?.GetValue(entry.Entity);
+
+        var auditLog = new AuditLog
+        {
+            EntityType = entityType,
+            EntityId = entityId?.ToString() ?? string.Empty,
+            OperationType = OperationType.Create,
+            UserId = _userService.GetUserId(),
+            Timestamp = DateTime.UtcNow,
+            IpAddress = _userService.GetIpAddress(),
+            UserAgent = _userService.GetUserAgent(),
+            Changes = CaptureAllProperties(entry)
+        };
+
+        await _auditRepository.AddAsync(auditLog, cancellationToken);
+    }
+
+    private List<FieldChange> CaptureAllProperties(EntityEntry entry)
+    {
+        var changes = new List<FieldChange>();
+
+        foreach (var property in entry.Entity.GetType().GetProperties())
+        {
+            var value = property.GetValue(entry.Entity);
+            changes.Add(new FieldChange
+            {
+                FieldName = property.Name,
+                OldValue = null,
+                NewValue = value?.ToString() ?? string.Empty
+            });
+        }
+
+        return changes;
+    }
+}
+```
+
+**Exemplos**:
+
+- Criar novo Ativo: Sistema captura automaticamente valores iniciais de todos campos.
+- Atualizar Nome do Ativo: Sistema registra Name: "Notebook" → "Desktop", com timestamp e usuário.
+- Deletar Ativo (soft delete): Sistema marca DeletedAt, registra deletado por quem e quando.
+
+---
+
+### RN-AUD-096-02: Captura de Contexto Completo de Execução (Before/After)
+
+**Descricao**: Cada mudança deve registrar valor anterior (before) e novo (after) para cada campo, além de metadados de contexto: usuário, IP, timestamp UTC, user-agent, ClienteId, EmpresaId.
+
+**Justificativa**: Contexto completo permite reconstrução exata do momento da alteração. IP identifica origem da requisição. User-Agent ajuda a identificar cliente (web, mobile, API). ClienteId/EmpresaId garantem segregação multi-tenant.
+
+**Implementacao**:
+
+```csharp
+public class AuditLog : Entity
+{
+    public string EntityType { get; set; } // Nome da entidade auditada
+    public string EntityId { get; set; } // ID da entidade
+    public OperationType OperationType { get; set; } // Create, Update, Delete
+
+    // Contexto de execução
+    public Guid UserId { get; set; }
+    public string Username { get; set; }
+    public DateTime Timestamp { get; set; } // UTC sempre
+    public string IpAddress { get; set; }
+    public string UserAgent { get; set; }
+    public Guid ClienteId { get; set; } // Multi-tenancy
+    public Guid EmpresaId { get; set; }
+
+    // Mudanças de campo
+    public List<FieldChange> Changes { get; set; }
+
+    // Referência cruzada
+    public Guid? CorrelationId { get; set; } // Agrupa mudanças relacionadas
+}
+
+public class FieldChange
+{
+    public string FieldName { get; set; }
+    public string OldValue { get; set; } // Before
+    public string NewValue { get; set; } // After
+    public string DataType { get; set; } // Tipo original (int, string, datetime, etc)
+    public bool IsSensitive { get; set; } // Flag LGPD
+}
+```
+
+**Exemplos**:
+
+- Alteração simples: `Ativo.Nome: "Notebook Antigo" → "Notebook Novo"`, `UserId: "user123"`, `Timestamp: "2025-12-28T14:35:22.123Z"`, `IpAddress: "192.168.1.100"`
+- Alteração sensível LGPD: `Consumidor.Email: "old@example.com" → "new@example.com"`, IsSensitive=true, alerta gerado.
+- Bulk update: Múltiplos registros alterados em 1 transação, mesma CorrelationId.
+
+---
+
+### RN-AUD-096-03: Imutabilidade de Registros de Auditoria
+
+**Descricao**: Registros de auditoria uma vez inseridos não podem ser modificados ou deletados, apenas lidos. A tabela AuditLog é append-only.
+
+**Justificativa**: Garante confiabilidade da trilha auditória. Impede fraude (cobertura de rastros). Atende requisitos de conformidade regulatória.
+
+**Validacao**:
+
+```sql
+-- Constraint de banco: nenhuma operação UPDATE/DELETE permitida na tabela AuditLog
+-- Trigger para rejeitar UPDATE/DELETE
+CREATE TRIGGER trg_AuditLog_Immutable
+ON dbo.AuditLog
+INSTEAD OF UPDATE, DELETE
+AS
+BEGIN
+    RAISERROR('AuditLog is immutable. Inserts only allowed.', 16, 1)
+    ROLLBACK TRANSACTION
+END
+```
+
+**Exemplos**:
+
+- Tentativa de UPDATE: `UPDATE AuditLog SET OperationType = 'Delete'` → Erro: "AuditLog is immutable"
+- Tentativa de DELETE: `DELETE FROM AuditLog WHERE Id = '123'` → Erro: "AuditLog is immutable"
+- INSERT permitido: `INSERT INTO AuditLog (...)` → Sucesso, registro adicionado.
+
+---
+
+### RN-AUD-096-04: Soft Delete com Rastreamento Completo
+
+**Descricao**: Deleções lógicas (soft delete) não removem dados fisicamente. Entidade recebe flag `DeletedAt` com timestamp. Registro de auditoria captura quem deletou, quando e metadados completos.
+
+**Justificativa**: Permite recuperação de dados. Mantém integridade referencial. Garante compliance com LGPD (direito ao esquecimento processado, mas dados recuperáveis internamente).
+
+**Implementacao**:
+
+```csharp
+[Audited]
+public class Consumidor : AggregateRoot, ISoftDeletable
+{
+    public string Nome { get; set; }
+
+    // Soft delete
+    public DateTime? DeletedAt { get; set; }
+    public Guid? DeletedBy { get; set; }
+    public string DeletionReason { get; set; }
+
+    public bool IsDeleted => DeletedAt.HasValue;
+}
+
+// Interceptor captura soft delete
+private async Task LogDeletion(EntityEntry entry, CancellationToken cancellationToken)
+{
+    var entity = entry.Entity as ISoftDeletable;
+    if (entity?.DeletedAt != null)
+    {
+        var auditLog = new AuditLog
+        {
+            EntityType = entry.Entity.GetType().Name,
+            EntityId = GetEntityId(entry),
+            OperationType = OperationType.Delete,
+            UserId = _userService.GetUserId(),
+            Timestamp = DateTime.UtcNow,
+            IpAddress = _userService.GetIpAddress(),
+            Changes = new List<FieldChange>
+            {
+                new FieldChange
+                {
+                    FieldName = "DeletedAt",
+                    OldValue = "null",
+                    NewValue = entity.DeletedAt?.ToString("O") ?? string.Empty,
+                    IsSensitive = false
+                }
+            }
+        };
+
+        await _auditRepository.AddAsync(auditLog, cancellationToken);
+    }
+}
+```
+
+**Exemplos**:
+
+- Deletar Consumidor: Flag `DeletedAt = 2025-12-28T15:00:00Z`, `DeletedBy = userId`, `DeletionReason = "Solicitação LGPD Art.17"`.
+- Query ignorando deletados: `WHERE DeletedAt IS NULL` (padrão em todos os SELECTs).
+- Recuperação: Restaurar `DeletedAt = NULL`, registrar reversal em auditoria.
+
+---
+
+### RN-AUD-096-05: Detecção Automática de Operações em Lote
+
+**Descricao**: Quando múltiplas entidades são alteradas em uma única transação, o sistema agrupa automaticamente mudanças com mesmo CorrelationId. Cada registro alterado gera entrada separada em AuditLog, mas ligadas por CorrelationId.
+
+**Justificativa**: Permite investigação rápida de quais registros foram alterados juntos. Identifica padrões de mudança correlacionados.
+
+**Implementacao**:
+
+```csharp
+public class AuditInterceptor : SaveChangesInterceptor
+{
+    public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
+    {
+        var correlationId = Guid.NewGuid(); // Agrupa todas mudanças desta transação
+
+        var entries = eventData.Context?.ChangeTracker.Entries()
+            .Where(e => e.Entity.GetType().GetCustomAttribute<AuditedAttribute>() != null)
+            .ToList() ?? new List<EntityEntry>();
+
+        foreach (var entry in entries)
+        {
+            var auditLog = new AuditLog
+            {
+                // ... outros campos ...
+                CorrelationId = correlationId, // Todas mudanças compartilham mesmo ID
+                Changes = CaptureChanges(entry)
+            };
+
+            await _auditRepository.AddAsync(auditLog, cancellationToken);
+        }
+
+        return result;
+    }
+}
+
+// Query exemplo: buscar todas mudanças de um lote
+public async Task<List<AuditLog>> GetBatchChangesAsync(Guid correlationId)
+{
+    return await _context.AuditLogs
+        .Where(a => a.CorrelationId == correlationId)
+        .OrderBy(a => a.Timestamp)
+        .ToListAsync();
+}
+```
+
+**Exemplos**:
+
+- Atualizar 100 Ativos em um lote: CorrelationId = "abc-123", 100 registros AuditLog criados, todos com CorrelationId = "abc-123".
+- Reverter lote completo: Query por CorrelationId, executar rollback para cada registro.
+
+---
+
+### RN-AUD-096-06: Rastreamento de Mudanças de Relacionamentos
+
+**Descricao**: Alterações em relacionamentos (ex: atribuição de Ativo a Consumidor) são rastreadas como mudanças de campo. Foreign keys são registradas antes/depois.
+
+**Justificativa**: Crítico para compliance. Permite rastrear histórico de propriedade de ativos, cadeias de custódia.
+
+**Implementacao**:
+
+```csharp
+// Tabela de relacionamento
+[Audited]
+public class RlConsumidorAtivo : Entity
+{
+    public Guid ConsumidorId { get; set; }
+    public Guid AtivoId { get; set; }
+    public DateTime DataAtribuicao { get; set; }
+    public DateTime? DataDevolucao { get; set; }
+}
+
+// Auditoria captura:
+// - Quando ConsumidorId muda: "ConsumidorId: uuid-123 → uuid-456"
+// - Quando AtivoId muda: "AtivoId: uuid-789 → uuid-012"
+// - Quando DataDevolucao é preenchida: "DataDevolucao: null → 2025-12-28"
+```
+
+**Exemplos**:
+
+- Atribuir Ativo a Consumidor: RlConsumidorAtivo criado, auditoria registra ConsumidorId, AtivoId, DataAtribuicao.
+- Reatribuir para outro Consumidor: ConsumidorId mudado, auditoria registra before/after.
+- Devolução: DataDevolucao preenchida, auditoria registra mudança.
+
+---
+
+### RN-AUD-096-07: Retenção de Dados de Auditoria conforme LGPD e SOX
+
+**Descricao**: Registros de auditoria devem ser retidos por período legal mínimo (LGPD: 5 anos, SOX 404: 10 anos). Após expiração, dados são arquivados ou deletados conforme política.
+
+**Justificativa**: Conformidade regulatória. Controle de espaço em disco. Balanceamento entre retenção legal e performance.
+
+**Implementacao**:
+
+```csharp
+// Policy de retenção
+public class AuditRetentionPolicy
+{
+    public int RetentionYears { get; set; } = 10; // SOX 404 default
+    public DateTime CalculateArchiveDate(DateTime logDate)
+        => logDate.AddYears(RetentionYears);
+
+    public bool IsExpired(AuditLog log)
+        => DateTime.UtcNow > CalculateArchiveDate(log.Timestamp);
+}
+
+// Job Hangfire que arquiva registros antigos
+[DisableConcurrentExecution(timeoutInSeconds: 3600)]
+public class ArchiveAuditLogsJob : IJob
+{
+    public async Task ExecuteAsync()
+    {
+        var expiredLogs = await _context.AuditLogs
+            .Where(a => a.Timestamp < DateTime.UtcNow.AddYears(-10))
+            .ToListAsync();
+
+        // Exportar para storage archival (blob storage)
+        await _archivalService.ArchiveAsync(expiredLogs);
+
+        // Deletar do banco principal
+        _context.AuditLogs.RemoveRange(expiredLogs);
+        await _context.SaveChangesAsync();
+    }
+}
+
+// Agendamento
+services.AddHangfireServer();
+BackgroundJob.Schedule<ArchiveAuditLogsJob>(
+    job => job.ExecuteAsync(),
+    TimeSpan.FromDays(30)); // Executar mensalmente
+```
+
+**Exemplos**:
+
+- Log criado em 2015: Expira em 2025, arquivado e deletado do banco principal.
+- Log criado em 2025: Retido por 10 anos, até 2035.
+
+---
+
+### RN-AUD-096-08: Alertas Automáticos para Mudanças em Dados Sensíveis LGPD
+
+**Descricao**: Quando campo classificado como sensível LGPD é alterado, alerta automático é gerado. Alertas integram com sistema de notificações.
+
+**Justificativa**: Detecção em tempo real de alterações em dados pessoais críticos. Conformidade com LGPD Art. 48 (comunicação de incidentes).
+
+**Implementacao**:
+
+```csharp
+// Classificação de sensibilidade
+[AttributeUsage(AttributeTargets.Property)]
+public class SensitiveAttribute : Attribute
+{
+    public SensitiveDataType DataType { get; set; }
+    public SensitiveDataType = Enum.Parse<SensitiveDataType>("CPF") // CPF, CNPJ, Email, Phone, Location, etc
+}
+
+// Entidade
+[Audited]
+public class Consumidor : AggregateRoot
+{
+    [Sensitive(SensitiveDataType.CPF)]
+    public string CPF { get; set; }
+
+    [Sensitive(SensitiveDataType.Email)]
+    public string Email { get; set; }
+}
+
+// Interceptor detecta mudanças em campos sensíveis
+private async Task LogModification(EntityEntry entry, CancellationToken cancellationToken)
+{
+    var changes = new List<FieldChange>();
+
+    foreach (var property in entry.Properties)
+    {
+        if (property.IsModified)
+        {
+            var isSensitive = property.Metadata.PropertyInfo?
+                .GetCustomAttribute<SensitiveAttribute>() != null;
+
+            if (isSensitive)
+            {
+                // Gerar alerta
+                await _alertService.SendAsync(new SensitiveDataChangeAlert
+                {
+                    EntityType = entry.Entity.GetType().Name,
+                    FieldName = property.Metadata.Name,
+                    UserId = _userService.GetUserId(),
+                    Timestamp = DateTime.UtcNow,
+                    OldValue = property.OriginalValue?.ToString() ?? "null",
+                    NewValue = property.CurrentValue?.ToString() ?? "null"
+                }, cancellationToken);
+            }
+
+            changes.Add(new FieldChange
+            {
+                FieldName = property.Metadata.Name,
+                OldValue = property.OriginalValue?.ToString(),
+                NewValue = property.CurrentValue?.ToString(),
+                IsSensitive = isSensitive
+            });
+        }
+    }
+}
+```
+
+**Exemplos**:
+
+- Alterar Email de Consumidor: Alerta enviado em tempo real para DPO (Data Protection Officer).
+- Alterar CPF: Alerta + notificação ao titular se integração com notificação existir.
+- Alterar Localização GPS: Alerta para investigação de possível roubo/desaparecimento.
+
+---
+
+### RN-AUD-096-09: Visualização de Timeline com Filtros Avançados
+
+**Descricao**: API de auditoria oferece endpoint que retorna timeline de todas mudanças de uma entidade, com suporte a filtros por campo alterado, valor anterior, valor novo, período, usuário, IP, tipo de operação.
+
+**Justificativa**: Facilita investigação. Interface intuitiva para auditores e compliance. Performance otimizada com índices apropriados.
+
+**Implementacao**:
+
+```csharp
+// Endpoint
+[ApiController]
+[Route("api/audit")]
+public class AuditController : ControllerBase
+{
+    private readonly IAuditService _auditService;
+
+    [HttpGet("{entityType}/{entityId}/history")]
+    [Authorize("audit:read")]
+    public async Task<ActionResult<AuditTimelineDto>> GetHistoryAsync(
+        string entityType,
+        string entityId,
+        [FromQuery] AuditFilterDto filters)
+    {
+        var audit = await _auditService.GetTimelineAsync(
+            entityType, entityId, filters);
+        return Ok(audit);
+    }
+}
+
+// DTO de filtros
+public class AuditFilterDto
+{
+    public DateTime? StartDate { get; set; }
+    public DateTime? EndDate { get; set; }
+    public string FieldName { get; set; }
+    public string UserName { get; set; }
+    public string IpAddress { get; set; }
+    public OperationType? OperationType { get; set; }
+    public bool? OnlySensitive { get; set; }
+}
+
+// Serviço com queries otimizadas
+public class AuditService : IAuditService
+{
+    public async Task<AuditTimelineDto> GetTimelineAsync(
+        string entityType,
+        string entityId,
+        AuditFilterDto filters)
+    {
+        var query = _context.AuditLogs
+            .Where(a => a.EntityType == entityType && a.EntityId == entityId);
+
+        if (filters.StartDate.HasValue)
+            query = query.Where(a => a.Timestamp >= filters.StartDate.Value);
+
+        if (filters.EndDate.HasValue)
+            query = query.Where(a => a.Timestamp <= filters.EndDate.Value);
+
+        if (!string.IsNullOrEmpty(filters.FieldName))
+            query = query.Where(a => a.Changes.Any(c => c.FieldName == filters.FieldName));
+
+        if (!string.IsNullOrEmpty(filters.UserName))
+            query = query.Where(a => a.Username.Contains(filters.UserName));
+
+        if (!string.IsNullOrEmpty(filters.IpAddress))
+            query = query.Where(a => a.IpAddress == filters.IpAddress);
+
+        if (filters.OperationType.HasValue)
+            query = query.Where(a => a.OperationType == filters.OperationType.Value);
+
+        if (filters.OnlySensitive == true)
+            query = query.Where(a => a.Changes.Any(c => c.IsSensitive));
+
+        var logs = await query
+            .OrderBy(a => a.Timestamp)
+            .ToListAsync();
+
+        return new AuditTimelineDto
+        {
+            EntityType = entityType,
+            EntityId = entityId,
+            Changes = logs.Select(MapToTimelineEntry).ToList(),
+            TotalCount = logs.Count
+        };
+    }
+}
+```
+
+**Exemplos**:
+
+- Timeline de Ativo: GET `/api/audit/Ativo/uuid-123/history` → Lista todas mudanças em ordem cronológica.
+- Filtrar por data: GET `/api/audit/Ativo/uuid-123/history?startDate=2025-01-01&endDate=2025-12-31` → Mudanças apenas de 2025.
+- Filtrar por campo: GET `/api/audit/Ativo/uuid-123/history?fieldName=Nome` → Apenas mudanças de campo Nome.
+- Filtrar por usuário: GET `/api/audit/Ativo/uuid-123/history?userName=admin` → Apenas mudanças feitas por admin.
+
+---
+
+### RN-AUD-096-10: Rollback com Validação de Integridade Referencial
+
+**Descricao**: Endpoint de rollback permite restaurar entidade para estado anterior, com validação de que relacionamentos e constraints não serão violados.
+
+**Justificativa**: Recuperação rápida de erros. Proteção contra rollbacks que quebram dados. Auditoria completa do rollback (registra quem, quando, por quê).
+
+**Implementacao**:
+
+```csharp
+// Endpoint de rollback
+[HttpPost("{entityType}/{entityId}/rollback")]
+[Authorize("audit:rollback")]
+public async Task<ActionResult<RollbackResultDto>> RollbackAsync(
+    string entityType,
+    string entityId,
+    [FromBody] RollbackRequestDto request)
+{
+    var validations = await _auditService.ValidateRollbackAsync(
+        entityType, entityId, request.TargetTimestamp);
+
+    if (!validations.IsValid)
+        return BadRequest(new { errors = validations.Errors });
+
+    var result = await _auditService.RollbackAsync(
+        entityType, entityId, request.TargetTimestamp, request.Reason);
+
+    return Ok(result);
+}
+
+// Serviço de rollback
+public async Task<RollbackResultDto> RollbackAsync(
+    string entityType,
+    string entityId,
+    DateTime targetTimestamp,
+    string reason)
+{
+    using (var transaction = await _context.Database.BeginTransactionAsync())
+    {
+        try
+        {
+            // Obter estado anterior
+            var targetLog = await _context.AuditLogs
+                .Where(a => a.EntityType == entityType
+                    && a.EntityId == entityId
+                    && a.Timestamp <= targetTimestamp)
+                .OrderByDescending(a => a.Timestamp)
+                .FirstOrDefaultAsync();
+
+            if (targetLog == null)
+                throw new InvalidOperationException("Target state not found");
+
+            // Restaurar valores
+            var entity = await _context.FindAsync(
+                Type.GetType(entityType), entityId);
+
+            foreach (var change in targetLog.Changes)
+            {
+                var property = entity.GetType().GetProperty(change.FieldName);
+                property?.SetValue(entity, change.OldValue);
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Registrar rollback na auditoria
+            var rollbackLog = new AuditLog
+            {
+                EntityType = $"Rollback_{entityType}",
+                EntityId = entityId,
+                OperationType = OperationType.Rollback,
+                UserId = _userService.GetUserId(),
+                Timestamp = DateTime.UtcNow,
+                Changes = new List<FieldChange>
+                {
+                    new FieldChange
+                    {
+                        FieldName = "RollbackReason",
+                        OldValue = null,
+                        NewValue = reason
+                    }
+                }
+            };
+
+            await _context.AuditLogs.AddAsync(rollbackLog);
+            await _context.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+            return new RollbackResultDto
+            {
+                Success = true,
+                EntityType = entityType,
+                EntityId = entityId,
+                RolledBackTo = targetTimestamp,
+                Message = $"Entidade restaurada ao estado de {targetTimestamp}"
+            };
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            return new RollbackResultDto
+            {
+                Success = false,
+                ErrorMessage = ex.Message
+            };
+        }
+    }
+}
+```
+
+**Exemplos**:
+
+- Rollback de alteração acidental: POST `/api/audit/Ativo/uuid-123/rollback` com `targetTimestamp: 2025-12-27T10:00:00Z` → Ativo restaurado.
+- Validação falha: Tentativa de rollback viola FK → Erro: "Cannot rollback: Ativo ainda atribuído a Consumidor".
+- Rollback registrado: Nova entrada em AuditLog tipo "Rollback" registra quem, quando e por quê.
+
+---
+
+### RN-AUD-096-11: Relatórios Parametrizáveis com Agregações
+
+**Descricao**: Sistema oferece endpoint de relatórios que retorna agregações e estatísticas sobre mudanças: volume por dia/semana/mês, mudanças por usuário, mudanças por entidade, mudanças por tipo operação.
+
+**Justificativa**: Insights para auditoria interna. Detecção de anomalias. Conformidade com requisitos de relatórios periódicos.
+
+**Implementacao**:
+
+```csharp
+// Endpoint de relatórios
+[HttpGet("reports")]
+[Authorize("audit:report")]
+public async Task<ActionResult<AuditReportDto>> GetReportAsync(
+    [FromQuery] AuditReportFilterDto filters)
+{
+    var report = await _auditService.GenerateReportAsync(filters);
+    return Ok(report);
+}
+
+// Serviço de relatórios
+public class AuditReportService
+{
+    public async Task<AuditReportDto> GenerateReportAsync(
+        AuditReportFilterDto filters)
+    {
+        var query = _context.AuditLogs
+            .Where(a => a.Timestamp >= filters.StartDate
+                && a.Timestamp <= filters.EndDate);
+
+        if (!string.IsNullOrEmpty(filters.EntityType))
+            query = query.Where(a => a.EntityType == filters.EntityType);
+
+        // Agregações
+        var volumeByDay = await query
+            .GroupBy(a => a.Timestamp.Date)
+            .Select(g => new VolumeMetricDto
+            {
+                Period = g.Key,
+                Count = g.Count()
+            })
+            .ToListAsync();
+
+        var changesByUser = await query
+            .GroupBy(a => a.Username)
+            .Select(g => new UserMetricDto
+            {
+                Username = g.Key,
+                CreateCount = g.Count(a => a.OperationType == OperationType.Create),
+                UpdateCount = g.Count(a => a.OperationType == OperationType.Update),
+                DeleteCount = g.Count(a => a.OperationType == OperationType.Delete),
+                TotalCount = g.Count()
+            })
+            .OrderByDescending(u => u.TotalCount)
+            .ToListAsync();
+
+        var changesByEntity = await query
+            .GroupBy(a => a.EntityType)
+            .Select(g => new EntityMetricDto
+            {
+                EntityType = g.Key,
+                TotalChanges = g.Count(),
+                AffectedRecords = g.Select(a => a.EntityId).Distinct().Count()
+            })
+            .OrderByDescending(e => e.TotalChanges)
+            .ToListAsync();
+
+        return new AuditReportDto
+        {
+            Period = new { from = filters.StartDate, to = filters.EndDate },
+            VolumeByDay = volumeByDay,
+            ChangesByUser = changesByUser,
+            ChangesByEntity = changesByEntity,
+            TotalChanges = query.Count()
+        };
+    }
+}
+```
+
+**Exemplos**:
+
+- Relatório mensal: GET `/api/audit/reports?startDate=2025-12-01&endDate=2025-12-31` → Volume de mudanças por dia, top usuários, top entidades.
+- Relatório por entidade: GET `/api/audit/reports?entityType=Ativo` → Apenas mudanças de Ativos.
+- Exportar para Excel: GET `/api/audit/reports?startDate=2025-01-01&endDate=2025-12-31&format=excel` → Download de arquivo.
+
+---
+
+### RN-AUD-096-12: Dashboard de Mudanças com Alertas de Anomalias
+
+**Descricao**: Frontend Angular exibe dashboard em tempo real com KPIs: volume de mudanças (gráfico de série temporal), entidades mais alteradas, usuários mais ativos, alertas de padrões suspeitos.
+
+**Justificativa**: Visualização executiva. Detecção rápida de anomalias. Alertas automáticos para atividades anormais.
+
+**Implementacao** (API Backend):
+
+```csharp
+// Endpoint de dashboard
+[HttpGet("dashboard/metrics")]
+[Authorize("audit:read")]
+public async Task<ActionResult<DashboardMetricsDto>> GetMetricsAsync(
+    [FromQuery] int days = 30)
+{
+    var startDate = DateTime.UtcNow.AddDays(-days);
+    var endDate = DateTime.UtcNow;
+
+    var metrics = await _auditService.GetDashboardMetricsAsync(startDate, endDate);
+    return Ok(metrics);
+}
+
+// Serviço de dashboard
+public async Task<DashboardMetricsDto> GetDashboardMetricsAsync(
+    DateTime startDate,
+    DateTime endDate)
+{
+    var logs = await _context.AuditLogs
+        .Where(a => a.Timestamp >= startDate && a.Timestamp <= endDate)
+        .ToListAsync();
+
+    var alerts = new List<AnomalyAlertDto>();
+
+    // Deteccão: Mudanças fora do horário comercial
+    var afterHoursChanges = logs.Where(a =>
+        a.Timestamp.Hour < 6 || a.Timestamp.Hour > 22).Count();
+
+    if (afterHoursChanges > logs.Count * 0.1) // > 10%
+        alerts.Add(new AnomalyAlertDto
+        {
+            Type = AlertType.AnomalousAccessTime,
+            Message = $"{afterHoursChanges} mudanças fora do horário (6-22h)",
+            Severity = Severity.Medium
+        });
+
+    // Deteccão: Mesmo usuário alterando muitos registros
+    var activeUsers = logs
+        .GroupBy(a => a.UserId)
+        .Select(g => new { UserId = g.Key, Count = g.Count() })
+        .OrderByDescending(u => u.Count)
+        .Take(5)
+        .ToList();
+
+    var averageChanges = logs.Count / (double)logs.Select(a => a.UserId).Distinct().Count();
+    var suspiciousUsers = activeUsers.Where(u => u.Count > averageChanges * 3).ToList();
+
+    foreach (var user in suspiciousUsers)
+        alerts.Add(new AnomalyAlertDto
+        {
+            Type = AlertType.HighActivity,
+            Message = $"Usuário {user.UserId} com {user.Count} mudanças (média: {averageChanges})",
+            Severity = Severity.Low
+        });
+
+    return new DashboardMetricsDto
+    {
+        TotalChanges = logs.Count,
+        CreateCount = logs.Count(a => a.OperationType == OperationType.Create),
+        UpdateCount = logs.Count(a => a.OperationType == OperationType.Update),
+        DeleteCount = logs.Count(a => a.OperationType == OperationType.Delete),
+        ActiveUsers = logs.Select(a => a.UserId).Distinct().Count(),
+        AffectedEntities = logs.Select(a => a.EntityType).Distinct().Count(),
+        AnomalyAlerts = alerts,
+        Timeline = GenerateTimelineChart(logs)
+    };
+}
+```
+
+**Exemplos**:
+
+- Dashboard exibe gráfico de mudanças últimos 30 dias.
+- Alerta: "Usuário admin alterou 500 ativos em 1 minuto (padrão anormal)".
+- Alerta: "35% das alterações ocorreram fora do horário comercial".
+
+---
+
+### RN-AUD-096-13: Integração com Azure Sentinel para Análise de Segurança
+
+**Descricao**: Eventos críticos de mudança (deleções, alterações de permissões, mudanças sensíveis LGPD) são automaticamente enviados para Azure Sentinel (SIEM) para análise centralizada.
+
+**Justificativa**: Conformidade com SOX 404. Detecção de ameaças correlacionada com outros eventos de segurança. Análise forense centralizada.
+
+**Implementacao**:
+
+```csharp
+// Serviço de integração com Sentinel
+public class SentinelService : ISentinelService
+{
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<SentinelService> _logger;
+
+    public async Task SendAuditEventAsync(AuditLog auditLog)
+    {
+        // Apenas eventos críticos
+        if (!ShouldSendToSentinel(auditLog))
+            return;
+
+        var sentinelEvent = new SentinelEventDto
+        {
+            EventType = "AuditChange",
+            Severity = GetSeverity(auditLog),
+            EntityType = auditLog.EntityType,
+            EntityId = auditLog.EntityId,
+            OperationType = auditLog.OperationType.ToString(),
+            UserId = auditLog.UserId,
+            Username = auditLog.Username,
+            IpAddress = auditLog.IpAddress,
+            Timestamp = auditLog.Timestamp,
+            Changes = auditLog.Changes,
+            ClienteId = auditLog.ClienteId
+        };
+
+        var json = JsonSerializer.Serialize(sentinelEvent);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        try
+        {
+            var response = await _httpClient.PostAsync(
+                "https://sentinelevent.azure.windows.net/api/logs",
+                content);
+
+            response.EnsureSuccessStatusCode();
+            _logger.LogInformation("Audit event sent to Sentinel: {EventId}", auditLog.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send audit event to Sentinel");
+        }
+    }
+
+    private bool ShouldSendToSentinel(AuditLog auditLog)
+    {
+        // Enviar deleções
+        if (auditLog.OperationType == OperationType.Delete)
+            return true;
+
+        // Enviar mudanças sensíveis LGPD
+        if (auditLog.Changes.Any(c => c.IsSensitive))
+            return true;
+
+        // Enviar mudanças de permissão
+        if (auditLog.EntityType.Contains("Permission") || auditLog.EntityType.Contains("Acesso"))
+            return true;
+
+        return false;
+    }
+
+    private Severity GetSeverity(AuditLog auditLog)
+    {
+        if (auditLog.OperationType == OperationType.Delete)
+            return Severity.High;
+
+        if (auditLog.Changes.Any(c => c.IsSensitive))
+            return Severity.High;
+
+        return Severity.Medium;
+    }
+}
+
+// Integrar no AuditInterceptor
+public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(...)
+{
+    // ... código existente ...
+
+    foreach (var auditLog in createdLogs)
+    {
+        await _sentinelService.SendAuditEventAsync(auditLog);
+    }
+
+    return result;
+}
+```
+
+**Exemplos**:
+
+- Deletar Ativo: Evento enviado para Sentinel com tipo "Delete", severidade "High".
+- Alterar Email de Consumidor: Evento enviado com flag "IsSensitive", severidade "High".
+- Alterar permissão de usuário: Evento enviado para correlação com tentativas de acesso.
+
+---
+
+### RN-AUD-096-14: Exportação de Trilha Auditória para Análise Forense
+
+**Descricao**: Endpoint oferece opção de exportar trilha auditória completa de uma entidade em múltiplos formatos (CSV, Excel, JSON, PDF) para análise forense ou conformidade regulatória.
+
+**Justificativa**: Conformidade regulatória. Facilitação de auditorias externas. Análise offline.
+
+**Implementacao**:
+
+```csharp
+// Endpoint de exportação
+[HttpGet("{entityType}/{entityId}/export")]
+[Authorize("audit:export")]
+public async Task<FileResult> ExportAuditTrailAsync(
+    string entityType,
+    string entityId,
+    [FromQuery] string format = "csv")
+{
+    var auditLogs = await _auditService.GetFullAuditTrailAsync(
+        entityType, entityId);
+
+    return format.ToLower() switch
+    {
+        "csv" => GenerateCsvFile(auditLogs),
+        "excel" => GenerateExcelFile(auditLogs),
+        "json" => GenerateJsonFile(auditLogs),
+        "pdf" => GeneratePdfFile(auditLogs),
+        _ => throw new InvalidOperationException($"Format {format} not supported")
+    };
+}
+
+// Gerador de CSV
+private FileResult GenerateCsvFile(List<AuditLog> logs)
+{
+    var csv = new StringBuilder();
+    csv.AppendLine("Timestamp,OperationType,UserId,Username,IpAddress,FieldName,OldValue,NewValue,IsSensitive");
+
+    foreach (var log in logs)
+    {
+        foreach (var change in log.Changes)
+        {
+            csv.AppendLine($"{log.Timestamp:O},\"{log.OperationType}\",{log.UserId},\"{log.Username}\",\"{log.IpAddress}\",\"{change.FieldName}\",\"{change.OldValue}\",\"{change.NewValue}\",{change.IsSensitive}");
+        }
+    }
+
+    return File(
+        Encoding.UTF8.GetBytes(csv.ToString()),
+        "text/csv",
+        $"audit_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv");
+}
+
+// Gerador de Excel
+private FileResult GenerateExcelFile(List<AuditLog> logs)
+{
+    using (var workbook = new XLWorkbook())
+    {
+        var worksheet = workbook.Worksheets.Add("Audit Trail");
+
+        // Headers
+        worksheet.Cell(1, 1).Value = "Timestamp";
+        worksheet.Cell(1, 2).Value = "Operation Type";
+        worksheet.Cell(1, 3).Value = "Username";
+        worksheet.Cell(1, 4).Value = "IP Address";
+        worksheet.Cell(1, 5).Value = "Field Name";
+        worksheet.Cell(1, 6).Value = "Old Value";
+        worksheet.Cell(1, 7).Value = "New Value";
+        worksheet.Cell(1, 8).Value = "Sensitive";
+
+        var row = 2;
+        foreach (var log in logs)
+        {
+            foreach (var change in log.Changes)
+            {
+                worksheet.Cell(row, 1).Value = log.Timestamp.ToString("O");
+                worksheet.Cell(row, 2).Value = log.OperationType.ToString();
+                worksheet.Cell(row, 3).Value = log.Username;
+                worksheet.Cell(row, 4).Value = log.IpAddress;
+                worksheet.Cell(row, 5).Value = change.FieldName;
+                worksheet.Cell(row, 6).Value = change.OldValue;
+                worksheet.Cell(row, 7).Value = change.NewValue;
+                worksheet.Cell(row, 8).Value = change.IsSensitive;
+                row++;
+            }
+        }
+
+        worksheet.Columns().AdjustToContents();
+
+        using (var ms = new MemoryStream())
+        {
+            workbook.SaveAs(ms);
+            return File(
+                ms.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"audit_{DateTime.UtcNow:yyyyMMdd_HHmmss}.xlsx");
+        }
+    }
+}
+```
+
+**Exemplos**:
+
+- Exportar CSV: GET `/api/audit/Ativo/uuid-123/export?format=csv` → Download de arquivo audit_20251228_143522.csv.
+- Exportar Excel: GET `/api/audit/Consumidor/uuid-456/export?format=excel` → Download com formatação, cores, filtros automáticos.
+- Exportar JSON: GET `/api/audit/Fatura/uuid-789/export?format=json` → Array JSON com estrutura completa.
+- Exportar PDF: GET `/api/audit/Ativo/uuid-123/export?format=pdf` → Relatório formatado para impressão.
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `GUA` (SQL Server 2016+)
+
+**Tabelas de Log** (implementação legada):
+
+```sql
+-- Tabela de log genérica (nenhuma no legado, cada entidade tinha a sua)
+CREATE TABLE [dbo].[Ativo_log](
+    [Id_Ativo_log] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Ativo] [int] NOT NULL,
+    [Nm_Ativo] [varchar](150),
+    [Cd_Patrimonio] [varchar](50),
+    -- ... outros campos ...
+    [Dt_Alteracao] [datetime] NOT NULL,
+    [Id_Usuario_Alteracao] [int],
+    CONSTRAINT [PK_Ativo_log] PRIMARY KEY CLUSTERED ([Id_Ativo_log] ASC)
+)
+
+CREATE TABLE [dbo].[Fatura_log](
+    [Id_Fatura_log] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Fatura] [int] NOT NULL,
+    [Valor_Fatura] [decimal](12, 2),
+    [Status] [varchar](20),
+    [Dt_Alteracao] [datetime] NOT NULL,
+    [Id_Usuario_Alteracao] [int],
+    CONSTRAINT [PK_Fatura_log] PRIMARY KEY CLUSTERED ([Id_Fatura_log] ASC)
+)
+
+CREATE TABLE [dbo].[Centro_Custo_log](
+    [Id_Centro_Custo_log] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Centro_Custo] [int] NOT NULL,
+    [Nm_Centro_Custo] [varchar](150),
+    [Cd_Centro_Custo] [varchar](50),
+    [Dt_Alteracao] [datetime] NOT NULL,
+    [Id_Usuario_Alteracao] [int],
+    CONSTRAINT [PK_Centro_Custo_log] PRIMARY KEY CLUSTERED ([Id_Centro_Custo_log] ASC)
+)
+
+CREATE TABLE [dbo].[Consumidor_log](
+    [id_Consumidor_log] [int] IDENTITY(1,1) NOT NULL,
+    [id_Consumidor] [int] NOT NULL,
+    [Nm_Consumidor] [varchar](255),
+    [Email_Consumidor] [varchar](255),
+    [Dt_Alteracao] [datetime] NOT NULL,
+    [Id_Usuario_Alteracao] [int],
+    CONSTRAINT [PK_Consumidor_log] PRIMARY KEY CLUSTERED ([id_Consumidor_log] ASC)
+)
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descricao | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `[Id_*_log]` | Chave primária incremental | Migrar para `[Id]` (GUID) |
+| `[Id_*]` | ID da entidade alterada | Migrar para `[EntityId]` (string/GUID) |
+| `[Dt_Alteracao]` | Data/hora da alteração | Migrar para `[Timestamp]` (UTC sempre) |
+| `[Id_Usuario_Alteracao]` | ID do usuário que alterou | Migrar para `[UserId]` + `[Username]` |
+| Campos de valor | Cada tabela tinha campos diferentes | Migrar para tabela `[FieldChange]` normalizada |
+
+### 3.2 Stored Procedures Legado
+
+**Arquivo**: `D:\IC2\ic1_legado\BancoDados\Interno\Auditoria.sql` (3.1 MB)
+
+| Procedure | Descricao | Migracao |
+|-----------|-----------|----------|
+| `pa_Importa_Auditoria` | Importa bilhetes de operadora para auditoria contábil | Substituir por API batch endpoint |
+| `pa_Auditoria_Lote_Monta` | Monta lote de auditoria com validações | Migrar lógica para Domain Service |
+| `pa_Auditoria_Tipo` | Classifica tipo de alteração (fatura, consumidor, ativo) | Usar decorador `[Audited]` automático |
+| `pa_Consulta_Auditoria_Log` | Retorna histórico de alterações | Usar endpoint `GET /api/audit/{entityType}/{id}/history` |
+
+### 3.3 Telas ASPX (Legado)
+
+**Localizacao**: `D:\IC2\ic1_legado\IControlIT\[Modulo]\*Auditoria*.aspx`
+
+| Pagina | Descricao | Tela Moderna |
+|--------|-----------|--------------|
+| `Auditoria.aspx` | Tela principal de auditoria (fatura x operadora) | `/audits/billing` (Angular) |
+| `Auditoria_Acompanhamento.aspx` | Acompanhamento de aberturas/contestações | `/audits/tracking` (Angular) |
+| `Auditoria_Consulta.aspx` | Consulta de histórico de mudanças | `/audits/history` (Angular) |
+| `Auditoria_Importa.aspx` | Upload de arquivo para auditoria | `/audits/upload` (Angular) |
+| `Auditoria_Status.aspx` | Status de lotes de auditoria | `/audits/status` (Angular) |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\IControlIT\WS_IControlIT\WSCadastro.asmx.vb`
+
+| Metodo | Descricao | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `WSCadastro.Envia_Log()` | Registra log de operação CRUD | POST `/api/audit` (automático via EF interceptor) |
+| `WSConsulta.Consulta_Log()` | Consulta histórico de mudanças | GET `/api/audit/{entityType}/{id}/history` |
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `AUDIT_CHANGE_TRACKING`
+
+**Configuracao**:
+
+```json
+{
+    "featureKey": "AUDIT_CHANGE_TRACKING",
+    "nome": "Auditoria de Mudanças de Dados",
+    "descricao": "Habilita rastreamento automático de todas alterações em nível de campo com decorador [Audited]",
+    "habilitado": true,
+    "isSystemFeature": true,
+    "settings": {
+        "enableRealTimeAlerts": true,
+        "enableSentinelIntegration": true,
+        "retentionYears": 10,
+        "archiveOldLogsAfterYears": 10,
+        "batchSize": 1000
+    }
+}
+```
+
+**Nota**: Feature flag system, nunca deve ser desabilitada sem aprovação de compliance/segurança.
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao** (pt-BR e en-US):
+
+```json
+{
+    "audit": {
+        "audit": {
+            "title": "Auditoria de Mudanças",
+            "subtitle": "Rastreamento de todas alterações em dados do sistema",
+            "breadcrumb": "Auditoria > Mudanças de Dados"
+        },
+        "filters": {
+            "entityType": "Tipo de Entidade",
+            "entityId": "ID da Entidade",
+            "fieldName": "Campo Alterado",
+            "operationType": "Tipo de Operação",
+            "startDate": "Data Inicial",
+            "endDate": "Data Final",
+            "userName": "Usuário",
+            "ipAddress": "Endereço IP",
+            "onlySensitive": "Apenas Dados Sensíveis",
+            "showDeleted": "Incluir Deletados"
+        },
+        "columns": {
+            "timestamp": "Data/Hora",
+            "operationType": "Operação",
+            "fieldName": "Campo",
+            "oldValue": "Valor Anterior",
+            "newValue": "Valor Novo",
+            "userName": "Usuário",
+            "ipAddress": "IP",
+            "reason": "Motivo"
+        },
+        "messages": {
+            "loadingHistory": "Carregando histórico...",
+            "noChanges": "Nenhuma mudança encontrada",
+            "loadError": "Erro ao carregar histórico de mudanças",
+            "rollbackSuccess": "Entidade restaurada com sucesso",
+            "rollbackFailed": "Falha ao restaurar entidade",
+            "deleteSuccess": "Registro deletado",
+            "deleteFailed": "Falha ao deletar",
+            "sensitiveDataAlert": "ALERTA: Dados sensíveis foram alterados"
+        },
+        "operations": {
+            "create": "Criação",
+            "update": "Atualização",
+            "delete": "Deleção",
+            "rollback": "Reversão"
+        },
+        "buttons": {
+            "viewHistory": "Ver Histórico",
+            "compare": "Comparar Versões",
+            "rollback": "Restaurar",
+            "export": "Exportar",
+            "refresh": "Atualizar",
+            "close": "Fechar"
+        },
+        "dashboard": {
+            "title": "Dashboard de Auditoria",
+            "totalChanges": "Total de Mudanças",
+            "creates": "Criações",
+            "updates": "Atualizações",
+            "deletes": "Deleções",
+            "activeUsers": "Usuários Ativos",
+            "affectedEntities": "Entidades Afetadas",
+            "anomalies": "Anomalias Detectadas",
+            "chartTitle": "Mudanças por Dia"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Criar Entidade | `AUD_ENTITY_CREATE` | Todos campos, usuário, timestamp, IP |
+| Atualizar Campo | `AUD_ENTITY_UPDATE` | Campo, before, after, usuário, timestamp, IP |
+| Deletar Entidade | `AUD_ENTITY_DELETE` | ID deletado, razão, usuário, timestamp, IP |
+| Rollback | `AUD_ROLLBACK` | Razão, entidade, timestamp alvo, executado por quem |
+| Exportar Auditoria | `AUD_EXPORT` | Filtros, formato, usuário, timestamp |
+
+**Retencao**: 10 anos (SOX 404), com arquivamento automático após 10 anos em blob storage.
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `audit:read` | Visualizar histórico e relatórios de auditoria | Auditor, Gerente, Compliance, DPO |
+| `audit:report` | Gerar relatórios de auditoria | Auditor, Compliance, DPO |
+| `audit:export` | Exportar dados de auditoria | Auditor, Compliance, DPO |
+| `audit:rollback` | Executar rollback de mudanças | Gerente, Compliance (somente com aprovação) |
+
+**Nota**: Permissão `audit:rollback` requer aprovação em dois níveis (Gestor + Compliance).
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/audit/{entityType}/{entityId}/history` | Obter timeline de mudanças | `audit:read` |
+| GET | `/api/audit/{entityType}/{entityId}/summary` | Resumo de mudanças | `audit:read` |
+| GET | `/api/audit/{id}` | Detalhe de uma mudança | `audit:read` |
+| GET | `/api/audit` | Listar mudanças com paginação | `audit:read` |
+| DELETE | `/api/audit/{id}/archive` | Arquivar registro antigo | `audit:manage` |
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| POST | `/api/audit/{entityType}/{entityId}/rollback` | Restaurar entidade | `audit:rollback` |
+| GET | `/api/audit/{entityType}/{entityId}/diff` | Comparação entre versões | `audit:read` |
+| GET | `/api/audit/reports` | Gerar relatório parametrizado | `audit:report` |
+| GET | `/api/audit/{entityType}/{entityId}/export` | Exportar trilha auditória | `audit:export` |
+| GET | `/api/audit/dashboard/metrics` | Métricas de dashboard | `audit:read` |
+| POST | `/api/audit/search` | Busca avançada | `audit:read` |
+| GET | `/api/audit/anomalies` | Listar anomalias detectadas | `audit:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Rastreamento Automático (CRUD)
+
+```
+Usuário submete formulário (Create/Update/Delete)
+    |
+    v
+Controller recebe request
+    |
+    v
+Handler executa command
+    |
+    v
+Entity é modificada no DbContext
+    |
+    v
+SaveChangesAsync() chamado
+    |
+    v
+AuditInterceptor.SavingChangesAsync() intercepta
+    |
+    +---> Verifica se entidade tem [Audited]
+    |       |
+    |       v (Sim)
+    |   CaptureAllProperties() extrai before/after
+    |       |
+    |       v
+    |   CreateAuditLog() cria registro
+    |       |
+    |       v
+    |   [Add context]
+    |
+    v
+SaveChangesAsync() completa
+    |
+    v
+AuditLog persiste + Entidade persiste (mesma transação)
+    |
+    v
+Response retorna ao cliente
+    |
+    v (Se mudança sensível LGPD)
+    SensitiveDataChangeAlert enviado
+    |
+    v (Se crítico)
+    Evento enviado para Azure Sentinel
+```
+
+### 6.2 Fluxo de Consulta de Histórico
+
+```
+Usuário acessa /audits/history/:entityType/:entityId
+    |
+    v
+Frontend carrega com filtros opcionais
+    |
+    v
+GET /api/audit/{entityType}/{entityId}/history chamado
+    |
+    v
+Backend valida permissão (audit:read)
+    |
+    v
+Query em AuditLogs com filtros aplicados
+    |
+    v
+Resultado ordenado por Timestamp DESC
+    |
+    v
+JSON retorna com timeline completa
+    |
+    v
+Frontend renderiza timeline interativa
+    |
+    v (Usuário seleciona 2 versões)
+    Comparação lado-a-lado exibida
+```
+
+### 6.3 Fluxo de Rollback
+
+```
+Usuário clica "Restaurar" no histórico
+    |
+    v
+Dialogo confirma: "Restaurar para 2025-12-27 10:00:00?"
+    |
+    v
+POST /api/audit/{entityType}/{entityId}/rollback
+    |
+    v
+Backend valida permissão (audit:rollback)
+    |
+    v
+ValidateRollbackAsync() verifica integridade referencial
+    |
+    +---> Se FK violada
+    |       |
+    |       v
+    |   Erro: "Cannot rollback: Ativo still assigned"
+    |
+    v (Se validação OK)
+    Transação iniciada
+    |
+    v
+    Estado anterior recuperado de AuditLog
+    |
+    v
+    Valores restaurados na entidade
+    |
+    v
+    SaveChangesAsync() grava mudanças
+    |
+    v
+    Novo registro AuditLog tipo "Rollback" criado
+    |
+    v
+    Transação committed
+    |
+    v
+    Response sucesso ao frontend
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| Imutabilidade de AuditLog | Trigger SQL rejeita UPDATE/DELETE na tabela |
+| Criptografia em Transito | HTTPS obrigatório, TLS 1.3+ |
+| Criptografia em Repouso | Sensitive fields criptografados com AES-256 |
+| Autenticacao JWT | Bearer token com expiração |
+| RBAC | Permissões granulares por endpoint |
+| Validacao de Entrada | Sanitização contra SQL injection, XSS |
+| Segregacao Multi-tenant | ClienteId validado em cada query |
+| Rate Limiting | Máximo 1000 requisições/minuto por usuário |
+| Auditoria de Acesso | Quem acessou quê em qual horário |
+| Logs Estruturados | Serilog com correlação de request |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [x] SQL Injection em filtros de busca (`userName`, `fieldName`)
+- [x] XSS em campos de texto exportados (CSV, JSON)
+- [x] CSRF Protection em endpoints POST/DELETE
+- [x] Validacao de permissões (audit:read, audit:rollback)
+- [x] Tentativa de modificar AuditLog (rejeição)
+- [x] Validacao de ClienteId (segregação multi-tenant)
+- [x] Rate limiting em endpoints de exportação
+- [x] Validacao de integridade referencial em rollback
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao |
+|-----|------|---------|
+| Latência de Auditoria | < 100ms | Tempo entre SaveChanges() e persistência de AuditLog |
+| Disponibilidade | 99.9% | Uptime da API de auditoria |
+| Cobertura de Rastreamento | 100% | % de operações CRUD auditadas (target: 100%) |
+| Taxa de Falsos Positivos | < 5% | Anomalias detectadas vs. realmente suspeitas |
+| Tempo de Investigação | < 1 hora | Tempo para reconstruir sequência de mudanças |
+| Retenção de Dados | 10 anos | Conformidade com SOX 404 |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| Acesso Fora do Horário | Mudanças entre 22h-6h > 10% volume dia | Notificar Segurança |
+| Atividade Anomala | Um usuário > 3x mudanças media | Revisar mudanças, possível bloqueio |
+| Modificacao de Auditoria | Tentativa de UPDATE/DELETE AuditLog | Alerta crítico, investigação imediata |
+| Dado Sensivel Alterado | Campo LGPD modificado | Notificar DPO, possível comunicação obrigatória |
+| Retenção Próxima do Limite | Logs com > 10 anos | Arquivar automaticamente |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF096](./MD-RF096-Auditoria-Mudancas-Dados.md)
+2. **Casos de Uso**: Criar [UC-RF096](./UC-RF096-Auditoria-Mudancas-Dados.md)
+3. **Workflows**: Criar [WF-RF096](./WF-RF096-Auditoria-Mudancas-Dados.md)
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml)
+5. **Implementacao Backend**: Commands, Queries, Handlers, Interceptors, Services
+6. **Implementacao Frontend**: Telas Angular (history, diff, rollback, dashboard, export)
+7. **Testes**: Executar TC-RF096-BACKEND, TC-RF096-FRONTEND, TC-RF096-E2E
+8. **Integracao Azure Sentinel**: Configurar webhook para envio de eventos
+9. **Configuracao Hangfire**: Agendamento de jobs de arquivamento
+10. **Deploy HOM**: Validação de funcionalidades em ambiente homologação
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial com 14 regras de negocio, integrações completas | Claude Code |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code
+**Revisao**: Pendente

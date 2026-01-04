@@ -1,0 +1,337 @@
+# =============================================
+# Massas de Teste (MT) — Template YAML (Agnóstico de Plataforma)
+# Versão: 2.0
+# Autor padrão: Agência ALC - alc.dev.br
+# =============================================
+# Este arquivo define massas de teste reutilizáveis e independentes
+# de linguagem, framework ou stack tecnológica, que podem ser
+# referenciadas nos casos de teste ou em outros locais.
+#
+# REGRAS OBRIGATÓRIAS (GOVERNANÇA):
+# 1. TODO MT DEVE ter categoria clara (SUCESSO, VALIDACAO, SEGURANCA, etc)
+# 2. TODO MT DEVE ter rastreabilidade para UC e RF (via contexto)
+# 3. PROIBIDO criar MT com valores "mágicos" sem explicação
+# 4. PROIBIDO usar texto livre não rastreável
+# 5. MT DEVE ser referenciada explicitamente em TC.yaml (não pode existir MT órfã)
+
+# =============================================
+# 1. METADADOS
+# =============================================
+metadata:
+  versao: "2.0"
+  data: "YYYY-MM-DD"
+  autor: "Agência ALC - alc.dev.br"
+  rf_relacionado:
+    id: "RFXXX"
+    nome: "Nome do Requisito"
+
+# =============================================
+# 2. CONFIGURAÇÕES GLOBAIS
+# =============================================
+defaults:
+  locale: "pt_BR"
+  timezone: "America/Sao_Paulo"
+  currency: "BRL"
+  tenant_padrao: 1
+  usuario_padrao: 1
+  formatos:
+    date: "YYYY-MM-DD"
+    datetime: "YYYY-MM-DD HH:mm:ss"
+
+# =============================================
+# 3. MASSAS DE TESTE
+# =============================================
+# Organização dos IDs:
+# MT001–099  : Sucesso
+# MT100–199  : Campos obrigatórios
+# MT200–299  : Formatos
+# MT300–399  : Regras de negócio
+# MT400–499  : Autorização / Autenticação
+# MT500–599  : Edge cases
+# MT600–699  : Performance / Concorrência (reservado)
+# MT700–799  : Multi-tenancy
+# MT800–899  : Auditoria
+# MT900–999  : Integração
+
+data_sets:
+
+  # =========================================
+  # SUCESSO (MT001–MT099)
+  # =========================================
+  MT001:
+    categoria: "SUCESSO"
+    descricao: "Criação com dados válidos completos"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["{entidade}.create"]
+
+      estado_inicial:
+        banco:
+          "{TABELA}": []
+
+    entrada:
+      tenant_id: 1
+      "{CAMPO_1}": "{VALOR_VALIDO_1}"
+      "{CAMPO_2}": 100
+      "{CAMPO_3}": true
+      "{CAMPO_4}": "2025-01-15"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        contem:
+          tenant_id: 1
+          "{CAMPO_1}": "{VALOR_VALIDO_1}"
+        gerados:
+          - id
+          - created_at
+          - created_by
+
+      banco:
+        "{TABELA}":
+          deve_existir:
+            - tenant_id: 1
+              "{CAMPO_1}": "{VALOR_VALIDO_1}"
+
+  MT002:
+    categoria: "SUCESSO"
+    descricao: "Criação apenas com campos obrigatórios"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["{entidade}.create"]
+      estado_inicial:
+        banco:
+          "{TABELA}": []
+
+    entrada:
+      "{CAMPO_1}": "{VALOR_VALIDO_1}"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      banco:
+        "{TABELA}":
+          deve_existir:
+            - "{CAMPO_1}": "{VALOR_VALIDO_1}"
+
+  # =========================================
+  # CAMPOS OBRIGATÓRIOS (MT100–MT199)
+  # =========================================
+  MT100:
+    categoria: "VALIDACAO_OBRIGATORIO"
+    descricao: "Campo obrigatório ausente"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        permissoes: ["{entidade}.create"]
+      estado_inicial:
+        banco:
+          "{TABELA}": []
+
+    entrada:
+      "{CAMPO_2}": 100
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          "{CAMPO_1}": "obrigatorio"
+
+      banco:
+        "{TABELA}":
+          quantidade: 0
+
+  # =========================================
+  # FORMATOS (MT200–MT299)
+  # =========================================
+  MT200:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Formato de e-mail inválido"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        permissoes: ["{entidade}.create"]
+
+    entrada:
+      email: "email_invalido"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          email: "formato_invalido"
+
+  # =========================================
+  # REGRAS DE NEGÓCIO (MT300–MT399)
+  # =========================================
+  MT300:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "Violação de unicidade"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["{entidade}.create"]
+      estado_inicial:
+        banco:
+          "{TABELA}":
+            - tenant_id: 1
+              "{CAMPO_1}": "{VALOR_DUPLICADO}"
+
+    entrada:
+      "{CAMPO_1}": "{VALOR_DUPLICADO}"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 422
+      erro:
+        tipo: "BUSINESS_RULE"
+        campos:
+          "{CAMPO_1}": "duplicado"
+
+  # =========================================
+  # AUTORIZAÇÃO (MT400–MT499)
+  # =========================================
+  MT400:
+    categoria: "AUTORIZACAO"
+    descricao: "Usuário não autenticado"
+
+    contexto:
+      autenticacao:
+        autenticado: false
+
+    entrada:
+      "{CAMPO_1}": "{VALOR_VALIDO}"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 401
+      erro:
+        tipo: "UNAUTHENTICATED"
+
+  MT401:
+    categoria: "AUTORIZACAO"
+    descricao: "Usuário sem permissão"
+
+    contexto:
+      autenticacao:
+        usuario_id: 2
+        permissoes: []
+
+    entrada:
+      "{CAMPO_1}": "{VALOR_VALIDO}"
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+      erro:
+        tipo: "FORBIDDEN"
+
+  # =========================================
+  # MULTI-TENANCY (MT700–MT799)
+  # =========================================
+  MT700:
+    categoria: "MULTI_TENANCY"
+    descricao: "Isolamento entre tenants"
+
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["{entidade}.view"]
+      estado_inicial:
+        banco:
+          "{TABELA}":
+            - id: 1
+              tenant_id: 2
+              "{CAMPO_1}": "{VALOR_OUTRO_TENANT}"
+
+    entrada:
+      id: 1
+
+    resultado_esperado:
+      sucesso: false
+      http_status: 404
+      erro:
+        tipo: "NOT_FOUND"
+
+  # =========================================
+  # AUDITORIA (MT800–MT899)
+  # =========================================
+  MT800:
+    categoria: "AUDITORIA"
+    descricao: "Auditoria na criação"
+
+    contexto:
+      autenticacao:
+        usuario_id: 5
+        permissoes: ["{entidade}.create"]
+
+    entrada:
+      "{CAMPO_1}": "{VALOR_VALIDO}"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        gerados:
+          - created_at
+          - created_by
+        valores:
+          created_by: 5
+
+# =============================================
+# 4. DADOS REUTILIZÁVEIS
+# =============================================
+reusable_data:
+  usuarios:
+    admin:
+      id: 1
+      role: "admin"
+      tenant_id: 1
+    user:
+      id: 2
+      role: "user"
+      tenant_id: 1
+
+  tenants:
+    principal:
+      id: 1
+      status: "ACTIVE"
+    secundario:
+      id: 2
+      status: "ACTIVE"
+
+# =============================================
+# 5. CONVENÇÕES E PLACEHOLDERS
+# =============================================
+conventions:
+  placeholders:
+    "{generated}": "Valor gerado automaticamente"
+    "{not_null}": "Valor não pode ser nulo"
+    "{CAMPO_X}": "Campo específico do RF"
+    "{TABELA}": "Tabela principal do RF"
+    "{entidade}": "Entidade de domínio"
+
+# =============================================
+# 6. HISTÓRICO
+# =============================================
+historico:
+  - versao: "2.0"
+    data: "YYYY-MM-DD"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Template MT agnóstico de plataforma, focado em cenário e contrato"

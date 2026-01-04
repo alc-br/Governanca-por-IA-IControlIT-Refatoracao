@@ -1,0 +1,474 @@
+# RF-007: Login e Autenticação
+
+**Versão**: 2.0
+**Data**: 2025-12-30
+**Autor**: Agência ALC - alc.dev.br
+**EPIC**: EPIC001-SYS - Sistema Infraestrutura
+**Fase**: Fase 1 - Sistema Base
+
+---
+
+## 1. OBJETIVO DO REQUISITO
+
+Prover ao sistema IControlIT um mecanismo seguro, robusto e auditável de **autenticação de usuários** baseado em JWT (JSON Web Token), garantindo:
+
+- Controle de acesso baseado em credenciais válidas (email + senha)
+- Proteção contra ataques de força bruta através de bloqueio temporário
+- Recuperação de senha via token temporário enviado por email
+- Gestão de sessões com renovação automática e timeout por inatividade
+- Auditoria completa de todas as tentativas de login (sucesso e falha)
+- Conformidade com LGPD e políticas de segurança corporativas
+
+Este requisito funcional define **O QUE** o sistema deve fazer em relação à autenticação, sem prescrever implementação técnica específica.
+
+---
+
+## 2. ESCOPO
+
+### 2.1 O que está dentro do escopo
+
+- [x] Autenticação por email corporativo e senha
+- [x] Geração de JWT Token com expiração configurável (padrão 8 horas)
+- [x] Refresh token para renovação automática de sessão
+- [x] Bloqueio temporário após 5 tentativas falhas (proteção anti brute-force)
+- [x] Recuperação de senha via email com token temporário (24 horas)
+- [x] Redefinição de senha com validação de requisitos mínimos
+- [x] Primeiro acesso com troca obrigatória de senha temporária
+- [x] Logout com invalidação de token
+- [x] Timeout por inatividade (30 minutos sem atividade)
+- [x] Auditoria de todas as tentativas de login
+- [x] Notificação de login em novo dispositivo/IP
+- [x] Histórico de senhas (impedir reutilização das últimas 5)
+- [x] Administração: desbloquear usuário, listar sessões ativas, invalidar sessão
+
+### 2.2 Fora do escopo (não objetivos)
+
+- Interface visual específica (responsabilidade do frontend)
+- Tecnologia de implementação (backend, linguagem, framework)
+- Layout, UX ou identidade visual
+- Autenticação via redes sociais (Facebook, Google, etc.)
+- Autenticação de dois fatores (2FA) - será implementado em RF futuro
+- Single Sign-On (SSO) - será implementado em RF futuro
+
+---
+
+## 3. CONCEITOS E DEFINIÇÕES
+
+| Termo | Definição |
+|-------|-----------|
+| **JWT Token** | Token de autenticação assinado digitalmente, contendo claims do usuário |
+| **Refresh Token** | Token de longa duração usado para renovar o JWT sem re-autenticação |
+| **Sessão** | Período entre login e logout (ou expiração automática) |
+| **Tentativa Falha** | Login com credenciais inválidas (email não encontrado OU senha incorreta) |
+| **Bloqueio Temporário** | Suspensão de acesso por 30 minutos após 5 tentativas falhas em 15 minutos |
+| **Token de Recuperação** | Token único gerado para redefinição de senha, válido por 24 horas |
+| **Primeiro Acesso** | Usuário com senha temporária gerada pelo sistema (flag `Fl_Primeiro_Acesso = true`) |
+| **Timeout por Inatividade** | Expiração automática da sessão após 30 minutos sem atividade do usuário |
+| **Senha Forte** | Senha com mínimo 8 caracteres, 1 maiúscula, 1 minúscula, 1 número, 1 especial |
+
+---
+
+## 4. FUNCIONALIDADES COBERTAS
+
+1. **Autenticar usuário** - Login com email e senha, geração de JWT
+2. **Renovar sessão** - Refresh token automático antes da expiração
+3. **Encerrar sessão** - Logout com invalidação de token
+4. **Solicitar recuperação de senha** - Envio de email com link temporário
+5. **Redefinir senha** - Troca de senha via token de recuperação
+6. **Alterar senha** - Troca de senha quando usuário está autenticado
+7. **Forçar troca de senha** - Primeiro acesso com senha temporária
+8. **Bloquear usuário** - Bloqueio automático após 5 tentativas falhas
+9. **Desbloquear usuário** - Desbloqueio manual por administrador
+10. **Listar sessões ativas** - Visualizar sessões de um usuário específico
+11. **Invalidar sessão** - Forçar logout de sessão específica
+12. **Auditar tentativas de login** - Registrar e consultar histórico de acessos
+
+---
+
+## 5. REGRAS DE NEGÓCIO
+
+### RN-AUTH-001 — Autenticação por Email e Senha
+
+**Descrição**: O sistema DEVE autenticar usuários através de email corporativo (único) e senha.
+
+**Justificativa**: Email é identificador único, fácil de lembrar e rastreável.
+
+**Critério de Aceite**:
+- Email DEVE ser validado como formato válido (regex)
+- Email DEVE ser case-insensitive para busca (`usuario@empresa.com` = `USUARIO@EMPRESA.COM`)
+- Senha DEVE ser case-sensitive para comparação
+- Credenciais inválidas DEVEM retornar mensagem genérica (ver RN-AUTH-011)
+
+**Tipo**: Validação
+**Criticidade**: CRÍTICA
+**Implementação**: Command `LoginCommand` com validação de email e verificação BCrypt da senha
+
+---
+
+### RN-AUTH-002 — JWT Token com Expiração de 8 Horas
+
+**Descrição**: O token JWT gerado DEVE expirar em 8 horas de trabalho (jornada padrão).
+
+**Justificativa**: Balanceamento entre segurança (tokens de curta duração) e usabilidade (usuário não precisa fazer login várias vezes ao dia).
+
+**Critério de Aceite**:
+- Token DEVE conter claim `exp` (expiration time) configurada para UTC + 8 horas
+- Após expiração, token DEVE ser rejeitado pelo sistema
+- Frontend DEVE ser notificado da expiração via erro HTTP 401
+
+**Tipo**: Regra de Negócio
+**Criticidade**: ALTA
+**Implementação**: Configuração do `JwtSecurityToken` com `expires: DateTime.UtcNow.AddHours(8)`
+
+---
+
+### RN-AUTH-003 — Bloqueio Após 5 Tentativas Falhas
+
+**Descrição**: Após 5 tentativas de login falhas em 15 minutos, o usuário DEVE ser bloqueado por 30 minutos.
+
+**Justificativa**: Proteção contra ataques de força bruta (brute-force).
+
+**Critério de Aceite**:
+- Sistema DEVE contar tentativas falhas por usuário (identificado por email)
+- Contador DEVE resetar após login bem-sucedido
+- Contador DEVE resetar após 15 minutos da primeira tentativa falha
+- Durante bloqueio, sistema DEVE retornar erro HTTP 423 (Locked) com tempo restante
+- Administrador PODE desbloquear manualmente antes dos 30 minutos
+
+**Tipo**: Segurança
+**Criticidade**: CRÍTICA
+**Implementação**: Middleware de validação ANTES de validar credenciais
+
+---
+
+### RN-AUTH-004 — Requisitos Mínimos de Senha
+
+**Descrição**: Toda senha DEVE atender aos seguintes requisitos:
+- Mínimo 8 caracteres
+- Pelo menos 1 letra maiúscula (A-Z)
+- Pelo menos 1 letra minúscula (a-z)
+- Pelo menos 1 número (0-9)
+- Pelo menos 1 caractere especial (!@#$%^&*)
+
+**Justificativa**: Conformidade com políticas de segurança corporativas e proteção contra senhas fracas.
+
+**Critério de Aceite**:
+- Validação DEVE ocorrer no backend (não confiar apenas no frontend)
+- Sistema DEVE rejeitar senhas que não atendam todos os requisitos
+- Mensagem de erro DEVE indicar quais requisitos não foram atendidos
+
+**Tipo**: Validação
+**Criticidade**: ALTA
+**Implementação**: `FluentValidation` com `PasswordValidator` customizado
+
+---
+
+### RN-AUTH-005 — Senha Case-Sensitive
+
+**Descrição**: A comparação de senhas DEVE ser case-sensitive.
+
+**Justificativa**: Aumenta significativamente a complexidade e segurança das senhas.
+
+**Critério de Aceite**:
+- `Senh@123` DEVE ser diferente de `senh@123`
+- BCrypt DEVE preservar case-sensitivity nativo
+
+**Tipo**: Segurança
+**Criticidade**: ALTA
+**Implementação**: BCrypt nativo já é case-sensitive
+
+---
+
+### RN-AUTH-006 — Token de Recuperação Válido por 24 Horas
+
+**Descrição**: O link de recuperação de senha DEVE expirar em 24 horas após geração.
+
+**Justificativa**: Tokens antigos não devem funcionar indefinidamente (segurança).
+
+**Critério de Aceite**:
+- Token DEVE ser único (Guid ou similar)
+- Sistema DEVE armazenar `DataExpiracao = DateTime.UtcNow.AddHours(24)`
+- Tokens expirados DEVEM ser rejeitados com mensagem clara
+- Token DEVE ser marcado como utilizado após redefinição de senha
+- Token utilizado NÃO PODE ser reutilizado
+
+**Tipo**: Segurança
+**Criticidade**: ALTA
+**Implementação**: Entidade `TokenRecuperacaoSenha` com validações
+
+---
+
+### RN-AUTH-007 — Não Reutilizar Últimas 5 Senhas
+
+**Descrição**: Nova senha NÃO PODE ser igual a nenhuma das 5 últimas senhas utilizadas.
+
+**Justificativa**: Impede que usuários alternem entre poucas senhas conhecidas.
+
+**Critério de Aceite**:
+- Sistema DEVE manter histórico de hashes das últimas 5 senhas
+- Ao definir nova senha, sistema DEVE verificar histórico
+- Se senha já foi usada, sistema DEVE rejeitar com mensagem clara
+
+**Tipo**: Segurança
+**Criticidade**: MÉDIA
+**Implementação**: Tabela `HistoricoSenhas` com validação no Command Handler
+
+---
+
+### RN-AUTH-008 — Primeiro Acesso Obriga Troca de Senha
+
+**Descrição**: Usuários com senha temporária (flag `Fl_Primeiro_Acesso = true`) DEVEM trocar a senha no primeiro login.
+
+**Justificativa**: Senhas temporárias são geradas pelo sistema e conhecidas por administradores (terceiros).
+
+**Critério de Aceite**:
+- Após login bem-sucedido, sistema DEVE verificar flag `Fl_Primeiro_Acesso`
+- Se `true`, sistema DEVE redirecionar para tela de troca de senha
+- Usuário NÃO PODE acessar outras funcionalidades até trocar a senha
+- Após troca, flag DEVE ser marcada como `false`
+
+**Tipo**: Segurança
+**Criticidade**: ALTA
+**Implementação**: Claim `primeiro_acesso` no JWT + Guard no frontend
+
+---
+
+### RN-AUTH-009 — Timeout por Inatividade de 30 Minutos
+
+**Descrição**: Sessão DEVE expirar automaticamente após 30 minutos sem atividade do usuário.
+
+**Justificativa**: Protege terminais deixados logados sem supervisão.
+
+**Critério de Aceite**:
+- Frontend DEVE monitorar eventos de atividade (cliques, navegação, digitação)
+- Após 30 minutos sem evento, frontend DEVE encerrar sessão localmente
+- Frontend DEVE exibir aviso 1 minuto antes da expiração
+- Usuário PODE renovar sessão clicando em "Continuar conectado"
+
+**Tipo**: Segurança
+**Criticidade**: MÉDIA
+**Implementação**: Interceptor no frontend Angular + Idle Timeout Service
+
+---
+
+### RN-AUTH-010 — Auditoria de Todas as Tentativas de Login
+
+**Descrição**: Sistema DEVE registrar TODAS as tentativas de login (sucesso e falha) com os seguintes dados:
+- Email tentado
+- IP de origem
+- User-Agent (navegador)
+- Data/Hora (UTC)
+- Resultado (sucesso/falha)
+- Motivo da falha (se aplicável)
+
+**Justificativa**: Conformidade com LGPD e rastreabilidade de acessos.
+
+**Critério de Aceite**:
+- Auditoria DEVE ocorrer automaticamente via Middleware
+- Dados DEVEM ser armazenados em tabela `AuditLog`
+- Retenção DEVE ser de 7 anos (conforme LGPD)
+- Administradores DEVEM poder consultar logs via endpoint `/api/auth/logs`
+
+**Tipo**: Auditoria
+**Criticidade**: CRÍTICA
+**Implementação**: `AuditInterceptor` automático + Endpoint de consulta
+
+---
+
+### RN-AUTH-011 — Mensagem Genérica para Credenciais Inválidas
+
+**Descrição**: Sistema NÃO DEVE informar se o problema está no email ou na senha.
+
+**Justificativa**: Impede enumeração de usuários (attacker descobre quais emails são válidos).
+
+**Critério de Aceite**:
+- Mensagem DEVE ser sempre: "Email ou senha incorretos"
+- Sistema NUNCA DEVE retornar "Usuário não encontrado"
+- Sistema NUNCA DEVE retornar "Senha incorreta"
+- Código HTTP DEVE ser sempre 401 (Unauthorized)
+
+**Tipo**: Segurança
+**Criticidade**: CRÍTICA
+**Implementação**: Tratamento de exceção unificado no Handler
+
+---
+
+### RN-AUTH-012 — Notificação de Login em Novo Dispositivo
+
+**Descrição**: Sistema DEVE enviar email de notificação quando detectar login de IP ou dispositivo desconhecido.
+
+**Justificativa**: Alerta usuário sobre possível acesso não autorizado.
+
+**Critério de Aceite**:
+- Sistema DEVE armazenar histórico de IPs e User-Agents por usuário
+- Ao detectar IP/User-Agent novo, sistema DEVE enviar email assíncrono
+- Email DEVE conter: IP, Navegador, Localização aproximada (se disponível), Data/Hora
+- Email NÃO DEVE bloquear o login (apenas notificar)
+
+**Tipo**: Segurança
+**Criticidade**: BAIXA
+**Implementação**: Job assíncrono (Hangfire) + Email Service
+
+---
+
+## 6. ESTADOS DA ENTIDADE
+
+Este RF não possui estados de entidade (Login é uma operação transacional).
+
+**Entidades relacionadas:**
+- `Usuario` (gerenciada em RF separado)
+- `TokenRecuperacaoSenha` (estados: `ativo`, `expirado`, `utilizado`)
+- `SessaoAtiva` (estados: `ativa`, `expirada`, `invalidada`)
+
+---
+
+## 7. EVENTOS DE DOMÍNIO
+
+| Evento | Quando ocorre | Subscribers |
+|--------|---------------|-------------|
+| `UsuarioAutenticado` | Após login bem-sucedido | Auditoria, Notificações |
+| `TentativaLoginFalhou` | Após tentativa com credenciais inválidas | Auditoria, Anti-Brute-Force |
+| `UsuarioBloqueado` | Após 5 tentativas falhas | Auditoria, Email Admin |
+| `UsuarioDesbloqueado` | Após desbloqueio manual | Auditoria |
+| `SenhaAlterada` | Após redefinição/alteração de senha | Auditoria, Email Usuário |
+| `TokenRecuperacaoGerado` | Após solicitação de recuperação | Email Service |
+| `SessaoExpirada` | Após timeout ou logout | Auditoria |
+
+---
+
+## 8. CRITÉRIOS GLOBAIS DE ACEITE
+
+- Nenhuma operação pode violar isolamento de tenant (usuário só acessa dados da sua empresa)
+- Nenhuma senha pode ser armazenada em texto plano (sempre BCrypt hash)
+- Nenhum token pode ser reutilizado após expiração
+- Erros devem ser previsíveis e rastreáveis (logs estruturados)
+- Auditoria DEVE registrar quem, quando e o quê para todas as operações
+- Sistema DEVE resistir a ataques de força bruta
+- Sistema DEVE resistir a injeção SQL, XSS, CSRF
+- Todas as comunicações DEVEM usar HTTPS em produção
+
+---
+
+## 9. SEGURANÇA
+
+### 9.1 Proteções Implementadas
+
+| Proteção | Descrição |
+|----------|-----------|
+| **BCrypt** | Hash de senhas com salt aleatório |
+| **JWT com RS256** | Assinatura assimétrica (chave privada/pública) |
+| **Rate Limiting** | Máximo 10 logins/minuto por IP |
+| **CORS** | Origem permitida configurável (apenas domínios autorizados) |
+| **HTTPS** | Obrigatório em produção (redirect automático) |
+| **HttpOnly Cookies** | Refresh token não acessível via JavaScript |
+| **CSP** | Content Security Policy para mitigar XSS |
+| **Anti-CSRF** | Tokens CSRF em formulários |
+
+### 9.2 Testes de Segurança Obrigatórios
+
+- SQL Injection no campo email
+- XSS em todos os campos de entrada
+- Brute Force Protection (validar bloqueio após 5 tentativas)
+- Token Tampering (validar assinatura JWT)
+- Session Fixation (validar geração de novo token após login)
+- CSRF Protection (validar tokens em requisições sensíveis)
+- Password Policy Bypass (tentar senhas fracas via API direta)
+
+---
+
+## 10. ARTEFATOS DERIVADOS
+
+Este RF é base para:
+
+- **UC-RF007.md** - Casos de Uso detalhados (UC00 a UC04)
+- **TC-RF007.yaml** - Casos de Teste
+- **MT-RF007.yaml** - Massas de Teste
+- **RL-RF007.md** - Referências ao Legado (VB.NET/ASP.NET)
+
+---
+
+## 11. RASTREABILIDADE
+
+| Artefato | Gerado | Localização |
+|----------|--------|-------------|
+| **Casos de Uso** | Obrigatório | `UC-RF007.md` |
+| **Casos de Teste** | Obrigatório | `TC-RF007.yaml` |
+| **Massas de Teste** | Obrigatório | `MT-RF007.yaml` |
+| **Referências ao Legado** | Obrigatório | `RL-RF007.md` + `RL-RF007.yaml` |
+| **Endpoints API** | Derivado do backend | `/api/auth/*` |
+| **Telas Frontend** | Derivado do frontend | `/sign-in`, `/forgot-password`, `/reset-password` |
+
+### Endpoints Esperados
+
+| Método | Endpoint | Descrição | Autenticação |
+|--------|----------|-----------|--------------|
+| POST | `/api/auth/login` | Realizar login | Pública |
+| POST | `/api/auth/logout` | Encerrar sessão | Autenticada |
+| POST | `/api/auth/refresh` | Renovar token | Refresh Token |
+| POST | `/api/auth/forgot-password` | Solicitar recuperação | Pública |
+| POST | `/api/auth/reset-password` | Redefinir senha | Token Recuperação |
+| POST | `/api/auth/change-password` | Alterar senha (logado) | Autenticada |
+| POST | `/api/auth/users/{id}/unlock` | Desbloquear usuário | Admin |
+| GET | `/api/auth/sessions` | Listar sessões ativas | Admin |
+| DELETE | `/api/auth/sessions/{id}` | Invalidar sessão | Admin |
+| GET | `/api/auth/logs` | Logs de acesso | Admin/Auditor |
+
+### Permissões RBAC
+
+| Permissão | Descrição | Perfis |
+|-----------|-----------|--------|
+| `auth:user:unlock` | Desbloquear usuário bloqueado | Admin, Super Admin |
+| `auth:session:view` | Visualizar sessões ativas | Admin, Super Admin |
+| `auth:session:invalidate` | Invalidar sessão de outro usuário | Admin, Super Admin |
+| `auth:logs:view` | Visualizar logs de acesso | Admin, Super Admin, Auditor |
+
+**Nota**: Login/Logout não requerem permissões específicas (acesso público/autenticado básico).
+
+### Integrações Obrigatórias
+
+1. **Central de Funcionalidades**
+   - FeatureKey: `AUTH_LOGIN`
+   - Tipo: Sistema (sempre habilitado)
+   - Não pode ser desabilitado
+
+2. **Internacionalização (i18n)**
+   - Namespace: `auth.*`
+   - Idiomas: pt-BR (padrão), en, es
+   - Chaves obrigatórias: ver seção "Chaves de Tradução"
+
+3. **Auditoria**
+   - Operações auditadas: `AUTH_LOGIN_SUCCESS`, `AUTH_LOGIN_FAILURE`, `AUTH_LOGOUT`, `AUTH_PASSWORD_CHANGED`, etc.
+   - Retenção: 7 anos (LGPD)
+
+4. **Email Service**
+   - Recuperação de senha (template: `password-reset`)
+   - Notificação de novo dispositivo (template: `new-device-login`)
+   - SLA: envio em até 5 minutos
+
+### KPIs e Métricas
+
+| KPI | Meta | Medição |
+|-----|------|---------|
+| Taxa de Login Falho | < 5% | (Tentativas falhas / Total) × 100 |
+| Contas Bloqueadas | < 1% | (Bloqueios / Usuários ativos) × 100 |
+| Tempo Médio de Login | < 2s | Response time médio do endpoint |
+| Recuperações de Senha | Monitorar | Quantidade por período |
+| Sessões Expiradas por Inatividade | Monitorar | Quantidade por período |
+
+### Alertas Críticos
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| Ataque Brute Force | > 50 falhas/min do mesmo IP | Bloquear IP temporariamente (Firewall) |
+| Conta Admin Bloqueada | Bloqueio de Super Admin | Notificar equipe de segurança (urgente) |
+| Token Comprometido | Uso de token em IPs diferentes | Invalidar todas as sessões do usuário |
+| Email Service Down | Falha no envio de recuperação | Notificar DevOps |
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|--------|------|-----------|-------|
+| 2.0 | 2025-12-30 | Migração para v2.0 - Separação RF/RL, 11 seções obrigatórias, contrato puro | Agência ALC - alc.dev.br |
+| 1.0 | 2025-11-19 | Versão inicial (mesclava moderno + legado) | Claude Code (Architect Agent) |

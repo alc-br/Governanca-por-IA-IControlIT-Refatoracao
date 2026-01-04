@@ -1,0 +1,462 @@
+rf_id: RF058
+titulo: Gestão de Tipos de Bilhetes
+versao: "2.0"
+status: em_desenvolvimento
+data_atualizacao: "2025-12-30"
+
+epic:
+  codigo: EPIC003-CAD-Cadastros-Base
+  nome: Cadastros Base
+
+fase:
+  numero: 2
+  nome: Cadastros e Serviços Transversais
+
+resumo:
+  descricao: |
+    Funcionalidade de cadastro, edição, visualização e gerenciamento de tipos de bilhetes,
+    permitindo categorizar e controlar bilhetes de suporte no sistema.
+
+  objetivos:
+    - Permitir criação e manutenção de tipos de bilhetes
+    - Garantir categorização adequada dos bilhetes
+    - Facilitar identificação e classificação de solicitações
+    - Fornecer interface intuitiva de gestão
+    - Integrar com sistema de bilhetes e atendimentos
+
+  escopo_incluido:
+    - CRUD completo de tipos de bilhetes
+    - Validações de dados e regras de negócio
+    - Auditoria completa de operações
+    - Controle de permissões RBAC
+    - Interface responsiva
+
+  escopo_excluido:
+    - Gestão de bilhetes propriamente dita
+    - Workflow de atendimento
+    - SLA e métricas de tempo
+    - Integração com sistemas externos de ticketing
+
+funcionalidades:
+  - id: FUNC-RF058-001
+    nome: Listar Tipos de Bilhetes
+    caso_uso: UC00
+    descricao: Exibir lista paginada de todos os tipos de bilhetes cadastrados
+    permissao: CAD.TIPOS_BILHETES.VIEW
+    caracteristicas:
+      - Grid com colunas (Nome, Descrição, Status, Ações)
+      - Paginação (padrão 10 itens/página)
+      - Ordenação por Nome (A-Z)
+      - Filtro por Status (Ativo/Inativo)
+      - Busca por Nome ou Descrição
+      - Ações (Visualizar, Editar, Inativar/Ativar)
+
+  - id: FUNC-RF058-002
+    nome: Criar Tipo de Bilhete
+    caso_uso: UC01
+    descricao: Cadastrar novo tipo de bilhete no sistema
+    permissao: CAD.TIPOS_BILHETES.CREATE
+    campos_obrigatorios:
+      - nome: Nome
+        tipo: string
+        tamanho_max: 100
+        validacoes:
+          - Único no sistema (case-insensitive)
+          - Apenas letras, números, espaços e hífen
+          - Mínimo 3 caracteres
+      - nome: Descrição
+        tipo: string
+        tamanho_max: 500
+        validacoes:
+          - Mínimo 10 caracteres
+
+  - id: FUNC-RF058-003
+    nome: Visualizar Tipo de Bilhete
+    caso_uso: UC02
+    descricao: Exibir detalhes completos de um tipo de bilhete específico
+    permissao: CAD.TIPOS_BILHETES.VIEW
+
+  - id: FUNC-RF058-004
+    nome: Editar Tipo de Bilhete
+    caso_uso: UC03
+    descricao: Modificar informações de tipo de bilhete existente
+    permissao: CAD.TIPOS_BILHETES.EDIT
+
+  - id: FUNC-RF058-005
+    nome: Inativar/Ativar Tipo de Bilhete
+    caso_uso: UC04
+    descricao: Alterar status de tipo de bilhete (soft delete)
+    permissao: CAD.TIPOS_BILHETES.DELETE
+
+regras_negocio:
+  - id: RN-RF058-001
+    nome: Validação de Nome Único
+    descricao: Nome do tipo de bilhete deve ser único no sistema (case-insensitive)
+    tipo: validacao
+    severidade: critica
+    implementacao: FluentValidator + Query case-insensitive
+
+  - id: RN-RF058-002
+    nome: Tamanho Mínimo de Nome
+    descricao: Nome deve ter no mínimo 3 caracteres
+    tipo: validacao
+    severidade: alta
+
+  - id: RN-RF058-003
+    nome: Tamanho Máximo de Nome
+    descricao: Nome não pode exceder 100 caracteres
+    tipo: validacao
+    severidade: alta
+
+  - id: RN-RF058-004
+    nome: Formato de Nome
+    descricao: Nome deve conter apenas letras, números, espaços e hífen
+    tipo: validacao
+    severidade: media
+    regex: "^[a-zA-Z0-9À-ÿ\\s\\-]+$"
+
+  - id: RN-RF058-005
+    nome: Descrição Obrigatória
+    descricao: Descrição é obrigatória com mínimo de 10 caracteres
+    tipo: validacao
+    severidade: alta
+
+  - id: RN-RF058-006
+    nome: Tamanho Máximo de Descrição
+    descricao: Descrição não pode exceder 500 caracteres
+    tipo: validacao
+    severidade: media
+
+  - id: RN-RF058-007
+    nome: Multi-Tenancy Obrigatório
+    descricao: Todo tipo de bilhete deve estar associado a uma empresa
+    tipo: seguranca
+    severidade: critica
+
+  - id: RN-RF058-008
+    nome: Soft Delete
+    descricao: Tipos não são excluídos fisicamente, apenas marcados como excluídos
+    tipo: dados
+    severidade: critica
+
+  - id: RN-RF058-009
+    nome: Auditoria Obrigatória
+    descricao: Todas as operações devem ser auditadas
+    tipo: auditoria
+    severidade: critica
+    operacoes:
+      - CREATE
+      - UPDATE
+      - DELETE
+      - ACCESS
+
+  - id: RN-RF058-010
+    nome: Status Padrão
+    descricao: Novos tipos são criados com status Ativo por padrão
+    tipo: dados
+    severidade: baixa
+
+  - id: RN-RF058-011
+    nome: Permissões Requeridas
+    descricao: Cada operação requer permissão específica
+    tipo: seguranca
+    severidade: critica
+
+  - id: RN-RF058-012
+    nome: Filtros de Listagem
+    descricao: Listagem deve respeitar filtros aplicados
+    tipo: interface
+    severidade: media
+
+modelo_dados:
+  entidade_principal: TipoBilhete
+  tabela: TipoBilhete
+
+  campos:
+    - nome: Id
+      tipo: GUID
+      obrigatorio: true
+      chave_primaria: true
+      descricao: Identificador único
+
+    - nome: Nome
+      tipo: String(100)
+      obrigatorio: true
+      validacoes:
+        - unique: true
+        - min_length: 3
+        - max_length: 100
+        - pattern: "^[a-zA-Z0-9À-ÿ\\s\\-]+$"
+
+    - nome: Descricao
+      tipo: String(500)
+      obrigatorio: true
+      validacoes:
+        - min_length: 10
+        - max_length: 500
+
+    - nome: Ativo
+      tipo: Boolean
+      obrigatorio: true
+      default: true
+
+    - nome: EmpresaId
+      tipo: GUID
+      obrigatorio: true
+      chave_estrangeira: Empresa.Id
+
+    - nome: DataCriacao
+      tipo: DateTime
+      obrigatorio: true
+      auto: true
+
+    - nome: UsuarioCriacaoId
+      tipo: GUID
+      obrigatorio: true
+      chave_estrangeira: Usuario.Id
+
+    - nome: DataAlteracao
+      tipo: DateTime
+      obrigatorio: false
+      auto: true
+
+    - nome: UsuarioAlteracaoId
+      tipo: GUID
+      obrigatorio: false
+      chave_estrangeira: Usuario.Id
+
+    - nome: Excluido
+      tipo: Boolean
+      obrigatorio: true
+      default: false
+
+  relacionamentos:
+    - tipo: N:1
+      entidade: Empresa
+      descricao: TipoBilhete pertence a uma Empresa
+
+    - tipo: N:1
+      entidade: Usuario
+      campo: UsuarioCriacaoId
+      descricao: Usuário que criou
+
+    - tipo: N:1
+      entidade: Usuario
+      campo: UsuarioAlteracaoId
+      descricao: Usuário que alterou
+
+    - tipo: 1:N
+      entidade: Bilhete
+      descricao: TipoBilhete pode ter vários Bilhetes (futuro)
+
+casos_uso:
+  - codigo: UC00
+    nome: Listar Tipos de Bilhetes
+    arquivo: Casos de Uso/UC00-listar-tipos-bilhetes.md
+    ator: Usuário do Sistema
+    permissao: CAD.TIPOS_BILHETES.VIEW
+
+  - codigo: UC01
+    nome: Criar Tipo de Bilhete
+    arquivo: Casos de Uso/UC01-criar-tipo-bilhete.md
+    ator: Administrador/Gestor
+    permissao: CAD.TIPOS_BILHETES.CREATE
+
+  - codigo: UC02
+    nome: Visualizar Tipo de Bilhete
+    arquivo: Casos de Uso/UC02-visualizar-tipo-bilhete.md
+    ator: Usuário do Sistema
+    permissao: CAD.TIPOS_BILHETES.VIEW
+
+  - codigo: UC03
+    nome: Editar Tipo de Bilhete
+    arquivo: Casos de Uso/UC03-editar-tipo-bilhete.md
+    ator: Administrador/Gestor
+    permissao: CAD.TIPOS_BILHETES.EDIT
+
+  - codigo: UC04
+    nome: Inativar Tipo de Bilhete
+    arquivo: Casos de Uso/UC04-inativar-tipo-bilhete.md
+    ator: Administrador
+    permissao: CAD.TIPOS_BILHETES.DELETE
+
+requisitos_nao_funcionais:
+  performance:
+    - metrica: Listagem
+      tempo_maximo: 2s
+    - metrica: Busca
+      tempo_maximo: 1s
+    - metrica: Criação/Edição
+      tempo_maximo: 3s
+
+  usabilidade:
+    - Interface responsiva (mobile-first)
+    - Mensagens de erro claras e acionáveis
+    - Feedback visual para todas as ações
+    - Confirmação para operações críticas
+
+  seguranca:
+    - Validação de entrada em todas as operações
+    - Proteção contra SQL Injection
+    - Proteção contra XSS
+    - Auditoria completa de operações
+
+  confiabilidade:
+    - Validação de dados antes de persistir
+    - Transações atômicas
+    - Logs estruturados
+
+interface_usuario:
+  telas:
+    - nome: Listagem
+      rota: /cadastros/tipos-bilhetes
+      componentes:
+        - Header com título
+        - Botão Novo (se permissão CREATE)
+        - Filtros (Status, Busca)
+        - Grid paginado
+        - Ações (Visualizar, Editar, Inativar)
+
+    - nome: Criação/Edição
+      rota: /cadastros/tipos-bilhetes/novo | /{id}/editar
+      campos:
+        - Nome (input text, obrigatório)
+        - Descrição (textarea, obrigatório)
+        - Status (toggle)
+      botoes:
+        - Salvar
+        - Cancelar
+
+    - nome: Visualização
+      rota: /cadastros/tipos-bilhetes/{id}
+      modo: somente_leitura
+      botoes:
+        - Editar (se permissão)
+        - Voltar
+
+integracoes:
+  central_funcionalidades:
+    codigo: CAD.TIPOS_BILHETES
+    nome: Gestão de Tipos de Bilhetes
+    modulo: Cadastros
+    rota: /cadastros/tipos-bilhetes
+    icone: heroicons_outline:ticket
+    ordem: 58
+
+  i18n:
+    namespace: tiposBilhetes
+    idiomas_suportados:
+      - pt-BR
+      - en-US
+      - es-ES
+    chaves_obrigatorias:
+      - titulo
+      - novo
+      - editar
+      - visualizar
+      - campos.*
+      - mensagens.*
+      - confirmacoes.*
+
+  auditoria:
+    operacoes:
+      - CREATE: TIPO_BILHETE_CREATED
+      - UPDATE: TIPO_BILHETE_UPDATED
+      - DELETE: TIPO_BILHETE_DELETED
+      - ACCESS: TIPO_BILHETE_ACCESSED
+    retencao_anos: 7
+
+  rbac:
+    permissoes:
+      - codigo: CAD.TIPOS_BILHETES.VIEW
+        descricao: Visualizar tipos de bilhetes
+        profiles:
+          - Super Admin
+          - Administrador
+          - Gestor
+          - Usuário Padrão
+
+      - codigo: CAD.TIPOS_BILHETES.CREATE
+        descricao: Criar tipos de bilhetes
+        profiles:
+          - Super Admin
+          - Administrador
+          - Gestor
+
+      - codigo: CAD.TIPOS_BILHETES.EDIT
+        descricao: Editar tipos de bilhetes
+        profiles:
+          - Super Admin
+          - Administrador
+          - Gestor
+
+      - codigo: CAD.TIPOS_BILHETES.DELETE
+        descricao: Inativar tipos de bilhetes
+        profiles:
+          - Super Admin
+          - Administrador
+
+criterios_aceite:
+  backend:
+    - Endpoints implementados (GET, POST, PUT, DELETE)
+    - Validações implementadas (FluentValidation)
+    - Testes unitários (>80% cobertura)
+    - Testes de integração
+    - Auditoria funcionando
+    - Multi-tenancy validado
+    - Permissões implementadas
+
+  frontend:
+    - Tela de listagem responsiva
+    - Tela de criação/edição funcional
+    - Tela de visualização funcional
+    - Validações de formulário
+    - Mensagens de erro/sucesso
+    - i18n completo (3 idiomas)
+    - Testes E2E (Playwright)
+
+  integracao:
+    - Central de Funcionalidades registrada
+    - Permissões criadas e associadas
+    - Traduções completas
+    - Auditoria testada
+
+riscos:
+  - risco: Duplicidade de nomes
+    impacto: medio
+    probabilidade: media
+    mitigacao: Validação única case-insensitive
+
+  - risco: Performance na listagem
+    impacto: baixo
+    probabilidade: baixa
+    mitigacao: Paginação + índices otimizados
+
+  - risco: Tipos em uso sendo inativados
+    impacto: baixo
+    probabilidade: media
+    mitigacao: Permitir inativação com alerta
+
+dependencias:
+  requisitos_funcionais:
+    - RF002: Gestão de Empresas (multi-tenancy)
+    - RF003: Gestão de Usuários (auditoria)
+    - RF001: Central de Funcionalidades (integração)
+
+  requisitos_tecnicos:
+    - .NET 10
+    - Entity Framework Core 10
+    - Angular 19
+    - SQL Server / SQLite
+    - Transloco (i18n)
+
+  dados_mestres:
+    - Empresa ativa
+    - Usuário autenticado
+
+metadados:
+  versao_documento: "2.0"
+  template_utilizado: TEMPLATE-RF.md v2.0
+  data_criacao: "2025-12-30"
+  responsavel: Equipe IControlIT
+  projeto: Modernização IControlIT (Web Forms → .NET 10 + Angular 19)

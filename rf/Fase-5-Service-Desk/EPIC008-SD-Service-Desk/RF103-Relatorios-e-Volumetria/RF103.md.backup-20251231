@@ -1,0 +1,1294 @@
+# RF-103: Relatórios e Volumetria
+
+**Versão**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF102 (Relatórios Customizados) | **EPIC**: EPIC008-SD-Service-Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o módulo de **Relatórios e Volumetria** do sistema IControlIT, responsável pela geração de relatórios estatísticos pré-formatados com foco em agregações de volume e tendências temporais.
+
+O módulo RF103 diferencia-se do RF102 (Relatórios Customizados) por **não permitir personalização de dimensões ou métricas**. Em vez disso, oferece relatórios específicos e altamente otimizados para análise rápida de volumetria (total de chamados, ativos, usuários, contratos, consumo) com comparativos temporais, análise de tendências e ranking top-10.
+
+A volumetria é calculada via **agregações SQL nativas** (COUNT, SUM, AVG, GROUP BY) ou **ElasticSearch** para volumes acima de 100.000 registros, com consolidação diária via **Hangfire** às 4h da madrugada para melhor performance em produção.
+
+### 1.2 Importância Estratégica
+
+O módulo de Relatórios e Volumetria é crítico para:
+
+- **Governança Operacional**: Prover visibilidade imediata sobre volume de operações (chamados, ativos, usuários) para tomada de decisão em tempo real
+- **Conformidade e Auditoria**: Manter histórico de volumetria por 24 meses conforme políticas de retenção de dados (LGPD)
+- **Planejamento de Capacidade**: Identificar tendências de crescimento/redução para planejar recursos (infraestrutura, pessoal, hardware)
+- **Benchmarking e Performance**: Comparar períodos (mês atual vs anterior, ano vs ano) para avaliar eficiência operacional
+- **Gestão Estratégica**: Fornecer KPIs agregados ao C-Level via dashboards executivos (RF099)
+
+### 1.3 Conceitos Fundamentais
+
+**Volumetria Agregada**: Métrica calculada via agregação SQL (COUNT, SUM, AVG, MIN, MAX) em um período específico. Exemplo: total de chamados criados em dezembro/2025.
+- Diferencia-se de "Analítica" (RF102) que permite drill-down dimensional customizado
+
+**Consolidação Diária**: Processo executado automaticamente via Hangfire às 4h, pré-calculando volumetrias principais em tabela `VolumetriaConsolidada` para melhor performance em consultas
+
+**Média Móvel 7 dias**: Técnica de suavização de tendências que calcula a média dos últimos 7 dias para reduzir ruído e identificar padrões reais
+
+**Top 10**: Ranking de dimensões (filiais, centros de custo, departamentos, responsáveis) ordenado descendente por volume, utilizado para identificar áreas críticas
+
+**Multi-tenancy em Volumetria**: Todos os relatórios são filtrados por `ClienteId`, garantindo isolamento de dados entre clientes
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Engine de Relatório** | Crystal Reports (lento, 30+ seg por relatório > 1M registros) | Agregações SQL + ElasticSearch (< 2 seg) |
+| **Consolidação** | Manual via botão "Gerar" (síncrono) | Automática Hangfire diariamente às 4h |
+| **Multi-tenancy** | Cada cliente banco próprio | Compartilhado com filtro ClienteId |
+| **Export** | Excel XLS (limite 65.536 linhas) | Excel XLSX (ilimitado), CSV, PDF |
+| **Cache** | Nenhum | Redis com invalidação inteligente |
+| **Comparativo Temporal** | Não disponível | Integrado (mês vs mês, ano vs ano) |
+| **Tendências** | Cálculo manual | Automático com média móvel 7 dias |
+| **Performance** | Travava com > 500k registros | Otimizado para 10M+ |
+| **Permissões** | Coarse-grained (acesso/bloqueia tudo) | Fine-grained: `report:volumetria:read`, `report:volumetria:export` |
+| **Auditoria** | Acesso não era registrado | Auditado em `LogAuditoria` com user, timestamp, tipo |
+
+### 1.5 Funcionalidades Principais
+
+1. **Volumetria de Chamados** - Total, por tipo, prioridade, status, com filtro por período
+2. **Volumetria de Ativos** - Total, por tipo, localização, status, com agregação por categoria
+3. **Volumetria de Usuários** - Ativos, inativos, por perfil RBAC, com análise temporal
+4. **Volumetria de Contratos** - Ativos, vencidos, renovados, com status de vigência
+5. **Consumo** - Linhas telefônicas ativas, dados móveis (GB), ativos de TI consumidos
+6. **Análise de Tendência** - Crescimento/redução diária com média móvel 7 dias
+7. **Comparativo de Períodos** - Mês atual vs anterior, ano vs ano, com cálculo de variação %
+8. **Top 10** - Maior volume por filial, centro de custo, departamento, responsável
+9. **Volumetria por Dimensão** - Agregação customizável por uma dimensão (filial, departamento, tipo)
+10. **Export Multi-formato** - Excel (XLSX), CSV, PDF com formatação e aba de resumo
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-VOL-103-01: Volumetria via Agregação SQL Nativa
+
+**Descrição**: Volumetrias devem ser calculadas utilizando agregações SQL nativas (COUNT, SUM, AVG, GROUP BY, HAVING) em vez de processamento em aplicação (C#). Isso garante performance e simplicidade.
+
+**Justificativa**: Agregações SQL são executadas no banco de dados, mais próximo dos dados, reduzindo transferência de rede e processamento em memória. Uma consulta que agregaria 1M registros em C# pode ser feita em < 100ms em SQL.
+
+**Implementação**:
+```csharp
+// CORRETO: Agregação SQL nativa
+public async Task<int> ObterTotalChamados(int clienteId, DateTime de, DateTime ate)
+{
+    return await _context.Chamados
+        .Where(c => c.ClienteId == clienteId &&
+                    c.DataCriacao >= de &&
+                    c.DataCriacao <= ate)
+        .CountAsync();
+}
+
+// INCORRETO: Trazer dados para C# e agregar
+public async Task<int> ObterTotalChamados_ERRADO(int clienteId, DateTime de, DateTime ate)
+{
+    var chamados = await _context.Chamados
+        .Where(c => c.ClienteId == clienteId)
+        .ToListAsync(); // Traz TODOS para memória
+    return chamados.Count(c => c.DataCriacao >= de && c.DataCriacao <= ate); // Filtra em C#
+}
+
+// Exemplo com GROUP BY
+public async Task<Dictionary<string, int>> VolumetriaComadosPorTipo(int clienteId, DateTime de, DateTime ate)
+{
+    return await _context.Chamados
+        .Where(c => c.ClienteId == clienteId &&
+                    c.DataCriacao >= de &&
+                    c.DataCriacao <= ate)
+        .GroupBy(c => c.Tipo.Nome)
+        .Select(g => new { Tipo = g.Key, Total = g.Count() })
+        .ToDictionaryAsync(x => x.Tipo, x => x.Total);
+}
+```
+
+**Exemplos**:
+- ✅ Válido: `SELECT COUNT(*) FROM Chamados WHERE ClienteId=1 AND DataCriacao BETWEEN '2025-12-01' AND '2025-12-31'`
+- ❌ Inválido: Trazer 1M registros para C# e contar em `LINQ to Objects`
+
+---
+
+### RN-VOL-103-02: Consolidação Diária via Hangfire às 4h
+
+**Descrição**: Um job Hangfire deve executar diariamente às 4h da madrugada, pré-calculando as volumetrias principais (chamados, ativos, usuários, contratos, consumo) e armazenando-as na tabela `VolumetriaConsolidada` para consulta rápida.
+
+**Justificativa**: Volumetrias são consultadas frequentemente por dashboards e relatórios. Pré-calcular às 4h (horário de baixa carga) elimina spikes de CPU durante horário comercial. Usuários consultam relatórios de "ontem" (já consolidado) em vez de calcular on-demand.
+
+**Implementação**:
+```csharp
+// Registrar no Startup
+services.AddHangfire(configuration =>
+{
+    configuration.UseSqlServerStorage("DefaultConnection");
+});
+
+services.AddHangfireServer();
+
+// No ApplicationBuilder
+app.UseHangfireServer();
+
+// Job Service
+public class ConsolidacaoVolumetriaJob
+{
+    private readonly IVolumetriaRepository _repo;
+    private readonly ILogger<ConsolidacaoVolumetriaJob> _logger;
+
+    public ConsolidacaoVolumetriaJob(IVolumetriaRepository repo, ILogger<ConsolidacaoVolumetriaJob> logger)
+    {
+        _repo = repo;
+        _logger = logger;
+    }
+
+    public async Task ExecutarConsolidacao()
+    {
+        _logger.LogInformation("Iniciando consolidação de volumetria às {Time}", DateTime.Now);
+
+        try
+        {
+            var dataBase = DateTime.Now.Date.AddDays(-1); // Ontem
+
+            // Consolidar para cada cliente
+            var clientes = await _repo.ObterTodosClientes();
+            foreach (var cliente in clientes)
+            {
+                await _repo.ConsolidarVolumetriaChamados(cliente.Id, dataBase);
+                await _repo.ConsolidarVolumetriaAtivos(cliente.Id, dataBase);
+                await _repo.ConsolidarVolumetriaUsuarios(cliente.Id, dataBase);
+                await _repo.ConsolidarVolumetriaContratos(cliente.Id, dataBase);
+                await _repo.ConsolidarVolumetriaConsumo(cliente.Id, dataBase);
+            }
+
+            _logger.LogInformation("Consolidação finalizada com sucesso");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro durante consolidação de volumetria");
+            throw;
+        }
+    }
+}
+
+// Registrar Job no Background Service Setup
+RecurringJob.AddOrUpdate<ConsolidacaoVolumetriaJob>(
+    "consolidacao-volumetria-diaria",
+    job => job.ExecutarConsolidacao(),
+    Cron.Daily(4, 0) // 4h da madrugada
+);
+```
+
+**Exemplos**:
+- ✅ Válido: Job dispara às 4h, calcula volumetria de ontem em 2 minutos, usuarios consultam resultado às 8h
+- ❌ Inválido: Usuário solicita relatorio, job calcula on-demand, trava por 45 segundos
+
+---
+
+### RN-VOL-103-03: Comparativos Temporais Exigem Mínimo 2 Períodos Completos
+
+**Descrição**: Um comparativo temporal (mês vs mês, ano vs ano) só pode ser gerado se ambos os períodos estiverem **completamente finalizados**. Comparativos parciais (período atual vs período anterior incompleto) retornam erro.
+
+**Justificativa**: Evitar visualizar "Janeiro de 2025 tem 20% menos chamados que Janeiro de 2024" quando Janeiro 2024 estava incompleto no sistema legado ou com dados parciais.
+
+**Implementação**:
+```csharp
+public async Task<ComparativoTemporalDto> ObterComparativoMesVsMes(int clienteId, int ano, int mes)
+{
+    // Validar se período anterior está completo
+    var mesAnterior = mes == 1 ? 12 : mes - 1;
+    var anoAnterior = mes == 1 ? ano - 1 : ano;
+
+    var dataFim = new DateTime(ano, mes, DateTime.DaysInMonth(ano, mes));
+    var dataFimAnterior = new DateTime(anoAnterior, mesAnterior, DateTime.DaysInMonth(anoAnterior, mesAnterior));
+
+    // Período atual está incompleto?
+    if (dataFim > DateTime.Now.Date)
+    {
+        throw new BusinessException("Comparativo não disponível. Período atual ainda está em aberto.");
+    }
+
+    // Período anterior tem dados?
+    var existeDadosAnterior = await _context.VolumetriaConsolidada
+        .AnyAsync(v => v.ClienteId == clienteId && v.Data == dataFimAnterior);
+
+    if (!existeDadosAnterior)
+    {
+        throw new BusinessException("Período anterior não possui dados de consolidação.");
+    }
+
+    var volumetriaAtual = await _repo.ObterVolumetriaConsolidada(clienteId, ano, mes);
+    var volumetriaAnterior = await _repo.ObterVolumetriaConsolidada(clienteId, anoAnterior, mesAnterior);
+
+    return new ComparativoTemporalDto
+    {
+        PeriodoAtual = $"{mes}/{ano}",
+        PeriodoAnterior = $"{mesAnterior}/{anoAnterior}",
+        VolumeAtual = volumetriaAtual.TotalChamados,
+        VolumeAnterior = volumetriaAnterior.TotalChamados,
+        VariacaoPercentual = ((volumetriaAtual.TotalChamados - volumetriaAnterior.TotalChamados) /
+                             (decimal)volumetriaAnterior.TotalChamados * 100).ToString("F2") + "%"
+    };
+}
+```
+
+**Exemplos**:
+- ✅ Válido: Comparar Dezembro/2024 vs Dezembro/2023 (ambos finalizados)
+- ❌ Inválido: Comparar Dezembro/2025 (18 dias) vs Dezembro/2024 (ambos dias faltando)
+
+---
+
+### RN-VOL-103-04: Top 10 Ordenado Descendente por Volume
+
+**Descrição**: Ranking top-10 de qualquer dimensão (filial, centro de custo, departamento, responsável) deve ser apresentado em **ordem descendente** (maior volume primeiro) com totalização acumulada.
+
+**Justificativa**: Priorizar visibilidade das áreas críticas. A alta administração quer saber imediatamente qual filial tem mais chamados (potencial problema) ou qual responsável tem mais ativos.
+
+**Implementação**:
+```csharp
+public async Task<IEnumerable<Top10Dto>> ObterTop10ChamadosPorFilial(int clienteId, DateTime de, DateTime ate)
+{
+    return await _context.Chamados
+        .Where(c => c.ClienteId == clienteId &&
+                    c.DataCriacao >= de &&
+                    c.DataCriacao <= ate)
+        .GroupBy(c => c.Filial.Nome)
+        .Select(g => new {
+            Filial = g.Key,
+            Total = g.Count()
+        })
+        .OrderByDescending(x => x.Total) // DESCENDENTE
+        .Take(10)
+        .Select((item, index) => new Top10Dto
+        {
+            Posicao = index + 1,
+            Dimensao = item.Filial,
+            Volume = item.Total,
+            PercentualTotal = 0 // Será calculado depois
+        })
+        .ToListAsync();
+}
+
+// Calcular percentual do total
+var total = resultado.Sum(x => x.Volume);
+foreach (var item in resultado)
+{
+    item.PercentualTotal = (item.Volume / (decimal)total * 100).ToString("F2") + "%";
+}
+```
+
+**Exemplos**:
+- ✅ Válido: Filial A (500 chamados), Filial B (350 chamados), Filial C (200 chamados)
+- ❌ Inválido: Filial C (200), Filial A (500), Filial B (350) - desordenado
+
+---
+
+### RN-VOL-103-05: Tendências Usam Média Móvel de 7 Dias
+
+**Descrição**: Análises de tendência (crescimento/redução ao longo do tempo) devem utilizar **média móvel de 7 dias** em vez de valores diários brutos, para suavizar flutuações e identificar padrões reais.
+
+**Justificativa**: Dados diários oscilam por fatores sazonais (segunda-feira > chamados, sexta-feira < chamados). Média 7 dias elimina ruído e revela trend real (se está crescendo ou reduzindo).
+
+**Implementação**:
+```csharp
+public async Task<IEnumerable<TendenciaDto>> ObterTendenciaChamados(int clienteId, DateTime de, DateTime ate)
+{
+    var volumetriaDiaria = await _context.VolumetriaConsolidada
+        .Where(v => v.ClienteId == clienteId &&
+                    v.Data >= de &&
+                    v.Data <= ate &&
+                    v.Tipo == "Chamados")
+        .OrderBy(v => v.Data)
+        .Select(v => new { v.Data, v.Volume })
+        .ToListAsync();
+
+    var tendencias = new List<TendenciaDto>();
+
+    for (int i = 0; i < volumetriaDiaria.Count; i++)
+    {
+        // Média móvel: últimos 7 dias (ou menos se < 7)
+        var inicio = Math.Max(0, i - 6);
+        var mediaMovel = volumetriaDiaria
+            .Skip(inicio)
+            .Take(i - inicio + 1)
+            .Average(x => x.Volume);
+
+        tendencias.Add(new TendenciaDto
+        {
+            Data = volumetriaDiaria[i].Data,
+            VolumeReal = volumetriaDiaria[i].Volume,
+            MediaMovel7Dias = (int)Math.Round(mediaMovel),
+            Tendencia = i > 0 && mediaMovel > tendencias[i-1].MediaMovel7Dias ? "Crescente" : "Decrescente"
+        });
+    }
+
+    return tendencias;
+}
+```
+
+**Exemplos**:
+- ✅ Válido: Dia 1=10, Dia 2=15, Dia 3=12, Dia 4=18, Dia 5=20 → Média móvel 7 dias suaviza para tendência
+- ❌ Inválido: Usar valor bruto diário (Day 1=10, Day 2=15) sem suavização
+
+---
+
+### RN-VOL-103-06: Volumetria Histórica Mantida por 24 Meses
+
+**Descrição**: Registros em `VolumetriaConsolidada` devem ser mantidos por **24 meses** (2 anos). Após esse período, podem ser arquivados para tabela histórica ou deletados conforme política de retenção LGPD.
+
+**Justificativa**: Permite comparativos ano vs ano. Após 24 meses, relatórios comparativos de período equivalente do ano anterior perdem valor. A retenção mínima de 24 meses satisfaz Lei Geral de Proteção de Dados.
+
+**Implementação**:
+```csharp
+// Job para limpeza de dados antigos (executar mensalmente)
+public class LimpezaVolumetriaAntigaJob
+{
+    private readonly IVolumetriaRepository _repo;
+    private readonly ILogger<LimpezaVolumetriaAntigaJob> _logger;
+
+    public async Task ExecutarLimpeza()
+    {
+        var dataLimite = DateTime.Now.AddMonths(-24);
+
+        var registrosDeletados = await _context.VolumetriaConsolidada
+            .Where(v => v.Data < dataLimite)
+            .ExecuteDeleteAsync();
+
+        _logger.LogInformation("Limpeza concluída. {Count} registros deletados", registrosDeletados);
+    }
+}
+
+// Registrar
+RecurringJob.AddOrUpdate<LimpezaVolumetriaAntigaJob>(
+    "limpeza-volumetria-mensal",
+    job => job.ExecutarLimpeza(),
+    Cron.Monthly(1, 5, 0) // Primeiro dia do mês às 5h
+);
+```
+
+**Exemplos**:
+- ✅ Válido: Manter volumetria desde Janeiro/2023 até Dezembro/2024 (24 meses)
+- ❌ Inválido: Deletar volumetria de Janeiro/2023 imediatamente após criar Janeiro/2024
+
+---
+
+### RN-VOL-103-07: Multi-tenancy Obrigatória - ClienteId em Todos os Filtros
+
+**Descrição**: **TODOS** os relatórios de volumetria devem filtrar obrigatoriamente por `ClienteId` do usuário autenticado. Nenhum relatório pode retornar dados de múltiplos clientes simultaneamente.
+
+**Justificativa**: Isolamento de dados entre clientes (SaaS). Um relatório sem filtro `ClienteId` pode vazar dados confidenciais (total de chamados de outra empresa).
+
+**Implementação**:
+```csharp
+public async Task<VolumetriaDto> ObterVolumetria(DateTime de, DateTime ate)
+{
+    var usuarioAtual = await _userContext.ObterUsuarioAutenticado();
+    int clienteId = usuarioAtual.ClienteId;
+
+    // OBRIGATÓRIO: Filtrar por ClienteId
+    var volumetria = await _context.VolumetriaConsolidada
+        .Where(v => v.ClienteId == clienteId && // LINHA CRÍTICA
+                    v.Data >= de &&
+                    v.Data <= ate)
+        .ToListAsync();
+
+    return MapearParaDto(volumetria);
+}
+
+// ANTI-PATTERN (PROIBIDO)
+public async Task<VolumetriaDto> ObterVolumetria_PROIBIDO(DateTime de, DateTime ate)
+{
+    // SEM filtro ClienteId = CRÍTICO
+    var volumetria = await _context.VolumetriaConsolidada
+        .Where(v => v.Data >= de && v.Data <= ate)
+        .ToListAsync();
+    return MapearParaDto(volumetria);
+}
+```
+
+**Exemplos**:
+- ✅ Válido: Usuario da Empresa A vê relatorio com dados de Empresa A apenas
+- ❌ Inválido: Usuario da Empresa A vê relatorio com dados de Empresa A + Empresa B
+
+---
+
+### RN-VOL-103-08: Export Excel Deve Conter Aba de Resumo + Abas Detalhadas
+
+**Descrição**: Exports em Excel devem ter estrutura de múltiplas abas: primeira aba contém "RESUMO EXECUTIVO" (KPIs principais, comparativos, tendências), abas subsequentes contêm dados detalhados por tipo (Chamados, Ativos, Usuários, etc).
+
+**Justificativa**: Executivos (C-Level) visualizam aba 1 (resumo) em 30 segundos. Analistas detalhados consultam abas específicas. Mantém relatório único com múltiplas camadas de detalhe.
+
+**Implementação**:
+```csharp
+public async Task<byte[]> ExportarExcel(int clienteId, DateTime de, DateTime ate)
+{
+    using (var package = new ExcelPackage())
+    {
+        // Aba 1: Resumo Executivo
+        var wsResumo = package.Workbook.Worksheets.Add("Resumo Executivo");
+        wsResumo.Cells["A1"].Value = "RELATÓRIO DE VOLUMETRIA";
+        wsResumo.Cells["A2"].Value = $"Período: {de:dd/MM/yyyy} a {ate:dd/MM/yyyy}";
+
+        var totalChamados = await ObterTotalChamados(clienteId, de, ate);
+        var totalAtivos = await ObterTotalAtivos(clienteId, de, ate);
+
+        wsResumo.Cells["A4"].Value = "RESUMO GERAL";
+        wsResumo.Cells["A5"].Value = "Total de Chamados:";
+        wsResumo.Cells["B5"].Value = totalChamados;
+        wsResumo.Cells["A6"].Value = "Total de Ativos:";
+        wsResumo.Cells["B6"].Value = totalAtivos;
+
+        // Aba 2: Detalhe Chamados
+        var wsChamados = package.Workbook.Worksheets.Add("Chamados");
+        await PopularDetalhesChamados(wsChamados, clienteId, de, ate);
+
+        // Aba 3: Detalhe Ativos
+        var wsAtivos = package.Workbook.Worksheets.Add("Ativos");
+        await PopularDetalhesAtivos(wsAtivos, clienteId, de, ate);
+
+        return package.GetAsByteArray();
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Válido: Excel com 4 abas (Resumo, Chamados, Ativos, Contratos), diretivo lê aba 1 em 30s
+- ❌ Inválido: Excel com 1 aba contendo 100.000 linhas, usuário perde-se nos detalhes
+
+---
+
+### RN-VOL-103-09: Relatórios > 100.000 Registros Processados em Background
+
+**Descrição**: Se um relatório for gerar > 100.000 registros (após agregação), deve ser processado **assincronamente** via fila Hangfire e notificado ao usuário via e-mail/notificação, em vez de bloquear a request HTTP.
+
+**Justificativa**: Uma agregação de 10M registros pode levar 60 segundos. HTTP timeout padrão é 30 segundos. Processar em background + notificar garante que relatório não fica perdido.
+
+**Implementação**:
+```csharp
+public async Task<IActionResult> SolicitarExportVolumetria(int clienteId, DateTime de, DateTime ate)
+{
+    // Estimar número de registros
+    var countEstimado = await _context.Chamados
+        .Where(c => c.ClienteId == clienteId && c.DataCriacao >= de && c.DataCriacao <= ate)
+        .CountAsync();
+
+    if (countEstimado > 100_000)
+    {
+        // Processar em background
+        var jobId = BackgroundJob.Enqueue<ProcessarExportVolumetriaJob>(
+            job => job.ProcessarExportAsync(clienteId, de, ate)
+        );
+
+        var usuarioAtual = await _userContext.ObterUsuarioAutenticado();
+
+        // Notificar usuário
+        await _notificationService.EnviarNotificacao(usuarioAtual.Id,
+            $"Seu relatório foi enfileirado (JobId: {jobId}). Você receberá um e-mail quando estiver pronto.");
+
+        return Ok(new { jobId, mensagem = "Relatório enfileirado para processamento" });
+    }
+
+    // Relatório pequeno: processar síncronamente
+    var excel = await ExportarExcel(clienteId, de, ate);
+    return File(excel, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "volumetria.xlsx");
+}
+
+public class ProcessarExportVolumetriaJob
+{
+    public async Task ProcessarExportAsync(int clienteId, DateTime de, DateTime ate)
+    {
+        var excel = await ExportarExcel(clienteId, de, ate);
+        var nomeArquivo = $"volumetria_{clienteId}_{de:yyyyMMdd}_{ate:yyyyMMdd}.xlsx";
+
+        // Salvar em Azure Blob Storage
+        await _blobService.UploadAsync(nomeArquivo, excel);
+
+        // Enviar e-mail
+        var usuario = await _context.Usuarios.FirstAsync(u => u.ClienteId == clienteId);
+        await _emailService.EnviarAsync(usuario.Email,
+            assunto: "Seu relatório de volumetria está pronto",
+            corpo: $"Seu relatório está disponível para download: {nomeArquivo}");
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Válido: Solicitar export de 2M registros → enfileirado → e-mail em 2 minutos com link
+- ❌ Inválido: Solicitar export de 2M registros → esperar 90 segundos → HTTP timeout 504
+
+---
+
+### RN-VOL-103-10: Auditoria de Acesso a Relatórios de Volumetria
+
+**Descrição**: **CADA acesso** a um relatório de volumetria deve ser registrado em `LogAuditoria` com: usuário, timestamp, tipo de relatório, parâmetros (período, dimensões), resultado (sucesso/erro).
+
+**Justificativa**: Conformidade (LGPD, ISO 27001): auditar quem acessa dados sensíveis de negócio. Detecção de anomalias (usuário consultando volumetria de 50 vezes por segundo = ataque).
+
+**Implementação**:
+```csharp
+[Authorize(Roles = "report:volumetria:read")]
+[HttpGet("api/volumetria/chamados")]
+public async Task<IActionResult> ObterVolumetriaChamados(DateTime de, DateTime ate)
+{
+    var usuarioAtual = await _userContext.ObterUsuarioAutenticado();
+
+    try
+    {
+        var resultado = await _volumetriaService.ObterVolumetriaChamados(
+            usuarioAtual.ClienteId, de, ate
+        );
+
+        // Registrar sucesso em auditoria
+        await _auditService.RegistrarAcesso(new LogAuditoriaDto
+        {
+            UsuarioId = usuarioAtual.Id,
+            ClienteId = usuarioAtual.ClienteId,
+            TipoOperacao = "RELATORIO_VOLUMETRIA_CHAMADOS",
+            Descricao = $"Consultou volumetria de chamados de {de:dd/MM/yyyy} a {ate:dd/MM/yyyy}",
+            DadosRelevantes = new { de, ate, total = resultado.Total },
+            StatusExecucao = "SUCESSO",
+            DataOperacao = DateTime.UtcNow
+        });
+
+        return Ok(resultado);
+    }
+    catch (Exception ex)
+    {
+        // Registrar erro em auditoria
+        await _auditService.RegistrarAcesso(new LogAuditoriaDto
+        {
+            UsuarioId = usuarioAtual.Id,
+            ClienteId = usuarioAtual.ClienteId,
+            TipoOperacao = "RELATORIO_VOLUMETRIA_CHAMADOS",
+            Descricao = $"Tentativa de consultar volumetria falhou: {ex.Message}",
+            StatusExecucao = "ERRO",
+            DataOperacao = DateTime.UtcNow
+        });
+
+        return StatusCode(500, "Erro ao gerar relatório");
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Válido: Usuario A (RFID: 123) consultou volumetria de chamados às 14:32:45 → registrado
+- ❌ Inválido: Usuario A consultou volumetria 1.000 vezes sem registro = impossível auditar anomalia
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IControl_Legado` (VB.NET)
+
+**Tabelas Principais**:
+
+```sql
+-- Tabela de chamados
+CREATE TABLE [dbo].[tb_chamados](
+    [id_chamado] [int] IDENTITY(1,1) NOT NULL,
+    [id_cliente] [int] NOT NULL,
+    [ds_tipo] [varchar](50) NOT NULL,
+    [ds_prioridade] [varchar](50) NOT NULL,
+    [ds_status] [varchar](50) NOT NULL,
+    [dt_criacao] [datetime] NOT NULL,
+    [dt_atualizacao] [datetime] NULL,
+    [id_filial] [int] NULL,
+    CONSTRAINT [PK_tb_chamados] PRIMARY KEY CLUSTERED ([id_chamado] ASC)
+);
+
+-- Tabela de ativos
+CREATE TABLE [dbo].[tb_ativos](
+    [id_ativo] [int] IDENTITY(1,1) NOT NULL,
+    [id_cliente] [int] NOT NULL,
+    [ds_tipo] [varchar](50) NOT NULL,
+    [ds_categoria] [varchar](50) NOT NULL,
+    [ds_status] [varchar](50) NOT NULL,
+    [id_localizacao] [int] NULL,
+    [dt_criacao] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_ativos] PRIMARY KEY CLUSTERED ([id_ativo] ASC)
+);
+
+-- Tabela de usuários
+CREATE TABLE [dbo].[tb_usuarios](
+    [id_usuario] [int] IDENTITY(1,1) NOT NULL,
+    [id_cliente] [int] NOT NULL,
+    [ds_nome] [varchar](100) NOT NULL,
+    [ds_email] [varchar](100) NOT NULL,
+    [ds_status] [varchar](50) NOT NULL,
+    [dt_criacao] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_usuarios] PRIMARY KEY CLUSTERED ([id_usuario] ASC)
+);
+
+-- Tabela de contratos
+CREATE TABLE [dbo].[tb_contratos](
+    [id_contrato] [int] IDENTITY(1,1) NOT NULL,
+    [id_cliente] [int] NOT NULL,
+    [ds_numero] [varchar](50) NOT NULL,
+    [ds_status] [varchar](50) NOT NULL,
+    [dt_vigencia_inicio] [datetime] NOT NULL,
+    [dt_vigencia_fim] [datetime] NOT NULL,
+    [dt_criacao] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_contratos] PRIMARY KEY CLUSTERED ([id_contrato] ASC)
+);
+```
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `pa_sp_volumetria_chamados` | Calcul total chamados por período | Migrado para Query LINQ nativa |
+| `pa_sp_top10_filiais` | Top 10 filiais por volume | Migrado para agregação SQL GROUPBY |
+| `pa_sp_comparativo_temporal` | Comparar período vs período anterior | Migrado para Query dinâmica |
+| `pa_sp_tendencia_30dias` | Tendência últimos 30 dias | Migrado para cálculo de média móvel 7d |
+| `pa_sp_export_volumetria_excel` | Gerar Excel legado | Migrado para EPPlus .NET Core |
+
+### 3.3 Telas ASPX Legado
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `RelatorioVolumetria.aspx` | Tela principal de volumetria | `/relatorios/volumetria` (Angular) |
+| `ComparativoTemporal.aspx` | Comparativo mês vs mês | `/relatorios/volumetria/comparativo` |
+| `Top10.aspx` | Ranking top 10 | `/relatorios/volumetria/top10` |
+| `ExportExcel.aspx` | Export para Excel | POST `/api/volumetria/export/excel` |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSVolumetria.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ObterVolumetriaChamados()` | Total de chamados | GET `/api/volumetria/chamados` |
+| `ObterTop10Filiais()` | Top 10 por filial | GET `/api/volumetria/top10/filial` |
+| `ObterComparativoMesVsMes()` | Comparativo temporal | GET `/api/volumetria/comparativo?periodo=mes` |
+| `ExportarExcel()` | Export legado | POST `/api/volumetria/export/excel` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `VOLUMETRIA_RELATORIOS`
+
+**Configuração**:
+```json
+{
+    "featureKey": "VOLUMETRIA_RELATORIOS",
+    "nome": "Módulo de Relatórios e Volumetria",
+    "descricao": "Habilita geração de relatórios de volumetria (chamados, ativos, usuários, contratos)",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "permitirDesabilitacao": true,
+    "impacto": "Se desabilitado, usuários não conseguem acessar /relatorios/volumetria"
+}
+```
+
+**Sub-features** (para controle granular):
+```json
+[
+    {
+        "featureKey": "VOLUMETRIA_EXPORT_EXCEL",
+        "nome": "Export em Excel",
+        "habilitado": true
+    },
+    {
+        "featureKey": "VOLUMETRIA_EXPORT_PDF",
+        "nome": "Export em PDF",
+        "habilitado": true
+    },
+    {
+        "featureKey": "VOLUMETRIA_EXPORT_CSV",
+        "nome": "Export em CSV",
+        "habilitado": true
+    },
+    {
+        "featureKey": "VOLUMETRIA_CONSOLIDACAO_AUTOMATICA",
+        "nome": "Consolidação automática via Hangfire",
+        "habilitado": true
+    }
+]
+```
+
+**Nota**: Se `VOLUMETRIA_EXPORT_EXCEL` estiver desabilitado, botão de export em Excel fica cinzento (disabled) na UI mas endpoint ainda responde com erro 403 se chamado diretamente.
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Tradução**:
+
+```json
+{
+    "volumetria": {
+        "titulo": {
+            "pt": "Relatórios de Volumetria",
+            "en": "Volumetry Reports",
+            "es": "Reportes de Volumetría"
+        },
+        "descricao": {
+            "pt": "Análise de volume de chamados, ativos, usuários, contratos e consumo",
+            "en": "Analysis of volume of calls, assets, users, contracts and consumption",
+            "es": "Análisis de volumen de llamadas, activos, usuarios, contratos y consumo"
+        },
+        "relatorios": {
+            "chamados": {
+                "pt": "Volumetria de Chamados",
+                "en": "Calls Volume",
+                "es": "Volumen de Llamadas"
+            },
+            "ativos": {
+                "pt": "Volumetria de Ativos",
+                "en": "Assets Volume",
+                "es": "Volumen de Activos"
+            },
+            "usuarios": {
+                "pt": "Volumetria de Usuários",
+                "en": "Users Volume",
+                "es": "Volumen de Usuarios"
+            },
+            "contratos": {
+                "pt": "Volumetria de Contratos",
+                "en": "Contracts Volume",
+                "es": "Volumen de Contratos"
+            },
+            "consumo": {
+                "pt": "Volumetria de Consumo",
+                "en": "Consumption Volume",
+                "es": "Volumen de Consumo"
+            }
+        },
+        "periodo": {
+            "label": {
+                "pt": "Período",
+                "en": "Period",
+                "es": "Período"
+            },
+            "de": {
+                "pt": "De",
+                "en": "From",
+                "es": "De"
+            },
+            "ate": {
+                "pt": "Até",
+                "en": "To",
+                "es": "Hasta"
+            }
+        },
+        "botoes": {
+            "gerar": {
+                "pt": "Gerar Relatório",
+                "en": "Generate Report",
+                "es": "Generar Informe"
+            },
+            "exportar": {
+                "pt": "Exportar",
+                "en": "Export",
+                "es": "Exportar"
+            },
+            "excel": {
+                "pt": "Excel",
+                "en": "Excel",
+                "es": "Excel"
+            },
+            "pdf": {
+                "pt": "PDF",
+                "en": "PDF",
+                "es": "PDF"
+            },
+            "csv": {
+                "pt": "CSV",
+                "en": "CSV",
+                "es": "CSV"
+            }
+        },
+        "mensagens": {
+            "sucesso": {
+                "pt": "Relatório gerado com sucesso",
+                "en": "Report generated successfully",
+                "es": "Informe generado con éxito"
+            },
+            "erro": {
+                "pt": "Erro ao gerar relatório",
+                "en": "Error generating report",
+                "es": "Error al generar informe"
+            },
+            "sem_dados": {
+                "pt": "Nenhum dado encontrado para o período selecionado",
+                "en": "No data found for the selected period",
+                "es": "No se encontraron datos para el período seleccionado"
+            },
+            "processando": {
+                "pt": "Relatório em processamento. Você receberá um e-mail quando estiver pronto.",
+                "en": "Report processing. You will receive an email when ready.",
+                "es": "Informe en proceso. Recibirás un correo cuando esté listo."
+            }
+        },
+        "campos": {
+            "total": {
+                "pt": "Total",
+                "en": "Total",
+                "es": "Total"
+            },
+            "tipo": {
+                "pt": "Tipo",
+                "en": "Type",
+                "es": "Tipo"
+            },
+            "prioridade": {
+                "pt": "Prioridade",
+                "en": "Priority",
+                "es": "Prioridad"
+            },
+            "status": {
+                "pt": "Status",
+                "en": "Status",
+                "es": "Estado"
+            },
+            "filial": {
+                "pt": "Filial",
+                "en": "Branch",
+                "es": "Sucursal"
+            },
+            "departamento": {
+                "pt": "Departamento",
+                "en": "Department",
+                "es": "Departamento"
+            },
+            "responsavel": {
+                "pt": "Responsável",
+                "en": "Responsible",
+                "es": "Responsable"
+            },
+            "variacao": {
+                "pt": "Variação",
+                "en": "Variation",
+                "es": "Variación"
+            },
+            "tendencia": {
+                "pt": "Tendência",
+                "en": "Trend",
+                "es": "Tendencia"
+            }
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|----------|--------|-------------------|
+| Consultar volumetria | `REL_VOLUMETRIA_READ` | UsuarioId, ClienteId, tipo relatório, período, resultado total |
+| Exportar Excel | `REL_VOLUMETRIA_EXPORT_EXCEL` | UsuarioId, ClienteId, tamanho arquivo, período |
+| Exportar PDF | `REL_VOLUMETRIA_EXPORT_PDF` | UsuarioId, ClienteId, tamanho arquivo, período |
+| Exportar CSV | `REL_VOLUMETRIA_EXPORT_CSV` | UsuarioId, ClienteId, tamanho arquivo, período |
+| Gerar comparativo | `REL_VOLUMETRIA_COMPARATIVO` | UsuarioId, ClienteId, períodos comparados, resultado |
+| Gerar tendência | `REL_VOLUMETRIA_TENDENCIA` | UsuarioId, ClienteId, dias analisados, média móvel |
+| Erro ao gerar | `REL_VOLUMETRIA_ERRO` | UsuarioId, ClienteId, mensagem erro, stack trace |
+
+**Retenção**: 24 meses (LGPD) - mesma retenção da volumetria
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis Padrão |
+|-----------|-----------|----------|
+| `relatorio:volumetria:read` | Visualizar relatórios de volumetria | Gestor, Analista, Admin, Diretoria |
+| `relatorio:volumetria:export` | Exportar relatórios (Excel, PDF, CSV) | Gestor, Admin, Diretoria |
+| `relatorio:volumetria:comparativo` | Gerar comparativos temporais | Analista, Admin, Diretoria |
+| `relatorio:volumetria:tendencia` | Visualizar análise de tendências | Analista, Admin, Diretoria |
+| `relatorio:volumetria:top10` | Visualizar ranking top-10 | Gestor, Analista, Admin, Diretoria |
+
+**Nota**: Usuário comum (Técnico, Atendente) **NÃO** tem permissão para acessar volumetria (segurança de dados de negócio).
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Método | Endpoint | Descrição | Permissão | Response Code |
+|--------|----------|-----------|-----------|-------|
+| GET | `/api/volumetria` | Listar tipos de volumetria disponíveis | `relatorio:volumetria:read` | 200 OK |
+| GET | `/api/volumetria/chamados` | Obter volumetria total de chamados | `relatorio:volumetria:read` | 200 OK |
+| GET | `/api/volumetria/ativos` | Obter volumetria total de ativos | `relatorio:volumetria:read` | 200 OK |
+| GET | `/api/volumetria/usuarios` | Obter volumetria total de usuários | `relatorio:volumetria:read` | 200 OK |
+| GET | `/api/volumetria/contratos` | Obter volumetria total de contratos | `relatorio:volumetria:read` | 200 OK |
+
+### 5.2 Operações Especiais
+
+| Método | Endpoint | Descrição | Permissão | Query Params |
+|--------|----------|-----------|-----------|-------|
+| GET | `/api/volumetria/consumo` | Volumetria de consumo (linhas, dados, ativos) | `relatorio:volumetria:read` | `de`, `ate` |
+| GET | `/api/volumetria/tendencia` | Análise de tendência com média móvel 7d | `relatorio:volumetria:tendencia` | `de`, `ate`, `tipo=chamados\|ativos\|usuarios` |
+| GET | `/api/volumetria/comparativo` | Comparativo mês vs mês ou ano vs ano | `relatorio:volumetria:comparativo` | `ano`, `mes`, `tipo=mes\|ano` |
+| GET | `/api/volumetria/top10/{tipo}` | Top 10 por tipo (filial, departamento, etc) | `relatorio:volumetria:top10` | `tipo=filial\|depto\|responsavel` |
+| GET | `/api/volumetria/por-dimensao/{dimensao}` | Volumetria agregada por dimensão customizada | `relatorio:volumetria:read` | `de`, `ate`, `dimensao=filial\|depto\|tipo` |
+| POST | `/api/volumetria/export/excel` | Exportar relatório em Excel | `relatorio:volumetria:export` | JSON body: `{ de, ate, tipos[] }` |
+| POST | `/api/volumetria/export/csv` | Exportar relatório em CSV | `relatorio:volumetria:export` | JSON body: `{ de, ate, tipos[] }` |
+| POST | `/api/volumetria/export/pdf` | Exportar relatório em PDF | `relatorio:volumetria:export` | JSON body: `{ de, ate, tipos[] }` |
+| GET | `/api/volumetria/consolidacao/status` | Status da consolidação automática | `relatorio:volumetria:read` | nenhum |
+
+### Detalhes dos Endpoints
+
+```http
+# 1. GET /api/volumetria
+GET /api/volumetria
+Authorization: Bearer {token}
+Accept: application/json
+
+Response 200:
+{
+  "tipos": [
+    {
+      "id": 1,
+      "nome": "Chamados",
+      "descricao": "Volumetria de chamados de service desk",
+      "icone": "icon-ticket"
+    },
+    {
+      "id": 2,
+      "nome": "Ativos",
+      "descricao": "Volumetria de ativos de TI",
+      "icone": "icon-laptop"
+    }
+  ]
+}
+
+# 2. GET /api/volumetria/chamados?de=2025-12-01&ate=2025-12-31
+GET /api/volumetria/chamados?de=2025-12-01&ate=2025-12-31
+Authorization: Bearer {token}
+
+Response 200:
+{
+  "periodo": {
+    "de": "2025-12-01",
+    "ate": "2025-12-31"
+  },
+  "total": 1250,
+  "porTipo": {
+    "Incidente": 750,
+    "Solicitação": 400,
+    "Mudança": 100
+  },
+  "porPrioridade": {
+    "Alta": 250,
+    "Média": 600,
+    "Baixa": 400
+  },
+  "porStatus": {
+    "Aberto": 50,
+    "Em Progresso": 200,
+    "Resolvido": 1000
+  }
+}
+
+Response 400:
+{
+  "erro": "Campo 'de' é obrigatório"
+}
+
+Response 403:
+{
+  "erro": "Usuário não tem permissão para acessar relatórios de volumetria"
+}
+
+# 3. GET /api/volumetria/comparativo?ano=2025&mes=12&tipo=mes
+GET /api/volumetria/comparativo?ano=2025&mes=12&tipo=mes
+Authorization: Bearer {token}
+
+Response 200:
+{
+  "periodoAtual": "12/2025",
+  "periodoAnterior": "11/2025",
+  "volumeAtual": 1250,
+  "volumeAnterior": 980,
+  "variacao": "+12.75%",
+  "tendencia": "CRESCENTE"
+}
+
+Response 422:
+{
+  "erro": "Período atual (Dezembro/2025) ainda está aberto. Comparativo disponível apenas para períodos finalizados."
+}
+
+# 4. POST /api/volumetria/export/excel
+POST /api/volumetria/export/excel
+Authorization: Bearer {token}
+Content-Type: application/json
+
+Request:
+{
+  "de": "2025-12-01",
+  "ate": "2025-12-31",
+  "tipos": ["Chamados", "Ativos", "Contratos"]
+}
+
+Response 200: (File Stream - Excel XLSX)
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+Content-Disposition: attachment; filename="volumetria_2025-12-01_2025-12-31.xlsx"
+
+Response 202 (quando > 100k registros):
+{
+  "jobId": "abc-123-xyz",
+  "mensagem": "Relatório enfileirado. Você receberá um e-mail quando estiver pronto.",
+  "statusUrl": "/api/volumetria/export/status/abc-123-xyz"
+}
+
+# 5. GET /api/volumetria/consolidacao/status
+GET /api/volumetria/consolidacao/status
+Authorization: Bearer {token}
+
+Response 200:
+{
+  "proximaExecucao": "2025-12-29T04:00:00Z",
+  "ultimaExecucao": "2025-12-28T04:15:32Z",
+  "statusUltimo": "SUCESSO",
+  "registrosConsolidados": 15234,
+  "tempoExecucao": "2m 15s"
+}
+```
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Geração de Relatório de Volumetria Simples
+
+```
+Usuario acessa /relatorios/volumetria
+    |
+    v
+[1. Carregar tela com filtros de período]
+    |
+    v
+Usuario seleciona: De: 01/12/2025, Até: 31/12/2025
+    |
+    v
+[2. Validar filtros]
+    |
+    +--- Período inválido? ---> Erro: "Data final < data inicial"
+    |
+    v (Período válido)
+[3. Chamar GET /api/volumetria/chamados?de=2025-12-01&ate=2025-12-31]
+    |
+    v
+Backend busca em VolumetriaConsolidada
+    |
+    +--- Dados não consolidados? ---> Buscar em Chamados + agregar (lento)
+    |
+    v (Dados consolidados)
+[4. Retornar JSON com totais por tipo, prioridade, status]
+    |
+    v
+[5. Renderizar gráficos em Angular (Chart.js)]
+    |
+    v
+Usuario visualiza:
+  - Gráfico de pizza (proporção por tipo)
+  - Tabela resumida (total por prioridade)
+  - Comparativo dia-a-dia (line chart)
+```
+
+### 6.2 Fluxo de Consolidação Automática (Hangfire)
+
+```
+[Diariamente às 04:00 AM]
+    |
+    v
+ConsolidacaoVolumetriaJob dispara
+    |
+    v
+[1. Para cada cliente no sistema]
+    |
+    v
+[2. Iterar clientes A, B, C...]
+    |
+    v
+[3. Consolidar volumetria de ONTEM (2025-12-27)]
+    |
+    v
+Para cada tipo (Chamados, Ativos, Usuarios, Contratos, Consumo):
+    |
+    +--- [Executar agregação SQL]
+    |    COUNT, SUM, AVG, GROUP BY
+    |
+    +--- [Inserir em VolumetriaConsolidada]
+    |
+    v
+[4. Registrar sucesso em LogConsolidacao]
+    |
+    v
+[5. Executar próximo cliente]
+    |
+    v
+[6. Job finaliza (~2-5 minutos para 1000 clientes)]
+```
+
+### 6.3 Fluxo de Export com Background Job
+
+```
+Usuario clica "Exportar Excel" com 2M registros
+    |
+    v
+[1. Frontend POST /api/volumetria/export/excel]
+    |
+    v
+Backend estima: COUNT = 2.1M (> 100k)
+    |
+    v
+[2. Enfileirar em Hangfire: ProcessarExportVolumetriaJob]
+    |
+    v
+[3. Retornar HTTP 202 com jobId + link status]
+    |
+    v
+Backend: Hangfire executa job em background
+    |
+    +--- [Agregar 2M registros (60 segundos)]
+    +--- [Gerar Excel XLSX (30 segundos)]
+    +--- [Upload para Azure Blob Storage (15 segundos)]
+    |
+    v
+[4. Enviar e-mail para usuario.email]
+    |
+    Subject: "Seu relatório está pronto"
+    |Body: "Link para download: https://blob.azure.com/volumetria_cliente123.xlsx"
+    |
+    v
+Usuario recebe email, clica link, faz download
+```
+
+### 6.4 Fluxo de Análise de Tendência (Média Móvel)
+
+```
+Usuario solicita tendência de 30 dias
+    |
+    v
+[1. Buscar volumetria diária dos últimos 30 dias]
+    |
+    v
+[2. Para cada dia, calcular média móvel 7d]
+    |
+    Dia 1 (04/12): média dos 1 dia = 100
+    Dia 2 (05/12): média dos 2 dias = 110
+    ...
+    Dia 7 (10/12): média dos 7 dias = 105
+    Dia 8 (11/12): média dias 2-8 = 112 (primeira MM real)
+    ...
+    |
+    v
+[3. Plotar gráfico de linha (volumetria diária vs média móvel)]
+    |
+    v
+Usuario vê:
+  - Linha azul (volumetria diária com variações)
+  - Linha vermelha (média móvel suavizada)
+  - Identifica trend: crescente/decrescente/estável
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição | Implementação |
+|----------|-----------|-----------|
+| **Autenticação JWT** | Token Bearer obrigatório em todas as requests | `[Authorize]` atributo em controllers |
+| **Multi-tenancy** | Filtro `ClienteId` obrigatório em todas queries | Verificação no `_userContext.ClienteId` |
+| **RBAC Fine-grained** | Permissões granulares (`relatorio:volumetria:export`) | `[Authorize(Roles = "...")]` |
+| **Auditoria Completa** | Cada acesso registrado em `LogAuditoria` | Middleware de logging automático |
+| **Rate Limiting** | Máximo 100 requests/minuto por usuário | Middleware de rate limit customizado |
+| **SQL Injection Prevention** | Parâmetros SQL via EF Core (nunca concatenar strings) | `Where(x => x.Campo == parametro)` |
+| **XSS Prevention** | Dados sanitizados antes de renderizar em HTML | Angular `[innerHTML]` vs `innerText` |
+| **CSRF Protection** | Token CSRF em forms | `.AddAntiforgery()` + `[ValidateAntiForgeryToken]` |
+| **Data Masking** | Dados sensíveis mascarados em logs | Nunca logar email, CPF, valores |
+| **Cache Control** | Headers HTTP apropriados | `Cache-Control: no-cache, no-store` |
+| **HTTPS Only** | TLS 1.3 obrigatório | Enforced em Azure App Service |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] **SQL Injection** - Tentar `SELECT * FROM Usuarios; DROP TABLE Usuarios;` em filtro de período
+- [ ] **XSS** - Tentar injetar `<script>alert('XSS')</script>` em parâmetro `de`
+- [ ] **CSRF** - POST /export sem token CSRF retorna 403
+- [ ] **Validação de Permissões** - Usuário sem `relatorio:volumetria:read` retorna 403
+- [ ] **Multi-tenancy** - Usuário de ClienteId=1 não consegue acessar dados de ClienteId=2
+- [ ] **Rate Limiting** - 101 requests em 60 segundos retorna 429 Too Many Requests
+- [ ] **Token Expirado** - Token JWT expirado retorna 401 Unauthorized
+- [ ] **Dados Mascarados** - Logs não contêm e-mail, CPF ou valores financeiros
+- [ ] **HTTPS** - HTTP retorna 301 redirect para HTTPS
+- [ ] **Authorization Header** - GET sem Authorization retorna 401
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medição | Responsável |
+|-----|------|---------|-----------|
+| **Performance Geração Relatório** | < 2 segundos | Cronometrar tempo de resposta GET /api/volumetria/chamados | DevOps |
+| **Taxa de Sucesso Consolidação** | 99.9% | % de consolidações bem-sucedidas vs tentativas | DevOps |
+| **Tempo Consolidação Diária** | < 5 minutos | Tempo total do job Hangfire para consolidar todos clientes | DevOps |
+| **Acurácia Volumetria** | 100% | Comparar COUNT agregado vs count manual em amostra de 1% | QA |
+| **Disponibilidade do Módulo** | 99.95% | Uptime do endpoint /api/volumetria | DevOps |
+| **Taxa de Export Sucesso** | 98% | % de exports bem-sucedidos vs tentativas | QA |
+| **Uso de Cache** | > 80% | % de requests servidas do Redis vs banco | DevOps |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| **Consolidação Falhou** | Job Hangfire de consolidação não completou às 5:30 AM | Enviar e-mail ao DevOps, abrir ticket crítico |
+| **Performance Degradada** | Tempo de resposta > 5 segundos | Investigar índices, cache, slow queries |
+| **Exportação Travou** | Job de export pendente > 30 minutos | Cancelar job, notificar usuário, tentar novamente |
+| **Taxa Erro Alta** | > 1% requests retornam erro 5xx | Investigar logs de erro, rollback se necessário |
+| **Espaço Disco Cheio** | Storage em Azure < 20% livre | Arquivar volumetria antiga, aumentar quota |
+| **Cache Inválido** | Taxa de hit do Redis < 50% | Revisar TTL do cache, otimizar invalidação |
+| **Retenção Violada** | Dados de volumetria > 24 meses encontrados | Executar limpeza manual, revisar job de retenção |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Casos de Uso**: Criar [UC-RF103](./UC-RF103-Relatorios-Volumetria.md)
+2. **Modelo de Dados**: Criar [MD-RF103](./MD-RF103-Relatorios-Volumetria.md)
+3. **Fluxos de Tela**: Criar [WF-RF103](./WF-RF103-Relatorios-Volumetria.md)
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml)
+5. **Testes**: Criar [TC-RF103-BACKEND.md](./TC-RF103-BACKEND.md), [TC-RF103-FRONTEND.md](./TC-RF103-FRONTEND.md), [TC-RF103-E2E.md](./TC-RF103-E2E.md)
+6. **Implementação Backend**: Commands/Queries/Handlers com CQRS + MediatR
+7. **Implementação Frontend**: Componentes Angular com Chart.js para gráficos
+8. **Integração Hangfire**: Configurar job de consolidação automática
+9. **Validação E2E**: Testes Playwright validando fluxos completos de relatório
+10. **Deploy HOM**: Testes em homologação antes de produção
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versão inicial com 10 RNs, 13 endpoints, integrações completas | Claude Code |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: Claude Code
+**Revisão**: Pendente
+**Status**: RASCUNHO

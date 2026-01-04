@@ -1,0 +1,474 @@
+# Template de Referência ao Legado (RL-RF036.yaml)
+# Versão: 1.0
+# Data: 2025-12-30
+# RF Relacionado: RF036 - Gestão de Custos Fixos
+
+rf_id: RF036
+titulo: "Gestão de Custos Fixos"
+
+legado:
+  sistema: "ASP.NET Web Forms + VB.NET"
+  versao: "4.x"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2014+"
+  multi_tenant: false
+  auditoria: "none"
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+# Cada item DEVE ter campo "destino" preenchido
+referencias:
+  - id: "LEG-RF036-001"
+    tipo: "regra_negocio"
+    nome: "Lançamento Manual Mensal de Custos Fixos"
+    caminho: "N/A (processo manual)"
+    descricao: |
+      No sistema legado, custos fixos (se gerenciados) eram lançados
+      manualmente todo mês pelo usuário responsável. Não havia
+      provisionamento automático ou recorrência configurável.
+    destino: "substituido"
+    justificativa: |
+      Substituído por provisionamento automático via job Hangfire mensal
+      (RN-RF036-02). Job executa no 1º dia útil do mês e cria lançamentos
+      automaticamente baseado em valor histórico ou orçado.
+      Impacto: Reduz risco de esquecimento e garante consistência.
+    rf_item_relacionado: "RN-RF036-02"
+    uc_relacionado: "UC05-provisionar-custos-fixos"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF036-002"
+    tipo: "regra_negocio"
+    nome: "Ausência de Validação de Variação Orçamentária"
+    caminho: "N/A (validação inexistente)"
+    descricao: |
+      Sistema legado aceitava qualquer valor de despesa sem comparar
+      com valor orçado ou alertar variações significativas.
+      Gestores descobriam desvios apenas no fechamento contábil.
+    destino: "substituido"
+    justificativa: |
+      Substituído por sistema de alertas automáticos de variação em 3 níveis
+      (RN-RF036-03): 10% (Informativo), 20% (Aviso), 30% (Crítico).
+      Gestores terão visibilidade proativa de desvios em tempo real.
+    rf_item_relacionado: "RN-RF036-03"
+    uc_relacionado: "UC06-registrar-valor-realizado"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF036-003"
+    tipo: "regra_negocio"
+    nome: "Ausência de Detecção de Anomalias"
+    caminho: "N/A (funcionalidade inexistente)"
+    descricao: |
+      Não havia análise estatística de valores fora do padrão histórico.
+      Erros de digitação (ex: R$ 10.000 ao invés de R$ 1.000) ou aumentos
+      anormais não eram detectados automaticamente.
+    destino: "substituido"
+    justificativa: |
+      Implementada detecção automática de anomalias via análise estatística
+      (RN-RF036-07). Sistema calcula média e desvio padrão dos últimos 6 meses.
+      Anomalia detectada se valorAtual > média + (2 × σ).
+      Impacto: Identifica erros e aumentos anormais automaticamente.
+    rf_item_relacionado: "RN-RF036-07"
+    uc_relacionado: "UC06-registrar-valor-realizado"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF036-004"
+    tipo: "regra_negocio"
+    nome: "Ausência de Rateio Automático"
+    caminho: "N/A (lançamento integral em um centro de custo)"
+    descricao: |
+      Custos compartilhados (ex: aluguel do prédio, energia elétrica)
+      eram lançados integralmente em um único centro de custo.
+      Rateio era feito manualmente em planilhas externas.
+    destino: "substituido"
+    justificativa: |
+      Implementado rateio multi-dimensional (RN-RF036-06) com validação
+      automática de soma = 100%. Permite distribuição por centro de custo
+      e filial com percentuais configuráveis.
+      Impacto: Alocação precisa de custos compartilhados entre áreas/filiais.
+    rf_item_relacionado: "RN-RF036-06"
+    uc_relacionado: "UC08-configurar-rateio"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF036-005"
+    tipo: "regra_negocio"
+    nome: "Ausência de Aprovação Gerencial"
+    caminho: "N/A (workflow inexistente)"
+    descricao: |
+      Não havia workflow de aprovação para lançamentos com valores
+      muito divergentes do orçado. Qualquer usuário podia lançar
+      qualquer valor sem validação gerencial.
+    destino: "substituido"
+    justificativa: |
+      Implementada aprovação gerencial obrigatória para variações >30%
+      (RN-RF036-05). Lançamentos ficam com Status=AguardandoAprovacao
+      até aprovação ou reprovação por gestor com permissão específica.
+      Impacto: Governança sobre custos com desvios significativos.
+    rf_item_relacionado: "RN-RF036-05"
+    uc_relacionado: "UC07-aprovar-lancamento"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF036-006"
+    tipo: "regra_negocio"
+    nome: "Ausência de Histórico de Alterações"
+    caminho: "N/A (auditoria inexistente)"
+    descricao: |
+      Alterações em valores de despesas ou custos orçados não eram
+      rastreadas (quem alterou, quando, valor anterior/novo, motivo).
+      Impossível auditar mudanças ou identificar responsáveis.
+    destino: "substituido"
+    justificativa: |
+      Implementada auditoria automática obrigatória com campos:
+      UsuarioCriacaoId, DataCriacao, UsuarioAlteracaoId, DataAlteracao.
+      Tabela CustoFixoHistorico registra todas alterações de valores críticos.
+      Impacto: Rastreabilidade completa para compliance e auditorias (LGPD 7 anos).
+    rf_item_relacionado: "RN-RF036-13"
+    uc_relacionado: "UC03-editar-custo-fixo"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF036-007"
+    tipo: "regra_negocio"
+    nome: "Ausência de Alertas de Vencimento"
+    caminho: "N/A (notificações inexistentes)"
+    descricao: |
+      Sistema não enviava notificações antes do vencimento de despesas.
+      Usuários precisavam consultar manualmente ou correr risco de
+      atraso e multas.
+    destino: "substituido"
+    justificativa: |
+      Implementado job diário de alertas de vencimento (RN-RF036-11).
+      Notificações enviadas 7, 3 e 1 dia antes do vencimento com
+      severidade crescente (Informativo → Aviso → Crítico).
+      Impacto: Reduz atrasos e multas por pagamento em atraso.
+    rf_item_relacionado: "RN-RF036-11"
+    uc_relacionado: "UC06-registrar-valor-realizado"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF036-008"
+    tipo: "tela"
+    nome: "Contas a Pagar (Hipotética)"
+    caminho: "Financeiro/ContasPagar.aspx (não confirmado)"
+    descricao: |
+      Tela genérica de contas a pagar que pode ter sido usada para
+      lançamento manual de custos fixos mensais. Sem campos específicos
+      para recorrência, valor orçado ou tipo de custo.
+    destino: "substituido"
+    justificativa: |
+      Substituída por tela específica de Gestão de Custos Fixos com
+      campos dedicados: TipoCustoFixo, ValorOrcadoMensal, DataInicio,
+      DataFim, Periodicidade, Fornecedor, Contrato, Rateio.
+      Impacto: Interface focada em necessidades específicas de custos fixos.
+    rf_item_relacionado: "RF036"
+    uc_relacionado: "UC01-criar-custo-fixo"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF036-009"
+    tipo: "regra_negocio"
+    nome: "ContasPagar (Tabela Genérica)"
+    caminho: "Database/dbo.ContasPagar"
+    descricao: |
+      Tabela genérica de contas a pagar que pode ter sido usada para
+      armazenar custos fixos. Problemas: sem campo de recorrência,
+      sem valor orçado, sem flag de provisionamento automático,
+      sem multi-tenancy, sem auditoria.
+    destino: "substituido"
+    justificativa: |
+      Substituída por entidades dedicadas: CustoFixo, LancamentoCustoFixo,
+      RateioCustoFixo. Novas entidades incluem: ConglomeradoId (multi-tenant),
+      campos de auditoria, FlExcluido (soft delete), ValorOrcado vs Realizado,
+      FlProvisionamentoAutomatico, RequereAprovacaoGerencial, FlAnomalia.
+      Impacto: Migração de dados necessária (se houver dados legados).
+    rf_item_relacionado: "RF036"
+    uc_relacionado: "UC00-listar-custos-fixos"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF036-010"
+    tipo: "regra_negocio"
+    nome: "Ausência de Dashboard Gerencial"
+    caminho: "N/A (funcionalidade inexistente)"
+    descricao: |
+      Não havia dashboard com visão consolidada de custos fixos,
+      top 10 maiores custos, projeção de custos futuros, análise YoY
+      ou gráficos de tendência.
+    destino: "substituido"
+    justificativa: |
+      Implementado dashboard gerencial completo (UC09) com:
+      - Visão consolidada por categoria
+      - Top 10 maiores custos fixos
+      - Indicadores de variação orçamentária
+      - Gráficos de evolução mensal
+      - Análise Year-over-Year (YoY)
+      - Projeção de custos 3, 6, 12 meses (UC10)
+      Impacto: Visibilidade estratégica para tomada de decisão gerencial.
+    rf_item_relacionado: "RF036"
+    uc_relacionado: "UC09-dashboard-custos-fixos"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# Telas Legadas (estrutura detalhada)
+telas:
+  - id: "LEG-RF036-008"
+    nome: "Contas a Pagar (Hipotética)"
+    caminho: "Financeiro/ContasPagar.aspx (não confirmado)"
+    responsabilidade: "Lançamento manual de despesas recorrentes"
+    campos:
+      - nome: "Descricao"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Apenas tamanho máximo"
+      - nome: "Valor"
+        tipo: "TextBox (decimal)"
+        obrigatorio: true
+        validacao: "Apenas > 0"
+      - nome: "DataVencimento"
+        tipo: "DatePicker"
+        obrigatorio: true
+        validacao: "Data válida"
+    comportamentos_implicitos:
+      - "Sem validação de variação orçamentária"
+      - "Sem flag de recorrência automática"
+      - "Sem rateio por centro de custo"
+      - "Sem notificações de vencimento"
+
+# WebServices Legados
+servicos:
+  - id: "LEG-RF036-SVC-001"
+    nome: "Nenhum WebService específico identificado"
+    localizacao: "N/A"
+    responsabilidade: "N/A"
+    notas: "Sistema legado não possui APIs específicas para Custos Fixos"
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "ContasPagar (hipotética)"
+    finalidade: "Armazenar despesas a pagar (genérico)"
+    problemas:
+      - "Sem campo de recorrência (fixo vs variável)"
+      - "Sem campo ValorOrcado vs ValorRealizado"
+      - "Sem campo MesReferencia para provisionamento"
+      - "Sem multi-tenancy (Id_Conglomerado)"
+      - "Sem auditoria (campos de criação/alteração)"
+      - "Sem exclusão lógica (Fl_Excluido)"
+      - "Sem flag de provisionamento automático"
+      - "Sem campo de justificativa de variação"
+      - "Sem campo de aprovação gerencial"
+
+# Regras de Negócio Implícitas (não documentadas no legado)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: "Lançamento manual mensal de custos fixos pelo usuário responsável"
+    fonte: "Comportamento padrão observado em outros módulos financeiros"
+  - id: "RL-RN-002"
+    descricao: "Sistema aceitava qualquer valor sem alertar variações orçamentárias"
+    fonte: "Ausência de validação em módulos financeiros legados"
+  - id: "RL-RN-003"
+    descricao: "Sem análise estatística de valores fora do padrão histórico"
+    fonte: "Funcionalidade inexistente no legado"
+  - id: "RL-RN-004"
+    descricao: "Custos compartilhados lançados integralmente em um centro de custo"
+    fonte: "Limitação observada em outros módulos"
+  - id: "RL-RN-005"
+    descricao: "Sem workflow de aprovação para lançamentos com valores divergentes"
+    fonte: "Ausência de workflow de aprovação no legado"
+  - id: "RL-RN-006"
+    descricao: "Alterações em valores não rastreadas (quem, quando, por quê)"
+    fonte: "Ausência de auditoria no legado"
+  - id: "RL-RN-007"
+    descricao: "Sem notificações antes do vencimento de despesas"
+    fonte: "Funcionalidade inexistente no legado"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Cadastro de Custos Fixos Dedicado"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Entidade dedicada com campos específicos (TipoCustoFixo, ValorOrcado, Periodicidade)"
+  - item: "Provisionamento Automático Mensal"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Job Hangfire no 1º dia útil do mês"
+  - item: "Alertas de Variação Orçamentária"
+    existe_legado: false
+    existe_moderno: true
+    notas: "3 níveis (10%, 20%, 30%)"
+  - item: "Detecção de Anomalias Estatísticas"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Análise média + 2σ com mínimo 6 meses histórico"
+  - item: "Dashboard Gerencial"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Visão consolidada, Top 10, gráficos, projeções"
+  - item: "Análise Year-over-Year (YoY)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Comparação mesmo mês ano anterior"
+  - item: "Rateio Multi-Dimensional"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Por centro de custo e filial com soma = 100%"
+  - item: "Aprovação Gerencial"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Obrigatória para variações >30%"
+  - item: "Alertas de Vencimento"
+    existe_legado: false
+    existe_moderno: true
+    notas: "7, 3, 1 dia antes com severidade crescente"
+  - item: "Auditoria Completa"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Campos de auditoria + tabela de histórico"
+  - item: "Multi-Tenancy"
+    existe_legado: false
+    existe_moderno: true
+    notas: "ConglomeradoId obrigatório com row-level security"
+  - item: "Exclusão Lógica"
+    existe_legado: false
+    existe_moderno: true
+    notas: "FlExcluido = true ao invés de DELETE físico"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Criar entidade CustoFixo separada de ContasPagar genérico"
+    motivo: |
+      Custos fixos têm comportamento específico (recorrência, provisionamento)
+      que justifica entidade dedicada com campos próprios.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Provisionamento automático via Hangfire no 1º dia útil do mês"
+    motivo: |
+      Elimina necessidade de lançamento manual recorrente, garante
+      consistência e reduz risco de esquecimento.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Alertas proativos de variação em 3 níveis (10%, 20%, 30%)"
+    motivo: |
+      Gestores identificam desvios em tempo real para ação corretiva
+      antes do fechamento contábil.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Workflow de aprovação obrigatório para variações >30%"
+    motivo: |
+      Governança sobre custos críticos, evita erros não detectados,
+      rastreabilidade de decisões gerenciais.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Rateio multi-dimensional com validação soma = 100%"
+    motivo: |
+      Custos compartilhados (aluguel, energia) precisam ser alocados
+      proporcionalmente entre áreas/filiais.
+    impacto: "medio"
+    data: "2025-12-30"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Dados legados sem histórico de custos fixos"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      Iniciar sistema novo sem migração de histórico legado.
+      Carregar apenas custos fixos ativos a partir de data de corte.
+
+  - risco: "Resistência a provisionamento automático"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Treinamento e período de transição com revisão manual de
+      lançamentos provisionados antes de confirmar.
+
+  - risco: "Falha no job de provisionamento"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      Monitoramento + alertas de falha + execução manual backup.
+      Job idempotente (executar duas vezes não cria duplicatas).
+
+  - risco: "Classificação incorreta de custos (fixo vs variável)"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Validação durante cadastro + revisão gerencial inicial.
+      Documentação clara de critérios de classificação.
+
+  - risco: "Alertas excessivos (fadiga de notificação)"
+    impacto: "baixo"
+    probabilidade: "media"
+    mitigacao: |
+      Configuração de threshold ajustável por usuário.
+      Opção de silenciar alertas específicos.
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "Lançamento Manual Mensal"
+    referencia_rf: "RN-RF036-02"
+    referencia_uc: "UC05-provisionar-custos-fixos"
+    status: "substituido"
+
+  - elemento_legado: "Ausência de Alertas de Variação"
+    referencia_rf: "RN-RF036-03"
+    referencia_uc: "UC06-registrar-valor-realizado"
+    status: "substituido"
+
+  - elemento_legado: "Ausência de Detecção de Anomalias"
+    referencia_rf: "RN-RF036-07"
+    referencia_uc: "UC06-registrar-valor-realizado"
+    status: "substituido"
+
+  - elemento_legado: "Ausência de Rateio"
+    referencia_rf: "RN-RF036-06"
+    referencia_uc: "UC08-configurar-rateio"
+    status: "substituido"
+
+  - elemento_legado: "Ausência de Aprovação Gerencial"
+    referencia_rf: "RN-RF036-05"
+    referencia_uc: "UC07-aprovar-lancamento"
+    status: "substituido"
+
+  - elemento_legado: "Ausência de Auditoria"
+    referencia_rf: "RN-RF036-13"
+    referencia_uc: "UC03-editar-custo-fixo"
+    status: "substituido"
+
+  - elemento_legado: "Ausência de Alertas de Vencimento"
+    referencia_rf: "RN-RF036-11"
+    referencia_uc: "UC06-registrar-valor-realizado"
+    status: "substituido"
+
+  - elemento_legado: "Tabela ContasPagar (genérica)"
+    referencia_rf: "RF036"
+    referencia_uc: "UC00-listar-custos-fixos"
+    status: "substituido"
+
+  - elemento_legado: "Ausência de Dashboard Gerencial"
+    referencia_rf: "RF036"
+    referencia_uc: "UC09-dashboard-custos-fixos"
+    status: "substituido"
+
+# Changelog
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Documentação inicial de referência ao legado - RF036 Gestão de Custos Fixos"
+    autor: "Agência ALC - alc.dev.br"

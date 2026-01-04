@@ -1,0 +1,511 @@
+rf:
+  id: RF101
+  nome: Dashboards Executivos Operacionais
+  versao: '2.0'
+  data: '2025-12-31'
+  fase: Fase 6 - Ativos, Auditoria e Integrações
+  epic: EPIC011-INT-Integracoes
+  status: aprovado
+descricao:
+  objetivo: 'Fornecer dashboards executivos pré-definidos para públicos estratégicos
+    (C-Level, Diretoria, Gerência Sênior),
+
+    consolidando dados operacionais e financeiros em visualizações de alto impacto
+    para tomada de decisão rápida.
+
+    '
+  problema_resolvido: 'Executivos precisam de visões consolidadas de múltiplas fontes
+    (telecom, TI, facilities) sem acesso a sistemas transacionais.
+
+    Falta de visibilidade estratégica em KPIs financeiros, compliance e SLA dificulta
+    governança corporativa.
+
+    '
+  publico_afetado: 'Primário: CEO, CFO, CIO, Diretoria Executiva, Gerência Sênior
+
+    Secundário: Analistas Executivos, Auditores Internos, Controladores Financeiros
+
+    Sistemas Integrados: RF099, RF093, RF094, RF079, RF023, RF028, RF029, RF008, RF009
+
+    '
+escopo:
+  incluso:
+  - Dashboard C-Level com 4 KPIs estratégicos (Receita, Custos, Compliance, SLA)
+  - Dashboard de Custos consolidados por contrato/filial/centro de custo com trending
+  - Dashboard de Compliance com status de políticas (RF079) e cobertura LGPD
+  - Dashboard de Performance com indicadores operacionais (RF093) e heatmap
+  - Indicadores de SLA com % atendimento vs meta contratual (RF028, RF029, RF023)
+  - Heatmap de Consumo (matriz filial × centro de custo com escala visual)
+  - Trending de Custos (diária 30d, semanal 13s, mensal 12m) com regressão linear
+  - Forecast com Machine Learning (ARIMA/Regressão Linear) com R² >= 0.85
+  - Budget vs Real com alertas automáticos (variação > 10% amarelo, > 20% vermelho)
+  - Balanced Scorecard com 4 perspectivas e indicadores balanceados
+  - Export Executivo em PowerPoint (.pptx) e PDF com gráficos PNG embutidos
+  - Drill-down detalhado navegando de KPI agregado para dados granulares
+  - Sincronização com Azure DevOps via RF079 para indicadores de projeto
+  - Consolidação diária via Hangfire às 06:00 AM UTC em fact tables
+  fora:
+  - Dashboards configuráveis customizados por usuário (usar RF099)
+  - Criação de novos KPIs ou métricas custom (usar RF093)
+  - Relatórios transacionais detalhados (usar módulos específicos)
+  - Exportação em Excel dinâmico (apenas PowerPoint e PDF executivos)
+  - Agendamento de envio de relatórios por email (roadmap futuro)
+  - Integração com Power BI Desktop (apenas Power BI Embedded)
+entidades:
+- nome: Dashboard
+  descricao: Representa um dashboard executivo pré-definido
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+  atributos:
+  - nome: Id
+    tipo: Guid
+    obrigatorio: true
+  - nome: ClienteId
+    tipo: Guid
+    obrigatorio: true
+  - nome: Tipo
+    tipo: enum
+    valores:
+    - CLevelDashboard
+    - CustosDashboard
+    - ComplianceDashboard
+    - PerformanceDashboard
+    obrigatorio: true
+  - nome: Titulo
+    tipo: string
+    obrigatorio: true
+  - nome: Descricao
+    tipo: string
+    obrigatorio: false
+  - nome: Ativo
+    tipo: bool
+    obrigatorio: true
+  - nome: PermissaoRequerida
+    tipo: string
+    obrigatorio: true
+- nome: FatoDashboard_Custos
+  descricao: Tabela de fatos dimensional com custos consolidados
+  multi_tenant: true
+  soft_delete: false
+  auditoria: false
+  atributos:
+  - nome: Id
+    tipo: bigint
+    obrigatorio: true
+  - nome: ClienteId
+    tipo: Guid
+    obrigatorio: true
+  - nome: ContratoId
+    tipo: Guid
+    obrigatorio: true
+  - nome: FilialId
+    tipo: Guid
+    obrigatorio: false
+  - nome: CentroCustoId
+    tipo: Guid
+    obrigatorio: false
+  - nome: DataConsolidacao
+    tipo: Date
+    obrigatorio: true
+  - nome: Mes
+    tipo: int
+    obrigatorio: true
+  - nome: Ano
+    tipo: int
+    obrigatorio: true
+  - nome: ValorTotal
+    tipo: decimal(18,2)
+    obrigatorio: true
+- nome: FatoDashboard_SLA
+  descricao: Consolidação de performance SLA
+  multi_tenant: true
+  soft_delete: false
+  auditoria: false
+  atributos:
+  - nome: Id
+    tipo: bigint
+    obrigatorio: true
+  - nome: ClienteId
+    tipo: Guid
+    obrigatorio: true
+  - nome: ContratoId
+    tipo: Guid
+    obrigatorio: true
+  - nome: DataReferencia
+    tipo: Date
+    obrigatorio: true
+  - nome: MetaPercentual
+    tipo: decimal(5,2)
+    obrigatorio: true
+  - nome: PercentualAtendimento
+    tipo: decimal(5,2)
+    obrigatorio: true
+  - nome: Status
+    tipo: enum
+    valores:
+    - Atendido
+    - Aviso
+    - NaoAtendido
+    obrigatorio: true
+- nome: Dashboard_Consolidacao
+  descricao: Registro de execução de jobs de consolidação diária
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+  atributos:
+  - nome: Id
+    tipo: Guid
+    obrigatorio: true
+  - nome: ClienteId
+    tipo: Guid
+    obrigatorio: true
+  - nome: DataConsolidacao
+    tipo: Date
+    obrigatorio: true
+  - nome: TipoDado
+    tipo: enum
+    valores:
+    - Custos
+    - SLA
+    - Compliance
+    - Performance
+    obrigatorio: true
+  - nome: Sucesso
+    tipo: bool
+    obrigatorio: true
+  - nome: RegistrosProcessados
+    tipo: int
+    obrigatorio: false
+  - nome: MensagemErro
+    tipo: string
+    obrigatorio: false
+- nome: ForecastResult
+  descricao: Resultado de previsão de Machine Learning
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+  atributos:
+  - nome: Id
+    tipo: Guid
+    obrigatorio: true
+  - nome: ClienteId
+    tipo: Guid
+    obrigatorio: true
+  - nome: ContratoId
+    tipo: Guid
+    obrigatorio: true
+  - nome: IsValido
+    tipo: bool
+    obrigatorio: true
+  - nome: RSquared
+    tipo: decimal(5,4)
+    obrigatorio: true
+  - nome: ConfiancaPercentual
+    tipo: int
+    obrigatorio: true
+  - nome: MotivoInvalido
+    tipo: string
+    obrigatorio: false
+regras_negocio:
+- id: RN-DSH-101-01
+  descricao: Apenas usuários com perfis C-Level, Diretoria, Gerência Sênior e Analista
+    Executivo podem acessar dashboards executivos
+  tipo: seguranca
+  campos_afetados:
+  - todos os endpoints
+  obrigatorio: true
+  mensagem_erro: Acesso negado. Usuário não possui permissão para visualizar dashboards
+    executivos.
+- id: RN-DSH-101-02
+  descricao: Dados agregados devem ser consolidados automaticamente via Hangfire às
+    6:00 AM UTC, job idempotente com registro de sucesso/falha
+  tipo: regra_negocio
+  campos_afetados:
+  - FatoDashboard_Custos
+  - FatoDashboard_SLA
+  - Dashboard_Consolidacao
+  obrigatorio: true
+- id: RN-DSH-101-03
+  descricao: Forecast exige mínimo 12 meses de histórico. Modelo ARIMA/Regressão Linear
+    deve atingir R² >= 0.85 para validade
+  tipo: validacao
+  campos_afetados:
+  - ForecastResult.IsValido
+  - ForecastResult.RSquared
+  obrigatorio: true
+- id: RN-DSH-101-04
+  descricao: 'Budget vs Real calcula variação percentual. Alertas: > 10% amarelo,
+    > 20% vermelho'
+  tipo: regra_negocio
+  campos_afetados:
+  - BudgetVsRealDto.VariacaoPercentual
+  - BudgetVsRealDto.AlertNivel
+  obrigatorio: true
+- id: RN-DSH-101-05
+  descricao: 'Heatmap usa escala de cores: verde < 80% meta, amarelo 80-100%, vermelho
+    > 100%. Cores acessíveis WCAG AA'
+  tipo: regra_negocio
+  campos_afetados:
+  - HeatmapCell.Status
+  - HeatmapCell.CorHex
+  obrigatorio: true
+- id: RN-DSH-101-06
+  descricao: 'Trending permite granularidades: diária (30d), semanal (13s), mensal
+    (12m). Linha tendência via regressão linear'
+  tipo: regra_negocio
+  campos_afetados:
+  - TrendingData.Granularidade
+  - TrendingData.Regressao
+  obrigatorio: true
+- id: RN-DSH-101-07
+  descricao: SLA mostra % atendimento vs meta contratual. Verde >= meta, amarelo 95-99%
+    meta, vermelho < 95%
+  tipo: regra_negocio
+  campos_afetados:
+  - SLAIndicadorDto.PercentualAtendimento
+  - SLAIndicadorDto.Status
+  obrigatorio: true
+- id: RN-DSH-101-08
+  descricao: Dashboard Compliance integra status de políticas (RF079). Exibir título,
+    atualização, conformidade, cobertura filiais
+  tipo: regra_negocio
+  campos_afetados:
+  - ComplianceDashboardDto.Indicadores
+  obrigatorio: true
+- id: RN-DSH-101-09
+  descricao: Export PowerPoint gera arquivo com 6 slides (Capa, Sumário, C-Level,
+    Custos, SLA/Compliance, Recomendações). Gráficos PNG embutidos
+  tipo: regra_negocio
+  campos_afetados:
+  - ExportResponse.UrlDownload
+  - ExportResponse.NomeArquivo
+  obrigatorio: true
+- id: RN-DSH-101-10
+  descricao: Toda tentativa de acesso deve ser auditada em AuditLog (RF004). Retenção
+    5 anos (LGPD)
+  tipo: seguranca
+  campos_afetados:
+  - AuditEntry
+  obrigatorio: true
+estados:
+- id: ativo
+  descricao: Dashboard habilitado para visualização
+- id: inativo
+  descricao: Dashboard desabilitado temporariamente (manutenção)
+- id: obsoleto
+  descricao: Dashboard descontinuado, substituído por nova versão
+transicoes:
+  permitidas:
+  - de: ativo
+    para: inativo
+  - de: inativo
+    para: ativo
+  - de: ativo
+    para: obsoleto
+  proibidas:
+  - de: obsoleto
+    para: ativo
+    motivo: Uma vez descontinuado, não pode ser reativado
+  - de: inativo
+    para: obsoleto
+    motivo: Deve passar por ativo antes de obsolescência
+permissoes:
+- codigo: dashboard.executivo.view_any
+  descricao: Listar dashboards disponíveis
+  perfis:
+  - CEO
+  - CFO
+  - CIO
+  - Diretoria
+  - Gerencia
+  - AnalistaExecutivo
+- codigo: dashboard.executivo.view
+  descricao: Visualizar dashboard específico
+  perfis:
+  - CEO
+  - CFO
+  - CIO
+  - Diretoria
+  - Gerencia
+  - AnalistaExecutivo
+- codigo: dashboard.executivo.clevel
+  descricao: Acessar Dashboard C-Level
+  perfis:
+  - CEO
+  - CFO
+  - CIO
+  - Diretoria
+- codigo: dashboard.executivo.custos
+  descricao: Acessar Dashboard Custos
+  perfis:
+  - CEO
+  - CFO
+  - Diretoria
+  - Gerencia
+- codigo: dashboard.executivo.compliance
+  descricao: Acessar Dashboard Compliance
+  perfis:
+  - CEO
+  - CFO
+  - CIO
+  - DiretorCompliance
+- codigo: dashboard.executivo.performance
+  descricao: Acessar Dashboard Performance
+  perfis:
+  - CEO
+  - CIO
+  - DiretorOperacoes
+  - Gerencia
+- codigo: dashboard.executivo.export
+  descricao: Exportar PowerPoint/PDF
+  perfis:
+  - CEO
+  - CFO
+  - CIO
+  - Diretoria
+  - AnalistaExecutivo
+- codigo: dashboard.executivo.drill_down
+  descricao: Acessar análise detalhada
+  perfis:
+  - CEO
+  - CFO
+  - CIO
+  - Diretoria
+  - Gerencia
+  - Analista
+- codigo: dashboard.executivo.audit
+  descricao: Visualizar logs de auditoria
+  perfis:
+  - CEO
+  - CIO
+  - GerenciaTI
+integracoes:
+  internas:
+  - RF099 - Dashboards Genéricos (widgets compartilhados)
+  - RF093 - Indicadores de Performance (KPIs operacionais)
+  - RF094 - Auditoria de Custos (dados consolidados)
+  - RF079 - Políticas e Compliance (status conformidade)
+  - RF023 - Contratos (metas SLA)
+  - RF028 - SLA Operações (performance realizada)
+  - RF029 - SLA Serviços (performance realizada)
+  - RF008 - Empresas e Filiais (hierarquia organizacional)
+  - RF009 - Centros de Custo (estrutura de custos)
+  - RF004 - Auditoria (log de acessos)
+  - RF001 - Central de Funcionalidades (feature flags)
+  - Autenticação/Autorização (JWT + RBAC)
+  - Multi-Tenancy (isolamento ClienteId)
+  externas:
+  - sistema: Azure ML
+    tipo: API REST
+    obrigatoria: false
+    descricao: 'Forecast com Machine Learning (alternativa: ML.NET local)'
+  - sistema: Power BI Embedded
+    tipo: JavaScript SDK
+    obrigatoria: false
+    descricao: Visualizações avançadas (opcional)
+  - sistema: Azure Blob Storage
+    tipo: SDK .NET
+    obrigatoria: true
+    descricao: Armazenamento de arquivos exportados
+  - sistema: Azure DevOps
+    tipo: API REST
+    obrigatoria: false
+    descricao: Sincronização de indicadores de projeto (via RF079)
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  rbac: true
+  jwt_bearer: true
+  https_obrigatorio: true
+  criptografia_repouso: true
+  cors_restritivo: true
+  rate_limiting: true
+  sql_injection_prevention: true
+  xss_prevention: true
+  csrf_protection: true
+rastreabilidade:
+  ucs_esperados:
+  - UC00-listar-dashboards-executivos
+  - UC01-visualizar-dashboard-clevel
+  - UC02-visualizar-dashboard-custos
+  - UC03-visualizar-dashboard-compliance
+  - UC04-visualizar-dashboard-performance
+  - UC05-exportar-powerpoint
+  - UC06-drill-down-kpi
+  dependencias:
+    depende_de:
+    - RF001 - Central de Funcionalidades
+    - RF004 - Auditoria
+    - RF008 - Empresas e Filiais
+    - RF009 - Centros de Custo
+    - RF023 - Contratos
+    - RF028 - SLA Operações
+    - RF029 - SLA Serviços
+    - RF079 - Políticas
+    - RF093 - Indicadores de Performance
+    - RF094 - Auditoria de Custos
+    - RF099 - Dashboards Genéricos
+    bloqueia: []
+catalog:
+  crud:
+  - id: RF-CRUD-01
+    title: Listar dashboards disponíveis
+    required: true
+    uc: UC00
+  - id: RF-CRUD-02
+    title: Visualizar dashboard C-Level
+    required: true
+    uc: UC01
+  - id: RF-CRUD-03
+    title: Visualizar dashboard Custos
+    required: true
+    uc: UC02
+  - id: RF-CRUD-04
+    title: Visualizar dashboard Compliance
+    required: true
+    uc: UC03
+  - id: RF-CRUD-05
+    title: Visualizar dashboard Performance
+    required: true
+    uc: UC04
+  validacoes:
+  - id: RF-VAL-01
+    title: Validar permissões RBAC em cada acesso
+    required: true
+  - id: RF-VAL-02
+    title: Validar R² >= 0.85 para forecast
+    required: true
+  - id: RF-VAL-03
+    title: Validar histórico >= 12 meses para forecast
+    required: true
+  seguranca:
+  - id: RF-SEC-01
+    title: Isolamento de tenant (ClienteId)
+    required: true
+  - id: RF-SEC-02
+    title: Permissões RBAC em todos endpoints
+    required: true
+  - id: RF-SEC-03
+    title: Auditoria completa de acessos (RF004)
+    required: true
+  - id: RF-SEC-04
+    title: Retenção 5 anos (LGPD)
+    required: true
+exclusions:
+  rf_items:
+  - Dashboards customizados por usuário (usar RF099)
+  - Criação de KPIs novos (usar RF093)
+  - Agendamento email (roadmap futuro)
+historico:
+- versao: '2.0'
+  data: '2025-12-31'
+  autor: Claude Code (Agente Architect)
+  descricao: 'Migração v1.0 → v2.0: Separação RF/RL completa, contrato funcional moderno
+    sem legado, estrutura YAML alinhada com template oficial'
+- versao: '1.0'
+  data: '2025-12-28'
+  autor: Claude Code
+  descricao: Versão inicial com regras, endpoints, integrações (incluía referências
+    ao legado)

@@ -1,0 +1,580 @@
+# RF099.yaml - Dashboards e KPIs (Estruturado)
+# Sincronizado 100% com RF099.md v2.0
+
+rf_id: RF099
+versao: "2.0"
+data: "2025-12-31"
+autor: "Agência ALC - alc.dev.br"
+epic: EPIC008-SD-Service-Desk
+fase: Fase-5-Service-Desk
+titulo: Dashboards e KPIs
+status: em_desenvolvimento
+
+# === ESCOPO ===
+escopo:
+  dentro:
+    - item: "Dashboards Configuráveis"
+      descricao: "Criação de dashboards com 4-12 widgets drag-and-drop"
+    - item: "Widgets Interativos"
+      descricao: "Gráficos (linha, barra, pizza, gauge), tabelas, scorecards com semáforo"
+    - item: "KPIs Estruturados"
+      descricao: "Definição de KPIs com fórmula de cálculo (SUM, AVG, COUNT, MAX, MIN, PERCENTAGE)"
+    - item: "Metas Configuráveis"
+      descricao: "Configuração de metas por KPI com validade temporal e segmentação"
+    - item: "Alertas Automatizados"
+      descricao: "Sistema de alertas com limites configuráveis (amarelo 80%, vermelho 60%)"
+    - item: "Refresh Real-Time"
+      descricao: "Atualização automática via SignalR a cada 30 segundos"
+    - item: "Filtros Dinâmicos"
+      descricao: "Segmentação por período, cliente, filial, centro de custo, status"
+    - item: "Drill-Down Interativo"
+      descricao: "Navegação hierárquica com filtros automáticos"
+    - item: "Scorecards com Semáforo"
+      descricao: "Indicadores visuais Verde/Amarelo/Vermelho"
+    - item: "Comparativos Temporais"
+      descricao: "Análise mês vs mês, ano vs ano com variação percentual"
+    - item: "Export Multi-Formato"
+      descricao: "PDF (com logo cliente), Excel (múltiplas abas), Power BI API"
+    - item: "Dashboard Types"
+      descricao: "Executivo (C-Level), Operacional (Gerentes), Departamental (Times), Pessoal (Analistas)"
+    - item: "Auditoria Completa"
+      descricao: "Registro de acessos, exports, alertas com retenção 7 anos"
+    - item: "Permissões Granulares"
+      descricao: "RBAC por tipo de dashboard (executivo:read, operacional:configure)"
+
+  fora:
+    - item: "Predição de KPIs"
+      motivo: "Machine Learning para prever tendências (futuro)"
+    - item: "Integração com DataWarehouse"
+      motivo: "ETL complexo de múltiplas fontes (fase posterior)"
+    - item: "Custom Chart Types"
+      motivo: "Criação de tipos de gráfico personalizados pelo usuário"
+    - item: "Dashboard Sharing Externo"
+      motivo: "Compartilhamento de dashboards com usuários fora do sistema"
+    - item: "Historical Data Migration"
+      motivo: "Migração histórica de dados de dashboards legados"
+
+# === REGRAS DE NEGÓCIO ===
+regras_negocio:
+  - codigo: RN-RF099-001
+    titulo: "Dashboard deve ter no mínimo 4 widgets"
+    descricao: "Dashboard válido contém mínimo 4 widgets. Máximo 12 widgets para não sobrecarregar interface"
+    criticidade: IMPORTANTE
+    validacao: "Command CreateDashboardCommand valida widget count entre 4-12"
+    http_code: 400
+    error_code: "Dashboard_InvalidWidgetCount"
+
+  - codigo: RN-RF099-002
+    titulo: "KPI deve ter fórmula de cálculo definida"
+    descricao: "Cada KPI é associado a fórmula de cálculo (SUM, AVG, COUNT, MAX, MIN, PERCENTAGE) com entidade origem, campo, filtros"
+    criticidade: CRÍTICA
+    validacao: "Entity KpiFormulaEntity valida campos obrigatórios"
+    http_code: 400
+    error_code: "KPI_InvalidFormula"
+
+  - codigo: RN-RF099-003
+    titulo: "Meta de KPI deve ser configurável"
+    descricao: "Meta de KPI (target value) configurável por usuário com permissão dashboard:kpi:configure. Meta varia por período e cliente"
+    criticidade: IMPORTANTE
+    validacao: "Command ConfigureKpiMetaCommand valida meta > 0"
+    http_code: 403
+    error_code: "dashboard:kpi:configure"
+
+  - codigo: RN-RF099-004
+    titulo: "Alertas disparam quando KPI < 80% da meta (amarelo) ou < 60% (vermelho)"
+    descricao: "Sistema monitora KPIs em tempo real. 80% meta = alerta amarelo, 60% = vermelho crítico. Alertas via email, SMS ou dashboard"
+    criticidade: ALTA
+    validacao: "BackgroundService MonitorKpiAlertsBackgroundService executa a cada 30s"
+    http_code: null
+    error_code: null
+
+  - codigo: RN-RF099-005
+    titulo: "Refresh automático a cada 30 segundos via SignalR"
+    descricao: "Dashboard atualiza automaticamente via WebSocket (SignalR). Não há polling HTTP. Conexão ao entrar, desconexão ao sair"
+    criticidade: ALTA
+    validacao: "DashboardHub + DashboardRefreshService"
+    http_code: null
+    error_code: null
+
+  - codigo: RN-RF099-006
+    titulo: "Export para PDF deve incluir logo do cliente"
+    descricao: "Export PDF inclui logo da empresa cliente (dinâmico), data/hora, usuário exportador, dados, filtros. PDF salvo no Azure Blob Storage"
+    criticidade: IMPORTANTE
+    validacao: "Command ExportDashboardPdfCommand valida ClienteId"
+    http_code: 403
+    error_code: "dashboard:export:pdf"
+
+  - codigo: RN-RF099-007
+    titulo: "Drill-down deve filtrar automaticamente próximo nível"
+    descricao: "Usuário clica em elemento de gráfico, sistema aplica filtro automático para próximo nível de detalhe. Filtro preservado na URL"
+    criticidade: MÉDIA
+    validacao: "Query DrillDownDashboardQuery valida DrillDownLevel < 4"
+    http_code: 404
+    error_code: "Widget_NotFound"
+
+  - codigo: RN-RF099-008
+    titulo: "Multi-tenancy obrigatório (ClienteId em filtros)"
+    descricao: "Toda operação valida ClienteId do usuário vs ClienteId do dashboard. Filtros dinâmicos intersectados com dados de acesso do usuário"
+    criticidade: CRÍTICA
+    validacao: "Middleware DashboardAuthorizationMiddleware + Query handlers"
+    http_code: 403
+    error_code: "TENANT_MISMATCH"
+
+  - codigo: RN-RF099-009
+    titulo: "Auditoria de acesso a dashboards sensíveis"
+    descricao: "Acesso a dashboards sensíveis auditado. Registra: usuário, timestamp, IP, dashboard, dados exportados, alertas. Retenção 7 anos LGPD"
+    criticidade: CRÍTICA
+    validacao: "DashboardAccessAuditAttribute + DashboardAccessAuditInterceptor"
+    http_code: null
+    error_code: null
+
+  - codigo: RN-RF099-010
+    titulo: "Permissão granular por dashboard"
+    descricao: "Permissions granulares. Cada dashboard tipo tem permissão própria: dashboard:executivo:read (C-Level), dashboard:operacional:read (Gerentes)"
+    criticidade: CRÍTICA
+    validacao: "IAuthorizationService valida permissão específica por tipo"
+    http_code: 403
+    error_code: "permission específica"
+
+# === PERMISSÕES RBAC ===
+permissoes_rbac:
+  - permission_code: "dashboard:executivo:read"
+    descricao: "Visualizar Dashboard Executivo"
+    roles_autorizadas:
+      - CEO
+      - Director
+      - VP
+    endpoints:
+      - "GET /api/dashboards/executivo"
+      - "GET /api/dashboards/{id} (se type=Executivo)"
+
+  - permission_code: "dashboard:executivo:configure"
+    descricao: "Configurar Dashboard Executivo"
+    roles_autorizadas:
+      - CEO
+      - VP
+    endpoints:
+      - "PUT /api/dashboards/{id} (se type=Executivo)"
+
+  - permission_code: "dashboard:operacional:read"
+    descricao: "Visualizar Dashboard Operacional"
+    roles_autorizadas:
+      - Director
+      - Manager
+      - Supervisor
+    endpoints:
+      - "GET /api/dashboards/operacional"
+
+  - permission_code: "dashboard:operacional:configure"
+    descricao: "Configurar Dashboard Operacional"
+    roles_autorizadas:
+      - Manager
+    endpoints:
+      - "PUT /api/dashboards/{id} (se type=Operacional)"
+
+  - permission_code: "dashboard:departamental:read"
+    descricao: "Visualizar Dashboard Departamental"
+    roles_autorizadas:
+      - TeamLead
+      - Analyst
+    endpoints:
+      - "GET /api/dashboards (filter type=Departamental)"
+
+  - permission_code: "dashboard:departamental:configure"
+    descricao: "Configurar Dashboard Departamental"
+    roles_autorizadas:
+      - TeamLead
+    endpoints:
+      - "PUT /api/dashboards/{id} (se type=Departamental)"
+
+  - permission_code: "dashboard:pessoal:read"
+    descricao: "Visualizar Dashboards Pessoais"
+    roles_autorizadas:
+      - All
+    endpoints:
+      - "GET /api/dashboards (filter type=Pessoal)"
+
+  - permission_code: "dashboard:pessoal:create"
+    descricao: "Criar novo Dashboard Pessoal"
+    roles_autorizadas:
+      - All
+    endpoints:
+      - "POST /api/dashboards (type=Pessoal)"
+
+  - permission_code: "dashboard:export:pdf"
+    descricao: "Exportar Dashboard como PDF"
+    roles_autorizadas:
+      - Manager
+      - Director
+      - VP
+      - CEO
+    endpoints:
+      - "POST /api/dashboards/{id}/export/pdf"
+
+  - permission_code: "dashboard:export:excel"
+    descricao: "Exportar Dashboard como Excel"
+    roles_autorizadas:
+      - Manager
+      - Director
+      - VP
+      - CEO
+    endpoints:
+      - "POST /api/dashboards/{id}/export/excel"
+
+  - permission_code: "dashboard:alert:create"
+    descricao: "Criar alertas de KPI"
+    roles_autorizadas:
+      - Manager
+      - Director
+    endpoints:
+      - "POST /api/alerts"
+
+  - permission_code: "dashboard:alert:receive"
+    descricao: "Receber notificações de alerta"
+    roles_autorizadas:
+      - Manager
+      - Director
+      - VP
+      - CEO
+    endpoints:
+      - "N/A (email/SMS notification)"
+
+  - permission_code: "dashboard:kpi:read"
+    descricao: "Visualizar definições de KPI"
+    roles_autorizadas:
+      - Manager
+      - Director
+      - VP
+      - CEO
+    endpoints:
+      - "GET /api/kpis"
+
+  - permission_code: "dashboard:kpi:configure"
+    descricao: "Configurar KPIs e metas"
+    roles_autorizadas:
+      - VP
+      - Director
+    endpoints:
+      - "POST /api/kpis"
+      - "PUT /api/kpis/{id}/meta"
+
+  - permission_code: "dashboard:widget:edit"
+    descricao: "Mover/editar widgets"
+    roles_autorizadas:
+      - Dashboard Owner
+    endpoints:
+      - "POST /api/dashboards/{id}/widgets/{widgetId}/position"
+      - "DELETE /api/dashboards/{id}/widgets/{widgetId}"
+
+# === ENDPOINTS ===
+endpoints:
+  - method: GET
+    path: "/api/dashboards"
+    descricao: "Listar dashboards do cliente"
+    permission: "dashboard:*:read"
+    response_type: "DashboardListResponse"
+
+  - method: GET
+    path: "/api/dashboards/{id}"
+    descricao: "Obter dashboard por ID"
+    permission: "dashboard:{type}:read"
+    response_type: "DashboardResponse"
+
+  - method: POST
+    path: "/api/dashboards"
+    descricao: "Criar novo dashboard"
+    permission: "dashboard:pessoal:create"
+    request_type: "CreateDashboardCommand"
+    response_type: "DashboardResponse"
+
+  - method: PUT
+    path: "/api/dashboards/{id}"
+    descricao: "Atualizar dashboard"
+    permission: "dashboard:{type}:configure"
+    request_type: "UpdateDashboardCommand"
+    response_type: "DashboardResponse"
+
+  - method: DELETE
+    path: "/api/dashboards/{id}"
+    descricao: "Excluir dashboard"
+    permission: "dashboard:{type}:configure"
+    response_type: "void"
+
+  - method: GET
+    path: "/api/dashboards/{id}/data"
+    descricao: "Obter dados atualizados do dashboard"
+    permission: "dashboard:{type}:read"
+    response_type: "DashboardDataResponse"
+
+  - method: GET
+    path: "/api/dashboards/{id}/widgets/{widgetId}/drill-down"
+    descricao: "Detalhar widget (drill-down)"
+    permission: "dashboard:{type}:read"
+    response_type: "DrillDownResponse"
+
+  - method: POST
+    path: "/api/dashboards/{id}/export/pdf"
+    descricao: "Exportar como PDF com branding"
+    permission: "dashboard:export:pdf"
+    request_type: "ExportDashboardPdfCommand"
+    response_type: "ExportResponse"
+
+  - method: POST
+    path: "/api/dashboards/{id}/export/excel"
+    descricao: "Exportar como Excel"
+    permission: "dashboard:export:excel"
+    request_type: "ExportDashboardExcelCommand"
+    response_type: "ExportResponse"
+
+  - method: GET
+    path: "/api/dashboards/{id}/alerts"
+    descricao: "Obter alertas ativos do dashboard"
+    permission: "dashboard:alert:read"
+    response_type: "AlertListResponse"
+
+  - method: POST
+    path: "/api/dashboards/{id}/widgets/{widgetId}/position"
+    descricao: "Reposicionar widget (drag-and-drop)"
+    permission: "dashboard:{type}:configure"
+    request_type: "RepositionWidgetCommand"
+    response_type: "void"
+
+  - method: DELETE
+    path: "/api/dashboards/{id}/widgets/{widgetId}"
+    descricao: "Remover widget"
+    permission: "dashboard:{type}:configure"
+    response_type: "void"
+
+  - method: POST
+    path: "/api/dashboards/{id}/subscribe"
+    descricao: "Subscrever a updates via SignalR"
+    permission: "dashboard:{type}:read"
+    response_type: "void"
+
+  - method: GET
+    path: "/api/kpis"
+    descricao: "Listar KPIs disponíveis"
+    permission: "dashboard:kpi:read"
+    response_type: "KpiListResponse"
+
+  - method: POST
+    path: "/api/kpis"
+    descricao: "Criar novo KPI"
+    permission: "dashboard:kpi:configure"
+    request_type: "CreateKpiCommand"
+    response_type: "KpiResponse"
+
+  - method: PUT
+    path: "/api/kpis/{id}/meta"
+    descricao: "Configurar meta de KPI"
+    permission: "dashboard:kpi:configure"
+    request_type: "ConfigureKpiMetaCommand"
+    response_type: "KpiMetaResponse"
+
+  - method: POST
+    path: "/api/alerts/{id}/acknowledge"
+    descricao: "Reconhecer alerta"
+    permission: "dashboard:alert:read"
+    request_type: "AcknowledgeAlertCommand"
+    response_type: "void"
+
+  - method: GET
+    path: "/api/dashboards/executivo"
+    descricao: "Dashboard executivo (atalho)"
+    permission: "dashboard:executivo:read"
+    response_type: "ExecutiveDashboardResponse"
+
+  - method: GET
+    path: "/api/dashboards/operacional"
+    descricao: "Dashboard operacional (atalho)"
+    permission: "dashboard:operacional:read"
+    response_type: "OperationalDashboardResponse"
+
+# === KPIs ===
+kpis:
+  - codigo: "KPI-DSH-001"
+    nome: "SLA Geral"
+    meta: "95%"
+    medicao: "(Chamados resolvidos no SLA / Total chamados) * 100"
+    unidade: "%"
+
+  - codigo: "KPI-DSH-002"
+    nome: "Tempo Médio Resolução"
+    meta: "4h"
+    medicao: "AVG(DataFechamento - DataAbertura)"
+    unidade: "horas"
+
+  - codigo: "KPI-DSH-003"
+    nome: "Taxa de Resolução"
+    meta: "90%"
+    medicao: "(Chamados Resolvidos / Total Chamados) * 100"
+    unidade: "%"
+
+  - codigo: "KPI-DSH-004"
+    nome: "Custo por Cliente"
+    meta: "Variável"
+    medicao: "SUM(Custo) / COUNT(Clientes)"
+    unidade: "reais"
+
+  - codigo: "KPI-DSH-005"
+    nome: "Taxa de Compliance"
+    meta: "98%"
+    medicao: "(Registros auditados OK / Total registros) * 100"
+    unidade: "%"
+
+  - codigo: "KPI-DSH-006"
+    nome: "Disponibilidade Sistema"
+    meta: "99.9%"
+    medicao: "(Tempo ativo / Tempo total) * 100"
+    unidade: "%"
+
+  - codigo: "KPI-DSH-007"
+    nome: "Alertas Atendidos"
+    meta: "100%"
+    medicao: "Alertas reconhecidos em < 1h"
+    unidade: "%"
+
+# === ALERTAS ===
+alertas:
+  - codigo: "ALERT-DSH-001"
+    titulo: "SLA em Risco (Amarelo)"
+    condicao: "SLA < 80% da meta"
+    acao: "Email para Manager"
+
+  - codigo: "ALERT-DSH-002"
+    titulo: "SLA Crítico (Vermelho)"
+    condicao: "SLA < 60% da meta"
+    acao: "Email + SMS para Director"
+
+  - codigo: "ALERT-DSH-003"
+    titulo: "Tempo Resolução Alto"
+    condicao: "Tempo médio > 80% da meta"
+    acao: "Notificação Dashboard"
+
+  - codigo: "ALERT-DSH-004"
+    titulo: "Custo Elevado"
+    condicao: "Custo por cliente > 110% do budget"
+    acao: "Email para CFO"
+
+# === INTEGRAÇÕES OBRIGATÓRIAS ===
+integracoes_obrigatorias:
+  - sistema: "Central de Funcionalidades"
+    feature_flags:
+      - feature_key: "DASHBOARD_REALTIME_REFRESH"
+        nome: "Refresh Real-Time"
+        descricao: "Habilita atualização automática via SignalR a cada 30s"
+        default: true
+      - feature_key: "DASHBOARD_ALERTS_ENABLED"
+        nome: "Alertas de KPI"
+        descricao: "Habilita sistema de alertas quando KPI sai de meta"
+        default: true
+      - feature_key: "DASHBOARD_EXPORT_PDF"
+        nome: "Export PDF"
+        descricao: "Permite export de dashboards como PDF com branding"
+        default: true
+
+  - sistema: "i18n (Transloco)"
+    namespace: "dashboard.*"
+    chaves_principais:
+      - "dashboard.menu.dashboards"
+      - "dashboard.menu.createDashboard"
+      - "dashboard.executivo.title"
+      - "dashboard.operacional.title"
+      - "dashboard.widgets.refresh"
+      - "dashboard.widgets.export_pdf"
+      - "dashboard.filters.period"
+      - "dashboard.alerts.alert_title"
+      - "dashboard.alerts.level_green"
+      - "dashboard.alerts.level_yellow"
+      - "dashboard.alerts.level_red"
+      - "dashboard.validation.required_widgets"
+
+  - sistema: "Auditoria"
+    operacoes:
+      - "DASHBOARD_ACCESS"
+      - "DASHBOARD_CREATE"
+      - "DASHBOARD_UPDATE"
+      - "DASHBOARD_DELETE"
+      - "DASHBOARD_EXPORT_PDF"
+      - "DASHBOARD_EXPORT_EXCEL"
+      - "ALERT_TRIGGERED"
+      - "KPI_CONFIGURE"
+      - "WIDGET_ADDED"
+      - "WIDGET_REMOVED"
+    retencao: "7 anos (LGPD Lei 13.709/2018)"
+
+  - sistema: "RBAC"
+    total_permissoes: 15
+    granularidade: "Por tipo de dashboard (executivo, operacional, departamental, pessoal)"
+
+# === ESTADOS ===
+estados:
+  dashboard:
+    - codigo: "DRAFT"
+      descricao: "Dashboard criado mas não publicado"
+    - codigo: "ACTIVE"
+      descricao: "Dashboard publicado e visível"
+    - codigo: "ARCHIVED"
+      descricao: "Dashboard arquivado (soft delete)"
+
+  kpi:
+    - codigo: "CONFIGURED"
+      descricao: "KPI com fórmula definida e meta ativa"
+    - codigo: "INACTIVE"
+      descricao: "KPI temporariamente desabilitado"
+
+  alert:
+    - codigo: "ACTIVE"
+      descricao: "Alerta disparado e não reconhecido"
+    - codigo: "ACKNOWLEDGED"
+      descricao: "Alerta reconhecido por usuário"
+    - codigo: "RESOLVED"
+      descricao: "Condição que gerou alerta foi resolvida"
+
+# === EVENTOS DE DOMÍNIO ===
+eventos_dominio:
+  - evento: "DashboardCreated"
+    descricao: "Dashboard criado por usuário"
+  - evento: "DashboardPublished"
+    descricao: "Dashboard transicionou de DRAFT → ACTIVE"
+  - evento: "WidgetAdded"
+    descricao: "Widget adicionado ao dashboard"
+  - evento: "WidgetRemoved"
+    descricao: "Widget removido do dashboard"
+  - evento: "KpiMetaConfigured"
+    descricao: "Meta de KPI foi alterada"
+  - evento: "AlertTriggered"
+    descricao: "Alerta disparado (amarelo ou vermelho)"
+  - evento: "AlertAcknowledged"
+    descricao: "Alerta reconhecido por usuário"
+  - evento: "DashboardExported"
+    descricao: "Dashboard exportado como PDF/Excel"
+
+# === DEPENDÊNCIAS ===
+dependencias:
+  entrada:
+    - rf: RF-053
+      descricao: "Solicitações e Chamados (fonte de dados para KPIs)"
+    - rf: RF-006
+      descricao: "Gestão de Usuários (autenticação/autorização)"
+    - rf: RF-007
+      descricao: "Gestão de Perfis de Acesso (RBAC)"
+    - rf: RF-008
+      descricao: "Gestão de Empresas e Filiais (multi-tenancy, filtros)"
+
+  saida:
+    - rf: RF-100
+      descricao: "Relatórios Service Desk (usa dashboards como fonte)"
+    - rf: RF-101
+      descricao: "Analytics Avançado (integra com KPIs de dashboards)"
+
+# === METADADOS ===
+metadados:
+  total_rns: 10
+  total_endpoints_api: 19
+  total_permissoes_rbac: 15
+  total_integracoes_obrigatorias: 4
+  total_kpis: 7
+  total_alertas: 4
+  total_estados: 7
+  total_eventos_dominio: 8

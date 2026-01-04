@@ -1,0 +1,698 @@
+# RF006.yaml - Gestão de Clientes (Multi-Tenancy SaaS)
+# Versão: 2.0
+# Data: 2025-12-29
+# Governança: RF-UC-RL v2.0
+
+rf_id: RF006
+titulo: "Gestão de Clientes (Multi-Tenancy SaaS)"
+epic: "EPIC001-SYS-Sistema-Infraestrutura"
+fase: "Fase-1-Sistema-Base"
+versao: "2.0"
+data_criacao: "2025-12-29"
+responsavel: "Architect Agent"
+
+# =============================================================================
+# VISÃO GERAL
+# =============================================================================
+
+resumo_executivo: |
+  Cliente representa a empresa que assinou a plataforma IControlIT e é a raiz
+  da hierarquia organizacional do sistema SaaS multi-tenant. Cada Cliente possui
+  isolamento total de dados via Row-Level Security (EF Core Query Filters).
+
+  No legado: 18 bancos SQL Server isolados (Alpargatas, Vale, Bombril, etc.).
+  No moderno: 1 banco único com ClienteId como discriminador de tenant.
+
+objetivos:
+  - id: "O01"
+    descricao: "Permitir que Super Admins criem novos Clientes em < 5 minutos"
+  - id: "O02"
+    descricao: "Garantir isolamento total via Row-Level Security"
+  - id: "O03"
+    descricao: "Automatizar preenchimento via ReceitaWS API"
+  - id: "O04"
+    descricao: "Validar CNPJ com dígitos verificadores no backend"
+  - id: "O05"
+    descricao: "Upload de logo corporativo para white-label"
+  - id: "O06"
+    descricao: "Soft delete obrigatório (preservar auditoria)"
+  - id: "O07"
+    descricao: "Bloquear usuários ao desativar Cliente"
+  - id: "O08"
+    descricao: "Auditoria completa com retenção 7 anos (LGPD)"
+  - id: "O09"
+    descricao: "RBAC restrito a Super Admins"
+  - id: "O10"
+    descricao: "Uptime 99.9% sem data leakage cross-tenant"
+
+# =============================================================================
+# REGRAS DE NEGÓCIO (10 RNs)
+# =============================================================================
+
+regras_negocio:
+  total_rns: 10
+  regras:
+    - id: "RN-CLI-006-01"
+      titulo: "Cliente como Tenant Raiz"
+      descricao: "ClienteId é discriminador de tenant obrigatório em TODAS as entidades"
+      tipo: "obrigatoria"
+      criticidade: "CRÍTICA"
+      justificativa: "Base do multi-tenancy seguro - previne data leakage cross-tenant"
+      implementacao:
+        - "EF Core Query Filters globais aplicados via IClienteEntity"
+        - "Super Admin bypass: IsSuperAdmin = true → ignora filtro ClienteId"
+        - "Validação: ClienteId NOT NULL em todas tabelas de negócio"
+      validacoes:
+        - tipo: "query_filter"
+          sql: "SELECT * FROM Empresas → WHERE ClienteId = @CurrentClienteId"
+        - tipo: "super_admin_bypass"
+          sql: "Super Admin → SEM filtro ClienteId (visão global)"
+      alertas:
+        - nivel: "CRITICAL"
+          condicao: "Query retorna dados de ClienteId diferente"
+          acao: "Parar sistema, investigar bypass, notificar CISO"
+
+    - id: "RN-CLI-006-02"
+      titulo: "CNPJ Único por Cliente"
+      descricao: "Não pode existir mais de um Cliente com mesmo CNPJ"
+      tipo: "obrigatoria"
+      criticidade: "ALTA"
+      justificativa: "CNPJ é identificador único legal - duplicidade causa problemas fiscais"
+      implementacao:
+        - "Unique constraint no banco: IX_Cliente_CNPJ_Unique"
+        - "FluentValidation: BeUniqueCnpj async"
+        - "Race condition: constraint bloqueia segundo INSERT"
+      validacoes:
+        - tipo: "unique_constraint"
+          sql: "CREATE UNIQUE INDEX IX_Cliente_CNPJ_Unique ON Cliente(CNPJ)"
+      exemplos:
+        - valido: "Cliente A: CNPJ 33.592.510/0001-54 (Vale)"
+        - invalido: "Cliente B: CNPJ 33.592.510/0001-54 → HTTP 400"
+
+    - id: "RN-CLI-006-03"
+      titulo: "Validação de Dígitos Verificadores do CNPJ"
+      descricao: "Validar dígitos usando algoritmo oficial Receita Federal"
+      tipo: "obrigatoria"
+      criticidade: "ALTA"
+      justificativa: "Previne erros de digitação e CNPJs falsos"
+      implementacao:
+        - "CnpjValidator.IsValid() com algoritmo oficial"
+        - "Rejeita CNPJs inválidos: 11111111111111, 00000000000000"
+        - "FluentValidation: .Must(CnpjValidator.IsValid)"
+      algoritmo:
+        primeiro_digito:
+          multiplicadores: [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+          formula: "soma % 11 → resto < 2 ? 0 : 11 - resto"
+        segundo_digito:
+          multiplicadores: [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+          formula: "soma % 11 → resto < 2 ? 0 : 11 - resto"
+      exemplos:
+        - valido: "33.592.510/0001-54 (dígitos 5 e 4 corretos)"
+        - invalido: "33.592.510/0001-00 (dígitos incorretos)"
+        - invalido: "11111111111111 (todos iguais)"
+
+    - id: "RN-CLI-006-04"
+      titulo: "Razão Social Obrigatória"
+      descricao: "Razão Social obrigatória, 3-200 caracteres, sem espaços vazios"
+      tipo: "obrigatoria"
+      criticidade: "MÉDIA"
+      justificativa: "Nome oficial registrado na Receita Federal"
+      implementacao:
+        - "FluentValidation: NotEmpty, MinLength(3), MaxLength(200)"
+        - "Constraint banco: CHK_Cliente_RazaoSocial_NotEmpty"
+      validacoes:
+        - tipo: "length"
+          min: 3
+          max: 200
+        - tipo: "not_empty"
+          sql: "LEN(LTRIM(RTRIM(RazaoSocial))) >= 3"
+
+    - id: "RN-CLI-006-05"
+      titulo: "Consulta ReceitaWS Automática"
+      descricao: "Consultar API ReceitaWS para preencher dados cadastrais automaticamente"
+      tipo: "obrigatoria"
+      criticidade: "MÉDIA"
+      justificativa: "Reduz erros de digitação em 80%, acelera onboarding"
+      observacao: "Se ReceitaWS indisponível, NÃO bloqueia criação de Cliente"
+      implementacao:
+        - "HttpClient baseAddress: https://www.receitaws.com.br/v1/"
+        - "Endpoint: GET /cnpj/{cnpj}"
+        - "Timeout: 10 segundos"
+        - "Fallback: usuário preenche manualmente"
+      rate_limiting:
+        max_consultas: 3
+        periodo: "1 minuto"
+        por: "usuário"
+      dados_retornados:
+        - "Razão Social (Nome)"
+        - "Nome Fantasia (Fantasia)"
+        - "Endereço completo"
+        - "Telefone"
+        - "Email"
+        - "Situação (ATIVA, BAIXADA, SUSPENSA)"
+
+    - id: "RN-CLI-006-06"
+      titulo: "Upload de Logo com Validação"
+      descricao: "Upload de logo JPG/PNG/SVG (max 2MB) para Azure Blob Storage"
+      tipo: "obrigatoria"
+      criticidade: "MÉDIA"
+      justificativa: "White-label para cada Cliente"
+      implementacao:
+        - "Formatos permitidos: .jpg, .jpeg, .png, .svg"
+        - "Tamanho máximo: 2MB (2.097.152 bytes)"
+        - "Validação magic bytes (prevenir .exe renomeado)"
+        - "Azure Blob: container clientes-logos, PublicAccessType.Blob"
+      magic_bytes:
+        PNG: "89 50 4E 47 0D 0A 1A 0A"
+        JPG: "FF D8 FF"
+        SVG: "3C 73 76 67 (\"<svg\")"
+      seguranca:
+        - "Validação magic bytes (não apenas extensão)"
+        - "Alerta CRITICAL se .exe detectado"
+        - "Registro IP do usuário"
+
+    - id: "RN-CLI-006-07"
+      titulo: "Soft Delete Obrigatório"
+      descricao: "Exclusão lógica via FlExcluido = true, DELETE físico bloqueado"
+      tipo: "obrigatoria"
+      criticidade: "CRÍTICA"
+      justificativa: "Compliance LGPD - retenção auditoria 7 anos"
+      implementacao:
+        - "Soft delete: UPDATE Cliente SET FlExcluido = 1"
+        - "Query Filter: WHERE !FlExcluido"
+        - "Trigger: INSTEAD OF DELETE → RAISERROR"
+      beneficios:
+        - "Restauração de exclusão acidental"
+        - "Preserva integridade referencial"
+        - "Auditoria intacta"
+        - "Análises retroativas"
+      validacoes:
+        - tipo: "trigger"
+          sql: "CREATE TRIGGER trg_Cliente_PreventPhysicalDelete INSTEAD OF DELETE"
+
+    - id: "RN-CLI-006-08"
+      titulo: "Super Admin Bypass de Multi-Tenancy"
+      descricao: "Super Admins veem TODOS os Clientes (ignora Query Filter)"
+      tipo: "obrigatoria"
+      criticidade: "ALTA"
+      justificativa: "Administração plataforma SaaS, suporte cross-tenant"
+      implementacao:
+        - "Query Filter: IsSuperAdmin OR ClienteId == CurrentClienteId"
+        - "Authorization Policy: SuperAdminOnly"
+      restricoes:
+        - "Apenas Super Admins têm bypass"
+        - "Admins de Cliente NÃO têm acesso cross-tenant"
+
+    - id: "RN-CLI-006-09"
+      titulo: "Desativação de Cliente Bloqueia Usuários"
+      descricao: "Ao desativar Cliente, TODOS os usuários vinculados são bloqueados"
+      tipo: "obrigatoria"
+      criticidade: "CRÍTICA"
+      justificativa: "Proteção de dados, cancelamento de contrato"
+      implementacao:
+        - "Se FlAtivo: true → false, então:"
+        - "  1. Buscar todos usuarios WHERE ClienteId = Id"
+        - "  2. Marcar Usuario.FlAtivo = false"
+        - "  3. Definir MotivoInativacao = \"Cliente desativado\""
+        - "  4. Registrar CLI_DEACTIVATE_USERS"
+      cenarios:
+        - cancelamento_contrato: "Bloqueia acesso imediato"
+        - pendencias_financeiras: "Proteção até regularização"
+        - reativacao: "Usuários NÃO reativados automaticamente (manual)"
+
+    - id: "RN-CLI-006-10"
+      titulo: "Auditoria de Operações de Cliente"
+      descricao: "TODAS as operações registradas em AuditLog (retenção 7 anos)"
+      tipo: "obrigatoria"
+      criticidade: "CRÍTICA"
+      justificativa: "Compliance LGPD Art. 16, ISO 27001"
+      implementacao:
+        - "AuditInterceptor: SaveChangesAsync"
+        - "EntityState: Added → CLI_CREATE"
+        - "EntityState: Modified → CLI_UPDATE"
+        - "EntityState: Deleted → CLI_DELETE"
+      operacoes_auditadas:
+        - codigo: "CLI_CREATE"
+          dados: "CNPJ, Razão Social, Usuário, Timestamp, IP"
+        - codigo: "CLI_UPDATE"
+          dados: "Campos alterados (before/after), Usuário, Timestamp"
+        - codigo: "CLI_DELETE"
+          dados: "CNPJ, Razão Social, Usuário, Timestamp"
+        - codigo: "CLI_LOGO_UPLOAD"
+          dados: "Nome arquivo, Tamanho, URL, Usuário"
+        - codigo: "CLI_DEACTIVATE_USERS"
+          dados: "Quantidade usuários, Motivo"
+        - codigo: "CLI_RECEITA_QUERY"
+          dados: "CNPJ consultado, Sucesso/Falha"
+      retencao: "7 anos (LGPD Art. 16)"
+
+# =============================================================================
+# LEGADO
+# =============================================================================
+
+legado:
+  estrategia: "CRIAR_DO_ZERO"
+  motivo: |
+    No legado NÃO existia gestão de Clientes via interface.
+    Cada Cliente tinha banco SQL Server completamente separado (18 bancos).
+    Onboarding era processo manual DBA (criar banco, copiar schema, configurar).
+
+  arquitetura_legado:
+    bancos_isolados: 18
+    exemplos:
+      - nome: "Alpargatas"
+        cnpj: "61.079.117/0001-05"
+      - nome: "Vale"
+        cnpj: "33.592.510/0001-54"
+      - nome: "Bombril"
+        cnpj: "50.248.011/0001-39"
+      - nome: "Anima_Educacao"
+        cnpj: "17.685.925/0001-92"
+      - nome: "Fresenius"
+        cnpj: "49.324.221/0001-04"
+
+  arquitetura_moderna:
+    banco_unico: true
+    discriminador: "ClienteId"
+    isolamento: "Row-Level Security (EF Core Query Filters)"
+    onboarding: "Automatizado < 5 minutos"
+
+  comparacao:
+    - aspecto: "Banco de Dados"
+      legado: "18 bancos SQL Server isolados"
+      moderno: "1 banco único com ClienteId"
+    - aspecto: "Isolamento"
+      legado: "Physical separation"
+      moderno: "Row-Level Security"
+    - aspecto: "Onboarding"
+      legado: "Manual DBA (dias)"
+      moderno: "Automatizado (< 5 minutos)"
+    - aspecto: "Custo Infra"
+      legado: "18+ licenças SQL Server"
+      moderno: "1 licença SQL Server"
+    - aspecto: "Logo"
+      legado: "Arquivo local ~/Images/Clientes/"
+      moderno: "Azure Blob Storage CDN"
+    - aspecto: "ReceitaWS"
+      legado: "NÃO existia"
+      moderno: "Consulta automática API"
+
+# =============================================================================
+# INTEGRAÇÕES
+# =============================================================================
+
+integracoes_obrigatorias:
+  central_funcionalidades:
+    feature_key: "CLIENTES_GESTAO"
+    nome: "Gestão de Clientes"
+    habilitado: true
+    is_system_feature: true
+    modulo: "Administração"
+    rota: "/admin/clientes"
+
+  i18n:
+    namespace: "clientes"
+    total_chaves: 80
+    idiomas: ["pt-BR", "en-US", "es-ES", "fr-FR"]
+    fallback: "pt-BR → en-US → chave não traduzida"
+
+  auditoria:
+    retencao_anos: 7
+    operacoes:
+      - "CLI_CREATE"
+      - "CLI_UPDATE"
+      - "CLI_DELETE"
+      - "CLI_ACCESS"
+      - "CLI_LOGO_UPLOAD"
+      - "CLI_DEACTIVATE_USERS"
+      - "CLI_RECEITA_QUERY"
+
+  apis_externas:
+    receita_ws:
+      url: "https://www.receitaws.com.br/v1/"
+      timeout_segundos: 10
+      rate_limit: "3 consultas/minuto/usuário"
+      nao_bloqueia_criacao: true
+
+    azure_blob:
+      container: "clientes-logos"
+      access_type: "PublicAccessType.Blob"
+      max_file_size_mb: 2
+      formatos_permitidos: ["jpg", "jpeg", "png", "svg"]
+
+# =============================================================================
+# RBAC
+# =============================================================================
+
+permissoes:
+  total: 7
+  lista:
+    - codigo: "clientes:cliente:create"
+      descricao: "Criar novos Clientes"
+      perfis: ["Super Admin"]
+
+    - codigo: "clientes:cliente:read"
+      descricao: "Visualizar lista e detalhes"
+      perfis: ["Super Admin", "Admin do Sistema"]
+      observacao: "Admin do Sistema: somente leitura"
+
+    - codigo: "clientes:cliente:update"
+      descricao: "Editar dados de Clientes"
+      perfis: ["Super Admin"]
+
+    - codigo: "clientes:cliente:delete"
+      descricao: "Desativar Clientes (soft delete)"
+      perfis: ["Super Admin"]
+
+    - codigo: "clientes:cliente:export"
+      descricao: "Exportar lista (CSV/Excel)"
+      perfis: ["Super Admin"]
+
+    - codigo: "clientes:cliente:logo_upload"
+      descricao: "Upload de logo"
+      perfis: ["Super Admin"]
+
+    - codigo: "clientes:cliente:restore"
+      descricao: "Restaurar Cliente excluído"
+      perfis: ["Super Admin"]
+
+matriz_permissoes:
+  - perfil: "Super Admin"
+    create: true
+    read: true
+    update: true
+    delete: true
+    export: true
+    logo_upload: true
+    restore: true
+
+  - perfil: "Admin do Sistema"
+    create: false
+    read: true
+    update: false
+    delete: false
+    export: false
+    logo_upload: false
+    restore: false
+
+  - perfil: "Admin de Cliente"
+    create: false
+    read: false
+    update: false
+    delete: false
+    export: false
+    logo_upload: false
+    restore: false
+
+# =============================================================================
+# API ENDPOINTS
+# =============================================================================
+
+endpoints:
+  crud:
+    - metodo: "GET"
+      path: "/api/clientes"
+      descricao: "Listar Clientes com paginação"
+      permissao: "clientes:cliente:read"
+      query_params:
+        - "page: int (default: 1)"
+        - "pageSize: int (default: 20, max: 100)"
+        - "search: string (CNPJ ou Razão Social)"
+        - "status: string (all|active|inactive)"
+
+    - metodo: "GET"
+      path: "/api/clientes/{id}"
+      descricao: "Obter detalhes por ID"
+      permissao: "clientes:cliente:read"
+
+    - metodo: "POST"
+      path: "/api/clientes"
+      descricao: "Criar novo Cliente"
+      permissao: "clientes:cliente:create"
+      payload: "CreateClienteCommand"
+
+    - metodo: "PUT"
+      path: "/api/clientes/{id}"
+      descricao: "Atualizar dados"
+      permissao: "clientes:cliente:update"
+      payload: "UpdateClienteCommand"
+
+    - metodo: "DELETE"
+      path: "/api/clientes/{id}"
+      descricao: "Desativar (soft delete)"
+      permissao: "clientes:cliente:delete"
+
+  especiais:
+    - metodo: "POST"
+      path: "/api/clientes/{id}/logo"
+      descricao: "Upload de logo"
+      permissao: "clientes:cliente:logo_upload"
+      content_type: "multipart/form-data"
+
+    - metodo: "POST"
+      path: "/api/clientes/{id}/restore"
+      descricao: "Restaurar Cliente excluído"
+      permissao: "clientes:cliente:restore"
+
+    - metodo: "GET"
+      path: "/api/clientes/export"
+      descricao: "Exportar lista (CSV/Excel)"
+      permissao: "clientes:cliente:export"
+
+    - metodo: "POST"
+      path: "/api/clientes/consultar-cnpj"
+      descricao: "Consultar ReceitaWS por CNPJ"
+      permissao: "clientes:cliente:create"
+      payload: "{ cnpj: string }"
+
+    - metodo: "GET"
+      path: "/api/clientes/{id}/usuarios"
+      descricao: "Listar usuários vinculados"
+      permissao: "clientes:cliente:read"
+
+    - metodo: "GET"
+      path: "/api/clientes/{id}/empresas"
+      descricao: "Listar empresas vinculadas"
+      permissao: "clientes:cliente:read"
+
+    - metodo: "GET"
+      path: "/api/clientes/{id}/audit-log"
+      descricao: "Histórico de auditoria"
+      permissao: "clientes:cliente:read"
+
+# =============================================================================
+# MODELO DE DADOS (RESUMO)
+# =============================================================================
+
+modelo_dados:
+  tabela: "Cliente"
+
+  campos_principais:
+    - nome: "Id"
+      tipo: "Guid"
+      pk: true
+    - nome: "CNPJ"
+      tipo: "string(14)"
+      unique: true
+      obrigatorio: true
+    - nome: "RazaoSocial"
+      tipo: "string(200)"
+      obrigatorio: true
+    - nome: "NomeFantasia"
+      tipo: "string(200)"
+      obrigatorio: false
+    - nome: "InscricaoEstadual"
+      tipo: "string(20)"
+      obrigatorio: false
+    - nome: "Email"
+      tipo: "string(100)"
+      obrigatorio: false
+    - nome: "Telefone"
+      tipo: "string(20)"
+      obrigatorio: false
+    - nome: "Site"
+      tipo: "string(200)"
+      obrigatorio: false
+    - nome: "Endereco"
+      tipo: "string(500)"
+      obrigatorio: false
+    - nome: "LogoUrl"
+      tipo: "string(500)"
+      obrigatorio: false
+      fonte: "Azure Blob Storage"
+    - nome: "FlAtivo"
+      tipo: "bool"
+      default: true
+    - nome: "FlExcluido"
+      tipo: "bool"
+      default: false
+
+  indices:
+    - nome: "IX_Cliente_CNPJ_Unique"
+      tipo: "Unique"
+      campos: ["CNPJ"]
+    - nome: "IX_Cliente_FlAtivo"
+      tipo: "Filtered Index"
+    - nome: "IX_Cliente_FlExcluido"
+      tipo: "Filtered Index"
+
+  constraints:
+    - nome: "CHK_Cliente_RazaoSocial_NotEmpty"
+      sql: "LEN(LTRIM(RTRIM(RazaoSocial))) >= 3"
+    - nome: "CHK_Cliente_CNPJ_Length"
+      sql: "LEN(CNPJ) = 14"
+
+  triggers:
+    - nome: "trg_Cliente_PreventPhysicalDelete"
+      tipo: "INSTEAD OF DELETE"
+      acao: "RAISERROR bloqueando DELETE físico"
+
+# =============================================================================
+# DEPENDÊNCIAS
+# =============================================================================
+
+dependencias:
+  pre_requisitos:
+    - rf_id: "RF001"
+      titulo: "Parâmetros e Configurações"
+      status: "implementado"
+    - rf_id: "RF002"
+      titulo: "Logs e Monitoramento"
+      status: "implementado"
+    - rf_id: "RF003"
+      titulo: "Auditoria"
+      status: "implementado"
+      critico: true
+    - rf_id: "RF004"
+      titulo: "Feature Flags"
+      status: "implementado"
+    - rf_id: "RF005"
+      titulo: "i18n"
+      status: "implementado"
+
+  bloqueantes_para:
+    - rf_id: "RF007"
+      titulo: "Gestão de Usuários"
+      motivo: "Precisa de Usuario.ClienteId"
+    - rf_id: "RF008"
+      titulo: "Gestão de Empresas"
+      motivo: "Precisa de Empresa.ClienteId"
+    - rf_id: "RF009"
+      titulo: "Gestão de Filiais"
+      motivo: "Precisa de ClienteId via Empresa"
+
+# =============================================================================
+# MÉTRICAS E KPIs
+# =============================================================================
+
+kpis:
+  - nome: "Tempo de Onboarding de Cliente"
+    meta: "< 5 minutos"
+    medicao: "POST /api/clientes → primeiro login usuário"
+
+  - nome: "Taxa de Sucesso ReceitaWS"
+    meta: "> 95%"
+    medicao: "(Consultas bem-sucedidas / Total) * 100"
+
+  - nome: "Uptime Multi-Tenancy"
+    meta: "99.9%"
+    medicao: "Tempo sem data leakage cross-tenant"
+
+  - nome: "Tempo de Resposta GET /api/clientes"
+    meta: "< 200ms (p95)"
+    medicao: "Percentil 95 de latência"
+
+  - nome: "Taxa de Erro Upload Logo"
+    meta: "< 2%"
+    medicao: "(Uploads falhados / Total uploads) * 100"
+
+alertas_criticos:
+  - nome: "Data Leakage Cross-Tenant"
+    condicao: "Query retorna dados de ClienteId diferente"
+    nivel: "CRITICAL"
+    acao: "Parar sistema, investigar bypass, notificar CISO"
+
+  - nome: "ReceitaWS Indisponível"
+    condicao: "> 10 falhas consecutivas"
+    nivel: "WARNING"
+    acao: "Notificar DevOps, exibir banner frontend"
+
+  - nome: "Upload de Logo Suspeito"
+    condicao: "Arquivo .exe detectado via magic bytes"
+    nivel: "CRITICAL"
+    acao: "Bloquear upload, notificar SecOps, registrar IP"
+
+  - nome: "Soft Delete Trigger Falhou"
+    condicao: "DELETE físico executado sem bloqueio"
+    nivel: "CRITICAL"
+    acao: "Restaurar backup, investigar trigger, notificar DBA"
+
+# =============================================================================
+# CRITÉRIOS DE ACEITE
+# =============================================================================
+
+criterios_aceite:
+  - id: "CA01"
+    descricao: "Criar Cliente com CNPJ válido + ReceitaWS → Dados preenchidos automaticamente"
+
+  - id: "CA02"
+    descricao: "Validar dígitos CNPJ no backend → CNPJ inválido retorna HTTP 400"
+
+  - id: "CA03"
+    descricao: "Rejeitar CNPJ duplicado → HTTP 400 'CNPJ já cadastrado'"
+
+  - id: "CA04"
+    descricao: "Upload logo PNG 1.5MB → Azure Blob Storage → URL retornada"
+
+  - id: "CA05"
+    descricao: "Rejeitar .exe renomeado → Magic bytes detectam → HTTP 400"
+
+  - id: "CA06"
+    descricao: "Desativar Cliente com 150 usuários → 150 bloqueados → Nenhum faz login"
+
+  - id: "CA07"
+    descricao: "Tentar DELETE físico → Trigger bloqueia → RAISERROR"
+
+  - id: "CA08"
+    descricao: "Super Admin visualiza → TODOS os Clientes (18 tenants)"
+
+  - id: "CA09"
+    descricao: "Admin Cliente A tenta GET /api/clientes → HTTP 403 Forbidden"
+
+  - id: "CA10"
+    descricao: "Todas operações em AuditLog → Retenção 7 anos"
+
+# =============================================================================
+# METADADOS
+# =============================================================================
+
+metadados:
+  total_linhas_rf_md: 1365
+  total_secoes: 11
+  total_rns: 10
+  total_permissoes: 7
+  total_endpoints: 13
+  total_kpis: 5
+  total_alertas_criticos: 4
+  total_criterios_aceite: 10
+
+  tecnologias:
+    - "EF Core Query Filters"
+    - "ReceitaWS API"
+    - "Azure Blob Storage"
+    - "FluentValidation"
+    - "CQRS + MediatR"
+    - "Multi-Tenancy SaaS"
+
+  complexidade: "MUITO_ALTA"
+  story_points_estimados: 55
+
+  changelog:
+    - versao: "2.0"
+      data: "2025-12-29"
+      descricao: "Migração para governança v2.0 - formato estruturado YAML"
+      autor: "Architect Agent"
+    - versao: "1.0"
+      data: "2025-12-28"
+      descricao: "Versão inicial"
+      autor: "Architect Agent"

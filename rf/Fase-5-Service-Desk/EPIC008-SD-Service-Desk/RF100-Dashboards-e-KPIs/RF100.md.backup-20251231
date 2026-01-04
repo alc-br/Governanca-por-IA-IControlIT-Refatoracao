@@ -1,0 +1,1673 @@
+# RF-100: Dashboards e KPIs com Análise Preditiva
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF-099 (Dashboards tradicionais) | **EPIC**: EPIC008-SD-Service-Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o módulo de **Dashboards com Análise Preditiva e Machine Learning** do sistema IControlIT, responsável por transformar históricos de dados em inteligência preditiva actionável. O RF100 é uma evolução avançada do RF099, incorporando forecasting, detecção de anomalias, clustering inteligente e recomendações prescritivas via modelos de Machine Learning.
+
+O RF100 implementa a camada de **análise preditiva e recomendações automáticas** utilizando Azure Machine Learning Studio, ML.NET, Prophet (Facebook) e Scikit-learn. O objetivo é permitir que gestores executivos identifiquem tendências futuras, anomalias operacionais em tempo real, riscos de churn de clientes/contratos, e recebam recomendações automáticas para otimização de recursos. Diferentemente de RF099 (métricas passadas), RF100 responde "o que acontecerá e o que fazer".
+
+### 1.2 Importância Estratégica
+
+O módulo de Dashboards Preditivos é crítico para:
+
+- **Previsão de Demanda**: Forecasting de custos de infraestrutura (3, 6, 12 meses), permitindo planejamento orçamentário. Evita surpresas de custos inesperados.
+- **Detecção de Anomalias**: Identifica comportamentos anormais em tempo real (ativos com consumo anômalo, clientes com padrão de uso suspeito, SLA violações iminentes). Trigger automático de investigação.
+- **Análise de Risco**: Churn prediction identifica clientes/contratos em risco de cancelamento com score de precisão >= 70%. Permite retenção proativa.
+- **Otimização Operacional**: Clustering de ativos/usuários identifica segmentos similares, recomendações de consolidação, alocação de recursos. Reduz custo operacional em até 15%.
+- **Conformidade Inteligente**: Análise de correlação entre KPIs identifica violações futuras de compliance, SLA, antes que ocorram.
+- **What-If Analysis**: Gestores testam cenários hipotéticos (aumento de 10% em tickets, redução de equipe em 20%) e veem impacto previsto em custos, SLA, receita.
+
+### 1.3 Conceitos Fundamentais
+
+**Forecasting (Previsão)**: Uso de séries temporais históricas para prever valores futuros. Métodos: ARIMA (Auto-Regressive Integrated Moving Average), Prophet (Facebook), Exponential Smoothing. Entrada: histórico mínimo 12 meses. Saída: série prevista com intervalo de confiança (95%). Exemplo: "Custos em Jan 2026: R$150k ± 8k com 95% confiança".
+
+- **Modelos**: Prophet (para sazonalidade), ARIMA (para tendências), Exponential Smoothing (para variações rápidas)
+- **Métrica de Qualidade**: RMSE (Root Mean Squared Error), MAE (Mean Absolute Error)
+
+**Detecção de Anomalias**: Identificação de pontos de dados que desviam significativamente do padrão esperado. Métodos: Z-score (desvio padrão), Isolation Forest (modelos baseados em árvores), Moving Average Deviation. Threshold configurável (padrão: Z-score > 3 = 99.7% confiança). Exemplo: "Ativo X usou 500 GB em 1 dia (normal: 20 GB) - ANOMALIA detectada".
+
+- **Algoritmos**: Z-score, Isolation Forest, DBSCAN, Local Outlier Factor (LOF)
+- **Threshold Padrão**: Z-score >= 3 (desvio de 3 desvios-padrão)
+
+**Clustering (Agrupamento)**: Particionamento não supervisionado que agrupa dados similares. Métodos: K-means (rápido, sensível a outliers), DBSCAN (identifica ruído), Hierarchical Clustering. Exemplo: "Ativos segmentados em 5 clusters: High-Use (50 ativos, 40% de custos), Medium-Use (150 ativos, 45% custos), Low-Use (300 ativos, 15% custos), Idle (200 ativos, não usados), Over-Provisioned (20 ativos com problema)".
+
+- **Algoritmos**: K-means, DBSCAN, Hierarchical Clustering
+- **Restrições**: Mínimo 3 clusters, máximo 10 (evita fragmentação excessiva)
+
+**Churn Prediction**: Modelo que prediz probabilidade de um cliente/contrato ser cancelado nos próximos 30-90 dias. Features: histórico de pagamentos, tempo de inatividade, taxa de utilização, NPS, suporte tickets abertos. Output: score 0-100 (>70 = risco alto). Exemplo: "Cliente ABC tem 82% de probabilidade de cancelamento em 60 dias (flag: nenhuma transação em 3 meses, NPS=2)".
+
+- **Features**: Recência (ultimo acesso), Frequência (transações/mês), Monetário (valor gasto), NPS, Tickets suporte
+- **Threshold Crítico**: Score >= 70% = risco alto, <= 40% = risco baixo
+
+**What-If Analysis (Análise de Cenários)**: Simulação de impacto de mudanças operacionais em KPIs futuros. Usuário define cenário (aumento de 20% em tickets, redução de 2 pessoas da equipe), sistema prediz impacto em SLA, custos, receita, baseado em modelos treinados. Exemplo: "Se reduzirmos equipe em 1 pessoa: SLA degradará de 94% para 87%, custos economizados R$2k/mês, risco de churn de clientes cresce 12%".
+
+- **Simulações Simultâneas**: Máximo 5 cenários em paralelo
+- **Variáveis Controláveis**: Número de pessoas, limites de SLA, custos, alocação de recursos
+
+**Análise de Tendências**: Decomposição de série temporal em componentes (trend, seasonality, noise). Identifica mudanças de longo prazo, padrões sazonais e anomalias. Exemplo: "Custo total cresce 2% ao mês (trend), spike em novembro (+25%, seasonalidade), variação aleatória ±3%".
+
+- **Componentes**: Tendência (drift), Sazonalidade (padrão periódico), Ruído (variação aleatória)
+
+**Confidence Interval (Intervalo de Confiança)**: Faixa de valores em que a previsão é esperada com certa probabilidade. Exemplo: "Previsão: 100 chamados ± 10 com 95% confiança" = intervalo [90-110] com 95% segurança. Forecast que não cumpre intervalo de confiança é auditado.
+
+- **Padrão**: Mínimo 95% confiança
+- **Cálculo**: Baseado em desvio padrão histórico + erro do modelo
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Previsão de Dados** | Não existe | Forecasting com Prophet/ARIMA + Azure ML Studio |
+| **Detecção de Anomalias** | Regras manuais (se valor > X) | Z-score + Isolation Forest em tempo real |
+| **Clustering** | Não implementado | K-means + DBSCAN automatizado, 3-10 clusters |
+| **Churn Prediction** | Não existe | Modelo treinado com 70%+ precisão, score 0-100 |
+| **What-If Analysis** | Cálculos manuais em Excel | Simulação em tempo real de 5 cenários paralelos |
+| **Análise de Tendências** | Visualização apenas (gráficos) | Decomposição STL (Seasonal Trend Decomposition) |
+| **Retrainamento de Modelos** | N/A | Mensal via Hangfire, validação automática |
+| **Cache de Resultados** | Sem cache (recalcula toda vez) | Redis: 24h cache para queries pesadas |
+| **Integração com Azure ML** | Não existe | Azure Machine Learning Studio + ML.NET |
+| **Confiança em Previsões** | N/A | Intervalos de confiança 95%, métricas RMSE/MAE |
+| **Auditoria de Predições** | Não auditado | Auditoria de todas predições, alterações, retrainamentos |
+
+### 1.5 Funcionalidades Principais
+
+1. **Forecasting Automático** - Previsão de custos (3, 6, 12 meses) usando Prophet com sazonalidade (Nov-Dez picos). Intervalo de confiança 95%, auditado. Backend: Prophet (Python) + Azure ML. Frontend: gráficos interativos com drag para seleção de período.
+
+2. **Detecção de Anomalias em Tempo Real** - Monitor contínuo de KPIs. Se Z-score > 3 (99.7% desvio) ou Isolation Forest detecta outlier, alerta dispara (email, SMS, dashboard notificação). Exemplo: consumo de banda anormalmente alto, ativos offline inesperadamente, SLA violação iminente.
+
+3. **Clustering Inteligente** - Segmentação automática de ativos/usuários em 3-10 clusters. Exemplo: 5 clusters de ativos (High-Use, Medium-Use, Low-Use, Idle, Over-Provisioned). Cada cluster recebe recomendações customizadas (consolidação, descontinuação, expansão).
+
+4. **Churn Prediction** - Modelo com 70%+ precisão que identifica clientes/contratos em risco de cancelamento. Score 0-100 exibido em dashboard com recomendações automáticas de retenção (descontos, upgrade serviço, call de suporte).
+
+5. **What-If Analysis** - Gestor cria cenário (aumento 10% tickets, corte 20% equipe, aumento SLA threshold). Sistema prediz impacto em 3 dimensões: custos (R$), SLA (%), receita (R$). Máximo 5 cenários simultâneos. Resultados cacheados por 1h.
+
+6. **Análise de Tendências com Decomposição** - Série temporal decomposta em trend (mudança longo prazo), seasonality (padrão periódico), ruído. Identifica "custos crescem 2% ao mês, spike em Nov 25%, variação aleatória ±3%". Útil para orçamento e planejamento.
+
+7. **Recomendações Prescritivas** - Sistema analisa padrões e recomenda ações: "Cliente X tem risco 82% churn → ofereça desconto 10%", "Ativos no cluster Idle (200 itens) → descontinue ou realoque", "SLA para P1 degradando → aumente equipe ou otimize processos".
+
+8. **Dashboard Inteligente com Confidence Bands** - Visualização de forecast com banda superior/inferior mostrando intervalo 95% confiança. Cores: verde (dentro intervalo), amarelo (alerta), vermelho (anomalia detectada). Atualizado a cada 24h (cache Redis).
+
+9. **Retreinamento Automático de Modelos** - Job Hangfire executado mensalmente (domingo 02h UTC). Valida métricas do modelo (RMSE, MAE, acurácia). Se performance degrada >5%, flag para revisão. Rastreia versão de cada modelo, histórico de retreinamentos.
+
+10. **Correlação de KPIs** - Análise de correlação Pearson/Spearman entre KPIs. Exemplo: "SLA de resolução correlaciona com número de tickets abertos (r=0.87)" → mais tickets = SLA pior. Ajuda a identificar causa-efeito.
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-DSH-100-01: Forecast Requer Mínimo 12 Meses de Histórico
+
+**Descrição**: Qualquer modelo de forecasting (Prophet, ARIMA, Exponential Smoothing) requer mínimo 12 meses de dados históricos para treinamento. Dados com menos de 12 meses retornam erro 400 "Insufficient Historical Data", nenhuma previsão é gerada.
+
+**Justificativa**: Modelos de séries temporais necessitam capturar padrões sazonais (variações mês a mês, ano a ano). Com menos de 12 meses, não há ciclo completo de sazonalidade, resultando em previsões imprecisas e não confiáveis. Threshold mínimo garante qualidade de forecast.
+
+**Implementação**:
+```csharp
+public class ForecastCommand : IRequest<ForecastResponse>
+{
+    public string MetricName { get; set; }
+    public string ClienteId { get; set; }
+    public int ForecastMonths { get; set; } // 3, 6, 12
+
+    public class Validator : AbstractValidator<ForecastCommand>
+    {
+        public Validator(IMetricsRepository metricsRepo)
+        {
+            RuleFor(x => x.ClienteId)
+                .NotEmpty()
+                .MustAsync(async (clienteId, ct) =>
+                {
+                    var historicalDataCount = await metricsRepo
+                        .CountDataPointsAsync(clienteId, DateTime.UtcNow.AddMonths(-13), ct);
+
+                    // Requer mínimo 12 meses de dados (365+ dias)
+                    return historicalDataCount >= 365;
+                })
+                .WithMessage("Requer minimo 12 meses de dados historicos para forecasting");
+        }
+    }
+
+    public class Handler : IRequestHandler<ForecastCommand, ForecastResponse>
+    {
+        private readonly IAzureMLClient _azureML;
+        private readonly IRedisCache _cache;
+
+        public async Task<ForecastResponse> Handle(ForecastCommand cmd, CancellationToken ct)
+        {
+            // Validação: 12 meses mínimo
+            var dataPoints = await _repository.GetDataPointsAsync(
+                cmd.ClienteId,
+                DateTime.UtcNow.AddMonths(-12),
+                DateTime.UtcNow,
+                ct);
+
+            if (dataPoints.Count() < 365)
+                throw new BusinessException("Forecast_InsufficientData");
+
+            // Verificar cache primeiro
+            var cacheKey = $"forecast:{cmd.ClienteId}:{cmd.MetricName}";
+            var cached = await _cache.GetAsync<ForecastResponse>(cacheKey, ct);
+            if (cached != null) return cached;
+
+            // Treinar modelo
+            var forecast = await _azureML.ForecastAsync(
+                cmd.MetricName,
+                dataPoints,
+                cmd.ForecastMonths,
+                method: "prophet", // ou ARIMA, ExponentialSmoothing
+                ct);
+
+            // Validar intervalo de confiança (mínimo 95%)
+            if (forecast.ConfidenceLevel < 0.95m)
+                throw new BusinessException("Forecast_LowConfidence");
+
+            // Cache 24 horas
+            await _cache.SetAsync(cacheKey, forecast, TimeSpan.FromHours(24), ct);
+
+            // Auditoria
+            await _auditService.LogAsync(new AuditEvent
+            {
+                Action = "FORECAST_GENERATED",
+                ClienteId = cmd.ClienteId,
+                Details = new { MetricName = cmd.MetricName, Months = cmd.ForecastMonths }
+            }, ct);
+
+            return forecast;
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Métrica com 13 meses de dados → forecast gerado com confiança 95%
+- Inválido: Métrica com 6 meses de dados → erro 400 "Insufficient Historical Data"
+- Válido: Métrica com 25 meses de dados → usa últimos 24 meses para treinamento
+
+---
+
+### RN-DSH-100-02: Anomaly Detection com Threshold Configurável (Padrão Z-score > 3)
+
+**Descrição**: Sistema detecta anomalias usando Z-score normalizado. Z-score = (valor - média) / desvio_padrão. Threshold padrão: |Z-score| > 3, equivalente a 99.7% confiança de que valor é anômalo. Threshold é configurável por tipo de métrica (alguns KPIs aceitam Z=2.5, outros Z=3.5). Quando anomalia detectada, alerta é disparado em tempo real.
+
+**Justificativa**: Z-score é estatisticamente robustos e ajusta-se dinamicamente a variação da métrica. Threshold 3 evita falsos positivos (99.7% confiança). Configurabilidade permite ajuste fino por negócio (SLA não tolera Z>2.5, enquanto banda larga tolera Z>3.5).
+
+**Implementação**:
+```csharp
+public class AnomalyDetectionService : IAnomalyDetectionService
+{
+    private readonly IAzureMLClient _azureML;
+    private readonly IAlertService _alertService;
+    private readonly IRepository<MetricConfig> _configRepo;
+
+    public async Task<AnomalyResult> DetectAnomalyAsync(
+        string metricName,
+        decimal currentValue,
+        string clienteId,
+        CancellationToken ct)
+    {
+        // 1. Buscar configuração da métrica (threshold customizado)
+        var config = await _configRepo.GetByMetricAsync(metricName, clienteId, ct);
+        var zThreshold = config?.AnomalyZThreshold ?? 3.0m; // Padrão 3 (99.7%)
+
+        // 2. Calcular estatísticas históricas (últimas 30 dias)
+        var historicalData = await _repository.GetDataPointsAsync(
+            metricName,
+            clienteId,
+            DateTime.UtcNow.AddDays(-30),
+            DateTime.UtcNow,
+            ct);
+
+        var mean = historicalData.Average(x => x.Value);
+        var stdDev = CalculateStdDeviation(historicalData.Select(x => x.Value));
+
+        // 3. Calcular Z-score
+        var zScore = Math.Abs((double)(currentValue - mean) / (double)stdDev);
+        var isAnomaly = zScore > (double)zThreshold;
+
+        // 4. Se anomalia, disparar alerta
+        if (isAnomaly)
+        {
+            await _alertService.SendAnomalyAlertAsync(new AnomalyAlert
+            {
+                MetricName = metricName,
+                ClienteId = clienteId,
+                CurrentValue = currentValue,
+                HistoricalAverage = mean,
+                ZScore = (decimal)zScore,
+                Threshold = zThreshold,
+                Severity = DetermineSeverity(zScore, zThreshold),
+                AlertChannels = config?.AlertChannels ?? new[] { "email", "dashboard" }
+            }, ct);
+        }
+
+        return new AnomalyResult
+        {
+            IsAnomaly = isAnomaly,
+            ZScore = (decimal)zScore,
+            Threshold = zThreshold,
+            HistoricalAverage = mean,
+            StandardDeviation = stdDev
+        };
+    }
+
+    private decimal CalculateStdDeviation(IEnumerable<decimal> values)
+    {
+        var avg = values.Average();
+        var sumOfSquares = values.Sum(x => (x - avg) * (x - avg));
+        return (decimal)Math.Sqrt((double)(sumOfSquares / values.Count()));
+    }
+}
+```
+
+**Exemplos**:
+- Métrica: Tempo Resolução P1, média 4h, desvio 0.5h. Valor atual: 6h → Z = (6-4)/0.5 = 4 → Z > 3 = ANOMALIA
+- Métrica: Banda Mensal, média 500GB, desvio 50GB, threshold customizado 2.5. Valor: 625GB → Z = 2.5 → ALERTA (threshold = 2.5)
+- Métrica: Receita Mensal, média R$100k, desvio R$10k. Valor: R$95k → Z = -0.5 → OK (Z < 3)
+
+---
+
+### RN-DSH-100-03: Modelos ML Retreinados Mensalmente via Hangfire
+
+**Descrição**: Cada modelo de Machine Learning (Prophet para forecasting, modelo de churn prediction, clustering) é retreinado automaticamente todo mês (domingo às 02h UTC via Hangfire job). Retreinamento usa dados dos últimos 12-24 meses (janela deslizante). Métricas de performance (RMSE, MAE, acurácia) são registradas. Se performance degrada mais de 5% vs mês anterior, flag para revisão manual.
+
+**Justificativa**: Modelos ML degradam com o tempo ("model drift") conforme padrões de negócio mudam. Retreinamento mensal mantém modelos atualizados. Validação automática (5% threshold) evita deployments de modelos ruins. Hangfire fornece resiliência (retry automático, logging).
+
+**Implementação**:
+```csharp
+public class ModelRetrainingJob : IHangfireJob
+{
+    private readonly IAzureMLClient _azureML;
+    private readonly IRepository<ModelMetrics> _metricsRepo;
+    private readonly IRepository<Model> _modelRepo;
+    private readonly ILogger<ModelRetrainingJob> _logger;
+    private readonly INotificationService _notificationService;
+
+    [Queue("model-retraining")]
+    [AutomaticRetry(Attempts = 3)]
+    public async Task ExecuteMonthlyRetrain()
+    {
+        _logger.LogInformation("Starting monthly model retraining at {time}", DateTime.UtcNow);
+
+        var models = await _modelRepo.GetAllAsync();
+
+        foreach (var model in models)
+        {
+            try
+            {
+                // 1. Coletar dados dos últimos 24 meses
+                var trainingData = await _repository.GetDataPointsAsync(
+                    model.MetricName,
+                    DateTime.UtcNow.AddMonths(-24),
+                    DateTime.UtcNow);
+
+                if (trainingData.Count() < 365)
+                {
+                    _logger.LogWarning($"Insuficiente dados para retraining: {model.MetricName}");
+                    continue;
+                }
+
+                // 2. Treinar novo modelo
+                var newModelPath = await _azureML.TrainModelAsync(
+                    model.Name,
+                    trainingData,
+                    model.Algorithm);
+
+                // 3. Validar em conjunto de testes (ultimas 2 semanas)
+                var testData = trainingData.Where(x => x.Timestamp > DateTime.UtcNow.AddDays(-14)).ToList();
+
+                var metrics = await _azureML.ValidateModelAsync(newModelPath, testData);
+
+                // 4. Comparar com modelo anterior
+                var previousMetrics = await _metricsRepo.GetLatestAsync(model.Id);
+                var performanceDegradation = CalculateDegradation(previousMetrics, metrics);
+
+                if (performanceDegradation > 0.05m) // 5% threshold
+                {
+                    // Performance degradou - sinalizar para revisão
+                    await _notificationService.NotifyAsync(
+                        "Model_Performance_Degradation",
+                        $"Model {model.Name} degradou {performanceDegradation:P} - requer revisão manual",
+                        "admin@icontrolit.com");
+
+                    _logger.LogWarning(
+                        $"Model {model.Name} degradou {performanceDegradation:P}");
+                }
+                else
+                {
+                    // Deploy novo modelo
+                    await _azureML.DeployModelAsync(newModelPath, model.Name);
+
+                    // Registrar metrics
+                    await _metricsRepo.AddAsync(new ModelMetrics
+                    {
+                        ModelId = model.Id,
+                        TrainedAt = DateTime.UtcNow,
+                        RMSE = metrics.RMSE,
+                        MAE = metrics.MAE,
+                        Accuracy = metrics.Accuracy,
+                        RMSEPrevious = previousMetrics?.RMSE,
+                        IsDeployed = true
+                    });
+
+                    _logger.LogInformation(
+                        $"Model {model.Name} retrained successfully. RMSE={metrics.RMSE:F4}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retraining model {model.Name}");
+                // Hangfire retentará automaticamente (3 tentativas)
+            }
+        }
+    }
+
+    private decimal CalculateDegradation(ModelMetrics previous, ModelMetrics current)
+    {
+        if (previous == null) return 0;
+
+        // Degradação = (RMSE novo - RMSE anterior) / RMSE anterior
+        return (current.RMSE - previous.RMSE) / previous.RMSE;
+    }
+}
+
+// Registrar job no Hangfire (Startup)
+public class HangfireConfiguration
+{
+    public static void Configure(IServiceCollection services, IConfiguration config)
+    {
+        services.AddHangfire(hangfireConfig =>
+        {
+            hangfireConfig.UseSqlServerStorage(config.GetConnectionString("DefaultConnection"));
+        });
+
+        // Agendar retraining para todo domingo às 02h UTC
+        RecurringJob.AddOrUpdate<ModelRetrainingJob>(
+            "monthly-model-retraining",
+            job => job.ExecuteMonthlyRetrain(),
+            Cron.Weekly(DayOfWeek.Sunday, 2, 0)); // Domingo 02h UTC
+    }
+}
+```
+
+**Exemplos**:
+- Jan 2026: Model Prophet para forecast custo retreinado, RMSE reduz de 8.5k para 7.2k → Deploy automático
+- Fev 2026: Model churn prediction retreinado, acurácia cai de 75% para 69% (6% degradação > 5% threshold) → Flag para revisão manual
+- Mar 2026: Clustering K-means retreinado com dados 24 meses → Deploy automático, 5 clusters validados
+
+---
+
+### RN-DSH-100-04: Forecast Requer Intervalo de Confiança Mínimo 95%
+
+**Descrição**: Qualquer forecast (previsão de custos, SLA, receita) gerado pelo sistema deve ter intervalo de confiança >= 95%. Confiança é calculada baseada no erro histórico do modelo (RMSE, MAE) durante validação cruzada. Forecast com confiança < 95% não é publicado ao usuário; sistema retorna erro 422 "Confidence Too Low" e solicita mais dados ou refinamento do modelo.
+
+**Justificativa**: Forecast com confiança baixa < 95% é especulação, não previsão confiável. Garante que predictions exibidas ao gestor são estatisticamente significativas. Threshold 95% é padrão em analytics/BI (rejeitando hipóteses com p-value > 0.05).
+
+**Implementação**:
+```csharp
+public class ForecastModel
+{
+    public Guid Id { get; set; }
+    public string MetricName { get; set; }
+    public string ClienteId { get; set; }
+
+    // Resultado da previsão
+    public List<ForecastPoint> ForecastedValues { get; set; } // [Timestamp, Value, UpperBound, LowerBound]
+    public decimal ConfidenceLevel { get; set; } // 0.95 = 95%
+    public decimal RMSE { get; set; } // Root Mean Squared Error (erro médio)
+
+    public DateTime CreatedAt { get; set; }
+    public string ModelAlgorithm { get; set; } // "prophet", "arima"
+}
+
+public class ForecastValidator : AbstractValidator<ForecastCommand>
+{
+    public ForecastValidator(IAzureMLClient azureML)
+    {
+        RuleFor(x => x.ClienteId)
+            .NotEmpty()
+            .MustAsync(async (cmd, clienteId, ct) =>
+            {
+                // Validar após forecast estar gerado
+                // NOTA: Este validador seria chamado após AzureML retornar resultado
+                var result = await azureML.GenerateForecastAsync(cmd, ct);
+
+                // Verificar confiança
+                return result.ConfidenceLevel >= 0.95m; // Mínimo 95%
+            })
+            .WithMessage("Forecast nao atende confianca minima de 95%");
+    }
+}
+
+public class ForecastHandler : IRequestHandler<ForecastCommand, ForecastResponse>
+{
+    public async Task<ForecastResponse> Handle(ForecastCommand cmd, CancellationToken ct)
+    {
+        // 1. Chamar Azure ML para gerar forecast
+        var rawForecast = await _azureML.ForecastAsync(cmd, ct);
+
+        // 2. Validar intervalo de confiança
+        if (rawForecast.ConfidenceLevel < 0.95m)
+        {
+            throw new DomainException(
+                ErrorCode.LowForecastConfidence,
+                $"Confianca insuficiente: {rawForecast.ConfidenceLevel:P}. Requer minimo 95%");
+        }
+
+        // 3. Calcular bounds (intervalo de confiança 95%)
+        var forecast = new ForecastModel
+        {
+            MetricName = cmd.MetricName,
+            ClienteId = cmd.ClienteId,
+            ConfidenceLevel = rawForecast.ConfidenceLevel,
+            RMSE = rawForecast.RMSE,
+            ModelAlgorithm = "prophet",
+            ForecastedValues = rawForecast.Values.Select(v => new ForecastPoint
+            {
+                Timestamp = v.Timestamp,
+                ForecastedValue = v.Value,
+                // Bounds = valor ± 1.96 * RMSE (95% confiança)
+                UpperBound = v.Value + (1.96m * rawForecast.RMSE),
+                LowerBound = v.Value - (1.96m * rawForecast.RMSE)
+            }).ToList()
+        };
+
+        await _repository.AddAsync(forecast, ct);
+        return forecast.ToResponse();
+    }
+}
+```
+
+**Exemplos**:
+- Forecast custo Jan 2026: R$150k ± 8k (intervalo confiança 95%, RMSE=4080) → ACEITO, publicado
+- Forecast SLA Fev 2026: 92% ± 7% (confiança 88%, RMSE alto) → REJEITADO, "Confidence Too Low"
+- Forecast receita Mar 2026: R$200k ± 5k (confiança 96%, RMSE pequeno) → ACEITO, publicado
+
+---
+
+### RN-DSH-100-05: Clustering Deve ter Mínimo 3 Clusters, Máximo 10
+
+**Descrição**: Operação de clustering (K-means, DBSCAN) deve gerar entre 3 e 10 clusters. Se algoritmo K-means com k < 3, retorna erro. Se k > 10, trunca para 10 (evita fragmentação). Elbow method é usado para determinar k ótimo automaticamente; se resultado < 3 ou > 10, ajusta para o limite mais próximo.
+
+**Justificativa**: 3 clusters (mínimo) garante segmentação significativa, evitando agrupamento trivial. 10 clusters (máximo) evita fragmentação excessiva que torna análise impraticável. Range 3-10 é padrão em segmentação de clientes/ativos.
+
+**Implementação**:
+```csharp
+public class ClusteringService : IClusteringService
+{
+    private readonly IAzureMLClient _azureML;
+    private readonly IRepository<ClusteringResult> _resultRepo;
+
+    public async Task<ClusteringResult> PerformClusteringAsync(
+        string entityType, // "Assets", "Customers", "Contracts"
+        string clienteId,
+        int? suggestedK = null,
+        CancellationToken ct = default)
+    {
+        // 1. Buscar dados para clustering
+        var data = await _repository.GetClusteringFeaturesAsync(entityType, clienteId, ct);
+
+        if (data.Count() < 30)
+            throw new BusinessException("Clustering_InsufficientData", "Requer minimo 30 registros");
+
+        // 2. Determinar número de clusters (K)
+        int k = suggestedK ?? await DetermineOptimalK(data, ct); // Elbow method
+
+        // 3. Validar restrições
+        if (k < 3) k = 3; // Mínimo 3
+        if (k > 10) k = 10; // Máximo 10
+
+        // 4. Executar K-means
+        var clusters = await _azureML.KMeansAsync(
+            data,
+            k,
+            algorithm: "kmeans++",
+            ct: ct);
+
+        // 5. Enriquecer cada cluster com análise
+        var enrichedClusters = clusters.Select(c => new ClusterAnalysis
+        {
+            ClusterId = c.Id,
+            Size = c.Members.Count,
+            Centroid = c.Centroid,
+            Characteristics = AnalyzeClusterCharacteristics(c),
+            Recommendations = GenerateRecommendations(entityType, c)
+        }).ToList();
+
+        // 6. Persistir resultado
+        var result = new ClusteringResult
+        {
+            Id = Guid.NewGuid(),
+            EntityType = entityType,
+            ClienteId = clienteId,
+            TotalClusters = k,
+            Clusters = enrichedClusters,
+            ExecutedAt = DateTime.UtcNow
+        };
+
+        await _resultRepo.AddAsync(result, ct);
+
+        return result;
+    }
+
+    private async Task<int> DetermineOptimalK(IEnumerable<DataPoint> data, CancellationToken ct)
+    {
+        // Elbow Method: testar K = 2..15, encontrar "cotovelo"
+        var inertias = new Dictionary<int, double>();
+
+        for (int k = 2; k <= 15; k++)
+        {
+            var clusters = await _azureML.KMeansAsync(data, k, ct: ct);
+            var inertia = clusters.Sum(c =>
+                c.Members.Sum(m => EuclideanDistance(m, c.Centroid)));
+
+            inertias[k] = inertia;
+        }
+
+        // Encontrar ponto de "cotovelo" (maior redução em inércia)
+        int optimalK = 3;
+        double maxElbow = 0;
+
+        for (int k = 3; k <= 14; k++)
+        {
+            double elbow = (inertias[k - 1] - inertias[k]) - (inertias[k] - inertias[k + 1]);
+            if (elbow > maxElbow)
+            {
+                maxElbow = elbow;
+                optimalK = k;
+            }
+        }
+
+        return optimalK;
+    }
+}
+```
+
+**Exemplos**:
+- Assets: 500 ativos, elbow method resulta k=4 → 4 clusters: High-Use (50), Medium-Use (150), Low-Use (250), Idle (50)
+- Customers: 1200 clientes, elbow k=6 → 6 clusters: Enterprise, Premium, Standard, Starter, At-Risk, Churned
+- Contracts: 80 contratos, elbow k=2 → ajusta para mínimo 3 clusters: Active, Expiring-Soon, Expired
+
+---
+
+### RN-DSH-100-06: Churn Prediction com Score >= 70% de Precisão
+
+**Descrição**: Modelo de churn prediction (probabilidade cliente cancelar contrato em 30-90 dias) requer acurácia mínima de 70% e precision/recall balanceados. Modelo usa features: recência de transações (dias), frequência (transações/mês), monetário (receita total), NPS, tickets suporte abertos, tempo de inatividade. Output: score 0-100 onde score >= 70 = risco alto. Modelo é validado com base em histórico real de churns passados.
+
+**Justificativa**: Score de precisão 70% garante que "cliente sinalizador como risco alto" tem 70% probabilidade real de churn. Evita falsos positivos que desperdiçariam esforço de retenção. Threshold 70% é balanço entre sensibilidade e especificidade.
+
+**Implementação**:
+```csharp
+public class ChurnPredictionModel
+{
+    public Guid Id { get; set; }
+    public string ClienteId { get; set; }
+    public string CustomerId { get; set; }
+
+    // Features
+    public int DaysSinceLastTransaction { get; set; }
+    public decimal TransactionsPerMonth { get; set; }
+    public decimal TotalMonetaryValue { get; set; }
+    public int NPS { get; set; } // Net Promoter Score (0-10)
+    public int OpenSupportTickets { get; set; }
+    public int DaysInactive { get; set; }
+
+    // Resultado
+    public decimal ChurnProbability { get; set; } // 0-100
+    public bool IsAtRisk { get; set; } // >= 70
+    public DateTime PredictedAt { get; set; }
+}
+
+public class ChurnPredictionValidator : AbstractValidator<ChurnPredictionRequest>
+{
+    public ChurnPredictionValidator(IAzureMLClient azureML)
+    {
+        RuleFor(x => x.ClienteId)
+            .NotEmpty()
+            .MustAsync(async (clienteId, ct) =>
+            {
+                // Validar modelo tem precisão >= 70%
+                var modelMetrics = await azureML.GetModelMetricsAsync(
+                    "ChurnPrediction",
+                    clienteId,
+                    ct);
+
+                return modelMetrics.Precision >= 0.70m;
+            })
+            .WithMessage("Modelo de churn sem precisao minima de 70%");
+    }
+}
+
+public class ChurnPredictionService : IChurnPredictionService
+{
+    private readonly IAzureMLClient _azureML;
+    private readonly IRepository<ChurnPredictionModel> _predictRepo;
+    private readonly IRepository<ModelMetrics> _metricsRepo;
+
+    public async Task<ChurnPredictionResult> PredictChurnAsync(
+        string customerId,
+        string clienteId,
+        CancellationToken ct)
+    {
+        // 1. Coletar features do cliente
+        var features = await GatherFeaturesAsync(customerId, clienteId, ct);
+
+        // 2. Invocar modelo Azure ML
+        var prediction = await _azureML.PredictChurnAsync(
+            features,
+            clienteId,
+            ct);
+
+        // Validar precisão (deve ser >= 70%)
+        var metrics = await _metricsRepo.GetLatestAsync("ChurnPrediction", clienteId, ct);
+        if (metrics.Precision < 0.70m)
+            throw new BusinessException("ChurnModel_LowPrecision",
+                $"Precisao atual: {metrics.Precision:P}");
+
+        // 3. Criar record de predição
+        var record = new ChurnPredictionModel
+        {
+            ClienteId = clienteId,
+            CustomerId = customerId,
+            DaysSinceLastTransaction = features.DaysSinceLastTransaction,
+            TransactionsPerMonth = features.TransactionsPerMonth,
+            TotalMonetaryValue = features.TotalMonetaryValue,
+            NPS = features.NPS,
+            OpenSupportTickets = features.OpenSupportTickets,
+            DaysInactive = features.DaysInactive,
+            ChurnProbability = prediction.Probability * 100, // 0-100
+            IsAtRisk = prediction.Probability >= 0.70m,
+            PredictedAt = DateTime.UtcNow
+        };
+
+        await _predictRepo.AddAsync(record, ct);
+
+        // 4. Se risco alto, gerar recomendação
+        if (record.IsAtRisk)
+        {
+            var recommendation = GenerateRetentionRecommendation(features, prediction);
+            return new ChurnPredictionResult
+            {
+                ChurnScore = record.ChurnProbability,
+                IsAtRisk = record.IsAtRisk,
+                Recommendation = recommendation
+            };
+        }
+
+        return new ChurnPredictionResult
+        {
+            ChurnScore = record.ChurnProbability,
+            IsAtRisk = false
+        };
+    }
+
+    private RetentionRecommendation GenerateRetentionRecommendation(
+        CustomerFeatures features,
+        ChurnPredictionOutput prediction)
+    {
+        // Análise de features para identificar motivo
+        if (features.NPS <= 4)
+            return new RetentionRecommendation
+            {
+                Action = "CALL_CUSTOMER",
+                Message = "NPS baixo - contactar para investigar insatisfacao",
+                Priority = "HIGH"
+            };
+
+        if (features.DaysSinceLastTransaction > 60)
+            return new RetentionRecommendation
+            {
+                Action = "OFFER_DISCOUNT",
+                Message = "Inativo 60+ dias - oferecer desconto 10-15%",
+                Priority = "MEDIUM"
+            };
+
+        if (features.OpenSupportTickets > 3)
+            return new RetentionRecommendation
+            {
+                Action = "ESCALATE_SUPPORT",
+                Message = "Multiplos tickets abertos - oferecer suporte prioritario",
+                Priority = "HIGH"
+            };
+
+        return new RetentionRecommendation
+        {
+            Action = "MONITOR",
+            Message = "Monitorar comportamento",
+            Priority = "LOW"
+        };
+    }
+}
+```
+
+**Exemplos**:
+- Cliente A: Inativo 90 dias, NPS=2, 5 tickets abertos, 0 transações → Score 85% → RISCO ALTO → Recomendação: "Contactar para insatisfação + oferecer upgrade suporte prioritário"
+- Cliente B: Ativo 2x/semana, NPS=8, receita crescendo, 0 tickets abertos → Score 8% → RISCO BAIXO → Sem ação
+- Cliente C: Inativo 45 dias, NPS=6, 1 ticket aberto, receita média → Score 62% → Risco baixo → Apenas monitorar
+
+---
+
+### RN-DSH-100-07: What-If Analysis Limitado a 5 Cenários Simultâneos
+
+**Descrição**: Operação de What-If Analysis permite ao usuário criar cenários hipotéticos (mudar número de pessoas, aumentar limite SLA, reduzir custos) e simular impacto em KPIs futuros. Sistema permite máximo 5 cenários simultâneos por usuário. Se usuário tentar criar 6º cenário enquanto 5 estão abertos, retorna erro 429 "Too Many Scenarios". Cada simulação executa em < 10 segundos (pré-calculado com cache).
+
+**Justificativa**: Limite 5 evita sobrecarga de CPU/memória no backend. 5 cenários paralelos é suficiente para análise de decisão. Timeout 10s garante resposta rápida ao usuário.
+
+**Implementação**:
+```csharp
+public class WhatIfAnalysisCommand : IRequest<WhatIfAnalysisResponse>
+{
+    public string ClienteId { get; set; }
+    public string UserId { get; set; }
+    public string ScenarioName { get; set; }
+    public Dictionary<string, object> Variables { get; set; } // { "TeamSize": 5, "SLAThreshold": 90 }
+
+    public class Validator : AbstractValidator<WhatIfAnalysisCommand>
+    {
+        public Validator(IScenarioRepository scenarioRepo)
+        {
+            RuleFor(x => x.UserId)
+                .NotEmpty()
+                .MustAsync(async (userId, ct) =>
+                {
+                    // Contar cenários abertos para este usuário
+                    var openCount = await scenarioRepo.CountOpenScenariosAsync(userId, ct);
+                    return openCount < 5; // Máximo 5 simultâneos
+                })
+                .WithMessage("Maximo 5 cenarios simultaneos permitidos");
+        }
+    }
+}
+
+public class WhatIfAnalysisHandler : IRequestHandler<WhatIfAnalysisCommand, WhatIfAnalysisResponse>
+{
+    private readonly IScenarioRepository _scenarioRepo;
+    private readonly IAzureMLClient _azureML;
+    private readonly IRedisCache _cache;
+
+    public async Task<WhatIfAnalysisResponse> Handle(
+        WhatIfAnalysisCommand cmd,
+        CancellationToken ct)
+    {
+        // 1. Validar limite de cenários
+        var openScenarios = await _scenarioRepo.CountOpenScenariosAsync(cmd.UserId, ct);
+        if (openScenarios >= 5)
+            throw new TooManyRequestsException("Maximo 5 cenarios simultâneos");
+
+        // 2. Criar scenario
+        var scenario = new Scenario
+        {
+            Id = Guid.NewGuid(),
+            UserId = cmd.UserId,
+            ClienteId = cmd.ClienteId,
+            ScenarioName = cmd.ScenarioName,
+            Variables = cmd.Variables,
+            CreatedAt = DateTime.UtcNow,
+            Status = ScenarioStatus.Running
+        };
+
+        await _scenarioRepo.AddAsync(scenario, ct);
+
+        // 3. Verificar cache
+        var cacheKey = $"whatif:{scenario.Id}";
+        var cached = await _cache.GetAsync<WhatIfAnalysisResponse>(cacheKey, ct);
+        if (cached != null) return cached;
+
+        // 4. Executar simulação (com timeout 10s)
+        using (var cts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+        {
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
+
+            try
+            {
+                var result = await _azureML.SimulateScenarioAsync(
+                    cmd.ClienteId,
+                    cmd.Variables,
+                    cts.Token);
+
+                // 5. Formatar resposta
+                var response = new WhatIfAnalysisResponse
+                {
+                    ScenarioId = scenario.Id,
+                    ScenarioName = cmd.ScenarioName,
+                    ImpactedKPIs = new()
+                    {
+                        { "SLA", new { Current = 94, Predicted = 87, Change = -7 } },
+                        { "CostMonthly", new { Current = 50000, Predicted = 48000, Change = -4 } },
+                        { "ChurnRisk", new { Current = 15, Predicted = 22, Change = 7 } }
+                    },
+                    Recommendations = GenerateRecommendations(result)
+                };
+
+                // 6. Cache 1 hora
+                await _cache.SetAsync(cacheKey, response, TimeSpan.FromHours(1), ct);
+
+                // 7. Marcar scenario como completo
+                scenario.Status = ScenarioStatus.Completed;
+                scenario.Result = response;
+                await _scenarioRepo.UpdateAsync(scenario, ct);
+
+                return response;
+            }
+            catch (OperationCanceledException)
+            {
+                scenario.Status = ScenarioStatus.TimedOut;
+                await _scenarioRepo.UpdateAsync(scenario, ct);
+                throw new TimeoutException("Simulacao exigiu mais de 10 segundos");
+            }
+        }
+    }
+
+    private WhatIfRecommendations GenerateRecommendations(SimulationResult result)
+    {
+        var recommendations = new List<string>();
+
+        if (result.ImpactedKPIs["SLA"].Predicted < 90)
+            recommendations.Add("SLA degradaria abaixo de 90% - rejeitar cenário ou adicionar recursos");
+
+        if (result.ImpactedKPIs["ChurnRisk"].Change > 5)
+            recommendations.Add("Risco de churn aumentaria >5% - impacto negativo em receita");
+
+        if (result.ImpactedKPIs["CostMonthly"].Change < -10)
+            recommendations.Add("Economia de custo > 10% sem impacto negativo - RECOMENDADO implementar");
+
+        return new WhatIfRecommendations { Items = recommendations };
+    }
+}
+```
+
+**Exemplos**:
+- Usuário 1 abre cenários: +Team (1 pessoa), +SLA (95%), -Custo (10%), What-If-4, What-If-5 = 5 cenários abertos
+- Usuário 1 tenta criar 6º cenário → Error 429 "Maximo 5 cenarios simultâneos"
+- Usuário 1 fecha cenário "What-If-4" → Abre novo cenário (+Contratos 20%) → OK
+- Simulação leva 8 segundos → completa com sucesso, resultado cacheado 1h
+
+---
+
+### RN-DSH-100-08: Resultados ML Cacheados por 24 Horas (Redis)
+
+**Descrição**: Qualquer resultado de ML (forecast, anomaly detection, clustering, churn prediction) é cacheado em Redis por 24 horas. Requisições subsequentes para mesmo metricName + clienteId + período retornam resultado cacheado sem recalcular modelo. Cache é invalidado se: (a) 24h expiraram, (b) usuário força refresh, (c) novo dado é adicionado para métrica, (d) modelo é retreinado.
+
+**Justificativa**: Recompilação de modelos é custosa (CPU, Azure ML billing). Cache 24h reduz latência (< 100ms vs 5-10s) e custos. 24h é intervalo razoável para forecasts serem "ainda válidos". Invalidação automática em caso de novos dados garante relevância.
+
+**Implementação**:
+```csharp
+public class CachedForecastService : IForecastService
+{
+    private readonly IAzureMLClient _azureML;
+    private readonly IDistributedCache _cache; // Redis IDistributedCache
+    private readonly ILogger<CachedForecastService> _logger;
+
+    public async Task<ForecastResponse> GetForecastAsync(
+        string metricName,
+        string clienteId,
+        int months,
+        bool forceRefresh = false,
+        CancellationToken ct = default)
+    {
+        // 1. Construir chave de cache
+        var cacheKey = $"forecast:{clienteId}:{metricName}:{months}";
+
+        // 2. Se não forçar refresh, tentar ler do cache
+        if (!forceRefresh)
+        {
+            var cached = await _cache.GetStringAsync(cacheKey, ct);
+            if (!string.IsNullOrEmpty(cached))
+            {
+                _logger.LogInformation($"Cache hit: {cacheKey}");
+                return JsonConvert.DeserializeObject<ForecastResponse>(cached);
+            }
+        }
+
+        // 3. Cache miss ou force refresh - gerar novo forecast
+        _logger.LogInformation($"Cache miss, generating forecast: {cacheKey}");
+
+        var forecast = await _azureML.ForecastAsync(
+            metricName,
+            clienteId,
+            months,
+            ct);
+
+        // 4. Armazenar no cache por 24 horas
+        var serialized = JsonConvert.SerializeObject(forecast);
+        var cacheOptions = new DistributedCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24)
+        };
+
+        await _cache.SetStringAsync(cacheKey, serialized, cacheOptions, ct);
+
+        _logger.LogInformation($"Forecast cached for 24h: {cacheKey}");
+
+        return forecast;
+    }
+
+    // Método para invalidar cache (chamado quando novos dados chegam)
+    public async Task InvalidateForecastCacheAsync(
+        string metricName,
+        string clienteId,
+        CancellationToken ct = default)
+    {
+        for (int months = 3; months <= 12; months += 3)
+        {
+            var cacheKey = $"forecast:{clienteId}:{metricName}:{months}";
+            await _cache.RemoveAsync(cacheKey, ct);
+            _logger.LogInformation($"Cache invalidated: {cacheKey}");
+        }
+    }
+}
+
+// Evento para invalidar cache quando novos dados chegam
+public class MetricDataAddedEventHandler : INotificationHandler<MetricDataAddedEvent>
+{
+    private readonly IForecastService _forecastService;
+
+    public async Task Handle(MetricDataAddedEvent notification, CancellationToken ct)
+    {
+        // Quando novo dado chega, invalidar cache de forecast
+        await _forecastService.InvalidateForecastCacheAsync(
+            notification.MetricName,
+            notification.ClienteId,
+            ct);
+
+        _logger.LogInformation(
+            $"Forecast cache invalidated due to new data: {notification.MetricName}");
+    }
+}
+
+// Configuração Redis no Startup
+public class RedisConfiguration
+{
+    public static void AddRedisCache(IServiceCollection services, IConfiguration config)
+    {
+        services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = config.GetConnectionString("Redis");
+            options.InstanceName = "ic2:";
+        });
+    }
+}
+```
+
+**Exemplos**:
+- 10:00 Forecast custo Jan 2026 solicitado → calculado via Azure ML → cacheado até 10:00 Jan 29
+- 10:05 Mesmo forecast solicitado → retorna cache < 100ms
+- 10:10 Novo dado métrica custo adicionado → cache invalidado
+- 10:11 Forecast solicitado → recalcula novo modelo
+- 10:00 Jan 30 (24h depois) → cache expira automaticamente
+
+---
+
+### RN-DSH-100-09: Multi-tenancy - ClienteId em Todos os Datasets
+
+**Descrição**: Todos os dados de ML (features para clustering, histórico para forecast, registros de churn prediction) devem estar particionados por ClienteId. Qualquer query ou modelo de ML recebe ClienteId como parâmetro obrigatório. É PROIBIDO construir forecasts, anomaly detection, clustering ou churn prediction com dados combinados de múltiplos clientes. Modelos são treinados por cliente, separadamente.
+
+**Justificativa**: Garantir isolamento de dados entre clientes (SaaS multi-tenancy). Cliente A não pode ver previsões/padrões de Cliente B. Compliance LGPD/GDPR.
+
+**Implementação**:
+```csharp
+public class AzureMLClient : IAzureMLClient
+{
+    public async Task<ForecastResponse> ForecastAsync(
+        string metricName,
+        string clienteId, // OBRIGATÓRIO
+        int forecastMonths,
+        CancellationToken ct)
+    {
+        // Validação: ClienteId obrigatório
+        if (string.IsNullOrWhiteSpace(clienteId) || clienteId.Length != 36)
+            throw new ArgumentException("ClienteId invalido (nao é GUID)");
+
+        // 1. Buscar histórico APENAS deste cliente
+        var dataPoints = await _repository
+            .Where(x => x.ClienteId == clienteId) // Filtro OBRIGATÓRIO
+            .Where(x => x.MetricName == metricName)
+            .Where(x => x.Timestamp >= DateTime.UtcNow.AddMonths(-24))
+            .ToListAsync(ct);
+
+        if (!dataPoints.Any())
+            throw new BusinessException("NoDataForForecast");
+
+        // 2. Treinar modelo (apenas dados deste cliente)
+        var forecast = await this._azureMLService.ForecastAsync(
+            dataPoints,
+            clienteId, // Passar ClienteId ao modelo
+            forecastMonths,
+            ct);
+
+        return forecast;
+    }
+
+    public async Task<ClusteringResult> ClusterAsync(
+        string entityType,
+        string clienteId, // OBRIGATÓRIO
+        CancellationToken ct)
+    {
+        // 1. Buscar entidades APENAS deste cliente
+        var entities = await _repository
+            .Where(x => x.ClienteId == clienteId) // Filtro OBRIGATÓRIO
+            .Where(x => x.EntityType == entityType)
+            .ToListAsync(ct);
+
+        // 2. Executar clustering
+        var clusters = await _azureMLService.KMeansAsync(
+            entities,
+            clienteId, // Passar ClienteId ao modelo
+            ct);
+
+        return clusters;
+    }
+}
+
+// No banco de dados, criar índices para ClienteId
+public class DataModelingConfiguration
+{
+    public static void ConfigureIndexes(ModelBuilder modelBuilder)
+    {
+        // Índice composite em ClienteId + MetricName para forecasting
+        modelBuilder.Entity<MetricDataPoint>()
+            .HasIndex(x => new { x.ClienteId, x.MetricName, x.Timestamp })
+            .IsUnique(false)
+            .HasName("IX_MetricDataPoints_ClienteId_MetricName_Timestamp");
+
+        // Índice em ClienteId + EntityType para clustering
+        modelBuilder.Entity<ClusteringFeature>()
+            .HasIndex(x => new { x.ClienteId, x.EntityType })
+            .IsUnique(false)
+            .HasName("IX_ClusteringFeatures_ClienteId_EntityType");
+
+        // Constraint: ClienteId nunca pode ser nulo
+        modelBuilder.Entity<MetricDataPoint>()
+            .Property(x => x.ClienteId)
+            .IsRequired();
+    }
+}
+```
+
+**Exemplos**:
+- ClienteA solicita forecast custo → dados de ClienteA apenas, modelo treinado com ClienteA
+- ClienteB solicita clustering ativos → dados de ClienteB apenas, não vê padrões de ClienteA
+- Query tenta `SELECT * FROM Metrics` (sem WHERE ClienteId) → DatabaseAccessLayer intercepta e lança erro
+
+---
+
+### RN-DSH-100-10: Auditoria de Todas as Predições e Recomendações
+
+**Descrição**: Sistema registra em tabela de auditoria (AuditLog) CADA predição gerada, CADA anomalia detectada, CADA recomendação emitida. Auditoria inclui: timestamp, tipo (forecast/anomaly/churn/whatif), quem solicitou, parâmetros de entrada, resultado, score confiança, usuário que acessou resultado. Auditoria é imutável (append-only) e retida por 2 anos (conforme LGPD).
+
+**Justificativa**: Rastreabilidade completa de decisões baseadas em ML. Se uma previsão falhar, auditar permite investigação causa-raiz. LGPD/compliance exige log de operações. Defesa em caso de litígio ("logs prove que cliente foi alertado de risco churn").
+
+**Implementação**:
+```csharp
+public class AuditLogEntity
+{
+    public Guid Id { get; set; }
+    public string ClienteId { get; set; }
+    public string UserId { get; set; }
+
+    // O quê
+    public string OperationType { get; set; } // "FORECAST_GENERATED", "ANOMALY_DETECTED", "CHURN_PREDICTION"
+    public string MetricName { get; set; }
+    public string EntityId { get; set; }
+
+    // Parâmetros de entrada
+    public Dictionary<string, object> InputParameters { get; set; }
+
+    // Resultado
+    public Dictionary<string, object> OutputResult { get; set; }
+    public decimal ConfidenceScore { get; set; }
+
+    // Quando
+    public DateTime CreatedAt { get; set; }
+    public DateTime? AccessedAt { get; set; }
+
+    // Imutável
+    public bool IsDeleted { get; set; } = false;
+}
+
+public class AuditService : IAuditService
+{
+    private readonly IRepository<AuditLogEntity> _auditRepo;
+
+    public async Task LogForecastAsync(
+        string clienteId,
+        string userId,
+        string metricName,
+        Dictionary<string, object> parameters,
+        ForecastResponse result,
+        CancellationToken ct)
+    {
+        var auditLog = new AuditLogEntity
+        {
+            Id = Guid.NewGuid(),
+            ClienteId = clienteId,
+            UserId = userId,
+            OperationType = "FORECAST_GENERATED",
+            MetricName = metricName,
+            InputParameters = parameters,
+            OutputResult = new Dictionary<string, object>
+            {
+                { "ForecastedValues", result.ForecastedValues },
+                { "ConfidenceLevel", result.ConfidenceLevel },
+                { "RMSE", result.RMSE }
+            },
+            ConfidenceScore = (decimal)result.ConfidenceLevel,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _auditRepo.AddAsync(auditLog, ct);
+    }
+
+    public async Task LogAnomalyDetectedAsync(
+        string clienteId,
+        string userId,
+        string metricName,
+        AnomalyResult anomaly,
+        CancellationToken ct)
+    {
+        var auditLog = new AuditLogEntity
+        {
+            Id = Guid.NewGuid(),
+            ClienteId = clienteId,
+            UserId = userId,
+            OperationType = "ANOMALY_DETECTED",
+            MetricName = metricName,
+            InputParameters = new Dictionary<string, object>
+            {
+                { "CurrentValue", anomaly.CurrentValue },
+                { "HistoricalAverage", anomaly.HistoricalAverage }
+            },
+            OutputResult = new Dictionary<string, object>
+            {
+                { "IsAnomaly", anomaly.IsAnomaly },
+                { "ZScore", anomaly.ZScore }
+            },
+            ConfidenceScore = 1m, // Anomaly é binário (sim/não)
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _auditRepo.AddAsync(auditLog, ct);
+    }
+}
+
+// Cleanup job para manter retenção 2 anos
+public class AuditCleanupJob : IHangfireJob
+{
+    private readonly IRepository<AuditLogEntity> _auditRepo;
+
+    [Queue("maintenance")]
+    public async Task DeleteOldAuditLogsAsync()
+    {
+        var cutoffDate = DateTime.UtcNow.AddYears(-2);
+
+        var oldLogs = await _auditRepo
+            .Where(x => x.CreatedAt < cutoffDate && !x.IsDeleted)
+            .ToListAsync();
+
+        foreach (var log in oldLogs)
+        {
+            log.IsDeleted = true; // Soft delete
+            await _auditRepo.UpdateAsync(log);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- 2025-12-28 10:00 Usuario admin@cliente.com solicita forecast custo Jan 2026 → Log registrado com inputs/outputs/confiança
+- 2025-12-28 10:05 Admin acessa resultado → AccessedAt = 10:05 registrado
+- 2025-12-28 14:30 Sistema detecta anomalia em banda (Z=4.2) → Log registrado
+- 2027-12-28 (2 anos depois) → Logs antigos marcados IsDeleted=true, mantidos arquivado
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IControlIT_Legado_2024`
+
+**Tabelas Relacionadas**:
+
+```sql
+-- Métrica (origem dos dados para forecasting/anomaly detection)
+CREATE TABLE [dbo].[Metricas](
+    [Id_Metrica] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Cliente] [int] NOT NULL,
+    [Nr_Nome_Metrica] [varchar](100) NOT NULL,
+    [Vl_Valor] [decimal](15, 2) NOT NULL,
+    [Dt_Data] [datetime] NOT NULL,
+    [Tp_Metrica] [varchar](20) NOT NULL,
+    PRIMARY KEY CLUSTERED ([Id_Metrica] ASC)
+);
+
+-- KPI Configuração
+CREATE TABLE [dbo].[KPI_Config](
+    [Id_KPI] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Cliente] [int] NOT NULL,
+    [Nr_Nome_KPI] [varchar](100) NOT NULL,
+    [Nr_Meta] [decimal](10, 2) NOT NULL,
+    [Vl_Alerta_Amarelo] [decimal](10, 2),
+    [Vl_Alerta_Vermelho] [decimal](10, 2),
+    [Ds_Formula] [varchar](500),
+    PRIMARY KEY CLUSTERED ([Id_KPI] ASC)
+);
+
+-- Relatório executivo (origem de dados para BI)
+CREATE TABLE [dbo].[Relatorio_Executivo](
+    [Id_Relatorio] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Cliente] [int] NOT NULL,
+    [Id_Usuario] [int] NOT NULL,
+    [Dt_Geracao] [datetime] NOT NULL,
+    [Tp_Relatorio] [varchar](50),
+    [Ds_Conteudo] [varchar](max),
+    PRIMARY KEY CLUSTERED ([Id_Relatorio] ASC)
+);
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descrição | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `[Id_Metrica]` | Identificador métrica | FK em MetricDataPoint |
+| `[Vl_Valor]` | Valor da métrica | Feature para ML models |
+| `[Dt_Data]` | Timestamp do registro | Série temporal para forecast |
+| `[Id_Cliente]` | ID cliente legado | Mapear para ClienteId (GUID) |
+| `[Ds_Formula]` | Fórmula de cálculo KPI | Migrar para KpiFormula entity |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `pa_Gera_Relatorio_Executivo` | Gera relatório executivo em PDF/Excel | Substituir por forecast + what-if endpoints |
+| `pa_Calcula_KPI` | Calcula KPI baseado em fórmula | Migrar lógica para KpiFormulaService |
+| `pa_Detecta_Anomalia_Manual` | Detecta anomalias com regras fixas | Substituir por Z-score + Isolation Forest |
+
+### 3.3 Telas ASPX Legado
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `RelatorioExecutivo.aspx` | Exibe relatórios estáticos | `/admin/dashboards-preditivos` (Angular) |
+| `DashboardKPI.aspx` | Dashboard com gráficos Crystal Reports | `/admin/dashboard-inteligente` (Power BI Embedded) |
+| `AnalisePreditiva.aspx` | Não existe no legado | `/analytics/forecast-analysis` (novo) |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSRelatorio.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `GetRelatorioExecutivo(idCliente)` | Retorna relatório pronto | `GET /api/ml/dashboards/{id}` |
+| `CalculaKPI(idKPI, dtInicio, dtFim)` | Calcula KPI manualmente | `POST /api/ml/forecast` |
+| `ExportarRelatorio(idRelatorio, tipo)` | Export para PDF/Excel | `POST /api/ml/export` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `ML_DASHBOARDS_PREDICTIVE`
+
+**Configuração**:
+```json
+{
+    "featureKey": "ML_DASHBOARDS_PREDICTIVE",
+    "nome": "Dashboards com Análise Preditiva (RF100)",
+    "descricao": "Ativa forecasting, anomaly detection, clustering e churn prediction",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "subFeatures": {
+        "FORECAST_ENABLED": true,
+        "ANOMALY_DETECTION_ENABLED": true,
+        "CLUSTERING_ENABLED": true,
+        "CHURN_PREDICTION_ENABLED": true,
+        "WHAT_IF_ANALYSIS_ENABLED": true,
+        "AZURE_ML_INTEGRATION_ENABLED": true
+    }
+}
+```
+
+**Nota**: Se feature desabilitada, endpoints retornam 403 "Feature not available". Permite rollout gradual.
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Tradução**:
+
+```json
+{
+    "dashboards": {
+        "predictive": {
+            "title": "Dashboards Preditivos",
+            "forecast": {
+                "title": "Previsão de Custos",
+                "noData": "Dados insuficientes (minimo 12 meses)",
+                "confidence": "Confiança: {{confidence}}%",
+                "upperBound": "Limite Superior",
+                "lowerBound": "Limite Inferior"
+            },
+            "anomaly": {
+                "title": "Detecção de Anomalias",
+                "detected": "Anomalia detectada",
+                "zScore": "Z-Score: {{score}}"
+            },
+            "clustering": {
+                "title": "Segmentação por Clustering",
+                "clusters": "{{count}} clusters identificados",
+                "highUse": "Alto uso",
+                "mediumUse": "Médio uso",
+                "lowUse": "Baixo uso",
+                "idle": "Inativo"
+            },
+            "churn": {
+                "title": "Previsão de Churn",
+                "riskScore": "Risco: {{score}}%",
+                "recommendation": "Recomendação: {{action}}"
+            },
+            "whatIf": {
+                "title": "Análise What-If",
+                "scenario": "Cenário",
+                "variable": "Variável",
+                "impact": "Impacto"
+            },
+            "messages": {
+                "success": "Análise concluída com sucesso",
+                "error": "Erro ao gerar análise",
+                "tooManyScenarios": "Máximo 5 cenários simultâneos"
+            }
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|----------|--------|-------------------|
+| Forecast Gerado | `ML_FORECAST_GENERATED` | MetricName, ForecastMonths, ConfidenceLevel, RMSE |
+| Anomalia Detectada | `ML_ANOMALY_DETECTED` | MetricName, CurrentValue, ZScore, IsAnomaly |
+| Clustering Executado | `ML_CLUSTERING_EXECUTED` | EntityType, ClusterCount, Algorithm |
+| Churn Previsto | `ML_CHURN_PREDICTED` | CustomerId, ChurnProbability, IsAtRisk |
+| What-If Simulado | `ML_WHATIF_SIMULATED` | ScenarioName, Variables, ImpactedKPIs |
+| Modelo Retreinado | `ML_MODEL_RETRAINED` | ModelName, Algorithm, RMSE, MAE, Accuracy |
+| Recomendação Aceita | `ML_RECOMMENDATION_ACCEPTED` | RecommendationId, Action, Result |
+
+**Retenção**: 2 anos (LGPD compliance)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis |
+|-----------|-----------|--------|
+| `ml:forecast:create` | Gerar forecast | Gestor, Diretor, Analista BI |
+| `ml:forecast:read` | Visualizar forecast | Todos com RF100 habilitado |
+| `ml:anomaly:read` | Visualizar anomalias | Gestor Operacional, Diretor |
+| `ml:clustering:create` | Executar clustering | Analista BI, Diretor |
+| `ml:churn:read` | Visualizar churn prediction | Gerente Comercial, Diretor |
+| `ml:whatif:create` | Criar cenário what-if | Diretor, Gestor Sênior |
+| `ml:recommendations:accept` | Aceitar recomendação | Gestor, Diretor |
+| `ml:models:retrain` | Retreinar modelo | DevOps, Arquiteto |
+| `ml:audit:read` | Visualizar auditoria | Compliance, Auditor |
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal - Dashboards Preditivos
+
+| Metodo | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/ml/dashboards` | Listar dashboards preditivos | `ml:forecast:read` |
+| GET | `/api/ml/dashboards/{id}` | Obter dashboard preditivo | `ml:forecast:read` |
+| POST | `/api/ml/dashboards` | Criar dashboard preditivo | `ml:forecast:create` |
+| PUT | `/api/ml/dashboards/{id}` | Atualizar dashboard preditivo | `ml:forecast:create` |
+| DELETE | `/api/ml/dashboards/{id}` | Excluir dashboard preditivo | `ml:forecast:create` |
+
+### 5.2 Operações Especiais - ML Avançado
+
+| Metodo | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| POST | `/api/ml/forecast` | Gerar forecast (3/6/12 meses) | `ml:forecast:create` |
+| POST | `/api/ml/anomaly-detection` | Detectar anomalias (Z-score + Isolation Forest) | `ml:anomaly:read` |
+| POST | `/api/ml/clustering` | Executar clustering (K-means, DBSCAN) | `ml:clustering:create` |
+| POST | `/api/ml/churn-prediction` | Predizer churn de cliente (0-100%) | `ml:churn:read` |
+| POST | `/api/ml/what-if` | Simular cenário (máx 5 paralelos) | `ml:whatif:create` |
+| GET | `/api/ml/trend-analysis` | Análise de tendências (decomposição STL) | `ml:forecast:read` |
+| POST | `/api/ml/models/retrain` | Retreinar modelo manualmente | `ml:models:retrain` |
+| GET | `/api/ml/models/metrics` | Obter métricas de modelo (RMSE, MAE, Accuracy) | `ml:forecast:read` |
+| GET | `/api/ml/recommendations` | Obter recomendações prescritivas | `ml:recommendations:accept` |
+| POST | `/api/ml/export` | Exportar dashboard/forecast para PDF/Excel | `ml:forecast:read` |
+| GET | `/api/ml/audit-log` | Visualizar auditoria de operações ML | `ml:audit:read` |
+| POST | `/api/ml/correlation-analysis` | Analisar correlação entre KPIs | `ml:forecast:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Forecasting com Validação
+
+```
+Usuario solicita forecast custo (3 meses)
+    |
+    v
+Validar ClienteId obrigatorio
+    |
+    v
+Buscar historico 24 meses do cliente
+    |
+    +--- Historico < 12 meses? --> Error 400 "Insufficient Data"
+    |
+    v
+Calcular estatisticas (mean, stdDev)
+    |
+    v
+Chamar Azure ML (Prophet/ARIMA)
+    |
+    v
+Validar confianca >= 95%
+    |
+    +--- Confianca < 95%? --> Error 422 "Confidence Too Low"
+    |
+    v
+Calcular bounds (valor ± 1.96 * RMSE)
+    |
+    v
+Armazenar em cache Redis (24h)
+    |
+    v
+Logar em auditoria (operacao, usuario, resultado)
+    |
+    v
+Retornar forecast com graficos + confidence bands
+```
+
+### 6.2 Fluxo de Detecção de Anomalias em Tempo Real
+
+```
+Novo metrica registrado (stream Kafka)
+    |
+    v
+Calcular Z-score vs historico 30 dias
+    |
+    v
+Z-score > threshold?
+    |
+    +--- Nao --> Registrar como OK
+    |
+    v (Sim)
+Classificar severidade (Z=4 = CRITICA, Z=3 = ALTA)
+    |
+    v
+Disparar alerta (email, SMS, dashboard notificacao)
+    |
+    v
+Logar em auditoria
+    |
+    v
+Atualizar dashboard em tempo real (SignalR)
+```
+
+### 6.3 Fluxo de Churn Prediction com Recomendação
+
+```
+Job horario: carregar clientes ativos
+    |
+    v
+Para cada cliente:
+    |
+    v
+Coletar features (recencia, frequencia, monetario, NPS, tickets)
+    |
+    v
+Invocar modelo churn Azure ML
+    |
+    v
+Score >= 70%?
+    |
+    +--- Nao --> Registrar como "baixo risco"
+    |
+    v (Sim)
+Gerar recomendacao:
+    - Score > 80% + inativo? --> "Oferecer desconto 15%"
+    - NPS <= 4? --> "Contactar para insatisfacao"
+    - Tickets abertos > 3? --> "Escalate suporte"
+    |
+    v
+Logar predicao em auditoria
+    |
+    v
+Notificar gestor comercial via email + dashboard
+    |
+    v
+Aguardar aceitar/rejeitar recomendacao
+```
+
+### 6.4 Fluxo de What-If Analysis com Simulacao
+
+```
+Usuario cria cenario "Aumentar team +20%, SLA +95%"
+    |
+    v
+Validar maximo 5 cenarios simultaneos
+    |
+    +--- 5 abertos? --> Error 429 "Too Many"
+    |
+    v
+Buscar modelos treinados
+    |
+    v
+Simular impacto em 3 dimensoes (timeout 10s):
+    1. SLA: 94% → 92% (degradacao 2%)
+    2. Custo: R$50k → R$60k (+20%)
+    3. ChurnRisk: 15% → 18% (+3%)
+    |
+    v
+Gerar recomendacoes automaticas
+    |
+    v
+Armazenar resultado em cache (1h)
+    |
+    v
+Retornar ao usuario com graficos comparativos
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição |
+|----------|-----------|
+| ClienteId Obrigatório | Todos endpoints validam ClienteId (GUID), evita SQL injection e isolamento de dados |
+| Z-score Validação | Detecta outliers em dados de entrada antes de processar (evita envenenamento de modelos) |
+| Rate Limiting | Máximo 5 cenários what-if por usuário para evitar DoS em Azure ML |
+| Cache Redis com TTL | 24h para forecast evita recalcular model a cada requisição, economiza resources |
+| Auditoria Imutável | Todos eventos ML auditados, append-only, impossível apagar (compliance) |
+| Feature Flags | Desabilitar RF100 inteiro se vulnerabilidade descoberta (rollout gradual) |
+| RBAC por Permissão | Usuário sem `ml:forecast:create` não pode gerar forecast |
+| TLS 1.3 | Comunicação Azure ML ↔ Backend criptografada |
+| Secret Management | Azure KeyVault armazena chaves Azure ML, nunca em código |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] Injeção de SQL em parâmetros ClienteId, MetricName
+- [ ] XSS em nomes de dashboard, labels de widget
+- [ ] CSRF em endpoints POST (forecast, what-if)
+- [ ] Validação de RBAC (usuário sem permissão não consegue criar forecast)
+- [ ] Rate limiting (máx 100 requests/min por IP)
+- [ ] Validação de intervalo confiança (rejeita forecast < 95%)
+- [ ] Envenenamento de modelo (dados maliciosos não degradam forecast)
+- [ ] DoS em Azure ML (máx 5 what-if paralelos)
+- [ ] Auditoria completa (nenhuma operação fica fora do log)
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs de Sucesso
+
+| KPI | Meta | Medição |
+|-----|------|---------|
+| Acurácia Forecast | >= 95% confiança | % de forecasts publicados com confiança >= 95% |
+| Acurácia Churn Prediction | >= 70% precision | Precision/Recall/F1-score do modelo |
+| Detecção Anomalias | < 5% falsos positivos | Anomalias detectadas vs verificadas como reais |
+| Tempo Resposta Forecast | < 10s | P99 latência endpoint POST /forecast |
+| Tempo Resposta What-If | < 10s | P99 latência cenário simulado |
+| Cache Hit Rate | >= 70% | % requisições servidas do Redis cache |
+| Retenção por Recomendação | >= 15% | Clientes em risco que aceitaram recomendação |
+| Downtime Azure ML | < 1% | SLA Azure ML = 99.9%, uptime previsto >= 99.9% |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| Forecast Confiança Baixa | < 90% confiança | Notificar DevOps, revisar dados históricos |
+| Modelo Degradação | RMSE aumenta > 5% | Parar deploy, investigar causa-raiz |
+| Azure ML Timeout | Requisição > 30s | Retry automático 3x, depois falha |
+| Anomalias em Cascata | > 10 anomalias em 1h | Possível ataque/erro de coleta, escalar |
+| Cache Redis Down | Falha ao conectar | Fallback para cálculo em tempo real, notificar |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF100](./MD-RF100-Dashboards-Preditivos.md) com schema SQL completo
+2. **Casos de Uso**: Criar [UC-RF100](./UC-RF100-Dashboards-Preditivos.md) com 6+ cenários
+3. **Workflows**: Criar [WF-RF100](./WF-RF100-Dashboards-Preditivos.md) com telas Angular
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml) com mínimo 5 stories
+5. **Implementação Backend**: Commands (Forecast, Clustering), Queries (GetDashboard), Handlers
+6. **Integração Azure ML**: Setup Azure ML Studio, treinar modelos Prophet/ARIMA
+7. **Implementação Frontend**: Componentes Angular (charts D3.js, Power BI Embedded, forms)
+8. **Testes**: Backend (validação confiança 95%, cache Redis), Frontend (E2E Playwright)
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versão inicial - Requisitos completos com 10 RN, 13 endpoints, integrações ML | Claude Code |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: Claude Code
+**Revisão**: Pendente de aprovação
+**Linha Total**: 1.450+ linhas

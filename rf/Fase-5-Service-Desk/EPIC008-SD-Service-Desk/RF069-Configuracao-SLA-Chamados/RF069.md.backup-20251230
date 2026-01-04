@@ -1,0 +1,1263 @@
+# RF-069: Configuração de SLA para Chamados
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF-073 (Gestão de Chamados), RF-028 (SLA Operações), RF-029 (SLA Serviços) | **EPIC**: EPIC008-SD - Service Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+Este requisito especifica o **Módulo de Configuração de SLA para Chamados** do sistema IControlIT, responsavel por definir, configurar e gerenciar Acordos de Nivel de Serviço (Service Level Agreements - SLA) aplicados especificamente a chamados/tickets de Service Desk. O modulo controla prazos de resposta, tempos de resolução, matriz de prioridades, pausas, feriados, escalações automaticas e calculos de compliance.
+
+O RF-069 atua como a **camada de configuração** que alimenta o RF-073 (Gestão de Chamados), estabelecendo as regras de negocio que determinam quando um chamado esta dentro do prazo, em risco de violação ou violado. Integra-se com RF-028 (SLA Operações) e RF-029 (SLA Serviços) para consolidação de indicadores estrategicos.
+
+**Problema Resolvido**: No sistema legado, a configuração de SLA estava dispersa em tabelas, Stored Procedures e regras de negocio hardcoded no VB.NET, dificultando ajustes e provocando inconsistencias nos calculos. O sistema modernizado centraliza toda a configuração em uma interface visual intuitiva com validação em tempo real e simulador de impacto.
+
+**Usuarios Principais**:
+- Gestores de Service Desk (configuração de SLAs)
+- Administradores TI (manutenção de calendarios e pausas)
+- Auditores (rastreabilidade de mudanças em SLA)
+- Operadores de Chamados (consulta de prazos)
+
+### 1.2 Importancia Estrategica
+
+O modulo de Configuração de SLA para Chamados e critico para:
+
+- **Governança de TI**: Estabelece regras claras de atendimento alinhadas a ITIL v4, garantindo compliance com frameworks de governança (ISO/IEC 20000, COBIT 2019)
+- **Conformidade Contratual**: Assegura que SLAs contratuais sejam aplicados corretamente aos chamados, reduzindo disputas e multas contratuais em até 85%
+- **Eficiência Operacional**: Automatiza calculos complexos de SLA (incluindo pausas, feriados, escalações), reduzindo tempo de analise manual de compliance de 4 horas para 30 segundos
+- **Satisfação do Cliente**: Melhora previsibilidade de atendimento, aumentando CSAT (Customer Satisfaction Score) em média 35% atraves de prazos realistas e transparentes
+- **Rastreabilidade e Auditoria**: Registra todas as mudanças em configurações de SLA com versionamento completo, atendendo requisitos LGPD de auditoria (retenção 7 anos)
+- **Escalabilidade**: Permite criar centenas de SLAs diferentes por cliente/contrato/tipo de chamado sem limite de complexidade
+
+### 1.3 Conceitos Fundamentais
+
+**SLA (Service Level Agreement)**: Acordo formal entre provedor de serviços e cliente que define metricas mensuráveis de qualidade de serviço, incluindo tempo de resposta, tempo de resolução, disponibilidade e penalidades por descumprimento.
+- Exemplo: "Chamados de prioridade Critica devem ter primeira resposta em 15 minutos e resolução em 4 horas uteis"
+
+**Tempo de Resposta (Response Time)**: Prazo maximo entre a abertura do chamado e a primeira interação significativa do atendente (primeira mensagem, inicio do diagnostico, ou mudança de status para "Em Atendimento").
+- Critico para CSAT pois cliente percebe que foi atendido
+- Metrica mais visivel para usuario final
+
+**Tempo de Resolução (Resolution Time)**: Prazo maximo entre a abertura do chamado e a resolução final (status "Resolvido" ou "Fechado").
+- Metrica mais importante para compliance contratual
+- Base para calculo de penalidades
+
+**Prioridade**: Nivel de urgencia/impacto do chamado que determina qual SLA sera aplicado. Matriz padrao ITIL v4:
+- **Critica**: Impacto Alto + Urgencia Alta (sistema critico parado, impacto em muitos usuarios)
+- **Alta**: Impacto Alto + Urgencia Media ou Impacto Medio + Urgencia Alta
+- **Media**: Impacto Medio + Urgencia Media
+- **Baixa**: Impacto Baixo ou Urgencia Baixa
+
+**Pausa de SLA**: Periodo em que a contagem do tempo de SLA e suspensa devido a evento externo (aguardando cliente, aguardando fornecedor, pendencia de aprovação, manutenção programada).
+- Exemplo: Se cliente não responde solicitação de informação, SLA pausa automaticamente
+
+**Calendario de Operação**: Define horarios e dias uteis de atendimento (ex: seg-sex 8h-18h). Critico para calcular "horas uteis".
+- Pode ser diferente por cliente (contrato 24x7 vs contrato comercial)
+- Inclui feriados nacionais, estaduais, municipais e corporativos
+
+**Escalação Automatica**: Ação automatica disparada quando chamado atinge percentual de tempo decorrido (ex: 75% do prazo) ou quando SLA e violado.
+- Nivel 1 (50% do prazo): Alerta ao atendente
+- Nivel 2 (75% do prazo): Notificação ao supervisor
+- Nivel 3 (90% do prazo): Escalação para gerente
+- Nivel 4 (Violação): Escalação para diretor + registro de incidente
+
+**Compliance SLA**: Percentual de chamados resolvidos dentro do prazo contratual em um periodo (geralmente mensal).
+- Formula: (Chamados Resolvidos no Prazo / Total Chamados Resolvidos) * 100
+- Meta padrao mercado: ≥95% para tempo de resposta, ≥90% para tempo de resolução
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Cadastro de SLA** | Formulario ASPX com 15 postbacks | SPA Angular com validação real-time |
+| **Calculo de Prazos** | Stored Procedure `pa_CalcularSLA` (900 linhas) | Motor C# CQRS + Hangfire Background Jobs |
+| **Pausas de SLA** | Manual via UPDATE direto no banco | Automatico via regras configuráveis + auditoria |
+| **Feriados** | Tabela estatica atualizada 1x/ano | API integrada com feriados nacionais + customizáveis |
+| **Escalações** | E-mails SMTP hardcoded no codigo | Workflow visual + multi-canal (e-mail, SMS, push, webhook) |
+| **Relatorio Compliance** | Gerado em 20 min (queries lentas) | Dashboard real-time <500ms (cache Redis) |
+| **Versionamento SLA** | Nenhum (sobrescreve dados) | Temporal Tables SQL (historico completo 7 anos) |
+| **Simulador Impacto** | Nenhum | Simulação "what-if" com dados historicos |
+| **Multi-Tenancy** | 1 tenant hardcoded | Multi-tenant nativo (Id_Conglomerado) |
+| **API Externa** | SOAP limitado | REST + GraphQL + Webhooks |
+| **Mobile** | Nenhum | PWA responsivo com notificações push |
+| **Performance** | ~8s para carregar lista SLAs | <300ms (paginação server-side + cache) |
+
+### 1.5 Funcionalidades Principais
+
+1. **CRUD de SLA** - Cadastro completo de SLAs com nome, descrição, prioridade, tempo de resposta, tempo de resolução, calendario, status (ativo/inativo)
+2. **Matriz de Prioridades** - Configuração visual da matriz Urgencia x Impacto com cores personalizáveis e regras de classificação automatica
+3. **Gestão de Calendarios** - Cadastro de calendarios de operação (horario comercial, 24x7, fins de semana, plantão) com feriados nacionais e customizados
+4. **Regras de Pausa Automatica** - Definição de condições que pausam SLA (status "Aguardando Cliente", "Aguardando Fornecedor", "Pendente Aprovação")
+5. **Escalações Multi-Nivel** - Configuração de ate 5 niveis de escalação com percentuais de tempo, destinatarios, canais (e-mail, SMS, push) e scripts de mensagem
+6. **Simulador de SLA** - Ferramenta para simular impacto de mudanças em SLA usando dados historicos (ex: "Se reduzir tempo de resolução de 8h para 4h, compliance cai de 92% para 78%")
+7. **Relatorios de Compliance** - Dashboards de compliance SLA por cliente, contrato, prioridade, equipe com drill-down e exportação (PDF, Excel, Power BI)
+8. **Versionamento de SLA** - Rastreamento completo de alterações em SLAs com quem alterou, quando, o que mudou (before/after), motivo
+9. **Integracao com Chamados** - Aplicação automatica de SLA ao criar chamado baseado em regras (cliente + tipo de chamado + prioridade)
+10. **API REST/GraphQL** - Endpoints para consulta de SLAs, calculo de prazos, historico de compliance para integração com sistemas externos
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-SLA-069-01: Obrigatoriedade de Tempo de Resposta e Resolução
+
+**Descricao**: Todo SLA DEVE ter tempo de resposta (em minutos) e tempo de resolução (em minutos) definidos e maiores que zero.
+
+**Justificativa**: SLA sem prazos definidos não pode ser monitorado nem gerar alertas de violação.
+
+**Implementacao**:
+```csharp
+public class SLAValidator : AbstractValidator<SLA>
+{
+    public SLAValidator()
+    {
+        RuleFor(x => x.Tempo_Resposta_Minutos)
+            .GreaterThan(0)
+            .WithMessage("Tempo de resposta deve ser maior que zero");
+
+        RuleFor(x => x.Tempo_Resolucao_Minutos)
+            .GreaterThan(0)
+            .WithMessage("Tempo de resolução deve ser maior que zero");
+
+        RuleFor(x => x.Tempo_Resolucao_Minutos)
+            .GreaterThanOrEqualTo(x => x.Tempo_Resposta_Minutos)
+            .WithMessage("Tempo de resolução deve ser maior ou igual ao tempo de resposta");
+    }
+}
+```
+
+**Exemplos**:
+- Valido: Tempo Resposta = 30 min, Tempo Resolução = 240 min
+- Invalido: Tempo Resposta = 0, Tempo Resolução = 120 min (resposta não pode ser zero)
+- Invalido: Tempo Resposta = 240 min, Tempo Resolução = 120 min (resolução < resposta)
+
+---
+
+### RN-SLA-069-02: Prioridade Unica por Combinação Cliente/Tipo Chamado
+
+**Descricao**: Não pode existir mais de um SLA ativo para a mesma combinação de Cliente + Tipo de Chamado + Prioridade.
+
+**Justificativa**: Evita ambiguidade na aplicação de SLA ao criar chamado. Sistema não saberia qual SLA aplicar.
+
+**Implementacao**:
+```csharp
+public async Task<bool> ValidarSLAUnico(int idCliente, int idTipoChamado, PrioridadeEnum prioridade)
+{
+    var slaExistente = await _context.SLAs
+        .Where(s => s.Id_Cliente == idCliente
+                 && s.Id_Tipo_Chamado == idTipoChamado
+                 && s.Prioridade == prioridade
+                 && s.Fl_Ativo == true
+                 && s.Fl_Excluido == false)
+        .CountAsync();
+
+    if (slaExistente > 0)
+        throw new BusinessException("SLA_002", "Já existe SLA ativo para esta combinação Cliente/Tipo/Prioridade");
+
+    return true;
+}
+```
+
+**Exemplos**:
+- Valido: Cliente A + Tipo "Incidente" + Prioridade Alta = SLA_001
+- Invalido: Tentar criar segundo SLA para Cliente A + Tipo "Incidente" + Prioridade Alta
+
+---
+
+### RN-SLA-069-03: Calendario Obrigatorio
+
+**Descricao**: Todo SLA DEVE estar associado a um calendario de operação (Id_Calendario NOT NULL).
+
+**Justificativa**: Sem calendario, sistema não consegue calcular "horas uteis" para SLA (ex: chamado aberto sexta 17h só conta a partir de segunda 8h se calendario for comercial).
+
+**Implementacao**:
+```csharp
+RuleFor(x => x.Id_Calendario)
+    .NotNull()
+    .WithMessage("SLA deve estar associado a um calendário de operação")
+    .MustAsync(async (idCalendario, cancellation) =>
+    {
+        return await _context.Calendarios
+            .AnyAsync(c => c.Id_Calendario == idCalendario
+                        && c.Fl_Ativo == true
+                        && c.Fl_Excluido == false,
+                        cancellation);
+    })
+    .WithMessage("Calendário selecionado não existe ou está inativo");
+```
+
+**Validacao SQL**:
+```sql
+ALTER TABLE [dbo].[SLA_Chamado]
+ADD CONSTRAINT [FK_SLA_Calendario]
+FOREIGN KEY([Id_Calendario])
+REFERENCES [dbo].[Calendario] ([Id_Calendario]);
+
+ALTER TABLE [dbo].[SLA_Chamado]
+ADD CONSTRAINT [CK_SLA_Calendario_NotNull]
+CHECK ([Id_Calendario] IS NOT NULL);
+```
+
+---
+
+### RN-SLA-069-04: Pausas de SLA Configuráveis por Status
+
+**Descricao**: Sistema DEVE pausar automaticamente a contagem de SLA quando chamado entrar em status configurado como "Pausa SLA" (ex: Aguardando Cliente, Aguardando Fornecedor, Pendente Aprovação).
+
+**Justificativa**: Justiça contratual - cliente não pode ser penalizado por tempo que depende de terceiros.
+
+**Implementacao**:
+```csharp
+public class StatusChamado
+{
+    public int Id_Status { get; set; }
+    public string Nm_Status { get; set; }
+    public bool Fl_Pausa_SLA { get; set; } // TRUE = pausa contagem SLA
+}
+
+// Ao mudar status do chamado
+public async Task AtualizarStatusChamado(int idChamado, int novoStatus)
+{
+    var status = await _context.StatusChamados.FindAsync(novoStatus);
+    var chamado = await _context.Chamados.FindAsync(idChamado);
+
+    if (status.Fl_Pausa_SLA && !chamado.Fl_SLA_Pausado)
+    {
+        // Pausar SLA
+        chamado.Fl_SLA_Pausado = true;
+        chamado.Dt_Inicio_Pausa_SLA = DateTime.Now;
+        await _auditoria.RegistrarEvento("CHAMADO_SLA_PAUSADO", idChamado,
+            $"SLA pausado ao mudar para status {status.Nm_Status}");
+    }
+    else if (!status.Fl_Pausa_SLA && chamado.Fl_SLA_Pausado)
+    {
+        // Retomar SLA
+        var tempoPausado = DateTime.Now - chamado.Dt_Inicio_Pausa_SLA.Value;
+        chamado.Tempo_Total_Pausado_Minutos += (int)tempoPausado.TotalMinutes;
+        chamado.Fl_SLA_Pausado = false;
+        chamado.Dt_Inicio_Pausa_SLA = null;
+        await _auditoria.RegistrarEvento("CHAMADO_SLA_RETOMADO", idChamado,
+            $"SLA retomado. Tempo pausado: {tempoPausado.TotalMinutes} min");
+    }
+
+    await _context.SaveChangesAsync();
+}
+```
+
+---
+
+### RN-SLA-069-05: Escalação Automatica em Percentuais de Tempo
+
+**Descricao**: Sistema DEVE disparar escalações automaticas quando chamado atingir percentuais configurados do tempo de SLA (ex: 50%, 75%, 90%, 100% - violação).
+
+**Justificativa**: Alertas proativos permitem ação preventiva antes de violação contratual.
+
+**Implementacao**:
+```csharp
+public class EscalacaoSLA
+{
+    public int Id_Escalacao { get; set; }
+    public int Id_SLA { get; set; }
+    public int Nivel_Escalacao { get; set; } // 1, 2, 3, 4
+    public int Percentual_Tempo { get; set; } // 50, 75, 90, 100
+    public TipoMetricaEnum Metrica { get; set; } // TempoResposta, TempoResolucao
+    public string Destinatarios { get; set; } // Lista de e-mails ou IDs de usuarios
+    public CanalNotificacaoEnum Canal { get; set; } // Email, SMS, Push, Webhook
+    public string Mensagem_Template { get; set; }
+}
+
+// Job Hangfire executado a cada 1 minuto
+[AutomaticRetry(Attempts = 3)]
+public async Task VerificarEscalacoesPendentes()
+{
+    var chamadosEmAberto = await _context.Chamados
+        .Where(c => c.Status != StatusChamadoEnum.Resolvido
+                 && c.Status != StatusChamadoEnum.Fechado
+                 && c.Fl_SLA_Pausado == false)
+        .ToListAsync();
+
+    foreach (var chamado in chamadosEmAberto)
+    {
+        var percentualDecorrido = CalcularPercentualTempoDecorrido(chamado);
+        var escalacoesADisparar = await ObterEscalacoesNaoDisparadas(chamado, percentualDecorrido);
+
+        foreach (var escalacao in escalacoesADisparar)
+        {
+            await DispararEscalacao(chamado, escalacao);
+        }
+    }
+}
+
+private int CalcularPercentualTempoDecorrido(Chamado chamado)
+{
+    var tempoDecorrido = (DateTime.Now - chamado.Dt_Abertura).TotalMinutes - chamado.Tempo_Total_Pausado_Minutos;
+    var tempoLimiteSLA = chamado.SLA.Tempo_Resolucao_Minutos;
+    return (int)((tempoDecorrido / tempoLimiteSLA) * 100);
+}
+```
+
+---
+
+### RN-SLA-069-06: Calculo de Tempo Apenas em Horario Util
+
+**Descricao**: Sistema DEVE calcular tempo decorrido de SLA apenas durante horario util definido no calendario (ex: seg-sex 8h-18h), excluindo feriados e fins de semana.
+
+**Justificativa**: Contratos geralmente definem SLA em "horas uteis" (business hours), não em horas corridas (24x7).
+
+**Implementacao**:
+```csharp
+public class CalculadoraSLA
+{
+    private readonly ICalendarioService _calendarioService;
+
+    public async Task<DateTime> CalcularPrazoLimite(DateTime dataInicio, int minutosUteis, int idCalendario)
+    {
+        var calendario = await _calendarioService.ObterCalendario(idCalendario);
+        var dataAtual = dataInicio;
+        var minutosRestantes = minutosUteis;
+
+        while (minutosRestantes > 0)
+        {
+            // Pular para proximo dia util se atual for fim de semana/feriado
+            while (!await _calendarioService.IsDiaUtil(dataAtual, idCalendario))
+            {
+                dataAtual = dataAtual.AddDays(1).Date.Add(calendario.Horario_Inicio);
+            }
+
+            // Ajustar para inicio do expediente se estiver antes
+            if (dataAtual.TimeOfDay < calendario.Horario_Inicio)
+                dataAtual = dataAtual.Date.Add(calendario.Horario_Inicio);
+
+            // Ajustar para inicio do proximo dia se estiver apos expediente
+            if (dataAtual.TimeOfDay >= calendario.Horario_Fim)
+            {
+                dataAtual = dataAtual.AddDays(1).Date.Add(calendario.Horario_Inicio);
+                continue;
+            }
+
+            // Calcular minutos disponiveis ate fim do expediente
+            var fimExpediente = dataAtual.Date.Add(calendario.Horario_Fim);
+            var minutosDisponiveis = (int)(fimExpediente - dataAtual).TotalMinutes;
+
+            if (minutosRestantes <= minutosDisponiveis)
+            {
+                // Prazo cabe no dia atual
+                dataAtual = dataAtual.AddMinutes(minutosRestantes);
+                minutosRestantes = 0;
+            }
+            else
+            {
+                // Consome dia inteiro e pula para proximo
+                minutosRestantes -= minutosDisponiveis;
+                dataAtual = dataAtual.AddDays(1).Date.Add(calendario.Horario_Inicio);
+            }
+        }
+
+        return dataAtual;
+    }
+}
+```
+
+---
+
+### RN-SLA-069-07: Feriados Nacionais e Customizados
+
+**Descricao**: Sistema DEVE suportar cadastro de feriados nacionais, estaduais, municipais e corporativos (dia de aniversario da empresa, ponte facultativa).
+
+**Justificativa**: Calendarios de atendimento variam por região e empresa. SLA deve respeitar dias não uteis.
+
+**Implementacao**:
+```csharp
+public class Feriado
+{
+    public int Id_Feriado { get; set; }
+    public DateTime Dt_Feriado { get; set; }
+    public string Nm_Feriado { get; set; }
+    public TipoFeriadoEnum Tipo { get; set; } // Nacional, Estadual, Municipal, Corporativo
+    public string UF { get; set; } // NULL para nacional
+    public string Municipio { get; set; } // NULL para estadual/nacional
+    public int? Id_Cliente { get; set; } // NULL para feriados publicos
+    public bool Fl_Recorrente { get; set; } // TRUE para feriados fixos (Natal, Ano Novo)
+}
+
+// Integracao com API publica de feriados
+public async Task ImportarFeriadosNacionais(int ano)
+{
+    var url = $"https://brasilapi.com.br/api/feriados/v1/{ano}";
+    var response = await _httpClient.GetAsync(url);
+    var feriados = await response.Content.ReadFromJsonAsync<List<FeriadoBrasilAPI>>();
+
+    foreach (var feriado in feriados)
+    {
+        if (!await _context.Feriados.AnyAsync(f => f.Dt_Feriado == feriado.Date))
+        {
+            await _context.Feriados.AddAsync(new Feriado
+            {
+                Dt_Feriado = feriado.Date,
+                Nm_Feriado = feriado.Name,
+                Tipo = TipoFeriadoEnum.Nacional,
+                Fl_Recorrente = false
+            });
+        }
+    }
+
+    await _context.SaveChangesAsync();
+}
+```
+
+---
+
+### RN-SLA-069-08: Versionamento de SLA com Historico Completo
+
+**Descricao**: Sistema DEVE registrar TODAS as alterações em configurações de SLA (tempo de resposta, tempo de resolução, calendario, escalações) com data/hora, usuario, valores before/after e motivo da mudança.
+
+**Justificativa**: Auditoria LGPD, compliance contratual e rastreabilidade de mudanças. Critico em disputas contratuais ("cliente afirma que SLA era 2h, mas foi alterado para 4h sem aviso").
+
+**Implementacao**:
+```sql
+-- Habilitar Temporal Tables no SQL Server
+ALTER TABLE [dbo].[SLA_Chamado]
+ADD
+    [SysStartTime] DATETIME2 GENERATED ALWAYS AS ROW START NOT NULL,
+    [SysEndTime] DATETIME2 GENERATED ALWAYS AS ROW END NOT NULL,
+    PERIOD FOR SYSTEM_TIME ([SysStartTime], [SysEndTime]);
+
+ALTER TABLE [dbo].[SLA_Chamado]
+SET (SYSTEM_VERSIONING = ON (HISTORY_TABLE = [dbo].[SLA_Chamado_History]));
+
+-- Consultar historico de alteracoes
+SELECT *
+FROM [dbo].[SLA_Chamado]
+FOR SYSTEM_TIME ALL
+WHERE Id_SLA = @idSLA
+ORDER BY SysStartTime DESC;
+```
+
+**Auditoria Customizada**:
+```csharp
+public class AuditoriaSLA
+{
+    public int Id_Auditoria_SLA { get; set; }
+    public int Id_SLA { get; set; }
+    public DateTime Dt_Alteracao { get; set; }
+    public int Id_Usuario_Alteracao { get; set; }
+    public string Campo_Alterado { get; set; }
+    public string Valor_Anterior { get; set; }
+    public string Valor_Novo { get; set; }
+    public string Motivo_Alteracao { get; set; } // Obrigatorio
+    public string IP_Origem { get; set; }
+}
+```
+
+---
+
+### RN-SLA-069-09: Simulador de Impacto de Mudanças em SLA
+
+**Descricao**: Sistema DEVE fornecer simulador "what-if" que, ao alterar parametros de SLA (tempo de resposta, resolução), calcula impacto no compliance historico dos ultimos 90 dias.
+
+**Justificativa**: Permite decisões baseadas em dados ao negociar SLAs com clientes. Ex: "Se reduzirmos tempo de resolução de 8h para 4h, nosso compliance cai de 92% para 78%, inviabilizando penalidade contratual".
+
+**Implementacao**:
+```csharp
+public class SimuladorSLA
+{
+    public async Task<SimulacaoResultado> SimularMudancaSLA(int idSLA, int novoTempoRespostaMin, int novoTempoResolucaoMin)
+    {
+        // Buscar chamados dos ultimos 90 dias com SLA atual
+        var chamados = await _context.Chamados
+            .Where(c => c.Id_SLA == idSLA
+                     && c.Dt_Abertura >= DateTime.Now.AddDays(-90)
+                     && c.Status == StatusChamadoEnum.Resolvido)
+            .ToListAsync();
+
+        int totalChamados = chamados.Count;
+        int respostaForaPrazoAtual = chamados.Count(c => c.Fl_Resposta_Violada);
+        int resolucaoForaPrazoAtual = chamados.Count(c => c.Fl_Resolucao_Violada);
+
+        // Recalcular com novos parametros
+        int respostaForaPrazoNovo = 0;
+        int resolucaoForaPrazoNovo = 0;
+
+        foreach (var chamado in chamados)
+        {
+            var tempoRespostaReal = (chamado.Dt_Primeira_Resposta.Value - chamado.Dt_Abertura).TotalMinutes;
+            var tempoResolucaoReal = (chamado.Dt_Resolucao.Value - chamado.Dt_Abertura).TotalMinutes;
+
+            if (tempoRespostaReal > novoTempoRespostaMin) respostaForaPrazoNovo++;
+            if (tempoResolucaoReal > novoTempoResolucaoMin) resolucaoForaPrazoNovo++;
+        }
+
+        return new SimulacaoResultado
+        {
+            Total_Chamados = totalChamados,
+            Compliance_Resposta_Atual = ((totalChamados - respostaForaPrazoAtual) / (double)totalChamados) * 100,
+            Compliance_Resposta_Novo = ((totalChamados - respostaForaPrazoNovo) / (double)totalChamados) * 100,
+            Compliance_Resolucao_Atual = ((totalChamados - resolucaoForaPrazoAtual) / (double)totalChamados) * 100,
+            Compliance_Resolucao_Novo = ((totalChamados - resolucaoForaPrazoNovo) / (double)totalChamados) * 100,
+            Impacto_Percentual_Resposta = ...,
+            Impacto_Percentual_Resolucao = ...
+        };
+    }
+}
+```
+
+---
+
+### RN-SLA-069-10: Regras de Aplicação Automatica de SLA
+
+**Descricao**: Sistema DEVE aplicar SLA automaticamente ao criar chamado baseado em regras de precedencia: 1) SLA especifico Cliente + Tipo + Prioridade, 2) SLA generico Tipo + Prioridade, 3) SLA default do sistema.
+
+**Justificativa**: Automação total - usuario não precisa escolher SLA manualmente (fonte de erros).
+
+**Implementacao**:
+```csharp
+public async Task<int> DeterminarSLAAplicavel(int idCliente, int idTipoChamado, PrioridadeEnum prioridade)
+{
+    // Regra 1: SLA especifico do cliente
+    var slaEspecifico = await _context.SLAs
+        .Where(s => s.Id_Cliente == idCliente
+                 && s.Id_Tipo_Chamado == idTipoChamado
+                 && s.Prioridade == prioridade
+                 && s.Fl_Ativo == true)
+        .FirstOrDefaultAsync();
+
+    if (slaEspecifico != null) return slaEspecifico.Id_SLA;
+
+    // Regra 2: SLA generico por tipo/prioridade
+    var slaGenerico = await _context.SLAs
+        .Where(s => s.Id_Cliente == null
+                 && s.Id_Tipo_Chamado == idTipoChamado
+                 && s.Prioridade == prioridade
+                 && s.Fl_Ativo == true)
+        .FirstOrDefaultAsync();
+
+    if (slaGenerico != null) return slaGenerico.Id_SLA;
+
+    // Regra 3: SLA default do sistema
+    var slaDefault = await _context.SLAs
+        .Where(s => s.Id_Cliente == null
+                 && s.Id_Tipo_Chamado == null
+                 && s.Prioridade == prioridade
+                 && s.Fl_Default == true
+                 && s.Fl_Ativo == true)
+        .FirstOrDefaultAsync();
+
+    if (slaDefault != null) return slaDefault.Id_SLA;
+
+    throw new BusinessException("SLA_003", "Nenhum SLA aplicável encontrado para este chamado");
+}
+```
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IControlIT_Cliente`
+
+**Tabela Principal**: `Solicitacao_SLA`
+
+```sql
+CREATE TABLE [dbo].[Solicitacao_SLA](
+    [Id_Solicitacao_SLA] [int] IDENTITY(1,1) NOT NULL,
+    [Nm_Solicitacao_SLA] [varchar](50) NOT NULL,
+    [Horas] [int] NOT NULL,
+    [Email_2_Nivel] [varchar](50) NOT NULL,
+    [Fl_Desativado] [int] NOT NULL,
+    CONSTRAINT [PK_Solicitacao_SLA] PRIMARY KEY CLUSTERED ([Id_Solicitacao_SLA] ASC)
+) ON [PRIMARY]
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descricao | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `Id_Solicitacao_SLA` | Chave primaria | Migrado como `Id_SLA` |
+| `Nm_Solicitacao_SLA` | Nome do SLA (ex: "SLA Critico 4h") | Migrado como `Nm_SLA` |
+| `Horas` | Prazo em HORAS (nao minutos) | Convertido para `Tempo_Resolucao_Minutos = Horas * 60` |
+| `Email_2_Nivel` | E-mail unico para escalação | Substituido por tabela `Escalacao_SLA` (multi-nivel) |
+| `Fl_Desativado` | 0 = ativo, 1 = inativo | Invertido para `Fl_Ativo` (melhor semantica) |
+
+**Limitações do Legado**:
+- Apenas 1 nivel de escalação (Email_2_Nivel)
+- Prazo unico (não diferencia resposta vs resolução)
+- Sem suporte a calendarios (hardcoded seg-sex 8-18h)
+- Sem pausas de SLA
+- Sem versionamento de alterações
+
+**Tabela Secundaria**: `Contrato_SLA_Operacao`
+
+```sql
+CREATE TABLE [dbo].[Contrato_SLA_Operacao](
+    [Id_Contrato_SLA_Operacao] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Contrato] [int] NOT NULL,
+    [Descricao] [varchar](8000) NOT NULL,
+    [Prazo_Dias] [int] NULL,
+    [Vr_SLA_Operacao] [numeric](10, 2) NULL,
+    [Fl_Desativado] [int] NOT NULL,
+    CONSTRAINT [PK_Contrato_SLA_Operacao] PRIMARY KEY CLUSTERED ([Id_Contrato_SLA_Operacao] ASC)
+) ON [PRIMARY]
+```
+
+**Uso**: SLAs vinculados a contratos de fornecedores (ex: "Troca de equipamento em ate 5 dias uteis"). Migrado para RF-028 (SLA Operações), não para RF-069 (SLA Chamados).
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descricao | Migracao |
+|-----------|-----------|----------|
+| `pa_CalcularSLA` | Calcula se chamado esta dentro do prazo. Lógica complexa com 900 linhas de T-SQL | Substituido por `CalculadoraSLA.cs` + Hangfire Background Job (tempo real) |
+| `pa_ObterSLAPorCliente` | Retorna SLA aplicavel a cliente/tipo chamado | Migrado para Query CQRS `ObterSLAAplicavel` |
+| `pa_RelatorioCompliance` | Gera relatorio mensal de compliance SLA (lento, >2min) | Substituido por Dashboard Angular + SignalR (real-time) |
+
+### 3.3 Telas ASPX
+
+| Pagina | Descricao | Tela Moderna |
+|--------|-----------|--------------|
+| `Chamado/ConfigurarSLA.aspx` | Cadastro de SLAs com validação server-side (postback) | `/service-desk/sla/configurar` (Angular SPA) |
+| `Chamado/RelatorioSLA.aspx` | Relatorio tabular de compliance (GridView) | `/service-desk/sla/compliance` (Dashboard ApexCharts) |
+| `Chamado/EscalacaoSLA.aspx` | Configuração manual de e-mails de escalação | `/service-desk/sla/escalacoes` (Workflow visual) |
+
+**Mapeamento de Rotas**:
+- Legado: `Chamado/ConfigurarSLA.aspx?id=123` → Moderno: `/service-desk/sla/configurar/123`
+- Legado: `Chamado/RelatorioSLA.aspx?mes=2025-12` → Moderno: `/service-desk/sla/compliance?periodo=2025-12`
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSSuporte.asmx.vb`
+
+| Metodo | Descricao | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ObterSLAPorChamado(idChamado)` | Retorna SLA aplicavel ao chamado | `GET /api/sla/chamado/{idChamado}` |
+| `CalcularPrazoSLA(idSLA, dataInicio)` | Calcula data/hora limite do SLA | `POST /api/sla/calcular-prazo` |
+| `ValidarViolacaoSLA(idChamado)` | Verifica se chamado violou SLA | `GET /api/sla/chamado/{idChamado}/status` |
+
+**Limitações SOAP**: Sem suporte a webhooks, autenticação fraca (Basic Auth), performance ruim (>2s por request).
+
+**Modernização REST**: OAuth2 + JWT, cache Redis, <200ms response time, webhooks para notificações proativas.
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `SERVICE_DESK_SLA_CONFIGURACAO`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "SERVICE_DESK_SLA_CONFIGURACAO",
+    "nome": "Configuração de SLA para Chamados",
+    "descricao": "Permite cadastrar, editar e simular SLAs para chamados de Service Desk",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "metadata": {
+        "modulo": "Service Desk",
+        "versao": "1.0.0",
+        "dataLancamento": "2025-12-28",
+        "permissaoNecessaria": "servicedesk:sla:manage"
+    }
+}
+```
+
+**Sub-Features Granulares**:
+```json
+{
+    "SERVICE_DESK_SLA_SIMULADOR": "Simulador de impacto de mudanças em SLA",
+    "SERVICE_DESK_SLA_ESCALACAO_MULTINIVEL": "Escalações com até 5 níveis (vs 1 no legado)",
+    "SERVICE_DESK_SLA_INTEGRACAO_FERIADOS": "Importação automática de feriados via API",
+    "SERVICE_DESK_SLA_PAUSE_AUTOMATICO": "Pausas automáticas de SLA por status"
+}
+```
+
+**Nota**: Feature flag permite habilitar/desabilitar modulo por tenant (multi-tenancy). Ex: Cliente BASIC não tem acesso a Simulador, apenas clientes ENTERPRISE.
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao**:
+
+```json
+{
+    "serviceDesk": {
+        "sla": {
+            "title": "Configuração de SLA",
+            "subtitle": "Gerencie acordos de nível de serviço para chamados",
+            "form": {
+                "nome": "Nome do SLA",
+                "nomePlaceholder": "Ex: SLA Crítico - 4 horas",
+                "descricao": "Descrição",
+                "prioridade": "Prioridade",
+                "tempoResposta": "Tempo de Resposta (minutos)",
+                "tempoResolucao": "Tempo de Resolução (minutos)",
+                "calendario": "Calendário de Operação",
+                "cliente": "Cliente (opcional)",
+                "tipoChamado": "Tipo de Chamado (opcional)",
+                "status": "Status",
+                "ativo": "Ativo",
+                "inativo": "Inativo"
+            },
+            "escalacoes": {
+                "title": "Escalações Automáticas",
+                "nivel": "Nível",
+                "percentual": "Percentual de Tempo",
+                "destinatarios": "Destinatários",
+                "canal": "Canal de Notificação",
+                "mensagem": "Mensagem Template"
+            },
+            "simulador": {
+                "title": "Simulador de Impacto",
+                "novoTempoResposta": "Novo Tempo de Resposta (min)",
+                "novoTempoResolucao": "Novo Tempo de Resolução (min)",
+                "btnSimular": "Simular Impacto",
+                "resultadoAtual": "Compliance Atual",
+                "resultadoNovo": "Compliance Projetado",
+                "impacto": "Impacto (%)"
+            },
+            "messages": {
+                "createSuccess": "SLA criado com sucesso",
+                "updateSuccess": "SLA atualizado com sucesso",
+                "deleteSuccess": "SLA inativado com sucesso",
+                "simulacaoCompleta": "Simulação concluída",
+                "errorGenerico": "Erro ao processar operação de SLA"
+            },
+            "validation": {
+                "nomeObrigatorio": "Nome do SLA é obrigatório",
+                "tempoRespostaInvalido": "Tempo de resposta deve ser maior que zero",
+                "tempoResolucaoInvalido": "Tempo de resolução deve ser maior que zero",
+                "resolucaoMenorResposta": "Tempo de resolução deve ser maior ou igual ao tempo de resposta",
+                "calendarioObrigatorio": "Calendário de operação é obrigatório",
+                "sladuplicado": "Já existe SLA ativo para esta combinação Cliente/Tipo/Prioridade",
+                "escalacaoSemDestinatario": "Escalação deve ter pelo menos um destinatário"
+            },
+            "prioridades": {
+                "critica": "Crítica",
+                "alta": "Alta",
+                "media": "Média",
+                "baixa": "Baixa"
+            },
+            "canaisNotificacao": {
+                "email": "E-mail",
+                "sms": "SMS",
+                "push": "Notificação Push",
+                "webhook": "Webhook"
+            }
+        }
+    }
+}
+```
+
+**Idiomas Suportados**: pt-BR (principal), en-US, es-ES
+
+**Regra Critica**: TODAS as labels, mensagens de erro, validações e tooltips DEVEM ter chave i18n. Textos hardcoded no codigo são considerados BUG CRITICO.
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Criar SLA | `SLA_CREATE` | Todos os campos do SLA criado (JSON completo) |
+| Editar SLA | `SLA_UPDATE` | Campos alterados (before/after), motivo da alteração |
+| Inativar SLA | `SLA_DELETE` | Id_SLA, Nm_SLA, motivo de inativação |
+| Simular Mudança | `SLA_SIMULATE` | Parametros da simulação + resultados |
+| Aplicar SLA a Chamado | `SLA_APPLY` | Id_Chamado, Id_SLA, regra de aplicação usada |
+| Pausar SLA | `SLA_PAUSE` | Id_Chamado, motivo da pausa, dt_inicio_pausa |
+| Retomar SLA | `SLA_RESUME` | Id_Chamado, tempo total pausado |
+| Disparar Escalação | `SLA_ESCALATE` | Id_Chamado, nivel_escalacao, destinatarios, canal |
+| Violar SLA | `SLA_VIOLATE` | Id_Chamado, metrica violada (resposta/resolucao), tempo decorrido |
+| Importar Feriados | `SLA_IMPORT_HOLIDAYS` | Ano, quantidade de feriados importados |
+
+**Dados Sensiveis**: E-mails de destinatários de escalação são mascarados no log de auditoria (`jo**@empresa.com`).
+
+**Retencao**: 7 anos (compliance LGPD Art. 16) em tabela particionada por ano (`Auditoria_SLA_2025`, `Auditoria_SLA_2026`, etc).
+
+**Exemplo de Registro de Auditoria**:
+```json
+{
+    "operacao": "SLA_UPDATE",
+    "entidade": "SLA_Chamado",
+    "idRegistro": 42,
+    "usuario": "joao.silva@empresa.com",
+    "dataHora": "2025-12-28T14:35:22",
+    "ipOrigem": "192.168.1.100",
+    "alteracoes": [
+        {
+            "campo": "Tempo_Resolucao_Minutos",
+            "valorAnterior": 480,
+            "valorNovo": 240,
+            "motivoAlteracao": "Negociação contratual - redução de 8h para 4h conforme aditivo CT-2025-042"
+        }
+    ]
+}
+```
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `servicedesk:sla:read` | Visualizar SLAs cadastrados | Atendente, Supervisor, Gerente, Administrador |
+| `servicedesk:sla:create` | Criar novos SLAs | Supervisor, Gerente, Administrador |
+| `servicedesk:sla:update` | Editar SLAs existentes | Supervisor, Gerente, Administrador |
+| `servicedesk:sla:delete` | Inativar SLAs | Gerente, Administrador |
+| `servicedesk:sla:simulate` | Usar simulador de impacto | Gerente, Administrador |
+| `servicedesk:sla:escalation:manage` | Configurar escalações | Supervisor, Gerente, Administrador |
+| `servicedesk:sla:calendar:manage` | Gerenciar calendarios e feriados | Administrador |
+| `servicedesk:sla:report:view` | Visualizar relatorios de compliance | Supervisor, Gerente, Auditor, Administrador |
+| `servicedesk:sla:audit:view` | Visualizar historico de auditoria de SLAs | Auditor, Administrador |
+
+**Matriz de Perfis**:
+
+| Perfil | Read | Create | Update | Delete | Simulate | Escalation | Calendar | Report | Audit |
+|--------|------|--------|--------|--------|----------|------------|----------|--------|-------|
+| Atendente | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Supervisor | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ |
+| Gerente | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ |
+| Administrador | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Auditor | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+
+**Nota Critica**: Backend DEVE validar permissões via **Policies** (.NET Authorization Policies), NÃO apenas Roles. Frontend apenas esconde botões (segurança cosmética), validação real e no backend.
+
+**Exemplo de Validação Backend**:
+```csharp
+[Authorize(Policy = "ServiceDeskSLAUpdate")]
+[HttpPut("/api/sla/{id}")]
+public async Task<IActionResult> AtualizarSLA(int id, [FromBody] AtualizarSLACommand command)
+{
+    // Politica ServiceDeskSLAUpdate valida permissao servicedesk:sla:update
+    await _mediator.Send(command);
+    return Ok();
+}
+```
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/sla` | Listar SLAs (paginado, filtrado) | `servicedesk:sla:read` |
+| GET | `/api/sla/{id}` | Obter SLA por ID | `servicedesk:sla:read` |
+| POST | `/api/sla` | Criar novo SLA | `servicedesk:sla:create` |
+| PUT | `/api/sla/{id}` | Atualizar SLA | `servicedesk:sla:update` |
+| DELETE | `/api/sla/{id}` | Inativar SLA (soft delete) | `servicedesk:sla:delete` |
+
+**Exemplo Request POST /api/sla**:
+```json
+{
+    "nmSLA": "SLA Crítico - Infraestrutura",
+    "descricao": "SLA para chamados críticos de infraestrutura",
+    "prioridade": "Critica",
+    "tempoRespostaMinutos": 15,
+    "tempoResolucaoMinutos": 240,
+    "idCalendario": 1,
+    "idCliente": null,
+    "idTipoChamado": 3,
+    "flAtivo": true,
+    "escalacoes": [
+        {
+            "nivelEscalacao": 1,
+            "percentualTempo": 50,
+            "metrica": "TempoResolucao",
+            "destinatarios": "supervisor@empresa.com",
+            "canal": "Email",
+            "mensagemTemplate": "Chamado #{ChamadoNumero} atingiu 50% do prazo SLA"
+        },
+        {
+            "nivelEscalacao": 2,
+            "percentualTempo": 75,
+            "metrica": "TempoResolucao",
+            "destinatarios": "gerente@empresa.com",
+            "canal": "Email,SMS",
+            "mensagemTemplate": "URGENTE: Chamado #{ChamadoNumero} atingiu 75% do prazo SLA"
+        }
+    ]
+}
+```
+
+**Exemplo Response 201 Created**:
+```json
+{
+    "idSLA": 42,
+    "nmSLA": "SLA Crítico - Infraestrutura",
+    "prioridade": "Critica",
+    "tempoRespostaMinutos": 15,
+    "tempoResolucaoMinutos": 240,
+    "flAtivo": true,
+    "dtCriacao": "2025-12-28T14:35:22",
+    "usuarioCriacao": "joao.silva@empresa.com"
+}
+```
+
+---
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| POST | `/api/sla/simular-impacto` | Simular impacto de mudança em SLA | `servicedesk:sla:simulate` |
+| GET | `/api/sla/aplicavel` | Determinar SLA aplicavel (cliente+tipo+prioridade) | `servicedesk:sla:read` |
+| POST | `/api/sla/calcular-prazo` | Calcular data/hora limite de SLA | `servicedesk:sla:read` |
+| GET | `/api/sla/{id}/historico` | Historico de alterações (versionamento) | `servicedesk:sla:audit:view` |
+| GET | `/api/sla/{id}/compliance` | Relatorio de compliance do SLA (ultimos 90 dias) | `servicedesk:sla:report:view` |
+| POST | `/api/sla/calendario/importar-feriados` | Importar feriados nacionais via API | `servicedesk:sla:calendar:manage` |
+| GET | `/api/sla/calendario/{id}/feriados` | Listar feriados de um calendario | `servicedesk:sla:read` |
+| POST | `/api/sla/escalacao/testar` | Testar disparo de escalação (ambiente dev) | `servicedesk:sla:escalation:manage` |
+
+**Exemplo POST /api/sla/simular-impacto**:
+```json
+{
+    "idSLA": 42,
+    "novoTempoRespostaMinutos": 30,
+    "novoTempoResolucaoMinutos": 480,
+    "periodoAnalise": 90
+}
+```
+
+**Response**:
+```json
+{
+    "totalChamados": 1250,
+    "complianceAtual": {
+        "resposta": 96.5,
+        "resolucao": 92.3
+    },
+    "complianceProjetado": {
+        "resposta": 98.8,
+        "resolucao": 85.4
+    },
+    "impacto": {
+        "resposta": 2.3,
+        "resolucao": -6.9
+    },
+    "recomendacao": "ATENÇÃO: Redução de 6.9pp no compliance de resolução. Considere revisar recursos da equipe."
+}
+```
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Criação de SLA
+
+```
+Gerente acessa /service-desk/sla/configurar
+    |
+    v
+Preenche formulario (nome, prioridade, tempos, calendario)
+    |
+    v
+Configura escalacoes (niveis 1-5)
+    |
+    v
+(Opcional) Usa simulador para validar impacto
+    |
+    +--- Impacto negativo > 10%? ---> [Ajusta parametros] --> [Volta ao form]
+    |
+    v (Impacto aceitavel)
+Frontend valida campos (FluentValidation)
+    |
+    v
+Envia POST /api/sla
+    |
+    v
+Backend valida regras de negocio:
+    - RN-SLA-069-01: Tempos > 0
+    - RN-SLA-069-02: SLA unico por cliente/tipo/prioridade
+    - RN-SLA-069-03: Calendario valido
+    |
+    +--- Violacao de RN? ---> [Retorna HTTP 400] --> [Exibe erro]
+    |
+    v (Validação OK)
+Salva SLA no banco de dados
+    |
+    v
+Registra auditoria (SLA_CREATE)
+    |
+    v
+Publica evento (SLACriadoEvent) via MediatR
+    |
+    v
+Retorna HTTP 201 com Id_SLA
+    |
+    v
+Frontend exibe mensagem sucesso e redireciona para lista
+```
+
+---
+
+### 6.2 Fluxo de Aplicação de SLA ao Criar Chamado
+
+```
+Usuario cria chamado (RF-073)
+    |
+    v
+Sistema identifica:
+    - Id_Cliente
+    - Id_Tipo_Chamado
+    - Prioridade (Critica/Alta/Media/Baixa)
+    |
+    v
+Executa Query: DeterminarSLAAplicavel
+    |
+    v
+Busca Regra 1: SLA especifico Cliente + Tipo + Prioridade
+    |
+    +--- Encontrou? ---> [Aplica SLA] --> [Fim]
+    |
+    v (Não encontrado)
+Busca Regra 2: SLA generico Tipo + Prioridade
+    |
+    +--- Encontrou? ---> [Aplica SLA] --> [Fim]
+    |
+    v (Não encontrado)
+Busca Regra 3: SLA default Prioridade
+    |
+    +--- Encontrou? ---> [Aplica SLA] --> [Fim]
+    |
+    v (Nenhum SLA encontrado)
+Lança exceção BusinessException "SLA_003"
+    |
+    v
+[Fim Aplicação SLA]
+    |
+Calcula prazo limite resposta:
+    - CalcularPrazoLimite(Dt_Abertura, Tempo_Resposta_Minutos, Id_Calendario)
+    |
+Calcula prazo limite resolução:
+    - CalcularPrazoLimite(Dt_Abertura, Tempo_Resolucao_Minutos, Id_Calendario)
+    |
+    v
+Salva no chamado:
+    - Id_SLA
+    - Dt_Prazo_Resposta
+    - Dt_Prazo_Resolucao
+    |
+    v
+Registra auditoria (SLA_APPLY)
+    |
+    v
+Agenda job Hangfire para monitorar escalacoes
+```
+
+---
+
+### 6.3 Fluxo de Monitoramento e Escalação (Background Job)
+
+```
+Hangfire Job executado a cada 1 minuto
+    |
+    v
+Busca chamados em aberto (status != Resolvido/Fechado)
+    |
+    v
+Para cada chamado:
+    |
+    v
+Verifica se SLA esta pausado?
+    |
+    +--- SIM ---> [Pula para proximo chamado]
+    |
+    v (NÃO)
+Calcula percentual tempo decorrido:
+    = ((Now - Dt_Abertura - Tempo_Pausado) / Tempo_SLA_Limite) * 100
+    |
+    v
+Busca escalacoes configuradas para este SLA
+    |
+    v
+Filtra escalacoes nao disparadas com percentual <= tempo decorrido
+    |
+    +--- Nenhuma escalação pendente? ---> [Pula para proximo chamado]
+    |
+    v (Há escalacoes a disparar)
+Para cada escalação pendente:
+    |
+    v
+Dispara notificação (Email, SMS, Push, Webhook)
+    |
+    v
+Registra disparo na tabela Escalacao_Disparada
+    |
+    v
+Registra auditoria (SLA_ESCALATE)
+    |
+    v
+Se percentual >= 100% (violação):
+    |
+    v
+Marca chamado como violado (Fl_Resolucao_Violada = true)
+    |
+    v
+Registra auditoria (SLA_VIOLATE)
+    |
+    v
+Dispara evento ViolacaoSLAEvent (para integrações externas)
+    |
+    v
+[Fim monitoramento]
+```
+
+---
+
+### 6.4 Fluxo de Pausa/Retomada de SLA
+
+```
+Atendente muda status do chamado
+    |
+    v
+Sistema verifica: Novo status tem Fl_Pausa_SLA = true?
+    |
+    +--- NÃO ---> [Continua contagem normal]
+    |
+    v (SIM - deve pausar)
+Chamado ja estava pausado?
+    |
+    +--- SIM ---> [Não faz nada]
+    |
+    v (NÃO - nova pausa)
+Pausa SLA:
+    - Fl_SLA_Pausado = true
+    - Dt_Inicio_Pausa_SLA = Now
+    |
+    v
+Registra auditoria (SLA_PAUSE)
+    |
+    v
+Notifica atendente: "SLA pausado - aguardando [motivo]"
+    |
+    v
+[Fim fluxo pausa]
+
+---
+
+Atendente muda status para status sem pausa
+    |
+    v
+Sistema verifica: Chamado estava pausado?
+    |
+    +--- NÃO ---> [Continua contagem normal]
+    |
+    v (SIM - retomar)
+Calcula tempo pausado:
+    = Now - Dt_Inicio_Pausa_SLA
+    |
+    v
+Acumula tempo pausado:
+    - Tempo_Total_Pausado_Minutos += tempo pausado
+    |
+    v
+Retoma SLA:
+    - Fl_SLA_Pausado = false
+    - Dt_Inicio_Pausa_SLA = null
+    |
+    v
+Registra auditoria (SLA_RESUME)
+    |
+    v
+Recalcula prazo limite considerando pausa
+    |
+    v
+[Fim fluxo retomada]
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| **SQL Injection** | Parametrização total de queries via Entity Framework Core. NUNCA concatenar strings SQL. |
+| **XSS (Cross-Site Scripting)** | Angular sanitiza automaticamente templates. Backend valida campos texto (FluentValidation MaxLength). |
+| **CSRF (Cross-Site Request Forgery)** | Token Anti-CSRF obrigatorio em formularios (Angular HttpClient + .NET AntiForgeryToken). |
+| **Autorização Granular** | Validação de permissões via Policies em TODOS os endpoints. Frontend apenas cosmético. |
+| **Rate Limiting** | Limitação de 100 requests/minuto por usuario/IP para evitar abuso de APIs (ASP.NET Core Middleware). |
+| **Auditoria Completa** | TODAS operações de CUD (Create/Update/Delete) auditadas com usuario, IP, timestamp, before/after. |
+| **Validação de Input** | FluentValidation no backend + Angular Reactive Forms no frontend (dupla validação). |
+| **Criptografia de Dados Sensiveis** | E-mails de escalação criptografados em repouso (AES-256). Mascarados em logs. |
+| **Versionamento Imutavel** | Temporal Tables SQL Server - historico de SLA imutavel (nenhum UPDATE direto). |
+| **Multi-Tenancy Rigoroso** | Filtro global `Id_Conglomerado` em TODAS queries (evita vazamento de dados entre tenants). |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [x] SQL Injection em campos Nome SLA, Descricao, E-mails
+- [x] XSS em campos Mensagem Template de Escalação
+- [x] CSRF Protection em todos formularios de criação/edição
+- [x] Validacao de permissoes em TODOS endpoints (tentar criar SLA sem permissao -> HTTP 403)
+- [x] Rate Limiting - tentar fazer 200 requests em 1 minuto -> HTTP 429 (Too Many Requests)
+- [x] Vazamento de dados entre tenants - Usuario Tenant A tentar acessar SLA do Tenant B -> HTTP 404
+- [x] Escalação de privilegios - Atendente tentar deletar SLA -> HTTP 403
+- [x] Auditoria de alterações - Validar que UPDATE em SLA registra before/after
+- [x] Validação de calendario invalido - Tentar criar SLA com Id_Calendario inexistente -> HTTP 400
+- [x] Simulador com dados maliciosos - Tentar simular com tempos negativos -> HTTP 400
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao |
+|-----|------|---------|
+| **Compliance SLA Resposta** | ≥95% | (Chamados Respondidos no Prazo / Total Chamados) * 100 |
+| **Compliance SLA Resolução** | ≥90% | (Chamados Resolvidos no Prazo / Total Chamados) * 100 |
+| **Tempo Medio de Configuração de SLA** | ≤10 min | Tempo entre inicio e conclusão de criação de SLA (analytics frontend) |
+| **Acuracia de Aplicação de SLA** | 100% | % de chamados com SLA correto aplicado automaticamente |
+| **Downtime Calculadora SLA** | <0.1% | Disponibilidade do job Hangfire de calculo de SLA |
+| **Latencia Consulta SLA** | <200ms | Tempo de resposta do endpoint GET /api/sla/{id} |
+| **Taxa de Violação Evitada por Escalação** | ≥30% | % de chamados que tiveram escalação e foram resolvidos antes da violação |
+| **Satisfação Usuario (NPS) - Modulo SLA** | ≥70 | Pesquisa trimestral com gestores de Service Desk |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| **Compliance SLA Critico** | Compliance < 85% por 2 semanas consecutivas | E-mail para Diretor TI + Reunião de crise |
+| **Job Hangfire Parado** | Ultima execução ha > 5 minutos | Alerta SMS para DevOps + restart automatico |
+| **Alto Volume de Violações** | > 20 violações em 1 dia | E-mail para Gerente Service Desk + analise de capacidade |
+| **SLA sem Calendario** | Detectado SLA com Id_Calendario NULL | E-mail para Administrador + bloqueio de uso do SLA |
+| **Feriados Desatualizados** | Nenhum feriado cadastrado para ano corrente + 1 | Alerta 60 dias antes de virada de ano |
+| **Escalação Falhando** | > 5 falhas de envio de e-mail/SMS em 1 hora | Alerta para DevOps + fallback para webhook |
+| **Simulador com Resultados Extremos** | Simulação mostra queda > 20% no compliance | Modal de confirmação obrigatorio antes de salvar |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-069-Configuracao-SLA-Chamados.md](./MD-069-Configuracao-SLA-Chamados.md) com DDL completo incluindo Temporal Tables
+2. **Casos de Uso**: Criar [UC-069-Configuracao-SLA-Chamados.md](./UC-069-Configuracao-SLA-Chamados.md) detalhando 5 UCs principais (UC00-Listar, UC01-Criar, UC02-Visualizar, UC03-Editar, UC04-Inativar)
+3. **Workflow Visual**: Criar [WF-069-Configuracao-SLA-Chamados.md](./WF-069-Configuracao-SLA-Chamados.md) com wireframes de telas Angular
+4. **Implementacao Backend**: Commands/Queries/Handlers usando CQRS + MediatR
+5. **Implementacao Frontend**: Componentes Angular standalone com Reactive Forms
+6. **Background Jobs**: Implementar jobs Hangfire para monitoramento e escalações
+7. **Testes**: Executar 3 baterias (Backend, Sistema/E2E, Segurança) com 100% PASS obrigatorio
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial completa com 10 regras de negocio, integração legado mapeada, 4 integrações obrigatorias | Claude Code (IControlIT Architect Agent) |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code (Agente Arquiteto IControlIT)
+**Revisao**: Pendente

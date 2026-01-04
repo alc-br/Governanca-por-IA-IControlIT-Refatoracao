@@ -1,0 +1,644 @@
+# ==============================================================================
+# RL-RF051 - Referência ao Legado (Gestão de Marcas e Modelos)
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# ==============================================================================
+
+rf_id: RF051
+titulo: "Gestão de Marcas e Modelos de Ativos"
+
+legado:
+  sistema: "ASP.NET Web Forms + VB.NET + SQL Server"
+  versao: "4.x"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server (múltiplos bancos por cliente)"
+  multi_tenant: false
+  auditoria: "none"  # Sem campos Created/Modified
+
+# ==============================================================================
+# REFERENCIAS AO LEGADO COM DESTINO OBRIGATÓRIO
+# ==============================================================================
+
+referencias:
+  # ----------------------------------------------------------------------------
+  # TELAS ASPX
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF051-001"
+    tipo: "tela"
+    nome: "Ativo_Modelo.aspx"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Ativo_Modelo.aspx"
+    descricao: |
+      Tela de cadastro de modelos de ativos com campos básicos:
+      - Descrição (TextBox obrigatório, MaxLength 50)
+      - Tipo do ativo (DropDownList FK Ativo_Tipo)
+      - Fabricante (DropDownList FK Ativo_Fabricante)
+
+      Comportamentos implícitos:
+      - Sem validação de duplicidade de modelo
+      - Edição inline no GridView
+      - Exclusão física (DELETE FROM)
+      - Carregamento de dropdowns via WebService
+      - Sem especificações técnicas
+      - Sem upload de imagens
+      - Sem controle de EOL ou homologação
+
+    destino: "substituido"
+    justificativa: |
+      Tela completamente redesenhada em Angular 19 com:
+      - Formulário reativo com validações (RN-RF051-001, RN-RF051-002)
+      - Upload drag-and-drop de imagens (RN-RF051-012)
+      - Editor JSON para especificações técnicas (RN-RF051-004)
+      - Fluxo de homologação (RN-RF051-010)
+      - Controle de EOL (RN-RF051-003)
+      - Histórico de preços (RN-RF051-005)
+
+    rf_item_relacionado: "RN-RF051-001, RN-RF051-002, RN-RF051-003, RN-RF051-004"
+    uc_relacionado: "UC08-criar-modelo"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF051-002"
+    tipo: "tela"
+    nome: "Ativo_Tipo.aspx (referência indireta)"
+    caminho: "ic1_legado/IControlIT/IControlIT/Cadastro/Ativo_Tipo.aspx"
+    descricao: |
+      Tela de cadastro de Tipos de Ativos (categoria), usada como FK em Ativo_Modelo.
+      Campos relacionados:
+      - Grupo (categorização)
+      - Sub Grupo (subcategorização)
+      - Estoque Regulador (quantidade mínima)
+      - Imagem/Photo (path de arquivo)
+
+    destino: "assumido"
+    justificativa: |
+      Funcionalidade mantida em RF049 (Gestão de Tipos de Ativos).
+      RF051 apenas referencia Tipos de Ativos via FK.
+      Hierarquia expandida para Fabricante → Marca → Modelo → Tipo.
+
+    rf_item_relacionado: "Seção 2 - Escopo (Relacionamento com RF049)"
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICES ASMX
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF051-003"
+    tipo: "webservice"
+    nome: "WSMarcasModelos.CadastrarFabricante()"
+    caminho: "ic1_legado/IControlIT/IControlIT/WebService/WSMarcasModelos.asmx"
+    descricao: |
+      Método SOAP para criar fabricante.
+      Parâmetros: String nome, String pais
+      Retorno: Integer Id do fabricante criado
+
+      Características:
+      - Sem autenticação JWT (provavelmente session-based)
+      - Retorna ID simples (não GUID)
+      - Sem validação de duplicidade
+      - Sem multi-tenancy
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por REST API moderna:
+      POST /api/fabricantes (CreateFabricanteCommand)
+      - Autenticação JWT
+      - GUID como ID
+      - Validação de unicidade (RN-RF051-001)
+      - Multi-tenancy (EmpresaId)
+      - Auditoria automática
+
+    rf_item_relacionado: "Seção 9 - Segurança (Controle de Permissões)"
+    uc_relacionado: "UC01-criar-fabricante"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF051-004"
+    tipo: "webservice"
+    nome: "WSMarcasModelos.ListarModelos()"
+    caminho: "ic1_legado/IControlIT/IControlIT/WebService/WSMarcasModelos.asmx"
+    descricao: |
+      Método SOAP para listar modelos.
+      Parâmetros: Integer idTipo (opcional)
+      Retorno: DataSet com todos os modelos (sem paginação)
+
+      Problemas:
+      - DataSet pesado (retorna tudo)
+      - Sem paginação
+      - Sem filtros avançados
+      - Performance ruim com muitos registros
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/modelos (GetModelosQuery) com:
+      - Paginação automática (PagedList)
+      - Filtros: Fabricante, Marca, Tipo, EOL, Homologado
+      - Projeção DTO (apenas campos necessários)
+      - AsNoTracking para performance
+
+    rf_item_relacionado: "Seção 9 - API Endpoints"
+    uc_relacionado: "UC07-listar-modelos"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF051-005"
+    tipo: "webservice"
+    nome: "WSMarcasModelos.ExcluirModelo()"
+    caminho: "ic1_legado/IControlIT/IControlIT/WebService/WSMarcasModelos.asmx"
+    descricao: |
+      Método SOAP para excluir modelo.
+      Parâmetros: Integer idModelo
+      Retorno: Boolean (sucesso/falha)
+
+      Comportamento: DELETE FROM Ativo_Modelo WHERE Id = @Id (exclusão física)
+
+      Problemas:
+      - Perda de histórico
+      - FK quebra se ativos referenciavam o modelo
+      - Sem soft delete
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por DELETE /api/modelos/{id} com:
+      - Inativação lógica (RN-RF051-007, RN-RF051-008)
+      - IsActive = false (mantém registro para histórico)
+      - FK preservadas
+      - Auditoria de exclusão (LastModified, LastModifiedBy)
+
+    rf_item_relacionado: "RN-RF051-007, RN-RF051-008"
+    uc_relacionado: "UC04-inativar-modelo"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF051-006"
+    tipo: "stored_procedure"
+    nome: "sp_Inserir_Ativo_Modelo"
+    caminho: "ic1_legado/Database/Procedures/sp_Inserir_Ativo_Modelo.sql"
+    descricao: |
+      Procedure para inserir modelo de ativo.
+
+      Parâmetros:
+      - @Descricao VARCHAR(50)
+      - @Id_Ativo_Tipo INT
+      - @Id_Ativo_Fabricante INT
+      - @Id_Usuario INT (criador)
+
+      Lógica:
+      1. Validar @Descricao não NULL
+      2. Validar FK Ativo_Tipo existe
+      3. Validar FK Ativo_Fabricante existe
+      4. Inserir em Ativo_Modelo
+      5. Retornar SCOPE_IDENTITY()
+
+      Problemas:
+      - Validação FK dentro da procedure (deveria ser constraint)
+      - Sem validação de duplicidade
+      - Campos auditoria podem não existir
+
+    destino: "substituido"
+    justificativa: |
+      Lógica migrada para Application Layer:
+      - CreateModeloCommandHandler (CQRS)
+      - CreateModeloCommandValidator (FluentValidation)
+      - FKs garantidas por constraints + EF Core navigation properties
+      - Validações declarativas (RN-RF051-001 a RN-RF051-012)
+
+    rf_item_relacionado: "RN-RF051-001, RN-RF051-002, RN-RF051-006"
+    uc_relacionado: "UC08-criar-modelo"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF051-007"
+    tipo: "stored_procedure"
+    nome: "sp_Listar_Modelos_Por_Fabricante"
+    caminho: "ic1_legado/Database/Procedures/sp_Listar_Modelos_Por_Fabricante.sql"
+    descricao: |
+      Procedure para listar modelos de um fabricante.
+
+      Parâmetros: @Id_Fabricante INT
+
+      Query:
+      SELECT M.*, T.Descricao AS TipoAtivo, F.Nome AS Fabricante
+      FROM Ativo_Modelo M
+      INNER JOIN Ativo_Tipo T ON M.Id_Ativo_Tipo = T.Id
+      INNER JOIN Ativo_Fabricante F ON M.Id_Ativo_Fabricante = F.Id
+      WHERE M.Id_Ativo_Fabricante = @Id_Fabricante
+      ORDER BY M.Descricao
+
+      Problemas:
+      - Sem paginação
+      - Sem filtros adicionais
+      - Performance ruim com muitos registros
+
+    destino: "substituido"
+    justificativa: |
+      Query substituída por GetModelosQuery (CQRS) com:
+      - Paginação automática
+      - Filtros dinâmicos (Fabricante, Marca, Tipo, EOL, Homologado)
+      - Projeção DTO otimizada
+      - AsNoTracking para performance
+      - EF Core LINQ (type-safe)
+
+    rf_item_relacionado: "Seção 4 - Funcionalidades (Listar modelos com filtros)"
+    uc_relacionado: "UC07-listar-modelos"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF051-008"
+    tipo: "tabela"
+    nome: "Ativo_Fabricante"
+    schema_legado: "[dbo].[Ativo_Fabricante]"
+    descricao: |
+      Tabela de fabricantes de equipamentos.
+
+      Estrutura:
+      - Id INT IDENTITY (PK)
+      - Nome VARCHAR(100) NOT NULL
+      - Pais VARCHAR(50) NULL
+      - Website VARCHAR(255) NULL
+      - Logo VARCHAR(255) NULL (path de arquivo)
+
+    problemas_identificados:
+      - "Falta unique constraint em Nome (permite duplicados)"
+      - "Sem auditoria (Created, CreatedBy, Modified, ModifiedBy)"
+      - "Sem multi-tenancy (Id_Conglomerado, EmpresaId)"
+      - "Sem soft delete (Fl_Excluido, IsDeleted)"
+      - "Logo como path, não BLOB/URL"
+      - "VARCHAR sem Unicode (NVARCHAR)"
+
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada como `Fabricante` (MD-RF051) com:
+      - EmpresaId GUID (multi-tenancy)
+      - Created, CreatedBy, LastModified, LastModifiedBy (auditoria)
+      - IsActive BOOLEAN (soft delete)
+      - Nome NVARCHAR com unique constraint por EmpresaId (RN-RF051-001)
+      - Logo como URL ou BLOB
+      - Suporte Unicode completo
+
+    rf_item_relacionado: "MD-RF051 - Tabela Fabricante"
+    uc_relacionado: "UC01-criar-fabricante"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF051-009"
+    tipo: "tabela"
+    nome: "Ativo_Modelo"
+    schema_legado: "[dbo].[Ativo_Modelo]"
+    descricao: |
+      Tabela de modelos de ativos vinculados a fabricantes e tipos.
+
+      Estrutura:
+      - Id INT IDENTITY (PK)
+      - Descricao VARCHAR(50) NOT NULL
+      - Id_Ativo_Tipo INT NOT NULL (FK)
+      - Id_Ativo_Fabricante INT NOT NULL (FK)
+
+    problemas_identificados:
+      - "Sem Part Number/SKU"
+      - "Sem especificações técnicas (JSON ou tabela relacionada)"
+      - "Sem EOL/Homologação (campos de status)"
+      - "Sem histórico de preços"
+      - "Sem imagens (tabela relacionada)"
+      - "FK sem cascade rules"
+      - "Sem índices em campos de busca"
+
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada como `Modelo` (MD-RF051) com:
+      - PartNumber, SKU (RN-RF051-002, RN-RF051-009)
+      - EspecificacoesTecnicas JSON (RN-RF051-004)
+      - IsEOL, IsHomologado, JustificativaHomologacao (RN-RF051-003, RN-RF051-010)
+      - Tabela ModeloPreco (histórico imutável - RN-RF051-005)
+      - Tabela ModeloImagem (até 10 fotos - RN-RF051-012)
+      - Índices em FabricanteId, MarcaId, PartNumber
+      - Cascade rules adequados
+
+    rf_item_relacionado: "MD-RF051 - Tabela Modelo"
+    uc_relacionado: "UC08-criar-modelo"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF051-010"
+    tipo: "regra_negocio"
+    nome: "Fabricante com Nome Duplicado Permitido"
+    localizacao_codigo: "Análise de banco legado (ausência de unique constraint)"
+    descricao: |
+      Sistema legado permitia cadastrar múltiplos fabricantes com mesmo nome.
+      Exemplo: "DELL", "Dell", "Dell Inc." coexistiam no banco.
+      Causava inconsistências em relatórios e filtros.
+
+    destino: "substituido"
+    justificativa: |
+      RN-RF051-001 força unicidade de nome (case-insensitive) por tenant.
+      Validação automática em CreateFabricanteCommandValidator.
+      HTTP 400 se nome duplicado.
+
+    rf_item_relacionado: "RN-RF051-001"
+    uc_relacionado: "UC01-criar-fabricante"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF051-011"
+    tipo: "regra_negocio"
+    nome: "Exclusão Física de Modelos"
+    localizacao_codigo: "Ativo_Modelo.aspx.vb - método btnExcluir_Click"
+    descricao: |
+      Sistema executava DELETE FROM permanente, removendo registro.
+      Problema: Perda de histórico. FKs de Ativos quebradas.
+
+    destino: "substituido"
+    justificativa: |
+      RN-RF051-007 e RN-RF051-008 implementam inativação lógica (soft delete).
+      IsActive = false (mantém registro para histórico).
+      FKs preservadas, auditoria completa.
+
+    rf_item_relacionado: "RN-RF051-007, RN-RF051-008"
+    uc_relacionado: "UC04-inativar-modelo"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF051-012"
+    tipo: "regra_negocio"
+    nome: "Sem Validação de Hierarquia Fabricante → Tipo"
+    localizacao_codigo: "Análise de queries legadas"
+    descricao: |
+      Sistema permitia vincular modelos a tipos incompatíveis.
+      Exemplo: modelo Dell com tipo "Software" (sem sentido).
+
+    destino: "substituido"
+    justificativa: |
+      RN-RF051-006 valida hierarquia correta:
+      Fabricante → Marca → Modelo → Tipo
+      Validação automática em CreateModeloCommandValidator.
+      HTTP 400 se hierarquia inválida.
+
+    rf_item_relacionado: "RN-RF051-006"
+    uc_relacionado: "UC08-criar-modelo"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF051-013"
+    tipo: "regra_negocio"
+    nome: "Preço como Campo Único (Sem Histórico)"
+    localizacao_codigo: "Tabela Ativo_Modelo - campo Preco DECIMAL(10,2)"
+    descricao: |
+      Preço era atualizado diretamente no modelo, perdendo histórico.
+      Impossível rastrear variações para análise financeira.
+
+    destino: "substituido"
+    justificativa: |
+      RN-RF051-005 implementa histórico imutável de preços.
+      Tabela ModeloPreco (append-only).
+      Não permite UPDATE/DELETE (HTTP 403).
+
+    rf_item_relacionado: "RN-RF051-005"
+    uc_relacionado: "UC12-gerenciar-historico-precos"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF051-014"
+    tipo: "regra_negocio"
+    nome: "Especificações em Texto Livre"
+    localizacao_codigo: "Observação de registros legados"
+    descricao: |
+      Especificações técnicas em VARCHAR como texto livre.
+      Exemplo: "Intel Core i5, 8GB RAM, HD 500GB, Tela 15 polegadas"
+      Impossível filtrar ou comparar automaticamente.
+
+    destino: "substituido"
+    justificativa: |
+      RN-RF051-004 implementa especificações como JSON válido.
+      Estrutura dinâmica permitida, validação de sintaxe.
+      Permite filtros e comparações programáticas.
+
+    rf_item_relacionado: "RN-RF051-004"
+    uc_relacionado: "UC08-criar-modelo"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF051-015"
+    tipo: "regra_negocio"
+    nome: "Sem Controle de Acesso Granular"
+    localizacao_codigo: "Web.config e session-based authorization"
+    descricao: |
+      Controle de acesso binário (logado/não logado).
+      Sem RBAC ou permissões por funcionalidade.
+      Qualquer usuário autenticado podia CRUD qualquer entidade.
+
+    destino: "substituido"
+    justificativa: |
+      RF051 implementa RBAC completo com 13 permissões específicas:
+      CREATE, UPDATE, DELETE, EOL, HOMOLOGAR, IMPORT, etc.
+      Authorization policies por endpoint.
+      Roles: Super Admin, Admin, Gestor de Ativos, Gestor Financeiro.
+
+    rf_item_relacionado: "Seção 9 - Segurança (Controle de Permissões)"
+    uc_relacionado: "Todos UCs"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+# ==============================================================================
+# BANCOS LEGADOS MAPEADOS
+# ==============================================================================
+
+bancos_legados:
+  - nome: "IControlIT_Cliente01"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "Ativo_Fabricante"
+      - "Ativo_Modelo"
+      - "Ativo_Tipo"
+    destino: "consolidado"
+    justificativa: |
+      Migrado para banco único com multi-tenancy (Row-Level Security).
+      EmpresaId em todas as tabelas.
+      Bancos separados consolidados em IControlIT.db (SQLite dev) / SQL Server moderno (prod).
+    banco_moderno: "IControlIT.db (dev) / SQL Server (prod)"
+
+  - nome: "IControlIT_Cliente02"
+    servidor: "SQL-LEGADO-02"
+    tabelas_relacionadas:
+      - "Ativo_Fabricante"
+      - "Ativo_Modelo"
+      - "Ativo_Tipo"
+    destino: "consolidado"
+    justificativa: "Mesma lógica de consolidação multi-tenant"
+    banco_moderno: "IControlIT.db (dev) / SQL Server (prod)"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF051-001"
+    titulo: "Arquitetura Multi-Database Não Escalável"
+    severidade: "CRÍTICA"
+    descricao: |
+      Cada cliente tinha banco SQL Server separado, gerando:
+      - Custo operacional alto (dezenas de bancos)
+      - Dificuldade de deploy (múltiplos scripts)
+      - Backup/restore complexo
+      - Impossível compartilhar dados entre clientes
+
+    impacto: "Alto custo operacional, baixa escalabilidade"
+    solucao_moderna: |
+      Multi-tenancy com EmpresaId em todas as tabelas.
+      Row-Level Security (RLS) para isolamento.
+      Banco único compartilhado com segurança garantida.
+
+  - id: "PROB-RF051-002"
+    titulo: "Ausência Total de Auditoria"
+    severidade: "ALTA"
+    descricao: |
+      Tabelas não tinham campos de auditoria (Created, Modified).
+      Impossível rastrear quem criou/modificou registros.
+      Problemas de compliance (LGPD, SOX).
+
+    impacto: "Impossibilidade de auditoria, risco de compliance"
+    solucao_moderna: |
+      Campos obrigatórios em todas as entidades:
+      - CreatedBy, CreatedAt, LastModifiedBy, LastModifiedAt
+      - AuditInterceptor do EF Core preenche automaticamente
+      - Histórico completo preservado
+
+  - id: "PROB-RF051-003"
+    titulo: "Performance de Queries Sem Otimização"
+    severidade: "MÉDIA"
+    descricao: |
+      Queries SQL sem índices em campos críticos.
+      Stored procedures retornavam DataSets completos (sem paginação).
+      Telas lentas com >1000 registros.
+
+    impacto: "Performance ruim, experiência de usuário degradada"
+    solucao_moderna: |
+      - Índices em campos de busca (FabricanteId, MarcaId, PartNumber)
+      - Paginação automática (PagedList)
+      - AsNoTracking para consultas read-only
+      - Projeção DTO (apenas campos necessários)
+
+  - id: "PROB-RF051-004"
+    titulo: "Dados Não Estruturados (Especificações)"
+    severidade: "MÉDIA"
+    descricao: |
+      Especificações técnicas em texto livre VARCHAR.
+      Impossível filtrar, comparar ou validar.
+
+    impacto: "Dificuldade de análise, relatórios limitados"
+    solucao_moderna: |
+      JSON estruturado e validado (RN-RF051-004).
+      Permite filtros programáticos e comparações.
+
+  - id: "PROB-RF051-005"
+    titulo: "Exclusão Física Causando Perda de Dados"
+    severidade: "ALTA"
+    descricao: |
+      DELETE FROM permanente causava:
+      - Perda de histórico
+      - FKs quebradas (ativos órfãos)
+      - Impossibilidade de restaurar dados
+
+    impacto: "Perda irreversível de dados, inconsistências"
+    solucao_moderna: |
+      Soft delete (IsActive = false).
+      Registros preservados para histórico.
+      FKs sempre válidas.
+
+  - id: "PROB-RF051-006"
+    titulo: "Controle de Acesso Binário (Sem RBAC)"
+    severidade: "MÉDIA"
+    descricao: |
+      Autorização session-based (logado/não logado).
+      Qualquer usuário autenticado podia fazer tudo.
+      Sem segregação de funções.
+
+    impacto: "Risco de segurança, falta de segregação"
+    solucao_moderna: |
+      RBAC completo com 13 permissões granulares.
+      Authorization policies por endpoint.
+      Roles diferenciadas (Super Admin, Admin, Gestor, etc.).
+
+# ==============================================================================
+# RASTREABILIDADE CONSOLIDADA
+# ==============================================================================
+
+rastreabilidade:
+  - elemento_legado: "Ativo_Modelo.aspx"
+    referencia_rf: "RF051 - Seção 4 (Funcionalidades)"
+    referencia_uc: "UC08-criar-modelo"
+    status: "migrado"
+    observacao: "Tela redesenhada em Angular 19"
+
+  - elemento_legado: "sp_Inserir_Ativo_Modelo"
+    referencia_rf: "RN-RF051-001 a RN-RF051-012"
+    referencia_uc: "UC08-criar-modelo"
+    status: "migrado"
+    observacao: "Substituído por CreateModeloCommandHandler"
+
+  - elemento_legado: "Tabela Ativo_Fabricante"
+    referencia_rf: "MD-RF051 - Tabela Fabricante"
+    referencia_uc: null
+    status: "migrado"
+    observacao: "Tabela redesenhada com auditoria e multi-tenancy"
+
+  - elemento_legado: "Tabela Ativo_Modelo"
+    referencia_rf: "MD-RF051 - Tabela Modelo"
+    referencia_uc: null
+    status: "migrado"
+    observacao: "Tabela redesenhada com campos adicionais (PartNumber, SKU, JSON, EOL, Homologado)"
+
+  - elemento_legado: "WSMarcasModelos.CadastrarFabricante()"
+    referencia_rf: "Seção 9 - API Endpoints"
+    referencia_uc: "UC01-criar-fabricante"
+    status: "migrado"
+    observacao: "Substituído por POST /api/fabricantes (REST API)"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 15
+  itens_assumidos: 1       # Ativo_Tipo.aspx (RF049)
+  itens_substituidos: 14   # Todos os outros
+  itens_descartados: 0
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+
+# ==============================================================================
+# HISTÓRICO
+# ==============================================================================
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: |
+      Criação do documento de referência ao legado de Marcas e Modelos.
+      15 itens rastreados com 100% de destinos definidos.
+      6 problemas críticos/altos documentados.
+    autor: "Agência ALC - alc.dev.br"

@@ -1,0 +1,380 @@
+# RF049 - Gestão de Políticas de Consumidores
+
+**Versão:** 1.0
+**Data:** 2025-12-18
+**Status:** Rascunho
+**Autor:** IControlIT Architect Agent
+
+---
+
+## 1. Resumo Executivo
+
+A Gestão de Políticas de Consumidores é uma funcionalidade estratégica do IControlIT v2 que permite definir, aplicar e gerenciar regras de uso e restrições para consumidores de telecomunicações (colaboradores, departamentos, dispositivos). O sistema oferece motor de políticas configurável que controla limites de consumo, restrições de uso, franquias de dados/voz/SMS, bloqueios automáticos, alertas proativos e aplicação baseada em perfis/departamentos/status.
+
+Este RF implementa um sistema de políticas altamente flexível que suporta múltiplos tipos de restrições (consumo monetário, volumetria, horários, destinos), aplicação em diferentes níveis (individual, departamento, empresa), processamento em lote de aplicação/remoção de políticas, motor de avaliação de políticas em tempo real, histórico completo de aplicações, e integração com processos de faturamento, auditoria, status e notificações.
+
+O sistema é essencial para: Controlar custos de telecomunicações através de limites e franquias, Prevenir uso indevido de recursos corporativos, Garantir conformidade com políticas corporativas e regulatórias, Automatizar bloqueios e notificações quando limites são atingidos, e Oferecer visibilidade gerencial sobre consumo e violações de políticas.
+
+A funcionalidade oferece interface moderna em Angular 19 com wizard de criação de políticas, simulador de impacto, dashboard de conformidade, e relatórios detalhados de violações. Integração completa com RFs de Consumidores (RF052), Status (RF048), Faturamento (RF026), Auditoria (RF034/RF035) e Notificações (RF066/RF067).
+
+### 1.1 Objetivo
+
+Implementar sistema completo de gestão de políticas de consumidores com:
+- Definição de políticas configuráveis (limites, restrições, franquias)
+- Aplicação automática baseada em perfis/status/departamentos
+- Motor de avaliação de políticas em tempo real
+- Processamento em lote de aplicação/remoção de políticas
+- Alertas proativos quando limites são atingidos (50%, 80%, 100%)
+- Bloqueios automáticos quando limites são excedidos
+- Histórico completo de aplicações e violações
+- Dashboard de conformidade e relatórios gerenciais
+- Simulador de impacto de políticas antes da aplicação
+- Integração com faturamento e auditoria
+
+### 1.2 Escopo
+
+**Incluído:**
+- CRUD completo de políticas de consumo
+- Motor de políticas configurável com múltiplos tipos de regras
+- Aplicação automática de políticas por perfil/status/departamento
+- Processamento em lote de aplicação/remoção
+- Avaliação de políticas em tempo real (API de verificação)
+- Alertas proativos em múltiplos limiares (50%, 80%, 100%)
+- Bloqueios automáticos por violação de políticas
+- Histórico de aplicações de políticas (7 anos)
+- Histórico de violações de políticas
+- Dashboard de conformidade com indicadores visuais
+- Simulador de impacto de políticas
+- Relatórios de violações e consumo
+- API REST completa com permissões RBAC
+- Interface Angular 19 com wizard de criação
+- Auditoria completa de todas as operações
+- Suporte multi-tenant com isolamento de dados
+- Templates de políticas pré-configuradas
+- Importação/Exportação de políticas
+
+**Excluído:**
+- Gerenciamento de usuários/perfis (RF006)
+- Gerenciamento de consumidores (RF052)
+- Gerenciamento de status (RF048)
+- Faturamento detalhado (RF026)
+- Auditoria de bilhetes (RF034, RF035)
+- Gestão de contratos (RF023)
+- Inventário de ativos (RF025)
+- Análise preditiva de consumo (futuro)
+
+---
+
+## 2. Regras de Negócio
+
+### RN01 - Tipos de Políticas Suportadas
+
+- **Descrição:** Sistema deve suportar múltiplos tipos de políticas de restrição
+- **Regra:** Tipos suportados: Limite Monetário (valor máximo R$), Franquia de Dados (MB/GB), Franquia de Voz (minutos), Franquia de SMS (quantidade), Restrição de Horário (ex: não usar fora do horário comercial), Restrição de Destinos (ex: bloquear ligações internacionais), Limite de Roaming, Limite por Tipo de Serviço. Cada política pode combinar múltiplos tipos de restrições
+- **Validação:** Sistema valida tipo de política ao criar e aplica validações específicas
+- **Exceção:** Políticas customizadas podem ser criadas por Super Admins com validação manual
+
+### RN02 - Aplicação Automática de Políticas por Perfil
+
+- **Descrição:** Políticas devem ser aplicadas automaticamente conforme perfil do consumidor
+- **Regra:** Perfis pré-definidos: Executivo, Gerente, Colaborador, Estagiário, Externo. Cada perfil tem conjunto padrão de políticas. Ao criar consumidor com perfil X, políticas do perfil são aplicadas automaticamente. Mudança de perfil aplica novas políticas e remove antigas (com histórico)
+- **Validação:** Sistema aplica políticas via Domain Event ao criar/atualizar consumidor
+- **Exceção:** Consumidores podem ter políticas customizadas que sobrescrevem políticas de perfil
+
+### RN03 - Aplicação Automática de Políticas por Status
+
+- **Descrição:** Mudança de status do consumidor deve aplicar políticas específicas
+- **Regra:** Status Ativo: Políticas normais do perfil. Status Suspenso: Bloqueio de novas operações, mantém consulta. Status Bloqueado: Bloqueio total. Status Inativo: Sem políticas aplicadas. Status Pendente: Políticas restritivas (ex: apenas ligações locais)
+- **Validação:** Integração com RF048 (Status) via Domain Events
+- **Exceção:** Políticas de status sobrescrevem políticas de perfil em caso de conflito
+
+### RN04 - Alertas Proativos em Múltiplos Limiares
+
+- **Descrição:** Sistema deve alertar ANTES de atingir limite para permitir ação preventiva
+- **Regra:** Alertas em: 50% do limite (aviso informativo), 80% do limite (aviso crítico), 100% do limite (bloqueio iminente). Canais: E-mail, SMS (crítico), Notificação in-app. Destinatários: Consumidor, Gestor responsável, Financeiro. Alertas não devem duplicar (apenas 1 alerta por limiar)
+- **Validação:** Sistema monitora consumo em tempo real e dispara alertas via RF066/RF067
+- **Exceção:** Alertas podem ser desabilitados por política (ex: para testes)
+
+### RN05 - Bloqueio Automático por Violação de Política
+
+- **Descrição:** Consumidores que violam políticas devem ser bloqueados automaticamente
+- **Regra:** Ao atingir 100% do limite: Bloqueia novas operações do tipo restrito (mantém outros serviços), Notifica stakeholders, Registra violação no histórico, Cria solicitação de análise para Gestor. Bloqueio pode ser: Total (todos os serviços) ou Parcial (apenas serviço que violou)
+- **Validação:** Motor de políticas avalia violação e dispara bloqueio via RF048
+- **Exceção:** Políticas com flag "AlertOnly" apenas alertam sem bloquear
+
+### RN06 - Processamento em Lote de Aplicação de Políticas
+
+- **Descrição:** Permitir aplicar/remover políticas de múltiplos consumidores simultaneamente
+- **Regra:** Operação em lote deve: Validar se política é aplicável a cada consumidor, Processar de forma assíncrona (job em background), Gerar relatório consolidado de sucesso/falha, Permitir rollback em caso de falha crítica, Respeitar limite máximo de 1000 consumidores por lote
+- **Validação:** Sistema processa via Hangfire, gerando relatório ao final
+- **Exceção:** Lotes com mais de 1000 registros devem ser divididos em múltiplos jobs
+
+### RN07 - Histórico Completo de Aplicações de Políticas (LGPD)
+
+- **Descrição:** Todas as aplicações/remoções de políticas devem ser registradas
+- **Regra:** Sistema registra: Data/Hora, Usuário Responsável, Consumidor Afetado, Política Aplicada/Removida, Motivo, Vigência (Data Início/Fim). Retenção de 7 anos conforme LGPD. Dados não podem ser alterados, apenas visualizados
+- **Validação:** Cada aplicação/remoção gera registro imutável na tabela PoliticaConsumidorHistorico
+- **Exceção:** Nenhuma. Histórico é obrigatório para conformidade
+
+### RN08 - Histórico de Violações de Políticas
+
+- **Descrição:** Todas as violações de políticas devem ser registradas para auditoria
+- **Regra:** Violação registra: Data/Hora, Consumidor, Política Violada, Valor Limite, Valor Consumido, Ação Tomada (bloqueio/alerta), Responsável pela Liberação (se aplicável). Dashboard exibe: Top 10 violadores, Políticas mais violadas, Tendência temporal de violações
+- **Validação:** Sistema cria registro automático ao detectar violação
+- **Exceção:** Violações em ambiente de teste não geram histórico
+
+### RN09 - Avaliação de Políticas em Tempo Real (API)
+
+- **Descrição:** Sistema deve fornecer API para verificar se ação viola política ANTES de executar
+- **Regra:** Endpoint `POST /api/politicas/avaliar` recebe: Consumidor, Tipo de Operação, Valor/Destino. Retorna: Permitido (true/false), Políticas Aplicáveis, Limite Atual, Consumo Atual, Percentual Usado. Tempo de resposta ≤ 100ms (P95) para não impactar operações
+- **Validação:** Motor de políticas avalia regras em memória (cache) para performance
+- **Exceção:** Em caso de falha do serviço, política padrão é "permitir" (fail-open)
+
+### RN10 - Simulador de Impacto de Políticas
+
+- **Descrição:** Permitir simular impacto de política antes de aplicar em produção
+- **Regra:** Simulador: Recebe política a ser testada, Analisa consumo histórico dos consumidores afetados, Retorna: Quantos seriam bloqueados, Quando seriam bloqueados, Estimativa de economia. Interface exibe relatório visual com gráficos
+- **Validação:** Simulador usa dados históricos reais mas não aplica mudanças
+- **Exceção:** Simulador não funciona para consumidores novos sem histórico
+
+### RN11 - Templates de Políticas Pré-Configuradas
+
+- **Descrição:** Sistema deve oferecer templates de políticas comuns para agilizar configuração
+- **Regra:** Templates disponíveis: "Executivo" (sem limites), "Gerente" (limite R$ 500), "Colaborador" (limite R$ 200), "Estagiário" (limite R$ 50, apenas local). Cada template pode ser customizado ao aplicar. Templates podem ser criados por administradores
+- **Validação:** Sistema lista templates disponíveis e permite clonagem/customização
+- **Exceção:** Templates não podem ser deletados se estiverem em uso
+
+### RN12 - Importação/Exportação de Políticas
+
+- **Descrição:** Permitir importar/exportar políticas para replicação entre ambientes ou backup
+- **Regra:** Exportação: Gera JSON/CSV com todas as políticas e configurações. Importação: Valida estrutura do arquivo, Verifica conflitos com políticas existentes, Permite preview antes de confirmar, Cria histórico de importação. Formato JSON deve seguir schema validado
+- **Validação:** Sistema valida schema JSON e integridade de dados
+- **Exceção:** Importação de políticas inválidas é rejeitada com mensagem de erro detalhada
+
+### RN13 - Dashboard de Conformidade com Indicadores Visuais
+
+- **Descrição:** Interface deve exibir visualmente conformidade de consumidores com políticas
+- **Regra:** Dashboard exibe: Total de consumidores por status de conformidade (Conforme, Aviso, Crítico, Violação), Gráfico de evolução de violações temporal, Lista de consumidores em situação crítica (>80%), Top 10 violadores do período. Cores: Verde (Conforme), Amarelo (Aviso), Laranja (Crítico), Vermelho (Violação)
+- **Validação:** Dashboard atualiza em tempo real via SignalR
+- **Exceção:** Dados históricos (>3 meses) carregam sob demanda
+
+### RN14 - Integração com Faturamento para Cálculo de Economia
+
+- **Descrição:** Sistema deve calcular economia gerada por políticas aplicadas
+- **Regra:** Cálculo: Consumo Real com Política - Consumo Estimado sem Política = Economia. Base de comparação: Média de consumo dos 3 meses anteriores à aplicação da política. Relatório mensal de economia enviado automaticamente para Gestores. Economia exibida no dashboard
+- **Validação:** Integração com RF026 (Faturamento) para obter dados de consumo
+- **Exceção:** Consumidores novos (<3 meses) não têm cálculo de economia
+
+### RN15 - Validação de Permissões RBAC
+
+- **Descrição:** Operações sobre políticas devem respeitar permissões por perfil
+- **Regra:** Permissões: GESTAO.POLITICAS.VIEW (visualizar), GESTAO.POLITICAS.CREATE (criar), GESTAO.POLITICAS.UPDATE (editar), GESTAO.POLITICAS.DELETE (excluir), GESTAO.POLITICAS.APPLY (aplicar a consumidores), GESTAO.POLITICAS.ADMIN (gerenciar templates)
+- **Validação:** Endpoints validam permissões via RequireAuthorization, Commands validam via Authorize(Roles)
+- **Exceção:** Nenhuma. Permissões são obrigatórias para segurança
+
+---
+
+## 3. Referências Técnicas
+
+### 3.1 Componentes Relacionados
+
+| Componente | Descrição | Localização |
+|------------|-----------|-------------|
+| PoliticaConsumidor (Entity) | Entidade de domínio para políticas | `backend/Domain/Entities/Gestao/PoliticaConsumidor.cs` |
+| PoliticaConsumidorAplicacao (Entity) | Aplicação de política a consumidor | `backend/Domain/Entities/Gestao/PoliticaConsumidorAplicacao.cs` |
+| PoliticaConsumidorHistorico (Entity) | Histórico de aplicações | `backend/Domain/Entities/Gestao/PoliticaConsumidorHistorico.cs` |
+| ViolacaoPolitica (Entity) | Registro de violações | `backend/Domain/Entities/Gestao/ViolacaoPolitica.cs` |
+| TemplatePolitica (Entity) | Templates pré-configurados | `backend/Domain/Entities/Gestao/TemplatePolitica.cs` |
+| CreatePoliticaConsumidorCommand | Command para criar política | `backend/Application/Gestao/Commands/PoliticasConsumidores/CreatePoliticaConsumidorCommand.cs` |
+| ApplyPoliticaCommand | Command para aplicar política | `backend/Application/Gestao/Commands/PoliticasConsumidores/ApplyPoliticaCommand.cs` |
+| RemovePoliticaCommand | Command para remover política | `backend/Application/Gestao/Commands/PoliticasConsumidores/RemovePoliticaCommand.cs` |
+| ProcessBatchApplyCommand | Command para aplicação em lote | `backend/Application/Gestao/Commands/PoliticasConsumidores/ProcessBatchApplyCommand.cs` |
+| EvaluatePoliticaQuery | Query para avaliar política | `backend/Application/Gestao/Queries/PoliticasConsumidores/EvaluatePoliticaQuery.cs` |
+| GetPoliticasConsumidoresQuery | Query para listar políticas | `backend/Application/Gestao/Queries/PoliticasConsumidores/GetPoliticasConsumidoresQuery.cs` |
+| SimulatePoliticaQuery | Query para simular impacto | `backend/Application/Gestao/Queries/PoliticasConsumidores/SimulatePoliticaQuery.cs` |
+| PoliticasEngine | Motor de avaliação de políticas | `backend/Infrastructure/Services/Gestao/PoliticasEngine.cs` |
+| PoliticasService | Lógica de negócio de políticas | `backend/Infrastructure/Services/Gestao/PoliticasService.cs` |
+| ViolationDetectorService | Detector de violações | `backend/Infrastructure/Services/Gestao/ViolationDetectorService.cs` |
+| PoliticasConsumidoresEndpoints | Endpoints da API | `backend/Web/Endpoints/Gestao/PoliticasConsumidores.cs` |
+| PoliticasConsumidoresComponent | Componente Angular principal | `frontend/src/app/modules/gestao/politicas-consumidores/politicas-consumidores.component.ts` |
+| PoliticaWizardComponent | Wizard de criação de política | `frontend/src/app/modules/gestao/politicas-consumidores/components/politica-wizard.component.ts` |
+| ConformidadeDashboardComponent | Dashboard de conformidade | `frontend/src/app/modules/gestao/politicas-consumidores/components/conformidade-dashboard.component.ts` |
+| SimuladorPoliticaComponent | Simulador de impacto | `frontend/src/app/modules/gestao/politicas-consumidores/components/simulador-politica.component.ts` |
+
+### 3.2 APIs Utilizadas
+
+| API | Método | Endpoint | Descrição |
+|-----|--------|----------|-----------|
+| Listar Políticas | GET | /api/gestao/politicas-consumidores | Lista políticas com filtros |
+| Obter Política | GET | /api/gestao/politicas-consumidores/{id} | Obtém detalhes de uma política |
+| Criar Política | POST | /api/gestao/politicas-consumidores | Cria nova política |
+| Atualizar Política | PUT | /api/gestao/politicas-consumidores/{id} | Atualiza política existente |
+| Excluir Política | DELETE | /api/gestao/politicas-consumidores/{id} | Exclui política |
+| Aplicar Política | POST | /api/gestao/politicas-consumidores/{id}/apply | Aplica política a consumidores |
+| Remover Política | POST | /api/gestao/politicas-consumidores/{id}/remove | Remove política de consumidores |
+| Aplicação em Lote | POST | /api/gestao/politicas-consumidores/batch-apply | Aplica política a múltiplos consumidores |
+| Avaliar Política | POST | /api/gestao/politicas-consumidores/avaliar | Avalia se ação viola política |
+| Simular Impacto | POST | /api/gestao/politicas-consumidores/{id}/simular | Simula impacto de política |
+| Obter Histórico | GET | /api/gestao/politicas-consumidores/{id}/historico | Obtém histórico de aplicações |
+| Listar Violações | GET | /api/gestao/politicas-consumidores/violacoes | Lista violações de políticas |
+| Dashboard Conformidade | GET | /api/gestao/politicas-consumidores/dashboard | Obtém dados do dashboard |
+| Listar Templates | GET | /api/gestao/politicas-consumidores/templates | Lista templates de políticas |
+| Importar Políticas | POST | /api/gestao/politicas-consumidores/importar | Importa políticas de arquivo |
+| Exportar Políticas | GET | /api/gestao/politicas-consumidores/exportar | Exporta políticas para arquivo |
+
+### 3.3 Serviços Externos
+
+- **Central de E-mails (RF067):** Envio de alertas e notificações
+- **Central de Notificações (RF066):** Notificações in-app e push
+- **Serviço de Auditoria (RF003):** Registro de todas as operações
+- **Serviço de Faturamento (RF026):** Integração para cálculo de consumo e economia
+- **Serviço de Status (RF048):** Integração para bloqueios automáticos
+- **Serviço de Consumidores (RF052):** Obtenção de dados de consumidores
+- **Hangfire:** Processamento assíncrono de lotes e monitoramento
+- **SignalR:** Atualizações em tempo real do dashboard
+
+---
+
+## 4. Dependências
+
+### 4.1 Dependências de Outros RFs
+
+| RF | Nome | Tipo de Dependência |
+|----|------|---------------------|
+| RF003 | Logs, Monitoramento e Observabilidade | Obrigatória (auditoria) |
+| RF006 | Gestão de Usuários | Obrigatória (permissões) |
+| RF026 | Gestão de Faturas | Obrigatória (cálculo de consumo) |
+| RF030 | Gestão de Parâmetros de Faturamento | Opcional (configurações) |
+| RF034 | Gestão de Itens de Auditoria | Opcional (auditoria avançada) |
+| RF035 | Gestão de Resumos de Auditoria | Opcional (auditoria avançada) |
+| RF048 | Gestão de Status de Consumidores | Obrigatória (bloqueios automáticos) |
+| RF052 | Gestão de Consumidores | Obrigatória (entidade principal) |
+| RF066 | Notificações e Alertas | Obrigatória (alertas proativos) |
+| RF067 | Central de E-mails | Obrigatória (notificações e-mail) |
+
+### 4.2 Dependências Externas
+
+- **Entity Framework Core 10:** ORM para persistência
+- **MediatR 12.x:** Implementação de CQRS
+- **FluentValidation 11.x:** Validação de commands
+- **Hangfire 1.8.x:** Jobs em background
+- **SignalR:** Comunicação em tempo real
+- **Angular 19:** Framework frontend
+- **Angular Material 19:** Componentes UI
+- **ApexCharts:** Gráficos do dashboard
+- **Transloco 6.x:** Internacionalização
+- **JSON Schema Validator:** Validação de importação/exportação
+
+---
+
+## 5. Requisitos Não-Funcionais
+
+### 5.1 Performance
+
+- **Tempo de resposta:** Avaliar política em tempo real ≤ 100ms (P95)
+- **Throughput:** Suportar até 50.000 avaliações de políticas/dia
+- **Processamento em lote:** Aplicar política a 1.000 consumidores em ≤ 5 minutos
+- **Dashboard:** Carregar dashboard completo em ≤ 2 segundos
+- **Simulador:** Simular impacto de política em ≤ 5 segundos
+- **Caching:** Cache de políticas ativas em memória por 5 minutos
+- **Índices:** Índices em Id_Fornecedor, Status, Consumidor, TipoPolitica
+
+### 5.2 Segurança
+
+- **Autenticação:** JWT Bearer Token obrigatório
+- **Autorização:** RBAC com permissões granulares (VIEW, CREATE, UPDATE, DELETE, APPLY, ADMIN)
+- **Auditoria:** Registro de todas as operações (CREATE, READ, UPDATE, DELETE, APPLY, REMOVE)
+- **Multi-tenancy:** Isolamento por Id_Fornecedor via Query Filter
+- **Criptografia:** Dados sensíveis em repouso (AES-256) e em trânsito (TLS 1.3)
+- **Rate Limiting:** Máximo 100 requests/minuto por usuário
+- **Validação:** Input validation em todos os endpoints
+- **Segregação de duties:** Quem cria política não pode aplicar diretamente
+
+### 5.3 Disponibilidade
+
+- **Uptime:** 99.9% (tempo de inatividade máximo: 8h45min/ano)
+- **Backup:** Backup diário com retenção de 30 dias
+- **Retenção de dados:** 7 anos para histórico e violações (LGPD)
+- **Disaster Recovery:** RPO ≤ 1 hora, RTO ≤ 4 horas
+- **Monitoramento:** Alertas para falhas em avaliação de políticas críticas
+- **Fail-open:** Em caso de falha do motor de políticas, permitir operação (com log de alerta)
+- **Jobs:** Monitoramento de jobs noturnos via Hangfire Dashboard
+
+---
+
+## 6. Critérios de Aceitação
+
+- [ ] CRUD completo de políticas de consumidores funcionando via API REST
+- [ ] Motor de políticas avaliando regras em tempo real (≤100ms)
+- [ ] Aplicação automática de políticas por perfil/status implementada
+- [ ] Processamento em lote de aplicação/remoção de políticas funcionando
+- [ ] Alertas proativos em múltiplos limiares (50%, 80%, 100%) enviados
+- [ ] Bloqueios automáticos por violação de políticas funcionando
+- [ ] Histórico de aplicações e violações armazenado (7 anos)
+- [ ] Dashboard de conformidade atualizando em tempo real via SignalR
+- [ ] Simulador de impacto de políticas funcionando corretamente
+- [ ] Templates de políticas pré-configuradas disponíveis
+- [ ] Importação/Exportação de políticas via JSON funcionando
+- [ ] Integração com faturamento calculando economia gerada
+- [ ] Interface Angular 19 com wizard de criação de políticas
+- [ ] Auditoria completa de todas as operações funcionando
+- [ ] Permissões RBAC validadas em todos os endpoints
+- [ ] Multi-tenancy com isolamento de dados por fornecedor
+- [ ] Todos os cenários de teste (CN-RF049) passando
+- [ ] Todos os casos de teste (TC-RF049) executados com sucesso
+- [ ] Cobertura de testes ≥ 80%
+- [ ] Performance atendendo requisitos (≤100ms P95 para avaliação)
+- [ ] Documentação técnica completa (Swagger + README)
+- [ ] Logs estruturados e monitoramento configurados
+
+---
+
+## 7. Observações
+
+### 7.1 Considerações de Implementação
+
+**Backend:**
+- PoliticasEngine deve cachear políticas ativas em memória para performance
+- Usar Domain Events para aplicação automática ao criar/atualizar consumidor
+- ViolationDetectorService monitora consumo em tempo real via eventos
+- Jobs Hangfire para processamento de lotes e verificação de violações
+- Avaliação de políticas deve ser fail-open (permitir se serviço falhar)
+- Implementar Circuit Breaker para proteção contra falhas
+
+**Frontend:**
+- Wizard de criação de políticas com validação em cada etapa
+- Dashboard com gráficos ApexCharts e atualização SignalR
+- Simulador com análise visual de impacto
+- Indicadores de conformidade com cores semânticas
+- Formulário de aplicação com seleção múltipla de consumidores
+- Preview de políticas antes de aplicar
+
+### 7.2 Integrações Críticas
+
+- **RF052 (Consumidores):** Aplicação de políticas a consumidores
+- **RF048 (Status):** Bloqueios automáticos por violação
+- **RF026 (Faturamento):** Cálculo de consumo e economia
+- **RF066/RF067 (Notificações):** Alertas proativos e notificações
+
+### 7.3 Migração de Dados
+
+O sistema legado não possui controle estruturado de políticas de consumidores. A migração deve:
+1. Criar políticas padrão baseadas em perfis existentes no legado
+2. Analisar histórico de faturas para definir limites razoáveis
+3. Não há histórico de violações para migrar (iniciar do zero)
+4. Aplicar políticas padrão a todos os consumidores ativos
+
+### 7.4 Roadmap Futuro
+
+- **Fase 2:** Machine Learning para sugerir políticas otimizadas baseadas em padrões de consumo
+- **Fase 3:** Políticas dinâmicas que se ajustam automaticamente conforme tendências
+- **Fase 4:** Integração com sistemas de RH para aplicação automática baseada em cargo/função
+- **Fase 5:** Motor de políticas baseado em regras (rules engine) configurável via UI
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-12-18 | IControlIT Architect Agent | Versão inicial - Especificação completa de Gestão de Políticas de Consumidores |

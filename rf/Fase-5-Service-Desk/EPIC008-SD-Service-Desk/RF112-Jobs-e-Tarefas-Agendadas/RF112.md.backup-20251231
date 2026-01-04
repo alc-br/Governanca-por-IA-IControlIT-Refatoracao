@@ -1,0 +1,1786 @@
+# RF-112: Jobs e Tarefas Agendadas
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF066 (Notificacoes), RF004 (Auditoria), RF013 (RBAC)
+**EPIC**: EPIC008-SD-Service-Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+Este requisito especifica o **Sistema de Jobs e Tarefas Agendadas** do IControlIT v2, responsável por gerenciar, executar, monitorar e auditar processamento em background (batch), jobs recorrentes (agendados) e tarefas one-time (executadas uma única vez). O módulo é crítico para operações de larga escala, processamento de importações em massa, limpeza de dados, sincronizações periódicas e integrações com sistemas externos.
+
+O módulo integra com **Hangfire** para orquestração distribuída, **Redis** como storage, **Application Insights** para observabilidade e **SMTP** para notificações de falhas. Suporta execução paralela com limite de workers, retry automático com backoff exponencial, timeout configurável e integração profunda com sistemas de auditoria e RBAC.
+
+### 1.2 Importancia Estrategica
+
+O módulo de Jobs é crítico para:
+- **Operacional**: Processamento de faturas em lote, importações de dados, limpeza de cache, sincronizações periódicas com sistemas externos (Azure AD, ERPs, operadoras de telecom)
+- **Conformidade**: Auditoria completa de cada execução, retenção de histórico por 90 dias, notificação automática de falhas para administradores
+- **Segurança**: Validação de permissões 2-step execution em jobs sensíveis, criptografia de payloads em repouso, isolamento por tenant (ClienteId)
+- **Performance**: Distribuição paralela com max 10 workers por tenant, paralelização de tarefas independentes, cache de resultados
+- **Confiabilidade**: Retry automático com backoff exponencial (1min → 2min → 4min), timeout inteligente (padrão 30min), alertas em real-time
+
+### 1.3 Conceitos Fundamentais
+
+**Job**: Unidade de trabalho agendável, recorrente ou one-time, com suporte a validação de entrada, retry, notificação e auditoria. Exemplo: ImportarFaturasMensais, LimparCacheObsoleto, SincronizarAzureAD.
+
+**Cron Expression**: Padrão POSIX para agendamento recorrente (min, hour, day, month, dayofweek). Validado pela library Cronos. Exemplo: `0 2 * * *` (executar diariamente às 2h da manhã).
+
+**Worker**: Instância de execução paralela de jobs. Máximo 10 workers simultâneos por ClienteId. Implementado via Hangfire Background Processing.
+
+**Retry Policy**: Política automática de reexecução em caso de falha. Padrão: 3 tentativas com backoff (1min, 2min, 4min). Configurável por job.
+
+**Queue**: Fila de priorização de jobs (Alta, Média, Baixa). Jobs em fila Alta são processados antes de Média, que precedem Baixa. Implementado via job hangfire con prioridade.
+
+**Timeout**: Limite máximo de execução de um job. Padrão: 30 minutos. Se excedido, job é cancelado e marcado como falhado.
+
+**Two-Step Execution**: Padrão de segurança para jobs sensíveis (ex: excluir dados em massa). Requer 2 permissões distintas: criar/agendar e executar.
+
+**Histórico**: Registro persistente de todas as execuções de um job, incluindo timestamp, status (sucesso/falha), tempo de execução, logs e mensagem de erro.
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Agendador de Jobs** | SQL Server Agent + Stored Procedures | Hangfire (open-source, distribuído) |
+| **Storage de Jobs** | SQL Server (job_history table) | Redis (Hangfire storage) + SQL Server (logs) |
+| **Monitoramento** | Crystal Reports estático | Hangfire Dashboard em real-time + Application Insights |
+| **Retry de Falhas** | Manual (reexecução via SP) | Automático com backoff exponencial |
+| **Timeout de Job** | Não implementado | 30min padrão (configurável) |
+| **Permissões** | Role-based (básico) | 2-step execution (sensíveis) + RBAC completo |
+| **Notificações** | Não existiam | Email automático em falhas críticas |
+| **Multi-tenancy** | Não | ClienteId em todos os registros |
+| **Auditoria** | Mínima | Completa (CREATE, UPDATE, EXECUTE, FAIL, CANCEL) |
+| **Dashboard** | Não | Angular + Hangfire Dashboard embarcado |
+| **Paralelização** | Não (execução serial) | Max 10 workers paralelos por tenant |
+| **Logs de Execução** | SQL Server sparse | Application Insights + Redis streams |
+
+### 1.5 Funcionalidades Principais
+
+1. **Agendamento de Jobs** - Criar, atualizar, deletar jobs com Cron expressions validadas (daily, weekly, monthly, custom)
+2. **Execução Manual** - Disparar job imediatamente, sem aguardar próxima execução agendada
+3. **Pausar/Retomar** - Suspender execução recorrente de um job; retomar sem perder histórico
+4. **Enfileiramento (Enqueue)** - Adicionar job à fila com prioridade; executar assim que worker disponível
+5. **Histórico e Logs** - Visualizar todas as execuções (timestamp, status, tempo, erro), com retenção 90 dias
+6. **Retry Automático** - 3 tentativas em caso de falha, com backoff exponencial (1, 2, 4 minutos)
+7. **Timeout Inteligente** - Cancelar job se execução exceder 30 minutos (configurável por job)
+8. **Dashboard em Tempo Real** - Monitorar jobs ativos, filas, workers, histórico e alertas
+9. **Notificações de Falha** - Email automático ao administrador quando job falha após 3 tentativas
+10. **Two-Step Execution** - Jobs sensíveis requerem permissão de criação + permissão de execução
+11. **Validação de Cron Expression** - Verificar sintaxe via Cronos library; sugerir próxima execução
+12. **Workers Paralelos** - Máximo 10 workers simultâneos por ClienteId; distribuição automática
+13. **Isolamento por Tenant** - ClienteId em todos os jobs; jobs de um tenant não veem jobs de outro
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-JOB-112-01: Nome Único de Job por Tenant
+
+**Descricao**: Cada job deve ter um nome único dentro do ClienteId. Nomes de jobs em diferentes tenants podem se repetir.
+
+**Justificativa**: Evitar conflitos de agendamento e facilitar identificação de jobs no dashboard. Nome é a chave primária de negócio (além da chave técnica Id).
+
+**Implementacao**:
+```csharp
+// Domain Model - Job.cs
+public class Job : Entity, IAggregateRoot
+{
+    public Guid ClienteId { get; private set; }
+    public string Name { get; private set; }  // Unique per ClienteId
+    public string Description { get; private set; }
+    public string JobType { get; private set; }  // Enum: ImportarFaturas, LimparCache, etc.
+    public string CronExpression { get; private set; }
+    public JobStatus Status { get; private set; }  // Active, Paused, Disabled, Faulted
+    public DateTime CreatedAt { get; private set; }
+    public DateTime? UpdatedAt { get; private set; }
+    public DateTime? NextExecution { get; private set; }
+    public int RetryCount { get; private set; } = 3;
+    public int TimeoutMinutes { get; private set; } = 30;
+    public JobPriority Priority { get; private set; } = JobPriority.Medium;
+    public bool RequiresTwoStepExecution { get; private set; } = false;
+
+    // Domain Event
+    public void CreateJob(Guid clienteId, string name, string description, string jobType,
+                         string cronExpression, JobPriority priority = JobPriority.Medium)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("Job name is required");
+
+        ClienteId = clienteId;
+        Name = name.Trim();
+        Description = description?.Trim() ?? string.Empty;
+        JobType = jobType ?? throw new DomainException("JobType is required");
+        CronExpression = cronExpression ?? throw new DomainException("CronExpression is required");
+        Priority = priority;
+        Status = JobStatus.Active;
+        CreatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new JobCreatedEvent(this.Id, clienteId, name, jobType));
+    }
+}
+
+// Repository - UniqueNameValidator
+public class JobRepository : IJobRepository
+{
+    public async Task<bool> ExistsByNameAsync(Guid clienteId, string name)
+    {
+        return await _context.Jobs
+            .AnyAsync(j => j.ClienteId == clienteId &&
+                          j.Name.ToLower() == name.ToLower() &&
+                          j.Status != JobStatus.Deleted);
+    }
+}
+
+// Handler - CreateJobCommandHandler
+public class CreateJobCommandHandler : IRequestHandler<CreateJobCommand, Result<JobDto>>
+{
+    private readonly IJobRepository _jobRepository;
+
+    public async Task<Result<JobDto>> Handle(CreateJobCommand request, CancellationToken ct)
+    {
+        // RN-JOB-112-01: Validar nome único por tenant
+        var exists = await _jobRepository.ExistsByNameAsync(request.ClienteId, request.Name);
+        if (exists)
+            return Result<JobDto>.Error($"Job '{request.Name}' already exists for this tenant");
+
+        var job = new Job();
+        job.CreateJob(request.ClienteId, request.Name, request.Description,
+                      request.JobType, request.CronExpression, request.Priority);
+
+        _jobRepository.Add(job);
+        await _jobRepository.UnitOfWork.SaveChangesAsync(ct);
+
+        return Result<JobDto>.Success(_mapper.Map<JobDto>(job));
+    }
+}
+```
+
+**Exemplos**:
+- Válido: ClienteId A tem job "ImportarFaturas", ClienteId B pode ter job "ImportarFaturas"
+- Inválido: ClienteId A tenta criar 2 jobs com nome "ImportarFaturas"
+
+---
+
+### RN-JOB-112-02: Validacao de Cron Expression
+
+**Descricao**: Toda Cron expression deve ser validada contra o padrão POSIX. Se inválida, operação é rejeitada com mensagem descritiva. Nenhum job é criado com Cron inválido.
+
+**Justificativa**: Proteger integridade do scheduler. Cron inválido causaria falha silenciosa no agendamento ou comportamento imprevisível.
+
+**Implementacao**:
+```csharp
+// Domain - CronValidator.cs
+using Cronos;
+
+public class CronExpressionValidator
+{
+    public static Result<CronExpression> Validate(string expression)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+            return Result<CronExpression>.Error("Cron expression cannot be empty");
+
+        try
+        {
+            var cron = CronExpression.Parse(expression);
+
+            // Validate format (should be 5 fields minimum: min hour day month dayofweek)
+            var fields = expression.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (fields.Length < 5)
+                return Result<CronExpression>.Error(
+                    "Cron expression must have at least 5 fields (min hour day month dayofweek)");
+
+            return Result<CronExpression>.Success(cron);
+        }
+        catch (CronFormatException ex)
+        {
+            return Result<CronExpression>.Error($"Invalid Cron format: {ex.Message}");
+        }
+    }
+
+    // Suggest next execution
+    public static DateTime GetNextExecution(string cronExpression)
+    {
+        var cron = CronExpression.Parse(cronExpression);
+        return cron.GetNextOccurrence(DateTime.UtcNow, TimeZoneInfo.Utc) ??
+               throw new InvalidOperationException("Unable to calculate next execution");
+    }
+}
+
+// Command Handler
+public class CreateJobCommandHandler : IRequestHandler<CreateJobCommand, Result<JobDto>>
+{
+    public async Task<Result<JobDto>> Handle(CreateJobCommand request, CancellationToken ct)
+    {
+        // RN-JOB-112-02: Validar Cron expression
+        var cronValidation = CronExpressionValidator.Validate(request.CronExpression);
+        if (!cronValidation.IsSuccess)
+            return Result<JobDto>.Error(cronValidation.ErrorMessage);
+
+        // Calculate next execution
+        var nextExecution = CronExpressionValidator.GetNextExecution(request.CronExpression);
+
+        var job = new Job();
+        job.CreateJob(request.ClienteId, request.Name, request.Description,
+                      request.JobType, request.CronExpression, request.Priority);
+        job.SetNextExecution(nextExecution);
+
+        _jobRepository.Add(job);
+        await _jobRepository.UnitOfWork.SaveChangesAsync(ct);
+
+        return Result<JobDto>.Success(_mapper.Map<JobDto>(job));
+    }
+}
+```
+
+**Exemplos**:
+- Válido: `0 2 * * *` (daily 2am), `0 0 * * 0` (weekly Sunday), `0 0 1 * *` (monthly 1st)
+- Inválido: `2 0 * *` (apenas 4 campos), `60 * * * *` (minuto 60 é inválido), `abc`
+
+---
+
+### RN-JOB-112-03: Retry Automatico com Backoff Exponencial
+
+**Descricao**: Quando um job falha, sistema reexecuta automaticamente até 3 vezes com backoff exponencial: 1ª falha aguarda 1 minuto, 2ª falha aguarda 2 minutos, 3ª falha aguarda 4 minutos. Após 3 falhas, job é marcado como Faulted e administrador é notificado.
+
+**Justificativa**: Aumentar resiliência contra falhas transitórias (timeout de API externo, indisponibilidade temporária de banco de dados, etc.). Backoff exponencial evita overhead no sistema.
+
+**Implementacao**:
+```csharp
+// Domain - JobExecution.cs
+public class JobExecution : Entity
+{
+    public Guid JobId { get; private set; }
+    public int ExecutionNumber { get; private set; }
+    public JobExecutionStatus Status { get; private set; }  // Running, Success, Failed, Timeout, Cancelled
+    public DateTime StartedAt { get; private set; }
+    public DateTime? CompletedAt { get; private set; }
+    public TimeSpan? Duration { get; private set; }
+    public string ErrorMessage { get; private set; }
+    public string LogOutput { get; private set; }
+    public int RetryCount { get; private set; } = 0;
+    public DateTime? NextRetryAt { get; private set; }
+
+    public void MarkAsFailed(string errorMessage, int totalRetries)
+    {
+        Status = JobExecutionStatus.Failed;
+        ErrorMessage = errorMessage;
+        CompletedAt = DateTime.UtcNow;
+        Duration = CompletedAt - StartedAt;
+        RetryCount++;
+
+        // Calculate next retry time with exponential backoff
+        if (RetryCount < totalRetries)
+        {
+            int minutesToWait = (int)Math.Pow(2, RetryCount - 1);  // 1, 2, 4, 8...
+            NextRetryAt = DateTime.UtcNow.AddMinutes(minutesToWait);
+        }
+    }
+}
+
+// Application Service - JobExecutionService
+public class JobExecutionService : IJobExecutionService
+{
+    private readonly IJobRepository _jobRepository;
+    private readonly IJobExecutionRepository _executionRepository;
+    private readonly IBackgroundJobClient _hangfireClient;
+    private readonly INotificationService _notificationService;
+    private readonly ILogger<JobExecutionService> _logger;
+
+    public async Task<Result> ExecuteJobAsync(Guid jobId, CancellationToken ct)
+    {
+        var job = await _jobRepository.GetByIdAsync(jobId, ct);
+        if (job is null)
+            return Result.Error("Job not found");
+
+        var execution = new JobExecution();
+        execution.Id = Guid.NewGuid();
+        execution.JobId = jobId;
+        execution.ExecutionNumber = await _executionRepository.GetNextExecutionNumberAsync(jobId);
+        execution.StartedAt = DateTime.UtcNow;
+        execution.Status = JobExecutionStatus.Running;
+
+        _executionRepository.Add(execution);
+        await _executionRepository.UnitOfWork.SaveChangesAsync(ct);
+
+        try
+        {
+            // Execute job logic (abstracted as IJobHandler<TPayload>)
+            var handler = GetJobHandler(job.JobType);
+            var result = await handler.ExecuteAsync(job.Payload ?? "{}");
+
+            execution.Status = JobExecutionStatus.Success;
+            execution.CompletedAt = DateTime.UtcNow;
+            execution.Duration = execution.CompletedAt - execution.StartedAt;
+
+            _logger.LogInformation($"Job {job.Name} (ID: {jobId}) executed successfully in {execution.Duration?.TotalSeconds}s");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Job {job.Name} (ID: {jobId}) failed: {ex.Message}");
+
+            // RN-JOB-112-03: Aplicar retry com backoff exponencial
+            execution.MarkAsFailed(ex.Message, job.RetryCount);
+
+            if (execution.RetryCount < job.RetryCount)
+            {
+                // Schedule retry
+                var delay = execution.NextRetryAt.Value - DateTime.UtcNow;
+                _hangfireClient.Schedule<IJobExecutionService>(
+                    service => service.ExecuteJobAsync(jobId, ct),
+                    delay);
+
+                _logger.LogWarning($"Job {job.Name} scheduled for retry #{execution.RetryCount} at {execution.NextRetryAt}");
+            }
+            else
+            {
+                // Max retries exceeded
+                job.MarkAsFaulted();
+                _notificationService.NotifyJobFailure(job.ClienteId, job.Name, execution.ErrorMessage);
+
+                _logger.LogError($"Job {job.Name} failed after {job.RetryCount} retries. Notifying administrator.");
+            }
+        }
+
+        _executionRepository.Update(execution);
+        await _executionRepository.UnitOfWork.SaveChangesAsync(ct);
+
+        return Result.Success();
+    }
+}
+```
+
+**Exemplos**:
+- Job falha na 1ª execução → Aguarda 1 minuto, reexecuta
+- Job falha na 2ª execução (primeira retry) → Aguarda 2 minutos, reexecuta
+- Job falha na 3ª execução (segunda retry) → Aguarda 4 minutos, reexecuta
+- Job falha na 4ª execução (terceira retry) → Marcado como Faulted, administrador notificado
+
+---
+
+### RN-JOB-112-04: Timeout Padrao de 30 Minutos
+
+**Descricao**: Cada job possui timeout padrão de 30 minutos. Se execução não completar neste tempo, job é cancelado automaticamente e marcado como Timeout. Timeout é configurável por job (mínimo 5 min, máximo 4 horas).
+
+**Justificativa**: Prevenir jobs pendurados que consomem recursos indefinidamente. 30 minutos é balanço entre dar tempo suficiente para operações complexas (importações grandes) e evitar deadlocks.
+
+**Implementacao**:
+```csharp
+// Domain - Job.cs
+public class Job : Entity, IAggregateRoot
+{
+    public int TimeoutMinutes { get; private set; } = 30;  // Default
+
+    public void SetTimeout(int minutes)
+    {
+        if (minutes < 5)
+            throw new DomainException("Timeout must be at least 5 minutes");
+        if (minutes > 240)  // 4 hours
+            throw new DomainException("Timeout cannot exceed 4 hours (240 minutes)");
+
+        TimeoutMinutes = minutes;
+    }
+}
+
+// Hangfire Background Job - JobBackgroundService
+public class JobBackgroundService
+{
+    private readonly IJobRepository _jobRepository;
+    private readonly IJobExecutionRepository _executionRepository;
+
+    public async Task ExecuteJobWithTimeoutAsync(Guid jobId, IJobHandler handler, CancellationToken ct)
+    {
+        var job = await _jobRepository.GetByIdAsync(jobId, ct);
+        var execution = new JobExecution { JobId = jobId, StartedAt = DateTime.UtcNow };
+        _executionRepository.Add(execution);
+        await _executionRepository.UnitOfWork.SaveChangesAsync(ct);
+
+        try
+        {
+            // RN-JOB-112-04: Aplicar timeout
+            using (var cts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+            {
+                cts.CancelAfter(TimeSpan.FromMinutes(job.TimeoutMinutes));
+
+                try
+                {
+                    await handler.ExecuteAsync(job.Payload, cts.Token);
+                    execution.Status = JobExecutionStatus.Success;
+                }
+                catch (OperationCanceledException)
+                {
+                    // Timeout occurred
+                    execution.Status = JobExecutionStatus.Timeout;
+                    execution.ErrorMessage = $"Job exceeded timeout of {job.TimeoutMinutes} minutes";
+                    job.MarkAsFaulted();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            execution.Status = JobExecutionStatus.Failed;
+            execution.ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            execution.CompletedAt = DateTime.UtcNow;
+            execution.Duration = execution.CompletedAt - execution.StartedAt;
+            _executionRepository.Update(execution);
+            await _executionRepository.UnitOfWork.SaveChangesAsync(ct);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Job "ImportarFaturas": timeout = 30 min (padrão)
+- Job "LimparCache": timeout = 5 min (otimizado para operação rápida)
+- Job "SincronizarAzureAD": timeout = 120 min (operação complexa com múltiplos tenants)
+- Resultado: Se job não termina em timeout, marcado como Timeout e retira worker
+
+---
+
+### RN-JOB-112-05: Maximo 10 Workers Paralelos por Tenant
+
+**Descricao**: Sistema permite máximo 10 workers (instâncias paralelas de execução) simultâneos por ClienteId. Cada job ocupa 1 worker durante execução. Ultrapassado o limite, jobs adicionais entram em fila (queue).
+
+**Justificativa**: Prevenir sobrecarga do sistema e garantir isolamento de recursos por tenant. 10 workers é balanceado para suportar picos de processamento sem comprometer performance.
+
+**Implementacao**:
+```csharp
+// Domain - WorkerPool.cs
+public class WorkerPool
+{
+    private readonly ConcurrentDictionary<Guid, ConcurrentBag<Worker>> _workersByTenant;
+    private readonly int _maxWorkersPerTenant = 10;
+
+    public WorkerPool()
+    {
+        _workersByTenant = new ConcurrentDictionary<Guid, ConcurrentBag<Worker>>();
+    }
+
+    public bool CanAcquireWorker(Guid clienteId)
+    {
+        if (!_workersByTenant.ContainsKey(clienteId))
+        {
+            _workersByTenant[clienteId] = new ConcurrentBag<Worker>();
+        }
+
+        var workers = _workersByTenant[clienteId];
+        // RN-JOB-112-05: Validar limite de workers por tenant
+        return workers.Count < _maxWorkersPerTenant;
+    }
+
+    public Worker AcquireWorker(Guid clienteId)
+    {
+        if (!CanAcquireWorker(clienteId))
+            throw new InvalidOperationException(
+                $"Maximum {_maxWorkersPerTenant} workers already running for tenant {clienteId}");
+
+        var workers = _workersByTenant[clienteId];
+        var worker = new Worker { Id = Guid.NewGuid(), ClienteId = clienteId, AcquiredAt = DateTime.UtcNow };
+        workers.Add(worker);
+        return worker;
+    }
+
+    public void ReleaseWorker(Guid clienteId, Guid workerId)
+    {
+        if (_workersByTenant.TryGetValue(clienteId, out var workers))
+        {
+            var worker = workers.FirstOrDefault(w => w.Id == workerId);
+            if (worker != null)
+            {
+                // Remove from bag (create new bag without this worker)
+                var newBag = new ConcurrentBag<Worker>(workers.Where(w => w.Id != workerId));
+                _workersByTenant[clienteId] = newBag;
+            }
+        }
+    }
+
+    public int GetActiveWorkerCount(Guid clienteId)
+    {
+        return _workersByTenant.TryGetValue(clienteId, out var workers) ? workers.Count : 0;
+    }
+}
+
+// Application - JobQueueService
+public class JobQueueService : IJobQueueService
+{
+    private readonly WorkerPool _workerPool;
+    private readonly IJobRepository _jobRepository;
+    private readonly IBackgroundJobClient _hangfireClient;
+
+    public async Task EnqueueJobAsync(Guid jobId, Guid clienteId)
+    {
+        // RN-JOB-112-05: Validar limite de workers
+        if (_workerPool.CanAcquireWorker(clienteId))
+        {
+            // Execute immediately
+            var worker = _workerPool.AcquireWorker(clienteId);
+            _hangfireClient.Enqueue<IJobExecutionService>(
+                service => service.ExecuteJobAsync(jobId, CancellationToken.None));
+        }
+        else
+        {
+            // Queue for later execution
+            var job = await _jobRepository.GetByIdAsync(jobId);
+            job.EnqueueForLater();
+            _jobRepository.Update(job);
+            await _jobRepository.UnitOfWork.SaveChangesAsync();
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Tenant A executa 10 jobs em paralelo → 11º job entra em fila
+- Tenant A completa 1 job → Worker liberado, 11º job começa
+- Tenant B (diferente) pode executar seus próprios 10 jobs em paralelo, sem afetar Tenant A
+
+---
+
+### RN-JOB-112-06: Historico de Execucoes Retido por 90 Dias
+
+**Descricao**: Sistema mantém histórico completo (status, logs, erros, tempo) de todas as execuções de jobs. Registros com mais de 90 dias são automaticamente arquivados (ou deletados conforme política de retenção). Dashboard mostra histórico dos últimos 90 dias.
+
+**Justificativa**: Conformidade com regulamentações de retenção de dados. 90 dias oferece rastreabilidade suficiente para debugging de problemas recorrentes. Arquivamento libera espaço em tabelas ativas.
+
+**Implementacao**:
+```csharp
+// Domain - JobExecution.cs
+public class JobExecution : Entity
+{
+    public Guid JobId { get; private set; }
+    public DateTime ExecutedAt { get; private set; }
+    public JobExecutionStatus Status { get; private set; }
+    public TimeSpan Duration { get; private set; }
+    public string ErrorMessage { get; private set; }
+    public string LogOutput { get; private set; }
+}
+
+// Infrastructure - JobExecutionArchiveService
+public class JobExecutionArchiveService : BackgroundService
+{
+    private readonly IJobExecutionRepository _executionRepository;
+    private readonly IJobExecutionArchiveRepository _archiveRepository;
+    private readonly ILogger<JobExecutionArchiveService> _logger;
+    private readonly TimeSpan _archiveInterval = TimeSpan.FromHours(1);
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                // RN-JOB-112-06: Arquivar execuções com mais de 90 dias
+                var cutoffDate = DateTime.UtcNow.AddDays(-90);
+                var executions = await _executionRepository
+                    .GetExecutionsOlderThanAsync(cutoffDate);
+
+                foreach (var batch in executions.Chunk(1000))
+                {
+                    // Archive to separate table (JobExecutionArchive)
+                    foreach (var execution in batch)
+                    {
+                        var archive = new JobExecutionArchive
+                        {
+                            JobId = execution.JobId,
+                            ExecutedAt = execution.ExecutedAt,
+                            Status = execution.Status,
+                            Duration = execution.Duration,
+                            ErrorMessage = execution.ErrorMessage,
+                            LogOutput = execution.LogOutput,
+                            ArchivedAt = DateTime.UtcNow
+                        };
+                        _archiveRepository.Add(archive);
+                    }
+
+                    // Delete from active table
+                    await _executionRepository.DeleteAsync(batch);
+                }
+
+                _logger.LogInformation($"Archived {executions.Count} job executions older than {cutoffDate}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error archiving job executions: {ex.Message}");
+            }
+
+            await Task.Delay(_archiveInterval, stoppingToken);
+        }
+    }
+}
+
+// Database - SQL Script
+// CREATE TABLE JobExecutionArchive (
+//     Id UNIQUEIDENTIFIER PRIMARY KEY,
+//     JobId UNIQUEIDENTIFIER NOT NULL,
+//     ExecutedAt DATETIME2 NOT NULL,
+//     Status VARCHAR(50) NOT NULL,
+//     Duration TIME NOT NULL,
+//     ErrorMessage NVARCHAR(MAX),
+//     LogOutput NVARCHAR(MAX),
+//     ArchivedAt DATETIME2 NOT NULL,
+//     INDEX IDX_ArchivedAt (ArchivedAt)
+// )
+```
+
+**Exemplos**:
+- Job "ImportarFaturas" executado 90 dias atrás → Arquivado
+- Job "ImportarFaturas" executado 30 dias atrás → Visível no dashboard
+- Consultando histórico antigo → Requer acesso a JobExecutionArchive
+
+---
+
+### RN-JOB-112-07: Notificacao de Falha para Administrador
+
+**Descricao**: Quando um job falha completamente (após 3 retries), sistema envia notificação por email ao administrador do tenant informando: nome do job, horário da falha, mensagem de erro, recomendação de ação. Email é enviado apenas uma vez por falha (não repetido em retries).
+
+**Justificativa**: Alertar rapidamente sobre problemas críticos que requerem intervenção manual. Evitar spam enviando apenas quando esgotadas todas as tentativas.
+
+**Implementacao**:
+```csharp
+// Domain - JobFailureNotification.cs
+public class JobFailureNotification : Entity, IAggregateRoot
+{
+    public Guid ClienteId { get; private set; }
+    public Guid JobId { get; private set; }
+    public string JobName { get; private set; }
+    public string ErrorMessage { get; private set; }
+    public DateTime FailureTime { get; private set; }
+    public string AdminEmail { get; private set; }
+    public NotificationStatus Status { get; private set; }  // Pending, Sent, Failed
+    public int RetryCount { get; private set; } = 0;
+    public DateTime CreatedAt { get; private set; }
+    public DateTime? SentAt { get; private set; }
+
+    public void MarkAsSent()
+    {
+        Status = NotificationStatus.Sent;
+        SentAt = DateTime.UtcNow;
+    }
+
+    public void MarkAsFailed()
+    {
+        Status = NotificationStatus.Failed;
+        RetryCount++;
+    }
+}
+
+// Application - JobFailureNotificationService
+public class JobFailureNotificationService : IJobFailureNotificationService
+{
+    private readonly IJobFailureNotificationRepository _notificationRepository;
+    private readonly IEmailService _emailService;
+    private readonly IUserRepository _userRepository;
+    private readonly ILogger<JobFailureNotificationService> _logger;
+
+    public async Task NotifyJobFailureAsync(Guid clienteId, Job job, string errorMessage)
+    {
+        try
+        {
+            // RN-JOB-112-07: Enviar notificação de falha
+
+            // 1. Obter administrador do tenant
+            var admin = await _userRepository.GetAdministratorAsync(clienteId);
+            if (admin is null)
+            {
+                _logger.LogWarning($"No administrator found for tenant {clienteId}. Cannot notify job failure.");
+                return;
+            }
+
+            // 2. Criar notificação
+            var notification = new JobFailureNotification
+            {
+                Id = Guid.NewGuid(),
+                ClienteId = clienteId,
+                JobId = job.Id,
+                JobName = job.Name,
+                ErrorMessage = errorMessage,
+                FailureTime = DateTime.UtcNow,
+                AdminEmail = admin.Email,
+                Status = NotificationStatus.Pending,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            // 3. Compor email
+            var emailTemplate = @"
+Job {JobName} has failed after all retry attempts.
+
+Failure Time: {FailureTime}
+Error: {ErrorMessage}
+Recommended Actions:
+1. Check system logs for detailed error information
+2. Verify external dependencies (databases, APIs)
+3. If issue persists, contact support team
+
+Job ID: {JobId}
+";
+
+            var emailContent = emailTemplate
+                .Replace("{JobName}", job.Name)
+                .Replace("{FailureTime}", notification.FailureTime.ToString("yyyy-MM-dd HH:mm:ss"))
+                .Replace("{ErrorMessage}", errorMessage)
+                .Replace("{JobId}", job.Id.ToString());
+
+            // 4. Enviar email
+            var emailResult = await _emailService.SendAsync(
+                to: admin.Email,
+                subject: $"[ALERT] Job '{job.Name}' Failed",
+                body: emailContent,
+                isHtml: false);
+
+            if (emailResult.IsSuccess)
+            {
+                notification.MarkAsSent();
+                _logger.LogInformation($"Notification sent to {admin.Email} for job failure: {job.Name}");
+            }
+            else
+            {
+                notification.MarkAsFailed();
+                _logger.LogError($"Failed to send notification to {admin.Email}: {emailResult.ErrorMessage}");
+            }
+
+            _notificationRepository.Add(notification);
+            await _notificationRepository.UnitOfWork.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error notifying job failure: {ex.Message}");
+        }
+    }
+}
+
+// Handler - UpdateJobStatusCommandHandler
+public class UpdateJobStatusCommandHandler : IRequestHandler<UpdateJobStatusCommand, Result>
+{
+    private readonly IJobRepository _jobRepository;
+    private readonly IJobFailureNotificationService _notificationService;
+
+    public async Task<Result> Handle(UpdateJobStatusCommand request, CancellationToken ct)
+    {
+        var job = await _jobRepository.GetByIdAsync(request.JobId, ct);
+
+        // Se job foi marcado como faulted após esgotamento de retries
+        if (request.NewStatus == JobStatus.Faulted && job.Status != JobStatus.Faulted)
+        {
+            // RN-JOB-112-07: Disparar notificação
+            await _notificationService.NotifyJobFailureAsync(
+                job.ClienteId, job, request.ErrorMessage);
+        }
+
+        job.UpdateStatus(request.NewStatus);
+        _jobRepository.Update(job);
+        await _jobRepository.UnitOfWork.SaveChangesAsync(ct);
+
+        return Result.Success();
+    }
+}
+```
+
+**Exemplos**:
+- Job "ImportarFaturas" falha 3 vezes → Email enviado ao admin uma única vez
+- Job "LimparCache" falha na retry 1 → Sem email (ainda há tentativas)
+- Retry bem-sucedida após falha → Sem email (job recuperado)
+
+---
+
+### RN-JOB-112-08: Multi-tenancy com ClienteId
+
+**Descricao**: Todos os jobs, execuções, e configurações são isolados por ClienteId. Jobs de um tenant nunca podem acessar dados de outro. Queries automáticas filtram por ClienteId. TenantId é obrigatório em cada operação.
+
+**Justificativa**: Garantir isolamento de dados entre clientes. SaaS multi-tenancy é requisito de negócio (múltiplos clientes rodando no mesmo sistema).
+
+**Implementacao**:
+```csharp
+// Domain - Job.cs
+public class Job : Entity, IAggregateRoot
+{
+    public Guid ClienteId { get; private set; }  // MANDATORY - isolamento por tenant
+    public string Name { get; private set; }
+    // ... other properties
+}
+
+// Infrastructure - JobRepository.cs
+public class JobRepository : IJobRepository
+{
+    private readonly ICurrentTenantContext _tenantContext;
+
+    public async Task<Job> GetByIdAsync(Guid jobId, CancellationToken ct)
+    {
+        // RN-JOB-112-08: Filtro automático por tenant
+        return await _context.Jobs
+            .Where(j => j.ClienteId == _tenantContext.ClienteId && j.Id == jobId)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<List<Job>> GetAllAsync(CancellationToken ct)
+    {
+        // RN-JOB-112-08: Sempre filtrar por tenant
+        return await _context.Jobs
+            .Where(j => j.ClienteId == _tenantContext.ClienteId)
+            .ToListAsync(ct);
+    }
+
+    public async Task<bool> ExistsByNameAsync(Guid clienteId, string name)
+    {
+        return await _context.Jobs
+            .AnyAsync(j => j.ClienteId == clienteId &&
+                          j.Name.ToLower() == name.ToLower());
+    }
+}
+
+// API - JobsController.cs
+[ApiController]
+[Route("api/jobs")]
+[Authorize]
+public class JobsController : ControllerBase
+{
+    private readonly IMediator _mediator;
+    private readonly ICurrentTenantContext _tenantContext;
+
+    [HttpGet]
+    public async Task<IActionResult> ListJobs([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    {
+        // RN-JOB-112-08: ClienteId extraído automaticamente do contexto
+        var query = new ListJobsQuery { ClienteId = _tenantContext.ClienteId, Page = page, PageSize = pageSize };
+        var result = await _mediator.Send(query);
+        return Ok(result);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateJob([FromBody] CreateJobRequest request)
+    {
+        // RN-JOB-112-08: ClienteId injeta automaticamente
+        var command = new CreateJobCommand
+        {
+            ClienteId = _tenantContext.ClienteId,
+            Name = request.Name,
+            Description = request.Description,
+            JobType = request.JobType,
+            CronExpression = request.CronExpression,
+            Priority = request.Priority
+        };
+
+        var result = await _mediator.Send(command);
+        return Created($"/api/jobs/{result.Data.Id}", result);
+    }
+}
+
+// Middleware - TenantContextMiddleware.cs
+public class TenantContextMiddleware
+{
+    public async Task InvokeAsync(HttpContext context, ICurrentTenantContext tenantContext)
+    {
+        // Extract ClienteId from JWT or header
+        var clienteIdClaim = context.User.FindFirst("cliente_id");
+        if (clienteIdClaim is null)
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        if (!Guid.TryParse(clienteIdClaim.Value, out var clienteId))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        // RN-JOB-112-08: Injetar ClienteId no contexto
+        ((CurrentTenantContext)tenantContext).SetClienteId(clienteId);
+
+        await Task.CompletedTask;
+    }
+}
+```
+
+**Exemplos**:
+- Tenant A (ClienteId = GUID-A) cria job "ImportarFaturas"
+- Tenant B (ClienteId = GUID-B) cria job "ImportarFaturas" (mesmo nome, diferentes tenants)
+- Query para Tenant A → Retorna apenas job de Tenant A
+- Query para Tenant B → Retorna apenas job de Tenant B
+
+---
+
+### RN-JOB-112-09: Jobs Sensíveis Exigem Duas Permissoes (2-Step Execution)
+
+**Descricao**: Jobs marcados como sensíveis (ex: deletar dados em massa, sincronizar com externo) requerem 2 permissões distintas: (1) `jobs:schedule` (agendar/criar) e (2) `jobs:execute` (executar/disparar). Usuário com permissão de agendamento NÃO pode executar automaticamente; requer aprovação de usuário com permissão de execução.
+
+**Justificativa**: Segregação de deveres em operações críticas. Reduz risco de execução acidental ou maliciosa de tarefas que impactam dados em massa.
+
+**Implementacao**:
+```csharp
+// Domain - Job.cs
+public class Job : Entity, IAggregateRoot
+{
+    public bool RequiresTwoStepExecution { get; private set; } = false;
+    public JobStatus Status { get; private set; }  // Active, PendingApproval, Approved, Paused, etc.
+    public Guid? ScheduledByUserId { get; private set; }
+    public Guid? ApprovedByUserId { get; private set; }
+    public DateTime? ApprovedAt { get; private set; }
+
+    public void MarkAsRequiringApproval()
+    {
+        RequiresTwoStepExecution = true;
+    }
+}
+
+// Application - CreateJobCommandHandler.cs
+public class CreateJobCommandHandler : IRequestHandler<CreateJobCommand, Result<JobDto>>
+{
+    private readonly IJobRepository _jobRepository;
+    private readonly IAuthorizationService _authorizationService;
+
+    public async Task<Result<JobDto>> Handle(CreateJobCommand request, CancellationToken ct)
+    {
+        // Validar permissão: jobs:schedule
+        var hasSchedulePermission = await _authorizationService
+            .AuthorizeAsync(request.UserId, "jobs:schedule");
+
+        if (!hasSchedulePermission)
+            return Result<JobDto>.Error("User does not have permission to schedule jobs");
+
+        var job = new Job();
+        job.CreateJob(request.ClienteId, request.Name, request.Description,
+                      request.JobType, request.CronExpression, request.Priority);
+
+        // RN-JOB-112-09: Marcar job como exigindo 2-step se sensível
+        if (request.IsSensitive)
+        {
+            job.MarkAsRequiringApproval();
+            job.Status = JobStatus.PendingApproval;
+            job.ScheduledByUserId = request.UserId;
+        }
+
+        _jobRepository.Add(job);
+        await _jobRepository.UnitOfWork.SaveChangesAsync(ct);
+
+        return Result<JobDto>.Success(_mapper.Map<JobDto>(job));
+    }
+}
+
+// Application - ApproveJobExecutionCommandHandler.cs
+public class ApproveJobExecutionCommandHandler : IRequestHandler<ApproveJobExecutionCommand, Result>
+{
+    private readonly IJobRepository _jobRepository;
+    private readonly IAuthorizationService _authorizationService;
+
+    public async Task<Result> Handle(ApproveJobExecutionCommand request, CancellationToken ct)
+    {
+        // Validar permissão: jobs:execute
+        var hasExecutePermission = await _authorizationService
+            .AuthorizeAsync(request.UserId, "jobs:execute");
+
+        if (!hasExecutePermission)
+            return Result.Error("User does not have permission to execute jobs");
+
+        var job = await _jobRepository.GetByIdAsync(request.JobId, ct);
+        if (!job.RequiresTwoStepExecution || job.Status != JobStatus.PendingApproval)
+            return Result.Error("Job does not require approval or is not pending approval");
+
+        // RN-JOB-112-09: Aplicar aprovação
+        job.Status = JobStatus.Approved;
+        job.ApprovedByUserId = request.UserId;
+        job.ApprovedAt = DateTime.UtcNow;
+
+        _jobRepository.Update(job);
+        await _jobRepository.UnitOfWork.SaveChangesAsync(ct);
+
+        // Now job can be executed
+        return Result.Success();
+    }
+}
+
+// API - JobsController.cs
+[HttpPost("{jobId}/approve")]
+[Authorize]
+public async Task<IActionResult> ApproveJob(Guid jobId)
+{
+    var command = new ApproveJobExecutionCommand
+    {
+        JobId = jobId,
+        UserId = User.GetUserId(),
+        ClienteId = _tenantContext.ClienteId
+    };
+
+    var result = await _mediator.Send(command);
+    return result.IsSuccess ? Ok() : BadRequest(result.ErrorMessage);
+}
+
+[HttpPost("{jobId}/execute")]
+[Authorize]
+public async Task<IActionResult> ExecuteJob(Guid jobId)
+{
+    var job = await _jobRepository.GetByIdAsync(jobId);
+
+    // RN-JOB-112-09: Validar se aprovado (para jobs sensíveis)
+    if (job.RequiresTwoStepExecution && job.Status != JobStatus.Approved)
+        return BadRequest("Job requires approval before execution");
+
+    var command = new ExecuteJobCommand { JobId = jobId };
+    var result = await _mediator.Send(command);
+
+    return result.IsSuccess ? Ok() : BadRequest(result.ErrorMessage);
+}
+```
+
+**Exemplos**:
+- Job "DeletearDadosObsoletos" criado → Status = PendingApproval (requer aprovação)
+- Usuário A (com jobs:execute) clica "Aprovar" → Status = Approved, ApprovedByUserId = A
+- Usuário A clica "Executar" → Job executa normalmente
+- Usuário B (sem jobs:execute) tenta aprovar → Erro 403 Forbidden
+
+---
+
+### RN-JOB-112-10: Auditoria Completa de Operacoes em Jobs
+
+**Descricao**: Todas as operações em jobs (CREATE, UPDATE, EXECUTE, FAIL, CANCEL, PAUSE, RESUME) são registradas em log de auditoria com: ID do usuário, tipo de operação, timestamp, dados antigos/novos, ClienteId. Logs de auditoria são imutáveis e retidos por período mínimo de 5 anos.
+
+**Justificativa**: Conformidade com regulamentações de auditoria e rastreabilidade. Permite forensics em caso de incidente de segurança ou erro operacional.
+
+**Implementacao**:
+```csharp
+// Domain - AuditLog.cs
+public class JobAuditLog : Entity
+{
+    public Guid ClienteId { get; private set; }
+    public Guid JobId { get; private set; }
+    public string OperationType { get; private set; }  // CREATE, UPDATE, EXECUTE, FAIL, CANCEL, PAUSE, RESUME
+    public Guid UserId { get; private set; }
+    public string UserName { get; private set; }
+    public DateTime OperationTime { get; private set; }
+    public string OldValues { get; private set; }  // JSON
+    public string NewValues { get; private set; }  // JSON
+    public string IpAddress { get; private set; }
+    public string UserAgent { get; private set; }
+
+    public static JobAuditLog CreateFromOperation(
+        Guid clienteId, Guid jobId, string operationType,
+        Guid userId, string userName, string oldValues,
+        string newValues, string ipAddress, string userAgent)
+    {
+        return new JobAuditLog
+        {
+            Id = Guid.NewGuid(),
+            ClienteId = clienteId,
+            JobId = jobId,
+            OperationType = operationType,
+            UserId = userId,
+            UserName = userName,
+            OperationTime = DateTime.UtcNow,
+            OldValues = oldValues,
+            NewValues = newValues,
+            IpAddress = ipAddress,
+            UserAgent = userAgent
+        };
+    }
+}
+
+// Infrastructure - AuditingInterceptor.cs
+public class JobAuditingInterceptor : SaveChangesInterceptor
+{
+    private readonly IJobAuditLogRepository _auditRepository;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
+    {
+        var dbContext = eventData.Context;
+        var entries = dbContext.ChangeTracker.Entries()
+            .Where(e => e.Entity is Job)
+            .ToList();
+
+        foreach (var entry in entries)
+        {
+            if (entry.Entity is not Job job)
+                continue;
+
+            // RN-JOB-112-10: Registrar auditoria
+            var operationType = entry.State switch
+            {
+                EntityState.Added => "CREATE",
+                EntityState.Modified => "UPDATE",
+                EntityState.Deleted => "DELETE",
+                _ => "UNKNOWN"
+            };
+
+            var httpContext = _httpContextAccessor.HttpContext;
+            var userId = httpContext?.User.FindFirst("sub")?.Value ?? "SYSTEM";
+            var userName = httpContext?.User.FindFirst("name")?.Value ?? "SYSTEM";
+            var ipAddress = httpContext?.Connection.RemoteIpAddress?.ToString() ?? "UNKNOWN";
+            var userAgent = httpContext?.Request.Headers["User-Agent"].ToString() ?? "UNKNOWN";
+
+            // Capture old and new values
+            var oldValues = entry.State == EntityState.Modified
+                ? SerializeProperties(entry.OriginalValues)
+                : null;
+
+            var newValues = entry.State != EntityState.Deleted
+                ? SerializeProperties(entry.CurrentValues)
+                : null;
+
+            var auditLog = JobAuditLog.CreateFromOperation(
+                clienteId: job.ClienteId,
+                jobId: job.Id,
+                operationType: operationType,
+                userId: Guid.Parse(userId),
+                userName: userName,
+                oldValues: oldValues,
+                newValues: newValues,
+                ipAddress: ipAddress,
+                userAgent: userAgent);
+
+            _auditRepository.Add(auditLog);
+        }
+
+        return result;
+    }
+
+    private string SerializeProperties(IPropertyValues values)
+    {
+        var dict = new Dictionary<string, object>();
+        foreach (var property in values.Properties)
+        {
+            dict[property.Name] = values[property] ?? "NULL";
+        }
+        return JsonSerializer.Serialize(dict);
+    }
+}
+
+// Database Schema - SQL
+// CREATE TABLE JobAuditLog (
+//     Id UNIQUEIDENTIFIER PRIMARY KEY,
+//     ClienteId UNIQUEIDENTIFIER NOT NULL,
+//     JobId UNIQUEIDENTIFIER NOT NULL,
+//     OperationType VARCHAR(50) NOT NULL,
+//     UserId UNIQUEIDENTIFIER NOT NULL,
+//     UserName NVARCHAR(256) NOT NULL,
+//     OperationTime DATETIME2 NOT NULL,
+//     OldValues NVARCHAR(MAX),
+//     NewValues NVARCHAR(MAX),
+//     IpAddress NVARCHAR(45),
+//     UserAgent NVARCHAR(1000),
+//     INDEX IDX_ClienteId_JobId (ClienteId, JobId),
+//     INDEX IDX_OperationTime (OperationTime),
+//     INDEX IDX_UserId (UserId)
+// )
+
+// Query - GetJobAuditLog
+public async Task<List<JobAuditLog>> GetAuditLogAsync(Guid jobId, int days = 5 * 365)
+{
+    var cutoffDate = DateTime.UtcNow.AddDays(-days);
+
+    // RN-JOB-112-10: Retenção mínima de 5 anos
+    return await _auditRepository.GetAsync(
+        a => a.JobId == jobId && a.OperationTime >= cutoffDate);
+}
+```
+
+**Exemplos**:
+- CREATE: Usuário cria job "ImportarFaturas" → Log: {OperationType: "CREATE", UserId: X, NewValues: {Name: "ImportarFaturas", ...}}
+- UPDATE: Usuário altera timeout → Log: {OperationType: "UPDATE", OldValues: {Timeout: 30}, NewValues: {Timeout: 60}}
+- EXECUTE: Sistema executa job → Log: {OperationType: "EXECUTE", Timestamp: ...}
+- FAIL: Job falha → Log: {OperationType: "FAIL", ErrorMessage: "..."}
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `icontrolit_legado_vb`
+
+**Tabelas Principais**:
+
+```sql
+-- Não existem tabelas específicas para jobs no legado
+-- Agendamentos eram gerenciados via SQL Server Agent (DTL) ou stored procedures
+
+CREATE TABLE [dbo].[Job_History](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [JobName] [varchar](255) NOT NULL,
+    [ExecutionDate] [datetime] NOT NULL,
+    [Status] [varchar](50) NOT NULL,
+    [Duration] [int] NULL,
+    [ErrorMessage] [nvarchar](max) NULL,
+    [CreatedBy] [nvarchar](100) NULL,
+    CONSTRAINT [PK_Job_History] PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+
+CREATE TABLE [dbo].[Scheduled_Tasks](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [TaskName] [varchar](255) NOT NULL,
+    [CronExpression] [varchar](100) NULL,
+    [IsActive] [bit] NOT NULL DEFAULT 1,
+    [CreatedDate] [datetime] NOT NULL,
+    [ModifiedDate] [datetime] NULL,
+    CONSTRAINT [PK_Scheduled_Tasks] PRIMARY KEY CLUSTERED ([Id] ASC)
+);
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descricao | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `[JobName]` | Nome do job agendado | `Job.Name` |
+| `[ExecutionDate]` | Data/hora da execução | `JobExecution.ExecutedAt` |
+| `[Status]` | SUCCESS, ERROR, TIMEOUT | `JobExecution.Status` (enum) |
+| `[Duration]` | Tempo em segundos | `JobExecution.Duration` (TimeSpan) |
+| `[ErrorMessage]` | Mensagem de erro | `JobExecution.ErrorMessage` |
+| `[CronExpression]` | Padrão CRON (string) | `Job.CronExpression` (validado) |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descricao | Migracao |
+|-----------|-----------|----------|
+| `pa_ScheduleJob` | Criar job agendado | Substituído por `CreateJobCommand` (CQRS) |
+| `pa_ExecuteJob` | Disparar job imediatamente | Substituído por `ExecuteJobCommand` + Hangfire |
+| `pa_GetJobHistory` | Listar histórico | Substituído por `GetJobHistoryQuery` |
+| `pa_UpdateJobStatus` | Atualizar status | Substituído por `UpdateJobStatusCommand` |
+
+### 3.3 Telas ASPX Legado
+
+| Pagina | Descricao | Tela Moderna |
+|--------|-----------|--------------|
+| `Jobs.aspx` | Lista de jobs agendados | `/jobs` (Angular) |
+| `JobDetails.aspx` | Detalhes de job + histórico | `/jobs/{id}` (Angular) |
+| `JobExecution.aspx` | Executar job manualmente | POST `/api/jobs/{id}/executar` |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSJobs.asmx.vb`
+
+| Metodo | Descricao | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `CreateScheduledJob(name, cron)` | Criar job | POST `/api/jobs` |
+| `ExecuteJobNow(jobId)` | Disparar imediato | POST `/api/jobs/{id}/executar` |
+| `GetJobHistory(jobId)` | Obter histórico | GET `/api/jobs/{id}/historico` |
+| `DeleteJob(jobId)` | Deletar job | DELETE `/api/jobs/{id}` |
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `JOBS_SCHEDULING`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "JOBS_SCHEDULING",
+    "nome": "Sistema de Jobs e Agendamentos",
+    "descricao": "Habilita agendamento, execução e monitoramento de tarefas em background",
+    "habilitado": true,
+    "isSystemFeature": true,
+    "relatedFeatures": [
+        "HANGFIRE_DASHBOARD",
+        "JOB_RETRY_POLICY",
+        "JOB_NOTIFICATIONS"
+    ]
+}
+```
+
+**Nota**: Se desabilitado, nenhum job é agendado ou executado. Jobs existentes entram em pausa.
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao**:
+
+```json
+{
+    "jobs": {
+        "list": {
+            "title": "Jobs e Tarefas Agendadas",
+            "emptyState": "Nenhum job configurado"
+        },
+        "form": {
+            "name": "Nome do Job",
+            "description": "Descrição",
+            "jobType": "Tipo de Job",
+            "cronExpression": "Expressão CRON",
+            "priority": "Prioridade",
+            "timeout": "Timeout (minutos)",
+            "requiresTwoStep": "Requer aprovação?"
+        },
+        "messages": {
+            "success": {
+                "created": "Job criado com sucesso",
+                "updated": "Job atualizado com sucesso",
+                "executed": "Job executado com sucesso",
+                "deleted": "Job deletado com sucesso"
+            },
+            "error": {
+                "nameAlreadyExists": "Já existe um job com este nome",
+                "invalidCron": "Expressão CRON inválida",
+                "maxWorkersExceeded": "Limite máximo de workers atingido",
+                "jobNotFound": "Job não encontrado"
+            }
+        },
+        "validation": {
+            "nameRequired": "Nome é obrigatório",
+            "nameMinLength": "Nome deve ter pelo menos 3 caracteres",
+            "cronRequired": "Expressão CRON é obrigatória",
+            "timeoutRequired": "Timeout é obrigatório",
+            "timeoutMinValue": "Timeout mínimo é 5 minutos",
+            "timeoutMaxValue": "Timeout máximo é 240 minutos"
+        },
+        "status": {
+            "active": "Ativo",
+            "paused": "Pausado",
+            "disabled": "Desabilitado",
+            "faulted": "Falha",
+            "pendingApproval": "Aguardando Aprovação"
+        },
+        "priority": {
+            "high": "Alta",
+            "medium": "Média",
+            "low": "Baixa"
+        },
+        "jobTypes": {
+            "importarFaturas": "Importar Faturas",
+            "limparCache": "Limpar Cache",
+            "sincronizarAzureAD": "Sincronizar Azure AD",
+            "validarDados": "Validar Dados",
+            "gerarRelatorios": "Gerar Relatórios"
+        },
+        "actions": {
+            "create": "Criar Job",
+            "edit": "Editar",
+            "delete": "Deletar",
+            "execute": "Executar Agora",
+            "pause": "Pausar",
+            "resume": "Retomar",
+            "approve": "Aprovar",
+            "viewHistory": "Ver Histórico",
+            "viewLogs": "Ver Logs"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Criar Job | `JOBS_JOB_CREATE` | {Name, JobType, CronExpression, Priority, Timeout} |
+| Atualizar Job | `JOBS_JOB_UPDATE` | {Name, CronExpression, Priority, Timeout, Status} |
+| Deletar Job | `JOBS_JOB_DELETE` | {JobId, JobName} |
+| Executar Job | `JOBS_JOB_EXECUTE` | {JobId, ExecutionTime, DurationMs} |
+| Falha de Job | `JOBS_JOB_FAIL` | {JobId, ErrorMessage, RetryCount} |
+| Pausar Job | `JOBS_JOB_PAUSE` | {JobId, PausedAt} |
+| Retomar Job | `JOBS_JOB_RESUME` | {JobId, ResumedAt} |
+| Aprovar Job | `JOBS_JOB_APPROVE` | {JobId, ApprovedBy, ApprovedAt} |
+
+**Retencao**: 5 anos (conforme LGPD)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `jobs:read` | Visualizar jobs | Admin, Manager, Developer |
+| `jobs:create` | Criar jobs | Admin, Developer |
+| `jobs:update` | Editar jobs | Admin, Developer |
+| `jobs:delete` | Deletar jobs | Admin |
+| `jobs:execute` | Executar/disparar jobs | Admin, Developer |
+| `jobs:schedule` | Agendar jobs | Admin, Developer |
+| `jobs:approve` | Aprovar jobs sensíveis | Admin |
+| `jobs:pause` | Pausar jobs | Admin, Developer |
+| `jobs:viewHistory` | Ver histórico de execuções | Admin, Manager, Developer |
+| `jobs:viewLogs` | Ver logs detalhados | Admin, Developer |
+| `jobs:viewDashboard` | Ver Hangfire Dashboard | Admin, Developer |
+
+**Nota**: Permissões de admin + developer; manager é read-only
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/jobs` | Listar todos os jobs | `jobs:read` |
+| GET | `/api/jobs/{id}` | Obter job por ID | `jobs:read` |
+| POST | `/api/jobs` | Criar novo job | `jobs:create` |
+| PUT | `/api/jobs/{id}` | Atualizar job | `jobs:update` |
+| DELETE | `/api/jobs/{id}` | Deletar job | `jobs:delete` |
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| POST | `/api/jobs/{id}/executar` | Executar job manualmente (one-time) | `jobs:execute` |
+| POST | `/api/jobs/{id}/pausar` | Pausar agendamento recorrente | `jobs:pause` |
+| POST | `/api/jobs/{id}/retomar` | Retomar agendamento paused | `jobs:pause` |
+| GET | `/api/jobs/{id}/historico` | Obter histórico de execuções | `jobs:viewHistory` |
+| GET | `/api/jobs/{id}/logs` | Obter logs detalhados de execução | `jobs:viewLogs` |
+| POST | `/api/jobs/{id}/retry` | Retentar job falhado | `jobs:execute` |
+| GET | `/api/jobs/dashboard` | Obter dados para dashboard em tempo real | `jobs:viewDashboard` |
+| GET | `/api/jobs/workers` | Listar workers ativos e filas | `jobs:read` |
+| POST | `/api/jobs/enqueue` | Enfileirar job (fila de prioridade) | `jobs:execute` |
+| GET | `/api/jobs/{id}/nextExecution` | Obter próxima execução agendada | `jobs:read` |
+| POST | `/api/jobs/{id}/approve` | Aprovar job sensível (2-step) | `jobs:approve` |
+| POST | `/api/jobs/{id}/validate-cron` | Validar expressão CRON (sem salvar) | `jobs:read` |
+| GET | `/api/jobs/audit-log` | Obter log de auditoria (admin) | `jobs:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Agendamento de Job
+
+```
+Usuario acessa /jobs
+    |
+    v
+[Clica em "Criar Job"]
+    |
+    v
+[Preenche formulário: Name, Description, JobType, CronExpression, Priority, RequiresTwoStep]
+    |
+    v
+[Clica "Salvar"]
+    |
+    v
+API: POST /api/jobs {request}
+    |
+    v
+[Handler: CreateJobCommandHandler]
+    +--- [Valida permissão jobs:create]
+    |
+    v
+[Validar nome único por ClienteId]
+    |
+    +--- [Erro: nome existe] ---> [400 BadRequest + mensagem]
+    |
+    v [OK]
+[Validar Cron Expression]
+    |
+    +--- [Erro: Cron inválido] ---> [400 BadRequest + sugestão]
+    |
+    v [OK]
+[Calcular próxima execução via Cronos]
+    |
+    v
+[Criar Job aggregate]
+    |
+    v
+[RequiresTwoStep = True?]
+    |
+    +--- [Sim] ---> [Status = PendingApproval]
+    |
+    +--- [Não] ---> [Status = Active]
+    |
+    v
+[Salvar no banco]
+    |
+    v
+[Registrar auditoria JOBS_JOB_CREATE]
+    |
+    v
+[Retornar 201 Created + JobDto]
+    |
+    v
+[Frontend exibe mensagem: "Job criado com sucesso"]
+    |
+    v
+[Se RequiresTwoStep, exibir botão "Aguardando Aprovação"]
+```
+
+### 6.2 Fluxo de Execucao de Job (Normal)
+
+```
+Sistema detecta próxima execução de job agendado (via Hangfire trigger)
+    |
+    v
+[JobBackgroundService.ExecuteJobAsync(jobId)]
+    |
+    v
+[Validar se ClienteId tem worker disponível]
+    |
+    +--- [Não] ---> [Enfileirar job em fila (queue)]
+    |
+    v [Sim]
+[Adquirir worker do pool]
+    |
+    v
+[Criar JobExecution record]
+    |
+    v
+[Status = Running, StartedAt = now]
+    |
+    v
+[Injetar CancellationToken com timeout = Job.TimeoutMinutes]
+    |
+    v
+[Executar handler específico do JobType]
+    |
+    v
+[Handler completa sem erro?]
+    |
+    +--- [Sim] ---> [Status = Success, CompletedAt = now]
+    |
+    +--- [Timeout] ---> [Status = Timeout, ErrorMessage = "Exceeded {timeout}min"]
+    |
+    +--- [Erro] ---> [Status = Failed, ErrorMessage = ex.Message]
+    |
+    v
+[Calcular Duration = CompletedAt - StartedAt]
+    |
+    v
+[Salvar JobExecution]
+    |
+    v
+[Registrar auditoria JOBS_JOB_EXECUTE / JOBS_JOB_FAIL]
+    |
+    v
+[Liberar worker]
+    |
+    v
+[Failed = True?]
+    |
+    +--- [Sim] ---> [Aplicar retry policy (RN-JOB-112-03)]
+    |
+    +--- [Não] ---> [Fim]
+    |
+    v
+[RetryCount < MaxRetries?]
+    |
+    +--- [Sim] ---> [Schedule Hangfire.Schedule(delay = backoff)]
+    |
+    +--- [Não] ---> [MarkAsFaulted(), NotifyAdmin()]
+```
+
+### 6.3 Fluxo de Aprovacao (2-Step Execution)
+
+```
+[Job criado com RequiresTwoStep = True]
+    |
+    v
+[Status = PendingApproval]
+    |
+    v
+[Admin acessa Dashboard -> Vê "Jobs Awaiting Approval"]
+    |
+    v
+[Clica no job -> Abre detalhes]
+    |
+    v
+[Lê descrição + riscos]
+    |
+    v
+[Clica "Aprovar"]
+    |
+    v
+API: POST /api/jobs/{id}/approve
+    |
+    v
+[Handler: ApproveJobExecutionCommandHandler]
+    |
+    +--- [Valida permissão jobs:approve]
+    |
+    +--- [Valida status = PendingApproval]
+    |
+    v
+[Status = Approved, ApprovedByUserId = {adminId}, ApprovedAt = now]
+    |
+    v
+[Registrar auditoria JOBS_JOB_APPROVE]
+    |
+    v
+[Retornar 200 OK]
+    |
+    v
+[Frontend: Badge "Approved by Admin X"]
+    |
+    v
+[Admin clica "Executar Agora"]
+    |
+    v
+API: POST /api/jobs/{id}/executar
+    |
+    v
+[Validar status = Approved (para jobs sensíveis)]
+    |
+    v
+[Executar job normalmente -> Fluxo 6.2]
+```
+
+### 6.4 Fluxo de Notificacao de Falha
+
+```
+[Job falha na execução]
+    |
+    v
+[RetryCount = 1, schedule retry 1min]
+    |
+    v
+[1 minuto depois -> Retry 1 executa]
+    |
+    v
+[Retry 1 também falha]
+    |
+    v
+[RetryCount = 2, schedule retry 2min]
+    |
+    v
+[2 minutos depois -> Retry 2 executa]
+    |
+    v
+[Retry 2 também falha]
+    |
+    v
+[RetryCount = 3, schedule retry 4min]
+    |
+    v
+[4 minutos depois -> Retry 3 executa]
+    |
+    v
+[Retry 3 também falha]
+    |
+    v
+[RetryCount >= MaxRetries (3)]
+    |
+    v
+[Job.MarkAsFaulted(), Status = Faulted]
+    |
+    v
+[JobFailureNotificationService.NotifyJobFailureAsync()]
+    |
+    v
+[Obter Admin do tenant]
+    |
+    v
+[Compor email com: JobName, FailureTime, ErrorMessage, RecommendedActions]
+    |
+    v
+[EmailService.SendAsync(admin.Email)]
+    |
+    v
+[Email enviado?]
+    |
+    +--- [Sim] ---> [Registrar notification.SentAt, log "Notified Admin"]
+    |
+    +--- [Não] ---> [Registrar notification.Status = Failed, retry depois]
+    |
+    v
+[Registrar auditoria JOBS_JOB_FAIL]
+    |
+    v
+[Dashboard exibe job como "FAULTED" com ícone de alerta]
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| **Multi-tenancy Enforced** | Todas as queries filtram por ClienteId; isolamento total entre tenants |
+| **RBAC por Operacao** | jobs:read, jobs:create, jobs:execute, jobs:approve (permissões granulares) |
+| **2-Step Execution** | Jobs sensíveis exigem 2 permissões distintas (segregação de deveres) |
+| **Auditoria Completa** | Todas as operações (CREATE, UPDATE, EXECUTE, FAIL) registradas em log imutável |
+| **Timeout Inteligente** | Previne jobs pendurados via CancellationToken + timeout configurável |
+| **Validacao de Input** | Cron expressions validadas; campos obrigatórios validados; tamanho máximo de payload |
+| **Criptografia de Payload** | Dados sensíveis em job.Payload são criptografados em repouso (ChaCha20Poly1305) |
+| **Rate Limiting** | Máximo 100 jobs por minuto por tenant (prevenção de DoS) |
+| **Worker Pool Isolation** | Máximo 10 workers por tenant; isolamento de recursos por cliente |
+| **CORS Configurado** | Apenas origins autorizados podem chamar APIs |
+| **HTTPS Mandatório** | Todas as comunicações em HTTPS; HTTP redirecionado |
+| **JWT com Expiracao** | Tokens JWT com expiração 15 minutos; refresh tokens com 7 dias |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [ ] Tentar acessar job de outro tenant (deve 403)
+- [ ] Tentar criar job com Cron inválido (deve 400)
+- [ ] Tentar deletar job sem permissão jobs:delete (deve 403)
+- [ ] Tentar aprovar job sem permissão jobs:approve (deve 403)
+- [ ] Tentar executar job sem histórico de falhas (comportamento normal)
+- [ ] Verificar timeout: disparar job com payload que leva > timeout (deve timeout após X min)
+- [ ] Verificar retry policy: simular falha, validar retry em backoff exponencial
+- [ ] SQL Injection em nome de job: inserir '; DROP TABLE Jobs; -- (deve 400 + escapado)
+- [ ] XSS em descrição: inserir <script>alert('xss')</script> (deve escapado em HTML)
+- [ ] CSRF Protection: validar anti-CSRF token em POST/PUT/DELETE
+- [ ] Rate limiting: fazer 101 requests em 1 minuto (deve 429 TooManyRequests)
+- [ ] Cron injection: tentar inserir Cron com comandos maliciosos (deve 400)
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao |
+|-----|------|---------|
+| **Taxa de Sucesso de Jobs** | >= 95% | (Execuções bem-sucedidas / Total de execuções) * 100 |
+| **Tempo Médio de Execucao** | <= 30 segundos (padrão) | Duration media em JobExecution |
+| **Taxa de Retry** | <= 5% | (Execuções com retry / Total) * 100 |
+| **Utilizacao de Workers** | 40-60% | (Workers ativos / Max workers) * 100 |
+| **Tempo de Fila** | <= 5 minutos | (Tempo de saída de fila - Tempo de entrada) |
+| **MTTR (Mean Time To Recover)** | <= 30 minutos | Tempo entre detecção de falha e correção |
+| **Disponibilidade do Scheduler** | >= 99.9% | (Tempo ativo / Tempo total) * 100 |
+| **Alertas de Falha Enviados** | 100% | (Notificações enviadas / Falhas críticas) * 100 |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| **Job Falhado** | Status = Failed após 3 retries | Notificar admin via email; abrir ticket |
+| **Worker Pool Saturado** | Workers ativos >= 10 | Log WARN; considerar aumentar cap |
+| **Fila Congestionada** | Jobs em fila >= 100 | Log ERROR; investigar workers lentos |
+| **Timeout Frequente** | > 10% jobs com timeout em 1 hora | Log WARN; aumentar timeout ou otimizar job |
+| **Scheduler Indisponivel** | Hangfire servidor off | Page on-call engineer |
+| **Auditoria Cheia** | Logs >= 1GB por mês | Archive para JobExecutionArchive |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF112](./MD-RF112-Jobs-Tarefas-Agendadas.md)
+2. **Casos de Uso**: Criar [UC-RF112](./UC-RF112-Jobs-Tarefas-Agendadas.md)
+3. **Workflow Visual**: Criar [WF-RF112](./WF-RF112-Jobs-Tarefas-Agendadas.md)
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml) com mínimo 5 user stories
+5. **Implementacao Backend**: Commands/Queries/Handlers/Repositories (Clean Architecture + CQRS)
+6. **Testes Backend**: Implementar 15+ testes unitários + 8+ testes de integração
+7. **Implementacao Frontend**: Dashboard Angular + componentes de CRUD
+8. **Testes E2E**: Validar fluxos completos com Playwright
+9. **Deploy**: Integração Hangfire em ambiente + Redis setup
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial completa com 10 RNs, 13 endpoints, 4 integrações, fluxos ASCII, auditoria, multi-tenancy, LGPD, 2-step execution | Claude Code |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code / IControlIT Team
+**Revisao**: Pendente (aguardando aprovação técnica)
+
+**Linhas Totais**: 1.847 linhas
+**Regras de Negócio**: 10 (RN-JOB-112-01 até RN-JOB-112-10)
+**Endpoints**: 14 (5 CRUD + 9 operações especiais)
+**Integrações**: 4 (Feature Flags, i18n, Auditoria, RBAC)
+**Tecnologias**: .NET 10, Hangfire, Cronos, Redis, SQL Server, Application Insights, MailKit, Clean Architecture, CQRS, MediatR

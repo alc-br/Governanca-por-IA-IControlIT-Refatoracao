@@ -1,0 +1,326 @@
+rf:
+  id: RF014
+  nome: Configurações do Usuário
+  versao: '2.0'
+  data: '2025-12-30'
+  fase: Fase 1 - Sistema Base
+  epic: EPIC001-SYS
+  status: concluido
+descricao:
+  objetivo: Fornecer ao usuário autenticado a capacidade de gerenciar autonomamente
+    suas informações pessoais, credenciais de segurança (senha) e preferências de
+    interface (idioma, tema, timezone), sem necessidade de intervenção administrativa.
+  problema_resolvido: Usuários não conseguem gerenciar suas próprias configurações,
+    precisando de administrador para alterações simples como senha ou idioma.
+  publico_afetado: Todos os usuários autenticados do sistema IControlIT.
+escopo:
+  incluso:
+  - Visualização de dados pessoais do usuário autenticado
+  - Edição limitada de dados pessoais (telefone, data de nascimento)
+  - Alteração de senha com validações de segurança
+  - Seleção de idioma da interface (pt-BR, en-US, es-ES)
+  - Seleção de tema visual (claro, escuro, automático)
+  - Seleção de timezone
+  - Auditoria de operações críticas (alteração de senha)
+  - 'Controle de acesso: apenas o próprio usuário acessa suas configurações'
+  - Persistência de preferências entre sessões
+  fora:
+  - Alteração de nome, email, CPF (requer validação administrativa)
+  - Gestão de permissões e roles do usuário
+  - Configurações globais do sistema (é responsabilidade de RF-001)
+  - Layout específico da interface (responsabilidade do frontend)
+  - Autenticação multifator (será tratado em RF futuro)
+  - Histórico de senhas anteriores
+entidades:
+- nome: Usuario
+  descricao: Entidade central que armazena dados pessoais e preferências do usuário
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+regras_negocio:
+- id: RN-RF014-01
+  descricao: Nome, email, CPF e empresa do usuário são exibidos como somente leitura
+  tipo: validacao
+  campos_afetados:
+  - Nome
+  - Email
+  - CPF
+  - EmpresaId
+  obrigatorio: true
+  justificativa: Dados críticos que requerem validação administrativa para alteração
+    (prevenção de fraude, compliance)
+- id: RN-RF014-02
+  descricao: Telefone deve seguir formato brasileiro (XX) XXXXX-XXXX ou (XX) XXXX-XXXX
+  tipo: validacao
+  campos_afetados:
+  - Telefone
+  obrigatorio: false
+  justificativa: Padronização para comunicação e integração com sistemas de notificação
+- id: RN-RF014-03
+  descricao: Para alterar senha, usuário deve informar senha atual corretamente
+  tipo: seguranca
+  campos_afetados:
+  - PasswordHash
+  obrigatorio: true
+  justificativa: Previne alteração de senha por terceiros que tenham acesso ao dispositivo
+    do usuário
+- id: RN-RF014-04
+  descricao: Nova senha deve ter mínimo 8 caracteres, incluindo maiúscula, minúscula,
+    número e caractere especial
+  tipo: seguranca
+  campos_afetados:
+  - PasswordHash
+  obrigatorio: true
+  justificativa: Segurança da aplicação conforme OWASP Top 10
+- id: RN-RF014-05
+  descricao: Nova senha não pode ser igual à senha atual
+  tipo: seguranca
+  campos_afetados:
+  - PasswordHash
+  obrigatorio: true
+  justificativa: Forçar renovação efetiva de credenciais
+- id: RN-RF014-06
+  descricao: Senhas comuns são bloqueadas (123456, password, senha123, admin123, qwerty,
+    etc)
+  tipo: seguranca
+  campos_afetados:
+  - PasswordHash
+  obrigatorio: true
+  justificativa: Prevenção contra ataques de dicionário
+- id: RN-RF014-07
+  descricao: Senha não pode conter nome do usuário ou parte do email
+  tipo: seguranca
+  campos_afetados:
+  - PasswordHash
+  - Nome
+  - Email
+  obrigatorio: true
+  justificativa: Dificulta engenharia social e adivinhação
+- id: RN-RF014-08
+  descricao: Campo de confirmação deve ser idêntico ao campo de nova senha
+  tipo: validacao
+  campos_afetados:
+  - PasswordHash
+  obrigatorio: true
+  justificativa: Prevenir erros de digitação
+- id: RN-RF014-09
+  descricao: Idioma selecionado é salvo no perfil do usuário e aplicado imediatamente
+  tipo: regra_negocio
+  campos_afetados:
+  - Idioma
+  obrigatorio: true
+  justificativa: Preferência deve persistir entre sessões
+- id: RN-RF014-10
+  descricao: 'Sistema suporta 3 idiomas: pt-BR (padrão), en-US, es-ES'
+  tipo: regra_negocio
+  campos_afetados:
+  - Idioma
+  obrigatorio: true
+  justificativa: Atendimento a usuários de diferentes países
+- id: RN-RF014-11
+  descricao: 'Usuário pode escolher entre temas: light, dark, auto'
+  tipo: regra_negocio
+  campos_afetados:
+  - Tema
+  obrigatorio: true
+  justificativa: Acessibilidade e preferência visual
+- id: RN-RF014-12
+  descricao: Sistema oferece lista de timezones IANA comuns (América, Europa, Ásia)
+  tipo: regra_negocio
+  campos_afetados:
+  - Timezone
+  obrigatorio: true
+  justificativa: Usuários em diferentes fusos horários veem datas/horas corretas
+- id: RN-RF014-13
+  descricao: Em telas menores (< 1024px), menu lateral de navegação vira drawer overlay
+  tipo: regra_negocio
+  campos_afetados: []
+  obrigatorio: false
+  justificativa: Usabilidade em dispositivos móveis
+- id: RN-RF014-14
+  descricao: Alteração de idioma em qualquer parte do sistema reflete na tela de configurações
+  tipo: regra_negocio
+  campos_afetados:
+  - Idioma
+  obrigatorio: true
+  justificativa: Consistência de estado entre componentes
+- id: RN-RF014-15
+  descricao: Tela de configurações só é acessível por usuários autenticados
+  tipo: seguranca
+  campos_afetados: []
+  obrigatorio: true
+  justificativa: Proteção de dados pessoais
+- id: RN-RF014-16
+  descricao: Usuário só pode visualizar e editar suas próprias configurações
+  tipo: seguranca
+  campos_afetados: []
+  obrigatorio: true
+  justificativa: Multi-tenancy e privacidade
+estados:
+- id: active
+  descricao: Usuário ativo (pode alterar configurações)
+- id: inactive
+  descricao: Usuário inativo (não pode fazer login)
+- id: blocked
+  descricao: Usuário bloqueado (não pode fazer login)
+transicoes:
+  permitidas:
+  - de: active
+    para: active
+    observacao: Apenas usuários ativos podem alterar configurações
+  proibidas:
+  - de: inactive
+    para: active
+    observacao: Usuário inativo não pode autenticar para alterar configurações
+  - de: blocked
+    para: active
+    observacao: Usuário bloqueado não pode autenticar para alterar configurações
+permissoes:
+- codigo: self.view
+  descricao: Visualizar suas próprias configurações (não requer permissão específica,
+    apenas autenticação)
+- codigo: self.update_profile
+  descricao: Atualizar telefone e data de nascimento
+- codigo: self.change_password
+  descricao: Alterar sua própria senha
+- codigo: self.update_preferences
+  descricao: Atualizar idioma, tema e timezone
+integracoes:
+  internas:
+  - Autenticação JWT
+  - Multi-Tenancy (EmpresaId)
+  - Auditoria (alteração de senha)
+  - i18n (Transloco)
+  externas: []
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_entrada: true
+  protecao_injecao: true
+  hash_seguro_senha: true
+  rate_limiting: true
+eventos_dominio:
+- evento: usuario.senha_alterada
+  quando: Após alteração bem-sucedida de senha
+  dados:
+  - UserId
+  - IP
+  - Timestamp
+- evento: usuario.preferencias_atualizadas
+  quando: Após atualização de idioma/tema/timezone
+  dados:
+  - UserId
+  - PreferenciasAntigas
+  - PreferenciasNovas
+- evento: usuario.dados_pessoais_atualizados
+  quando: Após edição de telefone ou data nascimento
+  dados:
+  - UserId
+  - CamposAlterados
+rastreabilidade:
+  ucs_esperados:
+  - UC00
+  - UC01
+  - UC02
+  - UC03
+  - UC04
+catalog:
+  crud:
+  - id: RF014-CRUD-01
+    title: Visualizar dados pessoais
+    required: true
+  - id: RF014-CRUD-02
+    title: Atualizar telefone e data nascimento
+    required: true
+  - id: RF014-CRUD-03
+    title: Alterar senha
+    required: true
+  - id: RF014-CRUD-04
+    title: Atualizar preferências (idioma, tema, timezone)
+    required: true
+  validacoes:
+  - id: RF014-VAL-01
+    title: Validar formato de telefone brasileiro
+    required: false
+  - id: RF014-VAL-02
+    title: Validar requisitos de senha forte
+    required: true
+  - id: RF014-VAL-03
+    title: Validar senha atual antes de alterar
+    required: true
+  - id: RF014-VAL-04
+    title: Validar nova senha diferente da atual
+    required: true
+  - id: RF014-VAL-05
+    title: Validar senha não está na blacklist
+    required: true
+  - id: RF014-VAL-06
+    title: Validar senha não contém dados pessoais
+    required: true
+  - id: RF014-VAL-07
+    title: Validar confirmação de senha
+    required: true
+  seguranca:
+  - id: RF014-SEC-01
+    title: Isolamento de dados (usuário só edita suas configurações)
+    required: true
+  - id: RF014-SEC-02
+    title: Autenticação JWT obrigatória
+    required: true
+  - id: RF014-SEC-03
+    title: Auditoria de alteração de senha
+    required: true
+  - id: RF014-SEC-04
+    title: Hash seguro de senha (BCrypt/PBKDF2)
+    required: true
+  - id: RF014-SEC-05
+    title: Rate limiting em alteração de senha
+    required: true
+exclusions:
+  rf_items:
+  - Alteração de nome, email, CPF (requer admin)
+  - Gestão de permissões e roles
+  - Configurações globais do sistema
+  - Autenticação multifator
+  - Histórico de senhas anteriores
+dependencias:
+- rf_id: RF-008
+  nome: Gestão de Usuários
+  descricao: Utiliza entidade Usuario e seus dados
+  tipo: entidade
+- rf_id: RF-005
+  nome: i18n
+  descricao: Sistema de tradução Transloco
+  tipo: servico
+- rf_id: RF-004
+  nome: Auditoria
+  descricao: Registro de alterações críticas
+  tipo: servico
+tecnologias:
+  backend:
+  - .NET 10
+  - Entity Framework Core 10
+  - FluentValidation
+  - BCrypt (hash de senha)
+  frontend:
+  - Angular 19
+  - Standalone Components
+  - Transloco (i18n)
+  - Material Design
+  - Fuse Media Watcher (responsivo)
+historico:
+- versao: '2.0'
+  data: '2025-12-30'
+  autor: Agência ALC - alc.dev.br
+  descricao: Migração para formato v2.0 com estrutura YAML canônica, separação estrita
+    RF/RL, eliminação de referências ao legado
+- versao: '1.1'
+  data: '2025-12-27'
+  autor: Equipe IControlIT
+  descricao: Atualização conforme CONTRATO DE DOCUMENTAÇÃO ESSENCIAL - Inclusão de
+    campos de auditoria completos, Fl_Ativo BIT
+- versao: '1.0'
+  data: '2025-11-19'
+  autor: Equipe IControlIT
+  descricao: Criação inicial da documentação reversa baseada na implementação existente

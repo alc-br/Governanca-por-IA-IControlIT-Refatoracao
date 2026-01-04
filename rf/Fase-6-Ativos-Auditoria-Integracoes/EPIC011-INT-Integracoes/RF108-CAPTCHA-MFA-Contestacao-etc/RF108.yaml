@@ -1,0 +1,715 @@
+# RF108.yaml - CAPTCHA, MFA, Contestação e Segurança Avançada
+# Versão: 2.0
+# Data: 2025-12-31
+# Autor: Claude Code
+# EPIC: EPIC011-INT-Integracoes
+# Fase: Fase 6 - Ativos, Auditoria e Integrações
+
+rf:
+  id: "RF108"
+  titulo: "CAPTCHA, MFA, Contestação e Segurança Avançada"
+  versao: "2.0"
+  versao_governanca: "2.0"
+  data: "2025-12-31"
+  autor: "Claude Code"
+  epic: "EPIC011-INT-Integracoes"
+  fase: "Fase 6 - Ativos, Auditoria e Integrações"
+
+# ==============================================================================
+# OBJETIVO E ESCOPO
+# ==============================================================================
+
+objetivo:
+  descricao: |
+    Implementar camadas adicionais de proteção além da autenticação básica,
+    fornecendo CAPTCHA, Multi-Factor Authentication (MFA), contestação de faturas,
+    detecção de bots, rate limiting, device fingerprinting e análise comportamental
+    de usuários para proteger contra ataques automatizados e fraudes.
+
+escopo:
+  dentro:
+    - "Validação CAPTCHA (reCAPTCHA v3) em formulários sensíveis"
+    - "Autenticação multi-fator (SMS, Email, TOTP)"
+    - "Contestação de faturas com workflow de aprovação"
+    - "Detecção e bloqueio de bots"
+    - "Rate limiting por IP/usuário"
+    - "Device fingerprinting"
+    - "Análise comportamental (UEBA)"
+    - "Notificação de acessos anômalos"
+    - "Bloqueio automático de IPs"
+    - "Whitelist/Blacklist de IPs"
+
+  fora:
+    - "Interface visual específica (definida em WF-RF108)"
+    - "Tecnologia de CAPTCHA ou MFA (implementação decide)"
+    - "Layout, UX ou identidade visual específica"
+    - "Estratégia de deploy ou infraestrutura"
+
+# ==============================================================================
+# CONCEITOS E DEFINIÇÕES
+# ==============================================================================
+
+conceitos:
+  - termo: "CAPTCHA"
+    definicao: "Mecanismo que diferencia humanos de bots. Usa reCAPTCHA v3 com score de risco (0.0 a 1.0)"
+
+  - termo: "MFA"
+    definicao: "Multi-Factor Authentication - autenticação com múltiplas formas de verificação"
+
+  - termo: "TOTP"
+    definicao: "Time-based One-Time Password (RFC 6238) - códigos únicos baseados em tempo"
+
+  - termo: "Device Fingerprinting"
+    definicao: "Identificação única de dispositivo baseada em atributos (User-Agent, resolução, timezone)"
+
+  - termo: "UEBA"
+    definicao: "User and Entity Behavior Analytics - análise de padrões anormais para detectar fraudes"
+
+  - termo: "Rate Limiting"
+    definicao: "Controle de taxa de requisições (ex: 100 req/min por IP)"
+
+# ==============================================================================
+# FUNCIONALIDADES
+# ==============================================================================
+
+funcionalidades:
+  - id: "FUNC-RF108-001"
+    titulo: "CAPTCHA em Formulários Sensíveis"
+    descricao: "Login, cadastro, redefinição de senha"
+
+  - id: "FUNC-RF108-002"
+    titulo: "MFA Multi-canal"
+    descricao: "SMS, Email ou TOTP (Google Authenticator)"
+
+  - id: "FUNC-RF108-003"
+    titulo: "Contestação de Faturas"
+    descricao: "Workflow com aprovação multi-nível"
+
+  - id: "FUNC-RF108-004"
+    titulo: "Detecção de Bots"
+    descricao: "Análise de padrões de requisição"
+
+  - id: "FUNC-RF108-005"
+    titulo: "Rate Limiting Inteligente"
+    descricao: "Por IP, usuário e tipo de operação"
+
+  - id: "FUNC-RF108-006"
+    titulo: "Bloqueio Automático de IPs"
+    descricao: "Após N tentativas falhadas"
+
+  - id: "FUNC-RF108-007"
+    titulo: "Whitelist/Blacklist de IPs"
+    descricao: "Gestão manual"
+
+  - id: "FUNC-RF108-008"
+    titulo: "Device Fingerprinting"
+    descricao: "Verificação de dispositivos confiáveis"
+
+  - id: "FUNC-RF108-009"
+    titulo: "UEBA (análise comportamental)"
+    descricao: "Detecção de acessos anômalos"
+
+  - id: "FUNC-RF108-010"
+    titulo: "Notificações de Acessos"
+    descricao: "Alerta de login de nova localização/dispositivo"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO (10 REGRAS)
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF108-001"
+    titulo: "CAPTCHA obrigatório após 3 falhas de login"
+    descricao: "Após 3 tentativas de login falhadas em 10 minutos, CAPTCHA é obrigatório para a próxima tentativa"
+    justificativa: "Proteção contra ataque de força bruta"
+    criticidade: "CRÍTICA"
+    tipo: "validacao"
+    criterio_aceite:
+      - "Tentativas 1-3: sem CAPTCHA"
+      - "Tentativa 4+: CAPTCHA obrigatório"
+      - "Após login bem-sucedido: contador resetado"
+    implementacao:
+      backend: true
+      frontend: true
+
+  - id: "RN-RF108-002"
+    titulo: "MFA obrigatório para perfis críticos"
+    descricao: "Usuários com perfis Admin, Gestor ou Auditor devem obrigatoriamente ativar MFA"
+    justificativa: "Proteção contra comprometimento de contas de alto privilégio"
+    criticidade: "CRÍTICA"
+    tipo: "validacao"
+    criterio_aceite:
+      - "Usuário comum: MFA opcional"
+      - "Admin/Gestor/Auditor sem MFA: bloqueado até configurar"
+      - "Validação em login: erro se perfil crítico sem MFA"
+    implementacao:
+      backend: true
+      frontend: true
+
+  - id: "RN-RF108-003"
+    titulo: "Código TOTP válido por 30 segundos"
+    descricao: "Códigos TOTP (Google Authenticator) válidos apenas por 30 segundos conforme RFC 6238"
+    justificativa: "Padrão de segurança para one-time passwords"
+    criticidade: "ALTA"
+    tipo: "validacao"
+    criterio_aceite:
+      - "Código atual: válido"
+      - "Código expirado (> 30s): rejeitado"
+      - "Janela de tolerância: +/- 30s (1 janela antes/depois)"
+    implementacao:
+      backend: true
+      frontend: false
+
+  - id: "RN-RF108-004"
+    titulo: "Código SMS válido por 5 minutos"
+    descricao: "Códigos enviados por SMS válidos por 5 minutos"
+    justificativa: "Tempo suficiente para receber e digitar, com limite de segurança"
+    criticidade: "ALTA"
+    tipo: "validacao"
+    criterio_aceite:
+      - "Código enviado: válido por 5 minutos"
+      - "Após 5 minutos: código inválido"
+      - "Código usado uma vez: invalidado imediatamente"
+    implementacao:
+      backend: true
+      frontend: false
+
+  - id: "RN-RF108-005"
+    titulo: "Contestação requer justificativa mínima"
+    descricao: "Contestação de fatura exige justificativa com mínimo 50 caracteres"
+    justificativa: "Garantir que contestação seja bem fundamentada"
+    criticidade: "MÉDIA"
+    tipo: "validacao"
+    criterio_aceite:
+      - "Justificativa < 50 caracteres: HTTP 400"
+      - "Justificativa >= 50 caracteres: aceito"
+      - "Justificativa obrigatória (não pode ser null ou vazia)"
+    implementacao:
+      backend: true
+      frontend: true
+
+  - id: "RN-RF108-006"
+    titulo: "Rate limiting de 100 req/min por IP"
+    descricao: "Máximo 100 requisições por minuto por IP. Acima disso, retornar HTTP 429 (Too Many Requests)"
+    justificativa: "Proteção contra DDoS e abuso de recursos"
+    criticidade: "CRÍTICA"
+    tipo: "validacao"
+    criterio_aceite:
+      - "<= 100 req/min: permitido"
+      - "> 100 req/min: HTTP 429 + header Retry-After"
+      - "Whitelist de IPs: sem limite"
+    implementacao:
+      backend: true
+      frontend: false
+
+  - id: "RN-RF108-007"
+    titulo: "Bloqueio automático após 5 falhas"
+    descricao: "IP bloqueado automaticamente após 5 tentativas de login falhadas em 15 minutos"
+    justificativa: "Proteção contra ataque de força bruta distribuído"
+    criticidade: "CRÍTICA"
+    tipo: "validacao"
+    criterio_aceite:
+      - "Tentativas 1-4: permitido"
+      - "Tentativa 5: IP bloqueado por 1 hora"
+      - "Bloqueio registrado em auditoria"
+    implementacao:
+      backend: true
+      frontend: false
+
+  - id: "RN-RF108-008"
+    titulo: "Device fingerprint armazenado para usuários confiáveis"
+    descricao: "Dispositivos marcados como confiáveis têm fingerprint armazenado para validação futura"
+    justificativa: "MFA pode ser pulado em dispositivos confiáveis"
+    criticidade: "MÉDIA"
+    tipo: "validacao"
+    criterio_aceite:
+      - "Primeiro acesso: dispositivo NÃO confiável"
+      - "Usuário marca como confiável: fingerprint armazenado"
+      - "Próximo login do mesmo dispositivo: MFA opcional"
+    implementacao:
+      backend: true
+      frontend: true
+
+  - id: "RN-RF108-009"
+    titulo: "Notificação de login de nova localização"
+    descricao: "Quando login ocorre de cidade/país diferente do padrão, enviar notificação ao usuário"
+    justificativa: "Alerta de possível comprometimento de conta"
+    criticidade: "ALTA"
+    tipo: "notificacao"
+    criterio_aceite:
+      - "Login de localização conhecida: sem notificação"
+      - "Login de nova localização: email + notificação in-app"
+      - "Notificação contém: IP, localização, data/hora"
+    implementacao:
+      backend: true
+      frontend: true
+
+  - id: "RN-RF108-010"
+    titulo: "Contestação aprovada/rejeitada por perfil superior"
+    descricao: "Apenas Gestores ou Admins podem aprovar/rejeitar contestações de faturas"
+    justificativa: "Workflow de aprovação com segregação de funções"
+    criticidade: "ALTA"
+    tipo: "validacao"
+    criterio_aceite:
+      - "Usuário comum: pode contestar, NÃO pode aprovar"
+      - "Gestor/Admin: pode aprovar/rejeitar"
+      - "Aprovação: status APPROVED + timestamp + aprovador"
+      - "Rejeição: status REJECTED + motivo obrigatório"
+    implementacao:
+      backend: true
+      frontend: true
+
+# ==============================================================================
+# ESTADOS E TRANSIÇÕES
+# ==============================================================================
+
+estados:
+  entidade: "Contestacao"
+  valores:
+    - estado: "Pending"
+      descricao: "Aguardando aprovação"
+
+    - estado: "Approved"
+      descricao: "Aprovada por gestor"
+
+    - estado: "Rejected"
+      descricao: "Rejeitada por gestor"
+
+    - estado: "Cancelled"
+      descricao: "Cancelada pelo solicitante"
+
+transicoes:
+  - de: "Pending"
+    para: "Approved"
+    condicao: "Gestor ou Admin aprova"
+
+  - de: "Pending"
+    para: "Rejected"
+    condicao: "Gestor ou Admin rejeita"
+
+  - de: "Pending"
+    para: "Cancelled"
+    condicao: "Solicitante cancela"
+
+# ==============================================================================
+# EVENTOS DE DOMÍNIO
+# ==============================================================================
+
+eventos_dominio:
+  - evento: "mfa.habilitado"
+    quando: "Após usuário ativar MFA"
+
+  - evento: "mfa.codigo_enviado"
+    quando: "Após envio de código SMS/Email"
+
+  - evento: "mfa.validado"
+    quando: "Após validação bem-sucedida"
+
+  - evento: "contestacao.criada"
+    quando: "Após criar contestação"
+
+  - evento: "contestacao.aprovada"
+    quando: "Após aprovação"
+
+  - evento: "contestacao.rejeitada"
+    quando: "Após rejeição"
+
+  - evento: "ip.bloqueado"
+    quando: "Após bloqueio automático de IP"
+
+  - evento: "dispositivo.confiavel"
+    quando: "Após marcar dispositivo como confiável"
+
+  - evento: "acesso.anomalo"
+    quando: "Após detecção de acesso anômalo"
+
+# ==============================================================================
+# CRITÉRIOS GLOBAIS DE ACEITE
+# ==============================================================================
+
+criterios_globais:
+  - "CAPTCHA obrigatório após 3 falhas de login"
+  - "MFA obrigatório para perfis críticos"
+  - "Códigos TOTP válidos por 30s, SMS por 5min"
+  - "Rate limiting de 100 req/min por IP"
+  - "Bloqueio automático após 5 falhas"
+  - "Contestação requer justificativa >= 50 caracteres"
+  - "Notificação de logins anômalos"
+  - "Device fingerprinting para dispositivos confiáveis"
+  - "Auditoria completa de todas as operações"
+
+# ==============================================================================
+# INTEGRAÇÕES OBRIGATÓRIAS
+# ==============================================================================
+
+integracoes:
+  central_funcionalidades:
+    feature_flags:
+      - key: "SECURITY_ADVANCED"
+        nome: "Segurança Avançada"
+        descricao: "CAPTCHA, MFA, Anti-fraude"
+
+      - key: "CAPTCHA_RECAPTCHA_V3"
+        nome: "reCAPTCHA v3"
+        descricao: "CAPTCHA invisível com score"
+
+      - key: "MFA_SMS"
+        nome: "MFA via SMS"
+        descricao: "Twilio"
+
+      - key: "MFA_EMAIL"
+        nome: "MFA via Email"
+        descricao: "SendGrid"
+
+      - key: "MFA_TOTP"
+        nome: "MFA via TOTP"
+        descricao: "Google Authenticator"
+
+      - key: "CONTESTACAO_WORKFLOW"
+        nome: "Contestação com Workflow"
+        descricao: "Aprovação multi-nível"
+
+      - key: "RATE_LIMITING"
+        nome: "Rate Limiting"
+        descricao: "Controle de taxa"
+
+      - key: "IP_BLOCKING"
+        nome: "Bloqueio de IPs"
+        descricao: "Automático/Manual"
+
+      - key: "DEVICE_FINGERPRINTING"
+        nome: "Device Fingerprinting"
+        descricao: "Identificação de dispositivos"
+
+      - key: "UEBA"
+        nome: "Análise Comportamental"
+        descricao: "Detecção de anomalias"
+
+  i18n:
+    chaves_obrigatorias:
+      - chave: "seguranca.captcha_requerido"
+        pt_br: "CAPTCHA obrigatório após múltiplas falhas"
+        en: "CAPTCHA required after multiple failures"
+        es: "CAPTCHA requerido después de múltiples fallas"
+
+      - chave: "seguranca.mfa_obrigatorio"
+        pt_br: "MFA obrigatório para seu perfil"
+        en: "MFA required for your profile"
+        es: "MFA requerido para su perfil"
+
+      - chave: "seguranca.codigo_invalido"
+        pt_br: "Código inválido ou expirado"
+        en: "Invalid or expired code"
+        es: "Código inválido o expirado"
+
+      - chave: "seguranca.ip_bloqueado"
+        pt_br: "IP bloqueado temporariamente"
+        en: "IP temporarily blocked"
+        es: "IP bloqueado temporalmente"
+
+      - chave: "contestacao.justificativa_minima"
+        pt_br: "Justificativa deve ter no mínimo 50 caracteres"
+        en: "Justification must have at least 50 characters"
+        es: "Justificación debe tener al menos 50 caracteres"
+
+  auditoria:
+    operacoes:
+      - operacao: "Login com MFA"
+        codigo: "AUTH_MFA_SUCCESS"
+        dados: "UsuarioId, MfaTipo, IP, Dispositivo"
+
+      - operacao: "Bloqueio de IP"
+        codigo: "SEC_IP_BLOCKED"
+        dados: "IP, Motivo, Timestamp"
+
+      - operacao: "Contestação Criada"
+        codigo: "CONTEST_CREATED"
+        dados: "ContestacaoId, FaturaId, UsuarioId, Justificativa"
+
+      - operacao: "Contestação Aprovada"
+        codigo: "CONTEST_APPROVED"
+        dados: "ContestacaoId, AprovadorId, Timestamp"
+
+    retencao: "7 anos (Lei de Acesso à Informação + LGPD)"
+
+  rbac:
+    permissoes:
+      - permissao: "seguranca:mfa:configurar"
+        descricao: "Configurar MFA"
+        perfis: ["Todos autenticados"]
+
+      - permissao: "seguranca:ips:bloquear"
+        descricao: "Bloquear IPs"
+        perfis: ["Administrador"]
+
+      - permissao: "seguranca:ips:desbloquear"
+        descricao: "Desbloquear IPs"
+        perfis: ["Administrador"]
+
+      - permissao: "contestacao:criar"
+        descricao: "Criar contestação"
+        perfis: ["Analista", "Gerente"]
+
+      - permissao: "contestacao:aprovar"
+        descricao: "Aprovar contestação"
+        perfis: ["Gerente", "Administrador"]
+
+      - permissao: "contestacao:rejeitar"
+        descricao: "Rejeitar contestação"
+        perfis: ["Gerente", "Administrador"]
+
+      - permissao: "seguranca:dispositivos:gerenciar"
+        descricao: "Gerenciar dispositivos confiáveis"
+        perfis: ["Todos autenticados"]
+
+# ==============================================================================
+# SEGURANÇA
+# ==============================================================================
+
+seguranca:
+  protecoes:
+    - tipo: "CAPTCHA reCAPTCHA v3"
+      descricao: "Score 0.0-1.0 (abaixo 0.5 = bot provável)"
+
+    - tipo: "MFA Obrigatório"
+      descricao: "Perfis críticos bloqueados sem MFA"
+
+    - tipo: "Rate Limiting"
+      descricao: "100 req/min por IP"
+
+    - tipo: "Bloqueio Automático"
+      descricao: "IP bloqueado após 5 falhas"
+
+    - tipo: "Device Fingerprinting"
+      descricao: "Identificação única de dispositivos"
+
+    - tipo: "UEBA"
+      descricao: "Análise comportamental com ML"
+
+    - tipo: "Auditoria Completa"
+      descricao: "Todas operações registradas"
+
+    - tipo: "TOTP RFC 6238"
+      descricao: "Padrão IETF para códigos temporários"
+
+  testes_obrigatorios:
+    - "Força bruta em login (validar bloqueio após 5 tentativas)"
+    - "DDoS em endpoint público (validar rate limiting)"
+    - "Bypass de CAPTCHA (validar server-side)"
+    - "Reuso de código MFA (validar invalidação)"
+    - "Escalação de privilégios em contestação (validar RBAC)"
+    - "SQL Injection em justificativa de contestação"
+    - "XSS em campos de texto livre"
+
+# ==============================================================================
+# ENDPOINTS DA API
+# ==============================================================================
+
+endpoints:
+  captcha:
+    - metodo: "POST"
+      rota: "/api/seguranca/captcha/validar"
+      descricao: "Validar reCAPTCHA token"
+      permissao: "Público"
+
+  mfa:
+    - metodo: "POST"
+      rota: "/api/seguranca/mfa/habilitar"
+      descricao: "Habilitar MFA"
+      permissao: "Autenticado"
+
+    - metodo: "POST"
+      rota: "/api/seguranca/mfa/enviar-sms"
+      descricao: "Enviar código SMS"
+      permissao: "Autenticado"
+
+    - metodo: "POST"
+      rota: "/api/seguranca/mfa/enviar-email"
+      descricao: "Enviar código Email"
+      permissao: "Autenticado"
+
+    - metodo: "POST"
+      rota: "/api/seguranca/mfa/validar-totp"
+      descricao: "Validar código TOTP"
+      permissao: "Autenticado"
+
+    - metodo: "POST"
+      rota: "/api/seguranca/mfa/desabilitar"
+      descricao: "Desabilitar MFA"
+      permissao: "Autenticado"
+
+  contestacao:
+    - metodo: "POST"
+      rota: "/api/contestacoes"
+      descricao: "Criar contestação"
+      permissao: "contestacao:criar"
+
+    - metodo: "GET"
+      rota: "/api/contestacoes/{id}"
+      descricao: "Obter contestação"
+      permissao: "contestacao:criar"
+
+    - metodo: "PUT"
+      rota: "/api/contestacoes/{id}/aprovar"
+      descricao: "Aprovar contestação"
+      permissao: "contestacao:aprovar"
+
+    - metodo: "PUT"
+      rota: "/api/contestacoes/{id}/rejeitar"
+      descricao: "Rejeitar contestação"
+      permissao: "contestacao:rejeitar"
+
+    - metodo: "DELETE"
+      rota: "/api/contestacoes/{id}"
+      descricao: "Cancelar contestação"
+      permissao: "contestacao:criar"
+
+  seguranca:
+    - metodo: "GET"
+      rota: "/api/seguranca/ips-bloqueados"
+      descricao: "Listar IPs bloqueados"
+      permissao: "seguranca:ips:bloquear"
+
+    - metodo: "POST"
+      rota: "/api/seguranca/ips-bloqueados"
+      descricao: "Bloquear IP manualmente"
+      permissao: "seguranca:ips:bloquear"
+
+    - metodo: "DELETE"
+      rota: "/api/seguranca/ips-bloqueados/{id}"
+      descricao: "Desbloquear IP"
+      permissao: "seguranca:ips:desbloquear"
+
+    - metodo: "GET"
+      rota: "/api/seguranca/dispositivos"
+      descricao: "Listar dispositivos confiáveis"
+      permissao: "Autenticado"
+
+    - metodo: "POST"
+      rota: "/api/seguranca/dispositivos/{id}/confiar"
+      descricao: "Marcar como confiável"
+      permissao: "Autenticado"
+
+# ==============================================================================
+# MÉTRICAS E INDICADORES
+# ==============================================================================
+
+metricas:
+  kpis:
+    - kpi: "Taxa Bloqueio de Bots"
+      meta: "> 95%"
+      medicao: "CAPTCHA score < 0.5 bloqueados"
+
+    - kpi: "Taxa Adoção MFA"
+      meta: "> 80% perfis críticos"
+      medicao: "COUNT(MFA habilitado) / COUNT(perfis críticos)"
+
+    - kpi: "Tempo Aprovação Contestação"
+      meta: "< 48h"
+      medicao: "AVG(ApprovedAt - CreatedAt)"
+
+    - kpi: "Taxa Falsos Positivos UEBA"
+      meta: "< 5%"
+      medicao: "(Alertas falsos / Total alertas) * 100"
+
+  alertas:
+    - alerta: "Ataque Força Bruta"
+      condicao: "> 100 logins falhados em 5min"
+      acao: "Bloquear IP + alerta DevOps"
+
+    - alerta: "DDoS Detectado"
+      condicao: "> 1000 req/min global"
+      acao: "Ativar Cloudflare DDoS protection"
+
+    - alerta: "MFA Não Configurado"
+      condicao: "Perfil crítico sem MFA > 7 dias"
+      acao: "Bloquear acesso + email"
+
+    - alerta: "Contestação Pendente"
+      condicao: "> 72h sem aprovação"
+      acao: "Email para gestor"
+
+# ==============================================================================
+# ARTEFATOS DERIVADOS
+# ==============================================================================
+
+artefatos_derivados:
+  - artefato: "UC-RF108.md"
+    titulo: "Casos de Uso"
+    obrigatorio: true
+    status: "Pendente"
+
+  - artefato: "MD-RF108.md"
+    titulo: "Modelo de Dados"
+    obrigatorio: true
+    status: "Pendente"
+
+  - artefato: "WF-RF108.md"
+    titulo: "Wireframes e Fluxos"
+    obrigatorio: true
+    status: "Pendente"
+
+  - artefato: "TC-RF108.yaml"
+    titulo: "Casos de Teste"
+    obrigatorio: true
+    status: "Pendente"
+
+  - artefato: "MT-RF108.yaml"
+    titulo: "Massas de Teste"
+    obrigatorio: true
+    status: "Pendente"
+
+# ==============================================================================
+# RASTREABILIDADE
+# ==============================================================================
+
+rastreabilidade:
+  - artefato: "Casos de Uso"
+    status: "Pendente"
+    obrigatorio: true
+
+  - artefato: "Modelo de Dados"
+    status: "Pendente"
+    obrigatorio: true
+
+  - artefato: "Wireframes"
+    status: "Pendente"
+    obrigatorio: true
+
+  - artefato: "Casos de Teste"
+    status: "Pendente"
+    obrigatorio: true
+
+  - artefato: "Massas de Teste"
+    status: "Pendente"
+    obrigatorio: true
+
+# ==============================================================================
+# CHANGELOG
+# ==============================================================================
+
+changelog:
+  - versao: "2.0"
+    data: "2025-12-31"
+    descricao: "Migração v1.0 → v2.0 - Separação RF/RL completa"
+    autor: "Claude Code"
+
+  - versao: "1.0"
+    data: "2025-12-28"
+    descricao: "Versão inicial (misturada com legado)"
+    autor: "Claude Code"
+
+# ==============================================================================
+# METADADOS ESTRUTURAIS
+# ==============================================================================
+
+metadados:
+  total_regras_negocio: 10
+  total_endpoints_api: 17
+  total_permissoes_rbac: 7
+  total_integracoes_obrigatorias: 4
+  total_feature_flags: 10
+  total_kpis: 4
+  total_alertas: 4
+  linhas_documentacao_md: 428
+  linhas_documentacao_yaml: 800

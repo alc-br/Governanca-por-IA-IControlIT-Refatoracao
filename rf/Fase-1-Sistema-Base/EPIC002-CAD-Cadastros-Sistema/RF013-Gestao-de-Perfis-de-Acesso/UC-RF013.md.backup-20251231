@@ -1,0 +1,3792 @@
+# Casos de Uso - RF013
+
+**Versão:** 1.0
+**Data:** 2025-12-17
+**RF Relacionado:** [RF013 - Gestao-de-Perfis-de-Acesso](./RF013.md)
+
+---
+
+## Índice de Casos de Uso
+
+| UC | Nome | Descrição |
+|----|------|-----------|
+| UC01 | Criar Perfil (Role) - Especificação Completa | Caso de uso |
+| UC02 | Visualizar Perfil (Role) - Especificação Completa | Caso de uso |
+| UC03 | Editar Perfil (Role) - Especificação Completa | Caso de uso |
+| UC04 | UC04 - Excluir Perfil de Acesso | Caso de uso |
+| UC07 | UC07 - Duplicar Perfil de Acesso | Caso de uso |
+
+---
+
+# UC01: Criar Perfil (Role) - Especificação Completa
+
+**Data Criação**: 2025-10-20
+**Última Atualização**: 2025-10-26
+**Autor**: Anderson Chipak + Claude Code
+**Status**: ✅ Implementado e Corrigido (Backend + Frontend)
+
+---
+
+## 📢 Atualização 2025-10-26 - Correções Críticas Implementadas
+
+### ✅ Correções Aplicadas
+
+**A. HierarchyLevel Agora Gerenciável via API**
+- ✅ Campo `hierarchyLevel` adicionado ao `CreateRoleCommand`
+- ✅ Campo `hierarchyLevel` adicionado ao `UpdateRoleCommand`
+- ✅ Frontend atualizado: `CreateRoleRequest` e `UpdateRoleRequest` incluem `hierarchyLevel`
+- **Arquivos modificados:**
+  - [CreateRole.cs](D:\IC2\backend\IControlIT.API\src\Application\RoleManagement\Commands\CreateRole\CreateRole.cs)
+  - [UpdateRole.cs](D:\IC2\backend\IControlIT.API\src\Application\RoleManagement\Commands\UpdateRole\UpdateRole.cs)
+  - [roles.types.ts](D:\IC2\frontend\icontrolit-app\src\app\modules\admin\management\roles\roles.types.ts)
+
+**B. Validação de Hierarquia Implementada**
+- ✅ `CreateRoleCommandHandler` agora valida se usuário pode criar perfil com nível solicitado
+- ✅ `UpdateRoleCommandHandler` valida se usuário pode editar perfil com nível solicitado
+- ✅ Regra: `currentUserLevel >= request.HierarchyLevel` resulta em `UnauthorizedAccessException`
+- ✅ Mensagem de erro clara: "Você não tem permissão para criar perfis com nível de hierarquia {X}"
+- **Impacto:** Admin (nível 1) não pode mais criar Super Admin (nível 0)
+
+**C. Validators Criados**
+- ✅ `CreateRoleCommandValidator.cs` criado com validações:
+  - Nome obrigatório, máx 100 caracteres
+  - Descrição máx 500 caracteres
+  - HierarchyLevel entre 0-10
+  - EmpresaId obrigatório quando não for perfil de sistema
+- ✅ `UpdateRoleCommandValidator.cs` criado com validações similares
+- **Arquivos criados:**
+  - [CreateRoleCommandValidator.cs](D:\IC2\backend\IControlIT.API\src\Application\RoleManagement\Commands\CreateRole\CreateRoleCommandValidator.cs)
+  - [UpdateRoleCommandValidator.cs](D:\IC2\backend\IControlIT.API\src\Application\RoleManagement\Commands\UpdateRole\UpdateRoleCommandValidator.cs)
+
+### 📊 Impacto nas Regras de Negócio
+
+**Antes da Correção:**
+- ❌ HierarchyLevel não era gerenciável via API
+- ❌ Todos os perfis criados ficavam com nível padrão = 3
+- ❌ Não havia validação de hierarquia (qualquer usuário podia criar qualquer nível)
+
+**Depois da Correção:**
+- ✅ HierarchyLevel completamente gerenciável
+- ✅ Validação de hierarquia robusta
+- ✅ Sistema de níveis funcional (0 = Super Admin, 1 = Admin, etc.)
+- ✅ Impossível escalar privilégios indevidamente
+
+---
+
+## 📋 Sumário Executivo
+
+| Aspecto | Detalhes |
+|---------|----------|
+| **Objetivo** | Permitir criação de perfis/roles personalizadas com permissões granulares |
+| **Atores** | Super Admin, Admin (com permissão `users:role:create`) |
+| **Pré-condições** | Usuário autenticado, permissão adequada, sistema de permissões configurado |
+| **Pós-condições** | Perfil criado, permissões associadas, auditoria registrada |
+| **Cenários de Teste** | **80 cenários** (validação, permissões, hierarquia, combinações) |
+| **Prioridade** | 🔴 Crítica (base do sistema de autorização) |
+
+---
+
+## 🎯 Descrição do Caso de Uso
+
+### Objetivo
+Permitir que administradores criem perfis personalizados de usuários, definindo:
+1. **Nome do perfil**: Ex: "Gerente de Documentos", "Auditor Regional"
+2. **Hierarquia**: Nível de autoridade (1 = maior, 10 = menor)
+3. **Permissões**: Conjunto de 0 a 23 permissões granulares
+4. **Descrição**: Finalidade e escopo do perfil
+5. **Escopo**: Global (todas empresas) ou específico de uma empresa
+
+### Conceitos Importantes
+
+| Conceito | Descrição | Exemplo |
+|----------|-----------|---------|
+| **Role/Perfil** | Conjunto nomeado de permissões | "Gerente de TI" |
+| **Hierarquia** | Nível de autoridade (1-10) | Super Admin = 1, Admin = 2, Gerente = 3, Usuário = 5 |
+| **Permissão** | Ação específica em recurso | `documents:template:create` |
+| **Escopo** | Abrangência do perfil | Global ou por Empresa |
+
+### Atores Principais
+- **Super Administrador**: Pode criar perfis globais e de qualquer hierarquia
+- **Administrador**: Pode criar perfis específicos da empresa (hierarquia >= sua própria)
+
+### Permissões Necessárias
+- **Criar perfil**: `users:role:create`
+- **Visualizar permissões**: `users:role:read` (para listar permissões disponíveis)
+
+---
+
+## 📊 Fluxos
+
+### Fluxo Principal - Criar Perfil Completo
+
+**FP-01: Criar Perfil com Permissões**
+
+1. Admin acessa `/management/roles`
+2. Admin clica em botão "➕ Novo Perfil"
+3. Sistema valida permissão `users:role:create`
+4. Sistema exibe modal/página de criação:
+   ```
+   Criar Novo Perfil
+
+   * Nome do Perfil: [_______________________]
+     Exemplo: "Gerente de Documentos"
+
+   * Hierarquia: [▼ Selecionar nível]
+     Opções: 2 (Admin), 3 (Gerente), 4 (Coordenador), 5 (Usuário)
+
+   Descrição (opcional):
+   [_____________________________________________]
+
+   Escopo:
+   ☐ Perfil de Sistema (pode ser usado em qualquer empresa) - Apenas Developer/Super Admin
+   (•) Específico desta empresa
+
+   Permissões:
+   ☑ Gestão de Usuários
+     ☐ users:user:create   Criar usuários
+     ☑ users:user:read     Visualizar usuários
+     ☑ users:user:update   Editar usuários
+     ☐ users:user:delete   Excluir usuários
+
+   ☑ Gestão de Documentos
+     ☑ documents:template:create   Criar templates
+     ☑ documents:template:read     Visualizar templates
+     ☑ documents:template:update   Editar templates
+     ...
+
+   [23 permissões organizadas em 6 grupos]
+
+   [Cancelar]  [Criar Perfil]
+   ```
+5. Admin preenche:
+   - Nome: "Gerente de Documentos"
+   - Hierarquia: 3 (Gerente)
+   - Descrição: "Responsável por gerenciar templates e geração de documentos"
+   - Escopo: Específico da empresa
+   - Permissões: Seleciona 8 permissões relacionadas a documentos e templates
+6. Admin clica em "Criar Perfil"
+7. Sistema valida:
+   - Nome não está vazio
+   - Nome é único (não existe outro perfil com mesmo nome)
+   - Hierarquia é válida (>= hierarquia do criador)
+   - Pelo menos 1 permissão selecionada
+   - Escopo global apenas se Super Admin
+8. Sistema executa `POST /api/roles`
+9. Backend:
+   - Cria registro em `Roles`:
+     ```sql
+     INSERT INTO Roles (Id, Nome, Hierarquia, Descricao, EmpresaId, CriadoPorId)
+     VALUES ('{guid}', 'Gerente de Documentos', 3, 'Responsável...', '{empresaId}', '{adminId}')
+     ```
+   - Cria registros em `RolePermissions` (8 linhas):
+     ```sql
+     INSERT INTO RolePermissions (RoleId, PermissionId)
+     VALUES ('{roleId}', '{permissionId}')
+     ```
+   - Registra no audit log
+10. Sistema retorna perfil criado com ID
+11. Sistema exibe toast: "✅ Perfil 'Gerente de Documentos' criado com sucesso"
+12. Sistema redireciona para lista de perfis (novo perfil aparece)
+
+**Resultado Esperado**:
+- ✅ Perfil criado no banco
+- ✅ 8 permissões associadas
+- ✅ Toast de sucesso
+- ✅ Audit log registrado
+- ✅ Disponível para atribuir a usuários
+
+---
+
+### Fluxo Alternativo 1 - Criar Perfil Mínimo
+
+**FA-01: Perfil com Apenas 1 Permissão**
+
+1. Admin cria perfil "Visualizador de Logs"
+2. Seleciona apenas 1 permissão: `audit:logs:read`
+3. Sistema permite criação
+4. Perfil funciona normalmente
+
+**Validação**: Pelo menos 1 permissão é obrigatória
+
+---
+
+### Fluxo Alternativo 2 - Criar Perfil Global
+
+**FA-02: Perfil de Sistema (Developer/Super Admin)**
+
+1. Developer ou Super Admin cria perfil "Auditor Regional"
+2. Marca checkbox: "Perfil de Sistema (pode ser usado em qualquer empresa)"
+3. Campo `empresaId` fica NULL no banco e flag `IsSystemRole = true`
+4. Perfil disponível para atribuir em qualquer empresa
+
+**Restrição**: Apenas Developer ou Super Admin podem criar Perfis de Sistema
+
+---
+
+### Fluxo Alternativo 3 - Clonar Perfil Existente
+
+**FA-03: Duplicar e Modificar**
+
+1. Admin visualiza perfil "Gerente"
+2. Admin clica em "Duplicar"
+3. Sistema cria formulário pré-preenchido:
+   - Nome: "Gerente (cópia)"
+   - Mesma hierarquia
+   - Mesmas permissões
+4. Admin modifica nome para "Gerente Financeiro"
+5. Admin adiciona permissões de relatórios
+6. Admin clica em "Criar Perfil"
+7. Novo perfil criado independente do original
+
+---
+
+### Fluxo Alternativo 4 - Template de Perfil
+
+**FA-04: Usar Template Pré-Definido**
+
+1. Admin clica em "Novo Perfil > Usar Template"
+2. Sistema exibe templates:
+   - 📋 "Gerente Padrão" (10 permissões)
+   - 📋 "Usuário Comum" (3 permissões)
+   - 📋 "Auditor" (5 permissões)
+3. Admin seleciona "Gerente Padrão"
+4. Formulário pré-preenchido
+5. Admin ajusta conforme necessário
+6. Cria perfil
+
+---
+
+### Fluxos de Exceção
+
+**FE-01: Nome Vazio**
+- **Condição**: Campo "Nome" em branco
+- **Ação**:
+  - Status: 400 Bad Request
+  - Erro: "Nome do perfil é obrigatório"
+  - Campo fica vermelho
+
+---
+
+**FE-02: Nome Duplicado**
+- **Condição**: Já existe perfil com mesmo nome
+- **Validação**: `SELECT COUNT(*) FROM Roles WHERE Nome = ? AND (EmpresaId = ? OR EmpresaId IS NULL)`
+- **Ação**:
+  - Status: 400 Bad Request
+  - Erro: "Já existe um perfil com este nome"
+  - Sugestão: "Gerente de Documentos 2"
+
+---
+
+**FE-03: Nome Muito Curto**
+- **Condição**: Nome com menos de 3 caracteres
+- **Ação**: Erro: "Nome deve ter pelo menos 3 caracteres"
+
+---
+
+**FE-04: Nome Muito Longo**
+- **Condição**: Nome com mais de 100 caracteres
+- **Ação**: Erro: "Nome deve ter no máximo 100 caracteres"
+
+---
+
+**FE-05: Nenhuma Permissão Selecionada**
+- **Condição**: Array de permissões vazio
+- **Ação**:
+  - Status: 400 Bad Request
+  - Erro: "Selecione pelo menos 1 permissão"
+  - Seção de permissões fica destacada em vermelho
+
+---
+
+**FE-06: Hierarquia Inválida - Auto-Promoção**
+- **Condição**: Admin (h=2) tenta criar perfil com h=1 (Super Admin)
+- **Validação**: `novaHierarquia >= criadorHierarquia`
+- **Ação**:
+  - Status: 403 Forbidden
+  - Erro: "Você não pode criar perfis de hierarquia superior à sua"
+  - Dropdown mostra apenas opções permitidas (h >= 2)
+
+---
+
+**FE-07: Perfil de Sistema - Admin Comum**
+- **Condição**: Admin (não Developer/Super Admin) tenta criar Perfil de Sistema
+- **Ação**:
+  - Status: 403 Forbidden
+  - Erro: "Apenas Developer ou Super Administrador podem criar Perfis de Sistema"
+  - Checkbox "Perfil de Sistema" desabilitado no frontend
+
+---
+
+**FE-08: Permissão Inexistente**
+- **Condição**: Frontend envia ID de permissão inválido
+- **Ação**:
+  - Status: 400 Bad Request
+  - Erro: "Permissão 'abc123' não existe"
+
+---
+
+**FE-09: Descrição Muito Longa**
+- **Condição**: Descrição com > 500 caracteres
+- **Ação**: Erro: "Descrição deve ter no máximo 500 caracteres"
+- **UI**: Contador de caracteres: "350/500"
+
+---
+
+**FE-10: Hierarquia Fora do Range**
+- **Condição**: Hierarquia < 1 ou > 10
+- **Ação**:
+  - Status: 400 Bad Request
+  - Erro: "Hierarquia deve estar entre 1 e 10"
+
+---
+
+**FE-11: Sem Permissão para Criar**
+- **Condição**: Usuário sem `users:role:create`
+- **Ação**:
+  - Status: 403 Forbidden
+  - Botão "Novo Perfil" não aparece no frontend
+  - Rota protegida: redireciona para `/dashboard`
+
+---
+
+**FE-12: Nome com Caracteres Especiais**
+- **Condição**: Nome contém `<>{}[]|`
+- **Ação**: Permitido, mas escapado ao exibir (proteção XSS)
+- **Alternativa**: Bloquear caracteres especiais (regex)
+
+---
+
+## 🧪 Cenários de Teste (80 Total)
+
+### Categoria 1: Validação de Campos (20 cenários)
+
+#### CT-001: Criar Perfil - Caminho Feliz
+**Pré-condições**:
+- Super Admin logado com `users:role:create`
+
+**Ação**:
+```http
+POST /api/roles
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "nome": "Gerente de Documentos",
+  "hierarquia": 3,
+  "descricao": "Responsável por gerenciar templates e documentos",
+  "empresaId": "5e74ca92-08d5-40f5-a27b-98887f81aa2e",
+  "permissoes": [
+    "documents:template:create",
+    "documents:template:read",
+    "documents:template:update",
+    "documents:document:generate",
+    "documents:document:read",
+    "documents:document:download",
+    "users:user:read",
+    "audit:logs:read"
+  ]
+}
+```
+
+**Resultado Esperado**:
+- ✅ Status: **201 Created**
+- ✅ Response:
+  ```json
+  {
+    "id": "role-guid",
+    "nome": "Gerente de Documentos",
+    "hierarquia": 3,
+    "descricao": "Responsável...",
+    "empresaId": "5e74ca92-...",
+    "permissoes": [...], // 8 permissões
+    "dataCriacao": "2025-10-20T15:30:00Z"
+  }
+  ```
+- ✅ Banco:
+  ```sql
+  SELECT * FROM Roles WHERE Id = 'role-guid'
+  SELECT COUNT(*) FROM RolePermissions WHERE RoleId = 'role-guid' -- 8
+  ```
+- ✅ Audit log criado
+
+---
+
+#### CT-002: Nome Obrigatório
+**Ação**: `{ "nome": "" }`
+
+**Resultado Esperado**:
+- ✅ Status: **400 Bad Request**
+- ✅ Erro: `{ "nome": ["Nome do perfil é obrigatório"] }`
+
+---
+
+#### CT-003: Nome Muito Curto
+**Ação**: `{ "nome": "AB" }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Nome deve ter pelo menos 3 caracteres"
+
+---
+
+#### CT-004: Nome Muito Longo
+**Ação**: `{ "nome": "A" * 101 }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Nome deve ter no máximo 100 caracteres"
+
+---
+
+#### CT-005: Nome Duplicado
+**Pré-condições**: Já existe perfil "Gerente"
+
+**Ação**: Criar outro perfil "Gerente"
+
+**Validação SQL**:
+```sql
+SELECT COUNT(*) FROM Roles
+WHERE Nome = 'Gerente' AND (EmpresaId = ? OR EmpresaId IS NULL)
+```
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Já existe um perfil com este nome"
+
+---
+
+#### CT-006: Nome Duplicado - Empresas Diferentes (Permitido)
+**Cenário**: Empresa A tem "Gerente", Empresa B cria "Gerente"
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Permitido (escopos diferentes)
+
+---
+
+#### CT-007: Nome com Espaços (Trimmed)
+**Ação**: `{ "nome": "  Gerente de TI  " }`
+
+**Resultado Esperado**:
+- ✅ Backend faz trim: `Nome = nome.Trim()`
+- ✅ Armazenado: "Gerente de TI"
+
+---
+
+#### CT-008: Nome com Caracteres Especiais
+**Ação**: `{ "nome": "Gerente (Região Sul)" }`
+
+**Resultado Esperado**:
+- ✅ Aceito (parênteses permitidos)
+- ✅ Escapado ao exibir HTML
+
+---
+
+#### CT-009: Descrição Opcional (NULL)
+**Ação**: `{ "descricao": null }`
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Campo `descricao` = NULL no banco
+
+---
+
+#### CT-010: Descrição Muito Longa
+**Ação**: `{ "descricao": "A" * 501 }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Descrição deve ter no máximo 500 caracteres"
+
+---
+
+#### CT-011: Hierarquia Obrigatória
+**Ação**: `{ "hierarquia": null }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Hierarquia é obrigatória"
+
+---
+
+#### CT-012: Hierarquia Mínima
+**Ação**: `{ "hierarquia": 1 }` (Super Admin cria)
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Apenas Super Admin pode criar h=1
+
+---
+
+#### CT-013: Hierarquia Máxima
+**Ação**: `{ "hierarquia": 10 }`
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Perfil de hierarquia mais baixa
+
+---
+
+#### CT-014: Hierarquia Fora do Range
+**Ação**: `{ "hierarquia": 0 }` ou `{ "hierarquia": 11 }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Hierarquia deve estar entre 1 e 10"
+
+---
+
+#### CT-015: Permissões - Array Vazio (NEGADO)
+**Ação**: `{ "permissoes": [] }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Selecione pelo menos 1 permissão"
+
+---
+
+#### CT-016: Permissões - Apenas 1 (Permitido)
+**Ação**: `{ "permissoes": ["audit:logs:read"] }`
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Perfil com 1 permissão funciona
+
+---
+
+#### CT-017: Permissões - Todas as 23
+**Ação**: `{ "permissoes": [... todas as 23 ...] }`
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Perfil equivalente a Super Admin (mas com hierarquia diferente)
+
+---
+
+#### CT-018: Permissão Inexistente
+**Ação**: `{ "permissoes": ["invalid:permission"] }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Permissão 'invalid:permission' não existe"
+
+---
+
+#### CT-019: Permissões Duplicadas no Request
+**Ação**: `{ "permissoes": ["users:user:read", "users:user:read"] }`
+
+**Resultado Esperado**:
+- ✅ Backend remove duplicatas: `permissoes = permissoes.Distinct()`
+- ✅ Status: 201 Created
+- ✅ Apenas 1 registro em `RolePermissions`
+
+---
+
+#### CT-020: EmpresaId NULL (Perfil Global)
+**Ação**: `{ "empresaId": null }` (Super Admin)
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Perfil disponível em todas as empresas
+
+---
+
+### Categoria 2: Segurança e Hierarquia (20 cenários)
+
+#### CT-021: Sem Permissão - Criar Perfil
+**Pré-condições**: Usuário SEM `users:role:create`
+
+**Ação**: `POST /api/roles`
+
+**Resultado Esperado**:
+- ✅ Status: **403 Forbidden**
+- ✅ Erro: "Você não tem permissão para criar perfis"
+- ✅ Botão "Novo Perfil" não aparece no frontend
+
+---
+
+#### CT-022: Hierarquia - Admin Cria Gerente
+**Cenário**: Admin (h=2) cria perfil Gerente (h=3)
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Hierarquia inferior permitida
+
+---
+
+#### CT-023: Hierarquia - Admin Tenta Criar Super Admin
+**Cenário**: Admin (h=2) tenta criar perfil com h=1
+
+**Validação**: `novaHierarquia >= criadorHierarquia`
+
+**Resultado Esperado**:
+- ✅ Status: **403 Forbidden**
+- ✅ Erro: "Você não pode criar perfis de hierarquia superior à sua"
+
+---
+
+#### CT-024: Hierarquia - Gerente Cria Usuário
+**Cenário**: Gerente (h=3) cria perfil Usuário (h=5)
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+
+---
+
+#### CT-025: Hierarquia - Mesma Hierarquia
+**Cenário**: Admin (h=2) cria outro perfil h=2
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Permitido criar perfil de mesma hierarquia
+
+---
+
+#### CT-026: Escopo Global - Apenas Super Admin
+**Cenário**: Admin (não Super) tenta criar perfil global
+
+**Ação**: `{ "empresaId": null }`
+
+**Resultado Esperado**:
+- ✅ Status: **403 Forbidden**
+- ✅ Erro: "Apenas Super Administradores podem criar perfis globais"
+
+---
+
+#### CT-027: Escopo Global - Super Admin
+**Cenário**: Super Admin cria perfil global
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ `empresaId = NULL`
+- ✅ Disponível em todas as empresas
+
+---
+
+#### CT-028: Criar Perfil para Outra Empresa (NEGADO)
+**Cenário**: Admin Empresa A tenta criar perfil para Empresa B
+
+**Ação**: `{ "empresaId": "empresa-b-id" }`
+
+**Resultado Esperado**:
+- ✅ Status: **403 Forbidden**
+- ✅ Erro: "Você não pode criar perfis para outras empresas"
+
+---
+
+#### CT-029: Super Admin Cria Perfil para Qualquer Empresa
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Super Admin pode criar para qualquer empresa
+
+---
+
+#### CT-030: Token Expirado
+**Ação**: Request com JWT expirado
+
+**Resultado Esperado**:
+- ✅ Status: **401 Unauthorized**
+- ✅ Redireciona para login
+
+---
+
+#### CT-031: SQL Injection no Nome
+**Ação**: `{ "nome": "'; DROP TABLE Roles; --" }`
+
+**Resultado Esperado**:
+- ✅ Query parametrizada, SQL não executa
+- ✅ Nome armazenado literalmente
+- ✅ Banco intacto
+
+---
+
+#### CT-032: XSS no Nome
+**Ação**: `{ "nome": "<script>alert('XSS')</script>" }`
+
+**Resultado Esperado**:
+- ✅ Backend aceita
+- ✅ Frontend escapa HTML ao exibir
+- ✅ Script NÃO executa
+
+---
+
+#### CT-033: Rate Limiting - Muitas Criações
+**Ação**: 50 POST /api/roles em 1 minuto
+
+**Resultado Esperado**:
+- ✅ Após 20 requests: Status **429 Too Many Requests**
+- ✅ Header: `Retry-After: 60`
+
+---
+
+#### CT-034: CSRF Protection
+**Ação**: Request sem token CSRF (se implementado)
+
+**Resultado Esperado**:
+- ✅ Status: 403 Forbidden
+- ✅ Erro: "CSRF token inválido"
+
+---
+
+#### CT-035: Audit Log - Quem Criou
+**Resultado Esperado**:
+```json
+{
+  "action": "CREATE",
+  "entityType": "Role",
+  "entityId": "role-guid",
+  "performedBy": "admin-guid",
+  "timestamp": "2025-10-20T15:30:00Z",
+  "details": {
+    "nome": "Gerente de Documentos",
+    "hierarquia": 3,
+    "permissoes": ["..."]
+  }
+}
+```
+
+---
+
+#### CT-036: Permissões Perigosas - Criar Super Admin
+**Cenário**: Criar perfil com todas as permissões mas h=2 (não é Super Admin)
+
+**Resultado Esperado**:
+- ✅ Status: 201 Created
+- ✅ Permitido (admin tem controle)
+- ✅ Aviso no frontend: "⚠️ Este perfil terá permissões totais"
+
+---
+
+#### CT-037: Validar EmpresaId Existe
+**Ação**: `{ "empresaId": "guid-inexistente" }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Empresa não encontrada"
+
+---
+
+#### CT-038: Empresa Inativa
+**Cenário**: Criar perfil para empresa desativada
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Não é possível criar perfis para empresas inativas"
+
+---
+
+#### CT-039: Mass Assignment Vulnerability
+**Ação**:
+```json
+{
+  "nome": "Gerente",
+  "id": "custom-id", // Tentando definir ID
+  "dataCriacao": "2000-01-01" // Tentando manipular data
+}
+```
+
+**Resultado Esperado**:
+- ✅ Backend ignora campos não-editáveis (whitelist)
+- ✅ `id` gerado automaticamente (GUID)
+- ✅ `dataCriacao` = NOW()
+
+---
+
+#### CT-040: Nomes Reservados (Opcional)
+**Ação**: `{ "nome": "Super Administrador" }` (Admin comum)
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request (opcional)
+- ✅ Erro: "Nome reservado pelo sistema"
+- ✅ OU permitir (não há problema técnico)
+
+---
+
+### Categoria 3: Combinações de Permissões (20 cenários)
+
+#### CT-041: CRUD Completo de Usuários
+**Ação**: Criar perfil com 4 permissões:
+- `users:user:create`
+- `users:user:read`
+- `users:user:update`
+- `users:user:delete`
+
+**Resultado Esperado**:
+- ✅ Perfil criado
+- ✅ Usuário com esse perfil pode fazer CRUD completo
+
+---
+
+#### CT-042: Apenas Leitura (Read-Only)
+**Ação**: Criar perfil "Visualizador" com:
+- `users:user:read`
+- `documents:document:read`
+- `audit:logs:read`
+
+**Resultado Esperado**:
+- ✅ Perfil sem permissões de modificação
+- ✅ Botões de criar/editar/deletar não aparecem
+
+---
+
+#### CT-043: Permissões Conflitantes (Não Existe)
+**Observação**: Sistema não tem conflitos (todas as permissões são aditivas)
+
+**Exemplo**: `users:user:create` + `users:user:delete` = Funciona normalmente
+
+---
+
+#### CT-044: Permissões Hierárquicas - Update Requer Read
+**Regra de Negócio**: Para editar, deve poder visualizar?
+
+**Validação**: `if (hasUpdate && !hasRead) → warning`
+
+**Resultado Esperado** (Opcional):
+- ✅ Backend permite (não há dependência técnica)
+- ✅ OU exibe aviso: "Recomendado adicionar permissão de leitura"
+
+---
+
+#### CT-045: Módulo Completo - Documentos
+**Ação**: Criar perfil "Gerente de Documentos" com:
+- Todas as 9 permissões de `documents:*`
+
+**Resultado Esperado**:
+- ✅ Controle total sobre templates e documentos
+
+---
+
+#### CT-046: Módulo Completo - Usuários
+**Ação**: Todas as 8 permissões de `users:*`
+
+**Resultado Esperado**:
+- ✅ Pode gerenciar usuários e perfis
+
+---
+
+#### CT-047: Permissão de Audit Logs
+**Ação**: `audit:logs:read` + `audit:logs:export`
+
+**Resultado Esperado**:
+- ✅ Pode visualizar e exportar logs
+- ✅ Perfil "Auditor"
+
+---
+
+#### CT-048: Permissões de Empresas
+**Ação**: 4 permissões de `companies:*`
+
+**Resultado Esperado**:
+- ✅ Pode gerenciar empresas (CRUD)
+
+---
+
+#### CT-049: Cross-Module - Gerente Geral
+**Ação**: Misturar permissões de diferentes módulos:
+- `users:user:*` (4)
+- `documents:template:*` (5)
+- `audit:logs:read` (1)
+- Total: 10 permissões
+
+**Resultado Esperado**:
+- ✅ Perfil funciona normalmente
+- ✅ União de permissões
+
+---
+
+#### CT-050: Perfil Mínimo Viável
+**Ação**: Criar perfil com apenas `users:user:read`
+
+**Resultado Esperado**:
+- ✅ Usuário pode fazer login
+- ✅ Pode ver lista de usuários
+- ✅ Nenhuma outra ação disponível
+
+---
+
+#### CT-051: Todas as Permissões Exceto 1
+**Ação**: 22 de 23 permissões (falta `users:role:delete`)
+
+**Resultado Esperado**:
+- ✅ Perfil quase completo
+- ✅ Não pode deletar perfis
+
+---
+
+#### CT-052: Permissões Simétricas
+**Cenário**: Criar 2 perfis com mesmas permissões mas nomes diferentes
+
+**Resultado Esperado**:
+- ✅ Permitido (nomes únicos)
+- ✅ Ambos funcionam igualmente
+
+---
+
+#### CT-053: Incremento de Permissões
+**Teste**: Criar perfis crescentes:
+- Perfil 1: 1 permissão
+- Perfil 2: 5 permissões
+- Perfil 3: 10 permissões
+- Perfil 4: 23 permissões
+
+**Resultado Esperado**:
+- ✅ Todos criados com sucesso
+
+---
+
+#### CT-054: Ordem das Permissões Irrelevante
+**Ação**: Enviar permissões em ordem aleatória
+
+**Resultado Esperado**:
+- ✅ Backend não depende de ordem
+- ✅ Todas armazenadas corretamente
+
+---
+
+#### CT-055: Remover Duplicatas
+**Ação**: `["users:user:read", "users:user:read", "users:user:create"]`
+
+**Resultado Esperado**:
+- ✅ Backend: `permissoes.Distinct().ToList()`
+- ✅ Apenas 2 registros em `RolePermissions`
+
+---
+
+#### CT-056: Validação de Formato de Permissão
+**Ação**: `["users-user-read"]` (hífen em vez de dois pontos)
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Formato inválido: 'users-user-read'"
+- ✅ Formato correto: `module:entity:action`
+
+---
+
+#### CT-057: Case Sensitivity
+**Ação**: `["Users:User:Read"]` (maiúsculas)
+
+**Resultado Esperado**:
+- ✅ Validação case-insensitive: `ToLower()`
+- ✅ Convertido para: `users:user:read`
+
+---
+
+#### CT-058: Permissões Futuras (Extensibilidade)
+**Cenário**: Sistema adiciona nova permissão `reports:report:generate`
+
+**Resultado Esperado**:
+- ✅ Perfis antigos continuam funcionando
+- ✅ Nova permissão disponível para novos perfis
+
+---
+
+#### CT-059: Limitar Permissões por Hierarquia (Opcional)
+**Regra**: h=3 não pode ter `users:role:delete`?
+
+**Resultado Esperado** (Se implementado):
+- ✅ Validação: Certas permissões restritas a h <= 2
+- ✅ Status: 400 Bad Request se violar
+
+---
+
+#### CT-060: Perfil "Clonar" - Mesmas Permissões
+**Ação**: Criar perfil com mesmas permissões de "Gerente" existente
+
+**Resultado Esperado**:
+- ✅ Permitido
+- ✅ Nomes diferentes, mesmas permissões
+
+---
+
+### Categoria 4: Performance e Integração (10 cenários)
+
+#### CT-061: Performance - Criar Perfil Simples
+**Ação**: Perfil com 3 permissões
+
+**Resultado Esperado**:
+- ✅ Response time < 500ms
+- ✅ 1 INSERT em `Roles`
+- ✅ 3 INSERTs em `RolePermissions`
+
+---
+
+#### CT-062: Performance - Perfil com 23 Permissões
+**Ação**: Todas as permissões
+
+**Resultado Esperado**:
+- ✅ Response time < 1 segundo
+- ✅ Bulk insert em `RolePermissions`
+
+---
+
+#### CT-063: Transaction Rollback
+**Cenário**: Erro ao inserir permissões (constraint violation)
+
+**Resultado Esperado**:
+- ✅ Transaction rollback
+- ✅ Perfil NÃO é criado (atomicidade)
+- ✅ Banco consistente
+
+---
+
+#### CT-064: Validação de Permissões - Query
+**Validação**: Verificar que todas as permissões existem
+
+**Query**:
+```sql
+SELECT COUNT(*) FROM Permissions WHERE Id IN (...)
+-- Deve retornar count = permissoes.length
+```
+
+**Resultado Esperado**:
+- ✅ Se count diferente: Erro "Permissões inválidas"
+
+---
+
+#### CT-065: Cache de Permissões
+**Resultado Esperado**:
+- ✅ Lista de permissões disponíveis em cache (Redis)
+- ✅ TTL: 1 hora
+- ✅ Invalidado ao adicionar nova permissão no sistema
+
+---
+
+#### CT-066: Concurrent Creation - Nomes Únicos
+**Cenário**: 2 admins criam perfil "Gerente" ao mesmo tempo
+
+**Resultado Esperado**:
+- ✅ Primeiro: 201 Created
+- ✅ Segundo: 400 Bad Request (nome duplicado)
+- ✅ Unique constraint no banco previne duplicata
+
+---
+
+#### CT-067: Audit Log - Permissões Criadas
+**Resultado Esperado**:
+- ✅ Log registra quais permissões foram associadas
+- ✅ Array no campo `details.permissoes`
+
+---
+
+#### CT-068: Integração - Perfil Imediatamente Disponível
+**Ação**: Criar perfil "Gerente"
+
+**Validação**: `GET /api/roles` imediatamente após
+
+**Resultado Esperado**:
+- ✅ Novo perfil aparece na lista
+- ✅ Cache invalidado
+
+---
+
+#### CT-069: Database Indexes
+**Validação**: Verificar query plan
+
+**Resultado Esperado**:
+- ✅ Índice em `Roles.Nome` (unicidade)
+- ✅ Índice em `Roles.EmpresaId` (filtro)
+- ✅ Índice composto em `RolePermissions(RoleId, PermissionId)`
+
+---
+
+#### CT-070: Memory Leak Test
+**Teste**: Criar 1000 perfis
+
+**Resultado Esperado**:
+- ✅ Memória estável
+- ✅ GC libera objetos
+- ✅ Sem memory leaks
+
+---
+
+### Categoria 5: UX e Frontend (10 cenários)
+
+#### CT-071: Formulário - Grupos de Permissões
+**Resultado Esperado**:
+- ✅ 23 permissões organizadas em 6 grupos:
+  - Gestão de Usuários (4)
+  - Gestão de Perfis (4)
+  - Gestão de Empresas (4)
+  - Templates (5)
+  - Documentos (4)
+  - Auditoria (2)
+- ✅ Checkbox "Selecionar Todos" por grupo
+
+---
+
+#### CT-072: Validação em Tempo Real
+**Ação**: Digitar nome no campo
+
+**Resultado Esperado**:
+- ✅ Validação de unicidade com debounce (500ms)
+- ✅ ✗ "Nome já existe" (vermelho)
+- ✅ ✓ "Nome disponível" (verde)
+
+---
+
+#### CT-073: Pré-visualização de Permissões
+**Resultado Esperado**:
+- ✅ Contador: "8 permissões selecionadas"
+- ✅ Lista expandível com nomes legíveis:
+  - `users:user:create` → "Criar usuários"
+
+---
+
+#### CT-074: Hierarquia - Dropdown Filtrado
+**Cenário**: Admin (h=2) cria perfil
+
+**Resultado Esperado**:
+- ✅ Dropdown mostra apenas: 2, 3, 4, 5, 6, 7, 8, 9, 10
+- ✅ h=1 não aparece (não pode criar Super Admin)
+
+---
+
+#### CT-075: Loading State
+**Resultado Esperado**:
+- ✅ Botão "Criar Perfil" mostra spinner: "Criando..."
+- ✅ Botão desabilitado (previne duplo clique)
+
+---
+
+#### CT-076: Toast de Sucesso
+**Resultado Esperado**:
+- ✅ Toast verde com ✓
+- ✅ Mensagem: "Perfil 'Gerente de Documentos' criado com sucesso"
+- ✅ Ação: "Atribuir a usuários"
+- ✅ Auto-dismiss em 5 segundos
+
+---
+
+#### CT-077: Toast de Erro
+**Resultado Esperado**:
+- ✅ Toast vermelho com ✗
+- ✅ Mensagem: "Erro ao criar perfil: Nome já existe"
+- ✅ Não auto-dismiss
+
+---
+
+#### CT-078: Acessibilidade - Formulário
+**Resultado Esperado**:
+- ✅ Navegação por teclado (Tab)
+- ✅ Labels associados a inputs (`for` attribute)
+- ✅ Checkboxes acessíveis por Space
+- ✅ Screen reader anuncia erros
+
+---
+
+#### CT-079: Mobile - Formulário Responsivo
+**Resultado Esperado**:
+- ✅ Permissões em lista vertical (não grid)
+- ✅ Campos ocupam 100% da largura
+- ✅ Botões grandes (touch-friendly)
+
+---
+
+#### CT-080: Confirmação ao Sair (Dados Não Salvos)
+**Cenário**: Admin preenche formulário e tenta sair
+
+**Resultado Esperado**:
+- ✅ Modal: "Deseja descartar alterações?"
+- ✅ [Cancelar] [Descartar]
+
+---
+
+## 🔒 Matriz de Permissões
+
+| Perfil | Criar Perfil | Hierarquia Permitida | Perfil de Sistema | Permissões Atribuíveis |
+|--------|-------------|---------------------|-------------------|----------------------|
+| **Developer** | ✅ | 1-10 (qualquer) | ✅ | Todas (23) |
+| **Super Admin** | ✅ | 1-10 (qualquer) | ✅ | Todas (23) |
+| **Admin** | ✅ | 2-10 (>= sua) | ❌ | Todas (23) |
+| **Gerente** | ❌ | N/A | ❌ | N/A |
+| **Usuário** | ❌ | N/A | ❌ | N/A |
+
+---
+
+## 📈 Critérios de Aceitação
+
+### Backend
+- [ ] Endpoint `POST /api/roles` com validação completa
+- [ ] Validação de hierarquia (não pode criar superior à sua)
+- [ ] Validação de unicidade de nome (por escopo)
+- [ ] Escopo global apenas para Super Admin
+- [ ] Mínimo 1 permissão obrigatória
+- [ ] Todas as permissões validadas (existem no sistema)
+- [ ] Transaction atômica (Role + RolePermissions)
+- [ ] Audit log completo
+- [ ] Response time < 1s (mesmo com 23 permissões)
+
+### Frontend
+- [ ] Formulário com validação em tempo real
+- [ ] Permissões organizadas em grupos
+- [ ] Checkbox "Selecionar Todos" por grupo
+- [ ] Dropdown de hierarquia filtrado conforme usuário
+- [ ] Campo escopo desabilitado para não-Super Admin
+- [ ] Contador de permissões selecionadas
+- [ ] Loading state durante criação
+- [ ] Toast de sucesso/erro
+- [ ] Validação de unicidade de nome (debounce 500ms)
+- [ ] Acessibilidade (WCAG 2.1 AA)
+
+---
+
+## 🧩 Dependências
+
+### Backend
+- `RolesController.Create(request)` ✅ Implementado
+- `PermissionsService.GetAll()` ✅ Implementado
+- `AuthorizationService.ValidateHierarchy()` ✅ Implementado
+- `AuditLogService.LogCreate()` ✅ Implementado
+
+### Frontend
+- `RolesListComponent` ✅ Implementado ([roles.component.ts](../../../frontend/icontrolit-app/src/app/modules/admin/management/roles/roles.component.ts))
+- `RolesService.createRole()` ✅ Implementado ([roles.service.ts](../../../frontend/icontrolit-app/src/app/modules/admin/management/roles/roles.service.ts))
+- `RolesDetailsComponent` ✅ Implementado
+- `PermissionsService` ✅ Implementado
+
+---
+
+## 📝 Notas de Implementação
+
+### Estrutura de Dados
+```csharp
+public class Role
+{
+    public Guid Id { get; set; }
+    public string Nome { get; set; } // max 100 chars
+    public int Hierarquia { get; set; } // 1-10
+    public string? Descricao { get; set; } // max 500 chars
+    public Guid? EmpresaId { get; set; } // NULL = global
+    public Guid CriadoPorId { get; set; }
+    public DateTime DataCriacao { get; set; }
+
+    // Navigation
+    public List<RolePermission> RolePermissions { get; set; }
+}
+
+public class RolePermission
+{
+    public Guid RoleId { get; set; }
+    public Guid PermissionId { get; set; }
+
+    public Role Role { get; set; }
+    public Permission Permission { get; set; }
+}
+```
+
+### Validação de Unicidade
+```csharp
+// Nome único por escopo (empresa ou global)
+var exists = await _context.Roles.AnyAsync(r =>
+    r.Nome == request.Nome &&
+    (r.EmpresaId == request.EmpresaId || r.EmpresaId == null)
+);
+if (exists) return BadRequest("Nome já existe");
+```
+
+### Bulk Insert de Permissões
+```csharp
+var rolePermissions = request.Permissoes.Select(p => new RolePermission
+{
+    RoleId = role.Id,
+    PermissionId = p
+});
+
+await _context.RolePermissions.AddRangeAsync(rolePermissions);
+await _context.SaveChangesAsync(); // Transaction atômica
+```
+
+---
+
+## ✅ Checklist de Completude
+
+- [x] Todos os fluxos documentados (4 alternativos, 12 exceção)
+- [x] 80 cenários de teste criados
+- [x] Validação de hierarquia
+- [x] Validação de escopo (global/empresa)
+- [x] Combinações de permissões (20 cenários)
+- [x] Performance e integração
+- [x] UX e acessibilidade
+- [x] Matriz de permissões
+- [x] Critérios de aceitação
+
+---
+
+**Status Final**: ✅ **UC05 100% ESPECIFICADO**
+
+**Complexidade**: 🔴 Alta (base do sistema de autorização)
+
+**Próximos Passos**:
+1. Executar todos os 80 cenários de teste
+2. Validar hierarquia com casos extremos
+3. Testar todas as 784 combinações de permissões
+4. Performance test com 1000 perfis
+5. Teste de concorrência (criação simultânea)
+
+**Última Atualização**: 2025-10-20
+**Revisado por**: Anderson Chipak + Claude Code
+
+---
+
+# UC06: Visualizar Perfil (Role) - Especificação Completa
+
+**Autor**: Anderson Chipak + Claude Code
+**Status**: ✅ Implementado (Backend + Frontend)
+
+---
+
+## 📋 Sumário Executivo
+
+| Aspecto | Detalhes |
+|---------|----------|
+| **Objetivo** | Permitir visualização de perfis/roles existentes e suas permissões |
+| **Atores** | Super Admin, Admin, Gerente (com permissão `users:role:read`) |
+| **Pré-condições** | Usuário autenticado com permissão `users:role:read` |
+| **Pós-condições** | Dados do perfil exibidos corretamente |
+| **Cenários de Teste** | **40 cenários** (validação, segurança, performance, UX) |
+| **Prioridade** | 🟢 Baixa (funcionalidade de leitura) |
+
+---
+
+## 🎯 Descrição do Caso de Uso
+
+### Objetivo
+Permitir que usuários autorizados:
+1. **Visualizem lista** de todos os perfis disponíveis
+2. **Visualizem detalhes** de um perfil específico
+3. **Filtrem e ordenem** perfis por hierarquia, empresa, etc.
+4. **Vejam usuários** associados a cada perfil
+
+### Atores Principais
+- **Super Administrador**: Visualiza todos os perfis (globais e de todas as empresas)
+- **Administrador**: Visualiza perfis da própria empresa + perfis globais
+- **Gerente**: Visualiza perfis disponíveis (se tiver permissão)
+- **Usuário**: Pode visualizar apenas próprios perfis atribuídos
+
+### Permissões Necessárias
+- **Visualizar lista**: `users:role:read`
+- **Visualizar detalhes**: `users:role:read`
+- **Ver usuários do perfil**: `users:role:read` + `users:user:read`
+
+---
+
+## 📊 Fluxos
+
+### Fluxo Principal - Visualizar Lista
+
+**FP-01: Listar Todos os Perfis**
+
+1. Usuário acessa página `/management/roles`
+2. Sistema valida permissão `users:role:read`
+3. Sistema carrega lista de perfis:
+   - **Super Admin**: Todos os perfis (globais + todas empresas)
+   - **Admin**: Perfis da empresa + globais
+   - **Outros**: Perfis disponíveis conforme escopo
+4. Sistema exibe tabela/cards com:
+   - Nome do perfil
+   - Hierarquia (número + badge colorido)
+   - Quantidade de permissões
+   - Quantidade de usuários
+   - Escopo (Global ou nome da empresa)
+   - Ações (visualizar, editar, excluir - conforme permissões)
+5. Sistema exibe total de registros
+6. Sistema exibe controles de filtro e ordenação
+
+**Resultado Esperado**:
+- ✅ Lista carregada em < 2 segundos
+- ✅ Perfis exibidos conforme escopo do usuário
+- ✅ Badges coloridos por hierarquia
+- ✅ Botões de ação corretos
+
+---
+
+### Fluxo Principal - Visualizar Detalhes
+
+**FP-02: Visualizar Detalhes de Perfil Específico**
+
+1. Usuário clica em perfil "Gerente de Documentos"
+2. Sistema redireciona para `/management/roles/{id}`
+3. Sistema valida permissão `users:role:read`
+4. Sistema valida que perfil está no escopo do usuário
+5. Sistema busca dados via `GET /api/roles/{id}`
+6. Sistema exibe painel de detalhes com seções:
+   ```
+   Gerente de Documentos
+   [Badge: Hierarquia 3 - Gerente]
+   [Badge: Empresa XYZ] ou [Badge: Global]
+
+   Descrição:
+   Responsável por gerenciar templates e geração de documentos
+
+   Permissões (8):
+   ✓ Criar templates (documents:template:create)
+   ✓ Visualizar templates (documents:template:read)
+   ✓ Editar templates (documents:template:update)
+   ✓ Publicar templates (documents:template:publish)
+   ✓ Gerar documentos (documents:document:generate)
+   ✓ Visualizar documentos (documents:document:read)
+   ✓ Baixar documentos (documents:document:download)
+   ✓ Visualizar logs (audit:logs:read)
+
+   Usuários com este perfil (5):
+   • João Silva
+   • Maria Santos
+   • Pedro Oliveira
+   • Ana Costa
+   • Carlos Ferreira
+   [Ver todos os usuários →]
+
+   Informações:
+   Criado em: 15/09/2025 por Admin Master
+   Última atualização: 20/10/2025 por Admin Master
+   ```
+7. Sistema exibe botões de ação (se autorizado):
+   - "Editar" (requer `users:role:update`)
+   - "Excluir" (requer `users:role:delete`)
+   - "Duplicar" (requer `users:role:create`)
+
+**Resultado Esperado**:
+- ✅ Detalhes carregados em < 1 segundo
+- ✅ Permissões exibidas com nomes legíveis
+- ✅ Lista de usuários visível
+- ✅ Botões aparecem conforme permissões
+
+---
+
+### Fluxos Alternativos
+
+**FA-01: Filtrar por Hierarquia**
+1. Usuário seleciona "Apenas Gerentes (h=3)"
+2. Sistema aplica filtro `hierarquia=3`
+3. Lista atualizada
+
+**FA-02: Filtrar por Empresa**
+1. Super Admin seleciona empresa no dropdown
+2. Sistema filtra perfis daquela empresa + globais
+3. Contador atualizado
+
+**FA-03: Ordenar por Nome**
+1. Usuário clica em coluna "Nome"
+2. Sistema ordena alfabeticamente
+3. Indicador visual (↑↓)
+
+**FA-04: Ordenar por Hierarquia**
+1. Ordenação por nível (1 → 10)
+2. Super Admin aparece primeiro
+
+**FA-05: Buscar por Nome**
+1. Usuário digita "documento" no campo de busca
+2. Sistema filtra: "Gerente de Documentos", "Auditor de Documentos"
+3. Busca case-insensitive e parcial
+
+**FA-06: Ver Usuários do Perfil**
+1. Usuário clica em "5 usuários" no card
+2. Modal/página exibe lista completa
+3. Link para perfil de cada usuário
+
+**FA-07: Visualizar Próprios Perfis (Usuário Comum)**
+1. Usuário comum acessa `/profile/my-roles`
+2. Sistema exibe apenas perfis atribuídos a ele
+3. Não pode ver outros perfis
+
+---
+
+### Fluxos de Exceção
+
+**FE-01: Permissão Negada**
+- **Condição**: Usuário sem `users:role:read`
+- **Ação**: Redirecionar para `/dashboard` com toast "Acesso negado"
+
+**FE-02: Perfil Não Encontrado**
+- **Condição**: `GET /api/roles/{id-inexistente}`
+- **Ação**: Página 404 com botão "Voltar para lista"
+
+**FE-03: Acesso a Perfil de Outra Empresa**
+- **Condição**: Admin Empresa A tenta ver perfil específico da Empresa B
+- **Ação**: 403 Forbidden ou 404 (obscuridade)
+
+**FE-04: Lista Vazia**
+- **Condição**: Nenhum perfil encontrado
+- **Ação**: Estado vazio: "Nenhum perfil encontrado. Crie o primeiro!"
+
+**FE-05: Erro de Conexão**
+- **Condição**: Backend inacessível
+- **Ação**: Skeleton loader por 30s, depois mensagem de erro
+
+---
+
+## 🧪 Cenários de Teste (40 Total)
+
+### Categoria 1: Validação Básica (10 cenários)
+
+#### CT-001: Listar Perfis - Caminho Feliz
+**Pré-condições**: Admin logado com `users:role:read`
+
+**Ação**:
+```http
+GET /api/roles
+Authorization: Bearer {token}
+```
+
+**Resultado Esperado**:
+- ✅ Status: **200 OK**
+- ✅ Response:
+  ```json
+  [
+    {
+      "id": "role-guid-1",
+      "nome": "Super Administrador",
+      "hierarquia": 1,
+      "descricao": "Controle total do sistema",
+      "empresaId": null,
+      "empresaNome": "Global",
+      "quantidadePermissoes": 23,
+      "quantidadeUsuarios": 2,
+      "dataCriacao": "2025-01-01T00:00:00Z"
+    },
+    {
+      "id": "role-guid-2",
+      "nome": "Gerente de Documentos",
+      "hierarquia": 3,
+      "descricao": "...",
+      "empresaId": "empresa-guid",
+      "empresaNome": "Acme Corp",
+      "quantidadePermissoes": 8,
+      "quantidadeUsuarios": 5,
+      "dataCriacao": "2025-09-15T10:30:00Z"
+    }
+  ]
+  ```
+- ✅ Response time < 2 segundos
+
+---
+
+#### CT-002: Visualizar Detalhes de Perfil
+**Ação**:
+```http
+GET /api/roles/role-guid-2
+```
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Response:
+  ```json
+  {
+    "id": "role-guid-2",
+    "nome": "Gerente de Documentos",
+    "hierarquia": 3,
+    "descricao": "Responsável por gerenciar templates...",
+    "empresaId": "empresa-guid",
+    "empresaNome": "Acme Corp",
+    "permissoes": [
+      {
+        "id": "perm-guid-1",
+        "codigo": "documents:template:create",
+        "nome": "Criar templates",
+        "descricao": "Permite criar novos templates de documentos"
+      },
+      // ... 7 mais
+    ],
+    "usuarios": [
+      {
+        "id": "user-guid-1",
+        "nome": "João Silva",
+        "email": "joao@acme.com"
+      },
+      // ... 4 mais
+    ],
+    "dataCriacao": "2025-09-15T10:30:00Z",
+    "criadoPor": "Admin Master",
+    "dataUltimaAtualizacao": "2025-10-20T14:22:00Z",
+    "modificadoPor": "Admin Master"
+  }
+  ```
+
+---
+
+#### CT-003: Super Admin Vê Todos os Perfis
+**Resultado Esperado**:
+- ✅ Retorna perfis globais + de todas as empresas
+- ✅ Sem filtro de `empresaId` aplicado
+
+---
+
+#### CT-004: Admin Vê Perfis da Empresa + Globais
+**Resultado Esperado**:
+- ✅ Query:
+  ```sql
+  SELECT * FROM Roles
+  WHERE EmpresaId = '{empresaDoAdmin}' OR EmpresaId IS NULL
+  ```
+- ✅ Não vê perfis de outras empresas
+
+---
+
+#### CT-005: Perfis Ordenados por Hierarquia (Padrão)
+**Resultado Esperado**:
+- ✅ Ordem: h=1, h=2, h=3, ..., h=10
+- ✅ Super Admin sempre primeiro
+
+---
+
+#### CT-006: Filtrar por Nome (Busca Parcial)
+**Ação**: `GET /api/roles?nome=gerente`
+
+**Resultado Esperado**:
+- ✅ Retorna: "Gerente de Documentos", "Gerente de TI", "Gerente Financeiro"
+- ✅ Case-insensitive
+- ✅ Busca parcial funciona
+
+---
+
+#### CT-007: Filtrar por Hierarquia
+**Ação**: `GET /api/roles?hierarquia=3`
+
+**Resultado Esperado**:
+- ✅ Retorna apenas perfis com h=3
+- ✅ Contador correto
+
+---
+
+#### CT-008: Filtrar por Empresa
+**Ação**: `GET /api/roles?empresaId=empresa-guid`
+
+**Resultado Esperado**:
+- ✅ Retorna perfis da empresa + globais
+- ✅ Não retorna de outras empresas
+
+---
+
+#### CT-009: Filtrar Apenas Perfis Globais
+**Ação**: `GET /api/roles?escopo=global`
+
+**Resultado Esperado**:
+- ✅ Query: `WHERE EmpresaId IS NULL`
+- ✅ Apenas perfis multi-empresa
+
+---
+
+#### CT-010: Ordenar por Nome
+**Ação**: `GET /api/roles?sortBy=nome&sortOrder=asc`
+
+**Resultado Esperado**:
+- ✅ Ordem alfabética A-Z
+- ✅ "Admin" antes de "Gerente"
+
+---
+
+### Categoria 2: Segurança e Permissões (10 cenários)
+
+#### CT-011: Sem Permissão - Listar
+**Pré-condições**: Usuário SEM `users:role:read`
+
+**Ação**: `GET /api/roles`
+
+**Resultado Esperado**:
+- ✅ Status: **403 Forbidden**
+- ✅ Frontend redireciona para `/dashboard`
+- ✅ Toast: "Acesso negado"
+
+---
+
+#### CT-012: Sem Permissão - Visualizar Detalhes
+**Ação**: `GET /api/roles/{id}`
+
+**Resultado Esperado**:
+- ✅ Status: 403 Forbidden
+
+---
+
+#### CT-013: Token Expirado
+**Ação**: Request com JWT expirado
+
+**Resultado Esperado**:
+- ✅ Status: **401 Unauthorized**
+- ✅ Redireciona para login
+
+---
+
+#### CT-014: IDOR - Ver Perfil de Outra Empresa
+**Cenário**: Admin Empresa A tenta `GET /api/roles/{perfil-empresa-b}`
+
+**Resultado Esperado**:
+- ✅ Status: **404 Not Found** (segurança por obscuridade)
+- ✅ Mensagem: "Perfil não encontrado"
+
+---
+
+#### CT-015: SQL Injection na Busca
+**Ação**: `GET /api/roles?nome='; DROP TABLE Roles; --`
+
+**Resultado Esperado**:
+- ✅ Query parametrizada, SQL não executa
+- ✅ Lista vazia ou erro genérico
+- ✅ Banco intacto
+
+---
+
+#### CT-016: XSS no Nome do Perfil
+**Cenário**: Perfil criado com nome `<script>alert('XSS')</script>`
+
+**Ação**: Visualizar detalhes
+
+**Resultado Esperado**:
+- ✅ Frontend escapa HTML
+- ✅ Nome exibido como texto: `&lt;script&gt;...`
+- ✅ Script NÃO executa
+
+---
+
+#### CT-017: Acesso Direto por URL (Sem Auth)
+**Ação**: Navegar para `/management/roles` sem login
+
+**Resultado Esperado**:
+- ✅ Route guard bloqueia
+- ✅ Redireciona para `/sign-in`
+- ✅ Salva URL para redirecionar após login
+
+---
+
+#### CT-018: Ver Usuários Requer Permissão Extra
+**Cenário**: Usuário com `users:role:read` mas SEM `users:user:read`
+
+**Resultado Esperado**:
+- ✅ Vê detalhes do perfil
+- ✅ Seção "Usuários" mostra: "5 usuários (requer permissão para visualizar)"
+- ✅ Ou apenas contador, sem nomes
+
+---
+
+#### CT-019: Rate Limiting
+**Ação**: 100 requisições GET em 1 minuto
+
+**Resultado Esperado**:
+- ✅ Após 50 requests: Status **429 Too Many Requests**
+- ✅ Header: `Retry-After: 60`
+
+---
+
+#### CT-020: Auditoria - Visualização Não é Logada
+**Resultado Esperado**:
+- ✅ Listagem NÃO cria log de auditoria (evitar spam)
+- ✅ Visualização de detalhes PODE criar log (opcional)
+
+---
+
+### Categoria 3: Performance (5 cenários)
+
+#### CT-021: Performance - Listar 50 Perfis
+**Ação**: `GET /api/roles` (sistema com 50 perfis)
+
+**Resultado Esperado**:
+- ✅ Response time < 500ms
+- ✅ Eager loading: `.Include(r => r.RolePermissions).Include(r => r.Usuarios)`
+
+---
+
+#### CT-022: Performance - Detalhes com 23 Permissões
+**Ação**: `GET /api/roles/{super-admin-id}`
+
+**Resultado Esperado**:
+- ✅ Response time < 1 segundo
+- ✅ Join eficiente: `RolePermissions JOIN Permissions`
+
+---
+
+#### CT-023: Performance - Contar Usuários
+**Validação**: Query otimizada
+
+**Query Ideal**:
+```sql
+SELECT r.*, COUNT(ur.UsuarioId) AS QuantidadeUsuarios
+FROM Roles r
+LEFT JOIN UsuarioRoles ur ON r.Id = ur.RoleId
+GROUP BY r.Id
+```
+
+**Resultado Esperado**:
+- ✅ Não faz N+1 queries
+- ✅ Agregação no banco (não na aplicação)
+
+---
+
+#### CT-024: Cache - Requisições Repetidas
+**Ação**: Fazer 10 requests idênticos seguidos
+
+**Resultado Esperado**:
+- ✅ Primeira requisição: 500ms
+- ✅ Demais requisições: < 50ms (cache)
+- ✅ Header: `X-Cache: HIT`
+- ✅ TTL: 5 minutos
+
+---
+
+#### CT-025: Database Indexes
+**Validação**: Verificar query plan
+
+**Resultado Esperado**:
+- ✅ Índice em `Roles.Nome` (busca)
+- ✅ Índice em `Roles.Hierarquia` (filtro)
+- ✅ Índice em `Roles.EmpresaId` (filtro de escopo)
+
+---
+
+### Categoria 4: UX e Frontend (10 cenários)
+
+#### CT-026: Loading State - Skeleton Loader
+**Ação**: Acessar página com conexão lenta
+
+**Resultado Esperado**:
+- ✅ Skeleton cards aparecem imediatamente
+- ✅ 10 placeholders de loading
+- ✅ Desaparecem quando dados carregam
+
+---
+
+#### CT-027: Empty State - Nenhum Perfil
+**Cenário**: Empresa nova sem perfis customizados
+
+**Resultado Esperado**:
+- ✅ Ilustração: "Nenhum perfil encontrado"
+- ✅ Mensagem: "Crie perfis personalizados para organizar permissões"
+- ✅ Botão: "➕ Criar Primeiro Perfil" (se autorizado)
+
+---
+
+#### CT-028: Error State - Falha ao Carregar
+**Ação**: Desconectar backend
+
+**Resultado Esperado**:
+- ✅ Mensagem: "Erro ao carregar perfis"
+- ✅ Botão "Tentar novamente"
+- ✅ Não mostra stack trace
+
+---
+
+#### CT-029: Badges de Hierarquia Coloridos
+**Resultado Esperado**:
+- ✅ h=1: Badge vermelho "Super Admin"
+- ✅ h=2: Badge laranja "Admin"
+- ✅ h=3: Badge azul "Gerente"
+- ✅ h=4: Badge verde "Coordenador"
+- ✅ h>=5: Badge cinza "Usuário"
+
+---
+
+#### CT-030: Ícones de Permissões
+**Resultado Esperado**:
+- ✅ `users:*` → 👤 ícone de pessoa
+- ✅ `documents:*` → 📄 ícone de documento
+- ✅ `audit:*` → 🔍 ícone de lupa
+- ✅ `companies:*` → 🏢 ícone de prédio
+
+---
+
+#### CT-031: Tooltip com Descrição
+**Ação**: Hover sobre nome da permissão
+
+**Resultado Esperado**:
+- ✅ Tooltip: "Criar templates - Permite criar novos templates de documentos"
+- ✅ Delay de 500ms
+
+---
+
+#### CT-032: Expansão de Permissões
+**Resultado Esperado**:
+- ✅ Card mostra: "8 permissões"
+- ✅ Clique expande lista completa
+- ✅ Ícone: ▼ (expandido) / ▶ (colapsado)
+
+---
+
+#### CT-033: Lista de Usuários Limitada
+**Cenário**: Perfil com 50 usuários
+
+**Resultado Esperado**:
+- ✅ Card mostra: "50 usuários (ver todos)"
+- ✅ Detalhes mostram primeiros 10
+- ✅ Botão: "Ver todos os 50 usuários"
+
+---
+
+#### CT-034: Busca com Debounce
+**Ação**: Digitar "gerente" no campo de busca
+
+**Resultado Esperado**:
+- ✅ Requisição só após 500ms sem digitação
+- ✅ Não faz 7 requisições (uma por letra)
+- ✅ Indicador: "Buscando..."
+
+---
+
+#### CT-035: Acessibilidade - Navegação por Teclado
+**Ação**: Usar Tab, Enter, Arrows
+
+**Resultado Esperado**:
+- ✅ Possível navegar por todos os cards
+- ✅ Enter abre detalhes
+- ✅ Focus visível
+
+---
+
+### Categoria 5: Integração (5 cenários)
+
+#### CT-036: Perfil com Zero Usuários
+**Cenário**: Perfil recém-criado, ainda não atribuído
+
+**Resultado Esperado**:
+- ✅ `quantidadeUsuarios: 0`
+- ✅ Mensagem: "Nenhum usuário com este perfil"
+- ✅ Link: "Atribuir a usuários"
+
+---
+
+#### CT-037: Perfil Global - Badge Especial
+**Resultado Esperado**:
+- ✅ Badge: "🌍 Global"
+- ✅ Tooltip: "Disponível em todas as empresas"
+- ✅ Cor diferenciada (azul claro)
+
+---
+
+#### CT-038: Permissões Herdadas (Não Aplicável)
+**Observação**: Sistema não tem herança de perfis (flat structure)
+
+**Resultado Esperado**:
+- ✅ Cada perfil tem permissões explícitas
+- ✅ Sem herança de "perfil pai"
+
+---
+
+#### CT-039: Sincronização com Usuários
+**Cenário**: Admin edita perfil enquanto Admin B está vendo lista
+
+**Resultado Esperado**:
+- ✅ Lista de Admin B não atualiza automaticamente (sem WebSocket)
+- ✅ Botão "Atualizar" disponível
+- ✅ Cache expira em 5 minutos
+
+---
+
+#### CT-040: Exportar Lista de Perfis (CSV)
+**Ação**: `GET /api/roles/export`
+
+**Resultado Esperado**:
+- ✅ Arquivo CSV:
+  ```csv
+  Nome,Hierarquia,Empresa,Permissões,Usuários
+  Super Administrador,1,Global,23,2
+  Gerente de Documentos,3,Acme Corp,8,5
+  ```
+- ✅ Encoding UTF-8 com BOM
+
+---
+
+## 🔒 Matriz de Permissões
+
+| Perfil | Listar Perfis | Ver Detalhes | Ver Usuários | Ver Todas Empresas |
+|--------|--------------|--------------|--------------|-------------------|
+| **Super Admin** | ✅ Todos | ✅ Todos | ✅ | ✅ |
+| **Admin** | ✅ Empresa + Globais | ✅ Empresa + Globais | ✅ | ❌ |
+| **Gerente** | ✅ (se tem permissão) | ✅ | ⚠️ Requer `users:user:read` | ❌ |
+| **Usuário** | ❌ | ❌ Apenas próprios | ❌ | ❌ |
+
+---
+
+## 📈 Critérios de Aceitação
+
+### Backend
+- [ ] Endpoint `GET /api/roles` com filtros e ordenação
+- [ ] Endpoint `GET /api/roles/{id}` com detalhes completos
+- [ ] Filtro automático por escopo (empresa/global)
+- [ ] Eager loading de permissões e usuários
+- [ ] Contadores calculados (quantidadePermissoes, quantidadeUsuarios)
+- [ ] Response time < 1s para 100 perfis
+- [ ] Cache de 5 minutos
+
+### Frontend
+- [ ] Página de listagem com cards/tabela
+- [ ] Filtros: nome, hierarquia, empresa
+- [ ] Ordenação por nome, hierarquia
+- [ ] Busca com debounce (500ms)
+- [ ] Skeleton loader durante carregamento
+- [ ] Empty state quando sem resultados
+- [ ] Error state com retry
+- [ ] Página de detalhes com todas as permissões
+- [ ] Lista de usuários do perfil
+- [ ] Badges coloridos por hierarquia
+- [ ] Acessível (WCAG 2.1 AA)
+
+---
+
+## 🧩 Dependências
+
+### Backend
+- `RolesController.GetAll()` ✅ Implementado
+- `RolesController.GetById(id)` ✅ Implementado
+- `AuthorizationService` ✅ Implementado
+
+### Frontend
+- `RolesListComponent` ✅ Implementado ([roles.component.ts](../../../frontend/icontrolit-app/src/app/modules/admin/management/roles/roles.component.ts))
+- `RolesService` ✅ Implementado ([roles.service.ts](../../../frontend/icontrolit-app/src/app/modules/admin/management/roles/roles.service.ts))
+- `RolesDetailsComponent` ✅ Implementado
+- `PermissionService` ✅ Implementado
+
+---
+
+## 📝 Notas de Implementação
+
+### Query Otimizada
+```csharp
+public async Task<List<RoleDto>> GetAll(string? empresaId)
+{
+    var query = _context.Roles
+        .Include(r => r.RolePermissions)
+            .ThenInclude(rp => rp.Permission)
+        .Include(r => r.UsuarioRoles)
+        .AsQueryable();
+
+    // Filtro de escopo
+    if (empresaId != null)
+    {
+        query = query.Where(r => r.EmpresaId == empresaId || r.EmpresaId == null);
+    }
+
+    var roles = await query.ToListAsync();
+
+    return roles.Select(r => new RoleDto
+    {
+        Id = r.Id,
+        Nome = r.Nome,
+        Hierarquia = r.Hierarquia,
+        QuantidadePermissoes = r.RolePermissions.Count,
+        QuantidadeUsuarios = r.UsuarioRoles.Count
+    }).ToList();
+}
+```
+
+### Cache Strategy
+```csharp
+var cacheKey = $"roles:empresa:{empresaId}";
+var cached = await _cache.GetAsync<List<RoleDto>>(cacheKey);
+
+if (cached != null) return cached;
+
+var roles = await GetRolesFromDatabase(empresaId);
+await _cache.SetAsync(cacheKey, roles, TimeSpan.FromMinutes(5));
+
+return roles;
+```
+
+---
+
+## ✅ Checklist de Completude
+
+- [x] Todos os fluxos documentados (7 alternativos, 5 exceção)
+- [x] 40 cenários de teste criados
+- [x] Validação de escopo (empresa/global)
+- [x] Performance otimizada (eager loading)
+- [x] Cache strategy definida
+- [x] UX completa (loading, empty, error states)
+- [x] Acessibilidade considerada
+- [x] Matriz de permissões
+
+---
+
+**Status Final**: ✅ **UC06 100% ESPECIFICADO**
+
+**Complexidade**: 🟢 Baixa (operação de leitura)
+
+**Próximos Passos**:
+1. Executar todos os 40 cenários de teste
+2. Validar performance com 1000 perfis
+3. Testar filtros e ordenação
+4. Validar cache (hit rate > 80%)
+5. Teste de acessibilidade
+
+**Última Atualização**: 2025-10-20
+**Revisado por**: Anderson Chipak + Claude Code
+
+---
+
+# UC03: Editar Perfil (Role) - Especificação Completa
+
+**Data Criação**: 2025-10-20
+**Última Atualização**: 2025-10-26
+**Autor**: Anderson Chipak + Claude Code
+**Status**: ✅ Implementado e Corrigido (Backend + Frontend)
+
+---
+
+## 📢 Atualização 2025-10-26 - Correções Críticas Implementadas
+
+### ✅ Correções Aplicadas
+
+**A. HierarchyLevel Agora Editável via API**
+- ✅ Campo `hierarchyLevel` adicionado ao `UpdateRoleCommand`
+- ✅ Frontend atualizado: `UpdateRoleRequest` inclui `hierarchyLevel`
+- ✅ Usuários agora podem alterar o nível de hierarquia de perfis existentes
+- **Arquivos modificados:**
+  - [UpdateRole.cs](D:\IC2\backend\IControlIT.API\src\Application\RoleManagement\Commands\UpdateRole\UpdateRole.cs)
+  - [roles.types.ts](D:\IC2\frontend\icontrolit-app\src\app\modules\admin\management\roles\roles.types.ts)
+
+**B. Validação de Hierarquia na Edição**
+- ✅ `UpdateRoleCommandHandler` valida se usuário pode atribuir o nível solicitado
+- ✅ Regra: `currentUserLevel >= request.HierarchyLevel` resulta em `UnauthorizedAccessException`
+- ✅ Mensagem de erro clara: "Você não tem permissão para atribuir nível de hierarquia {X}"
+- ✅ Previne que Admin (nível 1) edite perfil para Super Admin (nível 0)
+- **Impacto:** Impossível escalar privilégios ao editar perfis
+
+**C. Validator para Update Criado**
+- ✅ `UpdateRoleCommandValidator.cs` criado com validações:
+  - ID obrigatório
+  - Nome obrigatório, máx 100 caracteres
+  - Descrição máx 500 caracteres
+  - HierarchyLevel entre 0-10
+- **Arquivo criado:**
+  - [UpdateRoleCommandValidator.cs](D:\IC2\backend\IControlIT.API\src\Application\RoleManagement\Commands\UpdateRole\UpdateRoleCommandValidator.cs)
+
+### 📊 Impacto nas Regras de Negócio
+
+**Antes da Correção:**
+- ❌ HierarchyLevel não podia ser alterado via API
+- ❌ Perfis criados com nível errado ficavam "travados"
+- ❌ Não havia validação de hierarquia na edição
+
+**Depois da Correção:**
+- ✅ HierarchyLevel completamente editável (com validação)
+- ✅ Validação de hierarquia robusta na edição
+- ✅ Sistema de níveis totalmente funcional
+- ✅ Impossível escalar privilégios indevidamente ao editar
+
+---
+
+## 📋 Sumário Executivo
+
+| Aspecto | Detalhes |
+|---------|----------|
+| **Objetivo** | Permitir modificação de perfis/roles existentes e suas permissões |
+| **Atores** | Super Admin, Admin (com permissão `users:role:update`) |
+| **Pré-condições** | Usuário autenticado, perfil existe, permissão adequada |
+| **Pós-condições** | Perfil atualizado, permissões recalculadas para usuários, auditoria registrada |
+| **Cenários de Teste** | **90 cenários** (validação, permissões, impacto em usuários, concorrência) |
+| **Prioridade** | 🔴 Crítica (impacta múltiplos usuários simultaneamente) |
+
+---
+
+## 🎯 Descrição do Caso de Uso
+
+### Objetivo
+Permitir que administradores modifiquem perfis existentes, incluindo:
+1. **Nome e descrição**: Renomear perfil
+2. **Hierarquia**: Ajustar nível (com restrições)
+3. **Permissões**: Adicionar, remover ou modificar permissões
+4. **Escopo**: Alterar de específico para global (Super Admin only)
+
+### ⚠️ Impactos Críticos
+Editar um perfil afeta **TODOS** os usuários que possuem esse perfil:
+- Adicionar permissão → Todos ganham acesso imediatamente
+- Remover permissão → Todos perdem acesso imediatamente
+- Mudar hierarquia → Pode afetar validações de autorização
+
+### Atores Principais
+- **Super Administrador**: Pode editar qualquer perfil (inclusive hierarquia)
+- **Administrador**: Pode editar perfis da empresa (hierarquia >= sua própria)
+
+### Permissões Necessárias
+- **Editar perfil**: `users:role:update`
+- **Ver permissões**: `users:role:read` (para listar disponíveis)
+
+---
+
+## 📊 Fluxos
+
+### Fluxo Principal - Editar Perfil Completo
+
+**FP-01: Modificar Nome, Descrição e Permissões**
+
+1. Admin acessa `/management/roles/{id}`
+2. Sistema valida permissão `users:role:update`
+3. Sistema valida que perfil está no escopo do usuário
+4. Sistema valida hierarquia (editor >= perfil)
+5. Sistema carrega dados atuais do perfil
+6. Admin clica em botão "✏️ Editar"
+7. Sistema exibe formulário editável (campos pré-preenchidos):
+   ```
+   Editar Perfil: Gerente de Documentos
+
+   * Nome: [Gerente de Documentos_______]
+
+   * Hierarquia: [▼ 3 - Gerente]
+     ⚠️ 5 usuários serão afetados
+
+   Descrição:
+   [Responsável por gerenciar templates...]
+
+   Escopo:
+   (•) Empresa: Acme Corp
+   ( ) Global (apenas Super Admin)
+
+   Permissões (8 selecionadas):
+   ☑ Gestão de Documentos
+     ☑ documents:template:create
+     ☑ documents:template:read
+     ☑ documents:template:update
+     ☑ documents:template:publish
+     ☐ documents:template:delete   [ADICIONAR]
+     ☑ documents:document:generate
+     ☑ documents:document:read
+     ☑ documents:document:download
+     ☐ documents:document:delete   [ADICIONAR]
+
+   [23 permissões disponíveis]
+
+   ⚠️ Alterações afetarão 5 usuários imediatamente:
+   • João Silva
+   • Maria Santos
+   • Pedro Oliveira
+   • Ana Costa
+   • Carlos Ferreira
+
+   [Cancelar]  [Salvar Alterações]
+   ```
+8. Admin modifica:
+   - Nome: "Gerente de Documentos e Templates"
+   - Adiciona 2 permissões: `documents:template:delete`, `documents:document:delete`
+   - Descrição atualizada
+9. Admin clica em "Salvar Alterações"
+10. Sistema exibe confirmação (se mudanças impactantes):
+    ```
+    ⚠️ Confirmar Alterações
+
+    Você está prestes a:
+    ✓ Adicionar 2 permissões (template:delete, document:delete)
+
+    Isso afetará 5 usuários imediatamente.
+
+    [Cancelar]  [Confirmar e Salvar]
+    ```
+11. Admin confirma
+12. Sistema valida:
+    - Nome único (se alterado)
+    - Hierarquia válida
+    - Pelo menos 1 permissão selecionada
+    - Editor tem hierarquia >= perfil
+13. Sistema executa `PUT /api/roles/{id}`
+14. Backend:
+    - Atualiza registro em `Roles`
+    - Calcula diff de permissões (adicionadas/removidas)
+    - Remove permissões antigas: `DELETE FROM RolePermissions WHERE RoleId = ?`
+    - Insere permissões novas: `INSERT INTO RolePermissions...`
+    - **Invalida cache de permissões** de todos os usuários com esse perfil
+    - **Invalida tokens JWT** (força recálculo de permissões)
+    - Registra no audit log (before/after)
+    - Envia notificações assíncronas aos usuários afetados
+15. Sistema retorna perfil atualizado
+16. Sistema exibe toast: "✅ Perfil atualizado. 5 usuários afetados."
+17. Sistema atualiza lista de perfis
+18. Sistema envia emails aos usuários (opcional):
+    ```
+    Assunto: Suas permissões foram atualizadas
+
+    Olá João Silva,
+
+    O perfil "Gerente de Documentos" foi atualizado.
+
+    Novas permissões adicionadas:
+    • Excluir templates
+    • Excluir documentos
+
+    Estas alterações já estão ativas.
+
+    Equipe IControlIT
+    ```
+
+**Resultado Esperado**:
+- ✅ Perfil atualizado no banco
+- ✅ Permissões recalculadas para 5 usuários
+- ✅ Tokens JWT invalidados
+- ✅ Cache limpo
+- ✅ Audit log com diff completo
+- ✅ Notificações enviadas
+
+---
+
+### Fluxo Alternativo 1 - Editar Apenas Nome
+
+**FA-01: Renomear Perfil**
+
+1. Admin edita apenas campo "Nome"
+2. Sistema valida unicidade
+3. Sistema atualiza apenas nome
+4. Permissões não são recalculadas (não mudaram)
+5. Tokens JWT não são invalidados
+
+**Performance**: Mais rápido (sem recálculo de permissões)
+
+---
+
+### Fluxo Alternativo 2 - Adicionar Permissões
+
+**FA-02: Expandir Acesso**
+
+1. Admin adiciona 3 permissões ao perfil
+2. Sistema insere novos registros em `RolePermissions`
+3. Todos os usuários ganham acesso imediatamente
+4. Tokens invalidados (recalcular permissões)
+
+**Impacto**: Positivo (mais acesso)
+
+---
+
+### Fluxo Alternativo 3 - Remover Permissões
+
+**FA-03: Restringir Acesso**
+
+1. Admin remove permissão `users:user:delete`
+2. Sistema exibe aviso crítico:
+   ```
+   ⚠️⚠️ ATENÇÃO ⚠️⚠️
+
+   Remover "users:user:delete" fará com que 5 usuários
+   PERCAM a capacidade de excluir usuários.
+
+   Tem certeza?
+
+   [Cancelar]  [Sim, Remover Permissão]
+   ```
+3. Admin confirma
+4. Sistema remove permissão
+5. Usuários perdem acesso imediatamente
+6. Botão "Excluir" desaparece da UI para eles
+
+**Impacto**: Crítico (perda de acesso)
+
+---
+
+### Fluxo Alternativo 4 - Mudar Hierarquia
+
+**FA-04: Rebaixar ou Promover Perfil**
+
+1. Admin muda hierarquia de 3 para 4
+2. Sistema valida que editor tem h >= 4
+3. Sistema exibe aviso:
+   ```
+   Alterar hierarquia afetará validações de autorização.
+
+   Usuários com este perfil (h=4) não poderão mais
+   gerenciar usuários de h=5 que antes podiam.
+   ```
+4. Impactos recalculados
+5. Hierarquia atualizada
+
+**Restrição**: Não pode elevar perfil acima da própria hierarquia
+
+---
+
+### Fluxo Alternativo 5 - Converter para Global
+
+**FA-05: Tornar Perfil Multi-Empresa (Super Admin Only)**
+
+1. Super Admin edita perfil específico de Empresa A
+2. Muda escopo para "Global"
+3. Sistema seta `empresaId = NULL`
+4. Perfil agora disponível em todas as empresas
+5. Usuários da Empresa A mantêm o perfil
+6. Admins de outras empresas podem atribuir
+
+**Restrição**: Apenas Super Admin pode fazer isso
+
+---
+
+### Fluxo Alternativo 6 - Converter para Específico
+
+**FA-06: Tornar Perfil Global em Específico**
+
+1. Super Admin converte perfil global para Empresa A
+2. Sistema valida: Nenhum usuário de outras empresas tem esse perfil
+3. Sistema seta `empresaId = empresa-a-guid`
+4. Perfil agora específico da Empresa A
+
+**Validação Crítica**: Se usuários de outras empresas tiverem o perfil → Erro
+
+---
+
+### Fluxos de Exceção
+
+**FE-01: Nome Duplicado**
+- **Condição**: Novo nome já existe
+- **Ação**:
+  - Status: 400 Bad Request
+  - Erro: "Já existe um perfil com este nome"
+  - Campo fica vermelho
+
+---
+
+**FE-02: Permissão Negada - Hierarquia**
+- **Condição**: Admin (h=2) tenta editar Super Admin (h=1)
+- **Validação**: `editorHierarquia >= perfilHierarquia`
+- **Ação**:
+  - Status: 403 Forbidden
+  - Erro: "Você não pode editar perfis de hierarquia superior"
+  - Botão "Editar" não aparece no frontend
+
+---
+
+**FE-03: Remover Todas as Permissões**
+- **Condição**: Usuário desmarca todas as permissões
+- **Ação**:
+  - Status: 400 Bad Request
+  - Erro: "Perfil deve ter pelo menos 1 permissão"
+  - Checkbox de última permissão não pode ser desmarcado
+
+---
+
+**FE-04: Elevar Hierarquia Acima da Própria**
+- **Condição**: Admin (h=2) tenta mudar perfil para h=1
+- **Ação**:
+  - Status: 403 Forbidden
+  - Erro: "Você não pode elevar perfis acima da sua hierarquia"
+  - Dropdown mostra apenas h >= 2
+
+---
+
+**FE-05: Converter Global com Usuários de Múltiplas Empresas**
+- **Condição**: Perfil global tem usuários de 3 empresas, tentando tornar específico da Empresa A
+- **Validação**: `SELECT DISTINCT EmpresaId FROM Usuarios WHERE Perfis CONTAINS ?`
+- **Ação**:
+  - Status: 400 Bad Request
+  - Erro: "Perfil está sendo usado por 15 usuários de 3 empresas diferentes"
+  - Solução: "Remova o perfil desses usuários primeiro"
+
+---
+
+**FE-06: Editar Perfil de Outra Empresa**
+- **Condição**: Admin Empresa A tenta editar perfil da Empresa B
+- **Ação**:
+  - Status: 403 Forbidden ou 404 Not Found
+  - Mensagem: "Perfil não encontrado"
+
+---
+
+**FE-07: Concorrência - Edição Simultânea**
+- **Condição**: Admin A e Admin B editam mesmo perfil
+- **Detecção**: `rowVersion` ou `dataUltimaAtualizacao`
+- **Ação**:
+  - Status: 409 Conflict
+  - Erro: "Este perfil foi modificado por outro usuário"
+  - Opção: "Recarregar" ou "Sobrescrever"
+
+---
+
+**FE-08: Perfil com Usuários Ativos**
+- **Condição**: Tentar remover permissões críticas de perfil com 100 usuários
+- **Ação**: Confirmação extra:
+  ```
+  ⚠️⚠️ IMPACTO MASSIVO ⚠️⚠️
+
+  Esta alteração afetará 100 usuários!
+
+  Digite "CONFIRMAR" para prosseguir:
+  [____________]
+  ```
+
+---
+
+**FE-09: Perfil Sistema (Reservado)**
+- **Condição**: Tentar editar "Super Administrador" ou "Admin" (se reservados)
+- **Ação**:
+  - Status: 400 Bad Request
+  - Erro: "Perfis do sistema não podem ser editados"
+  - OU permitir (não há problema técnico)
+
+---
+
+**FE-10: Escopo Global - Admin Comum**
+- **Condição**: Admin (não Super) tenta tornar perfil global
+- **Ação**:
+  - Status: 403 Forbidden
+  - Erro: "Apenas Super Administradores podem criar perfis globais"
+  - Radio button desabilitado
+
+---
+
+## 🧪 Cenários de Teste (90 Total)
+
+### Categoria 1: Validação de Campos (20 cenários)
+
+#### CT-001: Editar Nome - Caminho Feliz
+**Pré-condições**: Admin logado, perfil "Gerente" existe
+
+**Ação**:
+```http
+PUT /api/roles/role-guid
+Authorization: Bearer {token}
+
+{
+  "nome": "Gerente de Operações",
+  "hierarquia": 3,
+  "descricao": "...",
+  "empresaId": "...",
+  "permissoes": [...]
+}
+```
+
+**Resultado Esperado**:
+- ✅ Status: **200 OK**
+- ✅ Banco: `UPDATE Roles SET Nome = 'Gerente de Operações', DataUltimaAtualizacao = NOW()`
+- ✅ Audit log:
+  ```json
+  {
+    "action": "UPDATE",
+    "changes": {
+      "nome": { "old": "Gerente", "new": "Gerente de Operações" }
+    }
+  }
+  ```
+
+---
+
+#### CT-002: Nome Duplicado
+**Ação**: Renomear para nome já existente
+
+**Resultado Esperado**:
+- ✅ Status: **400 Bad Request**
+- ✅ Erro: "Já existe um perfil com este nome"
+
+---
+
+#### CT-003: Nome Vazio
+**Ação**: `{ "nome": "" }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Nome é obrigatório"
+
+---
+
+#### CT-004: Editar Apenas Descrição
+**Ação**: Alterar apenas campo `descricao`
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Permissões não recalculadas (performance)
+- ✅ Tokens não invalidados
+
+---
+
+#### CT-005: Descrição Muito Longa
+**Ação**: `{ "descricao": "A" * 501 }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Descrição deve ter no máximo 500 caracteres"
+
+---
+
+#### CT-006: Adicionar 1 Permissão
+**Ação**: Perfil tinha 8 permissões, agora tem 9
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ `INSERT INTO RolePermissions` (1 registro)
+- ✅ Cache invalidado para usuários com esse perfil
+- ✅ Tokens JWT invalidados
+
+---
+
+#### CT-007: Remover 1 Permissão
+**Ação**: Perfil tinha 8, agora tem 7
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ `DELETE FROM RolePermissions WHERE RoleId = ? AND PermissionId = ?`
+- ✅ Usuários perdem acesso imediatamente
+
+---
+
+#### CT-008: Substituir Todas as Permissões
+**Ação**: Perfil tinha 8 permissões de documentos, agora tem 4 de usuários
+
+**Resultado Esperado**:
+- ✅ `DELETE FROM RolePermissions WHERE RoleId = ?`
+- ✅ `INSERT INTO RolePermissions` (4 novos)
+- ✅ Impacto crítico: Usuários perdem acesso a documentos, ganham acesso a usuários
+
+---
+
+#### CT-009: Remover Todas as Permissões (NEGADO)
+**Ação**: `{ "permissoes": [] }`
+
+**Resultado Esperado**:
+- ✅ Status: **400 Bad Request**
+- ✅ Erro: "Perfil deve ter pelo menos 1 permissão"
+
+---
+
+#### CT-010: Permissões Idênticas (Sem Mudança)
+**Ação**: Enviar mesmas permissões que já existem
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Nenhum `DELETE` ou `INSERT` em `RolePermissions`
+- ✅ Performance otimizada
+
+---
+
+#### CT-011: Hierarquia - Manter
+**Ação**: `{ "hierarquia": 3 }` (já é 3)
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Sem mudanças na hierarquia
+
+---
+
+#### CT-012: Hierarquia - Rebaixar
+**Ação**: h=3 → h=4
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Validações de autorização afetadas
+- ✅ Usuários com este perfil perdem capacidade de gerenciar h=5
+
+---
+
+#### CT-013: Hierarquia - Promover
+**Ação**: h=4 → h=3 (Admin h=2 faz isso)
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Permitido (editor h=2 >= nova h=3)
+
+---
+
+#### CT-014: Hierarquia - Elevar Acima da Própria (NEGADO)
+**Ação**: Admin (h=2) tenta h=3 → h=1
+
+**Resultado Esperado**:
+- ✅ Status: **403 Forbidden**
+- ✅ Erro: "Você não pode elevar perfis acima da sua hierarquia"
+
+---
+
+#### CT-015: Hierarquia Fora do Range
+**Ação**: `{ "hierarquia": 0 }` ou `{ "hierarquia": 11 }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Hierarquia deve estar entre 1 e 10"
+
+---
+
+#### CT-016: Escopo - Manter Específico
+**Ação**: `{ "empresaId": "empresa-guid" }` (já é essa empresa)
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Sem mudanças
+
+---
+
+#### CT-017: Escopo - Tornar Global (Super Admin)
+**Ação**: Super Admin: `{ "empresaId": null }`
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Perfil agora disponível em todas as empresas
+
+---
+
+#### CT-018: Escopo - Tornar Global (Admin Comum) - NEGADO
+**Ação**: Admin comum: `{ "empresaId": null }`
+
+**Resultado Esperado**:
+- ✅ Status: **403 Forbidden**
+- ✅ Erro: "Apenas Super Administradores podem criar perfis globais"
+
+---
+
+#### CT-019: Escopo - Tornar Específico (com Usuários em Outras Empresas)
+**Ação**: Perfil global → específico, mas há usuários em 3 empresas
+
+**Validação**:
+```sql
+SELECT COUNT(DISTINCT u.EmpresaId) FROM Usuarios u
+JOIN UsuarioRoles ur ON u.Id = ur.UsuarioId
+WHERE ur.RoleId = ?
+-- Se > 1, erro
+```
+
+**Resultado Esperado**:
+- ✅ Status: **400 Bad Request**
+- ✅ Erro: "Perfil está sendo usado por usuários de 3 empresas"
+
+---
+
+#### CT-020: Escopo - Tornar Específico (sem Conflitos)
+**Ação**: Perfil global, mas apenas usuários da Empresa A o têm
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ `empresaId` atualizado
+- ✅ Perfil agora específico
+
+---
+
+### Categoria 2: Impacto em Usuários (20 cenários)
+
+#### CT-021: Editar Perfil com 1 Usuário
+**Resultado Esperado**:
+- ✅ 1 usuário afetado
+- ✅ Token invalidado
+- ✅ Cache limpo
+- ✅ Próximo request recalcula permissões
+
+---
+
+#### CT-022: Editar Perfil com 100 Usuários
+**Resultado Esperado**:
+- ✅ 100 usuários afetados
+- ✅ Confirmação extra no frontend: "Impacto massivo!"
+- ✅ Batch invalidation de tokens
+- ✅ Performance: < 5 segundos
+
+---
+
+#### CT-023: Adicionar Permissão - Usuário Ganha Acesso
+**Cenário**: Adicionar `users:user:delete` ao perfil
+
+**Resultado Esperado**:
+- ✅ Próximo request do usuário: novo token com permissão extra
+- ✅ Botão "Excluir" aparece na UI
+
+---
+
+#### CT-024: Remover Permissão - Usuário Perde Acesso
+**Cenário**: Remover `users:user:delete`
+
+**Resultado Esperado**:
+- ✅ Tokens invalidados imediatamente
+- ✅ Próximo request: 403 Forbidden ao tentar deletar
+- ✅ Botão "Excluir" desaparece
+
+---
+
+#### CT-025: Usuário Online Durante Edição
+**Cenário**: João está logado e usando sistema, Admin edita perfil dele
+
+**Resultado Esperado**:
+- ✅ Token de João invalidado
+- ✅ Próximo request de João: 401 Unauthorized (token inválido)
+- ✅ Frontend força re-login ou refresh token
+- ✅ João recebe novo token com permissões atualizadas
+
+---
+
+#### CT-026: Múltiplos Perfis - Usuário Mantém Permissão
+**Cenário**: João tem perfis "Gerente" e "Auditor". Admin remove permissão `audit:logs:read` de "Gerente"
+
+**Resultado Esperado**:
+- ✅ João ainda tem `audit:logs:read` (vem de "Auditor")
+- ✅ União de permissões mantida
+
+---
+
+#### CT-027: Múltiplos Perfis - Usuário Perde Permissão
+**Cenário**: João tem apenas "Gerente". Admin remove `audit:logs:read`
+
+**Resultado Esperado**:
+- ✅ João perde acesso completamente
+- ✅ Nenhum outro perfil fornece essa permissão
+
+---
+
+#### CT-028: Usuário com Perfil Exclusivo
+**Cenário**: João é o único com perfil "Gerente Especial"
+
+**Resultado Esperado**:
+- ✅ Aviso no frontend: "Apenas 1 usuário possui este perfil"
+- ✅ Alterações afetam apenas João
+
+---
+
+#### CT-029: Notificações por Email
+**Resultado Esperado** (Opcional):
+- ✅ Email assíncrono para cada usuário afetado
+- ✅ Enfileirado (RabbitMQ/Hangfire)
+- ✅ Não bloqueia response do PUT
+
+---
+
+#### CT-030: Perfil Sem Usuários
+**Cenário**: Perfil recém-criado, ainda não atribuído
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Nenhum usuário afetado
+- ✅ Sem invalidação de tokens
+
+---
+
+#### CT-031: Invalidação de Cache - Redis
+**Resultado Esperado**:
+```redis
+DEL cache:user:{userId1}:permissions
+DEL cache:user:{userId2}:permissions
+...
+DEL cache:role:{roleId}
+```
+- ✅ Cache limpo para todos os usuários com esse perfil
+- ✅ Próxima requisição busca do banco
+
+---
+
+#### CT-032: Invalidação de Tokens - Blacklist
+**Resultado Esperado**:
+```redis
+SADD blacklist:role:{roleId} {userId1} {userId2} ...
+EXPIRE blacklist:role:{roleId} 86400  # 24h
+```
+- ✅ Tokens de usuários com esse perfil adicionados ao blacklist
+- ✅ Middleware valida blacklist em cada request
+
+---
+
+#### CT-033: Webhook - Sistema Externo
+**Resultado Esperado** (Opcional):
+```http
+POST https://external-system.com/webhook
+{
+  "event": "role.updated",
+  "roleId": "...",
+  "affectedUsers": 5,
+  "changes": ["permissions"]
+}
+```
+
+---
+
+#### CT-034: Auditoria - Lista de Usuários Afetados
+**Resultado Esperado**:
+```json
+{
+  "action": "UPDATE",
+  "entityType": "Role",
+  "entityId": "role-guid",
+  "affectedUsers": [
+    "user-guid-1",
+    "user-guid-2",
+    ...
+  ],
+  "affectedUsersCount": 5
+}
+```
+
+---
+
+#### CT-035: Hierarquia - Impacto em Validações
+**Cenário**: Rebaixar perfil h=3 → h=4
+
+**Resultado Esperado**:
+- ✅ Usuários com esse perfil não podem mais gerenciar h=5
+- ✅ Validação: `editorHierarquia < targetHierarquia` falha
+
+---
+
+#### CT-036: Permissões Calculadas - Performance
+**Cenário**: Usuário com 3 perfis, 1 é editado
+
+**Resultado Esperado**:
+- ✅ Recálculo de permissões: União de 3 perfis
+- ✅ Query otimizada:
+  ```sql
+  SELECT DISTINCT p.* FROM Permissions p
+  JOIN RolePermissions rp ON p.Id = rp.PermissionId
+  JOIN UsuarioRoles ur ON rp.RoleId = ur.RoleId
+  WHERE ur.UsuarioId = ?
+  ```
+
+---
+
+#### CT-037: Reversão Manual (Desfazer)
+**Funcionalidade**: Admin percebe erro e quer reverter
+
+**Resultado Esperado**:
+- ✅ Botão "Desfazer" (10 segundos)
+- ✅ OU usar audit log para restaurar versão anterior
+- ✅ Endpoint: `POST /api/roles/{id}/restore/{auditId}`
+
+---
+
+#### CT-038: Comparação Before/After
+**Frontend**: Modal mostrando diff
+
+**Resultado Esperado**:
+```
+Permissões Adicionadas (2):
++ documents:template:delete
++ documents:document:delete
+
+Permissões Removidas (0):
+(nenhuma)
+
+Usuários Afetados: 5
+```
+
+---
+
+#### CT-039: Teste com Usuário Real
+**Cenário**: Admin edita perfil, depois testa com usuário afetado
+
+**Resultado Esperado**:
+- ✅ Login como João
+- ✅ Verificar permissões efetivas
+- ✅ Confirmar botões aparecem/desaparecem conforme esperado
+
+---
+
+#### CT-040: Performance - Invalidação em Lote
+**Cenário**: 100 usuários afetados
+
+**Resultado Esperado**:
+- ✅ Batch invalidation (não 100 operações individuais)
+- ✅ SQL: `DELETE FROM UserTokens WHERE UserId IN (...)`
+- ✅ Redis: `DEL` com pipeline
+- ✅ Performance: < 2 segundos
+
+---
+
+### Categoria 3: Segurança e Permissões (20 cenários)
+
+#### CT-041: Sem Permissão - Editar
+**Pré-condições**: Usuário SEM `users:role:update`
+
+**Ação**: `PUT /api/roles/{id}`
+
+**Resultado Esperado**:
+- ✅ Status: **403 Forbidden**
+- ✅ Botão "Editar" não aparece no frontend
+
+---
+
+#### CT-042: Hierarquia - Admin Edita Gerente
+**Cenário**: Admin (h=2) edita perfil Gerente (h=3)
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Permitido
+
+---
+
+#### CT-043: Hierarquia - Gerente Tenta Editar Admin
+**Cenário**: Gerente (h=3) tenta editar Admin (h=2)
+
+**Resultado Esperado**:
+- ✅ Status: **403 Forbidden**
+- ✅ Erro: "Você não pode editar perfis de hierarquia superior"
+
+---
+
+#### CT-044: IDOR - Editar Perfil de Outra Empresa
+**Cenário**: Admin Empresa A tenta editar perfil da Empresa B
+
+**Resultado Esperado**:
+- ✅ Status: **404 Not Found** (obscuridade)
+- ✅ Mensagem: "Perfil não encontrado"
+
+---
+
+#### CT-045: Token Expirado
+**Ação**: Request com JWT expirado
+
+**Resultado Esperado**:
+- ✅ Status: **401 Unauthorized**
+- ✅ Frontend redireciona para login
+
+---
+
+#### CT-046: SQL Injection no Nome
+**Ação**: `{ "nome": "'; DROP TABLE Roles; --" }`
+
+**Resultado Esperado**:
+- ✅ Query parametrizada
+- ✅ Nome armazenado literalmente
+- ✅ Banco intacto
+
+---
+
+#### CT-047: XSS no Nome
+**Ação**: `{ "nome": "<script>alert('XSS')</script>" }`
+
+**Resultado Esperado**:
+- ✅ Backend aceita
+- ✅ Frontend escapa HTML
+- ✅ Script NÃO executa
+
+---
+
+#### CT-048: Rate Limiting
+**Ação**: 50 PUT requests em 1 minuto
+
+**Resultado Esperado**:
+- ✅ Após 20 requests: Status **429 Too Many Requests**
+
+---
+
+#### CT-049: CSRF Protection
+**Ação**: Request sem token CSRF
+
+**Resultado Esperado**:
+- ✅ Status: 403 Forbidden
+
+---
+
+#### CT-050: Audit Log Completo
+**Resultado Esperado**:
+```json
+{
+  "action": "UPDATE",
+  "entityType": "Role",
+  "entityId": "role-guid",
+  "performedBy": "admin-guid",
+  "timestamp": "2025-10-20T15:30:00Z",
+  "changes": {
+    "nome": { "old": "Gerente", "new": "Gerente de Operações" },
+    "permissoes": {
+      "added": ["documents:template:delete"],
+      "removed": []
+    }
+  },
+  "affectedUsers": 5
+}
+```
+
+---
+
+#### CT-051: Super Admin Edita Super Admin
+**Cenário**: Super Admin A edita perfil "Super Administrador"
+
+**Resultado Esperado**:
+- ✅ Status: 200 OK
+- ✅ Permitido (mesma hierarquia)
+- ✅ ⚠️ Cuidado: Pode impactar a si mesmo!
+
+---
+
+#### CT-052: Editar Próprio Perfil (Indireto)
+**Cenário**: Admin tem perfil "Admin", edita esse perfil
+
+**Resultado Esperado**:
+- ✅ Permitido (sem restrição técnica)
+- ✅ Aviso: "Você possui este perfil e será afetado"
+- ✅ Próprio token invalidado
+
+---
+
+#### CT-053: Último Super Admin - Remover Permissões
+**Cenário**: Único perfil h=1, tentar remover todas as permissões
+
+**Resultado Esperado** (Opcional):
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Sistema deve ter pelo menos 1 Super Admin com permissões totais"
+
+---
+
+#### CT-054: Mass Assignment Vulnerability
+**Ação**:
+```json
+{
+  "nome": "Gerente",
+  "id": "custom-id",  // Tentando mudar ID
+  "dataCriacao": "2000-01-01"
+}
+```
+
+**Resultado Esperado**:
+- ✅ Backend ignora campos não-editáveis (whitelist)
+- ✅ `id` e `dataCriacao` não mudam
+
+---
+
+#### CT-055: Permissão Inexistente
+**Ação**: `{ "permissoes": ["invalid:permission"] }`
+
+**Resultado Esperado**:
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Permissão 'invalid:permission' não existe"
+
+---
+
+#### CT-056: Validar Permissões Antes de Salvar
+**Validação SQL**:
+```sql
+SELECT COUNT(*) FROM Permissions WHERE Id IN (...)
+-- Deve retornar count = permissoes.length
+```
+
+**Resultado Esperado**:
+- ✅ Se count diferente: Erro antes de salvar
+
+---
+
+#### CT-057: Perfil Sistema Protegido (Opcional)
+**Cenário**: Tentar editar perfil "Super Administrador" (se reservado)
+
+**Resultado Esperado** (Opcional):
+- ✅ Status: 400 Bad Request
+- ✅ Erro: "Perfis do sistema não podem ser editados"
+
+---
+
+#### CT-058: Histórico de Alterações
+**Ação**: Editar perfil pela 5ª vez
+
+**Resultado Esperado**:
+- ✅ 5 registros de auditoria
+- ✅ Diff de cada alteração preservado
+- ✅ Possível reverter para qualquer versão
+
+---
+
+#### CT-059: Comparar Versões
+**Funcionalidade**: Ver diferença entre versão atual e anterior
+
+**Resultado Esperado**:
+```
+Versão 5 (atual) vs Versão 4
+
+Alterações:
+• Nome: "Gerente" → "Gerente de Operações"
+• Permissões: +1 (documents:template:delete)
+• Usuários afetados: 5
+```
+
+---
+
+#### CT-060: Super Admin Bypass (Cuidado)
+**Cenário**: Super Admin edita qualquer perfil sem restrições
+
+**Resultado Esperado**:
+- ✅ Sem validação de hierarquia
+- ✅ Pode editar até h=1
+- ✅ Pode tornar global/específico livremente
+
+---
+
+### Categoria 4: Concorrência (15 cenários)
+
+#### CT-061: Edição Simultânea - Mesmo Campo
+**Cenário**: Admin A e Admin B editam nome do mesmo perfil
+
+**Implementação**: `rowVersion` ou `timestamp`
+
+**Resultado Esperado**:
+- ✅ Admin A: 200 OK
+- ✅ Admin B: **409 Conflict**
+  - Erro: "Perfil foi modificado por outro usuário"
+  - Opção: "Recarregar" ou "Sobrescrever"
+
+---
+
+#### CT-062: Edição Simultânea - Campos Diferentes
+**Cenário**: Admin A edita nome, Admin B edita descrição
+
+**Estratégia**: Merge automático (opcional) ou sempre conflict
+
+**Resultado Esperado**:
+- ✅ Merge: Ambas as alterações aplicadas
+- ✅ OU sempre conflict (mais seguro)
+
+---
+
+#### CT-063: Adicionar e Remover Permissões Simultaneamente
+**Cenário**: Admin A adiciona permissão X, Admin B remove permissão Y
+
+**Resultado Esperado**:
+- ✅ Conflict (não fazer merge automático de permissões)
+- ✅ Último a salvar sobrescreve tudo
+
+---
+
+#### CT-064: Atribuir Perfil Durante Edição
+**Cenário**: Admin A edita perfil, Admin B atribui a novo usuário
+
+**Resultado Esperado**:
+- ✅ Ambas operações permitidas
+- ✅ Novo usuário recebe permissões atualizadas (após edição)
+
+---
+
+#### CT-065: Deletar Perfil Durante Edição
+**Cenário**: Admin A edita perfil, Admin B deleta
+
+**Resultado Esperado**:
+- ✅ Se delete primeiro: PUT retorna 404
+- ✅ Se PUT primeiro: DELETE funciona (perfil editado é deletado)
+
+---
+
+#### CT-066: Múltiplos Admins Editando Perfis Diferentes
+**Cenário**: Admin A edita "Gerente", Admin B edita "Auditor"
+
+**Resultado Esperado**:
+- ✅ Sem conflito (perfis diferentes)
+- ✅ Ambas operações bem-sucedidas
+
+---
+
+#### CT-067: Transaction Rollback
+**Cenário**: Erro ao inserir permissões (constraint violation)
+
+**Resultado Esperado**:
+- ✅ Transaction rollback
+- ✅ Perfil NÃO é atualizado
+- ✅ Banco consistente
+
+---
+
+#### CT-068: Idempotência - Requisições Duplicadas
+**Cenário**: Usuário clica "Salvar" 2 vezes rápido
+
+**Resultado Esperado**:
+- ✅ Primeira: 200 OK
+- ✅ Segunda: 200 OK (mesma resposta) OU 409 Conflict
+- ✅ Banco atualizado apenas 1 vez
+- ✅ Usar `Idempotency-Key` header
+
+---
+
+#### CT-069: Lock Otimista - RowVersion
+**Implementação**:
+```csharp
+public class Role
+{
+    [Timestamp]
+    public byte[] RowVersion { get; set; }
+}
+
+// No update
+try {
+    context.SaveChanges();
+} catch (DbUpdateConcurrencyException) {
+    return Conflict("Perfil foi modificado por outro usuário");
+}
+```
+
+**Resultado Esperado**:
+- ✅ Detecta edições concorrentes
+- ✅ Retorna 409 Conflict
+
+---
+
+#### CT-070: Refresh Automático (Frontend)
+**Cenário**: Frontend detecta 409 Conflict
+
+**Resultado Esperado**:
+- ✅ Modal: "Perfil foi modificado por Admin XYZ"
+- ✅ Mostrar diff das alterações externas
+- ✅ Opções: "Descartar minhas alterações" ou "Sobrescrever"
+
+---
+
+#### CT-071: Queue de Invalidação
+**Cenário**: 3 admins editam 3 perfis ao mesmo tempo
+
+**Resultado Esperado**:
+- ✅ Invalidações enfileiradas (não bloqueiam responses)
+- ✅ Worker processa em background
+- ✅ Performance mantida
+
+---
+
+#### CT-072: Deadlock Prevention
+**Cenário**: Admin A: UPDATE Role, DELETE RolePermissions
+Admin B: UPDATE Role, DELETE RolePermissions
+
+**Resultado Esperado**:
+- ✅ Ordem consistente de operações
+- ✅ Lock em ordem: Roles → RolePermissions
+- ✅ Sem deadlocks
+
+---
+
+#### CT-073: Timeout em Transaction
+**Cenário**: Atualização demora > 30 segundos
+
+**Resultado Esperado**:
+- ✅ Transaction timeout
+- ✅ Rollback automático
+- ✅ Erro: "Operação demorou muito"
+
+---
+
+#### CT-074: Race Condition - Último Usuário com Perfil
+**Cenário**: Perfil tem 1 usuário. Admin A remove usuário, Admin B edita perfil
+
+**Resultado Esperado**:
+- ✅ Ambas operações permitidas
+- ✅ Sem constraint violation
+
+---
+
+#### CT-075: Concurrent Cache Invalidation
+**Cenário**: 2 admins editam perfis ao mesmo tempo
+
+**Resultado Esperado**:
+- ✅ Cache invalidations não conflitam
+- ✅ Redis operations são atômicas
+- ✅ Ambas invalidações aplicadas
+
+---
+
+### Categoria 5: Performance e UX (15 cenários)
+
+#### CT-076: Performance - Update Simples
+**Ação**: Apenas nome
+
+**Resultado Esperado**:
+- ✅ Response time < 500ms
+- ✅ Sem recálculo de permissões
+
+---
+
+#### CT-077: Performance - Update com Permissões
+**Ação**: Adicionar 5 permissões
+
+**Resultado Esperado**:
+- ✅ Response time < 2 segundos (inclui invalidação de 50 usuários)
+- ✅ Bulk operations
+
+---
+
+#### CT-078: Performance - 100 Usuários Afetados
+**Resultado Esperado**:
+- ✅ Response time < 5 segundos
+- ✅ Batch invalidation de tokens
+- ✅ Não bloqueia thread principal
+
+---
+
+#### CT-079: Loading State
+**Resultado Esperado**:
+- ✅ Botão "Salvar" → "Salvando..."
+- ✅ Spinner
+- ✅ Botão desabilitado
+
+---
+
+#### CT-080: Toast de Sucesso
+**Resultado Esperado**:
+- ✅ Toast verde: "Perfil atualizado. 5 usuários afetados."
+- ✅ Ação: "Ver usuários"
+- ✅ Auto-dismiss em 5 segundos
+
+---
+
+#### CT-081: Confirmação de Impacto
+**Cenário**: > 10 usuários afetados
+
+**Resultado Esperado**:
+- ✅ Modal extra de confirmação
+- ✅ Lista de usuários afetados
+- ✅ Checkbox: "Entendo que isso afetará 50 usuários"
+
+---
+
+#### CT-082: Preview de Alterações
+**Resultado Esperado**:
+- ✅ Botão "Preview" antes de salvar
+- ✅ Modal mostrando diff
+- ✅ "8 permissões atuais → 10 permissões novas"
+
+---
+
+#### CT-083: Validação em Tempo Real
+**Ação**: Digitar nome no campo
+
+**Resultado Esperado**:
+- ✅ Validação de unicidade com debounce (500ms)
+- ✅ ✗ "Nome já existe" (vermelho)
+- ✅ ✓ "Nome disponível" (verde)
+
+---
+
+#### CT-084: Contador de Permissões
+**Resultado Esperado**:
+- ✅ "8 de 23 permissões selecionadas"
+- ✅ Barra de progresso visual
+
+---
+
+#### CT-085: Acessibilidade - Formulário
+**Resultado Esperado**:
+- ✅ Navegação por teclado
+- ✅ Checkboxes acessíveis
+- ✅ Screen reader anuncia mudanças
+- ✅ Focus visível
+
+---
+
+#### CT-086: Mobile - Formulário Responsivo
+**Resultado Esperado**:
+- ✅ Permissões em lista vertical
+- ✅ Botões grandes (touch-friendly)
+- ✅ Modal de confirmação full-screen
+
+---
+
+#### CT-087: Dirty Form Warning
+**Cenário**: Admin preenche formulário e tenta sair
+
+**Resultado Esperado**:
+- ✅ Modal: "Deseja descartar alterações?"
+- ✅ [Cancelar] [Descartar]
+
+---
+
+#### CT-088: Undo/Desfazer (10 segundos)
+**Resultado Esperado**:
+- ✅ Toast com botão "Desfazer"
+- ✅ Se clicar: Restaura versão anterior
+- ✅ Se não clicar em 10s: Alteração confirmada
+
+---
+
+#### CT-089: Database Indexes
+**Validação**: Query plan
+
+**Resultado Esperado**:
+- ✅ Índice em `Roles.Nome` (unicidade)
+- ✅ Índice em `RolePermissions(RoleId, PermissionId)`
+- ✅ UPDATE usa índice de primary key
+
+---
+
+#### CT-090: Memory Leak Test
+**Teste**: Executar 1000 updates
+
+**Resultado Esperado**:
+- ✅ Memória estabiliza
+- ✅ GC libera objetos
+- ✅ Heap size constante
+
+---
+
+## 🔒 Matriz de Permissões
+
+| Perfil | Editar Próprio Perfil | Editar Subordinados | Editar Mesma Hierarquia | Editar Qualquer |
+|--------|--------------------|---------------------|------------------------|----------------|
+| **Super Admin** | ⚠️ Sim (cuidado) | ✅ | ✅ | ✅ |
+| **Admin** | ⚠️ Sim (cuidado) | ✅ h >= 2 | ✅ | ❌ |
+| **Gerente** | ❌ | ✅ h >= 3 | ❌ | ❌ |
+
+---
+
+## 📈 Critérios de Aceitação
+
+### Backend
+- [ ] Endpoint `PUT /api/roles/{id}` com validação completa
+- [ ] Validação de hierarquia (não pode editar superior)
+- [ ] Validação de unicidade de nome (se alterado)
+- [ ] Recálculo de permissões para usuários afetados
+- [ ] Invalidação de tokens JWT (todos os usuários com esse perfil)
+- [ ] Invalidação de cache (Redis)
+- [ ] Optimistic locking (rowVersion)
+- [ ] Audit log com diff completo (before/after)
+- [ ] Transaction atômica
+- [ ] Response time < 2s (mesmo com 100 usuários afetados)
+
+### Frontend
+- [ ] Formulário com validação em tempo real
+- [ ] Preview de alterações (diff)
+- [ ] Confirmação de impacto (se > 10 usuários)
+- [ ] Lista de usuários afetados
+- [ ] Validação de unicidade de nome (debounce 500ms)
+- [ ] Loading state durante save
+- [ ] Toast de sucesso com contador de usuários afetados
+- [ ] Tratamento de 409 Conflict (refresh automático)
+- [ ] Dirty form warning
+- [ ] Acessibilidade (WCAG 2.1 AA)
+
+---
+
+## 🧩 Dependências
+
+### Backend
+- `RolesController.Update(id, request)` ✅ Implementado
+- `AuthorizationService.ValidateHierarchy()` ✅ Implementado
+- `PermissionCalculator.RecalculateForUsers()` ⚠️ Verificar
+- `TokenRevocationService.InvalidateByRole()` ⚠️ Implementar
+- `CacheService.InvalidateByRole()` ⚠️ Implementar
+- `AuditLogService.LogUpdate()` ✅ Implementado
+
+### Frontend
+- `RolesDetailsComponent` ✅ Implementado
+- `RolesService.updateRole()` ✅ Implementado
+- `ConfirmationDialogComponent` ✅ Implementado
+- `DiffViewerComponent` ⚠️ Criar
+
+---
+
+## 📝 Notas de Implementação
+
+### Optimistic Locking
+```csharp
+[Timestamp]
+public byte[] RowVersion { get; set; }
+
+try {
+    await _context.SaveChangesAsync();
+} catch (DbUpdateConcurrencyException) {
+    return Conflict(new {
+        error = "Perfil foi modificado por outro usuário",
+        currentData = await GetCurrentRole(id)
+    });
+}
+```
+
+### Invalidação de Tokens por Perfil
+```csharp
+public async Task InvalidateTokensByRole(Guid roleId)
+{
+    var userIds = await _context.UsuarioRoles
+        .Where(ur => ur.RoleId == roleId)
+        .Select(ur => ur.UsuarioId)
+        .ToListAsync();
+
+    foreach (var userId in userIds)
+    {
+        await _redis.SetAsync($"blacklist:user:{userId}", "revoked", TimeSpan.FromDays(1));
+    }
+}
+```
+
+### Diff de Permissões
+```csharp
+var permissoesAntigas = await GetCurrentPermissions(roleId);
+var permissoesNovas = request.Permissoes;
+
+var adicionadas = permissoesNovas.Except(permissoesAntigas).ToList();
+var removidas = permissoesAntigas.Except(permissoesNovas).ToList();
+
+// Audit log
+await _auditLog.LogUpdate(roleId, new {
+    permissoes = new {
+        added = adicionadas,
+        removed = removidas
+    }
+});
+```
+
+---
+
+## ✅ Checklist de Completude
+
+- [x] Todos os fluxos documentados (6 alternativos, 10 exceção)
+- [x] 90 cenários de teste criados
+- [x] Validação de hierarquia
+- [x] Impacto em usuários (20 cenários)
+- [x] Concorrência e optimistic locking (15 cenários)
+- [x] Performance e UX (15 cenários)
+- [x] Segurança completa (20 cenários)
+- [x] Matriz de permissões
+- [x] Critérios de aceitação
+
+---
+
+**Status Final**: ✅ **UC07 100% ESPECIFICADO**
+
+**Complexidade**: 🔴 Crítica (impacta múltiplos usuários, concorrência, invalidação massiva)
+
+**Próximos Passos**:
+1. Implementar optimistic locking
+2. Implementar invalidação de tokens por perfil
+3. Criar componente de diff/preview
+4. Testes de concorrência (2 admins editando)
+5. Teste de impacto (editar perfil com 100 usuários)
+6. Executar todos os 90 cenários de teste
+
+**Última Atualização**: 2025-10-20
+**Revisado por**: Anderson Chipak + Claude Code
+
+---
+
+# UC04 - Excluir Perfil de Acesso
+## 📋 Objetivo
+Permitir que administradores removam perfis (incluindo Perfis de Sistema) através de soft delete, validando que o perfil não possui usuários ativos vinculados.
+
+## 👤 Atores
+- Ator Principal: Administrador com permissão perfis:perfil:delete
+- Atores Secundários: Sistema de Auditoria, Sistema de Cache
+
+## 🎯 Pré-condições
+- ☒ Usuário autenticado no sistema
+- ☒ Usuário possui permissão perfis:perfil:delete (Developer, Super Administrador ou Administrador)
+- ☒ Perfil existe no sistema
+- ☒ Perfil não possui usuários ativos vinculados (única restrição, aplica-se também a Perfis de Sistema)
+
+## ▶️ Fluxo Principal
+- Usuário acessa detalhes do perfil e clica em "Excluir"
+- Sistema valida que não há usuários vinculados (ativos ou inativos):
+  - Query: SELECT COUNT(*) FROM UsuarioRole WHERE RoleId = @id
+  - **Nota**: Esta é a ÚNICA validação. Perfis de Sistema PODEM ser excluídos se não tiverem usuários.
+- Sistema exibe modal de confirmação:
+  - "Tem certeza que deseja excluir este perfil?"
+  - Se for Perfil de Sistema (IsSystemRole = true): "ATENÇÃO: Este é um Perfil de Sistema!"
+  - "Ação não pode ser desfeita (soft delete)."
+  - Botões: "Cancelar" | "Confirmar Exclusão"
+- Usuário clica "Confirmar Exclusão"
+- Sistema marca perfil como deletado:
+  - Atualiza Deletado = true (soft delete)
+  - Atualiza DataDelecao = GETDATE()
+- Sistema invalida cache Redis
+- Sistema registra auditoria (inclui informação se era Perfil de Sistema)
+- Resultado: Perfil excluído com sucesso
+
+## 🔀 Fluxos Alternativos
+### FA01 - Cancelar Exclusão
+Usuário clica “Cancelar” no modal de confirmação e retorna aos detalhes do perfil.
+### FA02 - Forçar Remoção de Usuários Primeiro
+Se houver usuários ativos, sistema exibe opção: “Remover {n} usuários deste perfil antes?”
+
+## ⚠️ Fluxos de Exceção
+### FE01 - Usuários Vinculados (ÚNICA RESTRIÇÃO)
+- **Condição**: Sistema detecta COUNT > 0 (usuários ativos ou inativos vinculados)
+- **Ação**: Erro 400 Bad Request
+- **Mensagem**: "Não é possível excluir este perfil pois existem {n} usuário(s) vinculado(s) a ele. Remova os usuários deste perfil antes de excluí-lo."
+- **Nota**: Esta regra se aplica TAMBÉM a Perfis de Sistema. É a ÚNICA validação que impede exclusão.
+
+### FE02 - Perfis Filhos Existem
+Se houver perfis filhos, sistema exibe aviso mas permite exclusão (filhos se tornam órfãos).
+
+### FE03 - Sem Permissão
+Sistema retorna erro 403 Forbidden se usuário não tem perfis:perfil:delete.
+
+## ✅ Pós-condições
+- ✅ Perfil marcado como deletado (soft delete)
+- ✅ Data de exclusão registrada
+- ✅ Auditoria completa registrada
+- ✅ Perfil ocultado das listagens (exceto modo admin)
+- ✅ Cache Redis invalidado
+
+## 📐 Regras de Negócio
+
+## 🧪 Cenários de Teste
+- CEN401 - Excluir perfil sem usuários (sucesso)
+- CEN402 - Tentar excluir perfil com usuários vinculados (HTTP 400)
+- CEN403 - **NOVO**: Excluir Perfil de Sistema sem usuários (sucesso - validar modal com aviso)
+- CEN404 - **NOVO**: Tentar excluir Perfil de Sistema com usuários (HTTP 400 - mesma regra)
+- CEN405 - Cancelar exclusão no modal
+- CEN406 - Excluir perfil com filhos (filhos ficam órfãos)
+- CEN407 - Tentar excluir sem permissão (HTTP 403)
+- CEN408 - Excluir perfil expirado
+- CEN409 - Verificar auditoria após exclusão (incluindo flag IsSystemRole)
+- CEN410 - Verificar que perfil não aparece mais na listagem
+- CEN411 - Tentar acessar perfil deletado (HTTP 404)
+Total: 11 cenários | Status: Atualizado (2025-11-16)
+
+## 📊 Rastreabilidade
+
+Última Atualização: 2025-11-16 - Perfis de Sistema agora PODEM ser excluídos (única restrição: usuários vinculados)
+
+---
+
+# UC07 - Duplicar Perfil de Acesso
+
+**Data Atualização**: 2025-11-15
+**Changelog v2.0**: Simplificado - removidas referências a código, hierarquia, limite de usuários e herança
+
+---
+
+## 📋 Objetivo
+Permitir que administradores criem uma cópia simples de um perfil existente, incluindo todas as suas permissões, com a opção de modificar nome e descrição.
+
+## 👤 Atores
+- Ator Principal: Administrador com permissão `perfis:perfil:create` e `perfis:perfil:read`
+- Atores Secundários: Sistema de Validação, Sistema de Auditoria
+
+## 🎯 Pré-condições
+- ☒ Usuário autenticado no sistema
+- ☒ Usuário possui permissões `perfis:perfil:create` e `perfis:perfil:read`
+- ☒ Perfil a ser duplicado existe
+- ☒ Banco de dados acessível
+
+## ▶️ Fluxo Principal
+1. Usuário acessa detalhes de um perfil e clica em "Duplicar"
+2. Sistema carrega modal "Duplicar Perfil":
+   - Nome original: "Gestor TI" → Novo: "Gestor TI - Cópia" (auto-preenchido)
+   - Descrição: cópia da original (editável)
+3. Usuário modifica nome e descrição (opcional)
+4. Sistema valida:
+   - Nome único para a empresa
+   - Nome não está vazio
+5. Usuário clica "Criar Cópia"
+6. Sistema cria novo perfil com:
+   - Dados modificados (nome/descrição)
+   - Todas as permissões do perfil original (cópias independentes)
+   - Mesma empresa (EmpresaId)
+7. Sistema registra auditoria: "Duplicado do perfil [ORIGINAL_ID]"
+8. Resultado: Perfil duplicado com sucesso
+
+## 🔀 Fluxos Alternativos
+### FA01 - Manter Nome Original
+Usuário altera apenas descrição, mantendo nome sugerido.
+
+### FA02 - Resetar Sugestão
+Usuário clica "Reset" para usar sugestão automática novamente.
+
+## ⚠️ Fluxos de Exceção
+### FE01 - Nome Duplicado
+Sistema exibe: "Nome já existe para esta empresa. Use outro nome."
+
+### FE02 - Nome Vazio
+Sistema exibe: "Nome é obrigatório."
+
+### FE03 - Perfil Original Não Acessível
+Se perfil foi deletado, sistema exibe erro 404: "Perfil não encontrado."
+
+## ✅ Pós-condições
+- ✅ Novo perfil criado com dados do original
+- ✅ Todas as permissões copiadas (registros independentes)
+- ✅ Auditoria registrada com referência ao original
+- ✅ Novo perfil disponível imediatamente para uso
+
+## 📐 Regras de Negócio
+### RN-UC07-001: Nome Único
+Nome do perfil duplicado deve ser único dentro da empresa.
+
+### RN-UC07-002: Permissões Independentes
+Permissões do perfil duplicado são cópias independentes. Alterações em um perfil não afetam o outro.
+
+### RN-UC07-003: Mesmo Escopo
+Perfil duplicado é criado no mesmo escopo (empresa) do perfil original. Apenas Super Admin pode duplicar perfis globais.
+
+## 🧪 Cenários de Teste
+- CEN701 - Duplicar perfil simples
+- CEN702 - Duplicar com modificação de nome
+- CEN703 - Duplicar com modificação de descrição
+- CEN704 - Duplicar com múltiplas permissões
+- CEN705 - Tentar duplicar com nome já existente (HTTP 400)
+- CEN706 - Duplicar perfil com descrição vazia
+- CEN707 - Verificar que permissões foram copiadas corretamente
+- CEN708 - Verificar auditoria com referência ao original
+- CEN709 - Tentar duplicar sem permissão `perfis:perfil:create` (HTTP 403)
+- CEN710 - Duplicar perfil de outra empresa (bloqueado por multi-tenancy)
+
+Total: 10 cenários | Status: Documentado
+
+## 📊 Rastreabilidade
+- - **Dependências**: UC01 (Criar Perfil), UC02 (Visualizar Perfil)
+
+---
+
+Última Atualização: 2025-11-15
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-12-17 | Sistema | Consolidação de 5 casos de uso |

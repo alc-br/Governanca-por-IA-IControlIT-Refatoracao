@@ -1,0 +1,597 @@
+# RL-RF006.yaml - Referência ao Legado: Gestão de Clientes
+# Versão: 2.0
+# Data: 2025-12-29
+# RF Relacionado: RF006 - Gestão de Clientes (Multi-Tenancy SaaS)
+
+rl_id: RL-RF006
+rf_relacionado: RF006
+titulo: "Referência ao Legado - Gestão de Clientes"
+versao: "2.0"
+data_criacao: "2025-12-29"
+
+# =============================================================================
+# DECISÃO DE MIGRAÇÃO
+# =============================================================================
+
+decisao_migracao: "CRIAR_DO_ZERO"
+
+justificativa_geral: |
+  No sistema legado (VB.NET + ASP.NET Web Forms), NÃO EXISTIA gestão de Clientes
+  via interface. Cada Cliente tinha banco de dados SQL Server completamente separado
+  (18 bancos isolados). Criação de Cliente era processo manual DBA (3-5 dias).
+
+  Sistema moderno cria módulo completo do zero com:
+  - Interface de gestão (/admin/clientes)
+  - Onboarding automatizado (< 5 minutos)
+  - Single database + multi-tenancy (Row-Level Security)
+  - ReceitaWS API (consulta automática)
+  - Azure Blob Storage (logos)
+  - Soft delete + auditoria LGPD (7 anos)
+
+# =============================================================================
+# PROBLEMAS DO LEGADO (6)
+# =============================================================================
+
+problemas_legado:
+  total: 6
+
+  - id: "RL-001"
+    titulo: "Ausência de Interface de Gestão de Clientes"
+    descricao: "Não existia telas ASPX para criar/editar/visualizar Clientes"
+    impacto: "CRÍTICO"
+    complexidade: "ALTA"
+    destino: "SUBSTITUÍDO"
+
+    detalhes:
+      processo_manual_dba:
+        - "DBA recebia solicitação da área comercial (email/ticket)"
+        - "Criava novo banco SQL Server via SSMS"
+        - "Executava script DDL completo (todas as tabelas)"
+        - "Configurava ConnectionString no Web.config"
+        - "Reiniciava aplicação"
+        - "Testava login com usuário de teste"
+        tempo_total: "3-5 dias"
+
+      componentes_afetados:
+        telas_aspx: "NENHUMA (gestão não existia)"
+        webservices: "NENHUM"
+        stored_procedures: "NENHUMA"
+        processo: "Manual DBA"
+
+      problemas:
+        - problema: "Onboarding demorado"
+          impacto: "3-5 dias por Cliente (vs. < 5 minutos moderno)"
+        - problema: "Custo elevado"
+          impacto: "Intervenção manual de DBA sênior"
+        - problema: "Risco de erro humano"
+          impacto: "ConnectionString incorreta"
+        - problema: "Sem rastreabilidade"
+          impacto: "Sem auditoria (quem criou, quando)"
+
+    migracao_moderna:
+      interface_completa:
+        - "/admin/clientes (listagem)"
+        - "/admin/clientes/novo (criação)"
+        - "/admin/clientes/{id} (edição)"
+      api: "POST /api/clientes (onboarding automatizado)"
+      auditoria: "CLI_CREATE registrado (quem, quando, de onde)"
+      tempo: "< 5 minutos"
+      reduo_tempo: "99% (3-5 dias → 5 minutos)"
+
+  - id: "RL-002"
+    titulo: "Arquitetura Multi-Database (Physical Separation)"
+    descricao: "Cada Cliente tinha banco SQL Server completamente separado"
+    impacto: "CRÍTICO"
+    complexidade: "MUITO_ALTA"
+    destino: "SUBSTITUÍDO"
+
+    detalhes:
+      total_bancos_legados: 18
+      bancos_identificados:
+        - nome: "Alpargatas"
+          cnpj: "61.079.117/0001-05"
+          razao_social: "Alpargatas S.A."
+        - nome: "Vale"
+          cnpj: "33.592.510/0001-54"
+          razao_social: "Vale S.A."
+        - nome: "Bombril"
+          cnpj: "50.248.011/0001-39"
+          razao_social: "Bombril S.A."
+        - nome: "Anima_Educacao"
+          cnpj: "17.685.925/0001-92"
+          razao_social: "Anima Educação"
+        - nome: "Fresenius"
+          cnpj: "49.324.221/0001-04"
+          razao_social: "Fresenius Kabi Brasil Ltda"
+        - nome: "Electrolux"
+          cnpj: "76.487.032/0001-25"
+          razao_social: "Electrolux do Brasil S.A."
+        - nome: "CPFL"
+          cnpj: "02.429.144/0001-93"
+          razao_social: "CPFL Energia S.A."
+        - nome: "Carrefour"
+          cnpj: "45.543.915/0001-81"
+          razao_social: "Carrefour Comércio e Indústria Ltda"
+        - nome: "Cielo"
+          cnpj: "01.027.058/0001-91"
+          razao_social: "Cielo S.A."
+        - nome: "Gerdau"
+          cnpj: "33.611.500/0001-19"
+          razao_social: "Gerdau S.A."
+        - nome: "Magazine_Luiza"
+          cnpj: "47.960.950/0001-21"
+          razao_social: "Magazine Luiza S.A."
+        - nome: "Natura"
+          cnpj: "71.673.990/0001-77"
+          razao_social: "Natura Cosméticos S.A."
+        - nome: "Rede_D_Or"
+          cnpj: "00.387.679/0001-58"
+          razao_social: "Rede D'Or São Luiz S.A."
+        - nome: "Weg"
+          cnpj: "07.175.725/0001-49"
+          razao_social: "WEG S.A."
+        - nome: "Ambev"
+          cnpj: "02.808.708/0001-07"
+          razao_social: "Ambev S.A."
+        - nome: "Embraer"
+          cnpj: "07.689.002/0001-89"
+          razao_social: "Embraer S.A."
+        - nome: "JBS"
+          cnpj: "02.916.265/0001-60"
+          razao_social: "JBS S.A."
+        - nome: "Localiza"
+          cnpj: "16.670.085/0001-55"
+          razao_social: "Localiza Rent a Car S.A."
+
+      problemas:
+        custo:
+          descricao: "18+ licenças SQL Server"
+          impacto: "Alto custo de licenciamento (vs. 1 licença moderno)"
+        manutencao:
+          descricao: "Alterar schema exigia script DDL em 18 bancos"
+          impacto: "Complexidade exponencial"
+        relatorios:
+          descricao: "Relatórios cross-tenant impossíveis"
+          impacto: "Não dava para consolidar dados de múltiplos Clientes"
+        backup:
+          descricao: "18 backups diários independentes"
+          impacto: "Processo demorado e propenso a erros"
+        escalabilidade:
+          descricao: "Adicionar Cliente = criar novo banco completo"
+          impacto: "Não escalou além de 18 Clientes"
+
+    comparacao_legado_moderno:
+      - aspecto: "Isolamento"
+        legado: "Physical (banco separado)"
+        moderno: "Lógico (Row-Level Security via ClienteId)"
+      - aspecto: "Custo Infraestrutura"
+        legado: "18+ licenças SQL Server"
+        moderno: "1 licença SQL Server"
+      - aspecto: "Onboarding"
+        legado: "Manual DBA (3-5 dias)"
+        moderno: "Automatizado API (< 5 minutos)"
+      - aspecto: "Schema Upgrade"
+        legado: "Script DDL em 18 bancos"
+        moderno: "Migration EF Core em 1 banco"
+      - aspecto: "Backup"
+        legado: "18 backups diários"
+        moderno: "1 backup diário"
+      - aspecto: "Relatórios Cross-Tenant"
+        legado: "Impossível"
+        moderno: "Possível (Super Admin)"
+      - aspecto: "Escalabilidade"
+        legado: "Limitada (criar banco)"
+        moderno: "Alta (INSERT em tabela)"
+
+    migracao_moderna:
+      arquitetura: "Single database + multi-tenancy lógico"
+      discriminador: "ClienteId"
+      isolamento: "EF Core Query Filters (WHERE ClienteId = @CurrentClienteId)"
+      bypass: "Super Admin (IsSuperAdmin = true)"
+      uptime_alvo: "99.9%"
+      data_leakage: "Alerta CRITICAL se detectado"
+
+  - id: "RL-003"
+    titulo: "Ausência de Validação de CNPJ"
+    descricao: "Não havia validação de dígitos verificadores de CNPJ"
+    impacto: "ALTO"
+    complexidade: "MÉDIA"
+    destino: "ASSUMIDO + SUBSTITUÍDO"
+
+    detalhes:
+      problemas_observados:
+        - "CNPJs com dígitos verificadores incorretos (~5% dos registros)"
+        - "CNPJs duplicados (mesmo Cliente cadastrado 2x por erro)"
+        - "CNPJs falsos (testes com 11111111111111, 99999999999999)"
+        - "Dados desatualizados (sem consulta à Receita Federal)"
+
+      impacto:
+        - "Problemas em emissão de notas fiscais eletrônicas (NF-e)"
+        - "Erros em integração bancária (boletos)"
+        - "Relatórios fiscais incorretos"
+
+    migracao_moderna:
+      rn_relacionada: "RN-CLI-006-03"
+      validacao: "CnpjValidator.IsValid() com algoritmo Receita Federal"
+      unique_constraint: "IX_Cliente_CNPJ_Unique"
+      receita_ws: "RN-CLI-006-05 (consulta automática)"
+      limpeza_dados: "CNPJ inválidos devem ser corrigidos durante migração"
+
+  - id: "RL-004"
+    titulo: "Ausência de ReceitaWS API"
+    descricao: "Não existia integração com ReceitaWS (ou qualquer API Receita Federal)"
+    impacto: "MÉDIO"
+    complexidade: "BAIXA"
+    destino: "SUBSTITUÍDO"
+
+    detalhes:
+      problemas:
+        - problema: "Erros de digitação em Razão Social, Endereço, Telefone"
+          impacto: "Retrabalho quando dados incorretos causam problemas fiscais"
+        - problema: "Dificuldade de contato com Cliente (telefone desatualizado)"
+          impacto: "Comunicação não chega ao Cliente"
+        - problema: "Emails errados"
+          impacto: "Comunicação perdida"
+
+    migracao_moderna:
+      rn_relacionada: "RN-CLI-006-05"
+      api_url: "https://www.receitaws.com.br/v1/"
+      endpoint: "POST /api/clientes/consultar-cnpj"
+      fallback: "Se ReceitaWS indisponível, permite preenchimento manual"
+      taxa_sucesso_alvo: "> 95%"
+      beneficio: "Redução de erros de digitação em 80%"
+
+  - id: "RL-005"
+    titulo: "Logo em Filesystem Local (Não Escalável)"
+    descricao: "Logos armazenadas em pasta local ~/Images/Clientes/"
+    impacto: "MÉDIO"
+    complexidade: "BAIXA"
+    destino: "SUBSTITUÍDO"
+
+    detalhes:
+      path_legado: "~/Images/Clientes/"
+      exemplos:
+        - "Alpargatas.png"
+        - "Vale.jpg"
+        - "Bombril.png"
+
+      problemas:
+        - "Perda de logos em caso de falha de servidor (sem replicação)"
+        - "Sem CDN (logos lentas para usuários distantes)"
+        - "Sem versionamento (substituir apaga anterior)"
+        - "Sem backup automático"
+        - "Desorganização (nomenclatura inconsistente)"
+
+    migracao_moderna:
+      rn_relacionada: "RN-CLI-006-06"
+      storage: "Azure Blob Storage"
+      container: "clientes-logos"
+      nomenclatura: "{ClienteId}.{extensão} (ex: guid-123.png)"
+      cdn: "Azure CDN (baixa latência global)"
+      backup: "Azure geo-replication"
+      versionamento: "Overwrite com histórico em auditoria"
+
+  - id: "RL-006"
+    titulo: "Ausência de Soft Delete e Auditoria LGPD"
+    descricao: "DELETE físico era permitido e comum, sem auditoria"
+    impacto: "CRÍTICO"
+    complexidade: "MÉDIA"
+    destino: "ASSUMIDO + SUBSTITUÍDO"
+
+    detalhes:
+      sql_legado: "DELETE FROM Empresa WHERE Id = 123 (dados perdidos permanentemente)"
+
+      problemas:
+        - "Perda permanente de dados (sem restauração)"
+        - "Compliance LGPD: Não havia retenção de auditoria por 7 anos"
+        - "Investigação de incidentes impossível (sem logs de quem deletou)"
+        - "Relatórios retroativos inviáveis (dados históricos perdidos)"
+
+      impacto_auditoria:
+        - "Sem registro de quem criou Cliente"
+        - "Sem registro de quem editou Cliente"
+        - "Sem registro de quem deletou Cliente"
+        - "Sem histórico de mudanças (before/after)"
+
+    migracao_moderna:
+      rn_soft_delete: "RN-CLI-006-07"
+      implementacao: "FlExcluido = true (soft delete)"
+      trigger: "INSTEAD OF DELETE → RAISERROR (bloqueia DELETE físico)"
+      rn_auditoria: "RN-CLI-006-10"
+      retencao: "7 anos (LGPD Art. 16)"
+      operacoes:
+        - "CLI_CREATE (quem criou, quando, de onde)"
+        - "CLI_UPDATE (campos alterados before/after)"
+        - "CLI_DELETE (soft delete)"
+        - "CLI_LOGO_UPLOAD"
+        - "CLI_DEACTIVATE_USERS"
+        - "CLI_RECEITA_QUERY"
+
+# =============================================================================
+# DESAFIOS DE MIGRAÇÃO
+# =============================================================================
+
+desafios_migracao:
+  - id: "DES-001"
+    titulo: "Migração de Dados (18 Bancos → 1 Banco)"
+    complexidade: "MUITO_ALTA"
+    risco: "ALTO"
+    estimativa_horas: "80-120"
+    sprints: "2-3"
+
+    pre_requisitos:
+      - "Backup completo de todos os 18 bancos"
+      - "Script de validação de integridade referencial"
+      - "Ambiente de teste isolado"
+
+    etapas:
+      - passo: 1
+        descricao: "Identificar CNPJs reais de cada banco legado"
+      - passo: 2
+        descricao: "Criar registros na tabela Cliente no banco moderno"
+      - passo: 3
+        descricao: "Adicionar coluna ClienteId em TODAS as tabelas de negócio"
+      - passo: 4
+        descricao: "Popular ClienteId em cada registro (mapear banco → ClienteId)"
+      - passo: 5
+        descricao: "Consolidar dados de 18 bancos → 1 banco (INSERT ... SELECT)"
+      - passo: 6
+        descricao: "Validar integridade (verificar FKs, testar Query Filters)"
+      - passo: 7
+        descricao: "Executar testes de isolamento (Cliente A não vê dados de Cliente B)"
+      - passo: 8
+        descricao: "Migrar logos de filesystem local → Azure Blob Storage"
+
+    riscos_e_mitigacoes:
+      - risco: "Data leakage cross-tenant"
+        impacto: "CRÍTICO"
+        probabilidade: "MÉDIA"
+        mitigacao: "Testes exaustivos de Query Filters antes de produção"
+
+      - risco: "Perda de dados durante consolidação"
+        impacto: "CRÍTICO"
+        probabilidade: "BAIXA"
+        mitigacao: "Backup completo + restore em caso de erro"
+
+      - risco: "Performance degradada (1 banco vs. 18)"
+        impacto: "ALTO"
+        probabilidade: "MÉDIA"
+        mitigacao: "Índices otimizados + particionamento de tabelas grandes"
+
+      - risco: "FKs quebradas após migração"
+        impacto: "ALTO"
+        probabilidade: "BAIXA"
+        mitigacao: "Validação de integridade referencial obrigatória"
+
+    observacao: "Migração de dados será RF separado (RF-MIG-001), NÃO faz parte do escopo RF006"
+
+  - id: "DES-002"
+    titulo: "Transição de Onboarding (Manual → Automatizado)"
+    complexidade: "BAIXA"
+    risco: "BAIXO"
+
+    mudanca_processo:
+      legado:
+        etapas:
+          - "Comercial envia email para DBA"
+          - "DBA cria ticket no Jira"
+          - "DBA cria banco SQL Server manualmente"
+          - "DBA executa script DDL (30 minutos)"
+          - "DBA configura ConnectionString no Web.config"
+          - "DBA reinicia aplicação"
+          - "DBA testa login com usuário de teste"
+          - "DBA responde email 'Cliente pronto'"
+        tempo_total: "3-5 dias"
+
+      moderno:
+        etapas:
+          - "Super Admin acessa /admin/clientes/novo"
+          - "Preenche CNPJ"
+          - "Clica 'Consultar Receita Federal'"
+          - "Sistema preenche automaticamente (Razão Social, Endereço, Telefone, Email)"
+          - "(Opcional) Upload de logo"
+          - "Clica 'Salvar'"
+          - "Sistema cria Cliente no banco"
+          - "Sistema registra CLI_CREATE"
+        tempo_total: "< 5 minutos"
+
+    treinamento_necessario:
+      - perfil: "Super Admins"
+        tempo: "30 minutos (tutorial)"
+      - perfil: "DBAs"
+        acao: "Informar que processo manual foi substituído"
+      - perfil: "Área Comercial"
+        acao: "Solicitar criação via ticket (Super Admin cria)"
+
+  - id: "DES-003"
+    titulo: "Manutenção de Bancos Legados Durante Transição"
+    complexidade: "MÉDIA"
+    risco: "MÉDIO"
+
+    periodo_dupla_operacao: "6-12 meses"
+
+    estrategia:
+      - "Clientes novos: Criados APENAS no sistema moderno"
+      - "Clientes legados: Permanecem no banco legado até migração"
+      - "Freeze de funcionalidades no legado: Apenas manutenção crítica"
+      - "Migração gradual: 1-2 Clientes por sprint"
+      - "Validação por Cliente: Testes UAT antes de desativar banco legado"
+      - "Desativação final: Após todos os 18 Clientes migrarem"
+
+# =============================================================================
+# LIÇÕES APRENDIDAS
+# =============================================================================
+
+licoes_aprendidas:
+  - id: "LIC-001"
+    titulo: "Arquitetura Multi-Database NÃO Escala"
+    descricao: |
+      Arquitetura com 1 banco por Cliente é adequada para < 10 Clientes,
+      mas torna-se INVIÁVEL acima disso.
+
+    escalabilidade:
+      - faixa: "1-5 Clientes"
+        status: "Gerenciável"
+      - faixa: "6-10 Clientes"
+        status: "Trabalhoso (manutenção schema aumenta)"
+      - faixa: "11-18 Clientes"
+        status: "Insustentável (custo e complexidade explodem)"
+      - faixa: "> 20 Clientes"
+        status: "Impossível (não escalou além de 18)"
+
+    recomendacao: "Para SaaS, sempre usar single database + multi-tenancy lógico desde o início"
+
+  - id: "LIC-002"
+    titulo: "Ausência de Validações Causou Débito Técnico"
+    descricao: |
+      Não validar CNPJ e não consultar ReceitaWS gerou dados inconsistentes
+      que exigirão limpeza na migração.
+
+    dados_problematicos:
+      - problema: "CNPJs com dígitos verificadores incorretos"
+        percentual: "~5%"
+      - problema: "CNPJs duplicados"
+        quantidade: "2 Clientes com mesmo CNPJ (erro manual)"
+      - problema: "Razão Social desatualizada"
+        descricao: "Empresas que mudaram de nome"
+      - problema: "Telefones desatualizados"
+        percentual: "30%"
+      - problema: "Emails inválidos"
+        percentual: "15%"
+
+    recomendacao: "Sempre validar dados críticos no BACKEND (não confiar apenas em client-side)"
+
+  - id: "LIC-003"
+    titulo: "Soft Delete Previne Perda de Dados"
+    descricao: "DELETE físico no legado causou perda irreversível de dados importantes"
+
+    casos_reais:
+      - "Cliente deletado por engano → Sem restauração"
+      - "Relatórios retroativos impossíveis (dados perdidos)"
+      - "Investigação de fraude comprometida (sem auditoria)"
+
+    recomendacao: |
+      Sempre usar soft delete em entidades críticas (Cliente, Usuario, Empresa).
+      DELETE físico só é aceitável em:
+      - Dados temporários (sessões, logs antigos)
+      - Dados sensíveis sob LGPD (right to erasure)
+
+  - id: "LIC-004"
+    titulo: "Auditoria LGPD Deve Ser Nativa, Não Retrofit"
+    descricao: "Adicionar auditoria DEPOIS é muito mais difícil do que projetar desde o início"
+
+    tentativa_retrofit:
+      esforco_horas: "200+"
+      complexidade: "Interceptar TODAS as operações em VB.NET"
+      status: "Projeto abandonado por custo"
+
+    recomendacao: "Usar AuditInterceptor do EF Core desde o dia 1 do projeto moderno"
+
+# =============================================================================
+# RECOMENDAÇÕES PARA SISTEMA MODERNO
+# =============================================================================
+
+recomendacoes:
+  - id: "REC-001"
+    titulo: "EF Core Query Filters: Validar Exaustivamente"
+    categoria: "SEGURANÇA"
+    criticidade: "CRÍTICA"
+
+    testes_obrigatorios:
+      - "Usuario Cliente A lista Empresas → Retorna APENAS do Cliente A"
+      - "Usuario Cliente B tenta acessar Empresa Cliente A → HTTP 404"
+      - "Super Admin lista Empresas → Retorna de TODOS os Clientes"
+      - "Tentar bypass Query Filter via SQL direto → DEVE falhar"
+      - "Tentar bypass via manipulação ClienteId no JWT → DEVE falhar"
+
+  - id: "REC-002"
+    titulo: "ReceitaWS: Implementar Fallback Robusto"
+    categoria: "INTEGRAÇÃO"
+    criticidade: "MÉDIA"
+
+    estrategia:
+      timeout_segundos: 10
+      nao_bloquear_criacao: true
+      retry: "3 tentativas (exponential backoff: 0s, 2s, 4s)"
+      cache_dias: 7
+      alerta_indisponibilidade: "> 10 falhas consecutivas → notificar DevOps"
+
+  - id: "REC-003"
+    titulo: "Azure Blob Storage: Configurar Geo-Replication"
+    categoria: "INFRAESTRUTURA"
+    criticidade: "MÉDIA"
+
+    configuracao:
+      tier: "Standard"
+      replicacao: "GRS (Geo-Redundant Storage)"
+      backup: "Soft delete habilitado (14 dias)"
+      cdn: "Azure CDN habilitado"
+      lifecycle_policy: "Cool Tier após 90 dias sem acesso"
+
+  - id: "REC-004"
+    titulo: "Monitoramento de Data Leakage Cross-Tenant"
+    categoria: "SEGURANÇA"
+    criticidade: "CRÍTICA"
+
+    metrica: "ApplicationInsights: DATA_LEAKAGE_DETECTED"
+    acao_detectar:
+      - "1. Parar sistema imediatamente (circuit breaker)"
+      - "2. Notificar CISO e equipe de segurança"
+      - "3. Investigar causa raiz"
+      - "4. Corrigir Query Filter"
+      - "5. Validar que nenhum dado vazou"
+      - "6. Escrever post-mortem"
+
+# =============================================================================
+# CRONOGRAMA DE DESATIVAÇÃO DO LEGADO
+# =============================================================================
+
+cronograma_desativacao:
+  - fase: "Fase 1: Criação do Sistema Moderno"
+    sprints: "1-3"
+    tarefas:
+      - "Criar RF006 (Gestão de Clientes)"
+      - "Implementar backend (CRUD + ReceitaWS + Azure Blob)"
+      - "Implementar frontend (/admin/clientes)"
+      - "Testes de isolamento multi-tenancy"
+      - "Deploy em DEV e HOM"
+
+  - fase: "Fase 2: Onboarding de Novos Clientes"
+    sprints: "4-6"
+    tarefas:
+      - "Clientes novos criados APENAS no sistema moderno"
+      - "Clientes legados permanecem em bancos separados"
+
+  - fase: "Fase 3: Migração Gradual de Clientes Legados"
+    sprints: "7-18"
+    tarefas:
+      - "Migrar 1-2 Clientes por sprint"
+      - "Validação UAT com Cliente antes de desativar banco legado"
+      - "Total: 18 Clientes a migrar"
+
+  - fase: "Fase 4: Desativação Final do Legado"
+    sprints: "19-20"
+    tarefas:
+      - "Após todos os 18 Clientes migrarem"
+      - "Desligar servidores SQL Server legados"
+      - "Remover ConnectionStrings do Web.config legado"
+      - "Arquivar backups finais"
+
+# =============================================================================
+# METADADOS
+# =============================================================================
+
+metadados:
+  total_problemas: 6
+  total_desafios: 3
+  total_licoes: 4
+  total_recomendacoes: 4
+  total_bancos_legados: 18
+  estimativa_migracao_horas: "80-120"
+  sprints_desativacao: 20
+
+  changelog:
+    - versao: "2.0"
+      data: "2025-12-29"
+      descricao: "Migração para governança v2.0 - formato estruturado YAML"
+      autor: "Architect Agent"

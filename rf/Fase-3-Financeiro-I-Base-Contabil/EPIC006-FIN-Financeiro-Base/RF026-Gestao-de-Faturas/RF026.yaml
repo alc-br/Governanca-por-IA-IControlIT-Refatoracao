@@ -1,0 +1,887 @@
+# ====================================================================================
+# RF-026: Gestão Completa de Faturas de Telecom e TI
+# Versão: 2.0 (Governança - Separação RF/RL)
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# ====================================================================================
+
+rf:
+  id: "RF026"
+  nome: "Gestão Completa de Faturas de Telecom e TI"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 3 - Financeiro I - Base Contábil"
+  epic: "EPIC006-FIN-Financeiro-Base"
+  status: "aprovado"
+  prioridade: "CRÍTICA"
+  complexidade: "MUITO_ALTA"
+
+descricao:
+  objetivo: "Prover capacidade completa de gestão de faturas de serviços de Telecom e TI com importação automatizada multi-layout, conciliação inteligente contra contratos, auditoria configurável pré-pagamento, rateio multi-dimensional, workflow de contestação formal e dashboard executivo com alertas preditivos de estouro de budget."
+  problema_resolvido: "Processos manuais de conciliação (40h/mês), descoberta tardia de erros de cobrança (após pagamento), falta de visibilidade de consumo em tempo real, impossibilidade de prever estouros de budget e ausência de workflow formal de contestação."
+  publico_afetado: "Controladores financeiros, gestores de TI, equipes de procurement, usuários finais, executivos e auditores."
+
+escopo:
+  incluso:
+    - "Importação multi-layout (CSV, XLS, XLSX, TXT, PDF) com 15+ templates pré-configurados + builder visual drag-and-drop"
+    - "OCR de PDF automatizado via Azure Form Recognizer (custom model 10.000+ faturas, 95% acurácia)"
+    - "Conciliação automática com algoritmo fuzzy matching (Levenshtein distance threshold 90%)"
+    - "Auditoria configurável com 25+ regras pré-definidas + custom rules engine visual"
+    - "Workflow contestação formal (7 etapas com rastreamento SLA)"
+    - "Rateio multi-dimensional automático (5 dimensões, 5 tipos de rateio)"
+    - "Dashboard executivo Chart.js com 10+ KPIs em tempo real via SignalR"
+    - "Alertas preditivos ML (Random Forest) 7/15/30 dias antecedência"
+    - "Integração APIs operadoras (Vivo, Claro, TIM) com OAuth 2.0 + polling Hangfire"
+    - "App mobile MAUI com assinatura digital DocuSign"
+    - "Isolamento multi-tenant obrigatório (ClienteId em todas queries)"
+    - "Soft delete obrigatório (preservação 7 anos compliance fiscal)"
+    - "Versionamento de faturas (snapshots preservados)"
+    - "Integração ERP financeiro (SAP, TOTVS, REST API) com retry policy + DLQ"
+    - "Validações condicionais por status (FluentValidation)"
+  fora:
+    - "Interface visual específica (design e UX)"
+    - "Tecnologia, framework ou linguagem"
+    - "Layout, UX ou identidade visual"
+    - "Estratégia de deploy ou infraestrutura"
+    - "Gestão de contratos (RF-023)"
+    - "Gestão de ativos (RF-025)"
+    - "Contabilização de lançamentos contábeis"
+
+entidades:
+  - nome: "Fatura"
+    descricao: "Entidade principal - documento fiscal de serviços Telecom/TI"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    versionamento: true
+  - nome: "Fatura_Detalhe"
+    descricao: "Linhas individuais da fatura (serviços cobrados)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+  - nome: "Fatura_Auditoria_Regra"
+    descricao: "Biblioteca de regras de auditoria configuráveis"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+  - nome: "Fatura_Auditoria_Resultado"
+    descricao: "Log de execução de regras por fatura"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+  - nome: "Fatura_Contestacao"
+    descricao: "Workflow completo de contestação formal"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+  - nome: "Fatura_Rateio_Regra"
+    descricao: "Regras configuráveis de rateio multi-dimensional"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+  - nome: "Fatura_Importacao_Template"
+    descricao: "Templates de layouts por operadora"
+    multi_tenant: false
+    soft_delete: true
+    auditoria: true
+  - nome: "Fatura_Importacao_Log"
+    descricao: "Histórico de uploads com rastreamento"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+  - nome: "Fatura_Anexos"
+    descricao: "PDFs originais armazenados em Azure Blob"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+  - nome: "Fatura_Aprovacao"
+    descricao: "Workflow aprovação multi-nível com DocuSign"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+  - nome: "Fatura_KPI_Snapshot"
+    descricao: "Snapshots diários de KPIs para dashboard histórico"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+  - nome: "Fatura_Previsao_ML"
+    descricao: "Previsões do modelo ML de estouro de budget"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+
+# ====================================================================================
+# REGRAS DE NEGÓCIO
+# ====================================================================================
+
+regras_negocio:
+  - id: "RN-RF026-001"
+    titulo: "Importação Suporta Múltiplos Layouts"
+    descricao: "Sistema DEVE suportar importação de faturas em múltiplos formatos (CSV, XLS, XLSX, TXT, PDF) com templates configuráveis por operadora/fornecedor. Cada template define mapeamento de colunas, delimitadores, encoding e regras de validação."
+    justificativa: "Cada operadora fornece faturas em layout próprio. Sistema legado só aceitava 1 layout fixo que quebrava a cada mudança."
+    tipo: "validacao"
+    criticidade: "ALTA"
+    campos_afetados: ["Template_Id", "Arquivo_Original_Blob_URL", "Status"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Template não encontrado → rejeição HTTP 400 com sugestão de template mais próximo"
+      - "Arquivo corrompido ou formato inválido → rejeição HTTP 400 com mensagem específica"
+      - "Sucesso → fatura em status Rascunho com preview de dados para usuário confirmar"
+
+  - id: "RN-RF026-002"
+    titulo: "OCR de PDF com Azure Form Recognizer"
+    descricao: "Se arquivo é PDF, sistema DEVE extrair dados via OCR usando Azure Form Recognizer com custom model treinado (10.000+ faturas reais, 95% acurácia). Campos extraídos: Número fatura, data emissão, vencimento, operadora, CNPJ, valores, impostos (ICMS, PIS, COFINS), linhas/ativos, consumo."
+    justificativa: "Operadoras frequentemente enviam faturas apenas em PDF scaneado. Sistema legado não suportava OCR, exigindo digitação manual."
+    tipo: "validacao"
+    criticidade: "ALTA"
+    campos_afetados: ["OCR_Confidence_Score", "OCR_Raw_JSON", "Campos_Revisao_Manual_Pendente"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Confidence score ≥ 85% → aceito automaticamente"
+      - "Confidence score < 85% → marcado para revisão manual com UI side-by-side"
+      - "Campos ausentes → revisão manual obrigatória"
+
+  - id: "RN-RF026-003"
+    titulo: "Conciliação Automática de Linhas com Contratos"
+    descricao: "Ao importar fatura, sistema DEVE automaticamente conciliar cada linha/ativo com contrato vigente, ativo registrado e centro custo responsável. Algoritmo: Exato → Fuzzy (Levenshtein 90%) → Manual (sugestões top 3)."
+    justificativa: "Controlador gasta 40h/mês conciliando manualmente em Excel. Automação reduz para 2h/mês revisando apenas casos <90%."
+    tipo: "regra_negocio"
+    criticidade: "CRÍTICA"
+    campos_afetados: ["Conciliacao_Status", "Contrato_Id", "Ativo_Id", "Match_Score", "Sugestoes_JSON"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Match exato → status Conciliado automaticamente"
+      - "Match fuzzy ≥90% → status Revisar com sugestão top 3"
+      - "Match <90% → status Não Conciliado para revisão manual obrigatória"
+      - "Relatório pós-importação: X% conciliado, Y% revisar, Z% não conciliado"
+
+  - id: "RN-RF026-004"
+    titulo: "Auditoria Pré-Pagamento com Regras Configuráveis"
+    descricao: "Sistema DEVE executar auditoria automática ANTES da aprovação para pagamento, aplicando 25+ regras pré-definidas + custom rules. Severidade: Alta bloqueia aprovação, Média exige justificativa, Baixa apenas alerta."
+    justificativa: "Sistema legado descobria erros após pagar. Auditoria pré-pagamento recupera 12-18% do valor total em cobranças indevidas."
+    tipo: "regra_negocio"
+    criticidade: "CRÍTICA"
+    campos_afetados: ["Auditoria_Status", "Regras_Falhas_JSON", "Valor_Total_Suspeito", "Bloqueio_Aprovacao"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Severidade Alta + falhou → bloqueia transição para Aguardando Aprovação"
+      - "Severidade Média + falhou → permite aprovação mas exige justificativa (≥20 caracteres)"
+      - "Severidade Baixa → apenas log de alerta (não bloqueia)"
+      - "Relatório PDF exportável com não-conformidades + valor total suspeito"
+
+  - id: "RN-RF026-005"
+    titulo: "Workflow de Contestação Formal"
+    descricao: "Sistema DEVE permitir criar contestação formal com workflow 7 etapas: Criação → Aprovação Interna → Envio Operadora → Acompanhamento SLA → Resposta → Validação Crédito → Fechamento. Rastreamento SLA com alerta se operadora não responde em 80% do prazo."
+    justificativa: "Sistema legado não tinha workflow formal (email + telefone sem rastreamento). Novo workflow garante rastreabilidade total e KPI de taxa de sucesso."
+    tipo: "workflow"
+    criticidade: "ALTA"
+    campos_afetados: ["Contestacao_Status", "Aprovador_Interno_Id", "Data_Envio_Operadora", "SLA_Prazo_Dias", "Resposta_Operadora", "Credito_Recebido", "Data_Fechamento"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Itens selecionados sem evidências → alerta mas permite continuar"
+      - "Aprovação interna negada → contestação volta para status Rascunho"
+      - "SLA excedido 80% → alerta automático para gestor + escala supervisor"
+      - "Crédito não apareceu em próxima fatura → alerta para reabrir contestação"
+
+  - id: "RN-RF026-006"
+    titulo: "Rateio Multi-Dimensional Automático"
+    descricao: "Sistema DEVE calcular rateio automático com 5 dimensões (Centro Custo, Projeto, Departamento, Geolocalização, Tipo Serviço) e 5 tipos (Percentual Fixo, Proporcional Consumo, Misto, Por Ativo, Hierárquico). Validação soma 100% obrigatória. Gera lançamentos CSV/TXT para ERP."
+    justificativa: "Controlador gasta 8 horas para recalcular rateio em Excel com VLOOKUP. Automação reduz para segundos."
+    tipo: "regra_negocio"
+    criticidade: "ALTA"
+    campos_afetados: ["Rateio_Regra_Id", "Rateio_Dimensoes_JSON", "Rateio_Percentuais_JSON"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Soma percentuais ≠ 100% → rejeição HTTP 400 com mensagem específica"
+      - "Regra sem dimensão definida → rejeição HTTP 400"
+      - "Sucesso → rateio calculado em <2s + exportação CSV/TXT disponível"
+
+  - id: "RN-RF026-007"
+    titulo: "Dashboard Executivo com KPIs Críticos"
+    descricao: "Sistema DEVE exibir dashboard executivo com 10+ KPIs em tempo real via SignalR: Gasto Total Mês, Variação MoM/YoY, Top 10 Maiores Contas, Distribuição por Tipo, Curva 12 Meses, Forecast 3 Meses ML, Taxa Economia Auditoria, Taxa Conciliação, Alertas Ativos. Drill-down + exportação PDF/Excel."
+    justificativa: "Sistema legado tinha apenas Excel estático semanal. Dashboard tempo real permite análise gerencial e identificação proativa de oportunidades de renegociação."
+    tipo: "visualizacao"
+    criticidade: "MÉDIA"
+    campos_afetados: []
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: true
+    criterios_aceite:
+      - "Dashboard carrega em <3s (mesmo com 10.000+ faturas)"
+      - "Drill-down funciona para todos os gráficos"
+      - "Exportação PDF snapshot completo do dashboard"
+      - "Exportação Excel dados brutos de cada gráfico"
+
+  - id: "RN-RF026-008"
+    titulo: "Alertas Preditivos de Estouro de Budget"
+    descricao: "Sistema DEVE usar ML (Random Forest Regressor) para prever estouros de budget com 7/15/30 dias antecedência. Dispara alerta se previsão >90% budget. Canais: 7 dias (email), 15 dias (email + push), 30 dias (email + push + in-app + dashboard). Inclui sugestões automáticas de ação corretiva. Feedback loop para aprimorar modelo."
+    justificativa: "Sistema legado não tinha alertas (descobre estouro ao fechar mês). Alertas preditivos permitem ações preventivas antes do estouro."
+    tipo: "regra_negocio"
+    criticidade: "MÉDIA"
+    campos_afetados: ["Previsao_Mes_Referencia", "Previsao_Valor", "Previsao_Confidence_Interval", "Alertas_Gerados_JSON"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: true
+    criterios_aceite:
+      - "Modelo ML atualizado mensalmente com dados novos"
+      - "Previsão accuracy mínimo 85% (validação cruzada 5-fold)"
+      - "Alertas enviados exatamente nas janelas configuradas (7/15/30 dias antes)"
+      - "Feedback loop registra ações corretivas tomadas"
+
+  - id: "RN-RF026-009"
+    titulo: "Integração com APIs de Operadoras"
+    descricao: "Sistema DEVE integrar com APIs REST de operadoras (Vivo, Claro, TIM web scraping) para automatizar download faturas, consulta consumo e envio contestações. OAuth 2.0 com refresh token (válido 90 dias) em Azure Key Vault. Hangfire job diário 02:00 UTC. Falha 3x → email + notificação TI + fallback manual. Rate limiting respeita limites (Vivo 100 req/min) com Polly retry."
+    justificativa: "Sistema legado não tinha integração (exigia download manual). Automação elimina trabalho manual e reduz atraso na importação."
+    tipo: "integracao_externa"
+    criticidade: "MÉDIA"
+    campos_afetados: ["Operadora_API_Integrada", "OAuth_Token_Validade", "Ultima_Sincronizacao_API"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "OAuth 2.0 refresh token renovado automaticamente antes de expirar"
+      - "Polling diário às 02:00 UTC executado via Hangfire"
+      - "Falha 3x consecutivas → email + notificação TI + fallback manual ativado"
+      - "Rate limiting respeitado (não excede 100 req/min para Vivo)"
+
+  - id: "RN-RF026-010"
+    titulo: "Aprovação Mobile com Assinatura Digital"
+    descricao: "Gestores DEVEM poder aprovar faturas/contestações/rateios via app MAUI com login biométrico (FaceID, TouchID), push notifications, visualização resumo, drill-down itens, aprovar/rejeitar com justificativa, assinatura digital DocuSign. Offline mode (sincroniza ao reconectar). Toda ação logada (timestamp, GPS, device ID, IP) para compliance SOX."
+    justificativa: "Gestores em viagem não conseguem aprovar faturas urgentes (legado apenas web). App mobile com assinatura digital permite aprovações on-the-go com validade legal."
+    tipo: "workflow"
+    criticidade: "MÉDIA"
+    campos_afetados: ["Aprovacao_Via_Mobile", "Device_Id", "GPS_Latitude", "GPS_Longitude", "DocuSign_Envelope_Id"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Login biométrico funciona em iOS e Android"
+      - "Push notification recebida em <5s após fatura disponível"
+      - "Offline mode permite visualizar faturas já baixadas"
+      - "Assinatura digital DocuSign integrada (callback webhook atualiza status)"
+      - "Auditoria completa (GPS, device, IP) de todas as ações"
+
+  - id: "RN-RF026-011"
+    titulo: "Isolamento Multi-Tenant Obrigatório"
+    descricao: "TODAS queries/operações DEVEM filtrar por ClienteId obtido do JWT token. Usuário Cliente A NÃO pode ver/editar/deletar faturas Cliente B mesmo se descobrir ID."
+    justificativa: "Multi-tenancy é requisito segurança crítico SaaS. Vazamento de dados é violação LGPD com multa até 2% faturamento."
+    tipo: "seguranca"
+    criticidade: "CRÍTICA"
+    campos_afetados: ["ClienteId"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Tentativa acessar fatura outro cliente → HTTP 404 Not Found (não 403)"
+      - "Queries incluem WHERE ClienteId = @clienteIdDoToken obrigatoriamente (EF Core Query Filter global)"
+      - "Índice composto (ClienteId, DataEmissao DESC) otimiza queries principais"
+
+  - id: "RN-RF026-012"
+    titulo: "Soft Delete Obrigatório"
+    descricao: "Sistema NUNCA deve fazer DELETE físico de faturas. Exclusão lógica via flag FlExcluido = TRUE. Preservar histórico 7 anos para auditorias fiscais (legislação brasileira). Queries incluem WHERE FlExcluido = 0 padrão (EF Core Query Filter global)."
+    justificativa: "Exclusão física impede auditoria retroativa e viola compliance fiscal. Empresa pode ser multada se não comprovar faturas últimos 7 anos em auditoria."
+    tipo: "seguranca"
+    criticidade: "CRÍTICA"
+    campos_afetados: ["FlExcluido", "DataExclusao", "UsuarioExclusaoId"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "DELETE físico não permitido (botão Excluir executa UPDATE FlExcluido = TRUE)"
+      - "Queries padrão não retornam registros com FlExcluido = TRUE"
+      - "Administrador pode visualizar registros excluídos com filtro especial (auditoria)"
+
+  - id: "RN-RF026-013"
+    titulo: "Histórico de Versões de Fatura"
+    descricao: "Se fatura reimportada/corrigida, sistema DEVE criar nova versão preservando anteriores em Fatura_Versao (Numero_Versao, Data_Versao, Usuario_Responsavel, Motivo_Alteracao obrigatório se v2+, Snapshot_Dados JSON). UI compara versões lado a lado (diff highlighting). Administrador pode restaurar versão anterior com justificativa."
+    justificativa: "Faturas podem ser corrigidas após importação (ex: operadora emite fatura corrigida). Sem versionamento perde histórico do que mudou e por quê."
+    tipo: "auditoria"
+    criticidade: "ALTA"
+    campos_afetados: ["Numero_Versao", "Versao_Atual_Flag", "Motivo_Alteracao", "Snapshot_Dados_JSON"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Reimportação cria v2 automaticamente preservando v1"
+      - "Correção manual exige Motivo_Alteracao (≥20 caracteres)"
+      - "Comparação lado a lado mostra diff linha por linha (highlight verde/vermelho)"
+      - "Restauração versão anterior apenas perfil Administrador"
+
+  - id: "RN-RF026-014"
+    titulo: "Integração com ERP Financeiro"
+    descricao: "Sistema DEVE sincronizar faturas aprovadas com ERP via API REST ou arquivo CSV/TXT. Formatos: SAP IDoc INVOIC02, TOTVS Protheus TXT CNAB, API REST genérica JSON. Dados: Cabeçalho fatura, Rateio contábil, Anexos (PDF). Retry policy Polly 3 tentativas (backoff 2s, 4s, 8s). Eventos não sincronizados após 3 tentativas → Dead Letter Queue (Azure Service Bus) para reprocessamento manual."
+    justificativa: "Sistema financeiro precisa receber dados faturas para contabilização. Integração manual (digitação) é propensa a erros e demorada."
+    tipo: "integracao_externa"
+    criticidade: "ALTA"
+    campos_afetados: ["ERP_Sincronizado", "ERP_Documento_Numero", "ERP_Data_Sync", "ERP_Erro_Log"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    criterios_aceite:
+      - "Fatura aprovada → evento enviado para ERP em <10s"
+      - "Falha temporária (timeout, erro 5xx) → retry automático 3x"
+      - "Falha permanente (erro 4xx) → Dead Letter Queue + alerta equipe TI"
+      - "Sincronização confirmada → flag ERP_Sincronizado = TRUE + ERP_Documento_Numero preenchido"
+
+  - id: "RN-RF026-015"
+    titulo: "Campos Obrigatórios por Status"
+    descricao: "Campos obrigatórios variam por status (validação condicional FluentValidation). Rascunho: Arquivo_Original, Data_Importacao. Aguardando Conciliação: + Operadora, Periodo_Referencia, Data_Emissao, Valor_Total. Aguardando Auditoria: + Resultado_Conciliacao. Aguardando Aprovação: + Resultado_Auditoria, Rateio_Calculado. Aprovada: + Aprovador_Id, Data_Aprovacao, Assinatura_Digital_Id. Paga: + Data_Pagamento, Numero_Documento_Pagamento."
+    justificativa: "Fatura em status Rascunho ainda não tem todos dados obrigatórios (ainda não foi conciliada). Validação condicional permite progresso incremental sem rejeitar prematuramente."
+    tipo: "validacao"
+    criticidade: "ALTA"
+    campos_afetados: ["Varia por status"]
+    obrigatorio: true
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    criterios_aceite:
+      - "Transição status valida campos obrigatórios do status destino"
+      - "Campo obrigatório ausente → rejeição HTTP 400 com mensagem específica"
+      - "Status Paga sem Data_Pagamento → bloqueio"
+
+# ====================================================================================
+# ESTADOS DA ENTIDADE
+# ====================================================================================
+
+estados:
+  - id: "rascunho"
+    descricao: "Fatura importada mas ainda não validada (dados podem estar incompletos)"
+  - id: "aguardando_conciliacao"
+    descricao: "Importação confirmada, aguardando execução de conciliação automática"
+  - id: "aguardando_auditoria"
+    descricao: "Conciliação concluída (manual ou automática), aguardando execução de regras de auditoria"
+  - id: "aguardando_aprovacao"
+    descricao: "Auditoria concluída sem bloqueios (ou bloqueios justificados), aguardando aprovação do gestor"
+  - id: "aprovada"
+    descricao: "Aprovada por gestor com assinatura digital, aguardando pagamento"
+  - id: "paga"
+    descricao: "Pagamento realizado e confirmado (integração com ERP financeiro)"
+  - id: "contestada"
+    descricao: "Fatura com contestação ativa (workflow de contestação em andamento)"
+  - id: "cancelada"
+    descricao: "Fatura cancelada antes de pagar (ex: operadora emitiu fatura corrigida)"
+
+transicoes:
+  permitidas:
+    - de: "rascunho"
+      para: "aguardando_conciliacao"
+      condicao: "Usuário confirma preview de importação"
+    - de: "aguardando_conciliacao"
+      para: "aguardando_auditoria"
+      condicao: "Conciliação executada (automática ou manual)"
+    - de: "aguardando_auditoria"
+      para: "aguardando_aprovacao"
+      condicao: "Auditoria executada + sem bloqueios Alta OU bloqueios Alta justificados"
+    - de: "aguardando_aprovacao"
+      para: "aprovada"
+      condicao: "Gestor aprova + assinatura digital DocuSign"
+    - de: "aprovada"
+      para: "paga"
+      condicao: "Pagamento confirmado (integração ERP)"
+    - de: "*"
+      para: "contestada"
+      condicao: "Usuário cria contestação formal"
+    - de: "contestada"
+      para: "estado_anterior"
+      condicao: "Contestação fechada (resolvida ou negada)"
+    - de: "*"
+      para: "cancelada"
+      condicao: "Administrador cancela fatura"
+  proibidas:
+    - de: "paga"
+      para: "*"
+      motivo: "Estado irreversível"
+    - de: "cancelada"
+      para: "*"
+      motivo: "Estado final (não permite transições)"
+
+# ====================================================================================
+# EVENTOS DE DOMÍNIO
+# ====================================================================================
+
+eventos:
+  - nome: "FaturaImportada"
+    descricao: "Após upload e preview confirmado pelo usuário"
+    payload: ["FaturaId", "TemplateId", "ArquivoOriginalURL", "NumeroLinhasImportadas"]
+  - nome: "FaturaOCRProcessada"
+    descricao: "Após OCR de PDF completar (sucesso ou falha)"
+    payload: ["FaturaId", "ConfidenceScore", "CamposExtraidos", "CamposRevisaoPendente"]
+  - nome: "FaturaConciliadaAutomaticamente"
+    descricao: "Após conciliação automática executar"
+    payload: ["FaturaId", "PercentualConciliado", "ItensConciliados", "ItensRevisar", "ItensNaoConciliados"]
+  - nome: "FaturaAuditada"
+    descricao: "Após execução de regras de auditoria"
+    payload: ["FaturaId", "RegrasFalhas", "ValorTotalSuspeito", "BloqueioAprovacao"]
+  - nome: "ContestacaoCriada"
+    descricao: "Após criação de contestação formal"
+    payload: ["ContestacaoId", "FaturaId", "ItensSelecionados", "ValorTotalContestado"]
+  - nome: "ContestacaoEnviadaOperadora"
+    descricao: "Após envio de contestação para operadora (API ou email)"
+    payload: ["ContestacaoId", "CanalEnvio", "DataEnvio", "SLAPrazoDias"]
+  - nome: "RateioCalculado"
+    descricao: "Após cálculo de rateio multi-dimensional"
+    payload: ["FaturaId", "RegraRateioId", "RateioDetalhado"]
+  - nome: "FaturaAprovada"
+    descricao: "Após aprovação do gestor com assinatura digital"
+    payload: ["FaturaId", "AprovadorId", "DataAprovacao", "DocuSignEnvelopeId"]
+  - nome: "FaturaPaga"
+    descricao: "Após confirmação de pagamento"
+    payload: ["FaturaId", "DataPagamento", "NumeroDocumentoPagamento", "ERPDocumentoNumero"]
+  - nome: "AlertaEstouroBudgetGerado"
+    descricao: "Quando previsão ML > 90% do budget aprovado"
+    payload: ["AlertaId", "MesReferencia", "ValorPrevisto", "PercentualBudget", "DiasAntecedencia"]
+  - nome: "FaturaSincronizadaERP"
+    descricao: "Após sincronização com sucesso no ERP financeiro"
+    payload: ["FaturaId", "ERPDocumentoNumero", "DataSync"]
+  - nome: "FaturaVersaoNovaCriada"
+    descricao: "Após reimportação ou correção manual gerar nova versão"
+    payload: ["FaturaId", "NumeroVersao", "MotivoAlteracao", "UsuarioResponsavel"]
+
+# ====================================================================================
+# PERMISSÕES RBAC
+# ====================================================================================
+
+permissoes:
+  - codigo: "faturas.view_any"
+    descricao: "Listar faturas com filtros (próprio ClienteId)"
+    roles_autorizadas: ["Super Admin", "Admin", "Financeiro", "Gestor TI"]
+    endpoint: "GET /api/v1/faturas"
+  - codigo: "faturas.view"
+    descricao: "Visualizar detalhes completos de fatura"
+    roles_autorizadas: ["Super Admin", "Admin", "Financeiro", "Gestor TI", "Usuário"]
+    endpoint: "GET /api/v1/faturas/{id}"
+  - codigo: "faturas.create"
+    descricao: "Importar nova fatura (upload arquivo ou OCR)"
+    roles_autorizadas: ["Super Admin", "Admin", "Financeiro"]
+    endpoint: "POST /api/v1/faturas/importar"
+  - codigo: "faturas.update"
+    descricao: "Atualizar fatura existente (cria nova versão)"
+    roles_autorizadas: ["Super Admin", "Admin", "Financeiro"]
+    endpoint: "PUT /api/v1/faturas/{id}"
+  - codigo: "faturas.delete"
+    descricao: "Excluir fatura (soft delete)"
+    roles_autorizadas: ["Super Admin", "Admin"]
+    endpoint: "DELETE /api/v1/faturas/{id}"
+  - codigo: "faturas.conciliar"
+    descricao: "Executar conciliação automática ou manual"
+    roles_autorizadas: ["Super Admin", "Admin", "Financeiro"]
+    endpoint: "POST /api/v1/faturas/{id}/conciliar"
+  - codigo: "faturas.auditar"
+    descricao: "Executar regras de auditoria"
+    roles_autorizadas: ["Super Admin", "Admin", "Financeiro"]
+    endpoint: "POST /api/v1/faturas/{id}/auditar"
+  - codigo: "faturas.contest"
+    descricao: "Criar contestação formal"
+    roles_autorizadas: ["Super Admin", "Admin", "Financeiro"]
+    endpoint: "POST /api/v1/faturas/{id}/contestacoes"
+  - codigo: "faturas.rateio"
+    descricao: "Calcular rateio multi-dimensional"
+    roles_autorizadas: ["Super Admin", "Admin", "Financeiro"]
+    endpoint: "POST /api/v1/faturas/{id}/ratear"
+  - codigo: "faturas.approve"
+    descricao: "Aprovar fatura para pagamento (multi-nível)"
+    roles_autorizadas: ["Super Admin", "Gestor TI", "Diretor", "CFO"]
+    endpoint: "POST /api/v1/faturas/{id}/aprovar"
+  - codigo: "faturas.admin"
+    descricao: "Operações administrativas (restaurar versões, visualizar excluídos)"
+    roles_autorizadas: ["Super Admin"]
+    endpoint: "Multiple admin endpoints"
+
+# ====================================================================================
+# API ENDPOINTS
+# ====================================================================================
+
+endpoints:
+  - method: "GET"
+    route: "/api/v1/faturas"
+    descricao: "Listar faturas com paginação cursor-based e filtros avançados"
+    autenticacao: true
+    authorization_policy: "FaturasRead"
+    request_dto: "GetFaturasQuery"
+    response_dto: "PaginatedListDto<FaturaDto>"
+  - method: "GET"
+    route: "/api/v1/faturas/{id}"
+    descricao: "Buscar fatura por ID com detalhes completos"
+    autenticacao: true
+    authorization_policy: "FaturasRead"
+    request_dto: null
+    response_dto: "FaturaDetalhadaDto"
+  - method: "POST"
+    route: "/api/v1/faturas/importar"
+    descricao: "Importar fatura multi-layout (CSV, XLS, XLSX, TXT, PDF)"
+    autenticacao: true
+    authorization_policy: "FaturasCreate"
+    request_dto: "ImportarFaturaCommand"
+    response_dto: "Guid"
+  - method: "POST"
+    route: "/api/v1/faturas/importar/ocr"
+    descricao: "OCR de PDF via Azure Form Recognizer"
+    autenticacao: true
+    authorization_policy: "FaturasCreate"
+    request_dto: "OCRFaturaPDFCommand"
+    response_dto: "OCRResultDto"
+  - method: "PUT"
+    route: "/api/v1/faturas/{id}"
+    descricao: "Atualizar fatura (cria nova versão)"
+    autenticacao: true
+    authorization_policy: "FaturasUpdate"
+    request_dto: "UpdateFaturaCommand"
+    response_dto: "void"
+  - method: "DELETE"
+    route: "/api/v1/faturas/{id}"
+    descricao: "Soft delete de fatura"
+    autenticacao: true
+    authorization_policy: "FaturasDelete"
+    request_dto: null
+    response_dto: "void"
+  - method: "POST"
+    route: "/api/v1/faturas/{id}/conciliar"
+    descricao: "Executar conciliação automática"
+    autenticacao: true
+    authorization_policy: "FaturasConciliar"
+    request_dto: "ConciliarFaturaCommand"
+    response_dto: "ConciliacaoResultDto"
+  - method: "GET"
+    route: "/api/v1/faturas/{id}/conciliacao"
+    descricao: "Resultado detalhado de conciliação"
+    autenticacao: true
+    authorization_policy: "FaturasRead"
+    request_dto: null
+    response_dto: "ConciliacaoDetalhadaDto"
+  - method: "POST"
+    route: "/api/v1/faturas/{id}/auditar"
+    descricao: "Executar regras de auditoria"
+    autenticacao: true
+    authorization_policy: "FaturasAuditar"
+    request_dto: "AuditarFaturaCommand"
+    response_dto: "AuditoriaResultDto"
+  - method: "GET"
+    route: "/api/v1/faturas/{id}/auditoria"
+    descricao: "Resultados de auditoria com falhas destacadas"
+    autenticacao: true
+    authorization_policy: "FaturasRead"
+    request_dto: null
+    response_dto: "AuditoriaDetalhadaDto"
+  - method: "POST"
+    route: "/api/v1/faturas/{id}/contestacoes"
+    descricao: "Criar contestação formal"
+    autenticacao: true
+    authorization_policy: "FaturasContest"
+    request_dto: "CreateContestacaoCommand"
+    response_dto: "Guid"
+  - method: "GET"
+    route: "/api/v1/faturas/contestacoes"
+    descricao: "Listar contestações ativas"
+    autenticacao: true
+    authorization_policy: "FaturasRead"
+    request_dto: "GetContestacoes Query"
+    response_dto: "PaginatedListDto<ContestacaoDto>"
+  - method: "POST"
+    route: "/api/v1/faturas/{id}/ratear"
+    descricao: "Calcular rateio multi-dimensional"
+    autenticacao: true
+    authorization_policy: "FaturasRateio"
+    request_dto: "RatearFaturaCommand"
+    response_dto: "RateioResultDto"
+  - method: "POST"
+    route: "/api/v1/faturas/{id}/aprovar"
+    descricao: "Aprovar fatura para pagamento (multi-nível + DocuSign)"
+    autenticacao: true
+    authorization_policy: "FaturasApprove"
+    request_dto: "AprovarFaturaCommand"
+    response_dto: "void"
+  - method: "GET"
+    route: "/api/v1/faturas/dashboard"
+    descricao: "KPIs principais do dashboard executivo"
+    autenticacao: true
+    authorization_policy: "FaturasRead"
+    request_dto: "GetDashboardFaturasQuery"
+    response_dto: "DashboardFaturasDto"
+  - method: "GET"
+    route: "/api/v1/faturas/dashboard/alertas"
+    descricao: "Alertas preditivos ativos (estouro budget)"
+    autenticacao: true
+    authorization_policy: "FaturasRead"
+    request_dto: null
+    response_dto: "List<AlertaPreditivoDto>"
+  - method: "GET"
+    route: "/api/v1/faturas/templates"
+    descricao: "Listar templates de layout disponíveis"
+    autenticacao: true
+    authorization_policy: "FaturasRead"
+    request_dto: null
+    response_dto: "List<TemplateLayoutDto>"
+  - method: "POST"
+    route: "/api/v1/faturas/templates"
+    descricao: "Criar template customizado (builder visual)"
+    autenticacao: true
+    authorization_policy: "FaturasAdmin"
+    request_dto: "CreateTemplateLayoutCommand"
+    response_dto: "Guid"
+
+# ====================================================================================
+# INTEGRACOES
+# ====================================================================================
+
+integracoes:
+  internas:
+    - "Autenticacao (JWT Bearer token)"
+    - "Multi-Tenancy (ClienteId filter)"
+    - "Auditoria (campos Created/Modified)"
+    - "RBAC (permissões baseadas em roles)"
+    - "i18n (Transloco - pt-BR/en/es)"
+    - "Central de Funcionalidades (registro obrigatório)"
+  externas:
+    - sistema: "Azure Form Recognizer"
+      tipo: "API REST"
+      obrigatoria: true
+      descricao: "OCR de PDFs de faturas"
+    - sistema: "DocuSign API"
+      tipo: "API REST"
+      obrigatoria: true
+      descricao: "Assinatura digital de aprovações"
+    - sistema: "Vivo Empresas API"
+      tipo: "API REST + OAuth 2.0"
+      obrigatoria: false
+      descricao: "Download faturas e envio contestações"
+    - sistema: "Claro Corporate API"
+      tipo: "API REST + OAuth 2.0"
+      obrigatoria: false
+      descricao: "Download faturas"
+    - sistema: "SAP ERP"
+      tipo: "IDoc INVOIC02"
+      obrigatoria: false
+      descricao: "Sincronização faturas aprovadas"
+    - sistema: "TOTVS Protheus"
+      tipo: "TXT CNAB"
+      obrigatoria: false
+      descricao: "Sincronização faturas aprovadas"
+    - sistema: "Azure Service Bus"
+      tipo: "Message Queue"
+      obrigatoria: true
+      descricao: "Dead Letter Queue para falhas sincronização ERP"
+    - sistema: "Azure Blob Storage"
+      tipo: "Blob Storage"
+      obrigatoria: true
+      descricao: "Armazenamento PDFs originais de faturas"
+
+# ====================================================================================
+# SEGURANCA
+# ====================================================================================
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_entrada: "FluentValidation com regras condicionais por status"
+  autenticacao: "JWT Bearer token"
+  autorizacao: "RBAC (roles + policies)"
+  protecao_dados_sensiveis:
+    - "Tokens OAuth 2.0 em Azure Key Vault"
+    - "PDFs em Azure Blob Storage com SAS token temporário"
+    - "PII mascarado em logs"
+  rate_limiting: "100 req/min por ClienteId"
+  compliance:
+    - "LGPD (isolamento multi-tenant)"
+    - "SOX (auditoria GPS + device ID + IP)"
+    - "Fiscal (preservação 7 anos)"
+
+# ====================================================================================
+# KPIs E MÉTRICAS
+# ====================================================================================
+
+kpis:
+  - nome: "Gasto Total Mês"
+    descricao: "Valor total faturas aprovadas no mês"
+    meta: "< Budget aprovado"
+    log_obrigatorio: true
+  - nome: "Variação MoM"
+    descricao: "Percentual variação vs. mês anterior"
+    meta: "Estável ou decrescente"
+    log_obrigatorio: true
+  - nome: "Variação YoY"
+    descricao: "Percentual variação vs. mesmo mês ano anterior"
+    meta: "Monitorar tendências anuais"
+    log_obrigatorio: true
+  - nome: "Taxa Conciliação Automática"
+    descricao: "Percentual itens conciliados automaticamente"
+    meta: ">= 90%"
+    log_obrigatorio: true
+  - nome: "Taxa Economia Auditoria"
+    descricao: "Percentual valor recuperado em contestações"
+    meta: ">= 12%"
+    log_obrigatorio: true
+  - nome: "Tempo Médio Conciliação"
+    descricao: "Tempo médio para conciliar fatura completa"
+    meta: "<= 2 minutos (fatura 500 linhas)"
+    log_obrigatorio: true
+  - nome: "Tempo Médio Rateio"
+    descricao: "Tempo médio para calcular rateio"
+    meta: "<= 2 segundos"
+    log_obrigatorio: true
+  - nome: "Taxa Sucesso Contestações"
+    descricao: "Percentual contestações aceitas por operadoras"
+    meta: ">= 70%"
+    log_obrigatorio: true
+  - nome: "Acurácia Previsão ML"
+    descricao: "Acurácia modelo ML de previsão de gastos"
+    meta: ">= 85%"
+    log_obrigatorio: true
+  - nome: "SLA Operadoras"
+    descricao: "Percentual contestações respondidas dentro do SLA"
+    meta: ">= 80%"
+    log_obrigatorio: true
+
+# ====================================================================================
+# ALERTAS CRÍTICOS
+# ====================================================================================
+
+alertas:
+  - evento: "Previsão estouro budget 30 dias"
+    threshold: "Previsão > 90% budget"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+      - "push"
+      - "in-app"
+      - "dashboard"
+  - evento: "Previsão estouro budget 15 dias"
+    threshold: "Previsão > 90% budget"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "push"
+  - evento: "Previsão estouro budget 7 dias"
+    threshold: "Previsão > 90% budget"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+  - evento: "Auditoria bloqueou aprovação"
+    threshold: "Regras severidade Alta falharam"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "in-app"
+  - evento: "SLA contestação excedido 80%"
+    threshold: "> 80% do prazo SLA"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "push"
+  - evento: "API operadora falha 3x consecutivas"
+    threshold: "> 3 falhas seguidas"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+  - evento: "Sincronização ERP falhou"
+    threshold: "Falha após 3 tentativas (DLQ)"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+  - evento: "Tentativa acesso não autorizado"
+    threshold: "> 10 em 5 minutos"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "sms"
+
+# ====================================================================================
+# RASTREABILIDADE
+# ====================================================================================
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-listar-faturas"
+    - "UC01-importar-fatura"
+    - "UC02-visualizar-fatura"
+    - "UC03-conciliar-fatura"
+    - "UC04-auditar-fatura"
+    - "UC05-contestar-fatura"
+    - "UC06-ratear-fatura"
+    - "UC07-aprovar-fatura"
+    - "UC08-dashboard-faturas"
+  mds_esperados:
+    - "MD-RF026-Fatura"
+    - "MD-RF026-Fatura-Detalhe"
+    - "MD-RF026-Auditoria-Regra"
+    - "MD-RF026-Contestacao"
+    - "MD-RF026-Rateio-Regra"
+  dependencias_upstream:
+    - "RF-023 (Gestão de Contratos)"
+    - "RF-025 (Gestão de Ativos)"
+    - "RF-014 (Gestão de Centros de Custo)"
+  dependencias_downstream:
+    - "RF-027 (Gestão de Aditivos de Contratos)"
+    - "RF-028 (Gestão de SLA de Operações)"
+
+# ====================================================================================
+# HISTÓRICO
+# ====================================================================================
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0 com separação estrita RF/RL. RF limpo (apenas contrato moderno), legado movido para RL-RF026.md. 15 regras de negócio em linguagem natural (sem código VB.NET/SQL). Estrutura 11 seções conforme template v2.0. Integrações obrigatórias documentadas (i18n, auditoria, RBAC, multi-tenancy)."
+  - versao: "1.0"
+    data: "2025-12-17"
+    autor: "Equipe IControlIT Architect"
+    descricao: "Versão inicial com conteúdo misto (legado + moderno). 5 seções básicas. Regras de negócio misturadas com referências ao legado. Necessitava migração para v2.0."

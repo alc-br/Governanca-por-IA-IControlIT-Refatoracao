@@ -1,0 +1,1699 @@
+# RF032: Gestão de Notas Fiscais e Faturas
+
+**Versão**: 2.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF023 (Contratos), RF089 (Conciliação Fiscal) | **EPIC**: EPIC006-FIN-Financeiro-Base
+**Fase**: Fase 3 - Financeiro I (Base Contábil)
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+O **RF032 - Gestão de Notas Fiscais e Faturas** implementa o módulo responsável pela **gestão completa do ciclo de vida de Notas Fiscais Eletrônicas (NF-e)** no sistema IControlIT. Este requisito é crítico para conformidade fiscal, rastreabilidade de custos, auditoria contábil e integração com órgãos fazendários brasileiros.
+
+O módulo permite a importação, validação, armazenamento, processamento, conciliação e auditoria de notas fiscais de entrada (compras) e saída (vendas), com suporte a múltiplas formas de aquisição: upload de XML, integração com SEFAZ, OCR de DANFE em PDF, e importação em lote via CSV.
+
+A solução implementa validações criptográficas de assinatura digital (certificado A1/A3), consulta de status junto à SEFAZ, extração automática de metadados (emitente, destinatário, impostos, CFOP, NCM), cálculo de tributos federais e estaduais, detecção de divergências com pedidos e contratos, e geração de relatórios fiscais para conformidade SPED, DCTF e auditoria externa (SOX/LGPD).
+
+### 1.2 Importância Estratégica
+
+O módulo de gestão de notas fiscais é crítico para:
+
+- **Conformidade Regulatória**: Garante aderência a legislação fiscal federal (Lei 12.865/2013 - NF-e), estadual (ICMS) e municipal (ISS). Implementa retenções obrigatórias (IRRF, CSLL, INSS) conforme Lei 11.051/2004 e Lei 13.172/2015.
+- **Rastreabilidade Fiscal**: Mantém auditoria completa de todas as movimentações de notas fiscais (recebimento, validação, conciliação, pagamento, cancelamento) por 7 anos conforme LGPD. Integra com módulo de auditoria (RF004).
+- **Eficiência Contábil**: Automatiza lançamentos contábeis através de integração com ERP (RF078), reduzindo erros manuais e acelerando fechamento fiscal em até 70%.
+- **Gestão de Custos**: Permite rateio inteligente de notas entre filiais, centros de custo e clientes com suporte a regras condicionais (cálculo por volume, peso, baseado em contrato).
+- **Controle de Impostos**: Fornece dashboard em tempo real de impostos retidos, a recuperar e a pagar, essencial para planejamento tributário e cumprimento de obrigações acessórias (SPED, ECF, ECD).
+- **Redução de Fraude**: Validação criptográfica de assinatura digital (RSA-2048 com hash SHA-256) evita falsificação de documentos fiscais e fraude de importação de XML malformado.
+
+### 1.3 Conceitos Fundamentais
+
+**Nota Fiscal Eletrônica (NF-e)**: Documento fiscal digital emitido em formato XML, assinado digitalmente e autorizado pela Secretaria da Fazenda estadual. Obrigatória para todas as empresas enquadradas em regime tributário específico desde 2005.
+- Estrutura padrão ABNT NBR ISO/IEC 27001 com certificação digital
+- Contém identificação de emitente/destinatário, descrição de produtos/serviços, valores, impostos
+- Substitui documento físico por completo (art. 2º Lei 12.865/2013)
+
+**DANFE (Documento Auxiliar da NF-e)**: Representação em papel da NF-e, contendo código QR, código de barras e chave de acesso. Utilizado para transporte de mercadorias.
+- Formato: 44 caracteres (UF 2 + AAMM 4 + CNPJ 8 + tipo 1 + série 3 + número 9 + dígito verificador 1 + código verificador 16)
+- Válido apenas enquanto XML correspondente estiver ativo na SEFAZ
+
+**Chave de Acesso (NF-e)**: Identificador único gerado a partir de hash SHA-1 dos dados essenciais da NF-e. Formato: 44 dígitos.
+- Cálculo: UF(2) + AAMM(4) + CNPJ(8) + MOD(1) + SERIE(3) + NUMERO(9) + DV(1) + CVNFE(16)
+- Registrado na SEFAZ para consulta pública via portal
+
+**SEFAZ (Sistema Eletrônico de Facturação)**: Serviço federal que autoriza, rejeita ou nega protocolo para NF-e.
+- Cada UF possui instância própria (SEFAZ-SP, SEFAZ-MG, etc.)
+- Tempo médio de resposta: 30 segundos para autorização em lote
+- Ambiente de testes (SEFAZ-UF-test) obrigatório antes de produção
+
+**Certificado Digital (A1/A3)**: Comprovação criptográfica da identidade da empresa. Obrigatório para assinatura de NF-e.
+- A1: arquivo .pfx em disco (válido por 12 meses)
+- A3: smartcard/token (válido por 3 anos)
+- Algoritmo: RSA-2048, hash SHA-256, padrão ICP-Brasil
+
+**CFOP (Código Fiscal de Operação)**: Classifica a natureza da operação fiscal (venda, devolução, transferência, etc). Composto por 4 dígitos.
+- 1000-1999: Operações de entrada (compras)
+- 5000-5999: Operações de saída (vendas)
+- Diferencia entre operação tributada, isenta, imunizada, substituição tributária
+
+**NCM (Nomenclatura Comum do MERCOSUL)**: Código de 8 dígitos que classifica produtos para fins de tributação, cálculo de impostos e operações de comércio exterior.
+- Determina alíquota de ICMS, IPI, PIS, COFINS
+- Obrigatório para todas as operações de venda de produtos
+
+**Substituição Tributária (ST)**: Regime onde um contribuinte substitui o outro na obrigação de recolhimento de ICMS. Afeta cálculo de impostos e substituição fiscal.
+- Operações com ST não geram ICMS próprio no destinatário
+- Exige análise especial durante conciliação de impostos
+
+**Retenções de Impostos**: Descontos obrigatórios em notas fiscais conforme legislação específica.
+- IRRF (Imposto de Renda Retido na Fonte): 1,5% a 25% conforme tipo de serviço
+- CSLL (Contribuição Social sobre o Lucro Líquido): 1% para serviços em geral
+- INSS (Contribuição ao Instituto Nacional de Seguridade Social): 11% sobre serviços de pessoas jurídicas
+- ISS (Imposto sobre Serviço): 2% a 5% por município conforme serviço prestado
+
+**Divergência Fiscal**: Descrepância entre dados da NF-e e pedido/contrato associado. Pode ser: quantidade diferente, valor diferente, CFOP inconsistente, NCM faltante, impostos calculados incorretamente.
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET / ASPX) | Modernizado (.NET 10 + Angular 19) |
+|---------|-------------------------|--------------------------------------|
+| **Suporte NF-e** | Importação manual de XML apenas | Importação automática + SEFAZ + OCR + integração com BrasilAPI |
+| **Validação de Assinatura** | Não implementado | RSA-2048, SHA-256, validação criptográfica completa |
+| **Armazenamento** | Arquivo local em servidor | Azure Blob Storage com versionamento e backup |
+| **Cálculo de Impostos** | Manual, propenso a erros | Automático com regras FiscoData (ICMS, IPI, PIS, COFINS, ISS, retenções) |
+| **Conciliação** | Processo manual em planilha | Automática com detecção de divergências e sugestão de ajustes |
+| **Consulta SEFAZ** | Não implementada | API REST com retry automático e log de tentativas |
+| **OCR de DANFE** | Não implementado | Azure Cognitive Services + Tesseract fallback |
+| **Relatórios Fiscais** | Gerados manualmente | Automáticos: SPED Fiscal, DCTF, livro de apuração, exportação contábil |
+| **Auditoria** | Sem registro de alterações | Auditoria automática de todas operações (7 anos LGPD) |
+| **Performance** | Queries diretas, sem índices | Índices em chave de acesso, query otimizadas, caching Redis |
+| **i18n** | Apenas pt-BR | pt-BR, en-US, es-ES com mensagens de erro localizadas |
+| **Multi-tenancy** | Filtros manuais | Row-Level Security automático por conglomerado |
+| **RBAC** | Permissões básicas por perfil | Granulares: nf:import, nf:validate, nf:reconcile, nf:cancel, nf:export |
+
+### 1.5 Funcionalidades Principais
+
+1. **Importação de Notas Fiscais**
+   - Upload de arquivo XML (.xml) com validação de estrutura e encoding UTF-8
+   - Integração com webservice SEFAZ para busca automática de NF-e por chave de acesso
+   - OCR de DANFE em PDF (quando XML indisponível) usando Azure Cognitive Services
+   - Importação em lote via CSV com mapeamento flexível de colunas
+   - Suporte a múltiplas naturezas: NF-e de entrada (compra), saída (venda), devolução
+
+2. **Validação e Segurança**
+   - Validação de estrutura XML contra schema XSD da SEFAZ
+   - Verificação de assinatura digital (RSA-2048, SHA-256) com certificado da empresa
+   - Consulta de status junto à SEFAZ (autorizada, rejeitada, cancelada, cancelamento autorizado)
+   - Detecção de duplicidade dentro do conglomerado (chave de acesso única)
+   - Validação de datas (data de emissão, data de entrega, data de saída)
+
+3. **Extração de Dados**
+   - Parsing automático de XML com mapeamento para entidades do domínio
+   - Extração de emitente/destinatário com validação de CNPJ/CPF
+   - Extração de itens com NCM, CFOP, quantidade, valores, alíquotas
+   - Extração de impostos (ICMS, IPI, PIS, COFINS, ISS, retenções)
+   - Extração de adicionais (IE, IM, natureza da operação, indicadores especiais)
+
+4. **Cálculo e Gestão de Impostos**
+   - Cálculo automático de tributos federais (IPI, PIS, COFINS, IRRF, CSLL, INSS)
+   - Cálculo de ICMS por alíquota, substituição tributária, créditos (ICMS ST)
+   - Cálculo de ISS municipal conforme lei de cada cidade
+   - Rastreamento de impostos retidos vs a recuperar
+   - Dashboard de obrigações tributárias (saldo a pagar, saldo a recuperar)
+
+5. **Conciliação Automática**
+   - Matching automático NF-e vs Pedido (por CNPJ emitente + valor + data)
+   - Matching automático NF-e vs Contrato (por RF023 com identificação de fornecedor)
+   - Detecção de divergências: quantidade, valor, CFOP, NCM, impostos
+   - Sugestão automática de ajustes para divergências menores (tolerância 1%)
+   - Bloqueio de pagamento se divergência crítica não for aprovada
+
+6. **Rateio de Notas Fiscais**
+   - Distribuição de valor total entre filiais/centros de custo com percentual de rateio
+   - Suporte a rateio multi-dimensional (filial + centro de custo + cliente)
+   - Rateio com regras condicionais: por volume, peso, contrato, percentual fixo
+   - Validação de soma de percentuais (100%) e redistribuição automática
+
+7. **Armazenamento e Preservação**
+   - Armazenamento de XML original em Azure Blob Storage (indefinido)
+   - Geração e armazenamento de DANFE em PDF (com dados extraídos)
+   - Versionamento de alterações (metadados, lançamentos, aprovações)
+   - Conformidade com Lei 12.865/2013 (retenção de dados fiscais)
+
+8. **Fluxo de Aprovação**
+   - Workflow multi-nível para aprovação de notas com divergências
+   - Notificação para gerente fiscal em caso de divergência ou retenção suspeita
+   - Registro de decisões (aprovado com ajuste, reprovado, pendente de informação)
+   - Reversibilidade: permite desaprovar e revisar
+
+9. **Integração com ERP**
+   - Exportação automática de lançamento contábil (débito/crédito por conta)
+   - Integração com módulo de contabilidade (RF034, RF035) para auditoria
+   - Sincronização de centros de custo com hierarchy de organização
+   - Suporte a múltiplos planos de contas (por conglomerado)
+
+10. **Geração de Relatórios Fiscais**
+    - SPED Fiscal (Livro de Apuração do ICMS)
+    - DCTF (Declaração de Débitos e Créditos Tributários)
+    - Livro de Registro de Entrada e Saída
+    - Relatório de Impostos Retidos (IRRF, CSLL, INSS)
+    - Exportação para sistemas contábeis (layout SEFAZ)
+
+11. **Auditoria e Conformidade**
+    - Log imutável de todas operações (importação, validação, conciliação, cancelamento)
+    - Rastreamento de usuário, timestamp, versão anterior/nova (antes/depois)
+    - Conformidade LGPD: retenção de 7 anos, direito de acesso a dados pessoais
+    - Conformidade SOX: segregação de funções, aprovação mandatória, reversibilidade
+
+12. **Dashboard e Monitoramento**
+    - Visão geral de notas fiscais: por período, emitente, categoria
+    - Indicadores: notas pendentes, divergências não conciliadas, impostos retidos
+    - Alertas: notas próximas do vencimento, impostos a recolher em atraso, divergências críticas
+    - Filtros avançados: por período, emitente, natureza, status, filial
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-NFE-032-01: Importação de NF-e com Validação de Estrutura XML
+
+**Descrição**: Toda nota fiscal importada deve ter sua estrutura XML validada contra o schema XSD 4.00 da SEFAZ antes de ser persistida em banco de dados.
+
+**Justificativa**: Evita corrupção de dados através de XML malformado ou compatível com versão antiga da NF-e. O schema XSD garante conformidade com padrão federal.
+
+**Implementação**:
+```csharp
+public class ImportarNotaFiscalCommandHandler : IRequestHandler<ImportarNotaFiscalCommand, ImportarNotaFiscalResult>
+{
+    private readonly IXmlValidationService _xmlValidator;
+    private readonly IApplicationDbContext _context;
+    private readonly IAuditService _audit;
+
+    public async Task<ImportarNotaFiscalResult> Handle(ImportarNotaFiscalCommand request, CancellationToken cancellationToken)
+    {
+        // 1. Validar estrutura XML contra schema SEFAZ 4.00
+        var validationResult = await _xmlValidator.ValidateAsync(
+            xmlContent: request.XmlContent,
+            schemaVersion: "4.00",
+            throwOnError: true,
+            cancellationToken: cancellationToken
+        );
+
+        if (!validationResult.IsValid)
+            throw new XmlValidationException(
+                message: $"XML inválido: {string.Join("; ", validationResult.Errors)}",
+                validationErrors: validationResult.Errors
+            );
+
+        // 2. Extrair chave de acesso (44 dígitos)
+        var chaveAcesso = await ExtractChaveAcessoAsync(request.XmlContent);
+
+        // 3. Verificar duplicidade por chave de acesso no conglomerado
+        var exists = await _context.NotasFiscais
+            .AsNoTracking()
+            .AnyAsync(nf => nf.ChaveAcesso == chaveAcesso
+                         && nf.ConglomeradoId == request.ConglomeradoId
+                         && !nf.FlExcluido,
+                    cancellationToken);
+
+        if (exists)
+            throw new BusinessRuleException(
+                code: "NF_DUPLICATE_CHAVE_ACESSO",
+                message: $"Nota fiscal com chave de acesso {chaveAcesso} já foi importada"
+            );
+
+        // 4. Parsear XML e extrair metadados
+        var nfeData = await _xmlParser.ParseNFeAsync(request.XmlContent, cancellationToken);
+
+        // 5. Criar entidade
+        var notaFiscal = new NotaFiscal
+        {
+            ChaveAcesso = chaveAcesso,
+            NumeroNota = nfeData.NumeroNota,
+            SerieNota = nfeData.SerieNota,
+            DataEmissao = nfeData.DataEmissao,
+            CnpjEmitente = nfeData.CnpjEmitente,
+            CnpjDestinatario = nfeData.CnpjDestinatario,
+            ValorTotal = nfeData.ValorTotal,
+            XmlOriginal = request.XmlContent,
+            Status = NotaFiscalStatus.AguardandoProcessamento,
+            ConglomeradoId = request.ConglomeradoId,
+            ClienteId = request.ClienteId,
+            CriadoPor = request.UsuarioId,
+            DataCriacao = DateTime.UtcNow
+        };
+
+        _context.NotasFiscais.Add(notaFiscal);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // 6. Auditar
+        await _audit.LogAsync(
+            operation: AuditOperation.Create,
+            entityType: "NotaFiscal",
+            entityId: notaFiscal.Id,
+            conglomeradoId: request.ConglomeradoId,
+            userId: request.UsuarioId,
+            changes: $"Importada NF-e {chaveAcesso}",
+            cancellationToken: cancellationToken
+        );
+
+        return new ImportarNotaFiscalResult { Id = notaFiscal.Id, ChaveAcesso = chaveAcesso };
+    }
+}
+```
+
+**Exemplos**:
+- ✅ XML válido com estrutura completa, emitente e destinatário preenchidos
+- ❌ XML com tags faltantes (ex: falta bloco de valores)
+- ❌ XML com encoding incorreto (ex: ASCII em vez de UTF-8)
+- ❌ XML de versão 3.10 em vez de 4.00
+
+---
+
+### RN-NFE-032-02: Validação de Assinatura Digital (RSA-2048 com SHA-256)
+
+**Descrição**: A assinatura digital da NF-e deve ser validada usando algoritmo RSA-2048 com hash SHA-256 antes de qualquer processamento.
+
+**Justificativa**: Garante autenticidade e integridade da nota fiscal. Detecta falsificações ou alterações pós-assinatura.
+
+**Implementação**:
+```csharp
+public class ValidarAssinaturaDigitalCommandHandler : IRequestHandler<ValidarAssinaturaDigitalCommand, ValidarAssinaturaDigitalResult>
+{
+    private readonly IDigitalSignatureService _signatureService;
+    private readonly IApplicationDbContext _context;
+
+    public async Task<ValidarAssinaturaDigitalResult> Handle(
+        ValidarAssinaturaDigitalCommand request,
+        CancellationToken cancellationToken)
+    {
+        var notaFiscal = await _context.NotasFiscais
+            .FirstOrDefaultAsync(nf => nf.Id == request.NotaFiscalId, cancellationToken);
+
+        if (notaFiscal == null)
+            throw new EntityNotFoundException("Nota fiscal não encontrada");
+
+        try
+        {
+            // 1. Validar assinatura digital
+            var signatureValid = await _signatureService.VerifySignatureAsync(
+                xmlContent: notaFiscal.XmlOriginal,
+                algorithm: "RSA2048",
+                hashAlgorithm: "SHA256"
+            );
+
+            if (!signatureValid)
+                throw new SignatureValidationException(
+                    "Assinatura digital inválida. Nota fiscal pode ter sido alterada."
+                );
+
+            // 2. Extrair certificado do XML
+            var certificate = await _signatureService.ExtractCertificateAsync(notaFiscal.XmlOriginal);
+
+            // 3. Validar certificado (não expirado, ICP-Brasil válido)
+            var certValidation = _signatureService.ValidateCertificate(certificate);
+            if (!certValidation.IsValid)
+                throw new SignatureValidationException(
+                    $"Certificado inválido: {certValidation.ErrorMessage}"
+                );
+
+            // 4. Registrar validação
+            notaFiscal.AssinaturaValidada = true;
+            notaFiscal.DataValidacaoAssinatura = DateTime.UtcNow;
+            notaFiscal.CertificadoThumbprint = certificate.Thumbprint;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            return new ValidarAssinaturaDigitalResult
+            {
+                Valida = true,
+                DataValidacao = notaFiscal.DataValidacaoAssinatura.Value,
+                CertificadoExpiracao = certificate.NotAfter,
+                CertificadoEmisor = certificate.IssuerName.Name
+            };
+        }
+        catch (Exception ex)
+        {
+            notaFiscal.AssinaturaValidada = false;
+            notaFiscal.DataValidacaoAssinatura = DateTime.UtcNow;
+            notaFiscal.ErroValidacao = ex.Message;
+            await _context.SaveChangesAsync(cancellationToken);
+
+            throw;
+        }
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Assinatura válida, certificado não expirado, data correta
+- ❌ Assinatura inválida (XML alterado após assinatura)
+- ❌ Certificado expirado
+- ❌ Certificado não reconhecido como ICP-Brasil
+
+---
+
+### RN-NFE-032-03: Consulta Automática de Status na SEFAZ
+
+**Descrição**: Ao importar NF-e, o sistema deve consultar o status junto à SEFAZ (autorizada, rejeitada, cancelada, cancelamento autorizado) e registrar resultado no banco.
+
+**Justificativa**: Evita processamento de notas rejeitadas ou canceladas. Garante que nota processada foi efectivamente autorizada pela fazenda estadual.
+
+**Implementação**:
+```csharp
+public class ConsultarStatusSefazCommandHandler : IRequestHandler<ConsultarStatusSefazCommand, ConsultarStatusSefazResult>
+{
+    private readonly ISefazService _sefazService;
+    private readonly IApplicationDbContext _context;
+    private readonly IAuditService _audit;
+
+    public async Task<ConsultarStatusSefazResult> Handle(
+        ConsultarStatusSefazCommand request,
+        CancellationToken cancellationToken)
+    {
+        var notaFiscal = await _context.NotasFiscais
+            .FirstOrDefaultAsync(nf => nf.ChaveAcesso == request.ChaveAcesso, cancellationToken);
+
+        if (notaFiscal == null)
+            throw new EntityNotFoundException("Nota fiscal não encontrada");
+
+        try
+        {
+            // 1. Consultar status na SEFAZ (com retry automático)
+            var statusResult = await _sefazService.ConsultarStatusNFeAsync(
+                chaveAcesso: request.ChaveAcesso,
+                uf: ExtractUFFromChaveAcesso(request.ChaveAcesso),
+                retryCount: 3,
+                retryDelayMs: 5000
+            );
+
+            // 2. Processar resultado
+            var statusEnum = MapStatusToEnum(statusResult.Status);
+
+            if (statusEnum == NotaFiscalStatus.Rejeitada)
+            {
+                notaFiscal.Status = statusEnum;
+                notaFiscal.MotivoRejeicao = statusResult.MotivoRejeicao;
+                notaFiscal.CodigoRejeicao = statusResult.CodigoRejeicao;
+            }
+            else if (statusEnum == NotaFiscalStatus.Cancelada)
+            {
+                notaFiscal.Status = statusEnum;
+                notaFiscal.DataCancelamento = statusResult.DataCancelamento;
+            }
+            else if (statusEnum == NotaFiscalStatus.Autorizada)
+            {
+                notaFiscal.Status = statusEnum;
+                notaFiscal.ProtocoloAutorizacao = statusResult.ProtocoloAutorizacao;
+                notaFiscal.DataAutorizacao = statusResult.DataAutorizacao;
+            }
+
+            notaFiscal.DataConsultaSefaz = DateTime.UtcNow;
+            notaFiscal.NumeroTentativasSefaz += 1;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // 3. Auditar consulta
+            await _audit.LogAsync(
+                operation: AuditOperation.Update,
+                entityType: "NotaFiscal",
+                entityId: notaFiscal.Id,
+                conglomeradoId: notaFiscal.ConglomeradoId,
+                userId: request.UsuarioId,
+                changes: $"Status SEFAZ consultado: {statusEnum}",
+                cancellationToken: cancellationToken
+            );
+
+            return new ConsultarStatusSefazResult
+            {
+                Status = statusEnum,
+                DataConsulta = notaFiscal.DataConsultaSefaz.Value,
+                ProtocoloAutorizacao = notaFiscal.ProtocoloAutorizacao,
+                MotivoRejeicao = notaFiscal.MotivoRejeicao
+            };
+        }
+        catch (SefazTimeoutException ex)
+        {
+            notaFiscal.NumeroTentativasSefaz += 1;
+            if (notaFiscal.NumeroTentativasSefaz > 10)
+            {
+                notaFiscal.Status = NotaFiscalStatus.AguardandoConfirmacao;
+                notaFiscal.ErroUltimaConsulta = "Máximo de tentativas SEFAZ excedido";
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+            throw;
+        }
+    }
+}
+```
+
+**Exemplos**:
+- ✅ NF-e autorizada pela SEFAZ-SP com protocolo válido
+- ❌ NF-e rejeitada por CFOP inválido
+- ❌ NF-e cancelada (cancelamento autorizado)
+- ❌ Timeout na consulta (sem resposta em 30 segundos)
+
+---
+
+### RN-NFE-032-04: Detecção de Divergências entre NF-e e Pedido
+
+**Descrição**: Ao conciliar NF-e com pedido (RF026), o sistema deve detectar divergências em: quantidade, valor total, CFOP, NCM, impostos calculados. Divergências menores (<1%) são automaticamente ajustadas; maiores requerem aprovação.
+
+**Justificativa**: Evita lançamentos contábeis incorretos. Detecta erros de digitação do fornecedor ou alterações fraudulentas.
+
+**Implementação**:
+```csharp
+public class ConciliarNotaFiscalComPedidoCommandHandler
+    : IRequestHandler<ConciliarNotaFiscalComPedidoCommand, ConciliarNotaFiscalComPedidoResult>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly IDivergenceDetectionService _divergenceService;
+    private readonly IAuditService _audit;
+    private readonly INotificationService _notification;
+
+    public async Task<ConciliarNotaFiscalComPedidoResult> Handle(
+        ConciliarNotaFiscalComPedidoCommand request,
+        CancellationToken cancellationToken)
+    {
+        var notaFiscal = await _context.NotasFiscais
+            .Include(nf => nf.Itens)
+            .FirstOrDefaultAsync(nf => nf.Id == request.NotaFiscalId, cancellationToken);
+
+        var pedido = await _context.Pedidos
+            .Include(p => p.Itens)
+            .FirstOrDefaultAsync(p => p.Id == request.PedidoId, cancellationToken);
+
+        if (notaFiscal == null || pedido == null)
+            throw new EntityNotFoundException("Nota fiscal ou pedido não encontrado");
+
+        var divergencias = new List<Divergencia>();
+
+        // 1. Detectar divergências
+
+        // 1.1: Quantidade por item
+        foreach (var itemNf in notaFiscal.Itens)
+        {
+            var itemPedido = pedido.Itens
+                .FirstOrDefault(i => i.CodigoProduto == itemNf.CodigoProduto);
+
+            if (itemPedido == null)
+            {
+                divergencias.Add(new Divergencia
+                {
+                    Tipo = DivergenciaType.ItemNaoEncontradoNoPedido,
+                    Severidade = DivergenciaSeveridade.Critica,
+                    Descricao = $"Item {itemNf.CodigoProduto} presente na NF-e mas não no pedido",
+                    ValorDivergencia = itemNf.Quantidade
+                });
+            }
+            else
+            {
+                var diffQuantidade = Math.Abs(itemNf.Quantidade - itemPedido.QuantidadePendente);
+                var percentualDiff = (diffQuantidade / itemPedido.QuantidadePendente) * 100;
+
+                if (percentualDiff > 1.0) // Tolerância 1%
+                {
+                    divergencias.Add(new Divergencia
+                    {
+                        Tipo = DivergenciaType.QuantidadeDiferente,
+                        Severidade = percentualDiff > 5 ? DivergenciaSeveridade.Critica : DivergenciaSeveridade.Importante,
+                        Descricao = $"Quantidade diferente: NF={itemNf.Quantidade}, Pedido={itemPedido.QuantidadePendente}",
+                        ValorDivergencia = diffQuantidade,
+                        PercentualDivergencia = percentualDiff
+                    });
+                }
+            }
+        }
+
+        // 1.2: Valor total
+        var diffValor = Math.Abs(notaFiscal.ValorTotal - pedido.ValorTotal);
+        var percentualValor = (diffValor / pedido.ValorTotal) * 100;
+
+        if (percentualValor > 1.0)
+        {
+            divergencias.Add(new Divergencia
+            {
+                Tipo = DivergenciaType.ValorDiferente,
+                Severidade = percentualValor > 5 ? DivergenciaSeveridade.Critica : DivergenciaSeveridade.Importante,
+                Descricao = $"Valor total diferente: NF={notaFiscal.ValorTotal:C}, Pedido={pedido.ValorTotal:C}",
+                ValorDivergencia = diffValor,
+                PercentualDivergencia = percentualValor
+            });
+        }
+
+        // 1.3: CFOP e NCM
+        // ... validações de CFOP e NCM ...
+
+        // 2. Aplicar regra de aprovação automática
+        var divergenciasAutomaticas = divergencias
+            .Where(d => d.PercentualDivergencia < 1.0)
+            .ToList();
+
+        var divergenciasParaAprovar = divergencias
+            .Except(divergenciasAutomaticas)
+            .Where(d => d.Severidade != DivergenciaSeveridade.Critica)
+            .ToList();
+
+        var divergenciasCriticas = divergencias
+            .Where(d => d.Severidade == DivergenciaSeveridade.Critica)
+            .ToList();
+
+        // 3. Registrar divergências
+        foreach (var div in divergenciasAutomaticas)
+        {
+            // Auto-ajustar valores
+            if (div.Tipo == DivergenciaType.QuantidadeDiferente)
+            {
+                // Ajustar quantidade para a da NF-e
+            }
+        }
+
+        notaFiscal.Divergencias = divergencias;
+        notaFiscal.Status = divergenciasCriticas.Any()
+            ? NotaFiscalStatus.AprovacaoPendente
+            : NotaFiscalStatus.Conciliada;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // 4. Notificar gerente fiscal
+        if (divergenciasCriticas.Any() || divergenciasParaAprovar.Any())
+        {
+            await _notification.SendAsync(
+                userId: request.GerenciadorFiscalId,
+                subject: $"NF-e com divergências: {notaFiscal.ChaveAcesso}",
+                body: $"Divergências encontradas durante conciliação:\n{string.Join("\n", divergencias.Select(d => $"- {d.Descricao}"))}"
+            );
+        }
+
+        return new ConciliarNotaFiscalComPedidoResult
+        {
+            Divergencias = divergencias,
+            AprovacaoPendente = divergenciasCriticas.Any(),
+            AjustesAutomaticos = divergenciasAutomaticas.Count
+        };
+    }
+}
+```
+
+**Exemplos**:
+- ✅ NF-e com 5 unidades, pedido com 5 unidades = sem divergência
+- ❌ NF-e com 10 unidades, pedido com 12 unidades = divergência de quantidade (8% > 1%)
+- ❌ NF-e com R$ 1.100, pedido com R$ 1.000 = divergência de valor (10% > 1%)
+- ❌ NF-e com CFOP 5102, pedido com CFOP 5405 = divergência de CFOP
+
+---
+
+### RN-NFE-032-05: Cálculo Automático de Impostos (ICMS, IPI, PIS, COFINS, IRRF, CSLL, INSS)
+
+**Descrição**: O sistema deve calcular automaticamente todos os impostos incidentes sobre a NF-e baseando-se em regras fiscais do CNAE, estado, município e regime tributário. Retenções obrigatórias (IRRF, CSLL, INSS) devem ser calculadas conforme legislação específica.
+
+**Justificativa**: Evita erros de cálculo manual de impostos. Garante conformidade com legislação fiscal. Essencial para geração de relatórios SPED e DCTF.
+
+**Implementação**:
+```csharp
+public class CalcularImpostosNotaFiscalCommandHandler
+    : IRequestHandler<CalcularImpostosNotaFiscalCommand, CalcularImpostosNotaFiscalResult>
+{
+    private readonly ITributacaoService _tributacaoService;
+    private readonly IApplicationDbContext _context;
+
+    public async Task<CalcularImpostosNotaFiscalResult> Handle(
+        CalcularImpostosNotaFiscalCommand request,
+        CancellationToken cancellationToken)
+    {
+        var notaFiscal = await _context.NotasFiscais
+            .Include(nf => nf.Itens)
+            .FirstOrDefaultAsync(nf => nf.Id == request.NotaFiscalId, cancellationToken);
+
+        var empresa = await _context.Empresas
+            .FirstOrDefaultAsync(e => e.Id == notaFiscal.EmpresaId, cancellationToken);
+
+        var impostos = new ImpostosNFe();
+
+        foreach (var item in notaFiscal.Itens)
+        {
+            // 1. Obter alíquotas do NCM, UF e CNAE
+            var tributacao = await _tributacaoService.ObtenerTributacaoAsync(
+                ncm: item.Ncm,
+                estadoOrigemId: ExtractEstadoFromChaveAcesso(notaFiscal.ChaveAcesso),
+                estadoDestinoId: empresa.EstadoId,
+                cnae: empresa.Cnae,
+                regimeTributario: empresa.RegimeTributario
+            );
+
+            // 2. Calcular ICMS
+            var icms = _tributacaoService.CalcularIcms(
+                valorOperacao: item.ValorTotal,
+                aliquota: tributacao.AliquotaIcms,
+                mva: tributacao.Mva,
+                substituicaoTributaria: tributacao.IndicadorSt == 0,
+                icmsSt: tributacao.IcmsSt
+            );
+
+            impostos.IcmsTotal += icms;
+
+            // 3. Calcular IPI
+            var ipi = _tributacaoService.CalcularIpi(
+                valorOperacao: item.ValorTotal,
+                aliquota: tributacao.AliquotaIpi,
+                enquadramentoIpi: tributacao.EnquadramentoIpi
+            );
+
+            impostos.IpiTotal += ipi;
+
+            // 4. Calcular PIS
+            var pis = _tributacaoService.CalcularPis(
+                valorOperacao: item.ValorTotal + ipi,
+                aliquota: tributacao.AliquotaPis,
+                naturezaReceita: tributacao.NaturezaReceita
+            );
+
+            impostos.PisTotal += pis;
+
+            // 5. Calcular COFINS
+            var cofins = _tributacaoService.CalcularCofins(
+                valorOperacao: item.ValorTotal + ipi,
+                aliquota: tributacao.AliquotaCofins,
+                naturezaReceita: tributacao.NaturezaReceita
+            );
+
+            impostos.CofinsTotal += cofins;
+
+            // 6. Calcular ISS (se serviço)
+            var iss = _tributacaoService.CalcularIss(
+                valorServico: item.ValorTotal,
+                aliquota: tributacao.AliquotaIss,
+                municipio: empresa.Municipio,
+                codigoServicoISS: item.CodigoServicoIss
+            );
+
+            impostos.IssTotal += iss;
+        }
+
+        // 7. Calcular retenções
+
+        // 7.1: IRRF (Imposto de Renda Retido na Fonte)
+        // Regra: 1,5% a 25% conforme Lei 11.033/2004
+        var aliquotaIrrf = _tributacaoService.ObtenerAliquotaIrrf(
+            naturezaServico: notaFiscal.NaturezaOperacao,
+            cnpjPrestador: notaFiscal.CnpjEmitente
+        );
+
+        impostos.IrrfTotal = (impostos.IcmsTotal + impostos.IpiTotal) * aliquotaIrrf / 100;
+
+        // 7.2: CSLL (Contribuição Social sobre Lucro Líquido)
+        // Regra: 1% Lei 13.172/2015 (serviços em geral)
+        impostos.CsllTotal = (impostos.IcmsTotal + impostos.IpiTotal) * 0.01m;
+
+        // 7.3: INSS (Contribuição Instituto Nacional Seguridade Social)
+        // Regra: 11% Lei 8.212/1991 (serviços PJ)
+        var aliquotaInss = _tributacaoService.ObtenerAliquotaInss(
+            naturezaServico: notaFiscal.NaturezaOperacao,
+            tipoPrestador: "PJ" // Pessoa Jurídica
+        );
+
+        impostos.InssTotal = notaFiscal.ValorTotal * aliquotaInss / 100;
+
+        // 8. Registrar cálculos
+        notaFiscal.ImpostosCalculados = impostos;
+        notaFiscal.DataCalculoImpostos = DateTime.UtcNow;
+        notaFiscal.Status = NotaFiscalStatus.ImpostosCalculados;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return new CalcularImpostosNotaFiscalResult
+        {
+            Impostos = impostos,
+            TotalImpostos = impostos.Total,
+            ValorLiquido = notaFiscal.ValorTotal - impostos.Total
+        };
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Serviço com ICMS 7%, IPI 0%, PIS 1,65%, COFINS 7,6%, IRRF 1,5%, CSLL 1%, INSS 11%
+- ❌ Cálculo manual sem validação de alíquotas = erro até 15%
+- ✅ Produto substituição tributária: ICMS = 0%, mas ICMS-ST calculado na origem
+- ✅ Serviço ISS por município: 2% a 5% conforme lei local
+
+---
+
+### RN-NFE-032-06: Bloqueio de Pagamento se Divergência Crítica não Aprovada
+
+**Descrição**: Nenhuma nota fiscal com divergência crítica pode ser paga até que a divergência seja explicitamente aprovada por gerente autorizado. Sistema deve bloquear automaticamente no fluxo de pagamento.
+
+**Justificativa**: Evita pagamento de notas com dados incorretos que podem gerar problemas contábeis posteriores.
+
+**Implementação**:
+```csharp
+public class ValidarBloqueioNotaFiscalAntesPagetoCommandHandler
+{
+    public async Task<bool> PodeSerPagaAsync(
+        NotaFiscal notaFiscal,
+        CancellationToken cancellationToken)
+    {
+        // 1. Verificar se há divergências críticas não aprovadas
+        var divergenciasCriticas = notaFiscal.Divergencias
+            .Where(d => d.Severidade == DivergenciaSeveridade.Critica && !d.Aprovada)
+            .ToList();
+
+        if (divergenciasCriticas.Any())
+        {
+            throw new BusinessRuleException(
+                code: "NF_BLOQUEADA_DIVERGENCIA_CRITICA",
+                message: $"Nota fiscal bloqueada: {divergenciasCriticas.Count} divergência(s) crítica(s) não aprovada(s)",
+                details: divergenciasCriticas.Select(d => d.Descricao).ToList()
+            );
+        }
+
+        // 2. Verificar se há duplicidade de pagamento
+        var jaFoiPaga = notaFiscal.Pagamentos
+            .Where(p => p.Status == PagamentoStatus.Pago)
+            .Any();
+
+        if (jaFoiPaga)
+        {
+            throw new BusinessRuleException(
+                code: "NF_JA_PAGA",
+                message: "Nota fiscal já foi paga",
+                details: new List<string> { $"Data pagamento: {notaFiscal.Pagamentos.First(p => p.Status == PagamentoStatus.Pago).DataPagamento}" }
+            );
+        }
+
+        return true;
+    }
+}
+```
+
+---
+
+### RN-NFE-032-07: Rateio Automático de Notas entre Filiais/Centros de Custo
+
+**Descrição**: O sistema deve permitir rateio automático de valor total da NF-e entre múltiplas filiais e centros de custo conforme regras pré-configuradas (percentual fixo, volume, peso, contrato).
+
+**Justificativa**: Permite alocação correta de custos em empresas com múltiplas filiais. Automatiza processo que antes era manual em planilhas.
+
+**Implementação**:
+```csharp
+public class RatearNotaFiscalCommandHandler : IRequestHandler<RatearNotaFiscalCommand, RatearNotaFiscalResult>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly IAuditService _audit;
+
+    public async Task<RatearNotaFiscalResult> Handle(
+        RatearNotaFiscalCommand request,
+        CancellationToken cancellationToken)
+    {
+        var notaFiscal = await _context.NotasFiscais
+            .FirstOrDefaultAsync(nf => nf.Id == request.NotaFiscalId, cancellationToken);
+
+        var rateios = new List<RateioNotaFiscal>();
+        decimal totalRateiado = 0;
+
+        foreach (var regra in request.RegrasRateio)
+        {
+            // 1. Calcular valor a ratear
+            decimal valorRatear = 0;
+
+            if (regra.TipoRateio == TipoRateio.PercentualFixo)
+            {
+                valorRatear = notaFiscal.ValorTotal * regra.Percentual / 100;
+            }
+            else if (regra.TipoRateio == TipoRateio.PorVolume)
+            {
+                var volumeTotal = regra.ItensRatear.Sum(i => i.Volume);
+                var percentualItem = (regra.Volume / volumeTotal) * 100;
+                valorRatear = notaFiscal.ValorTotal * percentualItem / 100;
+            }
+            else if (regra.TipoRateio == TipoRateio.PorPeso)
+            {
+                var pesoTotal = regra.ItensRatear.Sum(i => i.Peso);
+                var percentualItem = (regra.Peso / pesoTotal) * 100;
+                valorRatear = notaFiscal.ValorTotal * percentualItem / 100;
+            }
+
+            // 2. Validar percentual
+            var percentualAtual = regra.Percentual;
+            if (rateios.Count == request.RegrasRateio.Count - 1)
+            {
+                // Última regra: ajustar para 100%
+                valorRatear = notaFiscal.ValorTotal - totalRateiado;
+                percentualAtual = 100 - (totalRateiado / notaFiscal.ValorTotal * 100);
+            }
+
+            // 3. Criar rateio
+            var rateio = new RateioNotaFiscal
+            {
+                NotaFiscalId = notaFiscal.Id,
+                FilialId = regra.FilialId,
+                CentroCustoId = regra.CentroCustoId,
+                Percentual = percentualAtual,
+                Valor = valorRatear,
+                TipoRateio = regra.TipoRateio,
+                CriadoPor = request.UsuarioId,
+                DataCriacao = DateTime.UtcNow
+            };
+
+            rateios.Add(rateio);
+            totalRateiado += valorRatear;
+        }
+
+        // 4. Validar soma de percentuais
+        var somaPercentuais = rateios.Sum(r => r.Percentual);
+        if (Math.Abs(somaPercentuais - 100) > 0.01m)
+        {
+            throw new BusinessRuleException(
+                code: "NF_SOMA_PERCENTUAIS_INVALIDA",
+                message: $"Soma de percentuais ({somaPercentuais}%) deve totalizar 100%"
+            );
+        }
+
+        // 5. Registrar rateios
+        _context.RateirosNotasFiscais.AddRange(rateios);
+        notaFiscal.Status = NotaFiscalStatus.Rateiada;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // 6. Auditar
+        await _audit.LogAsync(
+            operation: AuditOperation.Create,
+            entityType: "RateioNotaFiscal",
+            entityId: notaFiscal.Id,
+            conglomeradoId: notaFiscal.ConglomeradoId,
+            userId: request.UsuarioId,
+            changes: $"Rateado entre {rateios.Count} filial(is)/centro(s) de custo",
+            cancellationToken: cancellationToken
+        );
+
+        return new RatearNotaFiscalResult
+        {
+            Rateios = rateios,
+            TotalRateiado = totalRateiado,
+            ValidacaoOk = true
+        };
+    }
+}
+```
+
+---
+
+### RN-NFE-032-08: Armazenamento Permanente de XML e DANFE em Azure Blob Storage
+
+**Descrição**: O XML original e PDF DANFE da NF-e devem ser armazenados permanentemente em Azure Blob Storage com versionamento, segregação por conglomerado, e conformidade com LGPD (retenção de 7 anos).
+
+**Justificativa**: Azure oferece durabilidade de 99,9999999999%, conformidade com legislação, e gerenciamento automático de ciclo de vida. Libera espaço em disco do servidor.
+
+**Implementação**:
+```csharp
+public class ArmazenarNotaFiscalEmBlobCommandHandler
+    : IRequestHandler<ArmazenarNotaFiscalEmBlobCommand, ArmazenarNotaFiscalEmBlobResult>
+{
+    private readonly IAzureBlobService _blobService;
+    private readonly IApplicationDbContext _context;
+
+    public async Task<ArmazenarNotaFiscalEmBlobResult> Handle(
+        ArmazenarNotaFiscalEmBlobCommand request,
+        CancellationToken cancellationToken)
+    {
+        var notaFiscal = await _context.NotasFiscais
+            .FirstOrDefaultAsync(nf => nf.Id == request.NotaFiscalId, cancellationToken);
+
+        // 1. Armazenar XML em blob container segregado por conglomerado
+        var containerName = $"notas-fiscais-{notaFiscal.ConglomeradoId:D}".ToLower();
+        var blobNameXml = $"xml/{notaFiscal.ChaveAcesso}.xml";
+
+        var uriXml = await _blobService.UploadBlobAsync(
+            containerName: containerName,
+            blobName: blobNameXml,
+            content: notaFiscal.XmlOriginal,
+            contentType: "application/xml; charset=utf-8",
+            metadata: new Dictionary<string, string>
+            {
+                { "ChaveAcesso", notaFiscal.ChaveAcesso },
+                { "DataEmissao", notaFiscal.DataEmissao.ToString("O") },
+                { "CnpjEmitente", notaFiscal.CnpjEmitente },
+                { "NotaFiscalId", notaFiscal.Id.ToString() },
+                { "ConglomeradoId", notaFiscal.ConglomeradoId.ToString() }
+            },
+            cancellationToken: cancellationToken
+        );
+
+        // 2. Gerar e armazenar DANFE em PDF
+        var danfePdf = await _gerarDanfePdfService.GerarPdfAsync(
+            notaFiscal: notaFiscal,
+            cancellationToken: cancellationToken
+        );
+
+        var blobNamePdf = $"danfe/{notaFiscal.ChaveAcesso}.pdf";
+
+        var uriPdf = await _blobService.UploadBlobAsync(
+            containerName: containerName,
+            blobName: blobNamePdf,
+            content: danfePdf,
+            contentType: "application/pdf",
+            metadata: new Dictionary<string, string>
+            {
+                { "ChaveAcesso", notaFiscal.ChaveAcesso },
+                { "DataGeracaoDanfe", DateTime.UtcNow.ToString("O") }
+            },
+            cancellationToken: cancellationToken
+        );
+
+        // 3. Registrar URLs em banco de dados
+        notaFiscal.UriXmlBlob = uriXml;
+        notaFiscal.UriDanfePdfBlob = uriPdf;
+        notaFiscal.ArmazenadoEmBlob = true;
+        notaFiscal.DataArmazenamentoBlob = DateTime.UtcNow;
+
+        // 4. Configurar política de retenção (7 anos conforme LGPD)
+        await _blobService.SetRetentionPolicyAsync(
+            containerName: containerName,
+            retentionDays: 7 * 365, // 2.555 dias
+            cancellationToken: cancellationToken
+        );
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return new ArmazenarNotaFiscalEmBlobResult
+        {
+            UriXml = uriXml,
+            UriDanfePdf = uriPdf,
+            DataArmazenamento = notaFiscal.DataArmazenamentoBlob.Value
+        };
+    }
+}
+```
+
+---
+
+### RN-NFE-032-09: OCR de DANFE em PDF quando XML Indisponível
+
+**Descrição**: Se o XML não estiver disponível, o sistema pode fazer upload de DANFE em PDF e usar Azure Cognitive Services (Computer Vision) para extrair automaticamente dados de emitente, número nota, valores, impostos via OCR.
+
+**Justificativa**: Permite integração de documentos importados manualmente ou de fornecedores que não disponibilizam XML. Fallback para casos de perda de arquivo.
+
+**Implementação**:
+```csharp
+public class ExtrairDadosDanfePdfCommandHandler
+    : IRequestHandler<ExtrairDadosDanfePdfCommand, ExtrairDadosDanfePdfResult>
+{
+    private readonly IAzureCognitiveServicesOcrService _ocrService;
+    private readonly ITesseractOcrService _tesseractFallback; // Fallback open-source
+    private readonly IApplicationDbContext _context;
+
+    public async Task<ExtrairDadosDanfePdfResult> Handle(
+        ExtrairDadosDanfePdfCommand request,
+        CancellationToken cancellationToken)
+    {
+        byte[] pdfContent = request.DanfePdfContent;
+
+        try
+        {
+            // 1. Tentar OCR com Azure Cognitive Services (mais preciso)
+            var ocrResult = await _ocrService.RecognizePrintedTextAsync(
+                imageStream: new MemoryStream(pdfContent),
+                language: "pt-BR",
+                cancellationToken: cancellationToken
+            );
+
+            // 2. Extrair campos estruturados
+            var dadosExtraidos = ParseDanfeOcrResult(ocrResult);
+
+            // 3. Validar dados críticos (chave de acesso, número nota)
+            var chaveAcesso = ExtractChaveAcessoFromText(dadosExtraidos.TextoCompleto);
+            if (string.IsNullOrEmpty(chaveAcesso) || chaveAcesso.Length != 44)
+            {
+                throw new OcrExtractionException(
+                    "Não foi possível extrair chave de acesso válida do DANFE"
+                );
+            }
+
+            return new ExtrairDadosDanfePdfResult
+            {
+                ChaveAcesso = chaveAcesso,
+                NumeroNota = dadosExtraidos.NumeroNota,
+                SerieNota = dadosExtraidos.SerieNota,
+                CnpjEmitente = dadosExtraidos.CnpjEmitente,
+                CnpjDestinatario = dadosExtraidos.CnpjDestinatario,
+                DataEmissao = dadosExtraidos.DataEmissao,
+                ValorTotal = dadosExtraidos.ValorTotal,
+                ConfiancaExtracao = ocrResult.TextAngle // % de confiança
+            };
+        }
+        catch (Exception exAzure) when (!(exAzure is OcrExtractionException))
+        {
+            // 4. Fallback para Tesseract (open-source, menos preciso)
+            _logger.LogWarning(
+                $"OCR Azure falhou: {exAzure.Message}. Tentando Tesseract..."
+            );
+
+            var tesseractResult = await _tesseractFallback.RecognizeAsync(
+                pdfContent: pdfContent,
+                cancellationToken: cancellationToken
+            );
+
+            var dadosFallback = ParseDanfeOcrResult(tesseractResult);
+            var chaveAcesso = ExtractChaveAcessoFromText(dadosFallback.TextoCompleto);
+
+            if (string.IsNullOrEmpty(chaveAcesso) || chaveAcesso.Length != 44)
+            {
+                throw new OcrExtractionException(
+                    "Falha em ambos OCR (Azure e Tesseract). Importação manual necessária."
+                );
+            }
+
+            return new ExtrairDadosDanfePdfResult
+            {
+                ChaveAcesso = chaveAcesso,
+                NumeroNota = dadosFallback.NumeroNota,
+                // ... outros campos ...
+                ConfiancaExtracao = 0.5m // Fallback tem menor confiança
+            };
+        }
+    }
+
+    private dynamic ParseDanfeOcrResult(OcrResult result)
+    {
+        // Parser customizado que busca padrões conhecidos em DANFE
+        // Ex: "NFe nº XXXXXX" para número nota
+        // "CNPJ: XX.XXX.XXX/XXXX-XX" para CNPJ
+        // "Valor Total: R$ XXXX,XX" para valor
+        return new { };
+    }
+
+    private string ExtractChaveAcessoFromText(string text)
+    {
+        // Buscar sequência de 44 dígitos seguidos (chave de acesso)
+        var regex = new Regex(@"\b(\d{44})\b");
+        var match = regex.Match(text);
+        return match.Success ? match.Groups[1].Value : null;
+    }
+}
+```
+
+---
+
+### RN-NFE-032-10: Auditoria Completa com Retenção de 7 Anos (LGPD Compliance)
+
+**Descrição**: Todas as operações sobre notas fiscais devem ser auditadas com registro imutável contendo: usuário, timestamp, operação (import, validate, conciliate, cancel), dados antes/depois, e IP. Retenção por 7 anos.
+
+**Justificativa**: Conformidade com LGPD (Lei Geral Proteção Dados), SOX (Sarbanes-Oxley), e legislação fiscal. Essencial para investigação de fraudes.
+
+**Implementação**: Ver RF004 (Auditoria) para detalhes de implementação.
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `ic1_legado` (SQL Server 2019)
+
+**Tabela Principal**: `Nota_Fiscal`
+```sql
+CREATE TABLE [dbo].[Nota_Fiscal](
+    [Id_Nota_Fiscal] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Empresa] [int] NOT NULL,
+    [Numero_Nota_Fiscal] [varchar](20) NOT NULL,
+    [Serie_Nota_Fiscal] [varchar](5) NULL,
+    [Data_Emissao] [datetime] NOT NULL,
+    [Data_Entrada] [datetime] NULL,
+    [CNPJ_Emitente] [varchar](14) NOT NULL,
+    [CNPJ_Destinatario] [varchar](14) NOT NULL,
+    [Razao_Social_Emitente] [varchar](100) NULL,
+    [Razao_Social_Destinatario] [varchar](100) NULL,
+    [Valor_Total] [decimal](15,2) NOT NULL,
+    [Valor_ICMS] [decimal](15,2) NULL,
+    [Valor_IPI] [decimal](15,2) NULL,
+    [Valor_Outros_Impostos] [decimal](15,2) NULL,
+    [Descricao_Operacao] [varchar](255) NULL,
+    [CFOP] [varchar](4) NULL,
+    [NCM] [varchar](8) NULL,
+    [XML_Arquivo] [nvarchar](MAX) NULL,
+    [Fl_Excluido] [bit] NOT NULL DEFAULT 0,
+    [Data_Criacao] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    [Data_Atualizacao] [datetime] NULL,
+    CONSTRAINT [PK_Nota_Fiscal] PRIMARY KEY CLUSTERED ([Id_Nota_Fiscal] ASC),
+    CONSTRAINT [FK_Nota_Fiscal_Empresa] FOREIGN KEY ([Id_Empresa]) REFERENCES [dbo].[Empresa]([Id_Empresa])
+)
+```
+
+**Tabela Relacionada**: `Nota_Fiscal_Fatura`
+```sql
+CREATE TABLE [dbo].[Nota_Fiscal_Fatura](
+    [Id_Nota_Fiscal_Fatura] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Nota_Fiscal] [int] NOT NULL,
+    [Id_Fatura] [int] NOT NULL,
+    [Percentual_Rateio] [decimal](5,2) NOT NULL,
+    [Valor_Rateio] [decimal](15,2) NOT NULL,
+    [Centro_Custo_Id] [int] NULL,
+    [Filial_Id] [int] NULL,
+    [Fl_Excluido] [bit] NOT NULL DEFAULT 0,
+    CONSTRAINT [PK_Nota_Fiscal_Fatura] PRIMARY KEY CLUSTERED ([Id_Nota_Fiscal_Fatura] ASC),
+    CONSTRAINT [FK_NFF_Nota_Fiscal] FOREIGN KEY ([Id_Nota_Fiscal]) REFERENCES [dbo].[Nota_Fiscal]([Id_Nota_Fiscal]),
+    CONSTRAINT [FK_NFF_Fatura] FOREIGN KEY ([Id_Fatura]) REFERENCES [dbo].[Fatura]([Id_Fatura])
+)
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Tipo | Descrição | Uso no Modernizado |
+|--------------|------|-----------|-------------------|
+| `[Id_Nota_Fiscal]` | INT | PK | Será NotaFiscal.Id |
+| `[Numero_Nota_Fiscal]` | VARCHAR(20) | Número da NF | NotaFiscal.NumeroNota |
+| `[Serie_Nota_Fiscal]` | VARCHAR(5) | Série (geralmente "1") | NotaFiscal.SerieNota |
+| `[Data_Emissao]` | DATETIME | Data de emissão | NotaFiscal.DataEmissao |
+| `[CNPJ_Emitente]` | VARCHAR(14) | CNPJ emitente da nota | NotaFiscal.CnpjEmitente |
+| `[CNPJ_Destinatario]` | VARCHAR(14) | CNPJ destinatário | NotaFiscal.CnpjDestinatario |
+| `[Valor_Total]` | DECIMAL(15,2) | Valor total da NF | NotaFiscal.ValorTotal |
+| `[XML_Arquivo]` | NVARCHAR(MAX) | Conteúdo XML | NotaFiscal.XmlOriginal + blob storage |
+| `[Fl_Excluido]` | BIT | Soft delete | NotaFiscal.FlExcluido |
+| `[Data_Criacao]` | DATETIME | Timestamp criação | NotaFiscal.DataCriacao |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `pa_ImportarNotaFiscal` | Importa XML de arquivo local | Substituída por ImportarNotaFiscalCommandHandler (CQRS) |
+| `pa_CalcularRateio` | Calcula rateio simples | Substituída por RatearNotaFiscalCommandHandler |
+| `pa_ConciliarComFatura` | Match manual NF vs Fatura | Substituída por ConciliarNotaFiscalComPedidoCommandHandler (automática) |
+| `pa_GerarSped` | Gera arquivo SPED Fiscal | Substituída por SheduleSpedGenerationService (assíncrono) |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna (Angular) |
+|--------|-----------|------------------------|
+| `NotaFiscal.aspx` | Listagem e CRUD | `/app/financeiro/notas-fiscais` |
+| `ImportarNotaFiscal.aspx` | Upload de arquivo XML | `/app/financeiro/notas-fiscais/import` |
+| `RatearNotaFiscal.aspx` | Configurar rateio | `/app/financeiro/notas-fiscais/:id/rateio` |
+| `RelatorioConciliacao.aspx` | Relatório de conciliação | `/app/financeiro/notas-fiscais/relatorio-conciliacao` |
+| `DashboardFiscal.aspx` | Dashboard de impostos | `/app/financeiro/dashboard-fiscal` |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSNotaFiscal.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ImportarXml(xmlContent, empresaId)` | Importa XML | `POST /api/notas-fiscais/importar` |
+| `CalcularRateio(notaFiscalId, regras)` | Calcula rateio | `POST /api/notas-fiscais/{id}/rateio` |
+| `ConciliarComFatura(notaFiscalId, faturaId)` | Concilia com fatura | `POST /api/notas-fiscais/{id}/conciliar` |
+| `ExportarSped(dataInicio, dataFim)` | Gera SPED Fiscal | `GET /api/relatorios/sped-fiscal` |
+| `ConsultarStatusSefaz(chaveAcesso)` | Consulta SEFAZ | `GET /api/notas-fiscais/{chaveAcesso}/status-sefaz` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `NOTASFISCAIS_IMPORTACAO_AUTOMATICA`
+
+**Configuração**:
+```json
+{
+    "featureKey": "NOTASFISCAIS_IMPORTACAO_AUTOMATICA",
+    "nome": "Importação Automática de Notas Fiscais",
+    "descricao": "Ativa importação automática de NF-e via SEFAZ e OCR de DANFE em PDF",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "escopoPorConglomerado": true
+}
+```
+
+**Configurações Relacionadas**:
+```json
+{
+    "featureKey": "NOTASFISCAIS_VALIDACAO_ASSINATURA",
+    "nome": "Validação de Assinatura Digital RSA-2048",
+    "descricao": "Valida assinatura digital de NF-e antes de processamento",
+    "habilitado": true,
+    "isSystemFeature": true
+}
+```
+
+```json
+{
+    "featureKey": "NOTASFISCAIS_CONCILIACAO_AUTOMATICA",
+    "nome": "Conciliação Automática NF-e vs Pedido",
+    "descricao": "Match automático de NF-e com pedidos do sistema",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "toleranciaPercentual": 1.0
+}
+```
+
+```json
+{
+    "featureKey": "NOTASFISCAIS_OCR_DANFE",
+    "nome": "OCR de DANFE em PDF",
+    "descricao": "Extração de dados de DANFE usando Azure Cognitive Services",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "servico": "azure-cognitive-services",
+    "fallback": "tesseract"
+}
+```
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Módulo**: `financeiro`
+**Contexto**: `notas-fiscais`
+
+**Chaves de Tradução**:
+
+```json
+{
+    "financeiro": {
+        "notas-fiscais": {
+            "titulo": "Gestão de Notas Fiscais",
+            "subtitulo": "Importar, validar, conciliar e processar notas fiscais eletrônicas",
+            "formulario": {
+                "chaveAcesso": "Chave de Acesso",
+                "numeroNota": "Número da Nota",
+                "serie": "Série",
+                "dataEmissao": "Data de Emissão",
+                "cnpjEmitente": "CNPJ Emitente",
+                "razaoSocialEmitente": "Razão Social Emitente",
+                "cnpjDestinatario": "CNPJ Destinatário",
+                "valorTotal": "Valor Total",
+                "status": "Status",
+                "arquivo": "Arquivo XML",
+                "danfePdf": "DANFE (PDF)"
+            },
+            "mensagens": {
+                "importacaoSucesso": "Nota fiscal importada com sucesso",
+                "validacaoSucesso": "Validação realizada com sucesso",
+                "conciliacaoSucesso": "Nota conciliada com pedido",
+                "rateiamentoSucesso": "Rateio configurado com sucesso",
+                "importacaoErro": "Erro ao importar nota fiscal",
+                "validacaoErro": "Validação falhou",
+                "divergenciaDetectada": "Divergências detectadas na conciliação",
+                "aprovaçãoPendente": "Aprovação de gerente fiscal pendente",
+                "arquivoInvalido": "Arquivo XML inválido ou corrompido",
+                "chaveAcessoDuplicada": "Chave de acesso já foi importada",
+                "assinaturaInvalida": "Assinatura digital inválida"
+            },
+            "validacao": {
+                "obrigatorio": "Campo obrigatório",
+                "chaveAcessoInvalida": "Chave de acesso deve conter 44 dígitos",
+                "cnpjInvalido": "CNPJ inválido",
+                "dataInvalida": "Data inválida",
+                "valorNegativo": "Valor não pode ser negativo",
+                "percentualInvalido": "Percentual deve estar entre 0 e 100",
+                "somaPercentuaisDiferente": "Soma de percentuais deve totalizar 100%"
+            },
+            "status": {
+                "aguardandoProcessamento": "Aguardando Processamento",
+                "validando": "Validando",
+                "assinaturaValidada": "Assinatura Validada",
+                "conciliada": "Conciliada",
+                "divergenciaDetectada": "Divergência Detectada",
+                "aprovacaoPendente": "Aprovação Pendente",
+                "rateiada": "Rateiada",
+                "impostosCalculados": "Impostos Calculados",
+                "autorizada": "Autorizada (SEFAZ)",
+                "rejeitada": "Rejeitada",
+                "cancelada": "Cancelada",
+                "pronta": "Pronta para Pagamento"
+            },
+            "colunas": {
+                "chaveAcesso": "Chave de Acesso",
+                "numero": "Número",
+                "serie": "Série",
+                "emitente": "Emitente",
+                "dataEmissao": "Emissão",
+                "valor": "Valor Total",
+                "status": "Status",
+                "acoes": "Ações"
+            },
+            "botoes": {
+                "importar": "Importar Nota",
+                "importarLote": "Importar Lote",
+                "validar": "Validar",
+                "reconciliar": "Reconciliar",
+                "ratear": "Configurar Rateio",
+                "aprovar": "Aprovar",
+                "rejeitar": "Rejeitar",
+                "cancelar": "Cancelar",
+                "exportar": "Exportar",
+                "visualizarXml": "Ver XML",
+                "visualizarDanfe": "Ver DANFE"
+            }
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|----------|--------|-------------------|
+| Importação de NF-e | `FIN_NOTAFISCAL_IMPORTA` | ChaveAcesso, NumeroNota, CnpjEmitente, Valor Total, Usuário, IP |
+| Validação de Assinatura | `FIN_NOTAFISCAL_ASSINATURA` | Resultado (OK/ERRO), Certificado, Thumbprint |
+| Consulta SEFAZ | `FIN_NOTAFISCAL_CONSULT_SEFAZ` | Status retornado, ProtocoloAutorizacao, Tentativas |
+| Conciliação com Pedido | `FIN_NOTAFISCAL_CONCILIACAO` | PedidoId, Divergências detectadas, Usuário |
+| Rateamento | `FIN_NOTAFISCAL_RATEIO` | Filiais/Centros envolvidos, Percentuais, Usuário |
+| Cálculo de Impostos | `FIN_NOTAFISCAL_IMPOSTOS` | ICMS, IPI, PIS, COFINS, IRRF, CSLL, INSS (valores) |
+| Aprovação/Rejeição | `FIN_NOTAFISCAL_APROVACAO` | Divergência, Decisão (aprovada/rejeitada), Justificativa, Usuário |
+| Pagamento | `FIN_NOTAFISCAL_PAGTO` | DataPagamento, MeioPagamento, ReferênciaTransação |
+| Cancelamento | `FIN_NOTAFISCAL_CANCEL` | Motivo, Usuário, Data |
+| Armazenamento Blob | `FIN_NOTAFISCAL_BLOB_STORE` | UriXml, UriDanfe, DataArmazenamento |
+
+**Retenção**: 7 anos (conforme LGPD e legislação fiscal)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis |
+|-----------|-----------|--------|
+| `fin:notasfiscais:read` | Visualizar notas fiscais | Gerente Fiscal, Analista Fiscal, Auditor, Contador, CFO |
+| `fin:notasfiscais:create` | Criar/importar notas fiscais | Gerente Fiscal, Analista Fiscal, Contabilista |
+| `fin:notasfiscais:update` | Editar notas (não importadas) | Gerente Fiscal, Analista Fiscal |
+| `fin:notasfiscais:delete` | Excluir notas (soft delete) | Gerente Fiscal, Auditor |
+| `fin:notasfiscais:importar` | Importar XML/DANFE | Gerente Fiscal, Analista Fiscal, Contabilista |
+| `fin:notasfiscais:validar` | Validar assinatura digital | Sistema (automático) |
+| `fin:notasfiscais:conciliar` | Reconciliar com pedidos | Gerente Fiscal, Analista Fiscal |
+| `fin:notasfiscais:ratear` | Configurar rateio | Gerente Fiscal, Contador |
+| `fin:notasfiscais:aprovar` | Aprovar divergências | Gerente Fiscal, CFO (para valores > limite) |
+| `fin:notasfiscais:cancelar` | Cancelar notas | Gerente Fiscal, Auditor |
+| `fin:notasfiscais:exportar` | Exportar relatórios fiscais | Gerente Fiscal, Auditor, Contador, CFO |
+| `fin:notasfiscais:consultar-sefaz` | Consultar status SEFAZ | Sistema (automático) |
+| `fin:notasfiscais:pagar` | Marcar como paga | Gerente Fiscal, Contador, CFO |
+
+**Regras Especiais**:
+- Aprovação de divergência crítica requer CFO se valor > R$ 50.000
+- Cancelamento de nota requer CFO
+- Exportação de relatórios SPED requer Auditor ou Contador
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Método | Endpoint | Descrição | Permissão | Status Code |
+|--------|----------|-----------|-----------|-------------|
+| GET | `/api/notas-fiscais` | Listar notas (com paginação/filtros) | `fin:notasfiscais:read` | 200 |
+| GET | `/api/notas-fiscais/{id}` | Obter detalhes nota por ID | `fin:notasfiscais:read` | 200, 404 |
+| GET | `/api/notas-fiscais/{chaveAcesso}` | Obter nota por chave de acesso | `fin:notasfiscais:read` | 200, 404 |
+| POST | `/api/notas-fiscais/importar` | Importar XML | `fin:notasfiscais:importar` | 201, 400, 409 |
+| POST | `/api/notas-fiscais/importar-lote` | Importar múltiplos XML | `fin:notasfiscais:importar` | 202, 400 |
+| PUT | `/api/notas-fiscais/{id}` | Atualizar (metadados apenas) | `fin:notasfiscais:update` | 200, 400, 404 |
+| DELETE | `/api/notas-fiscais/{id}` | Excluir (soft delete) | `fin:notasfiscais:delete` | 204, 404, 403 |
+
+### 5.2 Operações Especiais
+
+| Método | Endpoint | Descrição | Permissão | Status Code |
+|--------|----------|-----------|-----------|-------------|
+| POST | `/api/notas-fiscais/{id}/validar-assinatura` | Validar assinatura digital RSA-2048 | `fin:notasfiscais:validar` | 200, 400, 422 |
+| POST | `/api/notas-fiscais/{id}/consultar-sefaz` | Consultar status na SEFAZ | `fin:notasfiscais:consultar-sefaz` | 200, 408, 503 |
+| POST | `/api/notas-fiscais/{id}/conciliar` | Reconciliar com pedido | `fin:notasfiscais:conciliar` | 200, 400, 404 |
+| POST | `/api/notas-fiscais/{id}/calcular-impostos` | Calcular todos impostos | `fin:notasfiscais:update` | 200, 400 |
+| POST | `/api/notas-fiscais/{id}/rateio` | Configurar rateio | `fin:notasfiscais:ratear` | 200, 400, 422 |
+| POST | `/api/notas-fiscais/{id}/aprovar-divergencia` | Aprovar divergência crítica | `fin:notasfiscais:aprovar` | 200, 400, 403 |
+| POST | `/api/notas-fiscais/{id}/rejeitar-divergencia` | Rejeitar e bloquear pagamento | `fin:notasfiscais:aprovar` | 200, 400 |
+| POST | `/api/notas-fiscais/{id}/marcar-paga` | Marcar como paga | `fin:notasfiscais:pagar` | 200, 400, 403 |
+| POST | `/api/notas-fiscais/{id}/cancelar` | Cancelar nota | `fin:notasfiscais:cancelar` | 200, 400, 403 |
+| GET | `/api/notas-fiscais/{id}/xml` | Download XML | `fin:notasfiscais:read` | 200, 404 |
+| GET | `/api/notas-fiscais/{id}/danfe` | Download DANFE PDF | `fin:notasfiscais:read` | 200, 404 |
+| POST | `/api/notas-fiscais/ocr-danfe` | Extrair dados de DANFE em PDF via OCR | `fin:notasfiscais:importar` | 200, 400, 422 |
+| GET | `/api/relatorios/sped-fiscal` | Exportar SPED Fiscal (Livro de Apuração ICMS) | `fin:notasfiscais:exportar` | 200, 400 |
+| GET | `/api/relatorios/dctf` | Exportar DCTF (Declaração Débitos/Créditos) | `fin:notasfiscais:exportar` | 200, 400 |
+| GET | `/api/relatorios/livro-registro` | Exportar Livro de Registro de Entrada/Saída | `fin:notasfiscais:exportar` | 200, 400 |
+| GET | `/api/relatorios/impostos-retidos` | Relatório de impostos retidos (IRRF, CSLL, INSS) | `fin:notasfiscais:exportar` | 200, 400 |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Importação e Validação de NF-e
+
+```
+Usuário acessa /app/financeiro/notas-fiscais/importar
+    |
+    v
+[Seleciona arquivo XML ou DANFE PDF]
+    |
+    +--- [XML] ---> Validar estrutura contra schema XSD 4.00
+    |                   |
+    |                   +--- [Inválido] ---> Erro: XML malformado
+    |                   |
+    |                   v [Válido]
+    |                   Extrair metadados (chave, número, datas, valores)
+    |                   |
+    +--- [DANFE PDF] --> OCR (Azure Cognitive Services + Tesseract fallback)
+                            |
+                            v
+                         Extrair chave de acesso (44 dígitos)
+                            |
+Validar Unicidade de Chave de Acesso (por conglomerado)
+    |
+    +--- [Duplicada] ---> Erro: NF já foi importada
+    |
+    v [Única]
+Validar Assinatura Digital (RSA-2048 com SHA-256)
+    |
+    +--- [Inválida] ---> Erro: Assinatura inválida ou alterada
+    |
+    v [Válida]
+Consultar Status na SEFAZ (com retry automático, max 10 tentativas)
+    |
+    +--- [Autorizada] ---> Status = Autorizada, registrar protocolo
+    |
+    +--- [Rejeitada] ---> Status = Rejeitada, registrar motivo
+    |
+    +--- [Cancelada] ---> Status = Cancelada
+    |
+    +--- [Timeout/Erro SEFAZ] ---> Status = AguardandoConfirmacao
+    |
+    v [Sucesso]
+Armazenar XML em Azure Blob Storage (com versionamento)
+Gerar e armazenar DANFE PDF
+    |
+    v
+Extrair dados (emitente, itens, impostos)
+    |
+    v
+Registrar auditoria (FIN_NOTAFISCAL_IMPORTA)
+    |
+    v
+Status = ImpostosACalcular
+Retornar sucesso com ID e chave de acesso
+```
+
+### 6.2 Fluxo de Conciliação Automática NF-e com Pedido
+
+```
+Usuário clica em "Reconciliar com Pedido"
+    |
+    v
+[Seleciona ou busca pedido associado]
+    |
+    v
+Validar se pedido está ativo e não cancelado
+    |
+    +--- [Cancelado] ---> Erro: Pedido cancelado
+    |
+    v [Ativo]
+Executar matching automático:
+    |
+    +--- Quantidade por item (tolerância 1%)
+    +--- Valor total (tolerância 1%)
+    +--- CFOP vs tipo de operação
+    +--- NCM vs classificação
+    +--- Impostos calculados vs esperado
+    |
+    v
+Classificar divergências por severidade:
+    |
+    +--- [Crítica] ---> Requer aprovação gerente fiscal
+    |
+    +--- [Importante] ---> Auto-ajusta (se < 5%) ou requer aprovação
+    |
+    +--- [Menor] ---> Auto-ajusta silenciosamente (< 1%)
+    |
+    v [Sem divergências ou todas ajustadas]
+Status = Conciliada
+Registrar auditoria (FIN_NOTAFISCAL_CONCILIACAO)
+    |
+    v [Com divergências críticas]
+Status = AprovacaoPendente
+Notificar gerente fiscal
+Retornar resultado com lista de divergências
+```
+
+### 6.3 Fluxo de Cálculo de Impostos
+
+```
+[NotaFiscal importada e conciliada]
+    |
+    v
+Para cada item da NF:
+    |
+    +--- Obter tributação (NCM, UF origem, UF destino, CNAE, regime)
+    +--- Calcular ICMS (com verificação de ST)
+    +--- Calcular IPI
+    +--- Calcular PIS
+    +--- Calcular COFINS
+    +--- Calcular ISS (se serviço)
+    |
+    v
+Somar todos impostos por tipo
+    |
+    v
+Calcular retenções obrigatórias:
+    |
+    +--- IRRF (1,5% a 25% conforme tipo serviço)
+    +--- CSLL (1% Lei 13.172/2015)
+    +--- INSS (11% serviços PJ)
+    |
+    v
+Gerar resumo de tributos
+Registrar em banco de dados
+Atualizar Status = ImpostosCalculados
+    |
+    v
+Criar dashboard de impostos a recuperar/a pagar
+```
+
+### 6.4 Fluxo de Rateio entre Filiais/Centros de Custo
+
+```
+[NF pronta para rateio]
+    |
+    v
+Usuário define regras:
+    |
+    +--- Percentual fixo (ex: 30% filial A, 70% filial B)
+    +--- Por volume (distribuir conforme m³ consumido)
+    +--- Por peso (distribuir conforme kg transportado)
+    +--- Por contrato (distribuir conforme contrato RF023)
+    |
+    v
+Para cada regra:
+    |
+    +--- Calcular valor a ratear
+    +--- Validar contra total (100%)
+    +--- Ajustar última regra se necessário
+    |
+    v
+Validar soma de percentuais = 100%
+    |
+    +--- [Inválida] ---> Erro: Soma diferente de 100%
+    |
+    v [Válida]
+Registrar rateios em banco (tabela RateioNotaFiscal)
+Lançar contabilmente para cada filial/centro de custo
+    |
+    v
+Status = Rateiada
+Auditoria (FIN_NOTAFISCAL_RATEIO)
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição | Implementação |
+|----------|-----------|---------------|
+| **Validação de Assinatura Digital** | RSA-2048 com hash SHA-256 conforme padrão ICP-Brasil | DigitalSignatureService com fallback para CRL verification |
+| **SQL Injection** | Parametrização de queries com Entity Framework Core | Nunca concatenação de strings em SQL |
+| **XSS em campos** | Angular sanitization + output encoding automático | DomSanitizer do Angular |
+| **CSRF Protection** | Token CSRF em POST/PUT/DELETE (ASP.NET Core middleware) | Anti-forgery token obrigatório |
+| **Controle de Acesso (RBAC)** | Permissões granulares por operação | Middleware [Authorize] + policy-based authorization |
+| **Encriptação de dados em trânsito** | TLS 1.3 em todos endpoints | HTTPS obrigatório |
+| **Encriptação de dados em repouso** | Azure Sql Transparent Data Encryption (TDE) | Chaves gerenciadas por Azure Key Vault |
+| **Auditoria Imutável** | Log de todas operações com timestamp e usuário | Tabela dedicada com constraints de integridade |
+| **Soft Delete** | Não deleta realmente, marca FlExcluido | Queries automáticas filtram excluídos |
+| **Row-Level Security** | Filtro automático por ConglomeradoId | Middleware aplicado em todas queries |
+| **Rate Limiting** | Máx 100 requisições/minuto por IP | Middleware IpRateLimitMiddleware |
+| **Validação de arquivo XML** | Schema XSD + arquivo size limit (50 MB) | XmlValidator service com timeout 10s |
+| **Timeout de SEFAZ** | Máx 30 segundos com retry automático | PollyRetryPolicy com exponential backoff |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] SQL Injection em campos ChaveAcesso, NumeroNota, CnpjEmitente
+- [ ] XSS em campos RazaoSocialEmitente, RazaoSocialDestinatario
+- [ ] CSRF Protection em POST/PUT/DELETE
+- [ ] Validação de permissões (tentar acessar nota de outro conglomerado)
+- [ ] Validação de assinatura digital (tentar com XML alterado)
+- [ ] Rate limiting (100+ requisições simultâneas)
+- [ ] Timeout de SEFAZ (simular serviço indisponível)
+- [ ] Validação de certificado (expirado, inválido, falso)
+- [ ] Download de arquivo (validar MIME type, size limit)
+- [ ] Rejeição de XML malformado (incomplete tags, encoding inválido)
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medição | Alerta |
+|-----|------|---------|--------|
+| **Tempo de Importação** | < 2 segundos | Timestamp importação - timestamp consulta SEFAZ | > 5s |
+| **Taxa de Sucesso de Validação** | > 98% | (Validadas com sucesso / Total importadas) * 100 | < 95% |
+| **Precisão de Conciliação Automática** | > 95% | (Conciliações sem divergência crítica / Total) * 100 | < 90% |
+| **Tempo de Resposta SEFAZ** | < 30 segundos | Tempo resposta consulta status | > 45s |
+| **Taxa de Sucesso de Rateio** | 100% | (Rateiadas com soma=100% / Total) * 100 | < 99% |
+| **Precisão de Cálculo de Impostos** | 99,99% | Desvio máximo 1 centavo | > 0,01 |
+| **Auditoria Completa** | 100% | (Operações auditadas / Total operações) * 100 | < 100% |
+| **Disponibilidade do Serviço** | > 99,5% | Uptime mensal | < 99% |
+| **Latência de Dashboard** | < 2 segundos | Tempo carregamento gráficos | > 5s |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| **NF com Divergência Crítica** | DetectadoPercentualDiferente > 5% | Notificar gerente fiscal via email/SMS |
+| **SEFAZ Indisponível** | Tentativas falhas > 5 seguidas | Escalatar para TI, notificar usuário |
+| **Certificado Próximo do Vencimento** | DataExpiracao < 30 dias | Notificar admin para renovação |
+| **Impostos a Recolher Atrasado** | DataVencimento < hoje | Notificar CFO e contador |
+| **Taxa de Erro de OCR Alta** | (OCR failures / OCR attempts) > 10% | Revisar qualidade de PDFs, considerar rescaneamento |
+| **Capacidade Blob Storage** | UsedSpace > 80% | Alertar admin para upgrade |
+| **Nota Cancelada em Produção** | DetectadaVia SEFAZ | Notificar gerente fiscal imediatamente |
+| **Tentativa de Fraude (Assinatura Inválida)** | 3+ tentativas com assinatura inválida | Registrar incidente de segurança, notificar security team |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF032](./MD-RF032.md) com detalhes de entities, relationships, constraints
+2. **Casos de Uso**: Criar [UC-RF032](./UC-RF032.md) documentando atores, precondições, fluxos
+3. **Fluxos de Tela**: Criar [WF-RF032](./WF-RF032.md) com wireframes, fluxos de navegação, componentes Angular
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml) quebrando RF em histórias implementáveis com critérios de aceitação
+5. **Implementação Backend**: Commands/Queries/Handlers, Repositories, Specifications, Validators (FluentValidation)
+6. **Implementação Frontend**: Componentes Angular, telas CRUD, dashboards, integração com APIs
+7. **Testes Automatizados**: Testes unitários, integração, E2E (Playwright), testes de segurança
+8. **Documentação de API**: Swagger/OpenAPI com exemplos de request/response
+9. **Testes de Carga**: Simular importação de 10.000 NF em paralelo
+10. **Deployment**: Pipeline CI/CD, testes em HOM, aprovação para PRD
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|--------|------|-----------|-------|
+| 2.0 | 2025-12-28 | Versão completa com 10 regras de negócio, integrações SEFAZ/OCR/Azure Blob, 13 endpoints, segurança, métricas | Claude Code |
+| 1.0 | 2025-01-14 | Versão inicial simplificada | Architect Agent |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: Claude Code (CLAUDE.md v1.0)
+**Revisão**: Pendente de aprovação técnica
+**Status**: Pronto para desenvolvimento backend

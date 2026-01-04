@@ -1,0 +1,1796 @@
+# RF109: Gestão de Documentos Originais e Digitalização
+
+**Versão**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF020 (Documentos e Anexos) | **EPIC**: EPIC011-INT-Integracoes
+**Fase**: Fase 6 - Ativos, Auditoria e Integrações
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o **Módulo de Gestão de Documentos Originais e Digitalização** do sistema IControlIT, responsável por gerenciar o ciclo completo de documentos digitalizados, desde o upload até o armazenamento, indexação, processamento por OCR, assinatura digital e descarte conforme políticas de retenção (LGPD).
+
+O RF109 implementa um **Enterprise Content Management (ECM)** moderno que permite:
+- Upload de documentos em múltiplos formatos (PDF, imagens, Office)
+- Digitalização via scanner (TWAIN/WIA)
+- Extração de texto via OCR (Optical Character Recognition)
+- Classificação automática via Machine Learning
+- Controle de versão com rastreamento de mudanças
+- Workflows de aprovação baseados em papéis
+- Assinatura digital com certificados ICP-Brasil
+- Indexação full-text em ElasticSearch
+- Armazenamento seguro em Azure Blob Storage (com tiers hot/cool/archive)
+- Auditoria completa de acesso, modificação e download
+
+### 1.2 Importância Estratégica
+
+O módulo de Gestão de Documentos é crítico para:
+- **Conformidade Legal**: Atender requisitos de LGPD, NF-e, assinatura digital (Lei 14.063/2020), retenção documental (7 anos mínimo)
+- **Eficiência Operacional**: Reduzir processamento manual, acelerar workflows de aprovação, eliminar papel físico
+- **Segurança Informacional**: Controlar acesso granular, auditar todas as operações, proteger documentos sensíveis com criptografia
+- **Integração Corporativa**: Conectar com ERPs, sistemas de faturamento, CRMs via APIs RESTful
+- **Sustentabilidade**: Implementar políticas de descarte automático e reciclagem de storage
+
+### 1.3 Conceitos Fundamentais
+
+**Documento Digital**: Arquivo armazenado no sistema com metadados associados (criador, criação, última modificação, versões, status de aprovação, assinatura digital).
+- Pode ser nativo digital (uploadado) ou resultante de digitalização (scaneado + OCR)
+- Suporta versionamento automático ao ser substituído
+
+**OCR (Optical Character Recognition)**: Processo de extração de texto de imagens ou PDFs scaneados usando Azure Cognitive Services ou Tesseract.
+- Resultado é indexado para busca full-text
+- Heurística detecta automaticamente se PDF é scaneado vs nativo
+
+**Digitalização**: Captura de documento físico usando scanner (TWAIN/WIA) com suporte a alimentadores automáticos (ADF).
+- Incluir deskew, despeckle e auto-rotate
+- Imagens resultantes submetidas a OCR automático
+
+**Assinatura Digital**: Processo criptográfico baseado em certificado digital A3 (ICP-Brasil) que garante autenticidade, integridade e não-repúdio.
+- Integrado com DocuSign API ou Adobe Sign API
+- Suporta assinatura por múltiplos signatários em sequência (workflow)
+
+**Classificação Automática**: Uso de modelos de ML (Azure Form Recognizer, Azure Cognitive Services) para categorizar documentos em tipos predefinidos.
+- Exemplo: NF-e, Contrato, RG/CPF, Recibo, etc.
+- Classificação manual também possível para documentos não-identificados
+
+**Retenção de Documentos**: Política de permanência de documento no sistema com base em tipo, legislação ou contrato.
+- LGPD: Mínimo 7 anos para documentos fiscais/trabalhistas
+- Descarte automático após período de retenção
+- Movimentação automática para storage cool/archive para otimizar custo
+
+**Workflow de Aprovação**: Cadeia de validações sequenciais para liberar documento para uso (Rascunho → Revisão → Aprovado → Publicado).
+- Cada etapa pode ter observações, rejeições com feedback
+- Suporte a aprovação por perfil (Revisor, Gerente, Diretor, etc.)
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET + SQL Server 2008) | Modernizado (.NET 10 + Azure + Angular) |
+|---------|--------------------------------------|-------------------------------------------|
+| **Armazenamento** | Arquivo local (C:\Documentos), limite 2GB | Azure Blob Storage, ilimitado, replicação geográfica |
+| **Upload** | WebForm simples, máx 30 MB, sem antivírus | REST API com ClamAV, máx 50 MB, verificação de malware |
+| **OCR** | Manual via ferramenta externa | Automático (Azure Cognitive Services, Tesseract), async via Hangfire |
+| **Busca** | Busca em banco de dados (LIKE %), lento | ElasticSearch full-text, faceted search, relevância |
+| **Versionamento** | Sobrescrita manual, sem histórico | Automático com rastreamento de mudanças |
+| **Assinatura** | Sem suporte | DocuSign/Adobe Sign API com ICP-Brasil |
+| **Auditoria** | Registro básico de criação/modificação | Completo: acesso, download, visualização, deleção, modificação de metadados |
+| **Retenção** | Manual | Automática baseada em políticas, com descarte agendado |
+| **Classificação** | Manual | Automática via ML, com possibilidade de sobrescrita manual |
+| **Segurança** | Sem criptografia, acesso por pastas | Criptografia at-rest/in-transit, RBAC granular, MFA, validação de certificado |
+
+### 1.5 Funcionalidades Principais
+
+1. **Upload de Documentos** - Interface web e mobile-responsive para envio de arquivos em múltiplos formatos (PDF, JPG, PNG, DOCX, XLSX, TXT)
+2. **Digitalização via Scanner** - Captura de documentos físicos usando drivers TWAIN/WIA com deskew automático
+3. **Processamento de OCR** - Extração de texto de PDFs scaneados e imagens, com indexação automática
+4. **Busca Full-Text** - Busca avançada em conteúdo de documentos (OCR + metadados) usando ElasticSearch
+5. **Controle de Versão** - Mantém histórico completo de versões com diffs e rollback
+6. **Workflow de Aprovação** - Cadeia de validação de documentos com roles (Revisor, Aprovador, Publicador)
+7. **Assinatura Digital** - Integração com DocuSign/Adobe Sign para assinatura criptográfica ICP-Brasil
+8. **Classificação Automática** - Detecta tipo de documento via ML (NF-e, Contrato, RG, etc.)
+9. **Retenção e Descarte** - Políticas automáticas de retenção por tipo de documento com descarte programado
+10. **Auditoria Completa** - Rastreamento de todas as operações (acesso, download, modificação, aprovação, rejeição)
+11. **Download com Marca D'Água** - Aplicação de marca d'água em documentos baixados, identificando usuário/data/hora
+12. **Preview em Múltiplos Formatos** - Visualização in-browser de PDFs, imagens e Office documents
+13. **Sincronização com ERP** - Integração bidirecional com sistemas financeiros para associar documentos a notas fiscais, compras, etc.
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-DOC-109-01: Tamanho Máximo de Arquivo
+
+**Descrição**: Documentos uploadados não podem exceder 50 MB. Uploads maiores são rejeitados com erro HTTP 413.
+
+**Justificativa**: Evitar consumo excessivo de storage e banda; manter upload rápido e confiável; limitar uso de memória no processamento de OCR.
+
+**Implementação**:
+```csharp
+public class DocumentValidator
+{
+    private const long MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+
+    public ValidationResult ValidateFileSize(IFormFile file)
+    {
+        if (file.Length > MAX_FILE_SIZE)
+        {
+            return ValidationResult.Failure(
+                "FILE_TOO_LARGE",
+                $"Documento não pode exceder {MAX_FILE_SIZE / (1024 * 1024)} MB"
+            );
+        }
+        return ValidationResult.Success();
+    }
+}
+```
+
+**Exemplos**:
+- Válido: PDF de 25 MB
+- Inválido: ZIP com 100 MB
+
+---
+
+### RN-DOC-109-02: Formatos Permitidos
+
+**Descrição**: Apenas os seguintes formatos de arquivo são aceitos: PDF, JPG, PNG, DOCX, XLSX, TXT.
+
+**Justificativa**: Garantir compatibilidade com OCR, visualização e processamento; evitar malware via executáveis; padronizar processamento de metadados.
+
+**Implementação**:
+```csharp
+public class DocumentValidator
+{
+    private static readonly HashSet<string> ALLOWED_EXTENSIONS = new()
+    {
+        ".pdf", ".jpg", ".jpeg", ".png", ".docx", ".xlsx", ".txt"
+    };
+
+    public ValidationResult ValidateFileType(IFormFile file)
+    {
+        var extension = Path.GetExtension(file.FileName).ToLower();
+
+        if (!ALLOWED_EXTENSIONS.Contains(extension))
+        {
+            return ValidationResult.Failure(
+                "INVALID_FILE_TYPE",
+                $"Formato {extension} não é permitido. Formatos aceitos: PDF, JPG, PNG, DOCX, XLSX, TXT"
+            );
+        }
+
+        // Validação adicional por Magic Number (MIME type)
+        var mimeType = DetectMimeType(file);
+        var expectedMimeTypes = GetExpectedMimeTypes(extension);
+
+        if (!expectedMimeTypes.Contains(mimeType))
+        {
+            return ValidationResult.Failure(
+                "MIME_TYPE_MISMATCH",
+                "Tipo de arquivo não corresponde à extensão fornecida"
+            );
+        }
+
+        return ValidationResult.Success();
+    }
+
+    private string DetectMimeType(IFormFile file)
+    {
+        // Lê primeiros 256 bytes para detectar tipo real
+        byte[] headerBytes = new byte[256];
+        file.OpenReadStream().Read(headerBytes, 0, 256);
+        return MagicNumberValidator.GetMimeType(headerBytes);
+    }
+}
+```
+
+**Exemplos**:
+- Válido: proposal.pdf, invoice.jpg, contract.docx
+- Inválido: malware.exe, script.bat, binary.dll
+
+---
+
+### RN-DOC-109-03: OCR Automático para PDFs Scaneados
+
+**Descrição**: Detectar automaticamente se PDF é nativo ou scaneado. Se scaneado, executar OCR assincronamente dentro de 5 minutos.
+
+**Justificativa**: PDFs nativos já têm texto; PDFs scaneados precisam de OCR para permitir busca full-text e extração de dados. Execução assíncrona não bloqueia API.
+
+**Implementação**:
+```csharp
+public class OcrProcessor
+{
+    private readonly IHangfireBackgroundJobClient _backgroundJobClient;
+    private readonly IDocumentRepository _documentRepository;
+    private readonly IAzureCognitiveServicesClient _cognitiveServices;
+
+    public async Task ProcessDocumentAsync(Document document, Stream fileStream)
+    {
+        // Detectar se PDF é scaneado
+        bool isScanned = await DetectScannedPdfAsync(fileStream);
+
+        if (isScanned)
+        {
+            // Agendar OCR assincronamente
+            _backgroundJobClient.Enqueue(
+                () => ExecuteOcrAsync(document.Id)
+            );
+
+            document.OcrStatus = OcrStatusEnum.Pending;
+            document.OcrScheduledAt = DateTime.UtcNow;
+        }
+        else
+        {
+            document.OcrStatus = OcrStatusEnum.NotRequired;
+            // Extrair texto nativo do PDF para indexação
+            string nativeText = ExtractNativeTextFromPdf(fileStream);
+            document.ExtractedText = nativeText;
+            document.OcrCompletedAt = DateTime.UtcNow;
+        }
+
+        await _documentRepository.SaveAsync(document);
+    }
+
+    private async Task<bool> DetectScannedPdfAsync(Stream fileStream)
+    {
+        // Heurística: verificar se PDF contém stream de imagem de tamanho maior que texto
+        fileStream.Seek(0, SeekOrigin.Begin);
+        var pdfContent = new PdfDocument(fileStream);
+
+        double imageContentRatio = CalculateImageToTextRatio(pdfContent);
+        // Se > 80% é imagem, considerar scaneado
+        return imageContentRatio > 0.8;
+    }
+
+    public async Task ExecuteOcrAsync(long documentId)
+    {
+        var document = await _documentRepository.GetByIdAsync(documentId);
+
+        try
+        {
+            document.OcrStatus = OcrStatusEnum.Processing;
+            await _documentRepository.SaveAsync(document);
+
+            // Download do arquivo do Blob Storage
+            var fileContent = await _blobStorageService.DownloadAsync(document.BlobPath);
+
+            // Submeter ao Azure Cognitive Services (Read API)
+            var ocrResult = await _cognitiveServices.ReadAsync(
+                fileContent,
+                document.FileName
+            );
+
+            // Processamento de resultado
+            document.ExtractedText = ocrResult.FullText;
+            document.OcrConfidence = ocrResult.AverageConfidence;
+            document.OcrDetectedLanguages = string.Join(",", ocrResult.DetectedLanguages);
+            document.OcrStatus = OcrStatusEnum.Completed;
+            document.OcrCompletedAt = DateTime.UtcNow;
+
+            // Indexar no ElasticSearch
+            await IndexDocumentAsync(document);
+        }
+        catch (Exception ex)
+        {
+            document.OcrStatus = OcrStatusEnum.Failed;
+            document.OcrErrorMessage = ex.Message;
+            document.OcrFailedAt = DateTime.UtcNow;
+        }
+
+        await _documentRepository.SaveAsync(document);
+    }
+}
+```
+
+**Exemplos**:
+- Válido: PDF scaneado → OCR executado automaticamente
+- Válido: PDF nativo → Texto extraído diretamente
+- Inválido: OCR falhando → Status marcado como Failed, permite retry manual
+
+---
+
+### RN-DOC-109-04: Verificação Obrigatória de Antivírus
+
+**Descrição**: Todo arquivo uploadado deve ser verificado por ClamAV antes de ser armazenado. Arquivos infectados são rejeitados e deletados imediatamente.
+
+**Justificativa**: Proteger sistema contra malware; cumprir políticas de segurança corporativa; evitar propagação de vírus para outros usuários.
+
+**Implementação**:
+```csharp
+public class AntVirusService
+{
+    private readonly IClavaClient _clamAvClient;
+    private readonly IDocumentRepository _documentRepository;
+    private readonly IAuditService _auditService;
+
+    public async Task<VirusCheckResult> ScanFileAsync(IFormFile file, long clienteId)
+    {
+        var fileBytes = await file.GetBytesAsync();
+
+        // Conectar ao ClamAV (pode ser local ou via clamd daemon)
+        var scanResult = await _clamAvClient.ScanBytesAsync(fileBytes);
+
+        if (scanResult.IsInfected)
+        {
+            // Registrar na auditoria
+            await _auditService.LogAsync(new AuditEntry
+            {
+                ClienteId = clienteId,
+                EntityType = "Document",
+                OperationType = "MALWARE_DETECTED",
+                Details = $"Arquivo {file.FileName} contém vírus: {scanResult.VirusName}",
+                Severity = AuditSeverity.Critical
+            });
+
+            return VirusCheckResult.Infected(scanResult.VirusName);
+        }
+
+        return VirusCheckResult.Clean();
+    }
+
+    public async Task<VirusCheckResult> ResccanAsync(long documentId)
+    {
+        var document = await _documentRepository.GetByIdAsync(documentId);
+        var fileContent = await _blobStorageService.DownloadAsync(document.BlobPath);
+
+        var scanResult = await _clamAvClient.ScanBytesAsync(fileContent);
+
+        if (scanResult.IsInfected)
+        {
+            // Soft delete do documento
+            document.IsDeleted = true;
+            document.DeletedAt = DateTime.UtcNow;
+            document.DeleteReason = $"Malware detected: {scanResult.VirusName}";
+            await _documentRepository.SaveAsync(document);
+
+            // Avisar administrador
+            await _notificationService.SendToAdminsAsync(
+                $"Documento {document.Id} foi deletado por detecção de malware"
+            );
+        }
+
+        return scanResult.IsInfected
+            ? VirusCheckResult.Infected(scanResult.VirusName)
+            : VirusCheckResult.Clean();
+    }
+}
+```
+
+**Exemplos**:
+- Válido: PDF limpo → Armazenado normalmente
+- Inválido: ZIP contendo vírus → Rejeitado imediatamente, registrado em auditoria
+
+---
+
+### RN-DOC-109-05: Versionamento Automático de Documentos
+
+**Descrição**: Ao substituir um documento existente (PUT), criar automaticamente nova versão do arquivo anterior em vez de sobrescrever. Manter histórico completo com até 10 versões por documento.
+
+**Justificativa**: Permitir rastreamento de mudanças; auditar quem modificou quando; facilitar rollback se necessário.
+
+**Implementação**:
+```csharp
+public class DocumentVersioningService
+{
+    private readonly IDocumentRepository _documentRepository;
+    private readonly IBlobStorageService _blobStorageService;
+    private const int MAX_VERSIONS = 10;
+
+    public async Task CreateNewVersionAsync(
+        Document document,
+        IFormFile newFile,
+        long modifiedByUserId)
+    {
+        // Criar nova versão do arquivo anterior
+        var previousVersion = new DocumentVersion
+        {
+            DocumentId = document.Id,
+            VersionNumber = document.CurrentVersionNumber + 1,
+            FileName = document.FileName,
+            FileSize = document.FileSize,
+            BlobPath = document.BlobPath, // Caminho antigo
+            CreatedAt = DateTime.UtcNow,
+            CreatedByUserId = modifiedByUserId,
+            ChangeNotes = "Auto-versioned before update"
+        };
+
+        // Salvar metadados da versão anterior
+        await _documentRepository.AddVersionAsync(previousVersion);
+
+        // Upload do novo arquivo
+        var newBlobPath = await _blobStorageService.UploadAsync(
+            newFile,
+            $"{document.ClienteId}/documents/{document.Id}/v{previousVersion.VersionNumber}"
+        );
+
+        // Atualizar documento principal
+        document.FileName = newFile.FileName;
+        document.FileSize = newFile.Length;
+        document.BlobPath = newBlobPath;
+        document.CurrentVersionNumber = previousVersion.VersionNumber;
+        document.LastModifiedAt = DateTime.UtcNow;
+        document.LastModifiedByUserId = modifiedByUserId;
+        document.OcrStatus = OcrStatusEnum.Pending; // Re-processar OCR
+
+        // Limpar versões antigas se exceder limite
+        await PruneOldVersionsAsync(document.Id);
+
+        await _documentRepository.SaveAsync(document);
+    }
+
+    private async Task PruneOldVersionsAsync(long documentId)
+    {
+        var versions = await _documentRepository.GetVersionsByDocumentAsync(documentId);
+        var versionsToDelete = versions
+            .OrderByDescending(v => v.VersionNumber)
+            .Skip(MAX_VERSIONS)
+            .ToList();
+
+        foreach (var version in versionsToDelete)
+        {
+            await _blobStorageService.DeleteAsync(version.BlobPath);
+            await _documentRepository.DeleteVersionAsync(version.Id);
+        }
+    }
+
+    public async Task<DocumentVersion> GetVersionAsync(long versionId)
+    {
+        return await _documentRepository.GetVersionByIdAsync(versionId);
+    }
+
+    public async Task RollbackToVersionAsync(long documentId, int versionNumber, long rolledBackByUserId)
+    {
+        var document = await _documentRepository.GetByIdAsync(documentId);
+        var targetVersion = await _documentRepository.GetVersionAsync(documentId, versionNumber);
+
+        if (targetVersion == null)
+            throw new NotFoundException($"Versão {versionNumber} não encontrada");
+
+        // Copiar arquivo da versão anterior
+        var rollbackPath = await _blobStorageService.CopyAsync(
+            targetVersion.BlobPath,
+            $"{document.ClienteId}/documents/{document.Id}/v{document.CurrentVersionNumber + 1}"
+        );
+
+        // Criar novo registro de versão para o rollback
+        var rollbackVersion = new DocumentVersion
+        {
+            DocumentId = document.Id,
+            VersionNumber = document.CurrentVersionNumber + 1,
+            FileName = targetVersion.FileName,
+            FileSize = targetVersion.FileSize,
+            BlobPath = rollbackPath,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByUserId = rolledBackByUserId,
+            ChangeNotes = $"Rolled back to version {versionNumber}"
+        };
+
+        await _documentRepository.AddVersionAsync(rollbackVersion);
+        document.CurrentVersionNumber = rollbackVersion.VersionNumber;
+        await _documentRepository.SaveAsync(document);
+    }
+}
+```
+
+**Exemplos**:
+- Válido: Upload inicial → v1; Upload de revisão → v2 (v1 preservada)
+- Válido: Rollback de v3 para v1 → Cria v4 com conteúdo de v1
+
+---
+
+### RN-DOC-109-06: Retenção Mínima e Máxima de Documentos
+
+**Descrição**: Documentos devem ser retidos por período definido por tipo de documento e legislação. Retenção mínima é 7 anos para documentos fiscais/trabalhistas (LGPD). Retenção máxima é 15 anos ou conforme política corporativa. Após expiração, documento é movido para storage archive (cool tier) e marcado para descarte.
+
+**Justificativa**: Cumprir LGPD, NF-e, CLT e outras legislações; otimizar custo de storage; permitir auditoria de descarte automático.
+
+**Implementação**:
+```csharp
+public class RetentionPolicyService
+{
+    private readonly IDocumentRepository _documentRepository;
+    private readonly IBlobStorageService _blobStorageService;
+    private readonly IRetentionPolicyRepository _policyRepository;
+    private readonly IAuditService _auditService;
+
+    public async Task ApplyRetentionPolicyAsync(Document document)
+    {
+        // Determinar política de retenção baseada em tipo de documento
+        var policy = await _policyRepository.GetPolicyByDocumentTypeAsync(document.DocumentType);
+
+        if (policy == null)
+        {
+            // Política padrão (7 anos para não-identificados)
+            policy = new RetentionPolicy
+            {
+                DocumentType = "DEFAULT",
+                MinimumRetentionYears = 7,
+                MaximumRetentionYears = 15,
+                StorageTier = StorageTierEnum.Hot,
+                AutoDeleteAfterMaximum = false
+            };
+        }
+
+        document.RetentionPolicyId = policy.Id;
+        document.RetentionStartDate = document.CreatedAt;
+        document.RetentionExpirationDate = document.CreatedAt.AddYears(policy.MinimumRetentionYears);
+        document.MaxRetentionDate = document.CreatedAt.AddYears(policy.MaximumRetentionYears);
+
+        await _documentRepository.SaveAsync(document);
+    }
+
+    public async Task ProcessExpiredDocumentsAsync(long clienteId)
+    {
+        var now = DateTime.UtcNow;
+
+        // Documentos que atingiram retenção mínima
+        var minimumRetentionExpired = await _documentRepository.QueryAsync(
+            d => d.ClienteId == clienteId
+                && d.RetentionExpirationDate <= now
+                && d.RetentionStatus != RetentionStatusEnum.Archived
+        );
+
+        foreach (var document in minimumRetentionExpired)
+        {
+            // Mover para cool tier (arquivo morto)
+            var originalPath = document.BlobPath;
+            var archivePath = $"{document.ClienteId}/archived/{document.Id}/v{document.CurrentVersionNumber}";
+
+            await _blobStorageService.MoveToTierAsync(originalPath, archivePath, StorageTier.Cool);
+
+            document.BlobPath = archivePath;
+            document.RetentionStatus = RetentionStatusEnum.Archived;
+            document.ArchivedAt = now;
+
+            await _documentRepository.SaveAsync(document);
+
+            // Registrar auditoria
+            await _auditService.LogAsync(new AuditEntry
+            {
+                ClienteId = clienteId,
+                EntityType = "Document",
+                EntityId = document.Id,
+                OperationType = "RETENTION_ARCHIVED",
+                Details = $"Documento movido para arquivo (cool tier) após {document.RetentionPolicyId} anos",
+                Timestamp = now
+            });
+        }
+
+        // Documentos que atingiram retenção máxima
+        var maximumRetentionExpired = await _documentRepository.QueryAsync(
+            d => d.ClienteId == clienteId
+                && d.MaxRetentionDate <= now
+                && d.RetentionStatus != RetentionStatusEnum.Deleted
+        );
+
+        foreach (var document in maximumRetentionExpired)
+        {
+            var policy = await _policyRepository.GetByIdAsync(document.RetentionPolicyId);
+
+            if (policy.AutoDeleteAfterMaximum)
+            {
+                // Soft delete
+                await DeleteDocumentAsync(document.Id, clienteId, "Auto-deleted after maximum retention period");
+            }
+            else
+            {
+                // Apenas marcar como elegível para descarte
+                document.RetentionStatus = RetentionStatusEnum.PendingDeletion;
+                await _documentRepository.SaveAsync(document);
+            }
+        }
+    }
+
+    public async Task DeleteDocumentAsync(long documentId, long clienteId, string reason)
+    {
+        var document = await _documentRepository.GetByIdAsync(documentId);
+
+        // Soft delete
+        document.IsDeleted = true;
+        document.DeletedAt = DateTime.UtcNow;
+        document.DeleteReason = reason;
+        document.RetentionStatus = RetentionStatusEnum.Deleted;
+
+        // Opcionalmente, deletar fisicamente do Blob após X dias
+        document.PhysicalDeletionScheduledFor = DateTime.UtcNow.AddDays(30);
+
+        await _documentRepository.SaveAsync(document);
+
+        // Auditoria
+        await _auditService.LogAsync(new AuditEntry
+        {
+            ClienteId = clienteId,
+            EntityType = "Document",
+            EntityId = documentId,
+            OperationType = "DOC_DELETED",
+            Details = reason,
+            Severity = AuditSeverity.Warning
+        });
+    }
+}
+```
+
+**Exemplos**:
+- Válido: NF-e de 2018 → Marcada para descarte em 2025 (7 anos)
+- Válido: Contrato de 2010 → Movido para cool tier em 2017, deletado em 2025 (máx 15 anos)
+
+---
+
+### RN-DOC-109-07: Assinatura Digital com Certificado ICP-Brasil
+
+**Descrição**: Documentos que requerem assinatura legal devem ser assinados digitalmente usando certificado A3 (ICP-Brasil) via DocuSign ou Adobe Sign. Assinatura é validada, timestamped e armazenada no documento.
+
+**Justificativa**: Cumprir Lei 14.063/2020 (assinatura digital); garantir não-repúdio; validar autenticidade via ICP-Brasil.
+
+**Implementação**:
+```csharp
+public class DigitalSignatureService
+{
+    private readonly IDocuSignClient _docuSignClient;
+    private readonly IAdobeSignClient _adobeSignClient;
+    private readonly IDocumentRepository _documentRepository;
+    private readonly IAuditService _auditService;
+
+    public async Task<SignatureRequest> InitiateSignatureAsync(
+        long documentId,
+        List<SignatoryInfo> signatories,
+        SignatureProvider provider = SignatureProvider.DocuSign)
+    {
+        var document = await _documentRepository.GetByIdAsync(documentId);
+
+        // Download arquivo original
+        var fileContent = await _blobStorageService.DownloadAsync(document.BlobPath);
+
+        SignatureRequest signatureRequest = null;
+
+        if (provider == SignatureProvider.DocuSign)
+        {
+            signatureRequest = await _docuSignClient.CreateEnvelopeAsync(
+                fileContent,
+                document.FileName,
+                signatories.Select(s => new DocuSignRecipient
+                {
+                    Email = s.Email,
+                    Name = s.FullName,
+                    RoutingOrder = s.SequenceOrder,
+                    Role = s.Role
+                }).ToList()
+            );
+        }
+        else if (provider == SignatureProvider.AdobeSign)
+        {
+            signatureRequest = await _adobeSignClient.CreateSignatureRequestAsync(
+                fileContent,
+                document.FileName,
+                signatories.Select(s => new AdobeSignRecipient
+                {
+                    Email = s.Email,
+                    Name = s.FullName
+                }).ToList()
+            );
+        }
+
+        // Salvar referência de assinatura
+        var signature = new DocumentSignature
+        {
+            DocumentId = document.Id,
+            SignatureRequestId = signatureRequest.ExternalId,
+            SignatureProvider = provider,
+            Status = SignatureStatusEnum.Pending,
+            InitiatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(30)
+        };
+
+        foreach (var signatory in signatories)
+        {
+            signature.Signatories.Add(new SignatoryRecord
+            {
+                Email = signatory.Email,
+                FullName = signatory.FullName,
+                Role = signatory.Role,
+                SequenceOrder = signatory.SequenceOrder,
+                Status = SignatoryStatusEnum.Pending
+            });
+        }
+
+        await _documentRepository.AddSignatureAsync(signature);
+
+        // Auditoria
+        await _auditService.LogAsync(new AuditEntry
+        {
+            EntityType = "DocumentSignature",
+            EntityId = signature.Id,
+            OperationType = "SIGNATURE_INITIATED",
+            Details = $"Solicitação de assinatura enviada para {signatories.Count} signatários via {provider}"
+        });
+
+        return signatureRequest;
+    }
+
+    public async Task CompleteSignatureAsync(string signatureRequestId)
+    {
+        var signature = await _documentRepository.GetSignatureByRequestIdAsync(signatureRequestId);
+        var document = await _documentRepository.GetByIdAsync(signature.DocumentId);
+
+        // Baixar documento assinado
+        byte[] signedContent = null;
+
+        if (signature.SignatureProvider == SignatureProvider.DocuSign)
+        {
+            signedContent = await _docuSignClient.GetSignedDocumentAsync(signatureRequestId);
+        }
+        else if (signature.SignatureProvider == SignatureProvider.AdobeSign)
+        {
+            signedContent = await _adobeSignClient.GetSignedDocumentAsync(signatureRequestId);
+        }
+
+        // Armazenar versão assinada em Blob separado
+        var signedBlobPath = $"{document.ClienteId}/documents/{document.Id}/signed";
+        await _blobStorageService.UploadAsync(signedContent, signedBlobPath);
+
+        // Extrair certificado e validar contra ICP-Brasil
+        var certificate = ExtractCertificateFromSignedPdf(signedContent);
+        var isValidICP = await ValidateICPCertificateAsync(certificate);
+
+        if (!isValidICP)
+            throw new InvalidOperationException("Certificado não é válido contra ICP-Brasil");
+
+        // Atualizar assinatura
+        signature.Status = SignatureStatusEnum.Completed;
+        signature.SignedBlobPath = signedBlobPath;
+        signature.CompletedAt = DateTime.UtcNow;
+        signature.ICPValidated = true;
+        signature.CertificateThumbprint = certificate.Thumbprint;
+
+        // Marcar documento como assinado
+        document.IsSignedDigitally = true;
+        document.DigitalSignatureId = signature.Id;
+        document.SignatureCompletedAt = DateTime.UtcNow;
+
+        await _documentRepository.SaveAsync(document);
+        await _documentRepository.UpdateSignatureAsync(signature);
+
+        // Auditoria
+        await _auditService.LogAsync(new AuditEntry
+        {
+            EntityType = "DocumentSignature",
+            EntityId = signature.Id,
+            OperationType = "SIGNATURE_COMPLETED",
+            Details = $"Documento assinado digitalmente com {signature.Signatories.Count} assinadores"
+        });
+    }
+}
+```
+
+**Exemplos**:
+- Válido: NF-e assinada por contador com A3 válido
+- Inválido: Documento assinado com certificado expirado ou inválido → Rejeitado
+
+---
+
+### RN-DOC-109-08: Busca Full-Text em Conteúdo e Metadados
+
+**Descrição**: Busca deve indexar conteúdo extraído por OCR, metadados do documento (título, descrição, tags) e informações do arquivo (nome, criador) em ElasticSearch. Busca deve retornar resultados ordenados por relevância (TF-IDF).
+
+**Justificativa**: Permitir busca rápida em documentação corporativa massiva; usar ML para relevância; suportar queries complexas (faceted search, filtros).
+
+**Implementação**:
+```csharp
+public class DocumentSearchService
+{
+    private readonly IElasticClient _elasticClient;
+    private readonly IDocumentRepository _documentRepository;
+
+    public async Task IndexDocumentAsync(Document document)
+    {
+        var indexDocument = new DocumentSearchIndex
+        {
+            Id = document.Id.ToString(),
+            ClienteId = document.ClienteId,
+            DocumentType = document.DocumentType,
+            FileName = document.FileName,
+            Title = document.Title,
+            Description = document.Description,
+            ExtractedText = document.ExtractedText,
+            Tags = document.Tags,
+            CreatedBy = document.CreatedByUser?.FullName,
+            CreatedAt = document.CreatedAt,
+            LastModifiedAt = document.LastModifiedAt,
+            FileSize = document.FileSize,
+            Status = document.Status.ToString(),
+            IsSignedDigitally = document.IsSignedDigitally,
+            ClassificationConfidence = document.ClassificationConfidence
+        };
+
+        // Indexar no ElasticSearch
+        var response = await _elasticClient.IndexAsync(
+            indexDocument,
+            i => i.Index("documents").Id(document.Id.ToString())
+        );
+
+        if (!response.IsValid)
+            throw new ElasticsearchException($"Falha ao indexar documento: {response.ServerError?.Error?.Reason}");
+    }
+
+    public async Task<SearchResult> SearchAsync(
+        long clienteId,
+        string query,
+        DocumentType? filterType = null,
+        int page = 1,
+        int pageSize = 20)
+    {
+        var searchRequest = new SearchRequest("documents")
+        {
+            Query = new BoolQuery
+            {
+                Must = new QueryContainer[]
+                {
+                    new TermQuery { Field = "clienteId", Value = clienteId }
+                },
+                Should = new QueryContainer[]
+                {
+                    // Busca em título (weight alto)
+                    new MatchQuery { Field = "title", Query = query, Boost = 3.0 },
+
+                    // Busca em descrição (weight médio)
+                    new MatchQuery { Field = "description", Query = query, Boost = 1.5 },
+
+                    // Busca em conteúdo extraído por OCR (weight normal)
+                    new MatchQuery { Field = "extractedText", Query = query, Fuzziness = Fuzziness.Auto },
+
+                    // Busca em metadados
+                    new MatchQuery { Field = "tags", Query = query, Boost = 2.0 },
+
+                    // Busca em nome de arquivo
+                    new MatchQuery { Field = "fileName", Query = query }
+                },
+                Filter = new QueryContainer[]
+                {
+                    new TermQuery { Field = "status", Value = DocumentStatusEnum.Published.ToString() },
+                    new TermQuery { Field = "isDeleted", Value = false }
+                }
+            },
+            From = (page - 1) * pageSize,
+            Size = pageSize,
+            Highlight = new Highlight
+            {
+                Fields = new Dictionary<Field, HighlightField>
+                {
+                    { "title", new HighlightField() },
+                    { "description", new HighlightField() },
+                    { "extractedText", new HighlightField { NumberOfFragments = 3 } }
+                }
+            }
+        };
+
+        // Filtro adicional por tipo de documento
+        if (filterType.HasValue)
+        {
+            searchRequest.Query.Must = searchRequest.Query.Must.Concat(new[]
+            {
+                new TermQuery { Field = "documentType", Value = filterType.Value.ToString() }
+            }).ToArray();
+        }
+
+        var response = await _elasticClient.SearchAsync<DocumentSearchIndex>(searchRequest);
+
+        if (!response.IsValid)
+            throw new ElasticsearchException($"Falha na busca: {response.ServerError?.Error?.Reason}");
+
+        var results = response.Documents.Select(doc => new DocumentSearchResult
+        {
+            DocumentId = long.Parse(doc.Id),
+            FileName = doc.FileName,
+            Title = doc.Title,
+            Description = doc.Description,
+            Relevance = response.Hits.FirstOrDefault(h => h.Id == doc.Id)?.Score ?? 0,
+            Highlights = response.Hits.FirstOrDefault(h => h.Id == doc.Id)?.Highlights
+        }).ToList();
+
+        return new SearchResult
+        {
+            Documents = results,
+            TotalCount = response.Total,
+            Page = page,
+            PageSize = pageSize,
+            TotalPages = (int)Math.Ceiling(response.Total / (double)pageSize)
+        };
+    }
+
+    public async Task<IEnumerable<string>> GetSuggestionsAsync(long clienteId, string prefix)
+    {
+        var searchRequest = new SearchRequest("documents")
+        {
+            Query = new BoolQuery
+            {
+                Must = new QueryContainer[]
+                {
+                    new TermQuery { Field = "clienteId", Value = clienteId },
+                    new PrefixQuery { Field = "title", Value = prefix }
+                }
+            },
+            Size = 10
+        };
+
+        var response = await _elasticClient.SearchAsync<DocumentSearchIndex>(searchRequest);
+        return response.Documents.Select(d => d.Title).Distinct();
+    }
+}
+```
+
+**Exemplos**:
+- Query: "NF-e 2024" → Retorna notas fiscais de 2024 ordenadas por relevância
+- Query: "contrato fornecedor" → Retorna contratos onde fornecedor é mencionado
+
+---
+
+### RN-DOC-109-09: Workflow de Aprovação com Estados e Transições
+
+**Descrição**: Documentos seguem estado máquina: Rascunho → Revisão → Aprovado → Publicado. Cada transição exige permissão específica e pode incluir comentários de rejeição. Rejeição volta para Rascunho com feedback obrigatório.
+
+**Justificativa**: Garantir que apenas documentos validados estejam públicos; criar trilha de auditoria; permitir feedback estruturado.
+
+**Implementação**:
+```csharp
+public class DocumentApprovalWorkflow
+{
+    private readonly IDocumentRepository _documentRepository;
+    private readonly IAuthorizationService _authorizationService;
+    private readonly IAuditService _auditService;
+    private readonly INotificationService _notificationService;
+
+    public async Task<WorkflowTransitionResult> RequestReviewAsync(
+        long documentId,
+        long requestedByUserId)
+    {
+        var document = await _documentRepository.GetByIdAsync(documentId);
+
+        // Validar permissão
+        if (!(await _authorizationService.HasPermissionAsync(
+            requestedByUserId, "doc:request_review")))
+        {
+            return WorkflowTransitionResult.Failure("Usuário não tem permissão para solicitar revisão");
+        }
+
+        // Validar estado atual
+        if (document.Status != DocumentStatusEnum.Draft)
+        {
+            return WorkflowTransitionResult.Failure(
+                $"Documento em estado {document.Status} não pode ir para revisão"
+            );
+        }
+
+        // Transição
+        document.Status = DocumentStatusEnum.UnderReview;
+        document.ReviewRequestedAt = DateTime.UtcNow;
+        document.ReviewRequestedByUserId = requestedByUserId;
+
+        await _documentRepository.SaveAsync(document);
+
+        // Notificar revisores
+        var reviewers = await _authorizationService.GetUsersWithRoleAsync("DocumentReviewer");
+        await _notificationService.NotifyUsersAsync(
+            reviewers,
+            $"Documento '{document.Title}' aguarda revisão"
+        );
+
+        // Auditoria
+        await _auditService.LogAsync(new AuditEntry
+        {
+            EntityType = "Document",
+            EntityId = document.Id,
+            OperationType = "DOC_REVIEW_REQUESTED",
+            PerformedByUserId = requestedByUserId,
+            Details = document.Title
+        });
+
+        return WorkflowTransitionResult.Success();
+    }
+
+    public async Task<WorkflowTransitionResult> ApproveAsync(
+        long documentId,
+        long approverUserId,
+        string notes = null)
+    {
+        var document = await _documentRepository.GetByIdAsync(documentId);
+
+        // Validar permissão
+        if (!(await _authorizationService.HasPermissionAsync(
+            approverUserId, "doc:approve")))
+        {
+            return WorkflowTransitionResult.Failure("Usuário não tem permissão para aprovar");
+        }
+
+        // Validar estado
+        if (document.Status != DocumentStatusEnum.UnderReview)
+        {
+            return WorkflowTransitionResult.Failure(
+                $"Documento em estado {document.Status} não pode ser aprovado"
+            );
+        }
+
+        // Transição
+        document.Status = DocumentStatusEnum.Approved;
+        document.ApprovedAt = DateTime.UtcNow;
+        document.ApprovedByUserId = approverUserId;
+        document.ApprovalNotes = notes;
+
+        await _documentRepository.SaveAsync(document);
+
+        // Notificar criador
+        var creator = await _authorizationService.GetUserByIdAsync(document.CreatedByUserId);
+        await _notificationService.NotifyUserAsync(
+            creator,
+            $"Seu documento '{document.Title}' foi aprovado"
+        );
+
+        // Auditoria
+        await _auditService.LogAsync(new AuditEntry
+        {
+            EntityType = "Document",
+            EntityId = document.Id,
+            OperationType = "DOC_APPROVED",
+            PerformedByUserId = approverUserId,
+            Details = notes
+        });
+
+        return WorkflowTransitionResult.Success();
+    }
+
+    public async Task<WorkflowTransitionResult> RejectAsync(
+        long documentId,
+        long rejectorUserId,
+        string rejectionReason)
+    {
+        var document = await _documentRepository.GetByIdAsync(documentId);
+
+        // Validar permissão
+        if (!(await _authorizationService.HasPermissionAsync(
+            rejectorUserId, "doc:reject")))
+        {
+            return WorkflowTransitionResult.Failure("Usuário não tem permissão para rejeitar");
+        }
+
+        // Validar estado
+        if (document.Status != DocumentStatusEnum.UnderReview &&
+            document.Status != DocumentStatusEnum.Approved)
+        {
+            return WorkflowTransitionResult.Failure(
+                $"Documento em estado {document.Status} não pode ser rejeitado"
+            );
+        }
+
+        // Transição
+        document.Status = DocumentStatusEnum.Draft;
+        document.RejectedAt = DateTime.UtcNow;
+        document.RejectedByUserId = rejectorUserId;
+        document.RejectionReason = rejectionReason;
+
+        await _documentRepository.SaveAsync(document);
+
+        // Notificar criador com feedback
+        var creator = await _authorizationService.GetUserByIdAsync(document.CreatedByUserId);
+        await _notificationService.NotifyUserAsync(
+            creator,
+            $"Seu documento '{document.Title}' foi rejeitado. Motivo: {rejectionReason}"
+        );
+
+        // Auditoria
+        await _auditService.LogAsync(new AuditEntry
+        {
+            EntityType = "Document",
+            EntityId = document.Id,
+            OperationType = "DOC_REJECTED",
+            PerformedByUserId = rejectorUserId,
+            Details = rejectionReason,
+            Severity = AuditSeverity.Warning
+        });
+
+        return WorkflowTransitionResult.Success();
+    }
+
+    public async Task<WorkflowTransitionResult> PublishAsync(
+        long documentId,
+        long publisherUserId)
+    {
+        var document = await _documentRepository.GetByIdAsync(documentId);
+
+        // Validar permissão
+        if (!(await _authorizationService.HasPermissionAsync(
+            publisherUserId, "doc:publish")))
+        {
+            return WorkflowTransitionResult.Failure("Usuário não tem permissão para publicar");
+        }
+
+        // Validar estado
+        if (document.Status != DocumentStatusEnum.Approved)
+        {
+            return WorkflowTransitionResult.Failure(
+                $"Documento em estado {document.Status} não pode ser publicado"
+            );
+        }
+
+        // Transição
+        document.Status = DocumentStatusEnum.Published;
+        document.PublishedAt = DateTime.UtcNow;
+        document.PublishedByUserId = publisherUserId;
+
+        // Marcar como público (visível para todos com permissão de leitura)
+        document.IsPublic = true;
+
+        await _documentRepository.SaveAsync(document);
+
+        // Indexar no ElasticSearch
+        await _searchService.IndexDocumentAsync(document);
+
+        // Notificar interessados
+        await _notificationService.NotifyRoleAsync(
+            "DocumentConsumer",
+            $"Novo documento disponível: '{document.Title}'"
+        );
+
+        // Auditoria
+        await _auditService.LogAsync(new AuditEntry
+        {
+            EntityType = "Document",
+            EntityId = document.Id,
+            OperationType = "DOC_PUBLISHED",
+            PerformedByUserId = publisherUserId,
+            Details = document.Title
+        });
+
+        return WorkflowTransitionResult.Success();
+    }
+}
+```
+
+**Exemplos**:
+- Fluxo válido: Rascunho → Revisão → Aprovado → Publicado
+- Fluxo válido: Rascunho → Revisão → Rejeitado → Rascunho (com feedback)
+
+---
+
+### RN-DOC-109-10: Auditoria Completa de Acesso e Operações
+
+**Descrição**: Todas as operações em documentos (acesso, download, visualização, modificação, aprovação, rejeição, assinatura, deleção) devem ser auditadas com user ID, timestamp, IP, user agent e resultado.
+
+**Justificativa**: Cumprir LGPD (direito ao acesso e portabilidade); permitir investigação de incidentes; rastrear quem modificou quê e quando.
+
+**Implementação**:
+```csharp
+public class DocumentAuditService : IAuditService
+{
+    private readonly IAuditRepository _auditRepository;
+    private readonly IUserContext _userContext;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public async Task LogAccessAsync(long documentId, long userId, string ipAddress, string userAgent)
+    {
+        var entry = new AuditEntry
+        {
+            EntityType = "Document",
+            EntityId = documentId,
+            OperationType = "DOCUMENT_ACCESSED",
+            PerformedByUserId = userId,
+            PerformedAt = DateTime.UtcNow,
+            IpAddress = ipAddress,
+            UserAgent = userAgent,
+            Result = "Success",
+            Severity = AuditSeverity.Information
+        };
+
+        await _auditRepository.SaveAsync(entry);
+    }
+
+    public async Task LogDownloadAsync(
+        long documentId,
+        long userId,
+        long fileSizeBytes,
+        string ipAddress,
+        string userAgent)
+    {
+        var entry = new AuditEntry
+        {
+            EntityType = "Document",
+            EntityId = documentId,
+            OperationType = "DOCUMENT_DOWNLOADED",
+            PerformedByUserId = userId,
+            PerformedAt = DateTime.UtcNow,
+            IpAddress = ipAddress,
+            UserAgent = userAgent,
+            Details = $"Downloaded {fileSizeBytes} bytes",
+            Result = "Success",
+            Severity = AuditSeverity.Information
+        };
+
+        await _auditRepository.SaveAsync(entry);
+    }
+
+    public async Task LogOperationAsync(
+        string operationType,
+        long entityId,
+        long performedByUserId,
+        string details,
+        string result = "Success",
+        AuditSeverity severity = AuditSeverity.Information)
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+
+        var entry = new AuditEntry
+        {
+            EntityType = "Document",
+            EntityId = entityId,
+            OperationType = operationType,
+            PerformedByUserId = performedByUserId,
+            PerformedAt = DateTime.UtcNow,
+            IpAddress = httpContext?.Connection?.RemoteIpAddress?.ToString(),
+            UserAgent = httpContext?.Request?.Headers["User-Agent"].ToString(),
+            Details = details,
+            Result = result,
+            Severity = severity
+        };
+
+        await _auditRepository.SaveAsync(entry);
+    }
+
+    public async Task<IEnumerable<AuditEntry>> GetDocumentAuditTrailAsync(
+        long documentId,
+        DateTime? fromDate = null,
+        DateTime? toDate = null)
+    {
+        return await _auditRepository.QueryAsync(
+            a => a.EntityType == "Document"
+                && a.EntityId == documentId
+                && (!fromDate.HasValue || a.PerformedAt >= fromDate)
+                && (!toDate.HasValue || a.PerformedAt <= toDate)
+        );
+    }
+
+    public async Task<IEnumerable<AuditEntry>> GetUserAuditTrailAsync(
+        long userId,
+        DateTime? fromDate = null,
+        DateTime? toDate = null)
+    {
+        return await _auditRepository.QueryAsync(
+            a => a.PerformedByUserId == userId
+                && (!fromDate.HasValue || a.PerformedAt >= fromDate)
+                && (!toDate.HasValue || a.PerformedAt <= toDate)
+        );
+    }
+}
+```
+
+**Exemplos**:
+- Auditado: User X acessou documento Y em 2025-12-28 10:00:00 de IP 192.168.1.1
+- Auditado: User Z fez download de 25 MB do documento W em 2025-12-28 11:30:00
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `ic1_dados` (SQL Server 2008)
+
+**Tabelas Principais**:
+
+```sql
+-- Tabela de documentos (simplificada do legado)
+CREATE TABLE [dbo].[TB_DOCUMENTO](
+    [DOCUMENTO_ID] [int] IDENTITY(1,1) NOT NULL,
+    [CLIENTE_ID] [int] NOT NULL,
+    [TITULO] [varchar](255) NOT NULL,
+    [DESCRICAO] [varchar](1000) NULL,
+    [TIPO_DOCUMENTO] [varchar](50) NOT NULL,
+    [CAMINHO_ARQUIVO] [varchar](max) NOT NULL,
+    [TAMANHO_ARQUIVO] [bigint] NOT NULL,
+    [FORMATO_ARQUIVO] [varchar](10) NOT NULL,
+    [DATA_CRIACAO] [datetime] NOT NULL,
+    [USUARIO_CRIACAO] [int] NOT NULL,
+    [DATA_ATUALIZACAO] [datetime] NULL,
+    [USUARIO_ATUALIZACAO] [int] NULL,
+    [ATIVO] [bit] NOT NULL DEFAULT 1,
+    CONSTRAINT [PK_TB_DOCUMENTO] PRIMARY KEY CLUSTERED ([DOCUMENTO_ID] ASC),
+    CONSTRAINT [FK_TB_DOCUMENTO_CLIENTE] FOREIGN KEY ([CLIENTE_ID]) REFERENCES [dbo].[TB_CLIENTE]([CLIENTE_ID])
+);
+
+CREATE TABLE [dbo].[TB_DOCUMENTO_VERSAO](
+    [VERSAO_ID] [int] IDENTITY(1,1) NOT NULL,
+    [DOCUMENTO_ID] [int] NOT NULL,
+    [NUMERO_VERSAO] [int] NOT NULL,
+    [CAMINHO_ARQUIVO] [varchar](max) NOT NULL,
+    [TAMANHO_ARQUIVO] [bigint] NOT NULL,
+    [DATA_CRIACAO] [datetime] NOT NULL,
+    [USUARIO_CRIACAO] [int] NOT NULL,
+    [ANOTACOES] [varchar](500) NULL,
+    CONSTRAINT [PK_TB_DOCUMENTO_VERSAO] PRIMARY KEY CLUSTERED ([VERSAO_ID] ASC),
+    CONSTRAINT [FK_TB_DOCUMENTO_VERSAO] FOREIGN KEY ([DOCUMENTO_ID]) REFERENCES [dbo].[TB_DOCUMENTO]([DOCUMENTO_ID])
+);
+
+CREATE TABLE [dbo].[TB_DOCUMENTO_AUDITORIA](
+    [AUDITORIA_ID] [int] IDENTITY(1,1) NOT NULL,
+    [DOCUMENTO_ID] [int] NOT NULL,
+    [TIPO_OPERACAO] [varchar](50) NOT NULL, -- 'CREATE', 'UPDATE', 'DELETE', 'DOWNLOAD', 'ACCESS'
+    [DATA_OPERACAO] [datetime] NOT NULL,
+    [USUARIO_ID] [int] NOT NULL,
+    [ENDERECO_IP] [varchar](15) NULL,
+    [DETALHES] [varchar](max) NULL,
+    CONSTRAINT [PK_TB_DOCUMENTO_AUDITORIA] PRIMARY KEY CLUSTERED ([AUDITORIA_ID] ASC),
+    CONSTRAINT [FK_TB_DOCUMENTO_AUDITORIA] FOREIGN KEY ([DOCUMENTO_ID]) REFERENCES [dbo].[TB_DOCUMENTO]([DOCUMENTO_ID])
+);
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descrição | Uso no Modernizado |
+|---|---|---|
+| `DOCUMENTO_ID` | Chave primária | Mapeado para `Document.Id` |
+| `CLIENTE_ID` | Multi-tenancy | Mantém `ClienteId` para isolamento |
+| `TITULO` | Nome do documento | `Document.Title` |
+| `TIPO_DOCUMENTO` | Classificação | `Document.DocumentType` |
+| `CAMINHO_ARQUIVO` | Localização em disco | Substituído por `BlobPath` (Azure Blob) |
+| `TAMANHO_ARQUIVO` | Bytes | Mantém `FileSize` |
+| `DATA_CRIACAO` | Timestamp | `Document.CreatedAt` |
+| `USUARIO_CRIACAO` | Quem criou | `Document.CreatedByUserId` |
+
+### 3.2 WebServices Legado (VB.NET)
+
+**Arquivo Principal**: `D:\IC2\ic1_legado\WebService\WSDocumento.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|---|---|---|
+| `ListarDocumentos()` | Lista todos os docs | `GET /api/documentos` |
+| `ObterDocumento(id)` | Obter por ID | `GET /api/documentos/{id}` |
+| `SalvarDocumento()` | Criar/atualizar | `POST /api/documentos` |
+| `DeletarDocumento(id)` | Soft delete | `DELETE /api/documentos/{id}` |
+| `BaixarDocumento(id)` | Download | `GET /api/documentos/{id}/download` |
+| `ListarVersoes(id)` | Histórico | `GET /api/documentos/{id}/versoes` |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna (Angular) |
+|---|---|---|
+| `frmDocumento.aspx` | CRUD de documentos | `/documentos/list` |
+| `frmDocumentoDetalhe.aspx` | Visualizar detalhe | `/documentos/{id}` |
+| `frmDocumentoUpload.aspx` | Upload simples | `/documentos/upload` |
+| `frmBuscaDocumento.aspx` | Busca | `/documentos/search` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `DOCS_DIGITALIZATION_MODULE`
+
+**Configuração**:
+```json
+{
+    "featureKey": "DOCS_DIGITALIZATION_MODULE",
+    "nome": "Módulo de Gestão de Documentos Digitalizados",
+    "descricao": "Upload, OCR, assinatura digital, busca full-text de documentos",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "subFeatures": {
+        "DOCS_OCR_ENABLED": true,
+        "DOCS_DIGITAL_SIGNATURE_ENABLED": true,
+        "DOCS_AUTO_CLASSIFICATION_ENABLED": true,
+        "DOCS_FULL_TEXT_SEARCH_ENABLED": true,
+        "DOCS_RETENTION_POLICIES_ENABLED": true
+    }
+}
+```
+
+**Nota**: Feature flags permitem ativar/desativar OCR sem redeploy; útil para testes incrementais.
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Tradução**:
+
+```json
+{
+    "documents": {
+        "list": {
+            "title": "Documentos",
+            "breadcrumb": "Documentos",
+            "search_placeholder": "Buscar documentos por título, conteúdo...",
+            "new_button": "Novo Documento",
+            "columns": {
+                "title": "Título",
+                "type": "Tipo",
+                "created_at": "Criado em",
+                "status": "Status",
+                "actions": "Ações"
+            }
+        },
+        "form": {
+            "title": "Título do Documento",
+            "description": "Descrição",
+            "type": "Tipo de Documento",
+            "file": "Arquivo",
+            "tags": "Marcadores",
+            "retention_days": "Retenção (dias)"
+        },
+        "messages": {
+            "success_upload": "Documento enviado com sucesso",
+            "success_approval": "Documento aprovado",
+            "success_rejection": "Documento rejeitado",
+            "error_upload": "Erro ao enviar documento",
+            "error_malware": "Arquivo contém vírus e foi rejeitado",
+            "error_file_size": "Arquivo excede 50 MB",
+            "error_format": "Formato de arquivo não permitido"
+        },
+        "validation": {
+            "title_required": "Título é obrigatório",
+            "file_required": "Arquivo é obrigatório",
+            "invalid_format": "Formato inválido"
+        },
+        "status": {
+            "draft": "Rascunho",
+            "under_review": "Em Revisão",
+            "approved": "Aprovado",
+            "published": "Publicado",
+            "rejected": "Rejeitado"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|---|---|---|
+| Upload de documento | `DOC_UPLOADED` | Document ID, filename, size, user, IP |
+| Modificação de metadados | `DOC_METADATA_UPDATED` | Campos alterados, valores antigos/novos |
+| Download | `DOC_DOWNLOADED` | Document ID, user, IP, timestamp |
+| Acesso/Visualização | `DOC_ACCESSED` | Document ID, user, IP, timestamp |
+| Aprovação | `DOC_APPROVED` | Document ID, approver, notes |
+| Rejeição | `DOC_REJECTED` | Document ID, rejector, reason |
+| Assinatura digital | `DOC_SIGNED` | Document ID, signatory, certificate thumbprint |
+| Deleção | `DOC_DELETED` | Document ID, user, reason |
+| OCR completado | `DOC_OCR_COMPLETED` | Document ID, confidence, language |
+| Classificação | `DOC_CLASSIFIED` | Document ID, type, confidence |
+
+**Retenção**: 10 anos (legislação fiscal brasileira e LGPD)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis |
+|---|---|---|
+| `doc:create` | Criar/upload novo documento | Todos os usuários |
+| `doc:read` | Visualizar documento | Todos (respeitando compartilhamento) |
+| `doc:update` | Editar metadados | Criador, Gestor |
+| `doc:delete` | Deletar documento | Gestor, Administrador |
+| `doc:download` | Fazer download | Todos (respeitando permissões) |
+| `doc:request_review` | Solicitar revisão | Criador, Gestor |
+| `doc:approve` | Aprovar documento | Revisor, Gestor |
+| `doc:publish` | Publicar documento | Revisor, Gestor |
+| `doc:sign` | Assinar documento | Signatários designados |
+| `doc:manage_retention` | Gerenciar políticas de retenção | Administrador |
+| `doc:audit` | Visualizar auditoria | Administrador, Compliance |
+| `doc:scan` | Usar scanner para digitalização | Gestor, Operador |
+| `doc:ocr` | Executar OCR manual | Gestor |
+
+**Nota**: Acesso granular com suporte a compartilhamento (usuário/grupo/role).
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Método | Endpoint | Descrição | Permissão | Exemplo de Resposta |
+|---|---|---|---|---|
+| GET | `/api/documentos` | Listar documentos (paginado) | `doc:read` | 200 OK com array de documentos |
+| GET | `/api/documentos/{id}` | Obter documento por ID | `doc:read` | 200 OK com documento completo |
+| POST | `/api/documentos` | Upload de novo documento | `doc:create` | 201 Created com Document.Id |
+| PUT | `/api/documentos/{id}` | Atualizar metadados/arquivo | `doc:update` | 200 OK com documento atualizado |
+| DELETE | `/api/documentos/{id}` | Excluir documento (soft delete) | `doc:delete` | 204 No Content |
+
+**Exemplo GET /api/documentos (Resposta 200)**:
+```json
+{
+    "data": [
+        {
+            "id": 1,
+            "title": "Contrato 2024",
+            "description": "Contrato anual com fornecedor",
+            "type": "CONTRACT",
+            "fileName": "contrato_2024.pdf",
+            "fileSize": 2048576,
+            "status": "PUBLISHED",
+            "createdAt": "2025-01-15T10:30:00Z",
+            "createdBy": "João Silva",
+            "isSignedDigitally": true,
+            "ocrStatus": "COMPLETED",
+            "extractedText": "Contrato entre empresa A e B..."
+        }
+    ],
+    "pagination": {
+        "page": 1,
+        "pageSize": 20,
+        "total": 150,
+        "totalPages": 8
+    }
+}
+```
+
+### 5.2 Operações Especiais
+
+| Método | Endpoint | Descrição | Permissão |
+|---|---|---|---|
+| POST | `/api/documentos/{id}/ocr` | Executar OCR manual | `doc:ocr` |
+| GET | `/api/documentos/{id}/download` | Download com marca d'água | `doc:download` |
+| GET | `/api/documentos/{id}/preview` | Preview em-browser | `doc:read` |
+| GET | `/api/documentos/{id}/versoes` | Listar histórico de versões | `doc:read` |
+| POST | `/api/documentos/{id}/assinar` | Iniciar assinatura digital | `doc:sign` |
+| GET | `/api/documentos/{id}/auditoria` | Auditoria de acesso/modificação | `doc:audit` |
+| POST | `/api/documentos/buscar` | Busca full-text avançada | `doc:read` |
+| POST | `/api/documentos/{id}/aprovar` | Aprovar documento | `doc:approve` |
+| POST | `/api/documentos/{id}/rejeitar` | Rejeitar documento | `doc:approve` |
+| POST | `/api/documentos/{id}/publicar` | Publicar documento | `doc:publish` |
+| POST | `/api/documentos/digitalizar` | Upload via scanner (TWAIN) | `doc:scan` |
+| GET | `/api/documentos/{id}/classificacao` | Obter classificação automática | `doc:read` |
+| POST | `/api/documentos/{id}/compartilhar` | Compartilhar com usuário/grupo | `doc:update` |
+| PUT | `/api/documentos/{id}/politica-retencao` | Atualizar política de retenção | `doc:manage_retention` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Upload e Processamento de Documento
+
+```
+Usuário acessa /documentos/upload
+    |
+    v
+Seleciona arquivo (máx 50 MB)
+    |
+    +--- Arquivo > 50 MB? -----> Erro FILE_TOO_LARGE (413)
+    |
+    +--- Formato não permitido? -----> Erro INVALID_FILE_TYPE (400)
+    |
+    v (Validação passou)
+ClamAV escaneia arquivo
+    |
+    +--- Malware detectado? -----> Erro MALWARE_DETECTED (400) + Auditoria
+    |
+    v (Arquivo limpo)
+Upload para Azure Blob Storage
+    |
+    v
+Detectar se PDF é scaneado
+    |
+    +--- PDF Scaneado -----> Agendar OCR via Hangfire (status = Pending)
+    |
+    +--- PDF Nativo ou imagem -----> Extrair texto direto (status = Completed)
+    |
+    v
+Classificação automática (ML)
+    |
+    v
+Criar documento em banco de dados
+    |
+    v
+Indexar em ElasticSearch (se status = Published)
+    |
+    v
+Notificar usuário: "Documento criado com sucesso"
+```
+
+### 6.2 Fluxo de Workflow de Aprovação
+
+```
+Documento criado (Status = DRAFT)
+    |
+    v
+Usuário solicita revisão (POST /api/documentos/{id}/review)
+    |
+    v
+Status = UNDER_REVIEW
+    |
+    +--- Revisor rejeita -----> Status = DRAFT + Feedback + Notificação
+    |
+    v (Revisor aprova)
+Status = APPROVED
+    |
+    v
+Usuário com permissão publica documento (POST /api/documentos/{id}/publish)
+    |
+    v
+Status = PUBLISHED
+    |
+    v
+Indexar em ElasticSearch
+    |
+    v
+Notificar usuários: "Novo documento disponível"
+```
+
+### 6.3 Fluxo de Busca Full-Text
+
+```
+Usuário acessa /documentos/search
+    |
+    v
+Digita query: "contrato 2024"
+    |
+    v
+API envia para ElasticSearch
+    |
+    v
+ES retorna documentos ordenados por relevância (TF-IDF)
+    |
+    v
+Exibir resultados com highlights de trechos
+    |
+    v
+Usuário clica em resultado
+    |
+    v
+Navega para /documentos/{id}
+```
+
+### 6.4 Fluxo de Assinatura Digital
+
+```
+Documento em status APPROVED
+    |
+    v
+Usuário solicita assinatura (POST /api/documentos/{id}/assinar)
+    |
+    v
+API envia para DocuSign/Adobe Sign
+    |
+    v
+Signatários recebem email com link
+    |
+    v
+Signatário 1 assina via DocuSign
+    |
+    v
+Signatário 2 assina (sequencial)
+    |
+    v
+DocuSign retorna envelope assinado
+    |
+    v
+Validar certificado contra ICP-Brasil
+    |
+    v
+Se válido:
+    - Status = SIGNED
+    - Armazenar PDF assinado em Blob
+    - Auditoria registra assinatura
+    - Notificar criador
+Senão:
+    - Status = SIGNATURE_FAILED
+    - Erro em auditoria
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição |
+|---|---|
+| **Criptografia at-rest** | AES-256 para dados em Azure Blob Storage |
+| **Criptografia in-transit** | TLS 1.3 para todas as comunicações HTTPS |
+| **Antivírus** | ClamAV scanneia todo arquivo antes de aceitar |
+| **RBAC Granular** | Permissões por operação (create, read, update, delete, sign, etc.) |
+| **Auditoria Completa** | Todas as operações registradas com user, IP, timestamp |
+| **Validação de Entrada** | Whitelist de formatos, Magic Number validation |
+| **LGPD Compliance** | Direito ao esquecimento, políticas de retenção automáticas |
+| **Assinatura Digital** | Certificado ICP-Brasil validado |
+| **Marca D'Água** | Download inclui user/data/hora em mark (à prova de cópia) |
+| **Isolamento por Tenant** | ClienteId em todas as queries (multi-tenancy segura) |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] SQL Injection em campos de busca
+- [ ] XSS em título/descrição de documento
+- [ ] CSRF Protection em upload
+- [ ] Validação de permissões (user não acessa doc de outro tenant)
+- [ ] Antivírus rejeita .exe disfarçado de .pdf
+- [ ] Magic Number validation (arquivo .pdf contendo .exe é rejeitado)
+- [ ] Auditoria registra tentativas de acesso não autorizado
+- [ ] Download de documento deletado retorna 404
+- [ ] OCR não processa arquivo infectado
+- [ ] Assinatura valida certificado ICP-Brasil
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medição |
+|---|---|---|
+| **Tempo médio de OCR** | < 2 minutos | Média em horas de pico |
+| **Taxa de sucesso em upload** | > 99% | Total de uploads bem-sucedidos / Total |
+| **Latência de busca** | < 500ms | P95 em ElasticSearch |
+| **Taxa de classificação automática** | > 95% | Docs classificados corretamente / Total |
+| **Disponibilidade de API** | > 99.9% | Uptime mensal |
+| **Espaço em Azure Blob** | Otimizado | MB utilizados por tier (hot/cool/archive) |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|---|---|---|
+| **OCR Failed** | Status = FAILED por > 1 hora | Notificar admin, retry automático |
+| **Malware Detected** | Arquivo infectado detectado | Bloquear upload, auditoria crítica, notificar CISO |
+| **Quota Excedido** | Storage do cliente > 80% | Notificar cliente, sugerir limpeza |
+| **Antivírus Offline** | ClamAV não responde | Bloquear uploads até restaurar serviço |
+| **ElasticSearch Degradado** | < 90% de índices online | Notificar ops, fallback para busca em BD |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados Completo**: Criar [MD-RF109](./MD-RF109.md) com DDL completo de Document, DocumentVersion, DocumentSignature, RetentionPolicy, AuditEntry
+2. **Casos de Uso Detalhados**: Criar [UC-RF109](./UC-RF109.md) com 5 fluxos (Upload, Aprovação, Busca, Assinatura, Retenção)
+3. **Workflows e Telas**: Criar [WF-RF109](./WF-RF109.md) com mockups de interface, estados e componentes Angular
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml) quebrando RF em user stories implementáveis (upload, OCR, assinatura, etc.)
+5. **Testes de Contrato**: Criar [TC-RF109-BACKEND.md](./TC-RF109-BACKEND.md), [TC-RF109-FRONTEND.md](./TC-RF109-FRONTEND.md) com cenários end-to-end
+6. **Implementação Backend**: Commands/Queries/Handlers seguindo CQRS
+7. **Implementação Frontend**: Componentes Angular reusáveis
+8. **Testes E2E**: Executar cenários com dados reais
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|---|---|---|---|
+| 1.0 | 2025-12-28 | Versão inicial - RF109 Gestão de Documentos Originais e Digitalização | Claude Code |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: Claude Code
+**Revisão**: Pendente
+
+---
+
+## REFERÊNCIA TÉCNICA ADICIONAL
+
+### Tecnologias Recomendadas
+
+**Backend (.NET 10)**:
+- `Azure.Storage.Blobs` - Upload/download em Blob Storage
+- `Nest` (ElasticSearch .NET client)
+- `MediatR` - CQRS command/query handling
+- `ClamAV.Net` - Antivírus
+- `PdfSharpCore` - Processamento de PDFs
+- `Hangfire` - Jobs assincronos (OCR, classificação)
+- `Azure.AI.Vision.ImageAnalysis` - OCR (Azure Cognitive Services)
+- `DocuSign.eSignClient` ou `AdobeSignAPI` - Assinatura digital
+- `Serilog` - Logging estruturado
+
+**Frontend (Angular 18+)**:
+- `ngx-dropzone` - Upload com drag-and-drop
+- `ngx-document-scanner` - Captura via scanner (TWAIN/WIA)
+- `pdfjs-dist` - Preview de PDFs
+- `ngx-pagination` - Paginação de listagens
+- `ngx-permissions` - Validação de RBAC no frontend
+- `ngx-translate` - i18n
+
+**Infraestrutura**:
+- **Azure Blob Storage** - Armazenamento escalável
+- **ElasticSearch** - Indexação full-text (hospedado ou via Azure Cognitive Search)
+- **ClamAV** - Antivírus (local ou via clamd daemon)
+- **Hangfire** - Processamento async (ou Azure Service Bus)
+- **Azure Cognitive Services** - OCR, classificação, extração de dados
+
+---

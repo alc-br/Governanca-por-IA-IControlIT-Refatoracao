@@ -1,0 +1,199 @@
+# Matriz de Transições de Contratos
+# Define quais transições são permitidas entre contratos
+# Atualizado: 2025-12-26
+# Conforme: CONTRATO-ORQUESTRACAO.md
+
+transitions:
+  # ===========================
+  # FASE 1: DOCUMENTAÇÃO
+  # ===========================
+
+  CONTRATO-DOCUMENTACAO-ESSENCIAL:
+    allowed_next:
+      - CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES
+      - CONTRATO-DOCUMENTACAO-ESSENCIAL  # iterativo se incompleto
+
+  CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES:
+    allowed_next:
+      - CONTRATO-EXECUCAO-BACKEND
+      - CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES  # iterativo se incompleto
+
+  CONTRATO-DOCUMENTACAO-GOVERNADA:
+    allowed_next:
+      - CONTRATO-EXECUCAO-BACKEND
+      - CONTRATO-AUDITORIA-CONFORMIDADE
+
+  # ===========================
+  # FASE 2: DESENVOLVIMENTO BACKEND
+  # ===========================
+
+  CONTRATO-EXECUCAO-BACKEND:
+    allowed_next:
+      - CONTRATO-EXECUCAO-TESTER-BACKEND
+      - CONTRATO-REGULARIZACAO-DE-BACKEND  # se legado
+
+  CONTRATO-REGULARIZACAO-DE-BACKEND:
+    allowed_next:
+      - CONTRATO-EXECUCAO-TESTER-BACKEND
+
+  CONTRATO-EXECUCAO-TESTER-BACKEND:
+    allowed_next:
+      - CONTRATO-TRANSICAO-BACKEND-PARA-TESTES  # se aprovado
+      - CONTRATO-MANUTENCAO-BACKEND  # se reprovado
+      - CONTRATO-EXECUCAO-BACKEND  # se requer retrabalho
+
+  CONTRATO-TRANSICAO-BACKEND-PARA-TESTES:
+    allowed_next:
+      - CONTRATO-EXECUCAO-FRONTEND  # se frontend necessário
+      - CONTRATO-EXECUCAO-TESTES  # se frontend não necessário
+
+  # ===========================
+  # FASE 3: DESENVOLVIMENTO FRONTEND
+  # ===========================
+
+  CONTRATO-EXECUCAO-FRONTEND:
+    allowed_next:
+      - CONTRATO-EXECUCAO-TESTES
+
+  # ===========================
+  # FASE 4: TESTES
+  # ===========================
+
+  CONTRATO-EXECUCAO-TESTES:
+    allowed_next:
+      - CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY  # se aprovado (taxa 100%)
+      - CONTRATO-MANUTENCAO  # se reprovado
+      - CONTRATO-EXECUCAO-BACKEND  # se requer correção backend
+      - CONTRATO-EXECUCAO-FRONTEND  # se requer correção frontend
+
+  # ===========================
+  # FASE 5: TRANSIÇÃO PARA DEPLOY
+  # ===========================
+
+  CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY:
+    allowed_next:
+      - CONTRATO-EXECUCAO-DEPLOY
+      - CONTRATO-DEPLOY-AZURE  # alternativa
+      - CONTRATO-DEPLOY-HOM-SEM-VALIDACAO  # exceção
+
+  # ===========================
+  # FASE 6: DEPLOY
+  # ===========================
+
+  CONTRATO-EXECUCAO-DEPLOY:
+    allowed_next:
+      - CONTRATO-ROLLBACK  # se deploy falhar
+      - null  # sucesso - fim do fluxo
+
+  CONTRATO-DEPLOY-AZURE:
+    allowed_next:
+      - CONTRATO-ROLLBACK  # se deploy falhar
+      - null  # sucesso - fim do fluxo
+
+  CONTRATO-DEPLOY-HOM-SEM-VALIDACAO:
+    allowed_next:
+      - CONTRATO-ROLLBACK  # se deploy falhar
+      - CONTRATO-EXECUCAO-TESTES  # validação posterior
+      - null  # sucesso - fim do fluxo (risco aceito)
+
+  # ===========================
+  # FASE 7: ROLLBACK
+  # ===========================
+
+  CONTRATO-ROLLBACK:
+    allowed_next:
+      - CONTRATO-DEBUG-CONTROLADO  # investigar causa
+      - CONTRATO-MANUTENCAO  # corrigir problema
+      - CONTRATO-EXECUCAO-BACKEND  # retrabalho completo
+      - CONTRATO-HOTFIX-EM-PRODUCAO  # se crítico
+
+  # ===========================
+  # CONTRATOS DE MANUTENÇÃO
+  # ===========================
+
+  CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA:
+    allowed_next:
+      - CONTRATO-EXECUCAO-TESTES
+      - CONTRATO-EXECUCAO-BACKEND  # se requer retrabalho maior
+
+  CONTRATO-MANUTENCAO-CURTO:
+    allowed_next:
+      - CONTRATO-EXECUCAO-TESTES
+      - CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA  # se cresceu
+
+  CONTRATO-MANUTENCAO-BACKEND:
+    allowed_next:
+      - CONTRATO-EXECUCAO-TESTER-BACKEND  # revalidar contrato
+      - CONTRATO-EXECUCAO-TESTES
+
+  # ===========================
+  # CONTRATOS DE DEBUG E AUDITORIA
+  # ===========================
+
+  CONTRATO-DEBUG-CONTROLADO:
+    allowed_next:
+      - CONTRATO-MANUTENCAO  # correção identificada
+      - CONTRATO-EXECUCAO-BACKEND  # problema requer retrabalho
+      - CONTRATO-DEBUG-CONTROLADO  # investigação iterativa
+      - CONTRATO-AUDITORIA-CONFORMIDADE  # gap de documentação
+
+  CONTRATO-AUDITORIA-CONFORMIDADE:
+    allowed_next:
+      - CONTRATO-DOCUMENTACAO-GOVERNADA  # corrigir documentação
+      - CONTRATO-EXECUCAO-BACKEND  # gap de implementação
+      - CONTRATO-EXECUCAO-FRONTEND  # gap de implementação
+      - null  # conforme - sem ação
+
+  # ===========================
+  # CONTRATOS DE HOTFIX
+  # ===========================
+
+  CONTRATO-HOTFIX-EM-PRODUCAO:
+    allowed_next:
+      - CONTRATO-EXECUCAO-DEPLOY  # deploy emergencial
+      - CONTRATO-ROLLBACK  # se falhar
+
+  # ===========================
+  # CONTRATOS DE GOVERNANÇA
+  # ===========================
+
+  CONTRATO-DEVOPS-GOVERNANCA:
+    allowed_next:
+      - null  # apenas sincronização, não inicia novo contrato
+
+  CONTRATO-ORQUESTRACAO:
+    allowed_next:
+      - null  # apenas validação, não inicia novo contrato
+
+  # ===========================
+  # ALIASES (para compatibilidade)
+  # ===========================
+
+  DEBUG:
+    allowed_next:
+      - CONTRATO-DEBUG-CONTROLADO
+      - CONTRATO-MANUTENCAO
+
+  TESTES:
+    allowed_next:
+      - CONTRATO-EXECUCAO-TESTES
+
+  MANUTENCAO:
+    allowed_next:
+      - CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA
+
+  FRONTEND:
+    allowed_next:
+      - CONTRATO-EXECUCAO-FRONTEND
+
+  BACKEND:
+    allowed_next:
+      - CONTRATO-EXECUCAO-BACKEND
+
+  DEVOPS:
+    allowed_next:
+      - CONTRATO-DEVOPS-GOVERNANCA
+
+  DOCUMENTACAO:
+    allowed_next:
+      - CONTRATO-DOCUMENTACAO-ESSENCIAL

@@ -1,0 +1,602 @@
+# Template de Referência ao Legado (RL-RF002.yaml)
+# Versão: 2.0 (Adequação para Automação e Rastreabilidade)
+# Data: 2025-12-29
+
+rf_id: RF002
+titulo: "Sistema de Configurações e Parametrização Avançada"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "IControlIT v1.0"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server"
+  multi_tenant: false
+  auditoria: "none"
+  configuracoes: "web.config estático (XML)"
+  criptografia: "none"
+  versionamento: "none"
+  cache: "none"
+
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+referencias:
+  - id: "LEG-RF002-001"
+    tipo: "componente"
+    nome: "web.config (arquivo XML de configuração)"
+    caminho: "ic1_legado/IControlIT/IControlIT/web.config"
+    descricao: |
+      Arquivo XML estático que armazenava TODAS as configurações do sistema legado.
+      Continha:
+      - Configurações SMTP (host, port, usuário, senha em TEXTO CLARO)
+      - Credenciais Azure (TenantId, ClientSecret em TEXTO CLARO)
+      - API Keys externas (SAP, ERPs em TEXTO CLARO)
+      - Parâmetros de sistema (idioma, timezone, moeda)
+      - Connection strings de banco de dados
+
+      Problemas críticos:
+      - Senhas em texto claro (violação LGPD, PCI-DSS, SOX)
+      - Requer restart IIS para aplicar mudanças (downtime 30s-2min)
+      - Sem multi-tenancy (configurações globais)
+      - Sem versionamento (arquivo sobrescrito)
+      - Sem auditoria (desconhecido quem mudou, quando)
+      - Sem validação (aceita valores inválidos)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por tabela SistemaConfiguracaoGeral no banco de dados com:
+      - Criptografia AES-256-GCM via Azure Key Vault
+      - Cache Redis hot-reload (pub/sub, zero downtime)
+      - Multi-tenancy (hierarquia Global → Conglomerado → Empresa)
+      - Versionamento automático com diff JSON
+      - Auditoria SOX completa (quem, quando, IP, motivo)
+      - Validação de tipo + regex + ranges
+
+      Impacto:
+      - Eliminação de 8 problemas críticos de segurança e compliance
+      - Redução 95% tempo de deploy (sem restart IIS)
+      - Redução 80% erros humanos (validação automática)
+
+    rf_item_relacionado: "RN-RF002-01, RN-RF002-02, RN-RF002-03"
+    uc_relacionado: "UC01, UC03"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF002-002"
+    tipo: "regra_negocio"
+    nome: "ConfigurationManager.AppSettings() - Leitura sem validação"
+    caminho: "ic1_legado/IControlIT/App_Code/Helpers/ConfigHelper.vb"
+    descricao: |
+      Método VB.NET legado para ler configurações do web.config.
+
+      Código:
+      ```vb.net
+      Public Function ObterConfiguracao(chave As String) As String
+          Return ConfigurationManager.AppSettings(chave)
+      End Function
+      ```
+
+      Problemas:
+      - Retorna Nothing se chave não existir (NullReferenceException)
+      - Sem cache (lê XML a cada chamada)
+      - Sem validação de tipo (tudo retornado como String)
+      - Conversão manual propensa a FormatException
+      - Senhas retornadas em texto claro
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por ConfigurationService.GetAsync<T>(chave) com:
+      - Validação de tipo genérica <T>
+      - Cache Redis (100x mais rápido)
+      - Fallback para valor padrão (sem crash)
+      - Auditoria de acesso a valores sensíveis
+      - Descriptografia automática de valores sensíveis
+
+      Compatibilidade:
+      - Manter wrapper ObterConfiguracao() que chama ConfigurationService
+      - Remover wrapper após 30 dias de validação
+
+    rf_item_relacionado: "RN-RF002-03, RN-RF002-05"
+    uc_relacionado: "UC00, UC02"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF002-003"
+    tipo: "regra_negocio"
+    nome: "Senhas em Texto Claro (SMTP, Azure, APIs)"
+    caminho: "ic1_legado/IControlIT/IControlIT/web.config"
+    descricao: |
+      Web.config armazenava credenciais sensíveis em TEXTO CLARO:
+      - SMTP_Senha
+      - Azure_ClientSecret
+      - SAP_ApiKey
+      - Azure_StorageConnectionString
+
+      Exemplo:
+      ```xml
+      <add key="SMTP_Senha" value="senha123" />
+      <add key="Azure_ClientSecret" value="secret123" />
+      ```
+
+      Riscos:
+      - Vazamento em backups
+      - Exposição em logs IIS
+      - Commitados no Git acidentalmente
+      - Violação LGPD Art. 46, PCI-DSS Req. 8.2.1, SOX Seção 404
+
+    destino: "assumido_com_correcao"
+    justificativa: |
+      Assumido porém CORRIGIDO com criptografia obrigatória:
+      - Valores marcados Fl_Criptografado = 1
+      - Criptografia AES-256-GCM via Azure Key Vault
+      - Valores mascarados (********) para todos exceto Super Admin
+      - Auditoria de descriptografia (quem, quando, IP)
+
+      Migração:
+      - Script re-encripta senhas existentes do web.config
+      - Validação manual de todas credenciais
+      - Teste de conectividade pós-migração
+
+    rf_item_relacionado: "RN-RF002-02, RN-RF002-09"
+    uc_relacionado: "UC01, UC03"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF002-004"
+    tipo: "regra_negocio"
+    nome: "Restart IIS Obrigatório para Aplicar Mudanças"
+    caminho: "ic1_legado (comportamento sistêmico)"
+    descricao: |
+      Qualquer alteração no web.config exigia:
+      1. Editar arquivo manualmente
+      2. Executar iisreset
+      3. Downtime 30s-2min
+      4. Testar manualmente se não quebrou
+
+      Problemas:
+      - Violação SLA 99.9%
+      - Impossível deploy blue-green
+      - Risco de indisponibilidade em PRD
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por cache Redis hot-reload (pub/sub):
+      - Ao atualizar configuração, publica evento config:invalidate
+      - Todas instâncias subscrevem e invalidam cache automaticamente
+      - Zero downtime
+      - Mudança aplicada em <100ms
+
+      Teste de validação:
+      - Alterar configuração SMTP em PRD
+      - Verificar que e-mail funciona imediatamente sem restart
+
+    rf_item_relacionado: "RN-RF002-05, RN-RF002-06"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF002-005"
+    tipo: "regra_negocio"
+    nome: "Sem Multi-Tenancy (Configurações Globais)"
+    caminho: "ic1_legado/IControlIT/IControlIT/web.config"
+    descricao: |
+      Web.config era global para toda aplicação.
+      Impossível ter configurações específicas por:
+      - Conglomerado
+      - Empresa
+      - Departamento
+      - Usuário
+
+      Exemplo: Empresa A e Empresa B usavam mesmo SMTP
+      (problemático se empresas quiserem seus próprios servidores de e-mail)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por hierarquia multi-tenant:
+      - Global (fallback se não existir em níveis inferiores)
+      - Conglomerado (ex: Grupo Econômico XYZ)
+      - Empresa (ex: Empresa A do grupo)
+      - Departamento (ex: TI da Empresa A)
+      - Usuário (ex: João do TI)
+
+      Precedência: Usuário → Departamento → Empresa → Conglomerado → Global
+
+      Validação:
+      - Isolamento obrigatório por Id_Conglomerado/Id_Empresa
+      - Tentativa de acessar configuração de outro tenant → HTTP 403
+
+    rf_item_relacionado: "RN-RF002-01"
+    uc_relacionado: "UC00, UC01, UC02"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF002-006"
+    tipo: "regra_negocio"
+    nome: "Sem Versionamento e Rollback"
+    caminho: "ic1_legado (ausência de funcionalidade)"
+    descricao: |
+      Web.config não tinha versionamento:
+      - Arquivo sobrescrito diretamente
+      - Impossível ver histórico de mudanças
+      - Impossível saber quem mudou, quando, por quê
+      - Impossível rollback após erro
+
+      Processo manual de "backup":
+      - DevOps copiava web.config para web.config.backup-YYYYMMDD
+      - Frequentemente esquecido
+      - Backups desorganizados
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por versionamento automático:
+      - Tabela SistemaConfiguracaoHistorico
+      - Registro automático a cada mudança
+      - Diff JSON completo (valor anterior vs novo)
+      - Rollback 1-click para qualquer versão
+      - Auditoria completa (quem, quando, IP, motivo, ticket)
+
+      Compliance SOX Seção 404:
+      - Histórico imutável (soft delete)
+      - Retenção 7 anos
+      - Rastreabilidade completa de mudanças
+
+    rf_item_relacionado: "RN-RF002-06, RN-RF002-07, RN-RF002-11"
+    uc_relacionado: "UC02, UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF002-007"
+    tipo: "regra_negocio"
+    nome: "Sem Validação de Valores"
+    caminho: "ic1_legado (comportamento sistêmico)"
+    descricao: |
+      Web.config aceitava qualquer valor:
+      - Porta inválida (ex: 999999) → crash em runtime
+      - E-mail malformado → falha silenciosa no envio
+      - Boolean inválido → FormatException
+
+      Exemplo real de incidente:
+      - DevOps digitou SMTP_Port = 58 (sem o 7)
+      - Sistema aceitou
+      - Todos e-mails falharam silenciosamente por 2 dias
+      - Descoberto apenas quando cliente reclamou
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação rigorosa:
+      - Validação de tipo antes de persistir
+      - Validação customizada (regex, ranges, valores permitidos)
+      - Dry-run obrigatório em mudanças críticas
+      - Simulação de impacto antes de aplicar
+
+      Tipos suportados com validação:
+      - String (regex opcional)
+      - Integer (min/max opcional)
+      - Decimal (min/max opcional)
+      - Boolean (true/false)
+      - DateTime (futuro/passado opcional)
+      - JSON (schema validation opcional)
+      - Enum (valores permitidos obrigatório)
+
+    rf_item_relacionado: "RN-RF002-03, RN-RF002-04, RN-RF002-14"
+    uc_relacionado: "UC01, UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF002-008"
+    tipo: "regra_negocio"
+    nome: "Feature Flags Hardcoded no Código"
+    caminho: "ic1_legado/IControlIT/App_Code/**/*.vb"
+    descricao: |
+      Feature flags eram implementados como constantes bool:
+
+      ```vb.net
+      Public Const HABILITAR_NOVO_DASHBOARD As Boolean = False
+      ```
+
+      Problemas:
+      - Requer recompilação para alterar
+      - Impossível rollout progressivo (0%→25%→50%→100%)
+      - Impossível targeting por usuário/perfil/empresa
+      - Deploy de nova versão obrigatório para habilitar feature
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por feature flags dinâmicos com rollout progressivo:
+      - 4 estratégias: Percentual, Usuário, Perfil, Empresa
+      - Mudança em tempo real (sem recompilação)
+      - Expiração automática (job desabilita flags vencidas)
+      - Notificação Slack quando flag expirada
+
+      Exemplo real:
+      - Novo dashboard: rollout 10% → validar → 50% → validar → 100%
+      - Reduz risco de bugs massivos em PRD
+
+    rf_item_relacionado: "RN-RF002-08, RN-RF002-15"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+# Telas Legadas
+telas:
+  - id: "LEG-RF002-TELA-001"
+    nome: "INEXISTENTE"
+    caminho: null
+    responsabilidade: "Sistema legado NÃO tinha interface visual para gerenciamento de configurações"
+    campos: []
+    comportamentos_implicitos:
+      - "Edição manual do web.config via Notepad++"
+      - "Acesso RDP ao servidor obrigatório"
+      - "Sem validação (quebra descoberta apenas em runtime)"
+      - "Sem auditoria (desconhecido quem mudou)"
+      - "Downtime obrigatório (iisreset)"
+
+# WebServices Legados
+servicos:
+  - id: "LEG-RF002-SVC-001"
+    nome: "INEXISTENTE"
+    localizacao: null
+    responsabilidade: "Sistema legado não expunha API para gerenciamento de configurações"
+    notas: "Configurações lidas internamente via ConfigurationManager.AppSettings()"
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "INEXISTENTE"
+    finalidade: "Configurações NÃO eram armazenadas em banco de dados (apenas no web.config XML)"
+    problemas:
+      - "Senhas em texto claro no arquivo XML"
+      - "Sem versionamento"
+      - "Sem auditoria"
+      - "Sem multi-tenancy"
+      - "Sem validação"
+      - "Downtime obrigatório para aplicar mudanças"
+
+# Regras de Negócio Implícitas (não documentadas no legado)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      Se chave não existir em web.config, sistema retorna Nothing (null VB.NET)
+      e crasha com NullReferenceException em runtime
+    fonte: "ConfigurationManager.AppSettings(chave) - comportamento .NET nativo"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Conversão de tipo era responsabilidade do desenvolvedor sem validação automática.
+      Exemplo: Convert.ToInt32(ObterConfiguracao("SMTP_Port"))
+      Se valor inválido → FormatException
+    fonte: "App_Code/Email/EmailService.vb linha 15"
+
+  - id: "RL-RN-003"
+    descricao: |
+      Mudanças em configurações SMTP só eram aplicadas após restart IIS completo.
+      Downtime 30s-2min obrigatório.
+    fonte: "Comportamento ASP.NET Framework 4.8 com web.config estático"
+
+  - id: "RL-RN-004"
+    descricao: |
+      Não havia diferenciação entre ambientes (DEV/HOM/PRD).
+      Web.config copiado manualmente entre ambientes.
+    fonte: "Procedimento operacional DevOps"
+
+  - id: "RL-RN-005"
+    descricao: |
+      Backup de web.config era responsabilidade manual do DevOps.
+      Frequentemente esquecido, causando perda de configurações anteriores.
+    fonte: "Incidentes de produção 2023-07-15, 2024-02-03"
+
+  - id: "RL-RN-006"
+    descricao: |
+      Senhas em texto claro no web.config eram commitadas acidentalmente no Git.
+      Histórico exposto com credenciais sensíveis.
+    fonte: "Auditoria de segurança 2024-03-10"
+
+  - id: "RL-RN-007"
+    descricao: |
+      Não havia notificação quando configuração crítica era alterada.
+      Descoberto apenas quando sistema crashava ou funcionalidade quebrava.
+    fonte: "Incidente PRD 2024-05-22 (SMTP alterado, e-mails pararam por 2 dias)"
+
+  - id: "RL-RN-008"
+    descricao: |
+      Feature flags eram implementados como constantes bool no código.
+      Requer recompilação e deploy para alterar valor.
+    fonte: "App_Code/Constants/FeatureFlags.vb"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Criptografia de senhas"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: senhas em texto claro. Moderno: AES-256-GCM via Azure Key Vault"
+
+  - item: "Multi-tenancy"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: configurações globais. Moderno: hierarquia Global → Conglomerado → Empresa → Departamento → Usuário"
+
+  - item: "Versionamento"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem histórico. Moderno: versionamento automático com diff JSON e rollback 1-click"
+
+  - item: "Cache hot-reload"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: restart IIS obrigatório. Moderno: Redis pub/sub, zero downtime"
+
+  - item: "Validação de valores"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: aceita qualquer valor. Moderno: validação tipo + regex + ranges + dry-run"
+
+  - item: "Auditoria SOX"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem auditoria. Moderno: quem, quando, IP, motivo, ticket, diff JSON"
+
+  - item: "Feature flags dinâmicos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: bool hardcoded. Moderno: rollout progressivo (4 estratégias)"
+
+  - item: "Export/Import automatizado"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: cópia manual de arquivo. Moderno: YAML automatizado DEV→HOM→PRD"
+
+  - item: "UI administrativa"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: edição manual Notepad++. Moderno: interface web com categorias, validação, histórico"
+
+  - item: "Notificações automáticas"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: sem notificação. Moderno: Slack/Teams para mudanças críticas"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Migrar web.config para banco de dados"
+    motivo: |
+      Eliminar senhas em texto claro (compliance LGPD/PCI-DSS/SOX).
+      Permitir hot-reload sem restart IIS.
+      Habilitar multi-tenancy (requisito crítico negócio).
+      Auditoria obrigatória de mudanças.
+    impacto: "alto"
+    data: "2025-11-04"
+
+  - decisao: "Criptografia obrigatória com Azure Key Vault"
+    motivo: |
+      Compliance obrigatório: LGPD, PCI-DSS, SOX.
+      Auditoria de acesso a secrets.
+    impacto: "medio"
+    data: "2025-11-04"
+
+  - decisao: "Cache Redis hot-reload (pub/sub)"
+    motivo: |
+      Eliminar restart IIS (zero downtime).
+      Performance 100x superior.
+      Sincronização automática entre múltiplas instâncias.
+    impacto: "baixo"
+    data: "2025-11-04"
+
+  - decisao: "Feature flags com rollout progressivo"
+    motivo: |
+      Canary release progressivo (reduz risco bugs PRD).
+      Mudança em tempo real (sem recompilação).
+    impacto: "baixo"
+    data: "2025-11-04"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Script de migração web.config → SQL falha"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      Testar em DEV/HOM primeiro.
+      Manter web.config legado como fallback por 30 dias.
+      Backup completo antes de migração.
+
+  - risco: "Azure Key Vault indisponível"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      Cache Redis com TTL 5 min (valores descriptografados).
+      Fallback para web.config em emergency mode.
+
+  - risco: "Redis down"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Fallback para leitura direta do banco (degradação performance aceitável).
+      Monitoramento Redis com alertas.
+
+  - risco: "Valores inválidos migrados do web.config"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      Validação obrigatória durante migração.
+      Script rejeita valores inválidos (requer correção manual).
+      Dry-run completo antes de aplicar em PRD.
+
+  - risco: "Perda de configurações PRD"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      Backup completo web.config antes de migração (90 dias retenção).
+      Versionamento automático pós-migração (histórico imutável).
+
+  - risco: "Downtime durante migração"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Blue-green deployment: manter web.config ativo até validação completa.
+      Migração em janela de manutenção (madrugada).
+
+  - risco: "Código legado quebra após migração"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      Manter interface compatível: wrapper ObterConfiguracao() chama ConfigurationService.
+      Testes de regressão completos em HOM.
+      Remover wrapper apenas após 30 dias de validação.
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "web.config (arquivo XML)"
+    referencia_rf: "RN-RF002-01, RN-RF002-02, RN-RF002-03"
+    referencia_uc: "UC01, UC03"
+    status: "migrado"
+
+  - elemento_legado: "ConfigurationManager.AppSettings()"
+    referencia_rf: "RN-RF002-03, RN-RF002-05"
+    referencia_uc: "UC00, UC02"
+    status: "migrado"
+
+  - elemento_legado: "Senhas texto claro"
+    referencia_rf: "RN-RF002-02, RN-RF002-09"
+    referencia_uc: "UC01, UC03"
+    status: "migrado"
+
+  - elemento_legado: "Restart IIS obrigatório"
+    referencia_rf: "RN-RF002-05, RN-RF002-06"
+    referencia_uc: "UC03"
+    status: "migrado"
+
+  - elemento_legado: "Configurações globais (sem multi-tenancy)"
+    referencia_rf: "RN-RF002-01"
+    referencia_uc: "UC00, UC01, UC02"
+    status: "migrado"
+
+  - elemento_legado: "Sem versionamento"
+    referencia_rf: "RN-RF002-06, RN-RF002-07, RN-RF002-11"
+    referencia_uc: "UC02, UC03"
+    status: "migrado"
+
+  - elemento_legado: "Sem validação"
+    referencia_rf: "RN-RF002-03, RN-RF002-04, RN-RF002-14"
+    referencia_uc: "UC01, UC03"
+    status: "migrado"
+
+  - elemento_legado: "Feature flags hardcoded"
+    referencia_rf: "RN-RF002-08, RN-RF002-15"
+    referencia_uc: "UC03"
+    status: "migrado"
+
+# Changelog
+changelog:
+  - versao: "2.0"
+    data: "2025-12-29"
+    descricao: "Documentação completa estruturada em YAML - 8 referências legado com destino definido, gap analysis, decisões modernização, riscos migração, rastreabilidade completa"
+    autor: "Agência ALC - alc.dev.br"
+
+  - versao: "1.0"
+    data: "2025-11-04"
+    descricao: "Versão inicial (DESCONTINUADA)"
+    autor: "Equipe Projeto"

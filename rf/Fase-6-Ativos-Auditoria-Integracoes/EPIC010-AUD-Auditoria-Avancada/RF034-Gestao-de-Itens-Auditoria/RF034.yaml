@@ -1,0 +1,441 @@
+rf_id: RF034
+rf_title: "Gestão de Itens de Auditoria"
+versao_governanca: "2.0"
+data_migracao: "2025-12-30"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF034-001"
+    titulo: "Vinculação Obrigatória a Resumo e Bilhete"
+    descricao: "Todo item de auditoria deve estar obrigatoriamente vinculado a um resumo de auditoria válido e a um bilhete específico válido"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "campo_obrigatorio"
+      mensagem_erro: "Resumo de auditoria é obrigatório / Bilhete é obrigatório"
+      http_code: 400
+
+  - id: "RN-RF034-002"
+    titulo: "Cálculo Automático de Glosa"
+    descricao: "O sistema calcula automaticamente ValorCobradoAMais = ValorCobrado - ValorCorreto sem necessidade de entrada manual do usuário"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "calculo_automatico"
+      mensagem_erro: "Campo ValorCobradoAMais é somente leitura"
+      http_code: 400
+
+  - id: "RN-RF034-003"
+    titulo: "Precisão Numérica Conforme Padrão Telecomunicações"
+    descricao: "Todos os valores monetários devem ter precisão numérica de até 8 casas decimais (NUMERIC(13,8))"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "precisao_numerica"
+      mensagem_erro: "Máximo 8 casas decimais"
+      http_code: 400
+
+  - id: "RN-RF034-004"
+    titulo: "Quantidade de Consumo Positiva"
+    descricao: "A quantidade de consumo (minutos, MB, SMS, etc.) deve ser obrigatoriamente maior que zero"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "range"
+      mensagem_erro: "Quantidade deve ser maior que zero"
+      http_code: 400
+
+  - id: "RN-RF034-005"
+    titulo: "Validação de Relacionamentos Obrigatórios"
+    descricao: "Todos os relacionamentos (ativo, contrato, operadora, tipo de bilhete) devem referenciar registros válidos e ativos"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "foreign_key"
+      mensagem_erro: "Ativo não encontrado ou excluído"
+      http_code: 400
+
+  - id: "RN-RF034-006"
+    titulo: "Sincronização Automática com Resumo de Auditoria"
+    descricao: "Ao criar, editar ou excluir um item, os totalizadores do resumo (RF035) devem ser recalculados automaticamente via Domain Events"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "domain_event"
+      mensagem_erro: "N/A"
+      http_code: null
+
+  - id: "RN-RF034-007"
+    titulo: "Validação de Lote (Formato AAAAMM)"
+    descricao: "O campo Lote deve estar no formato AAAAMM (6 dígitos) representando um período válido de faturamento"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "formato"
+      mensagem_erro: "Lote deve ter exatamente 6 caracteres (AAAAMM)"
+      http_code: 400
+
+  - id: "RN-RF034-008"
+    titulo: "Exportação Estruturada para Contestação"
+    descricao: "Itens devem ser exportáveis em formato estruturado (PDF, Excel, CSV) agrupados por operadora"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "funcionalidade"
+      mensagem_erro: "N/A"
+      http_code: null
+
+  - id: "RN-RF034-009"
+    titulo: "Auditoria Completa de Operações"
+    descricao: "Todas as operações devem ser auditadas com registro de usuário, timestamp, valores antes/depois via Shadow Properties"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "auditoria"
+      mensagem_erro: "N/A"
+      http_code: null
+
+  - id: "RN-RF034-010"
+    titulo: "Filtros Avançados por Unidade de Consumo"
+    descricao: "Os itens devem ser filtráveis por unidade de consumo (minutos, MB, SMS, franquia)"
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "funcionalidade"
+      mensagem_erro: "N/A"
+      http_code: null
+
+  - id: "RN-RF034-011"
+    titulo: "Validação de Valores Conforme Tipo de Bilhete"
+    descricao: "Validações de unidade de consumo devem respeitar relacionamento com tipo de bilhete (VOZ usa minutos, DADOS usa MB)"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "consistencia"
+      mensagem_erro: "Unidade incompatível com tipo de bilhete"
+      http_code: 400
+
+  - id: "RN-RF034-012"
+    titulo: "Soft Delete com Recálculo de Agregados"
+    descricao: "Exclusão lógica deve definir FlExcluido=true e disparar evento para recálculo automático de totalizadores"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "soft_delete"
+      mensagem_erro: "N/A"
+      http_code: null
+
+  - id: "RN-RF034-013"
+    titulo: "Multi-Tenancy Obrigatório com Row-Level Security"
+    descricao: "Todos os itens devem estar isolados por ConglomeradoId com Global Query Filters garantindo isolamento automático"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "multi_tenancy"
+      mensagem_erro: "N/A (retorna vazio)"
+      http_code: null
+
+  - id: "RN-RF034-014"
+    titulo: "Índices para Performance em Consultas Analíticas"
+    descricao: "Criar índices não-clusterizados otimizados para consultas de auditoria, relatórios e exportações"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "performance"
+      mensagem_erro: "N/A"
+      http_code: null
+
+  - id: "RN-RF034-015"
+    titulo: "Exportação para Excel com Detalhamento Completo"
+    descricao: "Exportação para Excel deve incluir todas as colunas relevantes em formatação legível, com subtotais por operadora"
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "funcionalidade"
+      mensagem_erro: "N/A"
+      http_code: null
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "AUD.ITENS.VIEW"
+    descricao: "Visualizar itens de auditoria"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Auditor"
+      - "Gestor Fin."
+      - "Analista"
+    endpoint: "GET /api/auditoria-itens"
+
+  - permission_code: "AUD.ITENS.CREATE"
+    descricao: "Criar novo item de auditoria"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Auditor"
+    endpoint: "POST /api/auditoria-itens"
+
+  - permission_code: "AUD.ITENS.UPDATE"
+    descricao: "Editar item de auditoria existente"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Auditor"
+    endpoint: "PUT /api/auditoria-itens/{id}"
+
+  - permission_code: "AUD.ITENS.DELETE"
+    descricao: "Excluir item de auditoria (soft delete)"
+    roles_autorizadas:
+      - "Super Admin"
+    endpoint: "DELETE /api/auditoria-itens/{id}"
+
+  - permission_code: "AUD.ITENS.EXPORT"
+    descricao: "Exportar itens para Excel/PDF/CSV"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Auditor"
+      - "Gestor Fin."
+      - "Analista"
+    endpoint: "GET /api/auditoria-itens/export/*"
+
+  - permission_code: "AUD.ITENS.CONTESTACAO"
+    descricao: "Gerar documento de contestação"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Auditor"
+      - "Gestor Fin."
+    endpoint: "POST /api/auditoria-itens/gerar-contestacao"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  - method: "GET"
+    route: "/api/v1/auditoria-itens"
+    descricao: "Listar itens com paginação/filtros"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensRead"
+    request_dto: "GetAuditoriasItensQuery"
+    response_dto: "PaginatedListDto<AuditoriaItemDto>"
+
+  - method: "GET"
+    route: "/api/v1/auditoria-itens/{id}"
+    descricao: "Obter item por ID"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensRead"
+    request_dto: null
+    response_dto: "AuditoriaItemDto"
+
+  - method: "POST"
+    route: "/api/v1/auditoria-itens"
+    descricao: "Criar novo item"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensCreate"
+    request_dto: "CreateAuditoriaItemCommand"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/v1/auditoria-itens/{id}"
+    descricao: "Atualizar item existente"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensUpdate"
+    request_dto: "UpdateAuditoriaItemCommand"
+    response_dto: "Unit"
+
+  - method: "DELETE"
+    route: "/api/v1/auditoria-itens/{id}"
+    descricao: "Excluir item (soft delete)"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensDelete"
+    request_dto: null
+    response_dto: "Unit"
+
+  - method: "GET"
+    route: "/api/v1/auditoria-itens/export/excel"
+    descricao: "Exportar para Excel"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensExport"
+    request_dto: "ExportAuditoriasItensQuery"
+    response_dto: "byte[]"
+
+  - method: "POST"
+    route: "/api/v1/auditoria-itens/export/pdf"
+    descricao: "Exportar para PDF"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensExport"
+    request_dto: "ExportAuditoriasItensQuery"
+    response_dto: "byte[]"
+
+  - method: "POST"
+    route: "/api/v1/auditoria-itens/gerar-contestacao"
+    descricao: "Gerar documento de contestação"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensContestacao"
+    request_dto: "GerarContestacaoCommand"
+    response_dto: "byte[]"
+
+  - method: "GET"
+    route: "/api/v1/auditoria-itens/relatorios/por-operadora"
+    descricao: "Relatório consolidado por operadora"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensRead"
+    request_dto: "GetRelatorioOperadoraQuery"
+    response_dto: "RelatorioOperadoraDto"
+
+  - method: "GET"
+    route: "/api/v1/auditoria-itens/relatorios/por-tipo"
+    descricao: "Relatório consolidado por tipo de serviço"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensRead"
+    request_dto: "GetRelatorioTipoQuery"
+    response_dto: "RelatorioTipoDto"
+
+  - method: "GET"
+    route: "/api/v1/auditoria-itens/dashboard"
+    descricao: "Dashboard com KPIs em tempo real"
+    autenticacao: true
+    authorization_policy: "AuditoriasItensRead"
+    request_dto: "GetDashboardQuery"
+    response_dto: "DashboardDto"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Glosa Recuperada (R$)"
+    descricao: "Percentual de glosas recuperadas do total auditado"
+    meta: ">= 50%"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Análise"
+    descricao: "Tempo médio entre criação e aprovação de item"
+    meta: "<= 2 dias"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Divergência Crítica"
+    descricao: "Percentual de itens com divergência >10%"
+    meta: "<= 5%"
+    log_obrigatorio: true
+
+  - nome: "Performance Query Lista"
+    descricao: "Tempo médio de resposta da API de listagem"
+    meta: "<= 500ms"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Sucesso de Exportação"
+    descricao: "Percentual de exportações bem-sucedidas"
+    meta: ">= 99%"
+    log_obrigatorio: true
+
+  - nome: "Cobertura de Auditoria"
+    descricao: "Percentual de bilhetes auditados do total carregado"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Acurácia de Glosa"
+    descricao: "Percentual de glosas confirmadas após contestação"
+    meta: ">= 98%"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "Divergência Crítica Detectada"
+    threshold: "Glosa > 10% do valor contratual"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "signalr"
+      - "email"
+
+  - evento: "Performance de Query Degradada"
+    threshold: "Tempo > 2s"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "log"
+
+  - evento: "Falha de Exportação"
+    threshold: "> 3 tentativas sem sucesso"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "log"
+
+  - evento: "Falta de Sincronização com Resumo"
+    threshold: "Resumo não atualizado em 5 minutos"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "log"
+      - "retrigger_automatico"
+
+  - evento: "Retenção de Auditoria Expirada"
+    threshold: "Logs > 7 anos"
+    severidade: "BAIXA"
+    canal_notificacao:
+      - "archive_automatico"

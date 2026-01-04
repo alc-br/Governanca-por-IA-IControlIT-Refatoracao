@@ -1,0 +1,740 @@
+# CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
+
+**Versão:** 1.0
+**Data:** 2026-01-03
+**Status:** Ativo
+**Changelog v1.0:** Criação do contrato com auto-geração de specs E2E
+
+---
+
+## 📋 SUMÁRIO EXECUTIVO
+
+### ⚡ O que este contrato faz
+
+Este contrato **EXECUTA TODOS OS TESTES** de um RF automaticamente, incluindo:
+
+- ✅ **Testes Backend**: Unitários, integração, contrato, violação
+- ✅ **Testes Frontend**: Unitários, componentes, serviços
+- ✅ **Testes E2E**: Playwright (com auto-geração se necessário)
+- ✅ **Testes de Segurança**: SQL Injection, XSS, CSRF, Auth, Multi-tenancy
+- ✅ **Responsabilização Automática**: Identifica se falha é backend ou frontend
+- ✅ **Evidências Automáticas**: Screenshots, vídeos, logs, relatórios
+
+---
+
+## 1. Identificação do Agente
+
+| Campo | Valor |
+|-------|-------|
+| **Papel** | Agente Executor Completo de Testes |
+| **Escopo** | Validação completa (Backend + Frontend + E2E + Segurança) |
+| **Modo** | Autonomia total (sem intervenção manual) |
+
+---
+
+## 2. Ativação do Contrato
+
+Este contrato é ativado quando a solicitação mencionar explicitamente:
+
+> **"Conforme docs/contracts/testes/execucao-completa.md para RFXXX"**
+
+Exemplo:
+```
+Conforme docs/contracts/testes/execucao-completa.md para RF006.
+Seguir CLAUDE.md.
+```
+
+---
+
+## 3. PRÉ-REQUISITOS OBRIGATÓRIOS (BLOQUEANTES)
+
+O contrato TRAVA se qualquer condição falhar:
+
+| Pré-requisito | Descrição | Bloqueante |
+|---------------|-----------|------------|
+| Backend aprovado | `STATUS.yaml`: `execucao.backend = done` | Sim |
+| Frontend aprovado | `STATUS.yaml`: `execucao.frontend = done` | Sim |
+| MT-RFXXX.yaml | Massa de teste criada e validada | Sim |
+| TC-RFXXX.yaml | Casos de teste criados e validados | Sim |
+| Build backend | `dotnet build` deve passar | Sim |
+| Build frontend | `npm run build` deve passar | Sim |
+
+**PARAR se qualquer item falhar.**
+
+---
+
+## 4. MODO AUTONOMIA TOTAL (OBRIGATÓRIO)
+
+**REGRA CRÍTICA:** O agente DEVE executar TUDO automaticamente:
+
+- ❌ NÃO perguntar permissões ao usuário
+- ❌ NÃO esperar confirmação do usuário
+- ❌ NÃO solicitar que usuário execute comandos manualmente
+- ✅ EXECUTAR IMEDIATAMENTE todos os passos do contrato
+- ✅ SEMPRE iniciar backend e frontend automaticamente
+- ✅ Falhas em testes ANTERIORES NÃO são bloqueantes (são o motivo da re-execução)
+- ✅ Gerar evidências e relatórios SEM intervenção manual
+
+---
+
+## 5. FLUXO DE EXECUÇÃO (ORDEM OBRIGATÓRIA)
+
+### FASE 1: VALIDAÇÃO INICIAL (BLOQUEANTE)
+
+#### PASSO 1.1: Validar Pré-Requisitos
+
+```bash
+# Verificar STATUS.yaml
+# - execucao.backend = done
+# - execucao.frontend = done
+# - documentacao.mt = true
+# - documentacao.tc = true
+
+# Verificar arquivos
+# - backend/IControlIT.API/IControlIT.API.sln existe
+# - frontend/icontrolit-app/package.json existe
+# - docs/rf/.../MT-RFXXX.yaml existe
+# - docs/rf/.../TC-RFXXX.yaml existe
+```
+
+**Se qualquer validação FALHAR:** BLOQUEIO TOTAL
+
+#### PASSO 1.2: Validar Builds
+
+```bash
+# Backend
+cd backend/IControlIT.API
+dotnet build --no-incremental
+
+# Frontend
+cd frontend/icontrolit-app
+npm run build
+```
+
+**Se QUALQUER build FALHAR:** BLOQUEIO TOTAL (PARAR, REPORTAR, BLOQUEAR)
+
+---
+
+### FASE 2: SETUP DE AMBIENTE (AUTOMÁTICO)
+
+#### PASSO 2.1: Inicialização Automática (RECOMENDADO)
+
+**A forma MAIS SIMPLES e RECOMENDADA de iniciar o sistema completo:**
+
+```bash
+python run.py
+```
+
+O script `run.py` executa automaticamente:
+- ✅ Mata TODOS os processos travados (backend e frontend)
+- ✅ Inicia backend em BACKGROUND (porta 5000)
+- ✅ Inicia frontend em BACKGROUND (porta 4200)
+- ✅ Aguarda ambos estarem prontos
+- ✅ Valida health checks automaticamente
+
+**IMPORTANTE:** Sempre use `python run.py` para garantir ambiente limpo e funcional.
+
+#### PASSO 2.2: Credenciais de Teste (OBRIGATÓRIO)
+
+Para executar testes E2E, use as seguintes credenciais:
+
+```
+Email: anderson.chipak@k2apartners.com.br
+Senha: Vi696206@
+```
+
+Este usuário tem:
+- ✅ Perfil: Developer (escopo = 3)
+- ✅ Permissões completas para TODOS os RFs
+- ✅ Acesso a TODAS as funcionalidades do sistema
+- ✅ Dados de teste pré-populados
+
+#### PASSO 2.3: Preparação Manual (FALLBACK)
+
+Se `run.py` falhar ou não estiver disponível, executar MANUALMENTE:
+
+```powershell
+# 1. Matar processos travados (se houver)
+Get-Process | Where-Object { $_.ProcessName -like "*IControlIT*" } | Stop-Process -Force
+
+# 2. Aplicar seeds
+cd backend/IControlIT.API
+dotnet ef database update
+
+# 3. Iniciar backend (BACKGROUND)
+cd backend/IControlIT.API
+Start-Process -NoNewWindow -FilePath "dotnet" -ArgumentList "run"
+
+# 4. Iniciar frontend (BACKGROUND)
+cd frontend/icontrolit-app
+Start-Process -NoNewWindow -FilePath "npm" -ArgumentList "start"
+```
+
+**IMPORTANTE:** Backend pode travar durante inicialização de seeds.
+
+**Se /health não responder em 20s, backend está travado. Solução:**
+
+1. Verificar se Program.cs tem Task.Run() em InitialiseDatabaseAsync
+2. Se NÃO tiver, backend vai travar. Corrigir conforme:
+   - Linha 216-232 de backend/IControlIT.API/src/Web/Program.cs
+   - DEVE usar Task.Run() para executar seeds em BACKGROUND
+   - Nunca usar await direto (bloqueia startup)
+
+3. Se backend continuar travado após 30s:
+   - Matar processo: `Stop-Process -Name "IControlIT.API.Web" -Force`
+   - Limpar artifacts: `Remove-Item backend/IControlIT.API/artifacts -Recurse -Force`
+   - Rebuild: `dotnet build --no-incremental`
+   - Reiniciar: `dotnet run`
+
+#### PASSO 2.4: Validação de Health
+
+Após iniciar backend (via run.py OU manual), SEMPRE validar:
+
+```bash
+# Tentar 3 vezes com intervalo de 5s
+curl http://localhost:5000/health
+# Esperado: Status 200 OK (Healthy)
+```
+
+**Se timeout após 15s total:** Backend TRAVADO (erro CRÍTICO)
+
+---
+
+### FASE 3: TESTES BACKEND (Prioridade 1)
+
+#### PASSO 3.1: Executar Testes Backend
+
+```bash
+cd backend/IControlIT.API
+dotnet test --verbosity normal
+```
+
+#### PASSO 3.2: Registrar Resultados
+
+- ✅ Testes unitários passaram
+- ✅ Testes de integração passaram
+- ✅ Testes de contrato passaram
+- ✅ Testes de violação passaram
+- ✅ Backend rejeita payloads inválidos
+
+**Resultado:** PASS/FAIL
+
+---
+
+### FASE 4: TESTES FRONTEND (Prioridade 2)
+
+#### PASSO 4.1: Executar Testes Frontend
+
+```bash
+cd frontend/icontrolit-app
+npm run test
+```
+
+#### PASSO 4.2: Registrar Resultados
+
+- ✅ Testes unitários passaram
+- ✅ Testes de componentes passaram
+- ✅ Testes de serviços passaram
+- ✅ Validações de formulário funcionando
+
+**Resultado:** PASS/FAIL
+
+---
+
+### FASE 5: TESTES E2E (Prioridade 3) — AUTO-GERAÇÃO INTELIGENTE
+
+#### 🚨 PASSO 5.1: VERIFICAR SE SPECS PLAYWRIGHT EXISTEM (OBRIGATÓRIO)
+
+**ANTES de executar testes E2E, o agente DEVE verificar:**
+
+```bash
+# 1. Verificar pasta de specs do RF
+ls frontend/icontrolit-app/e2e/specs/RFXXX/
+
+# 2. Verificar arquivo de dados MT
+ls frontend/icontrolit-app/e2e/data/MT-RFXXX.data.ts
+
+# 3. Ler TC-RFXXX.yaml e contar TC-E2E
+# Exemplo: TC-RF006-E2E-001, TC-RF006-E2E-002, etc.
+```
+
+**Regra de Cobertura:**
+- Para CADA `TC-RFXXX-E2E-NNN` em TC-RFXXX.yaml
+- DEVE existir `TC-RFXXX-E2E-NNN.spec.ts` em `e2e/specs/RFXXX/`
+
+**Exemplo:**
+```yaml
+# TC-RF006.yaml
+test_cases:
+  - tc_id: TC-RF006-E2E-001
+    # ...
+  - tc_id: TC-RF006-E2E-002
+    # ...
+  - tc-id: TC-RF006-E2E-003
+    # ...
+```
+
+**Deve existir:**
+```
+frontend/icontrolit-app/e2e/specs/RF006/
+├── TC-RF006-E2E-001.spec.ts
+├── TC-RF006-E2E-002.spec.ts
+└── TC-RF006-E2E-003.spec.ts
+```
+
+#### 🚨 PASSO 5.2: SE SPECS NÃO EXISTEM OU INCOMPLETOS → AUTO-GERAÇÃO (BLOQUEANTE)
+
+**SE specs não existem ou cobertura < 100%:**
+
+**O agente DEVE AUTOMATICAMENTE:**
+
+1. **Ativar contrato de geração de specs:**
+   ```
+   Conforme docs/contracts/testes/geracao-testes-e2e-playwright.md para RFXXX.
+   Seguir CLAUDE.md.
+   ```
+
+2. **O contrato de geração irá:**
+   - Ler TC-RFXXX.yaml e MT-RFXXX.yaml
+   - Gerar `frontend/e2e/data/MT-RFXXX.data.ts`
+   - Gerar `frontend/e2e/helpers/rf-helpers.ts`
+   - Gerar `frontend/e2e/specs/RFXXX/*.spec.ts` (1 spec por TC-E2E)
+   - Validar cobertura 100% de TC-E2E
+
+3. **SOMENTE prosseguir** se geração aprovada 100%
+
+**REGRA CRÍTICA:**
+- ❌ NÃO executar testes E2E sem specs completos
+- ❌ NÃO pular auto-geração
+- ✅ SEMPRE validar cobertura 100% antes de executar
+- ✅ SEMPRE chamar contrato de geração se specs faltando
+
+#### PASSO 5.3: Executar Testes E2E
+
+```bash
+cd frontend/icontrolit-app
+npm run e2e
+```
+
+#### PASSO 5.4: Validar Fluxos Completos
+
+- ✅ Login como developer (anderson.chipak@k2apartners.com.br / Vi696206@)
+- ✅ Navegar via menu
+- ✅ Acessar tela do RFXXX
+- ✅ Executar CRUD completo (criar, editar, excluir, consultar)
+
+#### PASSO 5.5: Validar 4 Estados Renderizados
+
+- ✅ Estado Padrão (dados carregados)
+- ✅ Estado Loading (spinner/skeleton visível)
+- ✅ Estado Vazio (mensagem quando lista vazia)
+- ✅ Estado Erro (mensagem quando HTTP falha)
+
+#### PASSO 5.6: Validar i18n
+
+- ✅ pt-BR (Português Brasil)
+- ✅ en-US (Inglês EUA)
+- ✅ es-ES (Espanhol)
+
+#### PASSO 5.7: Capturar Evidências
+
+- Screenshots de cada estado
+- Vídeos de execução (se disponível)
+- Logs completos
+- Traces do Playwright
+
+**Resultado:** PASS/FAIL
+
+---
+
+### FASE 6: TESTES DE SEGURANÇA (Prioridade 4)
+
+#### PASSO 6.1: Validar Proteções
+
+- ✅ SQL Injection (backend rejeita)
+- ✅ XSS (backend sanitiza, frontend escapa)
+- ✅ CSRF (tokens validados)
+- ✅ Autenticação (401 quando não logado)
+- ✅ Autorização (403 quando sem permissão)
+- ✅ Multi-tenancy (isolamento entre tenants)
+
+**Resultado:** PASS/FAIL
+
+---
+
+### FASE 7: CONSOLIDAÇÃO DE RESULTADOS
+
+#### PASSO 7.1: Calcular Taxa de Aprovação
+
+```
+Taxa = (Testes PASS / Total Testes) * 100%
+```
+
+#### PASSO 7.2: Identificar Falhas Críticas
+
+Para cada teste FALHADO:
+- Identificar categoria (BACKEND/FRONTEND/INTEGRAÇÃO)
+- Capturar evidências (screenshot, log, trace)
+- Gerar relatório de falha
+- **Criar prompt de correção automático (OBRIGATÓRIO)**
+
+#### PASSO 7.3: Atribuir Responsabilidade
+
+**BACKEND é responsável quando:**
+- HTTP 500 (erro interno do servidor)
+- HTTP 400 com mensagem incorreta
+- Validação aceita payload inválido
+- Violação não rejeitada
+- Multi-tenancy quebrado (retorna dados de outro tenant)
+- Auditoria não gravada
+- Endpoint /health não responde (TIMEOUT/ERROR/BACKEND_DOWN)
+- Backend não confirma "Application started" nos logs
+- Seeds travando inicialização (InitialiseDatabaseAsync bloqueante)
+
+**FRONTEND é responsável quando:**
+- Elemento não renderizado (data-test ausente)
+- Estado Loading não visível
+- Estado Vazio não visível
+- Estado Erro não visível
+- i18n quebrado (chave não traduzida)
+- Validação de formulário ausente
+
+**INTEGRAÇÃO é responsável quando:**
+- Contrato de API quebrado (campo ausente)
+- DTO incompatível
+- Mapeamento incorreto
+
+---
+
+### FASE 7.4: GERAR PROMPT DE CORREÇÃO AUTOMÁTICO (SE REPROVADO)
+
+**SE taxa de aprovação < 100%, o agente DEVE gerar automaticamente um prompt de correção.**
+
+#### Template de Prompt de Correção
+
+```markdown
+# PROMPT PARA CORREÇÃO DE FALHAS RFXXX
+
+Conforme docs/contracts/desenvolvimento/execucao/manutencao/manutencao-controlada.md,
+corrija os seguintes erros CRÍTICOS identificados na Execução [N] de testes do RFXXX:
+
+## CONTEXTO DA EXECUÇÃO
+
+- **RF:** RFXXX - [Título do RF]
+- **Data:** [YYYY-MM-DD]
+- **Execução:** [N]ª tentativa
+- **Taxa de Aprovação:** [XX%] ([Y]/[Z] testes)
+- **Resultado:** REPROVADO (critério: 100%)
+- **Relatório:** .temp_ia/RELATORIO-TESTES-RFXXX-[DATA]-EXECUCAO-[N].md
+- **STATUS.yaml:** Atualizado com execução [N]
+
+## ERROS IDENTIFICADOS
+
+[PARA CADA CATEGORIA DE ERRO (FRONTEND, BACKEND, INTEGRAÇÃO), GERAR:]
+
+### ERRO [N] - [CATEGORIA] (PRIORIDADE [1-4] - [BLOQUEANTE/ALTA/MÉDIA/BAIXA])
+
+#### Descrição do Erro
+- **TC falhados:** [Lista de TCs ou quantidade]
+- **Erro:** [Mensagem de erro principal]
+- **Status:** [Descrição do impacto]
+
+#### Evidências
+- Frontend build: [✅/❌] [detalhes]
+- Backend build: [✅/❌] [detalhes]
+- Frontend rodando: [✅/❌] [URL]
+- Backend rodando: [✅/❌] [URL]
+- Sistema base (FASE-1): [✅/❌] [X/Y testes passando]
+- **RFXXX [Camada]:** [✅/❌] [X/Y testes passando]
+
+#### Testes Falhados
+[Lista detalhada de specs/testes que falharam]
+
+#### Responsabilidade
+- **Camada:** [BACKEND/FRONTEND/INTEGRAÇÃO] ❌
+- **Razão:** [Por que atribuiu a essa camada]
+
+#### Arquivos Prováveis
+[Lista de arquivos que provavelmente contêm o erro]
+
+#### Contexto Técnico
+- **[Informação relevante 1]**
+- **[Informação relevante 2]**
+- **Problema:** [Descrição técnica do problema]
+
+#### Solução Esperada
+1. [Passo 1 da correção esperada]
+2. [Passo 2 da correção esperada]
+3. [...]
+
+---
+
+## ORDEM DE CORREÇÃO OBRIGATÓRIA
+
+[SE HOUVER MÚLTIPLAS CATEGORIAS, DEFINIR ORDEM DE PRIORIDADE:]
+
+### FASE 1 - [CATEGORIA BLOQUEANTE]
+[Descrição do que deve ser corrigido primeiro]
+
+### FASE 2 - [CATEGORIA ALTA]
+[Descrição do que deve ser corrigido em seguida]
+
+---
+
+## CRITÉRIO DE SUCESSO
+
+- ✅ [Critério específico 1]
+- ✅ [Critério específico 2]
+- ✅ Taxa de aprovação = 100% ([Z]/[Z] testes)
+
+---
+
+## OBSERVAÇÕES IMPORTANTES
+
+1. **NÃO** altere código de testes (specs Playwright estão corretos)
+2. **NÃO** altere configuração de porta (4200 está correto)
+3. **FOCO:** [Áreas específicas a corrigir]
+
+Modo governança rígida. Não negociar escopo. Não extrapolar.
+Seguir CLAUDE.md e docs/contracts/desenvolvimento/execucao/manutencao/manutencao-controlada.md.
+```
+
+#### Regras para Geração do Prompt
+
+1. **Priorização de Erros:**
+   - **PRIORIDADE 1 (BLOQUEANTE):** Erros que impedem outros testes de executar
+     - Frontend: Rota não acessível, componente não carrega
+     - Backend: API não responde, autenticação quebrada
+
+   - **PRIORIDADE 2 (ALTA):** Erros que afetam múltiplos testes
+     - AutoMapper configuration
+     - Seeds/Fixtures quebrados
+     - Validações faltando
+
+   - **PRIORIDADE 3 (MÉDIA):** Erros isolados em funcionalidades específicas
+     - CRUD de entidade específica
+     - Validação de campo específico
+
+   - **PRIORIDADE 4 (BAIXA):** Erros de i18n, formatação, não-críticos
+
+2. **Agrupamento de Erros:**
+   - Agrupar erros da mesma categoria (FRONTEND vs BACKEND)
+   - Agrupar erros da mesma causa raiz (ex: todos relacionados à mesma rota)
+   - Ordenar por prioridade decrescente
+
+3. **Evidências Obrigatórias:**
+   - ✅ Status de build (frontend e backend)
+   - ✅ Status de servidores (rodando ou não)
+   - ✅ Taxa de aprovação do sistema base (FASE-1)
+   - ✅ Taxa de aprovação do RF específico
+   - ✅ Lista completa de testes falhados
+
+4. **Atribuição de Responsabilidade:**
+   - Usar regras da FASE 7.3 para atribuir camada
+   - Justificar atribuição com evidências técnicas
+   - Listar arquivos prováveis que contêm o erro
+
+5. **Solução Esperada:**
+   - Descrever passos claros de correção
+   - Referenciar arquivos específicos
+   - Evitar soluções genéricas ("corrigir o erro")
+   - Preferir soluções técnicas ("verificar se rota está registrada em app.routes.ts")
+
+6. **Salvar Prompt:**
+   - Criar arquivo: `.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md`
+   - Formato Markdown completo
+   - Pronto para copiar e colar em nova conversa
+
+---
+
+### FASE 8: DECISÃO FINAL
+
+#### PASSO 8.1: Aplicar Critério 0% ou 100%
+
+- ✅ **APROVADO**: Taxa de aprovação = 100% (TODOS os testes passaram)
+- ❌ **REPROVADO**: Taxa de aprovação < 100% (QUALQUER teste falhou)
+
+**NÃO EXISTE APROVAÇÃO COM RESSALVAS.**
+
+#### PASSO 8.2: Atualizar STATUS.yaml
+
+```yaml
+testes_ti:
+  resultado_final: "APROVADO" # ou "REPROVADO"
+  taxa_aprovacao: "100%" # ou "85%"
+  data_execucao: "2026-01-03"
+  backend:
+    resultado: "PASS" # ou "FAIL"
+    total: 50
+    passaram: 50
+  frontend:
+    resultado: "PASS" # ou "FAIL"
+    total: 30
+    passaram: 30
+  e2e:
+    resultado: "PASS" # ou "FAIL"
+    total: 15
+    passaram: 15
+    specs_gerados: true
+  seguranca:
+    resultado: "PASS" # ou "FAIL"
+    total: 10
+    passaram: 10
+  azure_devops:
+    ultima_execucao: "2026-01-03"
+    taxa_aprovacao: "100%"
+```
+
+#### PASSO 8.3: Atualizar Azure DevOps
+
+```bash
+# Atualizar azure-test-cases-RF[XXX].csv
+# - Coluna "State" atualizada (Design → Ready → Active → Closed)
+# - Resultados de execução adicionados
+# - Data de última execução registrada
+```
+
+---
+
+### FASE 9: EVIDÊNCIAS OBRIGATÓRIAS
+
+#### PASSO 9.1: Gerar Evidências
+
+- Screenshots de testes E2E (sucesso e falhas)
+- Vídeos de execução (se disponível)
+- Logs de execução completos
+- Relatório HTML de testes
+- Relatório de cobertura
+- Relatório de responsabilidade (backend vs frontend)
+
+#### PASSO 9.2: Organizar Evidências
+
+```
+relatorios/RFXXX/testes/
+├── backend/
+│   └── test-results.xml
+├── frontend/
+│   └── test-results.json
+├── e2e/
+│   ├── screenshots/
+│   ├── videos/
+│   ├── traces/
+│   └── playwright-report/
+├── seguranca/
+│   └── security-scan-results.txt
+└── RELATORIO-CONSOLIDADO-TESTES-RFXXX.md
+```
+
+---
+
+## 6. RELATÓRIO DE FALHAS (SE REPROVADO)
+
+Para cada teste REPROVADO, criar:
+
+```markdown
+# RELATÓRIO DE FALHA - TC-RFXXX-[CAT]-NNN
+
+## TESTE FALHADO
+- TC: TC-RFXXX-[CAT]-NNN
+- Descrição: [descrição do teste]
+- Categoria: [HAPPY_PATH/VALIDACAO/SEGURANCA/E2E/etc]
+- Prioridade: CRITICA/ALTA/MEDIA/BAIXA
+
+## ERRO IDENTIFICADO
+- Mensagem: [erro completo]
+- Screenshot: evidencias/TC-RFXXX-[CAT]-NNN-falha.png
+- Log: logs/TC-RFXXX-[CAT]-NNN.log
+
+## RESPONSABILIDADE
+- Camada: BACKEND ❌ | FRONTEND ❌ | INTEGRAÇÃO ❌
+- Razão: [por que atribuiu a essa camada]
+- Arquivo provável: [caminho do arquivo]
+- Linha provável: [número da linha, se identificável]
+
+## CONTEXTO
+- MT usada: MT-RFXXX-NNN
+- Dados enviados: { ... }
+- Resposta recebida: { ... }
+- Resposta esperada: { ... }
+
+## PRÓXIMO PASSO
+Corrigir via docs/contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md:
+
+\```
+Conforme docs/contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md,
+corrija o seguinte erro no [backend/frontend] de RFXXX:
+
+ERRO IDENTIFICADO:
+- TC falhado: TC-RFXXX-[CAT]-NNN
+- [Descrição completa do erro]
+
+EVIDÊNCIAS:
+- Screenshot: evidencias/TC-RFXXX-[CAT]-NNN-falha.png
+- Log: logs/TC-RFXXX-[CAT]-NNN.log
+
+CONTEXTO:
+- RF: RFXXX
+- UC: UCXX
+- Handler/Component: [nome]
+\```
+```
+
+---
+
+## 7. PROIBIÇÕES
+
+É **PROIBIDO**:
+
+- ❌ Executar apenas subset de testes
+- ❌ Pular testes que falharam
+- ❌ Modificar testes para fazer passar
+- ❌ Marcar como APROVADO se taxa < 100%
+- ❌ Alterar código de produção durante testes
+- ❌ Executar testes sem buildar antes
+- ❌ Executar testes sem seeds aplicados
+- ❌ **Executar testes E2E sem verificar se specs existem**
+- ❌ **Pular auto-geração de specs quando faltando**
+- ❌ **Executar com frontend em porta diferente de 4200**
+
+---
+
+## 8. CRITÉRIO DE PRONTO
+
+O contrato só é considerado CONCLUÍDO quando:
+
+- [ ] Pré-requisitos validados (backend/frontend aprovados, MT/TC validados)
+- [ ] Builds validados (backend e frontend buildando sem erros)
+- [ ] Ambiente iniciado (backend porta 5000, frontend porta 4200)
+- [ ] Health checks validados (backend e frontend respondendo)
+- [ ] **Specs Playwright verificados (se não existem → gerados automaticamente)**
+- [ ] Testes backend executados (dotnet test)
+- [ ] Testes frontend executados (npm run test)
+- [ ] Testes E2E executados (npm run e2e)
+- [ ] Testes de segurança executados
+- [ ] Taxa de aprovação calculada
+- [ ] Falhas identificadas com responsável atribuído
+- [ ] Evidências geradas (screenshots, logs, traces)
+- [ ] Relatório consolidado criado
+- [ ] **SE REPROVADO: Prompt de correção gerado (.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md)**
+- [ ] STATUS.yaml atualizado (incluindo testes.azure_devops)
+- [ ] azure-test-cases-RF[XXX].csv atualizado (State conforme resultado)
+- [ ] Decisão registrada (APROVADO/REPROVADO)
+- [ ] Nenhuma violação de contrato
+
+---
+
+## 9. REGRA DE NEGAÇÃO ZERO
+
+Se uma solicitação:
+- não estiver explicitamente prevista no contrato ativo, ou
+- conflitar com qualquer regra do contrato
+
+ENTÃO:
+
+- A execução DEVE ser NEGADA
+- Nenhuma ação parcial pode ser realizada
+- Nenhum "adiantamento" é permitido
+
+---
+
+**FIM DO CONTRATO**

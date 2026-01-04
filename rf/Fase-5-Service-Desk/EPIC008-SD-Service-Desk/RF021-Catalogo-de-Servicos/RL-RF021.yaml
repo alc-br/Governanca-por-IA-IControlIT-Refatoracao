@@ -1,0 +1,614 @@
+# =============================================
+# RL-RF021: Referência ao Legado (Catálogo de Serviços)
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF021
+titulo: "Catálogo de Serviços e Portal Self-Service"
+
+legado:
+  sistema: "ASP.NET Web Forms + VB.NET"
+  versao: "4.5"
+  arquitetura: "Monolítica WebForms sem separação de camadas"
+  banco_dados: "SQL Server 2012 (multi-database, um banco por cliente)"
+  multi_tenant: false
+  auditoria: "none"
+
+# ==============================================================================
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+# Campo "destino" OBRIGATÓRIO para 100% dos itens
+# ==============================================================================
+
+referencias:
+  # ----------------------------------------------------------------------------
+  # TELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-001"
+    tipo: "tela"
+    nome: "Chamados/Index.aspx"
+    caminho: "ic1_legado/IControlIT/Aplicacao/Chamados/Index.aspx"
+    descricao: |
+      Tela de listagem genérica de chamados (misturava incidentes e solicitações de serviços).
+      Funcionalidade: Listar todos os chamados do usuário com filtros básicos (status, categoria, prioridade).
+      Limitações:
+      - Sem filtro específico para solicitações de serviços (misturado com incidentes)
+      - Sem SLA visual (usuário não sabia quando vence)
+      - Sem tracking de aprovação (aprovações fora do sistema via e-mail)
+      - Paginação manual (50 registros por página)
+      - Sem cache (performance ruim)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por tela moderna de listagem de solicitações de serviços com:
+      - Catálogo específico de serviços (separado de incidentes)
+      - SLA tracking visual com semáforo verde/amarelo/vermelho
+      - Histórico completo de aprovações visível na tela
+      - Paginação server-side otimizada
+      - Cache de 5 minutos para melhor performance
+
+    rf_item_relacionado: "RN-RF021-014"
+    uc_relacionado: "UC00-listar-solicitacoes-servicos"
+
+    migracao_moderna:
+      componente_angular: "services-requests-list.component.ts"
+      rota_frontend: "/service-desk/requests"
+      api_rest: "GET /api/v1/services/requests/my-requests"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-002"
+    tipo: "tela"
+    nome: "Chamados/Novo.aspx"
+    caminho: "ic1_legado/IControlIT/Aplicacao/Chamados/Novo.aspx"
+    descricao: |
+      Tela de criação de novo chamado genérico (sem catálogo de serviços).
+      Campos: Categoria (Incidente/Solicitação/Mudança), Descrição (texto livre), Prioridade, Departamento.
+      Limitações:
+      - Sem catálogo: usuário descreve solicitação livremente (inconsistência)
+      - Sem formulários dinâmicos (faltam campos específicos por tipo de serviço)
+      - Sem workflow automatizado (aprovação manual via e-mail posterior)
+      - Sem anexos
+      - Sem validação de SQL Injection/XSS
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por portal self-service com:
+      - Catálogo visual categorizado de serviços disponíveis
+      - Formulários dinâmicos por serviço (JSON Schema)
+      - Carrinho de compras (múltiplos serviços antes de finalizar)
+      - Workflow de aprovação automatizado configurável
+      - Upload de anexos
+      - Validação dupla (client-side + server-side)
+
+    rf_item_relacionado: "RN-RF021-003, RN-RF021-006"
+    uc_relacionado: "UC06-solicitar-servico, UC05-adicionar-servico-carrinho"
+
+    migracao_moderna:
+      componente_angular: "services-catalog.component.ts, services-cart.component.ts"
+      rota_frontend: "/service-desk/catalog, /service-desk/cart"
+      api_rest: "GET /api/v1/services/catalog, POST /api/v1/services/requests"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICES LEGADOS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-003"
+    tipo: "webservice"
+    nome: "WSServicos.asmx::CriarChamado"
+    caminho: "ic1_legado/IControlIT/WebService/WSServicos.asmx.vb"
+    descricao: |
+      Método SOAP para criar chamado genérico via integração externa.
+      Parâmetros: idUsuario (Guid), categoria (String), descricao (String), prioridade (String), token (String).
+      Retorno: XML com ID do chamado criado ou mensagem de erro.
+      Limitações:
+      - Sem validação de formato (aceita qualquer string em categoria/prioridade)
+      - Sem sanitização de entrada (vulnerável a SQL Injection)
+      - Sem workflow de aprovação
+      - Sem notificações automáticas
+      - Sem auditoria (não registra IP, timestamp exato, origem)
+      - Token básico sem expiração (inseguro)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por API REST moderna com:
+      - Endpoint: POST /api/v1/services/requests
+      - Autenticação: JWT Bearer Token (com expiração)
+      - Validação: FluentValidation + Data Annotations
+      - Workflow: Aprovação automatizada configurável
+      - Notificações: E-mail + push + in-app em cada etapa
+      - Auditoria: Registro completo (IP, timestamp, user-agent, origem)
+      - Sanitização: Proteção contra XSS, SQL Injection, CSRF
+
+    rf_item_relacionado: "RN-RF021-001, RN-RF021-014"
+    uc_relacionado: "UC06-solicitar-servico"
+
+    migracao_moderna:
+      command_cqrs: "CreateServicoSolicitacaoCommand"
+      handler: "CreateServicoSolicitacaoCommandHandler"
+      validador: "CreateServicoSolicitacaoCommandValidator"
+
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-004"
+    tipo: "webservice"
+    nome: "WSServicos.asmx::ListarChamadosUsuario"
+    caminho: "ic1_legado/IControlIT/WebService/WSServicos.asmx.vb"
+    descricao: |
+      Método SOAP para listar chamados de um usuário.
+      Parâmetros: idUsuario (Guid), status (String), token (String).
+      Retorno: XML com lista de chamados.
+      Limitações:
+      - Sem paginação (retorna TODOS os registros - pode ser milhares)
+      - Sem filtro por tipo de solicitação (mistura incidentes e serviços)
+      - Sem SLA visual (campo Data_Vencimento_SLA não existe)
+      - Sem tracking de aprovação (campo Id_Aprovador não existe)
+      - XML ineficiente (não usa JSON)
+      - Sem ordenação customizável
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por API REST moderna com:
+      - Endpoint: GET /api/v1/services/requests/my-requests
+      - Paginação: PageSize, PageNumber (default: 20 registros)
+      - Filtros: status, categoria, dataInicio, dataFim
+      - Ordenação: campo, direção (ASC/DESC)
+      - Retorno: JSON com PaginatedList<ServicoSolicitacaoDto>
+      - SLA: campo SlaVencimentoCalculado + SlaStatus (Verde/Amarelo/Vermelho)
+      - Tracking de Aprovação: array de aprovações com data, aprovador, status
+
+    rf_item_relacionado: "RN-RF021-014"
+    uc_relacionado: "UC00-listar-solicitacoes-servicos"
+
+    migracao_moderna:
+      query_cqrs: "GetMinhasSolicitacoesQuery"
+      handler: "GetMinhasSolicitacoesQueryHandler"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-005"
+    tipo: "webservice"
+    nome: "WSServicos.asmx::AtualizarStatusChamado"
+    caminho: "ic1_legado/IControlIT/WebService/WSServicos.asmx.vb"
+    descricao: |
+      Método SOAP para atualizar status de um chamado.
+      Parâmetros: idChamado (Guid), novoStatus (String), observacao (String), token (String).
+      Retorno: XML com sucesso ou erro.
+      Limitações:
+      - Sem validação de workflow (atendente pode pular etapas)
+      - Sem registro de histórico (apenas sobrescreve campo Status)
+      - Sem notificações automáticas (usuário não é avisado)
+      - Sem auditoria (não registra quem mudou ou quando exatamente)
+      - Sem validação de permissão (qualquer usuário autenticado pode mudar status de qualquer chamado)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por API REST moderna com:
+      - Endpoint: PUT /api/v1/services/requests/{id}/status
+      - Validação de workflow: transições permitidas/proibidas (tabela de estados)
+      - Histórico: tabela Servico_Historico registra TODAS as mudanças de status
+      - Notificações: automáticas em cada mudança (e-mail + push + in-app)
+      - Auditoria: campos Created/Modified/By em todas as entidades
+      - Permissão: RBAC granular (SERVICO.ATENDER, SERVICO.APROVAR, SERVICO.CANCELAR_FORCADO)
+
+    rf_item_relacionado: "RN-RF021-011, RN-RF021-001"
+    uc_relacionado: "UC07-aprovar-solicitacao, UC08-atender-solicitacao, UC09-cancelar-solicitacao"
+
+    migracao_moderna:
+      command_cqrs: "AtualizarStatusSolicitacaoCommand"
+      handler: "AtualizarStatusSolicitacaoCommandHandler"
+      validador: "AtualizarStatusSolicitacaoCommandValidator"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-006"
+    tipo: "tabela"
+    nome: "Chamado"
+    caminho: "ic1_legado/Database/Tables/dbo.Chamado.sql"
+    schema_legado: "[dbo].[Chamado]"
+    descricao: |
+      Tabela única genérica para todos os tipos de chamados (incidentes, solicitações de serviços, mudanças).
+      Campos principais: Id, Id_Usuario_Solicitante, Categoria (texto livre), Descricao (NVARCHAR(MAX)),
+      Prioridade (texto livre), Status (texto livre), Data_Abertura, Observacao.
+    problemas_identificados:
+      - "Sem Foreign Keys: Id_Usuario_Solicitante não tem FK para tabela Usuario"
+      - "Campos sem validação: Categoria, Prioridade, Status são texto livre (inconsistência)"
+      - "Sem auditoria: não tem campos Id_Usuario_Criacao, Dt_Criacao, Id_Usuario_Alteracao, Dt_Alteracao"
+      - "Sem soft delete: registros deletados são removidos fisicamente (perda de histórico)"
+      - "Sem multi-tenancy: não tem campo Id_Conglomerado ou Id_Empresa (bancos separados por cliente)"
+      - "Sem SLA: não tem campo Data_Vencimento_SLA ou SLA_Atendimento_Horas"
+      - "Sem workflow: não tem campos Id_Aprovador, Status_Aprovacao, Nivel_Aprovacao"
+      - "Sem rastreamento de serviço: não diferencia solicitações de serviços de outros chamados"
+      - "Descrição genérica: campo Descricao em texto livre sem estrutura (impossível extrair métricas)"
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por 4 tabelas modernas especializadas:
+      1. Servico_Catalogo: catálogo de serviços disponíveis (nome, descrição, SLA, custo, formulário JSON)
+      2. Servico_Solicitacao: solicitações criadas (número SRV-YYYY-NNNNN, SLA calculado, status workflow)
+      3. Servico_Aprovacao: workflow de aprovações (nível, aprovador, data, status, justificativa)
+      4. Servico_Carrinho: carrinho temporário de serviços (sessão persistente, máximo 10 itens)
+
+      Melhorias:
+      - FKs obrigatórias com CONSTRAINT ON DELETE NO ACTION
+      - Campos enum (Status, Prioridade) com valores fixos
+      - Auditoria completa (Created/Modified/By em todas tabelas)
+      - Soft delete (Fl_Excluido)
+      - Multi-tenancy (Id_Conglomerado em todas tabelas)
+      - SLA automático (SLA_Vencimento_Calculado, SLA_Status)
+      - Workflow (Servico_Aprovacao com 4 níveis configuráveis)
+      - Formulário dinâmico (Formulario_JSON em Servico_Catalogo)
+      - Avaliação (Avaliacao_Nota, Avaliacao_Comentario em Servico_Solicitacao)
+
+    rf_item_relacionado: "RN-RF021-013, RN-RF021-005"
+    md_relacionado: "MD-RF021.md - Tabelas Servico_Catalogo, Servico_Solicitacao, Servico_Aprovacao, Servico_Carrinho"
+
+    migracao_moderna:
+      tabelas_modernas:
+        - "Servico_Catalogo"
+        - "Servico_Solicitacao"
+        - "Servico_Aprovacao"
+        - "Servico_Carrinho"
+      migration_ef_core: "20251230_CreateServicoTables.cs"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-007"
+    tipo: "regra_negocio"
+    nome: "Aprovação Manual Via E-mail"
+    caminho: "ic1_legado/IControlIT/Aplicacao/Chamados/Novo.aspx.vb"
+    localizacao_codigo: "Chamados/Novo.aspx.vb - linhas 100-120 + processos documentados em manual do usuário"
+    descricao: |
+      Quando chamado de categoria "Solicitação" é criado, atendente analisa descrição manualmente.
+      Se identificar necessidade de aprovação (ex: valor alto, equipamento crítico), envia e-mail para gestor.
+      Gestor responde e-mail com "Aprovado" ou "Negado".
+      Atendente atualiza status manualmente baseado na resposta.
+
+      Problemas:
+      - Sem rastreabilidade: e-mails podem ser perdidos
+      - Sem SLA: não há prazo para aprovador responder
+      - Inconsistência: critério de "precisa aprovação" varia entre atendentes
+      - Manual: processo 100% humano, propenso a erros e esquecimentos
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por workflow de aprovação automatizado (RN-RF021-001):
+      - Workflow configurável por serviço (4 níveis: gestor → TI → financeiro → diretor)
+      - Aprovação sequencial obrigatória (se um nível rejeitar, fluxo é cancelado)
+      - Notificações automáticas em cada etapa (e-mail + push + in-app)
+      - SLA de aprovação (72 horas por nível, escalação automática se não responder)
+      - Rastreabilidade completa (tabela Servico_Aprovacao com histórico)
+      - Auto-aprovação por regras (40%+ aprovações automáticas)
+
+    rf_item_relacionado: "RN-RF021-001"
+    uc_relacionado: "UC07-aprovar-solicitacao"
+
+    migracao_moderna:
+      handler: "AprovarSolicitacaoCommandHandler"
+      validador: "AprovarSolicitacaoCommandValidator"
+      evento_dominio: "SolicitacaoAprovada"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-008"
+    tipo: "regra_negocio"
+    nome: "Priorização Subjetiva de Solicitações"
+    caminho: "ic1_legado/IControlIT/Aplicacao/Chamados/Index.aspx.vb"
+    localizacao_codigo: "Observação de uso do sistema + entrevistas com atendentes"
+    descricao: |
+      Atendentes decidem ordem de atendimento baseado em:
+      - Quem solicitou (gerentes/diretores têm prioridade implícita)
+      - Urgência percebida na descrição (palavras "urgente", "emergência")
+      - Relacionamento pessoal com solicitante
+
+      Problemas:
+      - Sem SLA formal: não há cálculo automático de vencimento
+      - Favoritismo: certas solicitações priorizadas independente da urgência real
+      - Inconsistência: critérios variam entre atendentes
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por SLA tracking visual automatizado (RN-RF021-005):
+      - SLA calculado automaticamente: Data_Solicitacao + SLA_Atendimento_Horas
+      - Considera apenas dias úteis (segunda-sexta, 8h-18h)
+      - Semáforo visual: verde (>50% tempo restante), amarelo (20-50%), vermelho (<20% ou vencido)
+      - Job Hangfire verifica SLAs a cada 15 minutos
+      - Alertas automáticos ao atendente quando entrar em "vermelho"
+      - SLA pausado em status Aguardando_Estoque ou Aguardando_Usuario
+      - Priorização objetiva baseada em SLA (não em relacionamento pessoal)
+
+    rf_item_relacionado: "RN-RF021-005"
+    uc_relacionado: "UC08-atender-solicitacao"
+
+    migracao_moderna:
+      background_service: "SlaTrackingBackgroundService"
+      job_hangfire: "VerificarSlasJob (executa a cada 15 minutos)"
+
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-009"
+    tipo: "regra_negocio"
+    nome: "Verificação Manual de Estoque"
+    caminho: "ic1_legado/IControlIT/Aplicacao/Chamados/Novo.aspx.vb"
+    localizacao_codigo: "Processo documentado em planilha de controle de estoque separada"
+    descricao: |
+      Quando solicitação é de equipamento físico (notebook, smartphone):
+      1. Atendente acessa planilha Excel separada para verificar estoque
+      2. Telefona para almoxarifado para reservar item
+      3. Atualiza planilha manualmente marcando item como "reservado"
+      4. Se item não disponível, aguarda reposição (sem prazo definido)
+
+      Problemas:
+      - Sem integração: planilha Excel não conectada ao sistema de chamados
+      - Risco de dupla alocação: dois atendentes podem reservar o mesmo item simultaneamente
+      - Sem notificação automática: atendente verifica planilha manualmente para ver se item foi reposto
+      - Sem timeout: solicitações podem ficar indefinidamente "aguardando estoque"
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação de estoque automática (RN-RF021-004):
+      - Integração real-time com sistema de estoque (API interna)
+      - Verificação automática de disponibilidade antes da aprovação
+      - Reserva automática de item após aprovação (LOCK no banco)
+      - Notificação automática quando item for reposto
+      - Timeout de 15 dias: se estoque não reposto, solicitação cancelada automaticamente
+      - Liberação automática de reserva se solicitação for cancelada ou rejeitada
+
+    rf_item_relacionado: "RN-RF021-004"
+    uc_relacionado: "UC08-atender-solicitacao"
+
+    migracao_moderna:
+      service: "IEstoqueService (integração interna)"
+      method: "VerificarDisponibilidade, ReservarItem, LiberarReserva"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-010"
+    tipo: "regra_negocio"
+    nome: "Provisionamento Manual de Serviços"
+    caminho: "ic1_legado/IControlIT/Aplicacao/Chamados/Novo.aspx.vb"
+    localizacao_codigo: "Processos operacionais de provisionamento de linhas móveis"
+    descricao: |
+      Para ativação de linha móvel:
+      1. Atendente acessa portal da operadora manualmente
+      2. Preenche formulário online com dados do usuário
+      3. Aguarda e-mail de confirmação da operadora (24-72 horas)
+      4. Atualiza chamado manualmente quando receber confirmação
+      5. Notifica usuário via e-mail manual
+
+      Problemas:
+      - Processo 100% manual: cada etapa requer ação humana
+      - Alto tempo de atendimento: média de 48-72 horas
+      - Sem callback automático: atendente verifica e-mail manualmente
+      - Retrabalho: dados copiados manualmente (risco de erro)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por provisionamento automatizado (RN-RF021-007):
+      - Integração via API REST com operadoras (Vivo, Claro, TIM)
+      - Chamada automática após aprovação final
+      - Callback da operadora atualiza status: Em_Provisionamento → Aguardando_Entrega → Concluida
+      - Tempo de atendimento reduzido de 48-72h para <6h
+      - Notificações automáticas ao usuário em cada etapa
+      - Fallback manual: se API falhar, atendente provisiona manualmente
+      - Dados enviados automaticamente (sem retrabalho)
+
+    rf_item_relacionado: "RN-RF021-007"
+    uc_relacionado: "UC08-atender-solicitacao"
+
+    migracao_moderna:
+      service: "IProvisioningService"
+      integracao_externa:
+        - "VivoApiClient"
+        - "ClaroApiClient"
+        - "TimApiClient"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-011"
+    tipo: "regra_negocio"
+    nome: "Sem Sistema de Avaliação de Serviço"
+    caminho: "ic1_legado/IControlIT/Aplicacao/Chamados/Index.aspx.vb"
+    localizacao_codigo: "Inexistência de funcionalidade no sistema legado"
+    descricao: |
+      Após conclusão de chamado, não há:
+      - Solicitação de feedback ao usuário
+      - Forma de medir satisfação ou qualidade do atendimento
+      - Identificação de serviços problemáticos ou gargalos recorrentes
+
+    destino: "assumido"
+    justificativa: |
+      Funcionalidade NOVA implementada no sistema moderno (RN-RF021-009):
+      - Avaliação obrigatória: nota 1-5 estrelas + comentário opcional
+      - Notificações progressivas: push (imediato), e-mail (24h), modal bloqueante (48h)
+      - Atualização automática de Avaliacao_Media na tabela Servico_Catalogo
+      - Serviços com média < 3.0 por 3 meses consecutivos sinalizados ao gestor
+      - Comentários negativos geram ticket de melhoria automático
+      - Dashboard de analytics mostra avaliação média por serviço
+
+    rf_item_relacionado: "RN-RF021-009"
+    uc_relacionado: "UC10-avaliar-servico"
+
+    migracao_moderna:
+      componente_angular: "service-evaluation.component.ts"
+      api_rest: "POST /api/v1/services/requests/{id}/evaluate"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF021-012"
+    tipo: "regra_negocio"
+    nome: "Descrição Livre Sem Estrutura"
+    caminho: "ic1_legado/IControlIT/Aplicacao/Chamados/Novo.aspx.vb"
+    localizacao_codigo: "Campo Descricao da tabela Chamado"
+    descricao: |
+      Usuários descrevem solicitações de forma completamente livre:
+      - "preciso de um celular"
+      - "solicito linha móvel para trabalho"
+      - "quero smartphone novo para vendas"
+      Cada solicitação descrita diferentemente, impossibilitando análise de demanda.
+
+      Problemas:
+      - Inconsistência: mesma solicitação descrita de 10 formas diferentes
+      - Informações faltantes: atendente pede informações adicionais via e-mail (retrabalho)
+      - Impossibilidade de analytics: não há como identificar "quantas linhas móveis foram solicitadas em 2024"
+      - Sem validação: campo aceita qualquer texto, incluindo solicitações absurdas
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por formulários dinâmicos (RN-RF021-006):
+      - JSON Schema armazenado em Formulario_JSON (tabela Servico_Catalogo)
+      - Cada serviço define campos específicos (text, email, number, date, select, multiselect, checkbox, radio, file)
+      - Validações obrigatórias: required, minLength, maxLength, pattern, minimum, maximum
+      - Validação dupla: client-side (UX) + server-side (segurança)
+      - Renderização dinâmica no frontend Angular (@angular/forms)
+      - Dados estruturados permitem analytics precisos
+
+    rf_item_relacionado: "RN-RF021-006"
+    uc_relacionado: "UC06-solicitar-servico"
+
+    migracao_moderna:
+      componente_angular: "dynamic-form.component.ts (renderiza JSON Schema)"
+      validador: "CreateServicoSolicitacaoCommandValidator"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF021-001"
+    titulo: "Ausência de Catálogo Formal de Serviços"
+    severidade: "CRÍTICA"
+    descricao: |
+      Sistema legado não tinha catálogo pré-definido de serviços disponíveis.
+      Usuários solicitavam via descrição livre em texto, causando inconsistência massiva.
+    impacto: "Impossível padronizar solicitações, medir demanda ou otimizar processos"
+    solucao_moderna: |
+      Catálogo visual categorizado com 30-50 serviços pré-definidos.
+      Cada serviço tem: nome, descrição, SLA, custo, formulário dinâmico, aprovadores padrão.
+      Busca full-text com Elasticsearch permite encontrar serviços rapidamente.
+
+  - id: "PROB-RF021-002"
+    titulo: "Aprovações Manuais Via E-mail (Sem Rastreabilidade)"
+    severidade: "ALTA"
+    descricao: |
+      Aprovações eram feitas fora do sistema via e-mail, sem registro formal.
+      E-mails podem ser perdidos, não há SLA para aprovador responder, sem auditoria.
+    impacto: "Perda de aprovações, impossibilidade de rastreamento, compliance inadequado"
+    solucao_moderna: |
+      Workflow de aprovação automatizado configurável (4 níveis).
+      Aprovações sequenciais obrigatórias, notificações automáticas, SLA de 72h por nível.
+      Histórico completo em tabela Servico_Aprovacao (quem, quando, status, justificativa).
+
+  - id: "PROB-RF021-003"
+    titulo: "Sem SLA Tracking Visual"
+    severidade: "ALTA"
+    descricao: |
+      Usuários não sabiam quando solicitação venceria ou se estava atrasada.
+      Atendentes priorizavam subjetivamente (favoritismo, relacionamento pessoal).
+    impacto: "Solicitações esquecidas, SLA vencido frequentemente, insatisfação do usuário"
+    solucao_moderna: |
+      SLA calculado automaticamente considerando dias úteis (segunda-sexta, 8h-18h).
+      Semáforo visual verde/amarelo/vermelho mostra status em tempo real.
+      Job Hangfire verifica SLAs a cada 15 minutos e envia alertas quando entra em "vermelho".
+
+  - id: "PROB-RF021-004"
+    titulo: "Verificação Manual de Estoque (Planilha Excel Separada)"
+    severidade: "ALTA"
+    descricao: |
+      Atendentes usavam planilha Excel separada para verificar estoque.
+      Risco de dupla alocação, sem notificação automática quando item reposto.
+    impacto: "Solicitações travadas esperando estoque, duplicação de alocação, retrabalho"
+    solucao_moderna: |
+      Integração real-time com sistema de estoque (API interna).
+      Verificação automática de disponibilidade antes de aprovar.
+      Reserva automática de item (LOCK no banco) após aprovação.
+      Timeout de 15 dias: se não repor, solicitação cancelada automaticamente.
+
+  - id: "PROB-RF021-005"
+    titulo: "Provisionamento 100% Manual (Acesso a Portais Externos)"
+    severidade: "ALTA"
+    descricao: |
+      Para ativar linha móvel, atendente acessava portal da operadora manualmente.
+      Processo demorava 48-72 horas, com alto risco de erro de digitação.
+    impacto: "Alto tempo de atendimento, baixa satisfação, retrabalho, erros frequentes"
+    solucao_moderna: |
+      Integração via API REST com operadoras (Vivo, Claro, TIM).
+      Chamada automática após aprovação final, callback atualiza status.
+      Tempo de atendimento reduzido para <6h.
+      Fallback manual se API falhar.
+
+  - id: "PROB-RF021-006"
+    titulo: "Sem Sistema de Avaliação de Serviço"
+    severidade: "MÉDIA"
+    descricao: |
+      Após conclusão, não havia solicitação de feedback ao usuário.
+      Impossível medir satisfação ou identificar serviços problemáticos.
+    impacto: "Sem métricas de satisfação, sem melhoria contínua, sem identificação de gargalos"
+    solucao_moderna: |
+      Avaliação obrigatória (1-5 estrelas + comentário opcional).
+      Notificações progressivas (push/e-mail/modal) forçam avaliação.
+      Serviços com média < 3.0 por 3 meses consecutivos sinalizados ao gestor.
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 12
+  itens_assumidos: 1
+  itens_substituidos: 11
+  itens_descartados: 0
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"  # OBRIGATÓRIO: Deve ser sempre 100%
+
+# ==============================================================================
+# CHANGELOG
+# ==============================================================================
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Criação do documento de referência ao legado (RL) com separação estrita RF/RL conforme governança v2.0"
+    autor: "Agência ALC - alc.dev.br"

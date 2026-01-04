@@ -1,0 +1,1392 @@
+# RF105: Integração Operadoras Telecom
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF032, RF023 | **EPIC**: EPIC011-INT-Integracoes
+**Fase**: Fase 6 - Ativos, Auditoria e Integrações
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+Este requisito especifica o módulo de **Integração com Operadoras Telecom** do sistema IControlIT, responsável pela comunicação bidirecional com as principais operadoras de telecomunicações brasileiras (Vivo, Claro, TIM, Oi). O módulo fornece API de integração para consulta de faturas eletrônicas, consumo em tempo real, inventário de linhas, solicitação de serviços, portabilidade e contestação de faturas. O sistema sincroniza dados entre IControlIT e as operadoras de forma automática, garantindo consistência de dados, conformidade com LGPD e auditoria completa de todas as operações.
+
+### 1.2 Importancia Estrategica
+
+O módulo de Integração com Operadoras Telecom é crítico para:
+
+- **Automação**: Elimina processamento manual de faturas e pedidos via portal das operadoras
+- **Conformidade**: Garante conformidade LGPD através de criptografia, auditoria e direito ao esquecimento
+- **Eficiência Operacional**: Reduz tempo de processamento de pedidos de horas para segundos
+- **Integridade de Dados**: Sincronização bidirecional garante que inventário local sempre coincide com operadora
+- **Rastreabilidade**: Auditoria completa de todas as requisições API, respostas e exceções
+- **Resiliência**: Circuit breaker, retry automático e fallback garantem disponibilidade mesmo com falhas parciais
+
+### 1.3 Conceitos Fundamentais
+
+**Operadora de Telecomunicações**: Provedora de serviços de telefonia móvel/fixa (Vivo, Claro, TIM, Oi) que disponibiliza APIs para integração com sistemas de gestão corporativa.
+
+- Cada operadora possui seu próprio contrato de integração, documentação de API e credenciais de acesso
+
+**Fatura Eletrônica (XML NF-e)**: Documento fiscal digital em formato XML contendo detalhes de consumo, valores e impostos. Armazenado no Azure Blob Storage.
+
+- Permite análise de consumo por período, contestação automática e integração com RF032 (Notas Fiscais)
+
+**Consumo em Tempo Real**: Dados de voz (minutos), dados (MB/GB), SMS (unidades) consultados via API das operadoras.
+
+- Cacheado por 15 minutos em Redis para reduzir latência e carga nas operadoras
+
+**Inventário de Linhas**: Registro de todas as linhas telefônicas ativas contratadas com a operadora.
+
+- Inclui MSISDN (número da linha), IMSI, estado (ativa/bloqueada/suspensa), plano contratado
+
+**Portabilidade**: Processo de transferência de número telefônico de uma operadora para outra, obedecendo regulamentações da ANATEL.
+
+- Requer sincronização com sistema de gestão de contratos (RF023)
+
+**Webhook**: Endpoint HTTP que recebe notificações assíncronas das operadoras (fatura gerada, consumo atualizado, linha bloqueada).
+
+- Validado via HMAC-SHA256 para garantir autenticidade das notificações
+
+**Circuit Breaker**: Padrão de resiliência que abre o circuito (retorna erro imediatamente) após N falhas consecutivas.
+
+- Evita sobrecarregar operadoras em caso de indisponibilidade e permite recuperação gradual
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Integração com Operadoras** | Integração manual via SFTP ou portal web | API REST com autenticação OAuth 2.0, retry automático e circuit breaker |
+| **Armazenamento de Faturas** | Servidor local (arquivo físico) | Azure Blob Storage com criptografia AES-256 |
+| **Consumo em Tempo Real** | Consulta direta sem cache (lento) | Cache em Redis com TTL de 15 minutos |
+| **Processamento Assíncrono** | Job agent (VB.NET) | Azure Service Bus + Hangfire com scheduler |
+| **Validação de Webhook** | Nenhuma validação (inseguro) | HMAC-SHA256 obrigatório |
+| **Resiliência** | Sem retry automático | Polly com retry exponencial, timeout, circuit breaker |
+| **Auditoria** | Log em arquivo de texto | Auditoria centralizada com ClienteId, operador, timestamp, payload |
+| **Multi-tenancy** | Monolítico por cliente | ClienteId + OperadoraId em todas as operações |
+| **Sincronização** | Manual diária | Automática via Hangfire (3h da manhã) com reconciliação |
+
+### 1.5 Funcionalidades Principais
+
+1. **CRUD de Configuração de Operadoras** - Criar, ler, atualizar e excluir credenciais e endpoints de operadoras
+2. **Consulta de Faturas Eletrônicas** - Buscar faturas em formato XML via API, armazenar em Blob Storage
+3. **Consulta de Consumo em Tempo Real** - Obter voz, dados e SMS com cache por 15 minutos
+4. **Consulta de Inventário de Linhas** - Listar todas as linhas ativas, estados, planos contratados
+5. **Solicitação de Serviços** - Ativar/desativar linhas, mudança de plano, bloqueio/desbloqueio
+6. **Gerenciamento de Portabilidade** - Iniciar portabilidade, consultar status, confirmar transferência
+7. **Contestação de Faturas** - Submeter contestações à operadora via API com rastreamento de status
+8. **Consulta de Cobertura de Rede** - Verificar disponibilidade de cobertura em localização específica
+9. **Sincronização Bidirecional** - Job automático (Hangfire) que sincroniza IControlIT ↔ Operadoras diariamente
+10. **Webhook para Notificações Assíncronas** - Receber notificações de eventos (fatura gerada, linha alterada, portabilidade concluída)
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-INT-105-01: Credenciais Seguras por Operadora
+
+**Descricao**: Cada operadora (Vivo, Claro, TIM, Oi) deve ter suas próprias credenciais armazenadas com criptografia AES-256, incluindo API Key, Client ID, Client Secret e URL do endpoint.
+
+**Justificativa**: Separação de credenciais por operadora garante que comprometimento de uma não afeta as outras. Criptografia em repouso atende LGPD.
+
+**Implementacao**:
+```csharp
+public class OperadoraCredencial
+{
+    public int Id { get; set; }
+    public int ClienteId { get; set; } // Multi-tenancy
+    public int OperadoraId { get; set; } // Vivo, Claro, TIM, Oi
+    public string ApiKey { get; set; } // Armazenado criptografado
+    public string ClientId { get; set; } // Armazenado criptografado
+    public string ClientSecret { get; set; } // Armazenado criptografado
+    public string EndpointUrl { get; set; } // URL base da API
+    public DateTime DataCriacao { get; set; }
+    public DateTime DataAtualizacao { get; set; }
+    public bool Ativa { get; set; }
+}
+
+public class CriptografiaService
+{
+    private readonly IConfiguration _config;
+
+    public string Criptografar(string valor)
+    {
+        using (var aes = Aes.Create())
+        {
+            aes.Key = Encoding.UTF8.GetBytes(_config["Criptografia:ChaveMestra"].PadRight(32).Substring(0, 32));
+            aes.IV = Encoding.UTF8.GetBytes(_config["Criptografia:IV"].PadRight(16).Substring(0, 16));
+
+            using (var encryptor = aes.CreateEncryptor())
+            using (var ms = new MemoryStream())
+            {
+                using (var cs = new CryptoStream(ms, encryptor, CryptoStreamMode.Write))
+                {
+                    cs.Write(Encoding.UTF8.GetBytes(valor));
+                    cs.FlushFinalBlock();
+                    return Convert.ToBase64String(ms.ToArray());
+                }
+            }
+        }
+    }
+
+    public string Descriptografar(string valorCriptografado)
+    {
+        using (var aes = Aes.Create())
+        {
+            aes.Key = Encoding.UTF8.GetBytes(_config["Criptografia:ChaveMestra"].PadRight(32).Substring(0, 32));
+            aes.IV = Encoding.UTF8.GetBytes(_config["Criptografia:IV"].PadRight(16).Substring(0, 16));
+
+            using (var decryptor = aes.CreateDecryptor())
+            using (var ms = new MemoryStream(Convert.FromBase64String(valorCriptografado)))
+            using (var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read))
+            using (var sr = new StreamReader(cs))
+            {
+                return sr.ReadToEnd();
+            }
+        }
+    }
+}
+```
+
+**Exemplos**:
+- ✓ ApiKey: "vivo_rest_api_key_xyz" criptografado com ChaveMestra
+- ✗ ApiKey: "vivo_rest_api_key_xyz" armazenado em texto plano
+
+---
+
+### RN-INT-105-02: Timeout Diferenciado por Tipo de Operação
+
+**Descricao**: Requisições síncronas (consultas) têm timeout de 30 segundos. Requisições assíncronas (solicitações de serviço) retornam imediatamente com processamento em fila e timeout interno de 5 minutos.
+
+**Justificativa**: Consultas devem ser rápidas para não degradar UX. Solicitações complexas podem levar tempo nas operadoras, mas não devem bloquear interface.
+
+**Implementacao**:
+```csharp
+public class OperadoraHttpClientFactory
+{
+    private readonly HttpClient _httpClient;
+
+    public async Task<T> ConsultarAsync<T>(string operadoraId, string endpoint, CancellationToken ct = default)
+    {
+        // Timeout sícrono: 30 segundos
+        using (var cts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+        {
+            cts.CancelAfter(TimeSpan.FromSeconds(30));
+
+            try
+            {
+                var response = await _httpClient.GetAsync($"{endpoint}", cts.Token);
+                response.EnsureSuccessStatusCode();
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<T>(json);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new OperadoraTimeoutException(
+                    $"Timeout ao consultar {operadoraId}: 30s excedido");
+            }
+        }
+    }
+
+    public async Task SolicitarServicoAsync(string operadoraId, SolicitacaoServicoDto dto)
+    {
+        // Retorna imediatamente, processa com timeout interno de 5 minutos
+        var job = new ProcessarSolicitacaoOperadoraJob
+        {
+            ClienteId = dto.ClienteId,
+            OperadoraId = operadoraId,
+            Payload = JsonSerializer.Serialize(dto),
+            TentativasRestantes = 3,
+            CriadoEm = DateTime.UtcNow
+        };
+
+        await _jobQueue.EnqueueAsync(job);
+
+        // Timeout interno: 5 minutos
+        BackgroundJob.Enqueue(
+            () => ProcessarComTimeout(job.Id, TimeSpan.FromMinutes(5)),
+            TimeSpan.FromSeconds(5)
+        );
+    }
+}
+```
+
+**Exemplos**:
+- ✓ GET /api/operadoras/vivo/consultar-consumo retorna em 2s (< 30s)
+- ✓ POST /api/operadoras/vivo/solicitar-servico retorna 202 Accepted imediatamente
+- ✗ GET /api/operadoras/vivo/consultar-consumo aguarda 60s (> 30s timeout)
+
+---
+
+### RN-INT-105-03: Retry Automático com Backoff Exponencial
+
+**Descricao**: Requisições que falham por timeout ou erro 5xx devem retortar automaticamente 3 vezes com delay exponencial: 1s, 2s, 4s. Erros 4xx não são retentados.
+
+**Justificativa**: Falhas temporárias (flap de rede, pico de carga) resolvem-se sozinhas em segundos. Retentativa automática melhora confiabilidade sem impactar negócio.
+
+**Implementacao**:
+```csharp
+public class OperadoraResiliencePolicy
+{
+    public static IAsyncPolicy<HttpResponseMessage> CriarPolicyComRetry()
+    {
+        return HttpPolicyExtensions
+            .HandleTransientHttpError() // Trata timeout e 5xx
+            .Or<HttpRequestException>()
+            .OrResult(r => r.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt - 1)),
+                onRetry: (outcome, timespan, retryCount, context) =>
+                {
+                    Console.WriteLine($"[Retry {retryCount}] Aguardando {timespan.TotalSeconds}s...");
+                }
+            );
+    }
+}
+
+public class OperadoraHttpClient
+{
+    private readonly IAsyncPolicy<HttpResponseMessage> _retryPolicy;
+
+    public async Task<T> ConsultarComRetryAsync<T>(string url)
+    {
+        var response = await _retryPolicy.ExecuteAsync(async () =>
+            await _httpClient.GetAsync(url)
+        );
+
+        if (!response.IsSuccessStatusCode)
+            throw new OperadoraApiException($"Erro {response.StatusCode}");
+
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonSerializer.Deserialize<T>(json);
+    }
+}
+
+// Exemplo de uso com Polly
+var serviceCollection = new ServiceCollection();
+serviceCollection
+    .AddHttpClient<OperadoraHttpClient>()
+    .AddTransientHttpErrorPolicy(p => p.WaitAndRetryAsync(3, attempt =>
+        TimeSpan.FromSeconds(Math.Pow(2, attempt - 1))
+    ));
+```
+
+**Exemplos**:
+- ✓ Timeout na 1ª tentativa → Retry em 1s → Sucesso na 2ª
+- ✓ 503 Service Unavailable na 1ª → Retry em 1s → 503 novamente → Retry em 2s → Sucesso na 3ª
+- ✗ 400 Bad Request → Não retenta (é erro do cliente, não transiente)
+
+---
+
+### RN-INT-105-04: Validação HMAC-SHA256 de Webhook
+
+**Descricao**: Toda notificação via webhook deve incluir header `X-Signature` contendo HMAC-SHA256(payload, ClientSecret). Sistema deve validar antes de processar.
+
+**Justificativa**: Garante que notificações realmente vêm da operadora e não de atacante. Autenticação sem TLS mútuo.
+
+**Implementacao**:
+```csharp
+public class WebhookValidationMiddleware
+{
+    private readonly RequestDelegate _next;
+
+    public async Task InvokeAsync(HttpContext context, ICriptografiaService cripto)
+    {
+        if (context.Request.Path.StartsWithSegments("/api/operadoras/webhook"))
+        {
+            var body = await context.Request.Body.ReadAsStringAsync();
+            var operadoraId = context.Request.RouteValues["operadoraId"]?.ToString();
+
+            if (!context.Request.Headers.TryGetValue("X-Signature", out var signatureHeader))
+                throw new UnauthorizedAccessException("Header X-Signature ausente");
+
+            var operadora = await _operadoraRepo.GetByIdAsync(int.Parse(operadoraId));
+            var clientSecret = cripto.Descriptografar(operadora.ClientSecret);
+
+            // Calcula HMAC-SHA256
+            var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(clientSecret));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(body));
+            var expectedSignature = Convert.ToBase64String(hash);
+
+            if (signatureHeader.ToString() != expectedSignature)
+                throw new UnauthorizedAccessException("Assinatura inválida");
+
+            context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(body));
+        }
+
+        await _next(context);
+    }
+}
+
+public class WebhookController : ControllerBase
+{
+    [HttpPost("/api/operadoras/webhook/{operadoraId}")]
+    public async Task<IActionResult> ReceberNotificacao(int operadoraId, [FromBody] WebhookNotificacaoDto dto)
+    {
+        // Já validado pelo middleware
+        var evento = dto.Tipo switch
+        {
+            "fatura_gerada" => await ProcessarFaturaGerada(operadoraId, dto),
+            "consumo_atualizado" => await ProcessarConsumoAtualizado(operadoraId, dto),
+            "linha_alterada" => await ProcessarLinhaAlterada(operadoraId, dto),
+            "portabilidade_concluida" => await ProcessarPortabilidadeConcluida(operadoraId, dto),
+            _ => throw new InvalidOperationException($"Evento desconhecido: {dto.Tipo}")
+        };
+
+        return Accepted();
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Webhook contém X-Signature válida → Processa notificação
+- ✗ Webhook sem X-Signature → Retorna 401 Unauthorized
+- ✗ Webhook com X-Signature inválida → Retorna 401 Unauthorized
+
+---
+
+### RN-INT-105-05: Armazenamento de Faturas em Azure Blob Storage
+
+**Descricao**: Faturas eletrônicas (XML) devem ser armazenadas no Azure Blob Storage com criptografia AES-256, estrutura de pastas: `/cliente/{clienteId}/operadora/{operadoraId}/ano/{ano}/mes/{mes}/{nfe_id}.xml`.
+
+**Justificativa**: Blob Storage oferece durabilidade (99.999999999%), backup automático, integração com Azure, conformidade com LGPD.
+
+**Implementacao**:
+```csharp
+public class FaturaArmazenamentoService
+{
+    private readonly BlobContainerClient _container;
+
+    public async Task<string> ArmazenarFaturaAsync(int clienteId, int operadoraId, string xml, string nfeId)
+    {
+        var ano = DateTime.UtcNow.Year;
+        var mes = DateTime.UtcNow.Month;
+        var blobPath = $"cliente/{clienteId}/operadora/{operadoraId}/ano/{ano}/mes/{mes}/{nfeId}.xml";
+
+        var blobClient = _container.GetBlobClient(blobPath);
+
+        // Armazena com criptografia de servidor (gerenciada por Azure)
+        var options = new BlobUploadOptions
+        {
+            Metadata = new Dictionary<string, string>
+            {
+                { "ClienteId", clienteId.ToString() },
+                { "OperadoraId", operadoraId.ToString() },
+                { "DataCarregamento", DateTime.UtcNow.ToString("O") }
+            },
+            AccessTier = AccessTier.Hot // Para acesso frequente
+        };
+
+        await blobClient.UploadAsync(
+            BinaryData.FromString(xml),
+            overwrite: true,
+            options
+        );
+
+        return blobClient.Uri.ToString();
+    }
+
+    public async Task<string> ObterFaturaAsync(string blobPath)
+    {
+        var blobClient = _container.GetBlobClient(blobPath);
+        var download = await blobClient.DownloadAsync();
+
+        using (var sr = new StreamReader(download.Value.Content))
+        {
+            return await sr.ReadToEndAsync();
+        }
+    }
+
+    public async Task ExcluirFaturaAsync(string blobPath)
+    {
+        // LGPD: Direito ao esquecimento
+        var blobClient = _container.GetBlobClient(blobPath);
+        await blobClient.DeleteAsync();
+    }
+}
+
+// Configuracao no Program.cs
+services.AddAzureClients(builder =>
+{
+    builder.AddBlobContainerClient(new Uri(config["AzureBlob:ContainerUri"]))
+        .ConfigureOptions(options => options.Retry.MaxRetries = 3);
+});
+```
+
+**Exemplos**:
+- ✓ Fatura armazenada em: `/cliente/5/operadora/1/ano/2025/mes/12/nf123456789.xml`
+- ✓ Arquivo criptografado automaticamente por Azure
+- ✗ Fatura armazenada em servidor local sem backup
+
+---
+
+### RN-INT-105-06: Cache de Consumo em Tempo Real com TTL de 15 Minutos
+
+**Descricao**: Consultas de consumo (voz, dados, SMS) devem ser cacheadas em Redis por 15 minutos. Chave: `consumo:{clienteId}:{operadoraId}:{msisdn}`.
+
+**Justificativa**: Reduz carga nas APIs das operadoras (cobram por requisição), melhora latência e oferece melhor experiência. TTL de 15 minutos é balanço entre consistência e performance.
+
+**Implementacao**:
+```csharp
+public class ConsumoService
+{
+    private readonly IDistributedCache _cache;
+    private readonly OperadoraHttpClient _operadoraClient;
+
+    public async Task<ConsumoDto> ObterConsumoAsync(int clienteId, int operadoraId, string msisdn)
+    {
+        var cacheKey = $"consumo:{clienteId}:{operadoraId}:{msisdn}";
+
+        // Tenta obter do cache
+        var cached = await _cache.GetStringAsync(cacheKey);
+        if (cached != null)
+            return JsonSerializer.Deserialize<ConsumoDto>(cached);
+
+        // Se não está em cache, consulta API
+        var consumo = await _operadoraClient.ConsultarConsumoAsync(operadoraId, msisdn);
+
+        // Armazena em cache por 15 minutos
+        var cacheOptions = new DistributedCacheEntryOptions
+            .SetAbsoluteExpiration(TimeSpan.FromMinutes(15));
+
+        await _cache.SetStringAsync(
+            cacheKey,
+            JsonSerializer.Serialize(consumo),
+            cacheOptions
+        );
+
+        return consumo;
+    }
+
+    public async Task InvalidarCacheAsync(int clienteId, int operadoraId, string msisdn)
+    {
+        var cacheKey = $"consumo:{clienteId}:{operadoraId}:{msisdn}";
+        await _cache.RemoveAsync(cacheKey);
+    }
+}
+
+public class ConsumoController : ControllerBase
+{
+    [HttpPost("/api/operadoras/{operadoraId}/consultar-consumo")]
+    [Authorize]
+    public async Task<IActionResult> ConsultarConsumo(
+        int operadoraId,
+        [FromBody] ConsultarConsumoRequest request)
+    {
+        var clienteId = int.Parse(User.FindFirst("ClienteId").Value);
+        var consumo = await _consumoService.ObterConsumoAsync(clienteId, operadoraId, request.Msisdn);
+        return Ok(consumo);
+    }
+}
+
+// Configuracao no Program.cs
+services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = config.GetConnectionString("Redis");
+});
+```
+
+**Exemplos**:
+- ✓ 1ª consulta de consumo de 11987654321 → API da Vivo → Cache por 15min
+- ✓ 2ª consulta no mesmo período → Retorna do cache (instant)
+- ✓ Consulta após 16min → Cache expirado → API da Vivo novamente
+
+---
+
+### RN-INT-105-07: Sincronização Bidirecional via Hangfire às 3h da Manhã
+
+**Descricao**: Job agendado diariamente às 3:00 AM que sincroniza IControlIT ↔ Operadoras. Verifica se há novas faturas, atualiza consumo, valida inventário de linhas e marca inconsistências.
+
+**Justificativa**: Garante que dados locais nunca fiquem desatualizados. 3h AM é horário de baixa atividade, minimizando impacto em performance.
+
+**Implementacao**:
+```csharp
+public class SincronizacaoOperadoraJob
+{
+    private readonly IOperadoraService _operadoraService;
+    private readonly IFaturaService _faturaService;
+    private readonly IConsumoService _consumoService;
+    private readonly IInventarioService _inventarioService;
+
+    [RecurringJob("sincronizar-operadoras")]
+    public async Task SincronizarOperadoras()
+    {
+        var clientes = await _clienteRepo.ListarTodosAsync();
+
+        foreach (var cliente in clientes)
+        {
+            var operadoras = await _operadoraRepo.ListarPorClienteAsync(cliente.Id);
+
+            foreach (var operadora in operadoras)
+            {
+                try
+                {
+                    Console.WriteLine($"[{DateTime.UtcNow}] Sincronizando {operadora.Nome} para cliente {cliente.Nome}");
+
+                    // Sincroniza faturas
+                    await SincronizarFaturasAsync(cliente.Id, operadora.Id);
+
+                    // Sincroniza consumo
+                    await SincronizarConsumoAsync(cliente.Id, operadora.Id);
+
+                    // Sincroniza inventário de linhas
+                    await SincronizarInventarioAsync(cliente.Id, operadora.Id);
+
+                    Console.WriteLine($"[OK] Sincronização concluída para {operadora.Nome}");
+                }
+                catch (Exception ex)
+                {
+                    // Log de erro, mas continua com próxima operadora
+                    Console.WriteLine($"[ERRO] Sincronização falhou para {operadora.Nome}: {ex.Message}");
+                    await _auditoria.RegistrarErroAsync(
+                        clienteId: cliente.Id,
+                        operadoraId: operadora.Id,
+                        erro: ex.Message
+                    );
+                }
+            }
+        }
+    }
+
+    private async Task SincronizarFaturasAsync(int clienteId, int operadoraId)
+    {
+        // Consulta últimas 90 dias
+        var dataInicio = DateTime.UtcNow.AddDays(-90);
+        var faturas = await _operadoraClient.ListarFaturasAsync(operadoraId, dataInicio);
+
+        foreach (var fatura in faturas)
+        {
+            var existe = await _faturaRepo.ExisteAsync(clienteId, operadoraId, fatura.NfeId);
+            if (!existe)
+            {
+                await _faturaService.ImportarFaturaAsync(clienteId, operadoraId, fatura);
+            }
+        }
+    }
+
+    private async Task SincronizarConsumoAsync(int clienteId, int operadoraId)
+    {
+        var linhas = await _linhaRepo.ListarPorClienteEOperadoraAsync(clienteId, operadoraId);
+
+        foreach (var linha in linhas)
+        {
+            // Invalida cache para forçar atualização
+            await _consumoService.InvalidarCacheAsync(clienteId, operadoraId, linha.Msisdn);
+
+            // Consulta nova informação
+            var consumo = await _operadoraClient.ConsultarConsumoAsync(operadoraId, linha.Msisdn);
+
+            // Armazena em cache
+            await _consumoService.ArmazenarAsync(clienteId, operadoraId, linha.Msisdn, consumo);
+        }
+    }
+
+    private async Task SincronizarInventarioAsync(int clienteId, int operadoraId)
+    {
+        // Consulta inventário atual na operadora
+        var linhasOperadora = await _operadoraClient.ListarInventarioAsync(operadoraId);
+        var linhasLocais = await _linhaRepo.ListarPorClienteEOperadoraAsync(clienteId, operadoraId);
+
+        // Identifica novas linhas (devem ser sincronizadas)
+        var novasLinhas = linhasOperadora
+            .Where(x => !linhasLocais.Any(y => y.Msisdn == x.Msisdn))
+            .ToList();
+
+        foreach (var linha in novasLinhas)
+        {
+            await _linhaRepo.AdicionarAsync(new Linha
+            {
+                ClienteId = clienteId,
+                OperadoraId = operadoraId,
+                Msisdn = linha.Msisdn,
+                Imsi = linha.Imsi,
+                Estado = linha.Estado,
+                Plano = linha.Plano,
+                DataSincronizacao = DateTime.UtcNow
+            });
+        }
+
+        // Identifica linhas deletadas (devem ser marcadas como inativas)
+        var linhasDeletadas = linhasLocais
+            .Where(x => !linhasOperadora.Any(y => y.Msisdn == x.Msisdn))
+            .ToList();
+
+        foreach (var linha in linhasDeletadas)
+        {
+            linha.Estado = "inativa";
+            linha.DataSincronizacao = DateTime.UtcNow;
+            await _linhaRepo.AtualizarAsync(linha);
+        }
+    }
+}
+
+// Configuracao no Program.cs
+services.AddHangfire(config =>
+{
+    config.UseSqlServerStorage(connectionString);
+});
+
+services.AddHangfireServer();
+
+// Registra job recorrente
+var recurringJobManager = app.Services.GetRequiredService<IRecurringJobManager>();
+recurringJobManager.AddOrUpdate<SincronizacaoOperadoraJob>(
+    "sincronizar-operadoras",
+    job => job.SincronizarOperadoras(),
+    "0 3 * * *" // 3h da manhã todos os dias
+);
+```
+
+**Exemplos**:
+- ✓ 03:00 AM → Job dispara → Sincroniza Vivo, Claro, TIM, Oi
+- ✓ Fatura nova na Vivo → Sincronização detecta → Importa localmente
+- ✓ Linha deletada na operadora → Sincronização marca como inativa
+
+---
+
+### RN-INT-105-08: Multi-tenancy com ClienteId e OperadoraId
+
+**Descricao**: Toda operação CRUD deve incluir `ClienteId` (qual cliente) e `OperadoraId` (qual operadora). Consultas sempre filtram por ambos.
+
+**Justificativa**: Isolamento de dados entre clientes, segurança (usuário do cliente A não vê dados do cliente B).
+
+**Implementacao**:
+```csharp
+public class OperadoraConfiguracaoEntity
+{
+    public int Id { get; set; }
+    public int ClienteId { get; set; } // Multi-tenancy
+    public int OperadoraId { get; set; } // Vivo, Claro, TIM, Oi
+    public string ApiKey { get; set; }
+    public string ClientId { get; set; }
+    public string ClientSecret { get; set; }
+    public string EndpointUrl { get; set; }
+    public DateTime DataCriacao { get; set; }
+    public DateTime DataAtualizacao { get; set; }
+    public bool Ativa { get; set; }
+
+    // Auditoria
+    public int CriadoPorUsuarioId { get; set; }
+    public int AtualizadoPorUsuarioId { get; set; }
+}
+
+public class OperadoraRepository
+{
+    public async Task<OperadoraConfiguracaoEntity> GetByIdAsync(int clienteId, int operadoraId)
+    {
+        // Sempre filtra por ClienteId para garantir isolamento
+        return await _context.OperadoraConfiguracoes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.ClienteId == clienteId &&
+                x.OperadoraId == operadoraId &&
+                x.Ativa
+            );
+    }
+
+    public async Task<List<OperadoraConfiguracaoEntity>> ListarPorClienteAsync(int clienteId)
+    {
+        return await _context.OperadoraConfiguracoes
+            .AsNoTracking()
+            .Where(x => x.ClienteId == clienteId && x.Ativa)
+            .ToListAsync();
+    }
+}
+
+[ApiController]
+[Route("api/operadoras")]
+[Authorize]
+public class OperadoraController : ControllerBase
+{
+    [HttpGet("{id}")]
+    public async Task<IActionResult> ObterOperadora(int id)
+    {
+        var clienteId = int.Parse(User.FindFirst("ClienteId").Value);
+
+        var config = await _operadoraRepo.GetByIdAsync(clienteId, id);
+        if (config == null)
+            return NotFound();
+
+        return Ok(config);
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Cliente A consulta seus dados de Vivo → ClienteId=1, OperadoraId=1
+- ✓ Cliente B consulta seus dados de Vivo → ClienteId=2, OperadoraId=1 (dados diferentes)
+- ✗ Cliente A consegue ver dados de Cliente B (violação de isolamento)
+
+---
+
+### RN-INT-105-09: Auditoria Obrigatória de Requisições API
+
+**Descricao**: Toda requisição enviada para operadora, resposta recebida e webhook recebido deve ser registrado em tabela de auditoria com ClienteId, UserId, timestamp, método, URL, headers sanitizados, payload (sem secrets), resposta (sem secrets), código HTTP e tempo decorrido.
+
+**Justificativa**: Conformidade, rastreabilidade, debugging de problemas, análise de padrões de acesso.
+
+**Implementacao**:
+```csharp
+public class AuditoriaOperadoraEntity
+{
+    public long Id { get; set; }
+    public int ClienteId { get; set; }
+    public int OperadoraId { get; set; }
+    public int? UsuarioId { get; set; }
+    public string Metodo { get; set; } // GET, POST, PUT, DELETE
+    public string Url { get; set; }
+    public Dictionary<string, string> Headers { get; set; } // Sanitizado
+    public string PayloadEntrada { get; set; } // Sanitizado
+    public string PayloadSaida { get; set; } // Sanitizado
+    public int StatusCode { get; set; }
+    public long TempoDeclaidoMs { get; set; }
+    public string TipoOperacao { get; set; } // "consultar-consumo", "solicitar-servico", etc.
+    public string Status { get; set; } // "sucesso", "erro", "timeout"
+    public string MensagemErro { get; set; }
+    public DateTime DataOperacao { get; set; }
+}
+
+public class AuditoriaMiddleware
+{
+    private readonly RequestDelegate _next;
+
+    public async Task InvokeAsync(HttpContext context, IAuditoriaService auditoria)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var clienteId = int.Parse(context.User.FindFirst("ClienteId")?.Value ?? "0");
+        var usuarioId = int.Parse(context.User.FindFirst("UserId")?.Value ?? "0");
+
+        // Captura request body
+        var requestBody = "";
+        if (context.Request.ContentLength.HasValue && context.Request.ContentLength > 0)
+        {
+            var reader = new StreamReader(context.Request.Body);
+            requestBody = await reader.ReadToEndAsync();
+            context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(requestBody));
+        }
+
+        // Captura response body
+        var originalBody = context.Response.Body;
+        using (var memoryStream = new MemoryStream())
+        {
+            context.Response.Body = memoryStream;
+
+            try
+            {
+                await _next(context);
+            }
+            finally
+            {
+                stopwatch.Stop();
+
+                // Lê response
+                memoryStream.Seek(0);
+                var responseBody = await new StreamReader(memoryStream).ReadToEndAsync();
+                memoryStream.Seek(0);
+
+                // Registra auditoria
+                var headersDict = context.Request.Headers
+                    .Where(h => !new[] { "authorization", "x-signature" }.Contains(h.Key.ToLower()))
+                    .ToDictionary(h => h.Key, h => h.Value.ToString());
+
+                if (context.Request.Path.StartsWithSegments("/api/operadoras"))
+                {
+                    await auditoria.RegistrarAsync(new AuditoriaOperadoraEntity
+                    {
+                        ClienteId = clienteId,
+                        OperadoraId = 0, // Preenchido posteriormente
+                        UsuarioId = usuarioId,
+                        Metodo = context.Request.Method,
+                        Url = context.Request.Path,
+                        Headers = headersDict,
+                        PayloadEntrada = SanitizarPayload(requestBody),
+                        PayloadSaida = SanitizarPayload(responseBody),
+                        StatusCode = context.Response.StatusCode,
+                        TempoDeclaidoMs = stopwatch.ElapsedMilliseconds,
+                        Status = context.Response.StatusCode >= 400 ? "erro" : "sucesso",
+                        DataOperacao = DateTime.UtcNow
+                    });
+                }
+
+                // Retorna response ao cliente
+                await memoryStream.CopyToAsync(originalBody);
+            }
+        }
+    }
+
+    private string SanitizarPayload(string payload)
+    {
+        if (string.IsNullOrEmpty(payload))
+            return payload;
+
+        try
+        {
+            var json = JsonDocument.Parse(payload);
+            var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(payload);
+
+            // Remove campos sensíveis
+            dict?.Remove("ApiKey");
+            dict?.Remove("ClientSecret");
+            dict?.Remove("Token");
+            dict?.Remove("Password");
+
+            return JsonSerializer.Serialize(dict);
+        }
+        catch
+        {
+            return "[Não é JSON válido]";
+        }
+    }
+}
+
+// Configuracao no Program.cs
+app.UseMiddleware<AuditoriaMiddleware>();
+```
+
+**Exemplos**:
+- ✓ GET /api/operadoras/vivo/consultar-consumo → Registra request, response, 200 OK, 2.5s
+- ✓ POST /api/operadoras/vivo/solicitar-servico → Registra 202 Accepted, payload sanitizado
+- ✓ Erro 503 Service Unavailable → Registra erro, tentativas de retry
+
+---
+
+### RN-INT-105-10: Circuit Breaker após 5 Falhas Consecutivas
+
+**Descricao**: Se operadora falha 5 vezes consecutivas (timeout, 5xx), circuito abre por 5 minutos. Novas requisições retornam erro 503 Service Unavailable imediatamente sem tentar operadora.
+
+**Justificativa**: Protege operadora de sobrecarga (não envia mais requisições), permite recuperação gradual, melhora user experience (erro rápido em vez de timeout).
+
+**Implementacao**:
+```csharp
+public class OperadoraCircuitBreakerPolicy
+{
+    public static IAsyncPolicy<HttpResponseMessage> CriarPolicyComCircuitBreaker()
+    {
+        return HttpPolicyExtensions
+            .HandleTransientHttpError()
+            .OrResult(r => r.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            .CircuitBreakerAsync(
+                handledEventsAllowedBeforeBreaking: 5, // 5 falhas
+                durationOfBreak: TimeSpan.FromMinutes(5), // Abre por 5 minutos
+                onBreak: (outcome, timespan) =>
+                {
+                    Console.WriteLine($"[Circuit Breaker ABERTO] Aguardando {timespan.TotalMinutes}min");
+                },
+                onReset: () =>
+                {
+                    Console.WriteLine($"[Circuit Breaker FECHADO] Tentando novamente");
+                }
+            );
+    }
+}
+
+[ApiController]
+[Route("api/operadoras")]
+public class OperadoraController : ControllerBase
+{
+    private readonly IAsyncPolicy<HttpResponseMessage> _circuitBreakerPolicy;
+
+    [HttpPost("{operadoraId}/consultar-faturas")]
+    public async Task<IActionResult> ConsultarFaturas(int operadoraId, [FromBody] ConsultarFaturasRequest request)
+    {
+        try
+        {
+            var resultado = await _circuitBreakerPolicy.ExecuteAsync(async () =>
+            {
+                return await _operadoraClient.ConsultarFaturasAsync(operadoraId, request);
+            });
+
+            return Ok(resultado);
+        }
+        catch (BrokenCircuitException)
+        {
+            return StatusCode(503, new { erro = "Operadora indisponível, tente mais tarde" });
+        }
+        catch (OperadoraApiException ex)
+        {
+            return StatusCode(502, new { erro = ex.Message });
+        }
+    }
+}
+
+// Configuracao com Polly no Program.cs
+services
+    .AddHttpClient<OperadoraHttpClient>()
+    .AddTransientHttpErrorPolicy(p => p
+        .CircuitBreakerAsync(5, TimeSpan.FromMinutes(5))
+    );
+```
+
+**Exemplos**:
+- ✓ 1-4 falhas → Continua retentando
+- ✓ 5ª falha consecutiva → Circuito abre → 5 min de bloqueio
+- ✓ Após 5 min → Circuito fecha → Tenta novamente
+- ✗ Durante bloqueio → Retorna 503 imediatamente (sem tentar operadora)
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IC1`
+
+**Tabelas Principais**:
+
+```sql
+-- Tabela de linhas telefônicas
+CREATE TABLE [dbo].[LinhasTelefonicas](
+    [ID_Linha] [int] IDENTITY(1,1) NOT NULL,
+    [ID_Cliente] [int] NOT NULL,
+    [ID_Operadora] [int] NOT NULL,
+    [MSISDN] [varchar](20) NOT NULL,
+    [IMSI] [varchar](15) NULL,
+    [Estado] [varchar](20) NOT NULL, -- ativa, bloqueada, suspensa, inativa
+    [Plano] [varchar](100) NULL,
+    [DataAquisicao] [datetime] NOT NULL,
+    [DataAtualizacao] [datetime] NULL,
+    CONSTRAINT [PK_LinhasTelefonicas] PRIMARY KEY CLUSTERED ([ID_Linha] ASC)
+);
+
+-- Tabela de faturas de operadora
+CREATE TABLE [dbo].[FaturasOperadora](
+    [ID_Fatura] [int] IDENTITY(1,1) NOT NULL,
+    [ID_Cliente] [int] NOT NULL,
+    [ID_Operadora] [int] NOT NULL,
+    [NumeroNota] [varchar](50) NOT NULL,
+    [XMLFatura] [text] NOT NULL,
+    [DataEmissao] [datetime] NOT NULL,
+    [Valor] [decimal](12,2) NOT NULL,
+    [UrlArmazenamento] [varchar](500) NULL,
+    [DataCarregamento] [datetime] NOT NULL,
+    CONSTRAINT [PK_FaturasOperadora] PRIMARY KEY CLUSTERED ([ID_Fatura] ASC)
+);
+
+-- Tabela de credenciais de operadora
+CREATE TABLE [dbo].[ConfiguracaoOperadora](
+    [ID_Configuracao] [int] IDENTITY(1,1) NOT NULL,
+    [ID_Cliente] [int] NOT NULL,
+    [ID_Operadora] [int] NOT NULL,
+    [ApiKey] [varchar](500) NOT NULL, -- Criptografado
+    [ClienteId] [varchar](100) NULL, -- Criptografado
+    [ClienteSecret] [varchar](500) NULL, -- Criptografado
+    [UrlEndpoint] [varchar](500) NOT NULL,
+    [DataCriacao] [datetime] NOT NULL,
+    [DataAtualizacao] [datetime] NULL,
+    [Ativa] [bit] NOT NULL,
+    CONSTRAINT [PK_ConfiguracaoOperadora] PRIMARY KEY CLUSTERED ([ID_Configuracao] ASC)
+);
+
+-- Tabela de consumo de linhas
+CREATE TABLE [dbo].[ConsumoLinhas](
+    [ID_Consumo] [int] IDENTITY(1,1) NOT NULL,
+    [ID_Linha] [int] NOT NULL,
+    [DataConsulta] [datetime] NOT NULL,
+    [Voz] [decimal](10,2) NULL, -- Minutos
+    [Dados] [decimal](10,2) NULL, -- MB
+    [SMS] [int] NULL, -- Unidades
+    [DataAtualizacao] [datetime] NULL,
+    CONSTRAINT [PK_ConsumoLinhas] PRIMARY KEY CLUSTERED ([ID_Consumo] ASC),
+    CONSTRAINT [FK_ConsumoLinhas_Linhas] FOREIGN KEY ([ID_Linha])
+        REFERENCES [dbo].[LinhasTelefonicas]([ID_Linha])
+);
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descrição | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `[ID_Linha]` | ID único da linha | PK na nova entidade |
+| `[MSISDN]` | Número da linha (11987654321) | Identificador único para integração com operadora |
+| `[Estado]` | ativa/bloqueada/suspensa/inativa | Sincronizado automaticamente |
+| `[XMLFatura]` | Conteúdo da NF-e em XML | Armazenado em Blob Storage |
+| `[ApiKey]` | Credencial criptografada | Continua criptografado, schema melhorado |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `pa_ConsultarConsumoLinha` | Consulta voz/dados/SMS | Refatorado em ConsulteConsumoService |
+| `pa_ImportarFatura` | Importa XML de fatura | Migrado para FaturaService |
+| `pa_SincronizarInventario` | Sincroniza linhas da operadora | Migrado para SincronizacaoOperadoraJob |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `GestaoOperadoras.aspx` | Configurar credenciais | `/admin/integracao/operadoras` |
+| `ConsultaConsumo.aspx` | Consultar uso de linhas | `/integracao/consumo` |
+| `GestaoFaturas.aspx` | Listar e importar faturas | `/integracao/faturas` |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSOperadora.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ConsultarConsumo(msisdn, operadora)` | Consulta consumo | `POST /api/operadoras/{id}/consultar-consumo` |
+| `ImportarFatura(nfeXml, operadora)` | Importa fatura | `POST /api/operadoras/{id}/consultar-faturas` |
+| `ListarInventario(operadora)` | Lista linhas | `GET /api/operadoras/{id}/consultar-inventario` |
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `INT_OPERADORAS`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "INT_OPERADORAS",
+    "nome": "Integração com Operadoras Telecom",
+    "descricao": "Habilita integrações com APIs de operadoras (Vivo, Claro, TIM, Oi)",
+    "habilitado": true,
+    "isSystemFeature": false
+}
+```
+
+**SubFeatures**:
+- `INT_OPERADORAS_CONSULTAR_FATURAS` - Consultar faturas eletrônicas
+- `INT_OPERADORAS_CONSUMO_TEMPO_REAL` - Consultar consumo em tempo real
+- `INT_OPERADORAS_SINCRONIZACAO` - Sincronização bidirecional automática
+- `INT_OPERADORAS_WEBHOOK` - Receber notificações via webhook
+- `INT_OPERADORAS_PORTABILIDADE` - Gerenciar portabilidade de linhas
+
+**Nota**: Feature flags permitem desabilitar integração por operadora sem alterar código.
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao**:
+
+```json
+{
+    "integracao": {
+        "operadoras": {
+            "titulo": "Integração com Operadoras",
+            "descricao": "Gerencie integrações com operadoras telecom",
+            "formulario": {
+                "nomeOperadora": "Nome da Operadora",
+                "apiKey": "API Key",
+                "clientId": "ID do Cliente",
+                "clientSecret": "Segredo do Cliente",
+                "endpoint": "URL do Endpoint",
+                "ativa": "Ativa"
+            },
+            "operacoes": {
+                "consultarFaturas": "Consultar Faturas",
+                "consultarConsumo": "Consultar Consumo",
+                "consultarInventario": "Consultar Inventário",
+                "solicitarServico": "Solicitar Serviço",
+                "solicitarPortabilidade": "Solicitar Portabilidade",
+                "contestarFatura": "Contestar Fatura",
+                "consultarCobertura": "Consultar Cobertura",
+                "sincronizar": "Sincronizar"
+            },
+            "mensagens": {
+                "sucesso_consulta": "Consulta realizada com sucesso",
+                "sucesso_sincronizacao": "Sincronização concluída com sucesso",
+                "erro_timeout": "Timeout ao consultar operadora",
+                "erro_operadora_indisponivel": "Operadora indisponível no momento",
+                "erro_credenciais_invalidas": "Credenciais inválidas",
+                "confirm_deletar_operadora": "Tem certeza que deseja deletar esta operadora?",
+                "webhook_validacao_falhou": "Validação de webhook falhou"
+            },
+            "validacao": {
+                "campoObrigatorio": "Este campo é obrigatório",
+                "apiKeyInvalida": "API Key inválida",
+                "endpointInvalido": "URL do endpoint inválida"
+            }
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|----------|--------|-------------------|
+| Criar configuração de operadora | `INT_OPR_CONFIG_CREATE` | ClienteId, OperadoraId, EndpointUrl, UsuarioId |
+| Atualizar configuração | `INT_OPR_CONFIG_UPDATE` | ClienteId, OperadoraId, Campos alterados, UsuarioId |
+| Deletar configuração | `INT_OPR_CONFIG_DELETE` | ClienteId, OperadoraId, UsuarioId, motivo |
+| Consultar faturas | `INT_OPR_FATURA_CONSULT` | ClienteId, OperadoraId, Período, Linhas retornadas |
+| Importar fatura | `INT_OPR_FATURA_IMPORT` | ClienteId, OperadoraId, NFeId, Valor |
+| Consultar consumo | `INT_OPR_CONSUMO_CONSULT` | ClienteId, OperadoraId, MSISDN, Voz/Dados/SMS |
+| Solicitar serviço | `INT_OPR_SERVICO_SOLICIT` | ClienteId, OperadoraId, MSISDN, TipoServico, Status |
+| Solicitar portabilidade | `INT_OPR_PORT_SOLICIT` | ClienteId, OperadoraId, MSISDN, OperadoraDestino |
+| Contestar fatura | `INT_OPR_CONTEST_SOLICIT` | ClienteId, OperadoraId, NFeId, Motivo |
+| Sincronização | `INT_OPR_SINC_EXEC` | ClienteId, OperadoraId, Linhas sincronizadas, Faturas importadas |
+| Webhook recebido | `INT_OPR_WEBHOOK_RCV` | OperadoraId, TipoEvento, Validação HMAC, Payload |
+
+**Retencao**: 7 anos (conforme Lei de Arquivos e LGPD)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descrição | Perfis |
+|-----------|-----------|--------|
+| `int:operadora:read` | Visualizar configurações de operadora | Admin, GestorTI, AnalistaTI |
+| `int:operadora:create` | Criar nova operadora | Admin, GestorTI |
+| `int:operadora:update` | Editar configuração de operadora | Admin, GestorTI |
+| `int:operadora:delete` | Excluir operadora | Admin |
+| `int:fatura:read` | Visualizar faturas | Admin, GestorTI, AnalistaTI, Financeiro |
+| `int:fatura:import` | Importar faturas manualmente | Admin, GestorTI, Financeiro |
+| `int:consumo:read` | Consultar consumo de linhas | Admin, GestorTI, AnalistaTI |
+| `int:servico:create` | Solicitar serviços à operadora | Admin, GestorTI |
+| `int:portabilidade:create` | Solicitar portabilidade | Admin, GestorTI |
+| `int:portabilidade:read` | Visualizar status de portabilidade | Admin, GestorTI |
+| `int:contest:create` | Contestar faturas | Admin, GestorTI, Financeiro |
+| `int:sincronizacao:execute` | Executar sincronização manual | Admin, GestorTI |
+| `int:webhook:manage` | Gerenciar webhooks | Admin |
+
+**Nota**: Webhooks requerem permissão especial e validação HMAC obrigatória.
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD de Configuração de Operadoras
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/operadoras` | Listar operadoras configuradas | `int:operadora:read` |
+| GET | `/api/operadoras/{id}` | Obter configuração de operadora por ID | `int:operadora:read` |
+| POST | `/api/operadoras` | Criar nova configuração de operadora | `int:operadora:create` |
+| PUT | `/api/operadoras/{id}` | Atualizar configuração de operadora | `int:operadora:update` |
+| DELETE | `/api/operadoras/{id}` | Excluir configuração de operadora | `int:operadora:delete` |
+
+### 5.2 Operacoes de Integração
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| POST | `/api/operadoras/{id}/consultar-faturas` | Consultar faturas eletrônicas | `int:fatura:read` |
+| POST | `/api/operadoras/{id}/consultar-consumo` | Consultar consumo em tempo real | `int:consumo:read` |
+| POST | `/api/operadoras/{id}/consultar-inventario` | Consultar inventário de linhas ativas | `int:operadora:read` |
+| POST | `/api/operadoras/{id}/solicitar-servico` | Solicitar serviço à operadora | `int:servico:create` |
+| POST | `/api/operadoras/{id}/solicitar-portabilidade` | Solicitar portabilidade de linha | `int:portabilidade:create` |
+| POST | `/api/operadoras/{id}/contestar-fatura` | Contestar fatura | `int:contest:create` |
+| GET | `/api/operadoras/{id}/consultar-cobertura` | Consultar cobertura de rede | `int:operadora:read` |
+| POST | `/api/operadoras/{id}/sincronizar` | Sincronizar dados com operadora | `int:sincronizacao:execute` |
+| POST | `/api/operadoras/{id}/importar-faturas` | Importar faturas manualmente | `int:fatura:import` |
+| GET | `/api/operadoras/{id}/portabilidade/{msisdn}` | Consultar status de portabilidade | `int:portabilidade:read` |
+
+### 5.3 Webhook
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| POST | `/api/operadoras/webhook/{operadoraId}` | Receber notificações de eventos | Public (validado via HMAC) |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Consulta de Consumo em Tempo Real
+
+```
+Usuario solicita consumo de linha 11987654321
+    |
+    v
+API recebe POST /api/operadoras/vivo/consultar-consumo
+    |
+    v
+Valida permissoes (int:consumo:read)
+    |
+    v
+Busca em Redis (chave: consumo:clienteId:vivo:11987654321)
+    |
+    +--- Cache encontrado (< 15 min)? ---> Retorna cache
+    |
+    +--- Cache expirado ou nao existe ---> Consulta API Vivo
+        |
+        v
+    Polly Retry Policy: Tenta 3 vezes com backoff 1s, 2s, 4s
+        |
+        +--- Sucesso (200)? ---> Armazena em cache (15 min) ---> Retorna
+        |
+        +--- 5 falhas? ---> Circuit Breaker abre (5 min) ---> Retorna 503
+        |
+        v
+    Registra auditoria (sucesso/erro, payload sanitizado, tempo)
+        |
+        v
+    Retorna resposta ao cliente
+```
+
+### 6.2 Fluxo de Sincronização Bidirecional (Hangfire)
+
+```
+03:00 AM - Job dispara (SincronizacaoOperadoraJob)
+    |
+    v
+Para cada cliente:
+    |
+    +--- Para cada operadora:
+         |
+         v
+    Sincronizar Faturas
+        |
+        +--- Consulta últimas 90 dias em API
+        |
+        +--- Para cada fatura nova:
+             |
+             v
+        Armazena XML em Blob Storage
+        Importa para tabela local
+        Registra auditoria
+    |
+    v
+    Sincronizar Consumo
+        |
+        +--- Para cada linha da cliente:
+             |
+             v
+        Invalida cache
+        Consulta API
+        Armazena em Redis
+    |
+    v
+    Sincronizar Inventário
+        |
+        +--- Consulta linhas atuais em API
+        |
+        +--- Identifica novas linhas ---> Adiciona localmente
+        |
+        +--- Identifica linhas deletadas ---> Marca como inativas
+    |
+    v
+    Log: "Sincronização concluída para [Operadora]"
+    |
+    v
+Fim
+```
+
+### 6.3 Fluxo de Validação de Webhook
+
+```
+Operadora envia POST /api/operadoras/webhook/vivo
+    |
+    v
+Middleware captura header X-Signature e body
+    |
+    v
+Obtem ClientSecret da operadora (descriptografa)
+    |
+    v
+Calcula HMAC-SHA256(body, ClientSecret)
+    |
+    v
+Compara com X-Signature do header
+    |
+    +--- Assinatura válida? ---> Processa evento
+    |
+    +--- Assinatura inválida? ---> Retorna 401 Unauthorized
+    |
+    v
+Registra auditoria (assinatura validada, evento, payload)
+    |
+    v
+Processa evento:
+    - fatura_gerada ---> ImportarFaturaAsync()
+    - consumo_atualizado ---> InvalidarCacheAsync()
+    - linha_alterada ---> AtualizarLinhaAsync()
+    - portabilidade_concluida ---> AtualizarPortabilidadeAsync()
+    |
+    v
+Retorna 202 Accepted
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| **Criptografia em Repouso** | AES-256 para credenciais em banco de dados |
+| **Criptografia em Transito** | TLS 1.3 para todas as requisições |
+| **HMAC-SHA256 para Webhooks** | Valida autenticidade de notificações assíncronas |
+| **Isolamento de Dados** | ClienteId obrigatório em todas as consultas |
+| **Validacao de Entrada** | Valida MSISDN, tipos de dados, ranges |
+| **SQL Injection** | Usar parametrizacao (EF Core) |
+| **Circuit Breaker** | Protege contra DDoS e sobrecarga |
+| **Rate Limiting** | Limite de requisições por minuto por cliente |
+| **Auditoria Completa** | Log de todas as operações com timestamps e usuarios |
+| **Direito ao Esquecimento (LGPD)** | Endpoint para deletar dados historicos |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [ ] Tentar acessar dados de outro cliente (ClienteId diferente)
+- [ ] Enviar MSISDN inválido (SQL Injection)
+- [ ] Webhook sem X-Signature header
+- [ ] Webhook com X-Signature inválido
+- [ ] Requisição sem autenticação (JWT)
+- [ ] Requisição com JWT expirado
+- [ ] Requisição sem permissão necessária
+- [ ] Circuit breaker abrindo após 5 falhas
+- [ ] Rate limiting bloqueando requisiçoes excessivas
+- [ ] Criptografia de credenciais em repouso
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao |
+|-----|------|---------|
+| **Taxa de Sucesso de Consultas** | >= 99% | (Consultas sucesso / Total) |
+| **Latencia P95 de Consultas** | <= 5s | Percentil 95 de tempo de resposta |
+| **Taxa de Cobertura de Cache** | >= 70% | (Hits cache / Total consultas) |
+| **Disponibilidade da Sincronização** | >= 99.5% | (Execuções sucesso / Total) |
+| **Taxa de Validacao de Webhook** | 100% | Todas as notificacoes validadas com HMAC |
+| **RTO (Recovery Time Objective)** | <= 5 min | Tempo para recuperação de circuit breaker |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| **Circuit Breaker Aberto** | Falhas >= 5 | Notificar administrador, verificar status da operadora |
+| **Timeout Repetido** | > 3 timeouts em 10min | Revisar endpoint, aumentar timeout ou falhar rápido |
+| **Fatura Nao Importada** | Fatura consultada mas não importada | Verificar permissoes de Blob Storage |
+| **Cache Indisponivel** | Redis offline | Falha de consulta, tenta requisição direta |
+| **Webhook Invalido** | Assinatura HMAC falhou | Log de seguranca, rejeita notificacao |
+| **Sincronização Falhou** | Job nao completou em 30min | Alert para TI, resgate manual necessário |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF105](./MD-RF105-Integracao-Operadoras-Telecom.md)
+2. **Casos de Uso**: Criar [UC-RF105](./UC-RF105-Integracao-Operadoras-Telecom.md)
+3. **Workflow**: Criar [WF-RF105](./WF-RF105-Integracao-Operadoras-Telecom.md)
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml)
+5. **Implementacao Backend**: Commands, Queries, Handlers, Services
+6. **Implementacao Frontend**: Telas Angular para gestão de operadoras
+7. **Testes**: Executar TC-RF105-BACKEND.md, TC-RF105-FRONTEND.md, TC-RF105-E2E.md
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial com 10 regras de negocio, 14 endpoints, integracoes obrigatorias | Claude Code |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code
+**Revisao**: Pendente

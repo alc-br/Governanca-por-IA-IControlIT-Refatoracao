@@ -1,0 +1,28 @@
+﻿# Auditar Frontend vs Especificação
+
+Auditar conformidade do frontend do **RF-XXX** conforme docs/contracts/auditoria/conformidade.md.
+
+**RF:** [Especificar RF, ex: RF-027]
+
+---
+
+**Contrato ativado:** CONTRATO-AUDITORIA-CONFORMIDADE
+
+**Checklist:** docs/checklists/checklist-auditoria-conformidade.yaml
+
+**Agente responsável:** auditor (conformance-auditor)
+
+**Modo:** READ-ONLY (não corrige código)
+
+**Objetivo:**
+- Comparar frontend implementado vs RF/UC/WF
+- Identificar gaps (CRÍTICO, IMPORTANTE, MENOR)
+- Gerar relatório de gaps com evidências
+- Recomendar contrato para correções
+
+**Output:** `relatorios/AAAA-MM-DD-RFXXX-FRONTEND-Gaps.md`
+
+**Importante:**
+- Auditoria NÃO corrige, apenas identifica gaps
+- Gaps críticos bloqueiam aprovação
+- Após auditoria, usar contrato de manutenção para correções

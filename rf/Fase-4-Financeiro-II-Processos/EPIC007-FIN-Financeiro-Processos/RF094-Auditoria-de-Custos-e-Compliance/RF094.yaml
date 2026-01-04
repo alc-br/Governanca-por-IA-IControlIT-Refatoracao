@@ -1,0 +1,529 @@
+rf_id: RF094
+rf_title: "Auditoria de Custos e Compliance"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+epic: EPIC007-FIN-Financeiro-Processos
+fase: Fase-4-Financeiro-II-Processos
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF094-001"
+    titulo: "Cálculo de Variância"
+    descricao: |
+      Sistema deve calcular variância entre custo planejado e realizado,
+      expressando como percentual e valor absoluto.
+      Fórmula: Variância = CustoRealizado - CustoPlano
+      VariânciaPercentual = (Variância / CustoPlano) × 100%
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "calculo"
+      mensagem_erro: "Erro ao calcular variância"
+      http_code: 500
+    classificacao:
+      aceitavel: "≤ 5%"
+      aviso: "5% < x ≤ 15%"
+      critico: "> 15%"
+
+  - id: "RN-RF094-002"
+    titulo: "Detecção de Anomalias por Z-Score"
+    descricao: |
+      Transações com desvio superior a 2.5 desvios padrão
+      (Z-score > 2.5 ou < -2.5) são marcadas como potencial anomalia.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "algoritmo_estatistico"
+      threshold_zscore: 2.5
+      periodo_analise_meses: 12
+
+  - id: "RN-RF094-003"
+    titulo: "Categorização de Severidade de Anomalias"
+    descricao: |
+      Anomalias categorizadas por severidade baseado em impacto financeiro e Z-score.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    classificacao:
+      critica: "Impacto > R$ 10.000 E |Z-Score| > 4"
+      alta: "Impacto > R$ 5.000 OU |Z-Score| > 3.5"
+      media: "Impacto > R$ 1.000 OU |Z-Score| > 2.8"
+      baixa: "Demais casos"
+
+  - id: "RN-RF094-004"
+    titulo: "Cálculo de TCO (Total Cost of Ownership)"
+    descricao: |
+      TCO = ValorAquisição + (DepreciaçãoAnual × AnosVidaÚtil) +
+      (CustoManutenção + CustoSuporte) × AnosVidaÚtil - ValorResidual
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+
+  - id: "RN-RF094-005"
+    titulo: "Cálculo de ROI (Return on Investment)"
+    descricao: |
+      ROI = ((BenefícioAnual × Anos) - Investimento) / Investimento × 100%
+      Payback = Investimento / BenefícioMensal (em meses)
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+
+  - id: "RN-RF094-006"
+    titulo: "Identificação de Desperdícios"
+    descricao: |
+      Detectar automaticamente:
+      - Ativos inativos: sem movimento > 90 dias
+      - Linhas inativas: consumo zero > 60 dias
+      - Fornecedores duplicados: CNPJ idêntico
+      - Contratos expirados
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+
+  - id: "RN-RF094-007"
+    titulo: "Alertas de Não-Conformidade Automáticos"
+    descricao: |
+      Gerar alertas automáticos para: gastos acima do limite, fornecedores não aprovados,
+      linhas sem SLA ativo, contratos próximos vencimento (< 30 dias), aprovações pendentes.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: true
+    severidade:
+      critica: "Fornecedor não aprovado, SOX violation"
+      alta: "Gasto > 110% orçamento"
+      media: "Contrato vence em 30 dias"
+      baixa: "Linha inativa"
+
+  - id: "RN-RF094-008"
+    titulo: "Auditoria de Acesso com LGPD"
+    descricao: |
+      Todas operações (READ, MODIFY, EXPORT, DELETE) devem ser registradas
+      com usuário, timestamp, IP, dados acessados.
+      Retenção mínima 7 anos conforme LGPD artigo 7°.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    retencao_anos: 7
+    soft_delete: true
+
+  - id: "RN-RF094-009"
+    titulo: "Cálculo de Depreciação de Ativos"
+    descricao: |
+      Depreciação calculada mensalmente usando método linear ou acelerado.
+      Linear: DepreciaçãoMensal = (ValorOriginal - ValorResidual) / (AnosVidaÚtil × 12)
+      Acelerado: 50% no primeiro ano, 50% restante distribuído
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+
+  - id: "RN-RF094-010"
+    titulo: "Jobs de Análise Batch (Hangfire)"
+    descricao: |
+      Agendar jobs noturnos (02:00 UTC) para: detecção de anomalias,
+      cálculo de depreciação, análise de tendências, previsões de custo,
+      limpeza de auditoria antiga (após 7 anos).
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    configuracao:
+      horario_execucao: "02:00 UTC"
+      timeout_segundos: 3600
+      concurrent_execution: false
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "aud:auditoria:view"
+    descricao: "Visualizar módulo de auditoria"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Developer"
+      - "Cliente Admin"
+      - "Gestor"
+      - "Auditor"
+    endpoint: "GET /api/auditoria/*"
+
+  - permission_code: "aud:variancia:view"
+    descricao: "Visualizar análise de variância"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Gestor"
+      - "Auditor"
+    endpoint: "GET /api/auditoria/variancia"
+
+  - permission_code: "aud:variancia:exportar"
+    descricao: "Exportar análise de variância"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Auditor"
+    endpoint: "GET /api/auditoria/variancia/exportar"
+
+  - permission_code: "aud:anomalias:view"
+    descricao: "Visualizar anomalias detectadas"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Gestor"
+      - "Auditor"
+    endpoint: "GET /api/auditoria/anomalias"
+
+  - permission_code: "aud:anomalias:investigar"
+    descricao: "Marcar anomalia como investigando"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Auditor"
+    endpoint: "PATCH /api/auditoria/anomalias/{id}/status"
+
+  - permission_code: "aud:anomalias:resolver"
+    descricao: "Resolver anomalia"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Auditor"
+    endpoint: "PATCH /api/auditoria/anomalias/{id}/status"
+
+  - permission_code: "aud:compliance:view"
+    descricao: "Visualizar alertas de conformidade"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Gestor"
+      - "Auditor"
+    endpoint: "GET /api/auditoria/compliance"
+
+  - permission_code: "aud:compliance:remediar"
+    descricao: "Abrir chamado para remediar alerta"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Gestor"
+    endpoint: "POST /api/auditoria/compliance/alertas/remediar"
+
+  - permission_code: "aud:relatorios:view"
+    descricao: "Visualizar relatórios"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Gestor"
+      - "Auditor"
+      - "Operador"
+    endpoint: "GET /api/auditoria/relatorios"
+
+  - permission_code: "aud:relatorios:gerar"
+    descricao: "Gerar novos relatórios"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Auditor"
+    endpoint: "POST /api/auditoria/relatorios/gerar"
+
+  - permission_code: "aud:relatorios:exportar"
+    descricao: "Exportar relatórios (PDF, Excel)"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Auditor"
+    endpoint: "GET /api/auditoria/relatorios/{id}/exportar"
+
+  - permission_code: "aud:tco:calcular"
+    descricao: "Calcular TCO de ativos"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Gestor"
+    endpoint: "GET /api/auditoria/tco/{ativoId}"
+
+  - permission_code: "aud:roi:calcular"
+    descricao: "Calcular ROI de iniciativas"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Gestor"
+    endpoint: "GET /api/auditoria/roi/{iniciativaId}"
+
+  - permission_code: "aud:dashboard:view"
+    descricao: "Acessar dashboard executivo"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Cliente Admin"
+      - "Gestor"
+    endpoint: "GET /api/auditoria/dashboard"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  # Análise de Variância
+  - method: "GET"
+    route: "/api/auditoria/variancia"
+    descricao: "Listar análises de variância"
+    autenticacao: true
+    authorization_policy: "VarianciaRead"
+    request_dto: null
+    response_dto: "PaginatedListDto<VarianciaDto>"
+    query_params:
+      - "dataInicio"
+      - "dataFim"
+      - "centrocustoId"
+
+  - method: "GET"
+    route: "/api/auditoria/variancia/{id}"
+    descricao: "Obter análise de variância específica"
+    autenticacao: true
+    authorization_policy: "VarianciaRead"
+    request_dto: null
+    response_dto: "VarianciaDto"
+
+  - method: "POST"
+    route: "/api/auditoria/variancia"
+    descricao: "Criar nova análise de variância"
+    autenticacao: true
+    authorization_policy: "VarianciaCreate"
+    request_dto: "CreateVarianciaCommand"
+    response_dto: "Guid"
+
+  # Detecção de Anomalias
+  - method: "GET"
+    route: "/api/auditoria/anomalias"
+    descricao: "Listar anomalias detectadas"
+    autenticacao: true
+    authorization_policy: "AnomaliasRead"
+    request_dto: null
+    response_dto: "PaginatedListDto<AnomaliaDto>"
+    query_params:
+      - "dataInicio"
+      - "dataFim"
+      - "severidade"
+
+  - method: "POST"
+    route: "/api/auditoria/anomalias/detectar"
+    descricao: "Forçar execução de detecção de anomalias"
+    autenticacao: true
+    authorization_policy: "AnomaliasInvestigar"
+    request_dto: "DetectarAnomaliasCommand"
+    response_dto: "int"
+
+  - method: "PATCH"
+    route: "/api/auditoria/anomalias/{id}/status"
+    descricao: "Atualizar status de anomalia"
+    autenticacao: true
+    authorization_policy: "AnomaliasResolver"
+    request_dto: "UpdateAnomaliaStatusCommand"
+    response_dto: "void"
+
+  # Conformidade e Alertas
+  - method: "GET"
+    route: "/api/auditoria/compliance"
+    descricao: "Listar alertas de conformidade"
+    autenticacao: true
+    authorization_policy: "ComplianceRead"
+    request_dto: null
+    response_dto: "PaginatedListDto<AlertaConformidadeDto>"
+
+  - method: "POST"
+    route: "/api/auditoria/compliance/alertas/remediar"
+    descricao: "Criar chamado para remediar alerta"
+    autenticacao: true
+    authorization_policy: "ComplianceRemediar"
+    request_dto: "RemediarAlertaCommand"
+    response_dto: "Guid"
+
+  # TCO e ROI
+  - method: "GET"
+    route: "/api/auditoria/tco/{ativoId}"
+    descricao: "Calcular TCO de ativo específico"
+    autenticacao: true
+    authorization_policy: "TcoCalcular"
+    request_dto: null
+    response_dto: "TcoDto"
+
+  - method: "GET"
+    route: "/api/auditoria/roi/{iniciativaId}"
+    descricao: "Calcular ROI de iniciativa"
+    autenticacao: true
+    authorization_policy: "RoiCalcular"
+    request_dto: null
+    response_dto: "RoiDto"
+
+  # Relatórios e Dashboard
+  - method: "GET"
+    route: "/api/auditoria/relatorios"
+    descricao: "Listar relatórios gerados"
+    autenticacao: true
+    authorization_policy: "RelatoriosRead"
+    request_dto: null
+    response_dto: "PaginatedListDto<RelatorioDto>"
+
+  - method: "POST"
+    route: "/api/auditoria/relatorios/gerar"
+    descricao: "Gerar novo relatório de auditoria"
+    autenticacao: true
+    authorization_policy: "RelatoriosGerar"
+    request_dto: "GerarRelatorioCommand"
+    response_dto: "Guid"
+
+  - method: "GET"
+    route: "/api/auditoria/relatorios/{id}/exportar"
+    descricao: "Exportar relatório em formato especificado"
+    autenticacao: true
+    authorization_policy: "RelatoriosExportar"
+    request_dto: null
+    response_dto: "FileStreamResult"
+    query_params:
+      - "formato" # pdf, excel, csv
+
+  - method: "GET"
+    route: "/api/auditoria/dashboard"
+    descricao: "Obter dados do dashboard executivo"
+    autenticacao: true
+    authorization_policy: "DashboardRead"
+    request_dto: null
+    response_dto: "DashboardAuditoriaDto"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Economia Identificada (mensal)"
+    descricao: "Soma de economia potencial de desperdícios e renegociações"
+    meta: ">= R$ 50.000"
+    log_obrigatorio: true
+
+  - nome: "Anomalias Detectadas (mensal)"
+    descricao: "Contagem de anomalias com Z-Score > 2.5"
+    meta: "5-20 por cliente"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Variância Aceitável"
+    descricao: "Percentual de centros de custo com variância < 5%"
+    meta: "> 90%"
+    log_obrigatorio: true
+
+  - nome: "Tempo de Resolução de Anomalia"
+    descricao: "Mediano entre detecção e resolução"
+    meta: "< 5 dias"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Falsos Positivos"
+    descricao: "Anomalias marcadas como 'Falso Positivo' / Total"
+    meta: "< 20%"
+    log_obrigatorio: true
+
+  - nome: "Conformidade com Política"
+    descricao: "Transações aprovadas / Total de transações"
+    meta: "> 95%"
+    log_obrigatorio: true
+
+  - nome: "Tempo de Resposta Dashboard"
+    descricao: "P95 de latência ao carregar dashboard"
+    meta: "< 2 segundos"
+    log_obrigatorio: true
+
+  - nome: "Disponibilidade do Módulo"
+    descricao: "Uptime mensal do serviço"
+    meta: "99.5%"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "Anomalia Crítica Detectada"
+    threshold: "Z-Score > 4.0 em gasto de fornecedor"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "sms"
+      - "dashboard"
+
+  - evento: "Compliance Violado"
+    threshold: "Transação com fornecedor não aprovado"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "compliance_officer"
+      - "bloqueio_pagamento"
+
+  - evento: "Orçamento Excedido"
+    threshold: "Gasto mensal > 110% do orçamento"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "dashboard"
+
+  - evento: "Job Batch Falhou"
+    threshold: "Execução de AnaliseBatchAuditoriaJob retorna erro"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "devops_alert"
+      - "email"
+
+  - evento: "Taxa de Variância Alta"
+    threshold: "> 15% em centro de custo"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+      - "relatorio_automatico"
+
+  - evento: "Contrato Vencido"
+    threshold: "Data vencimento < hoje"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "procurement_alert"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_regras_negocio: 10
+  total_endpoints_api: 13
+  total_permissoes_rbac: 14
+  total_integracoes_obrigatorias: 4
+  linhas_documentacao:
+    rf_md: 607
+    rf_yaml: 580

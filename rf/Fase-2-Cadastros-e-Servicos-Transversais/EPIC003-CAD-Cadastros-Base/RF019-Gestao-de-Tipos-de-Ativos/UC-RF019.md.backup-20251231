@@ -1,0 +1,538 @@
+# Casos de Uso - RF019
+
+**Versão:** 1.0
+**Data:** 2025-12-17
+**RF Relacionado:** [RF019 - Gestao-de-Tipos-de-Ativos](./RF019.md)
+
+---
+
+## Índice de Casos de Uso
+
+| UC | Nome | Descrição |
+|----|------|-----------|
+| UC01 | UC01 - Criar Tipo de Ativo | Caso de uso |
+| UC02 | UC02 - Visualizar Tipo de Ativo | Caso de uso |
+| UC03 | UC03 - Editar Tipo de Ativo | Caso de uso |
+| UC04 | UC04 - Inativar Tipo de Ativo | Caso de uso |
+
+---
+
+# UC01 - Criar Tipo de Ativo
+
+**RF:** RF-063 - Gestão de Tipos de Ativos
+**Versão:** 1.0
+**Última Atualização:** 04/11/2025
+
+---
+
+## Descrição
+
+Permite ao usuário criar um novo tipo de ativo no sistema, definindo suas características, regras de depreciação, campos customizados e posicionamento na hierarquia.
+
+---
+
+## Atores
+
+- **Ator Principal**: Administrador do Sistema
+- **Atores Secundários**: Gestor de TI/Telecom (com permissão)
+
+---
+
+## Pré-condições
+
+- Usuário autenticado no sistema
+- Usuário possui permissão `CAD.TIPOS_ATIVOS.CRIAR`
+
+---
+
+## Fluxo Principal
+
+1. Usuário acessa tela de listagem de tipos de ativos
+2. Usuário clica em botão "Novo Tipo"
+3. Sistema exibe formulário com campos:
+   - **Identificação**:
+     - Código (obrigatório, máx 20 caracteres, único no conglomerado)
+     - Nome (obrigatório, máx 200 caracteres)
+     - Descrição (opcional, máx 1000 caracteres)
+   - **Classificação**:
+     - Categoria Principal (dropdown: Hardware, Software, LinhaMovel, LinhaFixa, Servico, Licenca, Acessorio, Outro)
+     - Subcategoria (opcional)
+     - Tipo Pai (dropdown com tipos existentes do mesmo conglomerado, opcional)
+   - **Características**:
+     - Inventariável? (checkbox, padrão: SIM)
+     - Depreciável? (checkbox, padrão: SIM)
+     - Rastreável? (checkbox, padrão: SIM - requer localização física)
+     - Faturável? (checkbox, padrão: NÃO - gera faturamento recorrente)
+     - Requer Número de Série? (checkbox, padrão: SIM)
+     - Requer IMEI? (checkbox, padrão: NÃO - para dispositivos móveis)
+     - Requer MAC Address? (checkbox, padrão: NÃO)
+   - **Depreciação** (visível se "Depreciável" = SIM):
+     - Taxa de Depreciação Anual (%, obrigatório se depreciável, 0-100)
+     - Vida Útil (anos, obrigatório se depreciável)
+     - Método de Depreciação (dropdown: Linear, DeclinioAcelerado, SomaDigitos)
+   - **Manutenção**:
+     - Intervalo Manutenção Preventiva (dias, opcional)
+     - Requer Calibrração? (checkbox, padrão: NÃO)
+   - **Identificação Visual**:
+     - Ícone (seletor Font Awesome, ex: fa-laptop)
+     - Cor (color picker hex, ex: #3498db)
+   - **Ordenação**:
+     - Ordem de Exibição (número, padrão: 100)
+4. Usuário preenche formulário exemplo:
+   - Código: "NOTE-CORP"
+   - Nome: "Notebook Corporativo"
+   - Descrição: "Notebooks para uso corporativo padrão"
+   - Categoria: Hardware
+   - Subcategoria: Notebook
+   - Tipo Pai: (seleciona "Computadores")
+   - Depreciável: SIM
+   - Taxa: 20%
+   - Vida Útil: 5 anos
+   - Método: Linear
+   - Ícone: fa-laptop
+   - Cor: #3498db
+5. Usuário clica em "Salvar"
+6. Sistema valida dados:
+   - Código único no conglomerado ✓
+   - Categoria válida ✓
+   - Se categoria "Hardware", obrigatório ter depreciação ✓
+   - Taxa entre 0-100% ✓
+   - Se tem tipo pai, calcular nível hierárquico (máx 5 níveis) ✓
+   - Validar que não cria loop na hierarquia ✓
+7. Sistema calcula:
+   - Nível hierárquico (se tipo pai: nível do pai + 1, senão: 1)
+   - Caminho hierárquico (ex: "/Computadores/Notebook Corporativo")
+8. Sistema cria tipo de ativo com ID único
+9. Sistema registra auditoria na tabela `Ativo_Tipo_Auditoria`:
+   - Tipo_Operacao: INSERT
+   - Dados_Depois: JSON com dados criados
+   - Id_Usuario, Nm_Usuario, IP_Origem
+10. Sistema exibe mensagem: "Tipo de ativo criado com sucesso"
+11. Sistema fecha formulário e atualiza lista/árvore com novo tipo
+
+---
+
+## Fluxos Alternativos
+
+### FA01 - Criar com Campos Customizados
+
+**Condição**: Usuário deseja definir campos customizados para o tipo
+
+1. Após passo 4, usuário clica em aba "Campos Customizados"
+2. Usuário clica em "Adicionar Campo"
+3. Sistema exibe formulário de campo:
+   - Código do Campo (ex: "velocidade_cpu")
+   - Nome do Campo (ex: "Velocidade do CPU")
+   - Tipo de Dados (String, Integer, Decimal, Date, Boolean, List, Text)
+   - Obrigatório? (checkbox)
+   - Valor Padrão (opcional)
+   - Se tipo "List": Valores da Lista (JSON array)
+   - Máscara de Formatação (opcional)
+   - Validação Regex (opcional)
+   - Ordem de Exibição (número)
+4. Usuário preenche e adiciona campo
+5. Sistema adiciona campo à lista temporária
+6. Usuário pode adicionar mais campos ou continuar
+7. Continua no passo 5 do fluxo principal
+8. Sistema salva campos customizados na tabela `Ativo_Tipo_Campo_Customizado`
+
+### FA02 - Importar de Template
+
+**Condição**: Usuário deseja usar template pré-configurado
+
+1. Após passo 2, usuário clica em "Usar Template"
+2. Sistema exibe lista de templates disponíveis:
+   - Desktop Padrão
+   - Notebook Corporativo
+   - Servidor Web
+   - Linha Móvel Voz+Dados
+3. Usuário seleciona template
+4. Sistema pré-preenche formulário com dados do template
+5. Usuário pode ajustar campos conforme necessário
+6. Continua no passo 5 do fluxo principal
+
+---
+
+## Fluxos de Exceção
+
+### FE01 - Código Duplicado
+
+**Condição**: Já existe tipo com mesmo código no conglomerado
+
+1. Sistema exibe mensagem: "Já existe um tipo de ativo com o código 'NOTE-CORP'"
+2. Sistema destaca campo "Código" em vermelho
+3. Retorna ao passo 4 do fluxo principal
+
+### FE02 - Hardware Sem Depreciação
+
+**Condição**: Categoria = "Hardware" mas Depreciável = NÃO
+
+1. Sistema exibe mensagem: "Tipos da categoria Hardware devem ter depreciação definida (compliance contábil)"
+2. Sistema marca checkbox "Depreciável" como obrigatório
+3. Retorna ao passo 4 do fluxo principal
+
+### FE03 - Hierarquia Excede 5 Níveis
+
+**Condição**: Tipo pai já está no nível 5
+
+1. Sistema exibe mensagem: "Hierarquia de tipos não pode ter mais de 5 níveis. Selecione outro tipo pai ou crie como tipo raiz"
+2. Sistema desabilita campo "Tipo Pai" para seleção deste tipo
+3. Retorna ao passo 4 do fluxo principal
+
+### FE04 - Loop Hierárquico Detectado
+
+**Condição**: Selecionar tipo pai criaria loop (ex: A → B → C → A)
+
+1. Sistema exibe mensagem: "Tipo pai selecionado criaria loop na hierarquia. Operação não permitida"
+2. Sistema limpa campo "Tipo Pai"
+3. Retorna ao passo 4 do fluxo principal
+
+### FE05 - Taxa Depreciação Inválida
+
+**Condição**: Taxa < 0 ou Taxa > 100
+
+1. Sistema exibe mensagem: "Taxa de depreciação deve estar entre 0% e 100%"
+2. Sistema destaca campo em vermelho
+3. Retorna ao passo 4 do fluxo principal
+
+---
+
+## Pós-condições
+
+- Tipo de ativo criado e disponível para associação a ativos
+- Registro de auditoria criado
+- Hierarquia atualizada se necessário
+- Campos customizados criados (se definidos)
+
+---
+
+## Regras de Negócio
+
+- **RN-CAD-015-01**: Código único por conglomerado
+- **RN-CAD-015-02**: Hierarquia máxima de 5 níveis
+- **RN-CAD-015-03**: Categoria deve ser valor válido da lista permitida
+- **RN-CAD-015-04**: Hardware OBRIGATORIAMENTE deve ter depreciação definida
+- **RN-CAD-015-05**: Taxa de depreciação entre 0-100%
+- **RN-CAD-015-06**: Não permitir loops na hierarquia
+- **RN-CAD-015-07**: Auditoria completa de criação
+
+---
+
+## Critérios de Aceite
+
+- [ ] Formulário exibe todos os campos necessários
+- [ ] Validações impedem dados inválidos
+- [ ] Código duplicado é rejeitado
+- [ ] Hardware sem depreciação é rejeitado
+- [ ] Hierarquia > 5 níveis é rejeitada
+- [ ] Loop hierárquico é detectado e rejeitado
+- [ ] Taxa fora de 0-100% é rejeitada
+- [ ] Caminho hierárquico é calculado corretamente
+- [ ] Auditoria é registrada com todos os dados
+- [ ] Tipo criado aparece na lista/árvore
+- [ ] Campos customizados são salvos corretamente
+- [ ] Templates funcionam corretamente
+
+---
+
+**Última Revisão:** 04/11/2025
+
+---
+
+# UC02 - Visualizar Tipo de Ativo
+
+**RF:** RF-063 - Gestão de Tipos de Ativos
+**Versão:** 1.0
+**Última Atualização:** 04/11/2025
+
+---
+
+## Descrição
+
+Permite ao usuário visualizar detalhes completos de um tipo de ativo cadastrado.
+
+---
+
+## Atores
+
+- **Ator Principal**: Usuário do Sistema (com permissão CAD.TIPOS_ATIVOS.VISUALIZAR)
+
+---
+
+## Pré-condições
+
+- Usuário autenticado com permissão `CAD.TIPOS_ATIVOS.VISUALIZAR`
+- Tipo de ativo existe
+
+---
+
+## Fluxo Principal
+
+1. Usuário acessa lista de tipos de ativos
+2. Usuário clica em um tipo na árvore/lista ou ícone "Visualizar"
+3. Sistema exibe painel/modal com detalhes completos:
+   - **Identificação**: Código, Nome, Descrição
+   - **Classificação**: Categoria, Subcategoria, Tipo Pai, Caminho Hierárquico Completo
+   - **Características**: Flags (Inventariável, Depreciável, Rastreável, Faturável, Requer Serial, IMEI, MAC)
+   - **Depreciação**: Taxa Anual, Vida Útil, Método
+   - **Manutenção**: Intervalo Manutenção, Requer Calibração
+   - **Visual**: Ícone, Cor
+   - **Hierarquia**: Quantidade de Subtipos, Lista de Subtipos
+   - **Uso**: Quantidade de Ativos Vinculados (link para lista de ativos)
+   - **Campos Customizados**: Lista de campos definidos
+   - **Auditoria**: Data Criação, Usuário Criação, Data Última Alteração, Usuário Alteração
+4. Usuário pode:
+   - Navegar para tipo pai (link clicável)
+   - Navegar para subtipos (links clicáveis)
+   - Ver lista de ativos deste tipo (botão)
+   - Editar (botão, se tiver permissão)
+   - Excluir (botão, se tiver permissão)
+   - Ver histórico de alterações (botão)
+
+---
+
+## Pós-condições
+
+- Detalhes completos do tipo são exibidos
+
+---
+
+## Critérios de Aceite
+
+- [ ] Todos os dados do tipo são exibidos
+- [ ] Caminho hierárquico completo é mostrado
+- [ ] Quantidade de ativos é exata
+- [ ] Campos customizados aparecem
+- [ ] Botões respeitam permissões
+
+---
+
+**Última Revisão:** 04/11/2025
+
+---
+
+# UC03 - Editar Tipo de Ativo
+
+**RF:** RF-063 - Gestão de Tipos de Ativos
+**Versão:** 1.0
+**Última Atualização:** 04/11/2025
+
+---
+
+## Descrição
+
+Permite ao usuário editar dados de um tipo de ativo existente.
+
+---
+
+## Atores
+
+- **Ator Principal**: Administrador do Sistema
+
+---
+
+## Pré-condições
+
+- Usuário autenticado com permissão `CAD.TIPOS_ATIVOS.EDITAR`
+- Tipo de ativo existe e não é tipo de sistema (Fl_Sistema = 0)
+
+---
+
+## Fluxo Principal
+
+1. Usuário acessa lista de tipos e clica em "Editar" em um tipo
+2. Sistema verifica se tipo não é de sistema (Fl_Sistema = 0)
+3. Sistema carrega formulário pré-preenchido com dados atuais
+4. Usuário altera campos permitidos:
+   - Nome
+   - Descrição
+   - Subcategoria
+   - Taxa de Depreciação
+   - Vida Útil
+   - Método de Depreciação
+   - Flags (Inventariável, Depreciável, etc)
+   - Ícone e Cor
+   - Ordem de Exibição
+5. Usuário clica em "Salvar"
+6. Sistema valida alterações
+7. Sistema atualiza registro
+8. Sistema registra auditoria com dados antes/depois
+9. Sistema exibe mensagem de sucesso
+10. Lista é atualizada
+
+---
+
+## Fluxos de Exceção
+
+### FE01 - Tipo de Sistema
+
+**Condição**: Fl_Sistema = 1
+
+1. Sistema exibe mensagem: "Tipos de sistema não podem ser alterados"
+2. Caso de uso encerrado
+
+### FE02 - Tipo com Ativos (Restrições)
+
+**Condição**: Tipo tem ativos vinculados
+
+1. Sistema permite edição mas impede alterações críticas:
+   - Não permite mudar Código
+   - Não permite mudar Categoria Principal
+   - Não permite desativar flags obrigatórias
+2. Exibe aviso sobre restrições
+3. Continua fluxo principal
+
+---
+
+## Regras de Negócio
+
+- **RN-CAD-015-08**: Tipos de sistema não editáveis
+- **RN-CAD-015-09**: Recalcular hierarquia ao mudar tipo pai
+- **RN-CAD-015-10**: Auditoria completa com antes/depois
+
+---
+
+## Critérios de Aceite
+
+- [ ] Tipos de sistema são protegidos
+- [ ] Alterações são validadas
+- [ ] Auditoria registra mudanças
+- [ ] Hierarquia é recalculada se mudar tipo pai
+
+---
+
+**Última Revisão:** 04/11/2025
+
+---
+
+# UC04 - Inativar Tipo de Ativo
+
+**RF:** RF-063 - Gestão de Tipos de Ativos
+**Versão:** 1.0
+**Última Atualização:** 04/11/2025
+
+---
+
+## Descrição
+
+Permite ao usuário inativar (soft delete) um tipo de ativo que não está mais em uso.
+
+---
+
+## Atores
+
+- **Ator Principal**: Administrador do Sistema
+
+---
+
+## Pré-condições
+
+- Usuário autenticado com permissão `CAD.TIPOS_ATIVOS.EXCLUIR`
+- Tipo de ativo existe
+- Tipo não é de sistema (Fl_Sistema = 0)
+- Tipo não possui ativos vinculados
+- Tipo não possui subtipos ativos
+
+---
+
+## Fluxo Principal
+
+1. Usuário acessa lista de tipos e clica em "Excluir" em um tipo
+2. Sistema verifica pré-condições:
+   - Não é tipo de sistema ✓
+   - Não tem ativos vinculados ✓
+   - Não tem subtipos ativos ✓
+3. Sistema exibe modal de confirmação:
+   - "Deseja realmente inativar o tipo 'Notebook Corporativo'?"
+   - "Esta ação pode ser revertida posteriormente"
+   - Botões: Cancelar, Confirmar
+4. Usuário clica em "Confirmar"
+5. Sistema marca Fl_Ativo = 0
+6. Sistema atualiza Dt_Ult_Atualizacao e Id_Usuario_Atualizacao
+7. Sistema registra auditoria (Tipo_Operacao: DELETE)
+8. Sistema exibe mensagem: "Tipo de ativo inativado com sucesso"
+9. Tipo é removido da lista/árvore
+
+---
+
+## Fluxos Alternativos
+
+### FA01 - Restaurar Tipo Inativo
+
+**Condição**: Usuário deseja restaurar tipo inativo
+
+1. Usuário acessa "Tipos Inativos" (filtro especial)
+2. Sistema lista tipos com Fl_Ativo = 0
+3. Usuário clica em "Restaurar" em um tipo
+4. Sistema marca Fl_Ativo = 1
+5. Sistema registra auditoria (RESTORE)
+6. Tipo volta para lista principal
+
+---
+
+## Fluxos de Exceção
+
+### FE01 - Tipo de Sistema
+
+**Condição**: Fl_Sistema = 1
+
+1. Sistema exibe mensagem: "Tipos de sistema não podem ser inativados"
+2. Caso de uso encerrado
+
+### FE02 - Tipo com Ativos Vinculados
+
+**Condição**: Existem ativos usando este tipo
+
+1. Sistema busca quantidade de ativos
+2. Sistema exibe mensagem: "Não é possível inativar este tipo pois existem 47 ativos associados. Reclassifique os ativos primeiro"
+3. Sistema exibe botão "Ver Ativos" (abre lista filtrada)
+4. Caso de uso encerrado
+
+### FE03 - Tipo com Subtipos Ativos
+
+**Condição**: Tipo tem subtipos ativos
+
+1. Sistema busca quantidade de subtipos
+2. Sistema exibe mensagem: "Não é possível inativar este tipo pois existem 3 subtipos ativos. Inactive os subtipos primeiro"
+3. Sistema exibe lista de subtipos
+4. Caso de uso encerrado
+
+---
+
+## Pós-condições
+
+- Tipo marcado como inativo (Fl_Ativo = 0)
+- Registro de auditoria criado
+- Tipo não aparece mais em listagens/dropdowns
+- Possível restaurar posteriormente
+
+---
+
+## Regras de Negócio
+
+- **RN-CAD-015-05**: Não permitir exclusão com ativos associados
+- **RN-CAD-015-08**: Tipos de sistema não são excluíveis
+- **RN-CAD-015-15**: Soft delete com possibilidade de restauração
+
+---
+
+## Critérios de Aceite
+
+- [ ] Tipos de sistema são protegidos
+- [ ] Tipos com ativos são protegidos
+- [ ] Tipos com subtipos são protegidos
+- [ ] Soft delete (Fl_Ativo = 0) é executado
+- [ ] Auditoria é registrada
+- [ ] Possível restaurar tipo inativo
+
+---
+
+**Última Revisão:** 04/11/2025
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-12-17 | Sistema | Consolidação de 4 casos de uso |

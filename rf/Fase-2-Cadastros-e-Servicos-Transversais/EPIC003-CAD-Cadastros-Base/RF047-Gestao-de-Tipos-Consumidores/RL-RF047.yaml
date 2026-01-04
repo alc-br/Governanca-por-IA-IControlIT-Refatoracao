@@ -1,0 +1,558 @@
+rf_id: RF047
+rl_id: RL-RF047
+rl_title: "Referência ao Legado - Gestão de Tipos de Consumidores"
+rf_moderno_relacionado: "RF-047"
+versao: "1.0"
+data: "2025-12-30"
+autor: "Agência ALC - alc.dev.br"
+sistema_legado: "ASP.NET Web Forms + VB.NET"
+objetivo: "Documentar comportamento do legado, garantindo rastreabilidade e mitigação de riscos na modernização"
+
+# ==============================================================================
+# CONTEXTO DO LEGADO
+# ==============================================================================
+
+contexto_legado:
+  arquitetura: "Monolítica Cliente-Servidor"
+  linguagem: "VB.NET"
+  stack: "ASP.NET Framework 4.5"
+  banco_dados: "SQL Server 2012+"
+  multi_tenant: false
+  auditoria: "Inexistente"
+  configuracoes: "Hardcoded no código VB.NET"
+
+# ==============================================================================
+# TELAS LEGADAS
+# ==============================================================================
+
+telas_legadas:
+  - id: "TELA-001"
+    nome: "TiposUsuario.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastros/TiposUsuario.aspx"
+    responsabilidade: "Exibir dropdown fixo com 3 tipos de usuário"
+    campos:
+      - nome: "ddlTipoUsuario"
+        tipo: "DropDownList"
+        obrigatorio: true
+        observacao: "Dropdown com 3 valores fixos (Gerente, Funcionário, Externo) carregados do enum TipoUsuario.vb"
+    comportamentos_implicitos:
+      - "Tipos são hardcoded no enum VB.NET"
+      - "Sem CRUD de tipos pela interface"
+      - "Sem customização de nomes ou quantidades"
+      - "Sem validação de permissões para alterar tipo"
+      - "Sem auditoria de mudanças de tipo"
+      - "Mudança de tipo é imediata e sem workflow"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "Tela substituída por API REST /tipos-consumidores com CRUD completo e filtros dinâmicos"
+
+# ==============================================================================
+# CÓDIGO LEGADO
+# ==============================================================================
+
+codigo_legado:
+  - id: "CODIGO-001"
+    tipo: "Enum"
+    nome: "TipoUsuario.vb"
+    caminho: "ic1_legado/IControlIT/App_Code/Enums/TipoUsuario.vb"
+    descricao: "Enum VB.NET com 3 tipos fixos: Gerente (1), Funcionário (2), Externo (3)"
+    valores:
+      - codigo: 1
+        nome: "Gerente"
+      - codigo: 2
+        nome: "Funcionario"
+      - codigo: 3
+        nome: "Externo"
+    limitacoes:
+      - "Apenas 3 tipos fixos hardcoded"
+      - "Alterar tipos exige recompilação e deploy"
+      - "Impossível criar novos tipos sem alterar código"
+      - "Nomes não são customizáveis"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "Enum substituído por tabela TipoConsumidor com CRUD completo e código alfanumérico customizável"
+
+# ==============================================================================
+# TABELAS LEGADAS
+# ==============================================================================
+
+tabelas_legadas:
+  - id: "TABELA-001"
+    nome: "Usuario"
+    campo: "TipoUsuario"
+    tipo_dado: "INT"
+    finalidade: "Armazena enum TipoUsuario (1, 2 ou 3)"
+    problemas:
+      - "Sem FK ou constraint, aceita valores fora do enum"
+      - "Não há tabela dedicada para tipos"
+      - "Impossível adicionar novos tipos sem alterar código"
+      - "Sem auditoria de mudanças de tipo"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "Coluna TipoUsuario INT substituída por TipoConsumidorId Guid (FK para TipoConsumidor)"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO IMPLÍCITAS
+# ==============================================================================
+
+regras_negocio_implicitas:
+  - id: "RL-RN-001"
+    titulo: "Apenas 3 Tipos Fixos"
+    descricao: "Sistema legado suporta apenas 3 tipos de usuário: Gerente (1), Funcionário (2), Externo (3)"
+    implementacao_legado: "Enum TipoUsuario.vb hardcoded"
+    limitacao: "Impossível criar novos tipos sem alterar código e recompilar"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "RN-RF047-001 permite tipos ilimitados (até 50 por fornecedor) com código alfanumérico customizável"
+
+  - id: "RL-RN-002"
+    titulo: "Nomes de Tipos Não Customizáveis"
+    descricao: "Nomes 'Gerente', 'Funcionário', 'Externo' são fixos e não podem ser alterados"
+    implementacao_legado: "String literals no enum VB.NET"
+    limitacao: "Impossível adaptar nomenclatura para diferentes contextos (ex: telecom vs TI)"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "RF-047 permite customização total de nomes via tabela TipoConsumidor.Nome"
+
+  - id: "RL-RN-003"
+    titulo: "Sem Hierarquia de Tipos"
+    descricao: "Tipos são planos, sem relação pai/filho"
+    implementacao_legado: "Enum flat sem estrutura hierárquica"
+    limitacao: "Impossível modelar relações tipo 'Gerente Regional' herda de 'Gerente'"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-003 introduz hierarquia com TipoPaiId e validação de loops (DAG)"
+
+  - id: "RL-RN-004"
+    titulo: "Sem Quotas por Tipo"
+    descricao: "Todos os tipos têm mesmas quotas de consumo"
+    implementacao_legado: "Quotas definidas por usuário individual, não por tipo"
+    limitacao: "Impossível definir 'Gerentes têm quota ilimitada'"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-004 introduz quotas por tipo (dados, voz, SMS) com suporte a -1 = ilimitado"
+
+  - id: "RL-RN-005"
+    titulo: "Sem Auto-Classificação"
+    descricao: "Tipo é atribuído manualmente na criação do usuário"
+    implementacao_legado: "Seleção manual via dropdown"
+    limitacao: "Impossível regras tipo 'Se e-mail @diretoria.com → tipo Gerente'"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-005 introduz auto-classificação baseada em regex/domínio/departamento com prioridades"
+
+  - id: "RL-RN-006"
+    titulo: "Mudança de Tipo Sem Aprovação"
+    descricao: "Qualquer usuário com acesso pode alterar tipo de outro usuário imediatamente"
+    implementacao_legado: "Update direto no banco sem workflow"
+    limitacao: "Sem controle sobre mudanças críticas (ex: promover a Gerente)"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-006 introduz workflow de aprovação para tipos críticos (aguardando_aprovacao → aprovado/rejeitado)"
+
+  - id: "RL-RN-007"
+    titulo: "Sem Custo Diferenciado por Tipo"
+    descricao: "Todos os tipos têm mesmo custo no billing"
+    implementacao_legado: "Custo calculado apenas por consumo (linhas, dados, voz), não por tipo"
+    limitacao: "Impossível cobrar 'Gerentes pagam R$50/mês a mais'"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-008 introduz CustoFixoMensal por tipo somado ao billing"
+
+  - id: "RL-RN-008"
+    titulo: "Sem Permissões Default por Tipo"
+    descricao: "Permissões são atribuídas manualmente após criação do usuário"
+    implementacao_legado: "Sem vínculo entre tipo e permissões"
+    limitacao: "Impossível definir 'Gerentes têm permissão X automaticamente'"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-012 introduz TipoConsumidorPermissao (junction table) aplicadas no onboarding"
+
+  - id: "RL-RN-009"
+    titulo: "Sem Histórico de Mudanças de Tipo"
+    descricao: "Mudanças de tipo sobrescrevem valor anterior sem registro"
+    implementacao_legado: "UPDATE direto na coluna TipoUsuario sem trigger de auditoria"
+    limitacao: "Impossível rastrear 'Quando fulano virou Gerente?'"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-015 introduz TipoConsumidorHistorico com 7 anos de retenção (LGPD)"
+
+  - id: "RL-RN-010"
+    titulo: "Sem Tipo Padrão Configurável"
+    descricao: "Novo usuário sempre recebe tipo 'Funcionário' (2) por padrão"
+    implementacao_legado: "Hardcoded no código de criação de usuário"
+    limitacao: "Impossível definir 'Tipo padrão = Externo' para determinado fornecedor"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-002 introduz TipoConsumidor.EhPadrao (flag booleana) configurável por fornecedor"
+
+  - id: "RL-RN-011"
+    titulo: "Sem Limite de Tipos"
+    descricao: "Conceito de limite não existe (máximo fixo = 3)"
+    implementacao_legado: "Enum fixo com 3 valores"
+    limitacao: "Impossível expandir além de 3 sem recompilação"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-009 introduz validação de máximo 50 tipos por fornecedor"
+
+  - id: "RL-RN-012"
+    titulo: "Sem Cores/Ícones de Identificação"
+    descricao: "Tipos não têm identificação visual"
+    implementacao_legado: "Apenas string text no dropdown"
+    limitacao: "Impossível usar cores/ícones em dashboards"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-014 introduz TipoConsumidor.Cor (hex) e TipoConsumidor.Icone (Material Icons)"
+
+  - id: "RL-RN-013"
+    titulo: "Sem Multi-tenancy"
+    descricao: "Todos os usuários compartilham mesma base de tipos (3 fixos)"
+    implementacao_legado: "Sem isolamento por empresa/fornecedor"
+    limitacao: "Impossível ter tipos diferentes por fornecedor"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-002 introduz TipoConsumidor.TenantId (Row-Level Security)"
+
+  - id: "RL-RN-014"
+    titulo: "Sem Dashboard de Custos"
+    descricao: "Sem visão agregada de custos por tipo"
+    implementacao_legado: "Relatórios manuais via SQL direto"
+    limitacao: "Impossível ver 'Quanto custam todos os Gerentes?'"
+    destino: "NOVO"
+    destino_detalhado: "RN-RF047-013 introduz dashboard com distribuição e custos por tipo (cache 5 min)"
+
+  - id: "RL-RN-015"
+    titulo: "Sem Template de Provisioning"
+    descricao: "Recursos são provisionados manualmente após criação do usuário"
+    implementacao_legado: "Processos manuais sem automação"
+    limitacao: "Impossível definir 'Gerentes recebem iPhone automaticamente'"
+    destino: "NOVO"
+    destino_detalhado: "FUNC-012 introduz TipoConsumidor.TemplateProvisioning (configuração JSON)"
+
+# ==============================================================================
+# GAP ANALYSIS
+# ==============================================================================
+
+gap_analysis:
+  - item: "Quantidade de Tipos"
+    legado: "3 fixos (hardcoded)"
+    rf_moderno: "Ilimitado (até 50 por fornecedor)"
+    observacao: "Flexibilidade total"
+    destino: "SUBSTITUÍDO"
+
+  - item: "Nomenclatura"
+    legado: "Fixa ('Gerente', 'Funcionário', 'Externo')"
+    rf_moderno: "Customizável"
+    observacao: "Adaptável ao contexto"
+    destino: "SUBSTITUÍDO"
+
+  - item: "Código Único"
+    legado: "Enum INT (1, 2, 3)"
+    rf_moderno: "Código alfanumérico (ex: GERENTE_TI)"
+    observacao: "Identificação estável"
+    destino: "SUBSTITUÍDO"
+
+  - item: "Hierarquia"
+    legado: "Ausente"
+    rf_moderno: "Suportada (até 5 níveis)"
+    observacao: "Herança de configurações"
+    destino: "NOVO"
+
+  - item: "Quotas"
+    legado: "Sem diferenciação"
+    rf_moderno: "Quotas por tipo (dados, voz, SMS)"
+    observacao: "Controle fino de consumo"
+    destino: "NOVO"
+
+  - item: "Auto-Classificação"
+    legado: "Ausente"
+    rf_moderno: "Regras baseadas em regex/domínio"
+    observacao: "Automação"
+    destino: "NOVO"
+
+  - item: "Workflow Aprovação"
+    legado: "Ausente"
+    rf_moderno: "Tipos críticos exigem aprovação"
+    observacao: "Governança"
+    destino: "NOVO"
+
+  - item: "Custo Fixo"
+    legado: "Ausente"
+    rf_moderno: "Custo mensal por tipo"
+    observacao: "Billing diferenciado"
+    destino: "NOVO"
+
+  - item: "Permissões Default"
+    legado: "Ausente"
+    rf_moderno: "Aplicadas automaticamente"
+    observacao: "Onboarding rápido"
+    destino: "NOVO"
+
+  - item: "Histórico de Mudanças"
+    legado: "Ausente"
+    rf_moderno: "7 anos de retenção"
+    observacao: "Auditoria LGPD"
+    destino: "NOVO"
+
+  - item: "Multi-tenancy"
+    legado: "Ausente"
+    rf_moderno: "Isolamento por TenantId"
+    observacao: "Segurança"
+    destino: "NOVO"
+
+  - item: "Tipo Padrão"
+    legado: "Hardcoded (Funcionário)"
+    rf_moderno: "Configurável por fornecedor"
+    observacao: "Flexibilidade"
+    destino: "NOVO"
+
+  - item: "Dashboard"
+    legado: "Ausente"
+    rf_moderno: "Distribuição e custos por tipo"
+    observacao: "Gestão gerencial"
+    destino: "NOVO"
+
+  - item: "Cores/Ícones"
+    legado: "Ausente"
+    rf_moderno: "Material Icons + Hex color"
+    observacao: "UX melhorada"
+    destino: "NOVO"
+
+  - item: "CRUD de Tipos"
+    legado: "Impossível"
+    rf_moderno: "Completo (criar, editar, inativar)"
+    observacao: "Gerenciabilidade"
+    destino: "NOVO"
+
+# ==============================================================================
+# DECISÕES DE MODERNIZAÇÃO
+# ==============================================================================
+
+decisoes_modernizacao:
+  - id: "DECISAO-001"
+    titulo: "Substituir Enum por Tabela Dedicada"
+    descricao: "Criar tabela TipoConsumidor com CRUD completo, substituindo enum VB.NET hardcoded"
+    motivo: "Permitir customização total de tipos sem recompilação"
+    impacto: "ALTO"
+    justificativa: "Flexibilidade é requisito crítico (RF-047 exige tipos customizáveis)"
+    destino: "ASSUMIDO"
+
+  - id: "DECISAO-002"
+    titulo: "Implementar Hierarquia com Validação de Loops"
+    descricao: "Adicionar coluna TipoPaiId e algoritmo DFS para detectar ciclos"
+    motivo: "Permitir herança de configurações (RN-RF047-011)"
+    impacto: "MÉDIO"
+    justificativa: "Herança evita duplicação e facilita manutenção"
+    destino: "ASSUMIDO"
+
+  - id: "DECISAO-003"
+    titulo: "Adicionar Auto-Classificação Baseada em Regras"
+    descricao: "Criar tabela RegraAutoClassificacao com padrões regex e prioridades"
+    motivo: "Automatizar atribuição de tipos (RN-RF047-005)"
+    impacto: "MÉDIO"
+    justificativa: "Reduz trabalho manual e erros de classificação"
+    destino: "ASSUMIDO"
+
+  - id: "DECISAO-004"
+    titulo: "Workflow de Aprovação para Tipos Críticos"
+    descricao: "Criar tabela SolicitacaoMudancaTipo com estados (pendente, aprovado, rejeitado)"
+    motivo: "Proteger tipos sensíveis de mudanças acidentais (RN-RF047-006)"
+    impacto: "ALTO"
+    justificativa: "Governança exigida para tipos executivos/VIP"
+    destino: "ASSUMIDO"
+
+  - id: "DECISAO-005"
+    titulo: "Histórico Imutável de 7 Anos"
+    descricao: "Criar tabela TipoConsumidorHistorico insert-only com retenção automática"
+    motivo: "Auditoria LGPD e rastreabilidade (RN-RF047-015)"
+    impacto: "MÉDIO"
+    justificativa: "Conformidade legal obrigatória"
+    destino: "ASSUMIDO"
+
+  - id: "DECISAO-006"
+    titulo: "Custo Fixo Mensal por Tipo"
+    descricao: "Adicionar coluna CustoFixoMensal em TipoConsumidor"
+    motivo: "Billing diferenciado (RN-RF047-008)"
+    impacto: "ALTO"
+    justificativa: "Requisito de negócio para diferenciação de planos"
+    destino: "ASSUMIDO"
+
+  - id: "DECISAO-007"
+    titulo: "Migração Automática ao Inativar Tipo"
+    descricao: "Trigger/job em massa migra consumidores para tipo padrão ao inativar"
+    motivo: "Evitar consumidores órfãos (RN-RF047-007)"
+    impacto: "ALTO"
+    justificativa: "Integridade de dados obrigatória"
+    destino: "ASSUMIDO"
+
+# ==============================================================================
+# RISCOS DE MIGRAÇÃO
+# ==============================================================================
+
+riscos_migracao:
+  - id: "RISCO-001"
+    risco: "Dados existentes com tipo inválido"
+    impacto: "ALTO"
+    mitigacao: "Script de validação pré-migração identifica usuários com TipoUsuario fora do enum (1, 2, 3)"
+    destino: "ASSUMIDO"
+
+  - id: "RISCO-002"
+    risco: "Perda de histórico de mudanças"
+    impacto: "MÉDIO"
+    mitigacao: "Aceitável - legado não tem histórico, modernização cria a partir da migração"
+    destino: "ASSUMIDO"
+
+  - id: "RISCO-003"
+    risco: "Performance em migração em massa"
+    impacto: "ALTO"
+    mitigacao: "Job Hangfire com batching (1000 registros/lote) e retry automático"
+    destino: "ASSUMIDO"
+
+  - id: "RISCO-004"
+    risco: "Usuários sem tipo padrão"
+    impacto: "CRÍTICO"
+    mitigacao: "Script de seed cria tipos padrão obrigatórios para todos os fornecedores"
+    destino: "ASSUMIDO"
+
+  - id: "RISCO-005"
+    risco: "Quebra de integrações externas"
+    impacto: "MÉDIO"
+    mitigacao: "API mantém compatibilidade com INT (1, 2, 3) via mapeamento TipoLegadoId"
+    destino: "ASSUMIDO"
+
+  - id: "RISCO-006"
+    risco: "Alterações simultâneas durante migração"
+    impacto: "MÉDIO"
+    mitigacao: "Lock de tabela Usuario durante migração + janela de manutenção agendada"
+    destino: "ASSUMIDO"
+
+# ==============================================================================
+# RASTREABILIDADE COMPLETA
+# ==============================================================================
+
+rastreabilidade:
+  - id: "TRACE-001"
+    elemento_legado: "Enum TipoUsuario.vb (Gerente = 1)"
+    referencia_rf: "RN-RF047-001"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "TipoConsumidor (codigo: GERENTE)"
+
+  - id: "TRACE-002"
+    elemento_legado: "Enum TipoUsuario.vb (Funcionario = 2)"
+    referencia_rf: "RN-RF047-001"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "TipoConsumidor (codigo: FUNCIONARIO)"
+
+  - id: "TRACE-003"
+    elemento_legado: "Enum TipoUsuario.vb (Externo = 3)"
+    referencia_rf: "RN-RF047-001"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "TipoConsumidor (codigo: EXTERNO)"
+
+  - id: "TRACE-004"
+    elemento_legado: "TiposUsuario.aspx (dropdown fixo)"
+    referencia_rf: "FUNC-004"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "API GET /tipos-consumidores (filtros dinâmicos)"
+
+  - id: "TRACE-005"
+    elemento_legado: "Usuario.TipoUsuario (INT)"
+    referencia_rf: "MD-RF047"
+    destino: "SUBSTITUÍDO"
+    destino_detalhado: "Consumidor.TipoConsumidorId (Guid FK)"
+
+  - id: "TRACE-006"
+    elemento_legado: "Sem hierarquia"
+    referencia_rf: "RN-RF047-003"
+    destino: "NOVO"
+    destino_detalhado: "TipoConsumidor.TipoPaiId + validação DAG"
+
+  - id: "TRACE-007"
+    elemento_legado: "Sem quotas por tipo"
+    referencia_rf: "RN-RF047-004"
+    destino: "NOVO"
+    destino_detalhado: "TipoConsumidor.QuotaDados/QuotaVoz/QuotaSms"
+
+  - id: "TRACE-008"
+    elemento_legado: "Sem auto-classificação"
+    referencia_rf: "RN-RF047-005"
+    destino: "NOVO"
+    destino_detalhado: "RegraAutoClassificacao (regex, prioridade)"
+
+  - id: "TRACE-009"
+    elemento_legado: "Sem workflow aprovação"
+    referencia_rf: "RN-RF047-006"
+    destino: "NOVO"
+    destino_detalhado: "SolicitacaoMudancaTipo (pendente/aprovado/rejeitado)"
+
+  - id: "TRACE-010"
+    elemento_legado: "Sem custo fixo"
+    referencia_rf: "RN-RF047-008"
+    destino: "NOVO"
+    destino_detalhado: "TipoConsumidor.CustoFixoMensal"
+
+  - id: "TRACE-011"
+    elemento_legado: "Sem permissões default"
+    referencia_rf: "RN-RF047-012"
+    destino: "NOVO"
+    destino_detalhado: "TipoConsumidorPermissao (junction table)"
+
+  - id: "TRACE-012"
+    elemento_legado: "Sem histórico"
+    referencia_rf: "RN-RF047-015"
+    destino: "NOVO"
+    destino_detalhado: "TipoConsumidorHistorico (7 anos retenção)"
+
+  - id: "TRACE-013"
+    elemento_legado: "Sem tipo padrão configurável"
+    referencia_rf: "RN-RF047-002"
+    destino: "NOVO"
+    destino_detalhado: "TipoConsumidor.EhPadrao (flag booleana)"
+
+  - id: "TRACE-014"
+    elemento_legado: "Sem limite de tipos"
+    referencia_rf: "RN-RF047-009"
+    destino: "NOVO"
+    destino_detalhado: "Validação 50 tipos/fornecedor"
+
+  - id: "TRACE-015"
+    elemento_legado: "Sem cores/ícones"
+    referencia_rf: "RN-RF047-014"
+    destino: "NOVO"
+    destino_detalhado: "TipoConsumidor.Cor/Icone"
+
+# ==============================================================================
+# COBERTURA DE DESTINOS (OBRIGATÓRIO 100%)
+# ==============================================================================
+
+cobertura_destinos:
+  total_itens_legado: 15
+  itens_com_destino: 15
+  percentual_cobertura: "100%"
+  validacao: "APROVADA"
+  destinos_distribuidos:
+    SUBSTITUÍDO: 5
+    NOVO: 10
+    ASSUMIDO: 7  # Decisões e riscos
+    DESCARTADO: 0
+    A_REVISAR: 0
+
+# ==============================================================================
+# REFERÊNCIAS
+# ==============================================================================
+
+referencias:
+  - id: "REF-001"
+    nome: "TiposUsuario.aspx"
+    tipo: "tela"
+    caminho: "ic1_legado/IControlIT/Cadastros/TiposUsuario.aspx"
+    descricao: "Tela com dropdown fixo de tipos"
+    destino: "substituido"
+
+  - id: "REF-002"
+    nome: "TipoUsuario.vb"
+    tipo: "componente"
+    caminho: "ic1_legado/IControlIT/App_Code/Enums/TipoUsuario.vb"
+    descricao: "Enum com 3 tipos fixos (1=Gerente, 2=Funcionario, 3=Externo)"
+    destino: "substituido"
+
+  - id: "REF-003"
+    nome: "Usuario.TipoUsuario"
+    tipo: "stored_procedure"
+    caminho: "Usuario.TipoUsuario INT"
+    descricao: "Coluna INT sem FK armazena enum hardcoded"
+    destino: "substituido"
+
+# ==============================================================================
+# CHANGELOG
+# ==============================================================================
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Criação do documento de referência ao legado RF-047"
+    autor: "Agência ALC - alc.dev.br"

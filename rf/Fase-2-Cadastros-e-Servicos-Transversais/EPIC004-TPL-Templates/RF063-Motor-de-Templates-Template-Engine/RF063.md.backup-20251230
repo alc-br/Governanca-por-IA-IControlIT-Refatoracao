@@ -1,0 +1,218 @@
+# RF063 - Motor de Templates (Template Engine)
+
+## 1. RESUMO EXECUTIVO
+
+Motor de processamento de templates dinâmicos com sintaxe Liquid/Handlebars para geração de e-mails, relatórios, documentos e notificações. Suporta variáveis, condicionais, loops, funções helper customizadas e preview em tempo real.
+
+**Importância:** Eliminar código hardcoded, permitir customização por cliente, versionamento de templates, preview antes de enviar, multi-idioma.
+
+**Funcionalidades:** Parser Liquid, variáveis de contexto, helpers customizados, preview em tempo real, versionamento, testes A/B.
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN001: Sintaxe Liquid
+**Descrição:** Utilizar sintaxe Liquid (Shopify) para templates.
+
+```liquid
+Olá {{ usuario.nome }},
+
+Sua solicitação #{{ solicitacao.numero }} foi {% if solicitacao.aprovada %}aprovada{% else %}rejeitada{% endif %}.
+
+{% for item in solicitacao.itens %}
+  - {{ item.descricao }}: R$ {{ item.valor | currency }}
+{% endfor %}
+
+Total: R$ {{ solicitacao.total | currency }}
+```
+
+---
+
+### RN002: Contexto de Dados
+**Descrição:** Passar objeto de contexto com todas as variáveis disponíveis.
+
+```csharp
+public class ContextoTemplate
+{
+    public Usuario Usuario { get; set; }
+    public Solicitacao Solicitacao { get; set; }
+    public Empresa Empresa { get; set; }
+    public Dictionary<string, object> Custom { get; set; }
+}
+
+public async Task<string> ProcessarTemplate(string templateLiquid, ContextoTemplate contexto)
+{
+    var template = Template.Parse(templateLiquid);
+    return template.Render(Hash.FromAnonymousObject(contexto));
+}
+```
+
+---
+
+### RN003: Filtros Customizados
+**Descrição:** Implementar filtros helper para formatação.
+
+```csharp
+public class FiltersCustomizados
+{
+    public static string Currency(decimal valor)
+    {
+        return valor.ToString("C2", new CultureInfo("pt-BR"));
+    }
+
+    public static string FormatarData(DateTime data, string formato)
+    {
+        return data.ToString(formato, new CultureInfo("pt-BR"));
+    }
+
+    public static string Truncar(string texto, int tamanho)
+    {
+        return texto.Length > tamanho ? texto.Substring(0, tamanho) + "..." : texto;
+    }
+}
+
+// Uso: {{ valor | currency }} → R$ 1.234,56
+// {{ data | formatarData: 'dd/MM/yyyy' }} → 14/01/2025
+```
+
+---
+
+### RN004: Preview em Tempo Real
+**Descrição:** Editor com preview lado a lado com dados de teste.
+
+```csharp
+public async Task<PreviewTemplate> GerarPreview(string templateLiquid, Guid contextoTesteId)
+{
+    var contexto = await ObterContextoTeste(contextoTesteId);
+    var html = await ProcessarTemplate(templateLiquid, contexto);
+
+    return new PreviewTemplate
+    {
+        TemplateOriginal = templateLiquid,
+        HTMLGerado = html,
+        VariaveisUtilizadas = ExtrairVariaveis(templateLiquid),
+        ErrosValidacao = ValidarSintaxe(templateLiquid)
+    };
+}
+```
+
+---
+
+### RN005: Versionamento de Templates
+**Descrição:** Manter histórico de versões com rollback.
+
+```csharp
+public class VersaoTemplate
+{
+    public Guid TemplateId { get; set; }
+    public int Versao { get; set; }
+    public string Conteudo { get; set; }
+    public DateTime DataCriacao { get; set; }
+    public Guid UsuarioCriacaoId { get; set; }
+    public bool Ativo { get; set; }
+}
+```
+
+---
+
+### RN006: Validação de Sintaxe
+**Descrição:** Validar sintaxe Liquid antes de salvar.
+
+---
+
+### RN007: Testes A/B
+**Descrição:** Permitir criar variações de template para testes.
+
+---
+
+### RN008: Herança de Templates
+**Descrição:** Templates filhos podem herdar de layout base.
+
+---
+
+### RN009: Parciais Reutilizáveis
+**Descrição:** Criar componentes parciais (header, footer, assinatura).
+
+---
+
+### RN010: Internacionalização
+**Descrição:** Templates multi-idioma com helper `{{ 't' }}`.
+
+---
+
+### RN011: Sanitização HTML
+**Descrição:** Prevenir XSS em variáveis renderizadas.
+
+---
+
+### RN012: Cache de Templates Compilados
+**Descrição:** Compilar templates apenas uma vez e cachear.
+
+---
+
+### RN013: Documentação de Variáveis
+**Descrição:** Gerar automaticamente lista de variáveis disponíveis.
+
+---
+
+### RN014: Condicional de Permissões
+**Descrição:** Helper `{% if usuario.tem_permissao: 'ADMIN' %}`.
+
+---
+
+### RN015: Auditoria de Uso
+**Descrição:** Rastrear quando e onde cada template foi utilizado.
+
+---
+
+## 3. REQUISITOS NÃO FUNCIONAIS
+
+- Performance: Processar template em < 200ms
+- Segurança: Sanitização contra XSS
+- Usabilidade: Editor com syntax highlighting
+- Escalabilidade: Cache Redis de templates compilados
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades
+```sql
+INSERT INTO SistemaFuncionalidade (Codigo, Nome)
+VALUES ('TPL.ENGINE', 'Motor de Templates');
+```
+
+### 4.2 RBAC
+```csharp
+public static class TemplatesPermissions
+{
+    public const string Create = "TPL.ENGINE.CREATE";
+    public const string Edit = "TPL.ENGINE.EDIT";
+    public const string Publish = "TPL.ENGINE.PUBLISH";
+}
+```
+
+---
+
+## 5. MODELO DE DADOS
+
+```csharp
+public class Template : AuditableEntity
+{
+    public Guid Id { get; set; }
+    public string Codigo { get; set; }
+    public string Nome { get; set; }
+    public string Categoria { get; set; } // EMAIL, RELATORIO, DOCUMENTO
+    public string Conteudo { get; set; }
+    public bool Ativo { get; set; }
+    public List<VersaoTemplate> Versoes { get; set; }
+    public Guid EmpresaId { get; set; }
+}
+```
+
+---
+
+**Documento gerado em:** 2025-01-14
+**Versão:** 1.0
+**Status:** Aprovado

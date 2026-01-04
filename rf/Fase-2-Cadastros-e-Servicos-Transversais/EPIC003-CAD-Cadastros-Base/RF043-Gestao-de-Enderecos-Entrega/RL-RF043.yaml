@@ -1,0 +1,319 @@
+rl_id: RL-RF043
+rf_correspondente: RF043
+versao_governanca: "2.0"
+data_criacao: "2025-12-30"
+proposito: "Documentar integralmente o sistema legado de gestão de endereços de entrega para rastreabilidade e análise de gaps"
+
+# ==============================================================================
+# TELAS ASPX (WEB FORMS)
+# ==============================================================================
+
+telas_aspx:
+  - id: "TELA-001"
+    arquivo: "Cadastro/EnderecoEntrega.aspx"
+    code_behind: "Cadastro/EnderecoEntrega.aspx.vb"
+    descricao: "Tela de cadastro e edição de endereços de entrega com formulário Web Forms básico"
+    funcionalidade: "Cadastro manual de CEP, logradouro, número, complemento, bairro, cidade, UF sem validação automática"
+    tecnologia: "ASP.NET Web Forms 4.8 + VB.NET"
+    problemas:
+      - "Sem validação de CEP via API (ViaCEP)"
+      - "Sem geocodificação (latitude/longitude)"
+      - "Sem validação de endereço duplicado (fuzzy match)"
+      - "ViewState pesado, postbacks lentos"
+      - "Session('UsuarioId') pode ser nula sem tratamento"
+      - "Sem validação de único endereço padrão por empresa"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "Angular 19 Standalone Component: enderecos-entrega-form.component.ts com validação automática de CEP (ViaCEP), geocodificação (Google Maps API), autocomplete, fuzzy match duplicatas"
+    data_substituicao: "2025-12-30"
+
+  - id: "TELA-002"
+    arquivo: "Consulta/Enderecos.aspx"
+    code_behind: "Consulta/Enderecos.aspx.vb"
+    descricao: "Tela de listagem de endereços cadastrados com Telerik RadGrid e filtros básicos"
+    funcionalidade: "Listagem com filtros por CEP (exato) e cidade (LIKE), paginação server-side, ações de editar/excluir"
+    tecnologia: "ASP.NET Web Forms 4.8 + VB.NET + Telerik RadGrid"
+    problemas:
+      - "Sem autocomplete (digitação completa obrigatória)"
+      - "Sem busca fuzzy (erros de digitação não encontram resultados)"
+      - "Paginação server-side lenta (reload completo)"
+      - "Exclusão hard delete (sem soft delete)"
+      - "Telerik RadGrid (licença paga, componente legado)"
+      - "Sem ordenação por 'mais usados'"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "Angular 19 Standalone Component: enderecos-entrega-list.component.ts com Angular Material Table, autocomplete (Levenshtein distance), soft delete, paginação client-side lazy loading"
+    data_substituicao: "2025-12-30"
+
+# ==============================================================================
+# WEBSERVICES ASMX (SOAP)
+# ==============================================================================
+
+webservices_asmx:
+  - id: "WS-001"
+    arquivo: "WebServices/EnderecoService.asmx"
+    code_behind: "WebServices/EnderecoService.asmx.vb"
+    descricao: "WebService SOAP para integração com sistema externo de gestão de pedidos"
+    metodos:
+      - "BuscarEnderecoPorCEP(cep As String) As EnderecoDto"
+      - "InserirEnderecoEntrega(endereco As EnderecoDto) As Boolean"
+      - "ExcluirEnderecoEntrega(id As String) As Boolean"
+    protocolo: "SOAP"
+    problemas:
+      - "SOAP (protocolo legado, substituído por REST)"
+      - "Sem autenticação JWT ou API Key (apenas IP whitelisting)"
+      - "Sem versionamento de API"
+      - "Sem validação de input estruturada"
+      - "Sem tratamento de erro estruturado (SoapException genérica)"
+      - "Sem paginação (retorna todos os endereços de uma só vez)"
+      - "Sem rate limiting (possível DDoS)"
+    destino: "SUBSTITUÍDO"
+    substituido_por: ".NET 10 Minimal APIs REST (14 endpoints) com autenticação JWT Bearer Token, versionamento /api/v1, FluentValidation, paginação, rate limiting"
+    data_substituicao: "2025-12-30"
+
+# ==============================================================================
+# STORED PROCEDURES
+# ==============================================================================
+
+stored_procedures:
+  - id: "SP-001"
+    nome: "sp_InserirEnderecoEntrega"
+    banco: "Cliente_Modelo (exemplo)"
+    parametros:
+      - "@CEP NVARCHAR(9)"
+      - "@Logradouro NVARCHAR(200)"
+      - "@Numero NVARCHAR(20)"
+      - "@Complemento NVARCHAR(100)"
+      - "@Bairro NVARCHAR(100)"
+      - "@Cidade NVARCHAR(100)"
+      - "@UF CHAR(2)"
+      - "@FlEnderecoPadrao BIT"
+      - "@CriadoPor NVARCHAR(450)"
+    funcionalidade: "Inserir novo endereço de entrega, desmarcar endereços padrão anteriores"
+    problemas:
+      - "BUG CRÍTICO: Desmarca endereço padrão de TODOS os clientes (falta WHERE ClienteId)"
+      - "Sem validação de CEP (aceita CEP inválido)"
+      - "Sem validação de endereço duplicado"
+      - "Sem multi-tenancy (ClienteId inexistente)"
+      - "CriadoPor pode ser NULL"
+      - "Sem soft delete (FlExcluido ausente)"
+      - "Sem auditoria completa (AlteradoPor, AlteradoEm)"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "EF Core 10 Command: CreateEnderecoEntregaCommand com FluentValidation, transação ACID para garantir único padrão por ClienteId, auditoria automática via Shadow Properties"
+    data_substituicao: "2025-12-30"
+
+  - id: "SP-002"
+    nome: "sp_BuscarEnderecos"
+    banco: "Cliente_Modelo"
+    parametros:
+      - "@CEP NVARCHAR(9) = NULL"
+      - "@Cidade NVARCHAR(100) = NULL"
+    funcionalidade: "Buscar endereços por CEP (exato) ou cidade (LIKE)"
+    problemas:
+      - "RISCO SQL INJECTION: Concatenação com LIKE '%' + @Cidade + '%'"
+      - "Sem paginação (retorna TODOS os registros)"
+      - "Sem busca fuzzy (Levenshtein distance)"
+      - "Sem filtro por ClienteId (multi-tenancy ausente)"
+      - "Sem filtro FlExcluido=0 (retorna excluídos também)"
+      - "Sem ordenação por 'mais usados' (COUNT entregas)"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "EF Core 10 Query: GetEnderecosEntregaQuery com busca fuzzy (FuzzySharp library), paginação (PaginatedList<T>), filtro ClienteId (Global Query Filter), ordenação por COUNT entregas DESC"
+    data_substituicao: "2025-12-30"
+
+  - id: "SP-003"
+    nome: "sp_ExcluirEnderecoEntrega"
+    banco: "Cliente_Modelo"
+    parametros:
+      - "@Id UNIQUEIDENTIFIER"
+    funcionalidade: "Excluir endereço de entrega permanentemente"
+    problemas:
+      - "HARD DELETE (sem soft delete FlExcluido=1)"
+      - "Sem validação de endereço padrão (permite excluir padrão)"
+      - "Sem validação de entregas vinculadas (órfãos em histórico)"
+      - "Sem auditoria de exclusão (não registra quem excluiu)"
+      - "Sem ClienteId (possível excluir endereço de outro cliente)"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "EF Core 10 Command: DeleteEnderecoEntregaCommand com soft delete (FlExcluido=1), validação FluentValidation custom rule (impede excluir padrão), auditoria automática"
+    data_substituicao: "2025-12-30"
+
+  - id: "SP-004"
+    nome: "sp_BuscarEnderecoPorCEP"
+    banco: "Cliente_Modelo"
+    parametros:
+      - "@CEP NVARCHAR(9)"
+    funcionalidade: "Buscar endereço específico por CEP exato"
+    problemas:
+      - "Busca exata (sem fuzzy match)"
+      - "Sem filtro ClienteId (multi-tenancy ausente)"
+      - "Sem validação de CEP válido"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "EF Core 10 Query: GetEnderecoEntregaByCepQuery com filtro ClienteId (Global Query Filter), validação de CEP via ViaCEP antes da busca"
+    data_substituicao: "2025-12-30"
+
+# ==============================================================================
+# TABELAS LEGADAS
+# ==============================================================================
+
+tabelas_legadas:
+  - id: "TAB-001"
+    nome: "EnderecoEntrega"
+    banco: "Cliente_Modelo (cada cliente tinha banco próprio)"
+    colunas_existentes:
+      - "Id UNIQUEIDENTIFIER PRIMARY KEY"
+      - "CEP NVARCHAR(9) NOT NULL"
+      - "Logradouro NVARCHAR(200) NOT NULL"
+      - "Numero NVARCHAR(20) NOT NULL"
+      - "Complemento NVARCHAR(100) NULL"
+      - "Bairro NVARCHAR(100) NOT NULL"
+      - "Cidade NVARCHAR(100) NOT NULL"
+      - "UF CHAR(2) NOT NULL"
+      - "FlEnderecoPadrao BIT DEFAULT 0"
+      - "CriadoPor NVARCHAR(450) NULL"
+      - "CriadoEm DATETIME2 DEFAULT GETDATE()"
+    colunas_ausentes:
+      - "Latitude DECIMAL(10,8) -- Geocodificação"
+      - "Longitude DECIMAL(11,8) -- Geocodificação"
+      - "Precisao NVARCHAR(50) -- ROOFTOP, RANGE_INTERPOLATED"
+      - "PlaceId NVARCHAR(200) -- Google Maps Place ID"
+      - "Categoria NVARCHAR(50) -- Matriz, Filial, Depósito"
+      - "NomeFantasia NVARCHAR(200) -- Identificação amigável"
+      - "Referencia NVARCHAR(300) -- Ponto de referência"
+      - "CodigoIBGE NVARCHAR(7) -- Código IBGE da cidade"
+      - "ClienteId UNIQUEIDENTIFIER NOT NULL -- Multi-tenancy"
+      - "AlteradoPor NVARCHAR(450) -- Auditoria"
+      - "AlteradoEm DATETIME2 -- Auditoria"
+      - "FlExcluido BIT DEFAULT 0 -- Soft delete"
+    indices_ausentes:
+      - "IX_EnderecoEntrega_CEP_ClienteId (CEP, ClienteId, FlExcluido)"
+      - "IX_EnderecoEntrega_Cidade_Bairro (Cidade, Bairro, FlExcluido)"
+      - "IX_EnderecoEntrega_Padrao (ClienteId, FlEnderecoPadrao)"
+      - "IX_EnderecoEntrega_Coordenadas (Latitude, Longitude)"
+    problemas:
+      - "Sem campos de geocodificação (impossível mapas e rotas)"
+      - "Sem ClienteId (multi-tenancy ausente)"
+      - "Sem campos de categorização e metadados"
+      - "Sem auditoria completa (AlteradoPor, AlteradoEm, FlExcluido)"
+      - "Sem validação de UF válida (aceita 'ZZ', 'AB')"
+      - "CriadoPor pode ser NULL"
+      - "Sem UNIQUE constraint para FlEnderecoPadrao por ClienteId"
+      - "Sem índices para performance"
+    destino: "ASSUMIDO"
+    assumido_como: "Tabela EnderecoEntrega modernizada com 12 colunas adicionadas (Latitude, Longitude, Precisao, PlaceId, Categoria, NomeFantasia, Referencia, CodigoIBGE, ClienteId, AlteradoPor, AlteradoEm, FlExcluido) + 4 índices para performance + migração de dados existentes via script T-SQL + geocodificação retroativa via job .NET"
+    migracao_necessaria: true
+    script_migracao: "ALTER TABLE EnderecoEntrega ADD colunas (ver RL-RF043.md Seção 7.4)"
+    data_migracao: "2025-12-30"
+
+  - id: "TAB-002"
+    nome: "EntregaHistorico"
+    banco: "N/A (NÃO EXISTIA NO LEGADO)"
+    descricao: "Tabela para rastrear histórico de entregas por endereço com status, evidências, avaliação do recebedor"
+    destino: "DESCARTADO"
+    motivo_descarte: "Tabela inexistente no legado. Criada do zero na modernização sem correspondente legado para migrar."
+    data_descarte: "N/A (nunca existiu)"
+
+  - id: "TAB-003"
+    nome: "RastreamentoEvento"
+    banco: "N/A (NÃO EXISTIA NO LEGADO)"
+    descricao: "Tabela para registrar eventos de rastreamento de transportadoras (webhooks: Postado, EmTransito, Entregue)"
+    destino: "DESCARTADO"
+    motivo_descarte: "Tabela inexistente no legado. Criada do zero na modernização sem correspondente legado para migrar."
+    data_descarte: "N/A (nunca existiu)"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO IMPLÍCITAS (AUSENTES NO LEGADO)
+# ==============================================================================
+
+regras_negocio_implicitas:
+  - id: "RN-IMP-001"
+    titulo: "Validação de CEP"
+    descricao_legado: "CEP era aceito sem validação de existência via API"
+    problema: "Usuário digitava CEP inexistente (ex: 00000-000), sistema aceitava, erro só descoberto na entrega (devolução)"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "RN-RF043-001: Validação automática via ViaCEP + fallback PostMon + preenchimento automático de logradouro, bairro, cidade, UF"
+    data_substituicao: "2025-12-30"
+
+  - id: "RN-IMP-002"
+    titulo: "Geocodificação"
+    descricao_legado: "Endereços não tinham coordenadas geográficas (latitude/longitude)"
+    problema: "Impossível exibir endereço em mapa, calcular distância entre matriz e endereço de entrega, criar mapa de calor"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "RN-RF043-002: Geocodificação automática via Google Maps API (lat, long, precisão, placeId) + fallback OpenStreetMap Nominatim"
+    data_substituicao: "2025-12-30"
+
+  - id: "RN-IMP-003"
+    titulo: "Cálculo de Frete"
+    descricao_legado: "Valores de frete eram consultados manualmente em sites de transportadoras ou planilhas Excel"
+    problema: "Processo lento, sem comparação automática, sem histórico de valores de frete"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "RN-RF043-003: Cálculo automático paralelo com APIs Correios, Jadlog, Total Express + ordenação (mais barato → mais rápido) + cache 6h"
+    data_substituicao: "2025-12-30"
+
+  - id: "RN-IMP-004"
+    titulo: "Endereço Padrão Único"
+    descricao_legado: "FlEnderecoPadrao=1 sem validação de único padrão por empresa, stored procedure desmarcava TODOS (bug crítico)"
+    problema: "Múltiplos endereços padrão possíveis, bug desmarcava padrão de outros clientes"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "RN-RF043-004: Apenas 1 endereço padrão por ClienteId + transação ACID + validação FluentValidation (impede excluir padrão)"
+    data_substituicao: "2025-12-30"
+
+  - id: "RN-IMP-005"
+    titulo: "Histórico de Entregas"
+    descricao_legado: "Não havia registro de entregas por endereço"
+    problema: "Impossível saber quantas entregas, identificar endereços problemáticos, calcular taxa de sucesso, sem evidências fotográficas"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "RN-RF043-005: Tabela EntregaHistorico com FK EnderecoEntrega + Solicitacao, evidências (foto, assinatura, comprovante), avaliação 1-5 estrelas, ProblemaReportado"
+    data_substituicao: "2025-12-30"
+
+  - id: "RN-IMP-006"
+    titulo: "Rastreamento em Tempo Real"
+    descricao_legado: "Não havia rastreamento automático, usuário consultava site da transportadora manualmente"
+    problema: "Sem notificações automáticas, atrasos descobertos após prazo vencido, sem timeline visual"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "RN-RF043-006: Webhooks de transportadoras (POST /api/webhooks/rastreamento/{transportadora}) + validação HMAC-SHA256 + notificações SignalR + e-mail + SMS + fallback polling 1h (Hangfire)"
+    data_substituicao: "2025-12-30"
+
+  - id: "RN-IMP-007"
+    titulo: "Validação de Endereço Duplicado"
+    descricao_legado: "Não havia validação de endereços duplicados"
+    problema: "Usuário cadastrava mesmo endereço múltiplas vezes, histórico fragmentado, busca retornava duplicatas"
+    destino: "SUBSTITUÍDO"
+    substituido_por: "RN-RF043-009: Fuzzy match Levenshtein ≥90% + modal 'Endereço similar encontrado' + log tentativa duplicação (AuditLog)"
+    data_substituicao: "2025-12-30"
+
+# ==============================================================================
+# METADADOS DE RASTREABILIDADE
+# ==============================================================================
+
+metadados:
+  total_telas_aspx: 2
+  total_webservices_asmx: 1
+  total_stored_procedures: 4
+  total_tabelas_legadas: 3  # EnderecoEntrega (assumida), EntregaHistorico (descartada/nova), RastreamentoEvento (descartada/nova)
+  total_regras_negocio_implicitas: 7
+  total_itens_legado: 17  # 2 telas + 1 ws + 4 sps + 3 tabs + 7 RNs implícitas
+
+  distribuicao_destinos:
+    ASSUMIDO: 1  # Tabela EnderecoEntrega (migrada com colunas adicionais)
+    SUBSTITUÍDO: 13  # 2 telas + 1 ws + 4 sps + 7 RNs implícitas
+    DESCARTADO: 2  # 2 tabelas novas sem correspondente legado
+    A_REVISAR: 0
+
+  cobertura_destinos: "100%"  # 17/17 itens com destino explícito
+
+  bancos_legados_mapeados:
+    - "Cliente_Modelo (exemplo genérico, cada cliente tinha banco próprio)"
+
+  periodo_uso_legado: "2010-2025 (aproximadamente 15 anos)"
+
+  problemas_legado_identificados:
+    - "Sem validação de CEP via API (ViaCEP)"
+    - "Sem geocodificação (latitude/longitude)"
+    - "Sem cálculo automático de frete"
+    - "Sem histórico de entregas por endereço"
+    - "Sem rastreamento em tempo real"
+    - "Bug crítico: endereço padrão desmarcado em TODOS os clientes"
+    - "SQL Injection em sp_BuscarEnderecos (concatenação LIKE)"
+    - "Hard delete (sem soft delete FlExcluido)"
+    - "Sem multi-tenancy (ClienteId ausente)"
+    - "Sem auditoria completa (AlteradoPor, AlteradoEm ausentes)"
+    - "SOAP (protocolo legado, substituído por REST)"
+    - "Telerik RadGrid (licença paga, componente legado)"
+    - "ViewState pesado, postbacks lentos"

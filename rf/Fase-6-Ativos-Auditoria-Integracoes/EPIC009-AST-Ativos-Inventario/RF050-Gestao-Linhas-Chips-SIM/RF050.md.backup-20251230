@@ -1,0 +1,348 @@
+# RF050 - Gestão de Linhas Móveis e Chips SIM
+
+**Versão:** 1.0
+**Data:** 2025-12-18
+**Status:** Rascunho
+**Autor:** IControlIT Architect Agent
+
+---
+
+## 1. Resumo Executivo
+
+A Gestão de Linhas Móveis e Chips SIM é uma funcionalidade essencial do IControlIT v2 que permite gerenciar o inventário completo de linhas telefônicas móveis, chips SIM, operações de ativação/portabilidade/troca, controle de estoque de chips, rastreamento de ICCID/IMSI/IMEI, e integração com operadoras para sincronização automática de dados. O sistema oferece visibilidade completa do ciclo de vida de linhas móveis desde aquisição até desativação, com controle de custos, alertas de vencimento de contrato, e relatórios gerenciais detalhados.
+
+Este RF implementa um sistema completo que gerencia tanto aspectos físicos (chip SIM, ICCID) quanto lógicos (número da linha, operadora, plano) de linhas móveis, com suporte a operações críticas como portabilidade (manter número, trocar operadora), troca de chip (manter número, trocar chip físico), upgrade/downgrade de plano, suspensão temporária, e cancelamento definitivo. A funcionalidade inclui integração com APIs de operadoras para sincronização automática de status e consumo, controle de estoque de chips novos/usados/defeituosos, e workflow de aprovação para operações financeiramente relevantes.
+
+O sistema é estratégico para: Manter inventário preciso de ativos móveis, Controlar custos de telefonia móvel, Otimizar utilização de linhas (identificar linhas subutilizadas), Automatizar processos de portabilidade e trocas, Garantir conformidade com contratos de operadoras, e Oferecer visibilidade gerencial sobre toda a frota de linhas móveis.
+
+A funcionalidade oferece interface moderna em Angular 19 com wizard de portabilidade, dashboard de estoque de chips, mapa de cobertura de operadoras, e relatórios de utilização. Integração completa com RFs de Fornecedores/Operadoras (RF022), Contratos (RF023), Consumidores (RF052), Faturamento (RF026) e Auditoria (RF003).
+
+### 1.1 Objetivo
+
+Implementar sistema completo de gestão de linhas móveis e chips SIM com:
+- Inventário completo de linhas e chips (ICCID, IMSI, IMEI)
+- Operações de ativação, portabilidade, troca de chip
+- Controle de estoque de chips (novo, usado, defeituoso)
+- Integração com APIs de operadoras para sincronização
+- Workflow de aprovação para operações críticas
+- Rastreamento de linha x chip x aparelho x consumidor
+- Alertas de vencimento de contrato e renovação
+- Relatórios de utilização e custos por linha
+- Dashboard de estoque e status de linhas
+- Auditoria completa de todas as operações
+
+### 1.2 Escopo
+
+**Incluído:**
+- CRUD completo de linhas móveis
+- CRUD completo de chips SIM
+- Operações: Ativação, Portabilidade, Troca de Chip, Suspensão, Cancelamento
+- Controle de estoque de chips (entrada, saída, inventário)
+- Rastreamento de ICCID, IMSI, IMEI
+- Associação linha x chip x aparelho x consumidor
+- Workflow de aprovação para operações críticas
+- Integração com APIs de operadoras (status, consumo)
+- Alertas de vencimento de contrato
+- Relatórios de utilização e custos
+- Dashboard de estoque e status
+- Histórico completo de operações (7 anos)
+- API REST completa com permissões RBAC
+- Interface Angular 19 com wizards
+- Auditoria completa de todas as operações
+- Suporte multi-tenant com isolamento de dados
+- Importação de linhas via CSV/Excel
+- Exportação de relatórios
+
+**Excluído:**
+- Gerenciamento de operadoras/fornecedores (RF022)
+- Gerenciamento de contratos (RF023)
+- Gerenciamento de consumidores (RF052)
+- Faturamento detalhado (RF026)
+- Gestão de aparelhos/dispositivos (RF025)
+- Auditoria de bilhetes de chamadas (RF034, RF035)
+- Integração com ERPs externos
+- Análise preditiva de churn
+
+---
+
+## 2. Regras de Negócio
+
+### RN01 - Estrutura de Linha Móvel e Chip SIM
+
+- **Descrição:** Linha móvel e chip SIM são entidades distintas mas relacionadas
+- **Regra:** Linha Móvel contém: Número (DDI+DDD+Número), Operadora, Plano, Data Ativação, Status (Ativo, Suspenso, Cancelado). Chip SIM contém: ICCID (19-20 dígitos, único), IMSI (14-15 dígitos), Status (Novo, Ativo, Defeituoso, Inativo). Relacionamento: 1 Linha pode ter histórico de múltiplos chips (trocas). 1 Chip ativo está associado a no máximo 1 linha
+- **Validação:** Sistema valida unicidade de Número e ICCID globalmente
+- **Exceção:** Linhas portadas podem ter histórico em múltiplas operadoras
+
+### RN02 - Operação de Ativação de Linha
+
+- **Descrição:** Ativação de nova linha móvel requer chip SIM disponível
+- **Regra:** Pré-requisitos: Chip SIM com status "Novo" no estoque, Operadora e Plano selecionados, Consumidor designado (opcional). Processo: Atribui número à linha, Associa chip à linha, Atualiza status chip para "Ativo", Registra data de ativação, Cria registro de custo mensal, Notifica consumidor. Requer aprovação de Gestor se plano > R$ 100/mês
+- **Validação:** Sistema valida disponibilidade de chip antes de ativar
+- **Exceção:** Em casos excepcionais, Super Admin pode ativar linha sem chip (aguardando recebimento)
+
+### RN03 - Operação de Portabilidade
+
+- **Descrição:** Portabilidade permite manter número ao trocar de operadora
+- **Regra:** Pré-requisitos: Linha ativa na operadora origem, Chip SIM da operadora destino disponível, Protocolo de portabilidade da ANATEL. Processo: Cria solicitação de portabilidade, Informa data agendada (D+7 dias úteis), Atualiza operadora na data agendada, Troca chip físico, Atualiza histórico, Mantém número da linha. Requer aprovação de Gestor + Financeiro
+- **Validação:** Sistema valida protocolo ANATEL e prazo mínimo de 7 dias úteis
+- **Exceção:** Portabilidade emergencial pode ser processada em 3 dias com justificativa
+
+### RN04 - Operação de Troca de Chip
+
+- **Descrição:** Troca de chip permite substituir chip defeituoso/perdido mantendo linha
+- **Regra:** Motivos: Chip Defeituoso, Chip Perdido, Chip Roubado, Upgrade de Tecnologia (3G→4G→5G). Processo: Valida motivo da troca, Desativa chip antigo (status "Inativo" ou "Defeituoso"), Atribui novo chip da mesma operadora, Mantém número da linha, Registra histórico de troca, Notifica consumidor. Troca por perda/roubo pode gerar cobrança ao consumidor
+- **Validação:** Sistema valida disponibilidade de chip compatível no estoque
+- **Exceção:** Múltiplas trocas (<30 dias) geram alerta para investigação de fraude
+
+### RN05 - Controle de Estoque de Chips
+
+- **Descrição:** Sistema deve gerenciar estoque físico de chips por operadora
+- **Regra:** Estados de chip: Novo (no estoque, nunca usado), Ativo (em uso), Inativo (foi usado, agora desativado), Defeituoso (falha física). Operações de estoque: Entrada (compra de chips novos), Saída (ativação de linha), Devolução (chip defeituoso para operadora), Baixa (descarte de chips defeituosos). Alertas: Estoque baixo (<10 chips por operadora), Chips parados >6 meses (risco de expiração)
+- **Validação:** Inventário físico mensal vs sistema (conciliação)
+- **Exceção:** Chips de teste/homologação têm controle separado
+
+### RN06 - Rastreamento ICCID, IMSI, IMEI
+
+- **Descrição:** Sistema deve rastrear identificadores únicos de linha, chip e aparelho
+- **Regra:** ICCID (Integrated Circuit Card ID): Identifica chip SIM (19-20 dígitos), Gravado no chip, Imutável. IMSI (International Mobile Subscriber Identity): Identifica assinante na rede (14-15 dígitos), Associado ao chip. IMEI (International Mobile Equipment Identity): Identifica aparelho (15 dígitos), Muda se trocar aparelho. Histórico: Sistema registra todos os IMEI já usados com cada linha (detector de múltiplos aparelhos)
+- **Validação:** Sistema valida formato de ICCID, IMSI, IMEI via regex
+- **Exceção:** Alguns chips eSIM não têm ICCID físico (usar ICCID virtual)
+
+### RN07 - Workflow de Aprovação para Operações Críticas
+
+- **Descrição:** Operações financeiramente relevantes requerem aprovação multi-nível
+- **Regra:** Operações críticas: Ativação de plano >R$ 100/mês (aprovação Gestor), Portabilidade (aprovação Gestor + Financeiro), Cancelamento antes de 12 meses (multa, aprovação Financeiro), Troca de chip por perda/roubo (aprovação Gestor, pode gerar cobrança). Workflow: Cria solicitação, Notifica aprovadores, Aguarda aprovações, Executa operação, Notifica solicitante
+- **Validação:** Sistema bloqueia execução até aprovações completas
+- **Exceção:** Super Admin pode aprovar/executar imediatamente em emergências
+
+### RN08 - Integração com APIs de Operadoras
+
+- **Descrição:** Sistema deve sincronizar automaticamente dados com operadoras
+- **Regra:** Dados sincronizados: Status da linha (ativo, suspenso, cancelado), Consumo do período (dados, voz, SMS), Saldo de franquia restante, Data de vencimento de contrato. Frequência: Consumo diário (via API ou arquivo), Status em tempo real (via webhook), Vencimento mensal. Em caso de divergência, operadora é fonte da verdade (com alerta para investigação)
+- **Validação:** Job noturno sincroniza dados de todas as operadoras integradas
+- **Exceção:** Operadoras sem API funcionam com importação manual de arquivos
+
+### RN09 - Alertas de Vencimento de Contrato
+
+- **Descrição:** Sistema deve alertar proativamente sobre vencimento de contratos
+- **Regra:** Alertas em: 90 dias antes do vencimento (planejamento), 60 dias antes (negociação), 30 dias antes (decisão urgente), No vencimento (renovação automática ou cancelamento). Destinatários: Gestor responsável, Financeiro, Compras. Ação recomendada: Renovar contrato, Renegociar valores, Migrar para operadora concorrente, Cancelar linha (se subutilizada)
+- **Validação:** Job diário verifica vencimentos e envia alertas via RF066/RF067
+- **Exceção:** Contratos sem prazo determinado não geram alertas
+
+### RN10 - Identificação de Linhas Subutilizadas
+
+- **Descrição:** Sistema deve identificar linhas com baixo consumo para otimização de custos
+- **Regra:** Critérios de subutilização: Consumo de dados <10% da franquia por 3 meses consecutivos, Consumo de voz <5 minutos/mês por 3 meses, Sem uso de SMS por 6 meses. Ação recomendada: Downgrade de plano, Suspensão temporária, Cancelamento (se consumidor concorda). Relatório mensal: Top 20 linhas subutilizadas, Economia potencial
+- **Validação:** Job mensal analisa consumo e gera relatório automático
+- **Exceção:** Linhas de emergência (segurança, ambulância) não são avaliadas
+
+### RN11 - Operação de Suspensão Temporária
+
+- **Descrição:** Permitir suspender linha temporariamente sem cancelar (ex: férias, licença)
+- **Regra:** Motivos válidos: Férias (até 30 dias), Licença médica (até 120 dias), Viagem internacional (usa chip local), Perda temporária de aparelho. Efeitos: Linha mantém número, Não pode fazer/receber chamadas, Cobrança reduzida (geralmente 50%), Pode ser reativada a qualquer momento. Suspensão >30 dias requer aprovação de Gestor
+- **Validação:** Sistema valida prazo máximo de suspensão conforme contrato da operadora
+- **Exceção:** Suspensões >120 dias podem ser negadas pela operadora (risco de perda do número)
+
+### RN12 - Operação de Cancelamento Definitivo
+
+- **Descrição:** Cancelamento de linha libera número e chip, com cálculo de multa se aplicável
+- **Regra:** Pré-requisitos: Linha ativa ou suspensa, Aprovação de Gestor (sempre), Aprovação de Financeiro (se houver multa >R$ 500). Cálculo de multa: Se contrato <12 meses: Multa proporcional aos meses restantes, Se contrato ≥12 meses: Sem multa. Processo: Calcula e exibe multa, Aguarda aprovações, Solicita cancelamento à operadora, Atualiza status linha para "Cancelado", Libera chip (status "Inativo"), Desassocia de consumidor/aparelho
+- **Validação:** Sistema valida pendências financeiras antes de cancelar
+- **Exceção:** Cancelamento por fraude/irregularidade pode ser imediato
+
+### RN13 - Dashboard de Estoque e Status de Linhas
+
+- **Descrição:** Interface deve exibir visualmente status de linhas e estoque de chips
+- **Regra:** Dashboard exibe: Total de linhas por operadora (cards coloridos), Total de linhas por status (Ativo, Suspenso, Cancelado), Estoque de chips por operadora (Novo, Ativo, Defeituoso), Gráfico de ativações/cancelamentos temporal, Alertas de vencimento de contrato, Top 10 linhas de maior custo. Atualização em tempo real via SignalR
+- **Validação:** Dashboard carrega em ≤2 segundos, atualiza automaticamente
+- **Exceção:** Dados históricos (>1 ano) carregam sob demanda
+
+### RN14 - Importação de Linhas via CSV/Excel
+
+- **Descrição:** Permitir importação em lote de linhas para agilizar migração/atualização
+- **Regra:** Formato: CSV/Excel com colunas obrigatórias (Número, ICCID, Operadora, Plano, Consumidor). Validações: Unicidade de Número e ICCID, Operadora existente no cadastro, Formato válido de números. Processo: Upload de arquivo, Preview dos dados, Validação linha a linha, Importação com relatório de sucesso/erro. Limite de 1000 linhas por arquivo
+- **Validação:** Sistema valida estrutura do arquivo e dados antes de importar
+- **Exceção:** Importações >1000 linhas devem ser processadas via job em background
+
+### RN15 - Auditoria Completa de Operações de Linhas
+
+- **Descrição:** Todas as operações sobre linhas devem ser auditadas
+- **Regra:** Operações auditadas: Ativação, Portabilidade, Troca de Chip, Suspensão, Cancelamento, Atualização de dados, Importação. Dados: Usuário, Data/Hora, Operação, Dados antes/depois, IP, Justificativa. Retenção de 7 anos conforme LGPD
+- **Validação:** Auditoria via AuditInterceptor automático do EF Core
+- **Exceção:** Operações de leitura simples (listagem) não geram auditoria detalhada
+
+---
+
+## 3. Referências Técnicas
+
+### 3.1 Componentes Relacionados
+
+| Componente | Descrição | Localização |
+|------------|-----------|-------------|
+| LinhaMovel (Entity) | Entidade de domínio para linhas | `backend/Domain/Entities/Gestao/LinhaMovel.cs` |
+| ChipSIM (Entity) | Entidade de domínio para chips | `backend/Domain/Entities/Gestao/ChipSIM.cs` |
+| HistoricoLinhaChip (Entity) | Histórico de associações linha-chip | `backend/Domain/Entities/Gestao/HistoricoLinhaChip.cs` |
+| OperacaoLinha (Entity) | Registro de operações realizadas | `backend/Domain/Entities/Gestao/OperacaoLinha.cs` |
+| EstoqueChip (Entity) | Controle de estoque de chips | `backend/Domain/Entities/Gestao/EstoqueChip.cs` |
+| CreateLinhaMovelCommand | Command para criar linha | `backend/Application/Gestao/Commands/LinhasMoveis/CreateLinhaMovelCommand.cs` |
+| ActivateLinhaMovelCommand | Command para ativar linha | `backend/Application/Gestao/Commands/LinhasMoveis/ActivateLinhaMovelCommand.cs` |
+| PortabilidadeLinhaCommand | Command para portabilidade | `backend/Application/Gestao/Commands/LinhasMoveis/PortabilidadeLinhaCommand.cs` |
+| TrocaChipCommand | Command para troca de chip | `backend/Application/Gestao/Commands/LinhasMoveis/TrocaChipCommand.cs` |
+| SuspendLinhaMovelCommand | Command para suspensão | `backend/Application/Gestao/Commands/LinhasMoveis/SuspendLinhaMovelCommand.cs` |
+| CancelLinhaMovelCommand | Command para cancelamento | `backend/Application/Gestao/Commands/LinhasMoveis/CancelLinhaMovelCommand.cs` |
+| GetLinhasMovelsQuery | Query para listar linhas | `backend/Application/Gestao/Queries/LinhasMoveis/GetLinhasMovelsQuery.cs` |
+| GetEstoqueChipsQuery | Query para estoque de chips | `backend/Application/Gestao/Queries/LinhasMoveis/GetEstoqueChipsQuery.cs` |
+| LinhasMovelsService | Lógica de negócio de linhas | `backend/Infrastructure/Services/Gestao/LinhasMovelsService.cs` |
+| OperadoraIntegrationService | Integração com APIs de operadoras | `backend/Infrastructure/Services/Gestao/OperadoraIntegrationService.cs` |
+| EstoqueChipsService | Gestão de estoque de chips | `backend/Infrastructure/Services/Gestao/EstoqueChipsService.cs` |
+| LinhasMovelsEndpoints | Endpoints da API | `backend/Web/Endpoints/Gestao/LinhasMovels.cs` |
+| LinhasMovelsComponent | Componente Angular principal | `frontend/src/app/modules/gestao/linhas-moveis/linhas-moveis.component.ts` |
+| PortabilidadeWizardComponent | Wizard de portabilidade | `frontend/src/app/modules/gestao/linhas-moveis/components/portabilidade-wizard.component.ts` |
+| EstoqueChipsDashboardComponent | Dashboard de estoque | `frontend/src/app/modules/gestao/linhas-moveis/components/estoque-chips-dashboard.component.ts` |
+
+### 3.2 APIs Utilizadas
+
+| API | Método | Endpoint | Descrição |
+|-----|--------|----------|-----------|
+| Listar Linhas | GET | /api/gestao/linhas-moveis | Lista linhas com filtros |
+| Obter Linha | GET | /api/gestao/linhas-moveis/{id} | Obtém detalhes de uma linha |
+| Criar Linha | POST | /api/gestao/linhas-moveis | Cria nova linha |
+| Atualizar Linha | PUT | /api/gestao/linhas-moveis/{id} | Atualiza linha existente |
+| Ativar Linha | POST | /api/gestao/linhas-moveis/{id}/ativar | Ativa nova linha |
+| Portabilidade | POST | /api/gestao/linhas-moveis/{id}/portabilidade | Solicita portabilidade |
+| Troca de Chip | POST | /api/gestao/linhas-moveis/{id}/trocar-chip | Troca chip da linha |
+| Suspender Linha | POST | /api/gestao/linhas-moveis/{id}/suspender | Suspende linha temporariamente |
+| Cancelar Linha | POST | /api/gestao/linhas-moveis/{id}/cancelar | Cancela linha definitivamente |
+| Obter Histórico | GET | /api/gestao/linhas-moveis/{id}/historico | Obtém histórico de operações |
+| Listar Chips | GET | /api/gestao/chips-sim | Lista chips no estoque |
+| Estoque Dashboard | GET | /api/gestao/chips-sim/dashboard | Obtém dados do dashboard de estoque |
+| Importar Linhas | POST | /api/gestao/linhas-moveis/importar | Importa linhas via CSV/Excel |
+| Exportar Linhas | GET | /api/gestao/linhas-moveis/exportar | Exporta linhas para arquivo |
+| Sincronizar Operadora | POST | /api/gestao/linhas-moveis/sincronizar/{operadora} | Sincroniza dados com operadora |
+
+### 3.3 Serviços Externos
+
+- **APIs de Operadoras (Vivo, Claro, TIM, Oi):** Sincronização de status e consumo
+- **Central de E-mails (RF067):** Envio de notificações
+- **Central de Notificações (RF066):** Notificações in-app
+- **Serviço de Auditoria (RF003):** Registro de operações
+- **Serviço de Faturamento (RF026):** Integração para custos mensais
+- **Hangfire:** Processamento assíncrono e jobs noturnos
+- **SignalR:** Atualizações em tempo real do dashboard
+
+---
+
+## 4. Dependências
+
+### 4.1 Dependências de Outros RFs
+
+| RF | Nome | Tipo de Dependência |
+|----|------|---------------------|
+| RF003 | Logs, Monitoramento e Observabilidade | Obrigatória (auditoria) |
+| RF006 | Gestão de Usuários | Obrigatória (permissões) |
+| RF022 | Gestão de Fornecedores | Obrigatória (operadoras) |
+| RF023 | Gestão de Contratos | Obrigatória (contratos de linhas) |
+| RF025 | Gestão de Ativos | Opcional (aparelhos móveis) |
+| RF026 | Gestão de Faturas | Obrigatória (faturamento) |
+| RF052 | Gestão de Consumidores | Obrigatória (associação linha-consumidor) |
+| RF066 | Notificações e Alertas | Obrigatória (alertas) |
+| RF067 | Central de E-mails | Obrigatória (notificações) |
+
+### 4.2 Dependências Externas
+
+- **Entity Framework Core 10:** ORM para persistência
+- **MediatR 12.x:** Implementação de CQRS
+- **FluentValidation 11.x:** Validação de commands
+- **Hangfire 1.8.x:** Jobs em background
+- **SignalR:** Comunicação em tempo real
+- **Angular 19:** Framework frontend
+- **Angular Material 19:** Componentes UI
+- **ApexCharts:** Gráficos do dashboard
+- **Transloco 6.x:** Internacionalização
+- **EPPlus/ClosedXML:** Importação/Exportação Excel
+
+---
+
+## 5. Requisitos Não-Funcionais
+
+### 5.1 Performance
+
+- **Tempo de resposta:** Operações CRUD ≤ 300ms (P95)
+- **Throughput:** Suportar até 5.000 operações de linhas/dia
+- **Importação:** Processar arquivo com 1.000 linhas em ≤ 2 minutos
+- **Dashboard:** Carregar dashboard completo em ≤ 2 segundos
+- **Sincronização:** Sincronizar dados de operadora em ≤ 5 minutos
+- **Caching:** Cache de dados de operadoras por 1 hora
+- **Índices:** Índices em Número, ICCID, Id_Fornecedor, Status
+
+### 5.2 Segurança
+
+- **Autenticação:** JWT Bearer Token obrigatório
+- **Autorização:** RBAC com permissões granulares
+- **Auditoria:** Registro de todas as operações críticas
+- **Multi-tenancy:** Isolamento por Id_Fornecedor
+- **Criptografia:** Dados sensíveis em repouso e em trânsito
+- **Validação:** Input validation em todos os endpoints
+- **Rate Limiting:** Máximo 100 requests/minuto
+
+### 5.3 Disponibilidade
+
+- **Uptime:** 99.9%
+- **Backup:** Backup diário com retenção de 30 dias
+- **Retenção:** 7 anos para histórico (LGPD)
+- **Disaster Recovery:** RPO ≤ 1 hora, RTO ≤ 4 horas
+- **Monitoramento:** Alertas para falhas em operações críticas
+
+---
+
+## 6. Critérios de Aceitação
+
+- [ ] CRUD completo de linhas móveis e chips SIM via API REST
+- [ ] Operações de ativação, portabilidade, troca de chip funcionando
+- [ ] Controle de estoque de chips implementado
+- [ ] Integração com APIs de operadoras sincronizando dados
+- [ ] Workflow de aprovação para operações críticas
+- [ ] Alertas de vencimento de contrato enviados automaticamente
+- [ ] Identificação de linhas subutilizadas funcionando
+- [ ] Dashboard de estoque atualizando em tempo real
+- [ ] Importação/Exportação de linhas via CSV/Excel
+- [ ] Auditoria completa de todas as operações
+- [ ] Permissões RBAC validadas em todos os endpoints
+- [ ] Todos os cenários de teste (CN-RF050) passando
+- [ ] Cobertura de testes ≥ 80%
+- [ ] Performance atendendo requisitos
+- [ ] Documentação técnica completa
+
+---
+
+## 7. Observações
+
+### 7.1 Considerações de Implementação
+
+**Backend:**
+- Validação rigorosa de ICCID, IMSI, IMEI via regex
+- Jobs Hangfire para sincronização com operadoras
+- Circuit Breaker para proteger integrações externas
+- Domain Events para notificações assíncronas
+
+**Frontend:**
+- Wizards para operações complexas (portabilidade)
+- Dashboard com gráficos e indicadores visuais
+- Formulários com validação em tempo real
+
+### 7.2 Migração de Dados
+
+Sistema legado possui tabelas de linhas e chips. Migração deve:
+1. Importar todas as linhas ativas do legado
+2. Importar chips associados (ICCID disponível)
+3. Reconstruir histórico de trocas se possível
+4. Conciliar estoque físico de chips
+
+---
+
+## Histórico de Alterações
+
+| Versão | Data | Autor | Descrição |
+|--------|------|-------|-----------|
+| 1.0 | 2025-12-18 | IControlIT Architect Agent | Versão inicial - Especificação completa de Gestão de Linhas Móveis e Chips SIM |

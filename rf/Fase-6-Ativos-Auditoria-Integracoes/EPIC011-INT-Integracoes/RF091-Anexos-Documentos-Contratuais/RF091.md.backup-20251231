@@ -1,0 +1,1552 @@
+# RF091: Gestão de Anexos e Documentos Contratuais
+
+**Versão**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF023 (Gestão de Contratos), RF020 (Documentos e Anexos) | **EPIC**: EPIC011-INT-Integracoes
+**Fase**: Fase 6 - Ativos, Auditoria e Integrações
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o módulo **Gestão de Anexos e Documentos Contratuais** do sistema IControlIT, responsável pelo gerenciamento completo do ciclo de vida de documentos e anexos associados a contratos e operações do sistema.
+
+O módulo fornece capacidades avançadas de upload, armazenamento seguro, versionamento, acesso controlado e integração com serviços de nuvem (Azure Blob Storage) e processamento de documentos (OCR, Assinatura Digital). Ele resolve o problema crítico de centralizar e controlar documentação contratual em ambientes multi-tenancy com requisitos estritos de conformidade (LGPD, ISO 27001).
+
+O módulo é destinado a gestores de contratos, compliance officers, analistas financeiros e usuários finais que necessitam acessar, baixar ou gerenciar documentação contratual com rastreabilidade completa de operações.
+
+### 1.2 Importância Estratégica
+
+O módulo de Gestão de Anexos e Documentos Contratuais é crítico para:
+
+- **Conformidade Legal**: Atender requisitos LGPD art. 8 (guarda de dados pessoais), ISO 27001 (proteção de informações) e regulações de auditoria interna/externa
+- **Segurança de Informação**: Implementar criptografia, validação de integridade, scan antivírus e auditoria de acesso para proteger documentação confidencial
+- **Rastreabilidade Operacional**: Registrar quem acessou qual documento, quando, e para qual propósito, atendendo requisitos forenses e de compliance
+- **Eficiência Operacional**: Eliminar silos de documentação física, facilitar busca rápida e reduzir overhead de armazenamento local
+- **Integração Contratual**: Vincular documentos a contratos, faturas, SLAs e fornecedores para criar visão unificada
+- **Preservação de Evidência**: Manter versionamento completo, imutabilidade de downloads históricos e evidência de assinatura digital
+
+### 1.3 Conceitos Fundamentais
+
+**Anexo (Attachment)**: Arquivo digital associado a uma entidade do sistema (Contrato, Fatura, Fornecedor) com metadados (tipo, tamanho, hash, versão, proprietário). Exemplos: PDF de contrato assinado, comprovante de assinatura, especificações técnicas.
+
+- Cada anexo é versionado independentemente
+- Suporta até 50MB por arquivo individual
+- Tipos permitidos (whitelist): PDF, DOCX, XLSX, JPG, PNG, TIFF
+- Armazenado em Azure Blob Storage com redundância geográfica
+
+**Documento Contratual**: Entidade do domínio que representa uma categoria de documentação necessária para contratos. Exemplo: "Proposta Original", "Termo Assinado", "Aditivo 01", "Comprovante de Vigência".
+
+- Cada contrato pode ter múltiplos documentos contratuais
+- Cada documento contratual pode ter múltiplos anexos (versões)
+- Suporta obrigatoriedade (alguns documentos são mandatórios)
+
+**Acesso Controlado (RBAC)**: Permissão granular por papel (Role) ou política (Policy) para criar, visualizar, baixar, editar, excluir, assinatura digital ou compartilhamento de documentos.
+
+- Baseado em RBAC: Admin, Gerente, Analista, Vendedor, Viewer
+- Suporta delegação temporal (acesso válido até data X)
+- Revogação imediata de acessos
+
+**Armazenamento Seguro (Azure Blob)**: Serviço em nuvem Microsoft para armazenamento de objetos binários com:
+- Criptografia em repouso (AES-256)
+- Criptografia em trânsito (TLS 1.2+)
+- Controle de acesso (SAS tokens com expiração)
+- Backup automático com redundância geográfica (RA-GRS)
+
+**OCR (Optical Character Recognition)**: Serviço de extração de texto de documentos (PDF, imagens) usando Azure Cognitive Services, permitindo busca full-text em documentação escaneada.
+
+- Suporta 29 idiomas (incluindo português)
+- Taxa de sucesso típica: 98%+ para documentos legais com qualidade adequada
+- Resultado armazenado como metadado indexável
+
+**Assinatura Digital (DocuSign)**: Integração com plataforma DocuSign para capturar assinaturas eletrônicas com valor legal (Lei 14.063/2020), incluindo rastreamento de quem assinou, quando e de qual IP.
+
+- Fluxo: Enviar para assinatura → Acompanhar → Receber PDF assinado → Validar integridade
+- Gera evidência forense de assinatura (timestamp, IP, geolocalização)
+
+**Watermark (Marca d'Água)**: Proteção contra impressão não autorizada de documentos. Implementado como:
+- Marca d'Água visual (logotipo, texto com data/hora/usuário) em PDFs baixados
+- Marca d'Água invisível (metadata) para detecção de origem de vazamentos
+
+**Auditoria de Download**: Registro não-repudiável (não pode ser negado) de toda operação de acesso/download documentos, incluindo:
+- Quem baixou (UserId, Email)
+- O que baixou (DocumentId, Nome, Versão)
+- Quando (Timestamp UTC)
+- De onde (IP, Geolocalização)
+- Qual dispositivo (User-Agent, SO)
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Armazenamento** | File System local (servidor) | Azure Blob Storage com redundância geográfica |
+| **Segurança** | Sem criptografia (apenas NTFS ACLs) | AES-256 em repouso + TLS 1.2+ em trânsito |
+| **Upload** | Formulário ASPX simples, sem validação | Drag-drop Angular, validação client-side + server-side dupla |
+| **Controle de Acesso** | VB-based (verificação no code-behind) | RBAC centralizado com Policy/Role, revogação imediata |
+| **Scan de Vírus** | Nenhum | ClamAV integrado (detecção 99.9% de malware) |
+| **Versionamento** | Sobrescreve arquivo anterior | Versionamento completo com histórico imutável |
+| **OCR** | Nenhum (documentos ilegíveis em busca) | Azure Cognitive Services (busca full-text em PDFs scaneados) |
+| **Assinatura Digital** | Nenhuma integração | DocuSign com rastreamento forense (IP, timestamp, geolocalização) |
+| **Auditoria** | Logs básicos em banco | AuditLog estruturado (não-repudiável, imutável, retenção 10 anos) |
+| **Integração i18n** | Mensagens hardcoded em português | Totalmente i18n (pt-BR, en-US, es-ES, fr-FR) |
+| **Performance** | Queries N+1, sem cache | Índices de busca (Elasticsearch), cache distribuído (Redis) |
+| **Busca** | Like em banco de dados | Elasticsearch com full-text search em OCR + metadados |
+
+### 1.5 Funcionalidades Principais
+
+1. **Upload e Validação de Documentos** - Aceitar múltiplos arquivos simultaneamente, validar tipo (whitelist), tamanho (máx 50MB), e integridade (hash SHA-256)
+
+2. **Gestão de Versões** - Manter histórico completo de uploads, permitir rollback para versão anterior, indicar qual versão está "atual"
+
+3. **Armazenamento Seguro em Nuvem** - Integração com Azure Blob Storage com criptografia AES-256, backup geográfico redundante (RA-GRS), SAS tokens com expiração
+
+4. **Scan de Antivírus Automático** - Validar cada arquivo contra base de vírus ClamAV em tempo real, quarentena de arquivos maliciosos
+
+5. **OCR e Busca Full-Text** - Extrair texto de PDFs e imagens via Azure Cognitive Services, indexar em Elasticsearch para busca por conteúdo
+
+6. **Controle de Acesso por RBAC** - Permissões granulares (create, read, download, delete, share, sign) por papel ou usuário específico
+
+7. **Download Seguro com Tokens Temporários** - Gerar URLs com SAS token que expiram após 15 minutos, registrar cada download em auditoria
+
+8. **Visualização Inline** - Renderizar PDFs e imagens diretamente no navegador (viewer PDF.js), sem necessidade de download
+
+9. **Watermark em Documentos** - Adicionar marca d'água visual (nome do usuário, data/hora, logotipo) antes de qualquer download
+
+10. **Assinatura Digital com DocuSign** - Integração com DocuSign para capturas de assinatura eletrônica com rastreamento forense
+
+11. **Integração com RF023 (Contratos)** - Vincular documentos a contratos, validar obrigatoriedade de documentação, bloquear contratos incompletos
+
+12. **Integração com LGPD (RF020)** - Permitir exclusão automática de documentos após término contratual, anonimização de dados pessoais
+
+13. **Auditoria Completa** - Registrar todas operações (upload, download, exclusão, compartilhamento, assinatura) com timestamp UTC, UserId, IP, rastreabilidade
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-DOC-091-01: Validação Obrigatória de Tipo de Arquivo
+
+**Descrição**: Apenas tipos de arquivo explicitamente aprovados (whitelist) podem ser aceitos. Qualquer tentativa de upload de tipo não autorizado resulta em rejeição imediata.
+
+**Justificativa**: Proteger contra execução de código malicioso (arquivos .exe, .bat, .js) e garantir que documentação armazenada seja em formatos suportados por visualizadores (PDF, Office, imagem).
+
+**Implementação**:
+```csharp
+public static class AllowedFileTypes
+{
+    private static readonly HashSet<string> AllowedMimeTypes = new()
+    {
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "image/jpeg",
+        "image/png",
+        "image/tiff"
+    };
+
+    public bool IsAllowed(IFormFile file)
+    {
+        var extension = Path.GetExtension(file.FileName).ToLower();
+        var mimeType = file.ContentType.ToLower();
+
+        // Dupla validação: extensão + MIME type
+        return extension switch
+        {
+            ".pdf" => mimeType == "application/pdf",
+            ".docx" => mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xlsx" => mimeType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".jpg" or ".jpeg" => mimeType == "image/jpeg",
+            ".png" => mimeType == "image/png",
+            ".tiff" or ".tif" => mimeType == "image/tiff",
+            _ => false
+        } && AllowedMimeTypes.Contains(mimeType);
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Válido: arquivo.pdf (application/pdf, extensão .pdf)
+- ✗ Inválido: arquivo.exe (application/octet-stream, extensão .exe não permitida)
+- ✗ Inválido: contrato.pdf.exe (duplicação de extensão, detectada como .exe)
+- ✓ Válido: proposta.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document)
+
+---
+
+### RN-DOC-091-02: Limite de Tamanho de Arquivo (50MB)
+
+**Descrição**: Nenhum arquivo individual pode exceder 50MB. Tentativas de upload de arquivos maiores resultam em erro HTTP 413 (Payload Too Large) com mensagem clara ao usuário.
+
+**Justificativa**: Controlar consumo de banda, tempo de upload/download, armazenamento em blob storage e performance de visualizadores. 50MB é suficiente para contratos em PDF alta qualidade, especificações técnicas e planilhas complexas.
+
+**Implementação**:
+```csharp
+public class ValidateFileSizeHandler : IRequestHandler<UploadDocumentCommand, Result>
+{
+    private const long MaxFileSize = 50 * 1024 * 1024; // 50MB
+
+    public async Task<Result> Handle(UploadDocumentCommand request, CancellationToken ct)
+    {
+        if (request.File.Length > MaxFileSize)
+        {
+            return Result.Failure(
+                errorCode: "FILE_TOO_LARGE",
+                message: $"Arquivo excede tamanho máximo de {MaxFileSize / 1024 / 1024}MB",
+                statusCode: StatusCodes.Status413PayloadTooLarge
+            );
+        }
+
+        // Continua processamento...
+    }
+}
+```
+
+**Exemplos**:
+- ✓ 5MB - Contrato assinado (PDF)
+- ✓ 45MB - Planilha com anexos (XLSX)
+- ✗ 75MB - Vídeo de apresentação (não permitido, além do tamanho)
+- ✓ 50MB - Documento de especificação técnica (máximo permitido)
+
+---
+
+### RN-DOC-091-03: Scan Obrigatório de Antivírus (ClamAV)
+
+**Descrição**: Todo arquivo recebido deve ser submetido a scan de antivírus ClamAV antes de ser armazenado no blob storage. Se detectado malware, o arquivo é colocado em quarentena e o upload é rejeitado.
+
+**Justificativa**: Prevenir distribuição de malware através do sistema, atender requisitos de ISO 27001 e conformidade com políticas de segurança da informação.
+
+**Implementação**:
+```csharp
+public class ClamAvScanHandler
+{
+    private readonly IConfiguration _config;
+
+    public async Task<ScanResult> ScanFileAsync(IFormFile file, CancellationToken ct)
+    {
+        using (var stream = file.OpenReadStream())
+        using (var client = new ClamClient(_config["ClamAv:Host"], _config["ClamAv:Port"]))
+        {
+            var scanResult = await client.ScanStreamAsync(stream, ct);
+
+            if (scanResult.Result == ClamScanResults.VirusFound)
+            {
+                // Log para auditoria de segurança
+                await _auditService.LogThreatDetectedAsync(
+                    fileName: file.FileName,
+                    detectedVirus: scanResult.InfectedFiles.FirstOrDefault()?.VirusName,
+                    userId: _currentUser.Id,
+                    timestamp: DateTime.UtcNow,
+                    ct
+                );
+
+                // Coloca em quarentena (não armazena no blob)
+                throw new MalwareDetectedException(
+                    $"Malware detectado: {scanResult.InfectedFiles.FirstOrDefault()?.VirusName}"
+                );
+            }
+
+            return scanResult;
+        }
+    }
+}
+```
+
+**Exemplos**:
+- ✓ PDF limpo - Arquivo sem vírus, armazenado normalmente
+- ✗ DOCX infectado - Detectado vírus EICAR, colocado em quarentena, usuário notificado
+- ✓ ZIP analisado - Decompactado e cada arquivo escaneado recursivamente
+
+---
+
+### RN-DOC-091-04: Validação de Integridade com SHA-256
+
+**Descrição**: Cada arquivo recebe um hash SHA-256 calculado no servidor após upload. Este hash é registrado e pode ser usado para validar integridade do arquivo em downloads posteriores.
+
+**Justificativa**: Detectar corrupção acidental de arquivo (falha de transmissão, disco degradado) e fornecer evidência de não-repúdio (arquivo não foi alterado desde upload original).
+
+**Implementação**:
+```csharp
+public class CalculateFileHashHandler
+{
+    public async Task<string> CalculateSha256Async(Stream fileStream, CancellationToken ct)
+    {
+        using (var sha256 = System.Security.Cryptography.SHA256.Create())
+        {
+            fileStream.Seek(0, SeekOrigin.Begin);
+            var hash = await Task.Run(() => sha256.ComputeHash(fileStream), ct);
+            return Convert.ToHexString(hash);
+        }
+    }
+}
+
+// Entity com hash armazenado
+public class DocumentAttachment : Entity
+{
+    public string FileName { get; set; }
+    public string MimeType { get; set; }
+    public long FileSize { get; set; }
+    public string Sha256Hash { get; set; } // Imutável após criação
+    public int VersionNumber { get; set; }
+    public DateTime UploadedAt { get; set; }
+    public Guid UploadedBy { get; set; }
+}
+```
+
+**Exemplos**:
+- Upload de contrato.pdf → Hash: a1b2c3d4e5f6g7h8i9j0... (armazenado)
+- Download → Hash recalculado, comparado com valor armazenado
+- ✓ Hashes idênticos - Integridade validada
+- ✗ Hashes diferentes - Corrupção detectada, alerta de segurança
+
+---
+
+### RN-DOC-091-05: Versionamento Imutável de Documentos
+
+**Descrição**: Cada versão de um documento é imutável e identificada por VersionNumber. Novo upload cria VersionNumber+1, sem alterar versões anteriores. Apenas a versão mais recente é marcada como "Atual".
+
+**Justificativa**: Preservar histórico completo para auditoria, permitir rollback a versões anteriores em caso de erro, e criar trilha forense de alterações.
+
+**Implementação**:
+```csharp
+public class UploadDocumentVersionCommand : IRequest<UploadDocumentResponse>
+{
+    public Guid ContractId { get; set; }
+    public Guid DocumentCategoryId { get; set; } // Tipo: "Proposta Original", "Termo Assinado"
+    public IFormFile File { get; set; }
+}
+
+public class UploadDocumentVersionHandler : IRequestHandler<UploadDocumentVersionCommand>
+{
+    public async Task<UploadDocumentResponse> Handle(UploadDocumentVersionCommand cmd, CancellationToken ct)
+    {
+        // Busca documento mais recente
+        var lastVersion = await _repo.GetLatestVersionAsync(
+            cmd.ContractId,
+            cmd.DocumentCategoryId,
+            ct
+        );
+
+        var newVersion = new DocumentAttachment
+        {
+            ContractId = cmd.ContractId,
+            DocumentCategoryId = cmd.DocumentCategoryId,
+            VersionNumber = (lastVersion?.VersionNumber ?? 0) + 1,
+            IsCurrentVersion = true, // Apenas nova versão é "atual"
+            FileName = cmd.File.FileName,
+            // ... outros campos
+        };
+
+        // Marca versão anterior como histórica
+        if (lastVersion != null)
+        {
+            lastVersion.IsCurrentVersion = false;
+            await _repo.UpdateAsync(lastVersion, ct);
+        }
+
+        // Armazena novo arquivo
+        var blobUri = await _blobStorage.UploadAsync(newVersion.BlobKey, cmd.File, ct);
+        newVersion.BlobUri = blobUri;
+
+        await _repo.AddAsync(newVersion, ct);
+
+        return new UploadDocumentResponse
+        {
+            DocumentId = newVersion.Id,
+            VersionNumber = newVersion.VersionNumber,
+            UploadedAt = newVersion.UploadedAt
+        };
+    }
+}
+```
+
+**Exemplos**:
+- Upload 1: contrato_v1.pdf → VersionNumber=1, IsCurrentVersion=true
+- Upload 2: contrato_v2.pdf → VersionNumber=2, IsCurrentVersion=true (v1 fica com IsCurrentVersion=false)
+- Rollback: Usuário escolhe restaurar v1 → Nova versão v3 com conteúdo idêntico a v1 é criada
+
+---
+
+### RN-DOC-091-06: Controle de Acesso por RBAC com Delegação Temporal
+
+**Descrição**: Acesso a documentos é controlado por papel (Role) ou política (Policy). Suporta delegação temporária de acesso (válido até data específica) e revogação imediata de permissões.
+
+**Justificativa**: Garantir que apenas usuários autorizados possam acessar documentação sensível (contratos, aditivos, NDA), atender requisitos de segregação de funções (SoD) e auditoria de acesso.
+
+**Implementação**:
+```csharp
+public class DocumentAccessPolicy
+{
+    public Guid DocumentId { get; set; }
+    public Guid UserId { get; set; }
+    public List<Permission> Permissions { get; set; } = new(); // read, download, delete, sign, share
+    public DateTime? ValidUntil { get; set; } // Null = permanente
+    public bool IsRevoked { get; set; }
+}
+
+public class CheckDocumentAccessHandler : IRequestHandler<CheckDocumentAccessQuery, bool>
+{
+    public async Task<bool> Handle(CheckDocumentAccessQuery query, CancellationToken ct)
+    {
+        // 1. Validar autenticação
+        if (query.UserId == Guid.Empty)
+            throw new UnauthorizedException("Usuário não autenticado");
+
+        // 2. Validar papel (Role)
+        var userRoles = await _roleRepository.GetUserRolesAsync(query.UserId, ct);
+        var roleHasAccess = userRoles.Any(r => r.HasPermission($"doc:read:{query.DocumentId}"));
+
+        // 3. Validar política específica de documento
+        var documentAccess = await _accessPolicyRepository.GetAsync(
+            query.DocumentId,
+            query.UserId,
+            ct
+        );
+
+        var policyHasAccess = documentAccess != null
+            && !documentAccess.IsRevoked
+            && (documentAccess.ValidUntil == null || documentAccess.ValidUntil > DateTime.UtcNow);
+
+        // 4. Usuário precisa estar em Role OU ter Policy explícita
+        return roleHasAccess || policyHasAccess;
+    }
+}
+```
+
+**Exemplos**:
+- Role "Gerente de Contratos" tem acesso a todos os contratos de sua unidade
+- Usuário "joão@empresa.com" tem acesso temporário a contrato X até 31/12/2025
+- Admin revoga acesso de "maria@empresa.com" imediatamente (IsRevoked=true)
+- ✗ Usuário sem Role/Policy tenta acessar documento → HTTP 403 Forbidden
+
+---
+
+### RN-DOC-091-07: Download Seguro com SAS Token e Watermark
+
+**Descrição**: Downloads de documentos são realizados através de SAS token (Shared Access Signature) do Azure, válido por 15 minutos, e incluem watermark visual (nome do usuário, data/hora) em PDFs.
+
+**Justificativa**: Impedir compartilhamento de URLs permanentes, criar auditoria de quem baixou quando, e deixar marca visual em documentos impressos prevenindo vazamentos não autorizados.
+
+**Implementação**:
+```csharp
+public class GenerateSecureDownloadUrlCommand : IRequest<SecureDownloadUrlResponse>
+{
+    public Guid DocumentId { get; set; }
+}
+
+public class GenerateSecureDownloadUrlHandler : IRequestHandler<GenerateSecureDownloadUrlCommand>
+{
+    private const int SasTokenExpiryMinutes = 15;
+
+    public async Task<SecureDownloadUrlResponse> Handle(GenerateSecureDownloadUrlCommand cmd, CancellationToken ct)
+    {
+        // 1. Validar permissão
+        var hasAccess = await _accessChecker.HasAccessAsync(
+            cmd.DocumentId,
+            _currentUser.Id,
+            Permission.Download,
+            ct
+        );
+        if (!hasAccess) throw new AccessDeniedException();
+
+        // 2. Buscar documento
+        var document = await _repo.GetAsync(cmd.DocumentId, ct);
+        if (document == null) throw new DocumentNotFoundException();
+
+        // 3. Gerar SAS token com expiração
+        var sasUri = await _blobStorage.GenerateSasUriAsync(
+            blobName: document.BlobKey,
+            expiryTime: TimeSpan.FromMinutes(SasTokenExpiryMinutes),
+            permissions: BlobSasPermissions.Read
+        );
+
+        // 4. Se PDF, preparar watermark
+        string downloadUrl = sasUri.AbsoluteUri;
+        if (document.MimeType == "application/pdf")
+        {
+            downloadUrl = await _pdfWatermarkService.AddWatermarkAsync(
+                sasUri,
+                $"Baixado por {_currentUser.Name} em {DateTime.UtcNow:dd/MM/yyyy HH:mm}",
+                ct
+            );
+        }
+
+        // 5. Registrar auditoria
+        await _auditService.LogDownloadAsync(
+            documentId: document.Id,
+            userId: _currentUser.Id,
+            timestamp: DateTime.UtcNow,
+            ipAddress: _httpContext.Connection.RemoteIpAddress?.ToString(),
+            ct
+        );
+
+        return new SecureDownloadUrlResponse
+        {
+            Url = downloadUrl,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(SasTokenExpiryMinutes)
+        };
+    }
+}
+```
+
+**Exemplos**:
+- URL gerada: `https://blob.azure.com/...?sv=2021-06-08&sig=...&se=2025-12-28T14:30:00Z` (válida por 15 min)
+- PDF baixado contém watermark: "Baixado por João Silva em 28/12/2025 14:15"
+- URL expirada → Usuário recebe erro "Link expirou, gere novo download"
+
+---
+
+### RN-DOC-091-08: Busca Full-Text com OCR em Elasticsearch
+
+**Descrição**: Documentos PDF e imagens sofrem OCR (Optical Character Recognition) para extração de texto, que é indexado em Elasticsearch permitindo busca por conteúdo de documentos (não apenas nome).
+
+**Justificativa**: Usuários precisam encontrar contratos específicos pelo número do fornecedor, valor, datas ou termos-chave sem conhecer nome exato do arquivo.
+
+**Implementação**:
+```csharp
+public class IndexDocumentForSearchCommand : IRequest<Unit>
+{
+    public Guid DocumentId { get; set; }
+}
+
+public class IndexDocumentForSearchHandler : IRequestHandler<IndexDocumentForSearchCommand>
+{
+    public async Task<Unit> Handle(IndexDocumentForSearchCommand cmd, CancellationToken ct)
+    {
+        var document = await _repo.GetAsync(cmd.DocumentId, ct);
+        if (document == null) throw new DocumentNotFoundException();
+
+        // 1. Se PDF ou imagem, extrair texto via OCR
+        string extractedText = document.MimeType switch
+        {
+            "application/pdf" => await _ocrService.ExtractTextFromPdfAsync(document.BlobUri, ct),
+            "image/jpeg" or "image/png" => await _ocrService.ExtractTextFromImageAsync(document.BlobUri, ct),
+            _ => null
+        };
+
+        // 2. Indexar em Elasticsearch
+        var indexDoc = new DocumentSearchIndex
+        {
+            DocumentId = document.Id,
+            ContractId = document.ContractId,
+            FileName = document.FileName,
+            ExtractedText = extractedText,
+            MimeType = document.MimeType,
+            UploadedAt = document.UploadedAt,
+            UploadedBy = document.UploadedBy,
+            // Metadados do contrato vinculado
+            ContractNumber = document.Contract?.Number,
+            SupplierName = document.Contract?.Supplier?.Name,
+            ContractValue = document.Contract?.Value,
+        };
+
+        await _elasticsearchService.IndexAsync(indexDoc, ct);
+
+        return Unit.Value;
+    }
+}
+
+// Query de busca
+public class SearchDocumentsQuery : IRequest<List<DocumentSearchResult>>
+{
+    public string SearchTerm { get; set; } // "fornecedor ABC" ou "valor 50000"
+    public Guid? ContractId { get; set; }
+    public int PageSize { get; set; } = 20;
+    public int PageNumber { get; set; } = 1;
+}
+
+public class SearchDocumentsHandler : IRequestHandler<SearchDocumentsQuery, List<DocumentSearchResult>>
+{
+    public async Task<List<DocumentSearchResult>> Handle(SearchDocumentsQuery query, CancellationToken ct)
+    {
+        var searchRequest = new SearchRequest<DocumentSearchIndex>
+        {
+            Query = new MultiMatchQuery
+            {
+                Query = query.SearchTerm,
+                Fields = new[] { "fileName", "extractedText", "contractNumber", "supplierName" }
+            },
+            From = (query.PageNumber - 1) * query.PageSize,
+            Size = query.PageSize
+        };
+
+        // Filtro por contrato se especificado
+        if (query.ContractId.HasValue)
+        {
+            searchRequest.Query = new BoolQuery
+            {
+                Must = new[] { searchRequest.Query },
+                Filter = new[] { new TermQuery { Field = "contractId", Value = query.ContractId.Value } }
+            };
+        }
+
+        var result = await _elasticsearchClient.SearchAsync(searchRequest, ct);
+
+        return result.Documents
+            .Select(d => new DocumentSearchResult
+            {
+                DocumentId = d.DocumentId,
+                FileName = d.FileName,
+                Relevance = result.Hits.FirstOrDefault(h => h.Source.DocumentId == d.DocumentId)?.Score ?? 0
+            })
+            .ToList();
+    }
+}
+```
+
+**Exemplos**:
+- Busca: "contrato 2025" → Retorna contratos com "2025" no conteúdo extraído do PDF
+- Busca: "fornecedor XYZ" → Retorna contratos onde nome do fornecedor aparece no OCR
+- Busca: "R$ 100.000" → Retorna documentos com valor específico
+
+---
+
+### RN-DOC-091-09: Integração com RF023 - Obrigatoriedade de Documentação
+
+**Descrição**: Cada tipo de contrato (RF023) pode definir quais tipos de documento são obrigatórios. Um contrato não pode ser marcado como "Ativo" enquanto não tiver todos os documentos obrigatórios.
+
+**Justificativa**: Garantir que documentação contratual está completa antes de operações iniciarem (faturamento, SLA, etc).
+
+**Implementação**:
+```csharp
+public class ValidateContractComplianceHandler : IRequestHandler<ActivateContractCommand, Result>
+{
+    public async Task<Result> Handle(ActivateContractCommand cmd, CancellationToken ct)
+    {
+        var contract = await _contractRepo.GetAsync(cmd.ContractId, ct);
+        var requiredDocuments = await _documentCategoryRepo.GetRequiredCategoriesAsync(
+            contract.ContractTypeId,
+            ct
+        );
+
+        // Validar se cada documento obrigatório tem pelo menos 1 versão
+        foreach (var requiredDoc in requiredDocuments)
+        {
+            var hasAttachment = await _attachmentRepo.HasCurrentVersionAsync(
+                contract.Id,
+                requiredDoc.Id,
+                ct
+            );
+
+            if (!hasAttachment)
+            {
+                return Result.Failure(
+                    errorCode: "MISSING_REQUIRED_DOCUMENT",
+                    message: $"Documento '{requiredDoc.Name}' é obrigatório para contratos do tipo '{contract.ContractType.Name}'",
+                    statusCode: StatusCodes.Status400BadRequest
+                );
+            }
+        }
+
+        // Ativar contrato
+        contract.Status = ContractStatus.Active;
+        contract.ActivatedAt = DateTime.UtcNow;
+        await _contractRepo.UpdateAsync(contract, ct);
+
+        return Result.Success();
+    }
+}
+```
+
+**Exemplos**:
+- Contrato de fornecedor exige: "Proposta Assinada", "CNPJ Válido", "Certificado de Conformidade"
+- Usuário tenta ativar contrato com apenas 2 documentos → Erro: "Documento 'Certificado de Conformidade' falta"
+- Usuário faz upload do terceiro documento → Contrato pode ser ativado
+
+---
+
+### RN-DOC-091-10: Auditoria Não-Repudiável de Todas as Operações
+
+**Descrição**: Toda operação em documentos (upload, download, visualização, exclusão, compartilhamento, assinatura) é registrada em tabela de auditoria imutável com timestamp UTC, UserId, IP, User-Agent e descrição da ação.
+
+**Justificativa**: Atender requisitos LGPD (rastreabilidade de acesso a dados pessoais), ISO 27001 (evidência de atividades) e forense de segurança em caso de incidente.
+
+**Implementação**:
+```csharp
+public class AuditLogEntry : Entity
+{
+    public Guid ClienteId { get; set; } // Multi-tenancy
+    public Guid UserId { get; set; }
+    public string UserEmail { get; set; }
+    public string Action { get; set; } // "DOC_UPLOAD", "DOC_DOWNLOAD", "DOC_DELETE", "DOC_SIGN"
+    public Guid? DocumentId { get; set; }
+    public Guid? ContractId { get; set; }
+    public DateTime Timestamp { get; set; } // UTC
+    public string IpAddress { get; set; }
+    public string UserAgent { get; set; }
+    public string Description { get; set; }
+    public Dictionary<string, object> Metadata { get; set; } // Dados contextais
+}
+
+public class LogDocumentOperationService
+{
+    public async Task LogAsync(
+        string action,
+        Guid documentId,
+        Guid userId,
+        string userEmail,
+        string ipAddress,
+        string userAgent,
+        Dictionary<string, object> metadata,
+        CancellationToken ct
+    )
+    {
+        var auditEntry = new AuditLogEntry
+        {
+            ClienteId = _tenantService.CurrentClienteId,
+            UserId = userId,
+            UserEmail = userEmail,
+            Action = action,
+            DocumentId = documentId,
+            Timestamp = DateTime.UtcNow,
+            IpAddress = ipAddress,
+            UserAgent = userAgent,
+            Metadata = metadata
+        };
+
+        await _auditRepository.AddAsync(auditEntry, ct);
+        await _auditRepository.CommitAsync(ct);
+    }
+}
+
+// Uso nos handlers
+public class DownloadDocumentHandler : IRequestHandler<DownloadDocumentCommand>
+{
+    public async Task Handle(DownloadDocumentCommand cmd, CancellationToken ct)
+    {
+        // ... validações e geração de URL ...
+
+        // Log de auditoria
+        await _auditService.LogAsync(
+            action: "DOC_DOWNLOAD",
+            documentId: document.Id,
+            userId: _currentUser.Id,
+            userEmail: _currentUser.Email,
+            ipAddress: _httpContext.Connection.RemoteIpAddress?.ToString(),
+            userAgent: _httpContext.Request.Headers["User-Agent"],
+            metadata: new Dictionary<string, object>
+            {
+                { "DocumentName", document.FileName },
+                { "VersionNumber", document.VersionNumber },
+                { "FileSize", document.FileSize },
+                { "ContractId", document.ContractId }
+            },
+            ct
+        );
+    }
+}
+```
+
+**Exemplos**:
+- 28/12/2025 14:15:32 UTC - UserId: abc123 - Action: DOC_UPLOAD - DocumentId: def456 - FileName: "contrato_2025.pdf" - Size: 2.5MB
+- 28/12/2025 14:20:15 UTC - UserId: xyz789 - Action: DOC_DOWNLOAD - DocumentId: def456 - IP: 192.168.1.100 - User-Agent: "Mozilla/5.0..."
+- 28/12/2025 14:25:00 UTC - UserId: admin01 - Action: DOC_DELETE - DocumentId: def456 - Reason: "Arquivo obsoleto"
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `ic1_legado` (SQL Server)
+
+**Tabelas Relacionadas**:
+
+```sql
+-- Tabela de armazenamento de anexos (VB.NET)
+CREATE TABLE [dbo].[tblAnexos](
+    [IdAnexo] [int] IDENTITY(1,1) NOT NULL,
+    [IdContrato] [int] NOT NULL,
+    [NomeArquivo] [varchar](255) NOT NULL,
+    [CaminhoArquivo] [varchar](500) NOT NULL,
+    [TipoAnexo] [varchar](50) NULL,
+    [DataUpload] [datetime] NOT NULL,
+    [UsuarioUpload] [varchar](100) NOT NULL,
+    [Ativo] [bit] DEFAULT (1),
+    CONSTRAINT [PK_tblAnexos] PRIMARY KEY CLUSTERED ([IdAnexo] ASC)
+);
+
+-- Tabela de categorias de documento (ex: "Proposta", "Termo Assinado")
+CREATE TABLE [dbo].[tblCategoriaDocumento](
+    [IdCategoria] [int] IDENTITY(1,1) NOT NULL,
+    [NomeCategoria] [varchar](100) NOT NULL,
+    [Descricao] [text] NULL,
+    [Obrigatoria] [bit] DEFAULT (0),
+    CONSTRAINT [PK_tblCategoriaDocumento] PRIMARY KEY CLUSTERED ([IdCategoria] ASC)
+);
+
+-- Tabela de histórico de downloads
+CREATE TABLE [dbo].[tblHistoricoDownload](
+    [IdHistorico] [int] IDENTITY(1,1) NOT NULL,
+    [IdAnexo] [int] NOT NULL,
+    [UsuarioDownload] [varchar](100) NOT NULL,
+    [DataDownload] [datetime] NOT NULL,
+    [IPAddress] [varchar](15) NULL,
+    CONSTRAINT [PK_tblHistoricoDownload] PRIMARY KEY CLUSTERED ([IdHistorico] ASC),
+    CONSTRAINT [FK_HistoricoDownload_Anexos] FOREIGN KEY ([IdAnexo])
+        REFERENCES [dbo].[tblAnexos]([IdAnexo])
+);
+```
+
+**Problemas Identificados no Legado**:
+- Caminhos de arquivo armazenados como strings (acoplamento com sistema de arquivos)
+- Sem criptografia de dados em repouso
+- Sem scan de antivírus
+- Sem versionamento (novo upload sobrescreve arquivo anterior)
+- Sem auditoria detalhada (apenas timestamp e usuário)
+- Sem controle granular de acesso (apenas verificação no código VB)
+- Sem integração com Azure Blob Storage
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `sp_UploadAnexo` | Registra novo anexo no banco | Migrado para Command `UploadDocumentCommand` + Azure Blob |
+| `sp_ListarAnexosPorContrato` | Lista anexos de um contrato | Migrado para Query `GetDocumentsByContractQuery` |
+| `sp_ExcluirAnexo` | Marca anexo como inativo | Migrado para Command `DeleteDocumentCommand` + soft delete |
+| `sp_AtualizarStatusAnexo` | Atualiza status (ativo/inativo) | Integrado em handlers CQRS |
+
+### 3.3 Telas ASPX
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `GerenciarAnexos.aspx` | Upload/listagem de anexos por contrato | `/contratos/{id}/documentos` (Angular) |
+| `VisualizarAnexo.aspx` | Visualização de PDF em novo aba | `/documentos/{id}/visualizar` (PDF.js) |
+| `DownloadAnexo.aspx` | Download com validação de acesso | API endpoint `/api/documents/{id}/download` com SAS token |
+| `HistoricoAnexos.aspx` | Histórico de uploads | `/contratos/{id}/documentos/historico` (Angular) |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSAnexos.asmx.vb` (hipotético)
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `UploadAnexo(idContrato, arquivo)` | Upload de arquivo | `POST /api/documents/upload` |
+| `ListarAnexosPorContrato(idContrato)` | Listar documentos | `GET /api/documents?contractId={id}` |
+| `DownloadAnexo(idAnexo)` | Download com acesso local | `GET /api/documents/{id}/download` (com SAS token) |
+| `ExcluirAnexo(idAnexo)` | Exclusão lógica | `DELETE /api/documents/{id}` |
+| `GetHistoricoDownloads(idAnexo)` | Auditoria de downloads | `GET /api/documents/{id}/audit-log` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `DOC_MANAGEMENT_091`
+
+**Configuração**:
+```json
+{
+    "featureKey": "DOC_MANAGEMENT_091",
+    "nome": "Gestão de Anexos e Documentos Contratuais",
+    "descricao": "Upload, versionamento, OCR, assinatura digital e auditoria de documentos contratuais",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "childFeatures": [
+        {
+            "featureKey": "DOC_ANTIVIRUS_SCAN",
+            "nome": "Scan de Antivírus (ClamAV)",
+            "descricao": "Validar cada arquivo contra malware",
+            "habilitado": true
+        },
+        {
+            "featureKey": "DOC_OCR_INDEXING",
+            "nome": "OCR e Indexação (Elasticsearch)",
+            "descricao": "Extrair texto de PDFs/imagens e indexar para busca",
+            "habilitado": true
+        },
+        {
+            "featureKey": "DOC_DIGITAL_SIGNATURE",
+            "nome": "Assinatura Digital (DocuSign)",
+            "descricao": "Capturar assinaturas eletrônicas com valor legal",
+            "habilitado": true
+        },
+        {
+            "featureKey": "DOC_WATERMARK",
+            "nome": "Watermark em Downloads",
+            "descricao": "Adicionar marca d'água visual em PDFs baixados",
+            "habilitado": true
+        }
+    ]
+}
+```
+
+**Nota**: Feature flags podem ser desabilitadas por cliente em caso de custo (OCR, antivírus) sem quebrar funcionalidades básicas.
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Tradução**:
+
+```json
+{
+    "documents": {
+        "management": {
+            "title": "Gestão de Documentos e Anexos",
+            "description": "Gerenciar documentação contratual com controle de acesso e auditoria",
+            "breadcrumb": "Documentos"
+        },
+        "upload": {
+            "title": "Fazer Upload",
+            "button": "Escolher Arquivo",
+            "dragDrop": "Arraste arquivos aqui ou clique para selecionar",
+            "maxSize": "Tamanho máximo: 50MB",
+            "allowedTypes": "Tipos permitidos: PDF, DOCX, XLSX, JPG, PNG, TIFF",
+            "success": "Arquivo enviado com sucesso",
+            "error": "Erro ao enviar arquivo",
+            "validationError": "Arquivo inválido",
+            "fileTooLarge": "Arquivo excede o tamanho máximo de 50MB",
+            "malwareDetected": "Malware detectado no arquivo. Upload rejeitado."
+        },
+        "download": {
+            "button": "Baixar",
+            "expires": "Link expira em 15 minutos",
+            "warning": "Este arquivo contém marca d'água com seu nome e data",
+            "success": "Download iniciado",
+            "accessDenied": "Você não tem permissão para baixar este documento"
+        },
+        "versions": {
+            "title": "Versões",
+            "current": "Versão atual",
+            "historic": "Histórico",
+            "uploadedBy": "Enviado por",
+            "uploadedAt": "Enviado em",
+            "rollback": "Restaurar esta versão"
+        },
+        "audit": {
+            "title": "Auditoria de Acesso",
+            "action": "Ação",
+            "user": "Usuário",
+            "timestamp": "Data/Hora",
+            "ipAddress": "Endereço IP",
+            "actions": {
+                "upload": "Upload",
+                "download": "Download",
+                "delete": "Exclusão",
+                "view": "Visualização",
+                "sign": "Assinatura",
+                "share": "Compartilhamento"
+            }
+        },
+        "permissions": {
+            "create": "Criar documentos",
+            "read": "Visualizar documentos",
+            "download": "Baixar documentos",
+            "update": "Editar documentos",
+            "delete": "Excluir documentos",
+            "sign": "Assinar documentos",
+            "share": "Compartilhar documentos"
+        },
+        "messages": {
+            "missingRequiredDocument": "Documento obrigatório ausente: {documentName}",
+            "documentNotFound": "Documento não encontrado",
+            "accessDenied": "Acesso negado a este documento",
+            "documentDeleted": "Documento excluído com sucesso",
+            "versionRestored": "Versão restaurada com sucesso"
+        },
+        "validation": {
+            "required": "Campo obrigatório",
+            "invalidType": "Tipo de arquivo não permitido",
+            "maxSize": "Arquivo excede tamanho máximo",
+            "corrupted": "Arquivo corrompido ou inválido"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Upload de Documento | `DOC_ATTACH_UPLOAD` | DocumentId, FileName, FileSize, SHA256, UserId, ClienteId, Timestamp, IP |
+| Download de Documento | `DOC_ATTACH_DOWNLOAD` | DocumentId, UserId, ClienteId, Timestamp, IP, User-Agent, ExpiryTime |
+| Exclusão de Documento | `DOC_ATTACH_DELETE` | DocumentId, FileName, UserId, ClienteId, Timestamp, IP, Reason |
+| Visualização de Documento | `DOC_ATTACH_VIEW` | DocumentId, UserId, ClienteId, Timestamp, IP, Duration |
+| Assinatura Digital | `DOC_ATTACH_SIGN` | DocumentId, UserId, ClienteId, Timestamp, IP, SignatureProvider (DocuSign), SignatureId |
+| Compartilhamento | `DOC_ATTACH_SHARE` | DocumentId, SharedBy, SharedWith, ExpiryDate, Timestamp, Permissions |
+| Malware Detectado | `DOC_ATTACH_MALWARE` | FileName, VirusName, UserId, ClienteId, Timestamp, IP, Action (quarantine) |
+| OCR Processado | `DOC_ATTACH_OCR` | DocumentId, FileName, TextLength, SuccessRate, ProcessingTime, Timestamp |
+
+**Retenção**: 10 anos (requisito LGPD e auditoria contábil)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `doc:document:create` | Criar novo documento | Gerente de Contratos, Admin |
+| `doc:document:read` | Visualizar documentos | Gerente, Analista, Viewer (com restrições) |
+| `doc:document:download` | Baixar documentos | Gerente, Analista, Vendedor |
+| `doc:document:update` | Editar metadados | Gerente, Owner do documento |
+| `doc:document:delete` | Excluir documentos | Gerente, Admin |
+| `doc:document:sign` | Assinar documentos | Gerente, Diretor (com autenticação MFA) |
+| `doc:document:share` | Compartilhar com usuários externos | Gerente, Admin |
+| `doc:document:audit` | Visualizar logs de auditoria | Gerente, Compliance, Admin |
+| `doc:approval:workflow` | Aprovar fluxo de assinatura | Diretor, CFO (para contratos > valor X) |
+| `doc:ocr:request` | Requisitar OCR de documentos | Gerente, Analyst |
+
+**Nota**: Permissões podem ser delegadas temporariamente (ValidUntil em DocumentAccessPolicy).
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao | Status Esperado |
+|--------|----------|-----------|-----------|-----------------|
+| GET | `/api/documents` | Listar documentos com filtros | `doc:document:read` | 200 OK |
+| GET | `/api/documents/{id}` | Obter detalhes de documento | `doc:document:read` | 200 OK |
+| POST | `/api/documents/upload` | Fazer upload de novo documento | `doc:document:create` | 201 Created |
+| PUT | `/api/documents/{id}` | Atualizar metadados | `doc:document:update` | 200 OK |
+| DELETE | `/api/documents/{id}` | Excluir documento (soft delete) | `doc:document:delete` | 204 No Content |
+
+**Detalhes**:
+
+```
+GET /api/documents
+Query Parameters:
+  ?contractId={Guid}
+  &categoryId={Guid}
+  &versionNumber={int}
+  &search={text}
+  &pageSize={int}
+  &pageNumber={int}
+  &sortBy={field}
+  &sortDirection={asc|desc}
+
+Response (200):
+{
+  "data": [
+    {
+      "id": "doc-guid",
+      "contractId": "contract-guid",
+      "categoryId": "category-guid",
+      "fileName": "contrato_2025.pdf",
+      "mimeType": "application/pdf",
+      "fileSize": 2500000,
+      "versionNumber": 1,
+      "isCurrentVersion": true,
+      "uploadedAt": "2025-12-28T10:15:00Z",
+      "uploadedBy": "user-guid",
+      "uploadedByName": "João Silva",
+      "sha256Hash": "a1b2c3d4...",
+      "permissions": ["read", "download", "sign"],
+      "accessibleUntil": null
+    }
+  ],
+  "pagination": {
+    "totalCount": 42,
+    "pageSize": 10,
+    "pageNumber": 1,
+    "totalPages": 5
+  }
+}
+```
+
+### 5.2 Operações Especiais
+
+| Metodo | Endpoint | Descricao | Permissao | Status |
+|--------|----------|-----------|-----------|--------|
+| POST | `/api/documents/{id}/download-url` | Gerar URL segura com SAS token (15 min) | `doc:document:download` | 200 OK |
+| POST | `/api/documents/{id}/versions` | Listar histórico de versões | `doc:document:read` | 200 OK |
+| POST | `/api/documents/{id}/rollback` | Restaurar versão anterior | `doc:document:update` | 200 OK |
+| POST | `/api/documents/{id}/share` | Compartilhar documento com usuário/grupo | `doc:document:share` | 201 Created |
+| GET | `/api/documents/{id}/audit-log` | Histórico de acesso (downloads, visualizações) | `doc:document:audit` | 200 OK |
+| POST | `/api/documents/{id}/sign` | Iniciar fluxo de assinatura (DocuSign) | `doc:document:sign` | 202 Accepted |
+| GET | `/api/documents/{id}/sign-status` | Status de assinatura pendente | `doc:document:read` | 200 OK |
+| POST | `/api/documents/{id}/ocr-request` | Requisitar OCR para indexação | `doc:ocr:request` | 202 Accepted |
+| GET | `/api/documents/search` | Busca full-text em conteúdo (OCR) | `doc:document:read` | 200 OK |
+| POST | `/api/documents/{id}/permissions` | Gerenciar permissões de acesso | `doc:document:share` | 200 OK |
+
+**Detalhes**:
+
+```
+POST /api/documents/{id}/download-url
+Request:
+{
+  "withWatermark": true
+}
+
+Response (200):
+{
+  "url": "https://icontrolit.blob.azure.com/documents/doc-guid?sv=2021-06-08&sig=...&se=2025-12-28T14:30:00Z",
+  "expiresAt": "2025-12-28T14:30:00Z",
+  "expiresIn": "15 minutes"
+}
+```
+
+```
+POST /api/documents/{id}/share
+Request:
+{
+  "sharedWithUserIds": ["user-guid-1", "user-guid-2"],
+  "permissions": ["read", "download"],
+  "validUntil": "2026-01-31T23:59:59Z"
+}
+
+Response (201):
+{
+  "sharedDocument": {
+    "id": "share-guid",
+    "documentId": "doc-guid",
+    "sharedBy": "user-guid",
+    "sharedAt": "2025-12-28T10:15:00Z",
+    "sharingCount": 2,
+    "expiresAt": "2026-01-31T23:59:59Z"
+  }
+}
+```
+
+```
+POST /api/documents/{id}/sign
+Request:
+{
+  "signingOrder": ["user-email-1@empresa.com", "user-email-2@empresa.com"],
+  "message": "Por favor assinar contrato referente ao fornecedor XYZ",
+  "provider": "docusign"
+}
+
+Response (202):
+{
+  "signingFlowId": "sign-flow-guid",
+  "status": "pending",
+  "currentSigner": "user-email-1@empresa.com",
+  "signingUrl": "https://na4.docusign.net/...",
+  "createdAt": "2025-12-28T10:15:00Z"
+}
+```
+
+```
+GET /api/documents/search?q=fornecedor%20ABC&contractId={guid}
+Response (200):
+{
+  "results": [
+    {
+      "documentId": "doc-guid",
+      "fileName": "contrato_fornecedor_abc.pdf",
+      "relevance": 0.95,
+      "snippet": "...Fornecedor ABC é responsável pela prestação de serviços conforme....",
+      "versionNumber": 2,
+      "uploadedAt": "2025-12-20T15:00:00Z"
+    }
+  ],
+  "totalCount": 1,
+  "executionTime": "145ms"
+}
+```
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Upload de Documento
+
+```
+Usuário acessa /contratos/{id}/documentos
+    |
+    v
+Clica em "Fazer Upload"
+    |
+    v
+Seleciona arquivo (Drag-drop ou File Dialog)
+    |
+    v
+Frontend valida (tamanho, extensão)
+    |
+    ├─ [Validação falhou] → Exibe erro ao usuário
+    |
+    v
+POST /api/documents/upload
+    |
+    v
+Backend valida tipo MIME + extensão (dupla validação)
+    |
+    ├─ [Tipo não permitido] → HTTP 400 Bad Request
+    |
+    v
+Calcula SHA-256 do arquivo
+    |
+    v
+Submete arquivo a ClamAV para scan de antivírus
+    |
+    ├─ [Malware detectado] → Coloca em quarentena, HTTP 400 Bad Request
+    |
+    v
+Armazena arquivo em Azure Blob Storage
+    |
+    v
+Cria DocumentAttachment Entity com:
+  - BlobUri, BlobKey
+  - VersionNumber (incrementado)
+  - IsCurrentVersion=true (versão anterior fica false)
+  - SHA256Hash, FileSize, MimeType
+  - UploadedAt, UploadedBy
+    |
+    v
+Se documento é PDF ou imagem:
+    |
+    ├─ Submete a OCR (Azure Cognitive Services)
+    ├─ Aguarda extração de texto (async)
+    ├─ Indexa em Elasticsearch
+    |
+    v
+Registra auditoria (DOC_ATTACH_UPLOAD)
+    |
+    v
+HTTP 201 Created
+    |
+    v
+Frontend exibe sucesso:
+  - "Arquivo enviado com sucesso"
+  - VersionNumber, DataUpload, Tamanho
+  - Link para download + botão de compartilhamento
+```
+
+### 6.2 Fluxo de Download Seguro
+
+```
+Usuário visualiza documento em /contratos/{id}/documentos
+    |
+    v
+Clica em botão "Baixar"
+    |
+    v
+Frontend chama POST /api/documents/{id}/download-url
+    |
+    v
+Backend valida permissão (RBAC + DocumentAccessPolicy)
+    |
+    ├─ [Sem permissão] → HTTP 403 Forbidden
+    ├─ [Acesso expirou] → HTTP 403 Forbidden (ValidUntil < Now)
+    ├─ [Acesso revogado] → HTTP 403 Forbidden (IsRevoked=true)
+    |
+    v
+Gera SAS token do Azure (valid por 15 minutos)
+    |
+    v
+Se PDF:
+    |
+    ├─ Prepara payload para watermark:
+    |   - Nome do usuário
+    |   - Data/Hora atual
+    |   - Logotipo da empresa
+    ├─ Cria pipeline de processamento PDF (via iTextSharp)
+    |
+    v
+Registra auditoria (DOC_ATTACH_DOWNLOAD) com:
+  - UserId, IP, User-Agent
+  - DocumentId, FileName, VersionNumber
+  - Timestamp UTC
+    |
+    v
+HTTP 200 com corpo JSON contendo URL + expiração
+    |
+    v
+Frontend cria link <a href="url"> ou window.open()
+    |
+    v
+Navegador baixa arquivo com SAS token
+    |
+    v
+Azure Blob Storage valida token e entrega arquivo
+    |
+    v
+Se PDF com watermark:
+    |
+    ├─ Navegador renderiza com marca d'água visual
+    |
+    v
+Arquivo salvo em Downloads/
+```
+
+### 6.3 Fluxo de Assinatura Digital (DocuSign)
+
+```
+Usuário em detalhe de contrato, seção "Documentos"
+    |
+    v
+Seleciona documento "Termo Assinado" (versão não assinada)
+    |
+    v
+Clica em "Enviar para Assinatura"
+    |
+    v
+Frontend abre modal com:
+  - Campo de entrada: "Ordem de signatários (emails)"
+  - Textarea: "Mensagem personalizada"
+  - Dropdown: "Provedor" (DocuSign)
+    |
+    v
+POST /api/documents/{id}/sign
+    |
+    v
+Backend cria SigningFlow Entity com:
+  - DocumentId, ContractId
+  - SigningOrder (array de emails)
+  - Status=Pending
+  - CreatedAt
+    |
+    v
+Integra com DocuSign API:
+    |
+    ├─ Cria Envelope (contém documento + signatários)
+    ├─ Define ordem de assinatura
+    ├─ Gera Signing URL (válido por 90 dias)
+    |
+    v
+Registra auditoria (DOC_ATTACH_SIGN_INITIATED)
+    |
+    v
+HTTP 202 Accepted com SigningFlowId
+    |
+    v
+Frontend exibe "Convites de assinatura enviados"
+    |
+    v
+Sistema aguarda webhooks do DocuSign (envelope-sent, envelope-signed)
+    |
+    v
+Signatário recebe email com link de assinatura
+    |
+    v
+Signatário clica em link → Abre DocuSign Signing Ceremony
+    |
+    v
+Signatário assina (captura eletrônica com:
+  - Timestamp exato
+  - IP address
+  - Geolocalização
+  - Device fingerprint
+    |
+    v
+DocuSign envia webhook: envelope-completed
+    |
+    v
+Backend recebe webhook → Faz download de PDF assinado de DocuSign
+    |
+    v
+Armazena novo arquivo como nova VersionNumber do documento
+    |
+    v
+Marca SigningFlow.Status=Completed
+    |
+    v
+Registra auditoria (DOC_ATTACH_SIGN_COMPLETED) com detalhes do signatário
+    |
+    v
+Sistema notifica todos os signatários: "Documento assinado com sucesso"
+    |
+    v
+RF023 (Gestão de Contratos) detecta que documento "Termo Assinado" foi assinado
+    |
+    v
+Se todas documentações obrigatórias estão presentes:
+    |
+    ├─ Desbloqueia botão "Ativar Contrato"
+```
+
+### 6.4 Fluxo de Busca Full-Text (OCR)
+
+```
+Usuário em /documentos?search=true
+    |
+    v
+Digite "fornecedor ABC" ou "valor 100000"
+    |
+    v
+Frontend dispara GET /api/documents/search?q={searchTerm}
+    |
+    v
+Backend consulta Elasticsearch:
+    |
+    ├─ Multi-match query em campos:
+    |   - fileName
+    |   - extractedText (OCR)
+    |   - contractNumber
+    |   - supplierName
+    |
+    v
+Elasticsearch retorna resultados ordenados por relevância
+    |
+    v
+Backend enriquece resultado com:
+  - DocumentId, FileName
+  - Relevance score (0-1)
+  - Snippet de contexto (50 chars antes/depois)
+  - VersionNumber, UploadedAt
+    |
+    v
+HTTP 200 com array de resultados
+    |
+    v
+Frontend renderiza lista com:
+  - Nome do arquivo (bold)
+  - Snippet de contexto
+  - Data de upload
+  - Botões: Download, Ver Detalhes
+    |
+    v
+Usuário clica em resultado → Navega para detalhe do documento
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Protecao | Descricao | Implementacao |
+|----------|-----------|---------------|
+| **Criptografia em Repouso** | AES-256 no Azure Blob Storage | Configuração da conta de storage: "Encryption at rest" habilitada |
+| **Criptografia em Trânsito** | TLS 1.2+ em todas comunicações | HTTPS obrigatório, HSTS header, certificado ECC 256-bit |
+| **Validação de Tipo** | Whitelist de MIME types + extensão | Dupla validação client-side + server-side |
+| **Limite de Tamanho** | 50MB máximo por arquivo | Validação em middleware + endpoint |
+| **Scan de Antivírus** | ClamAV em tempo real | Arquivo scaneado antes de armazenar em blob |
+| **Hash de Integridade** | SHA-256 calculado no servidor | Validado em downloads, evidência forense |
+| **Controle de Acesso** | RBAC + Policy-based | Permissões verificadas em cada endpoint |
+| **SAS Token Temporário** | Expiração em 15 minutos | Azure Blob SAS URI com BlobSasPermissions.Read |
+| **Watermark Visual** | Marca d'água em PDFs | Nome + data/hora + logotipo incrustado |
+| **Auditoria Imutável** | Log não-repudiável | Tabela separada, retenção 10 anos, sem delete |
+| **Prevenção de CSRF** | Token CSRF em POST | Middleware `[ValidateAntiForgeryToken]` |
+| **Prevenção de SQL Injection** | Parameterized queries + EF Core | Nenhuma string concatenation em SQL |
+| **Prevenção de XSS** | Encoding em templates Angular | DomSanitizer em trusted URLs |
+| **Rate Limiting** | Throttling por IP/usuário | 100 uploads/hora, 1000 downloads/hora por usuário |
+| **MFA para Assinatura** | Autenticação multi-fator | Exige MFA para assinar documentos |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] SQL Injection em campos de busca (`/api/documents/search?q=...` malicioso)
+- [ ] XSS em nomes de arquivo (upload `<script>alert('xss')</script>.pdf`)
+- [ ] CSRF em endpoints POST (sem token CSRF)
+- [ ] Path Traversal em download (`/api/documents/../../../etc/passwd`)
+- [ ] Acesso não autorizado (usuário A tenta acessar documento de usuário B)
+- [ ] Upload de arquivo executável (.exe, .bat, .sh) bloqueado
+- [ ] Arquivo > 50MB rejeitado com erro apropriado
+- [ ] Malware (EICAR test file) detectado por ClamAV
+- [ ] SAS token expirado retorna 403
+- [ ] Verificação de integridade (hash mismatch) detectada
+- [ ] Auditoria registrada para cada acesso
+- [ ] Revoção de acesso (IsRevoked=true) bloquia downloads
+- [ ] Validação de expiração (ValidUntil < Now) bloquia downloads
+- [ ] Rate limiting evita abuso (100+ uploads rápidos)
+- [ ] Watermark presente em PDF baixado
+- [ ] OCR malicioso (PDF com imagem contendo XSS) não executa código
+- [ ] DocuSign webhook verificado (assinatura legítima, não falsificada)
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao | Alertas |
+|-----|------|---------|---------|
+| **Taxa de Sucesso de Upload** | 99.5%+ | (Uploads Sucesso / Uploads Total) × 100 | < 99% por 1h |
+| **Tempo Médio de Upload** | < 5 segundos (p50) | Timestamp POST até HTTP 201 | > 10s (p95) |
+| **Taxa de Detecção de Malware** | 100% (0 falsos-negativos) | Arquivos quarentenados / Scans executados | Qualquer falso-negativo |
+| **Disponibilidade do Serviço** | 99.9% | Uptime / Tempo Total | < 99.9% |
+| **Tempo Médio de OCR** | < 30 segundos | Tempo de processamento por página | > 60s por página |
+| **Taxa de Erro em Downloads** | < 0.5% | (Downloads com erro / Total downloads) × 100 | > 1% em 1h |
+| **SLA de Assinatura Digital** | 99% em 48h | Documentos assinados em < 48h / Total enviados | > 1% não assinado em 48h |
+| **Auditoria Completude** | 100% | Operações registradas / Operações executadas | < 100% |
+| **Capacidade de Armazenamento** | 10TB usado / 50TB disponível | Size(Blob Storage) | > 80% capacidade |
+| **Busca Full-Text Latência** | < 500ms (p95) | Tempo de query em Elasticsearch | > 1s (p95) |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao | Severidade |
+|--------|----------|------|-----------|
+| **Malware Detectado** | Arquivo com vírus quarentenado | Email para SecOps + Slack #security | CRÍTICA |
+| **Taxa de Erro Alta** | > 5% de erros em 5 minutos | PagerDuty onCall, rollback se necessário | ALTA |
+| **Upload Lento** | Tempo medio > 30s em 10 min | Investigar Azure Storage, verificar rede | MÉDIA |
+| **Espaço em Disco** | > 80% da capacidade usada | Email para DevOps, provisionar mais storage | ALTA |
+| **Acesso Não Autorizado** | > 10 tentativas 403 do mesmo IP | Rate limiting + notificação segurança | ALTA |
+| **Falha de Antivírus** | ClamAV offline ou não responde | Bloquear uploads, alerta crítico | CRÍTICA |
+| **Elasticsearch Degradado** | Latência > 5s ou taxa erro > 10% | Failover para cache, alertar DevOps | ALTA |
+| **Certificado SSL Expirando** | < 30 dias para expiração | Email para DevOps, renovar ASAP | MÉDIA |
+| **DocuSign API Rate Limit** | Excedido limite de requisições | Fila de espera, retry exponencial | MÉDIA |
+| **Auditoria Não-Registrada** | Operação sem log correspondente | Alerta crítico, investigar code path | CRÍTICA |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF091](./MD-RF091-Gestao-Anexos-Documentos.md) com DDL completo incluindo:
+   - Tabelas: DocumentAttachment, DocumentAccessPolicy, DocumentCategory, AuditLog
+   - Índices para performance (by ContractId, UploadedAt, Sha256Hash)
+   - Triggers para auditoria
+   - Políticas de retenção (10 anos para auditoria, exclusão após período)
+
+2. **Casos de Uso**: Criar [UC-RF091](./UC-RF091-Gestao-Anexos-Documentos.md) com 5-8 cenários:
+   - UC-091-01: Upload de Documento Contratual
+   - UC-091-02: Enviar Documento para Assinatura
+   - UC-091-03: Baixar Documento com Rastreamento
+   - UC-091-04: Compartilhar Documento com Usuário Externo
+   - UC-091-05: Restaurar Versão Anterior
+   - UC-091-06: Auditar Acesso a Documento
+   - UC-091-07: Validar Documentação Contratual Obrigatória
+   - UC-091-08: Buscar Documento por Conteúdo (OCR)
+
+3. **Fluxos de Tela**: Criar [WF-RF091](./WF-RF091-Gestao-Anexos-Documentos.md) com:
+   - /documentos (listagem com filtros)
+   - /documentos/{id}/detalhes (visualização)
+   - /documentos/{id}/upload-versao (novo upload)
+   - /documentos/{id}/versoes (histórico)
+   - /documentos/{id}/assinatura (fluxo DocuSign)
+   - /documentos/{id}/permissoes (compartilhamento)
+   - /documentos/{id}/auditoria (logs de acesso)
+   - /documentos/busca (busca full-text)
+
+4. **Implementação Backend**: Commands/Queries/Handlers
+   - `UploadDocumentCommand` + Handler + Validator
+   - `CreateDocumentAccessPolicyCommand`
+   - `ShareDocumentCommand`
+   - `SignDocumentCommand` + DocuSign Integration
+   - `SearchDocumentsQuery` com Elasticsearch
+   - `GetDocumentAuditLogQuery`
+   - `GenerateSecureDownloadUrlCommand`
+   - `ValidateContractDocumentationQuery`
+
+5. **Implementação Frontend**: Componentes Angular
+   - DocumentUploadComponent (drag-drop, progress bar)
+   - DocumentListComponent (tabela, filtros)
+   - DocumentViewerComponent (PDF.js)
+   - DocumentVersionsComponent (histórico)
+   - DocumentSharingComponent (permissões)
+   - DocumentSigningComponent (workflow DocuSign)
+   - DocumentSearchComponent (full-text com Elasticsearch)
+   - DocumentAuditComponent (logs estruturados)
+
+6. **Testes**: 3 baterias (100% PASS)
+   - Backend: Unit tests dos handlers, mock de antivírus/blob/OCR/DocuSign
+   - Frontend: E2E com Playwright (upload, download, compartilhamento, assinatura)
+   - Segurança: Testes de XSS, SQL injection, CSRF, acesso não autorizado
+
+7. **Documentação de Testes**: Criar TC-RF091-*.md
+   - TC-RF091-BACKEND.md (testes de contracts, validações)
+   - TC-RF091-FRONTEND.md (testes de UI, integração com API)
+   - TC-RF091-SEGURANCA.md (testes de autorização, integridade)
+   - TC-RF091-E2E.md (testes end-to-end com QA)
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versão inicial - RF091 Gestão de Anexos e Documentos Contratuais com integração com Azure Blob, ClamAV, OCR, DocuSign e auditoria | Claude Code |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: Claude Code - AI Assistant
+**Revisão**: Pendente

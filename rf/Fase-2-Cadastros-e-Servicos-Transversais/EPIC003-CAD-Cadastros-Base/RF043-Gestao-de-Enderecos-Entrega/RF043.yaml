@@ -1,0 +1,487 @@
+rf_id: RF043
+rf_title: "Gestão de Endereços de Entrega"
+versao_governanca: "2.0"
+data_migracao: "2025-12-30"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF043-001"
+    titulo: "Validação Automática de CEP via ViaCEP"
+    descricao: "Ao digitar o CEP, sistema busca automaticamente na API ViaCEP e preenche logradouro, bairro, cidade e UF"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "api_externa"
+      mensagem_erro: "CEP não encontrado - verifique se está correto"
+      http_code: 400
+    detalhes:
+      - "CEP deve ter exatamente 8 dígitos numéricos"
+      - "Trigger: onChange após 8 dígitos digitados"
+      - "Debounce: 500ms"
+      - "Timeout máximo: 5 segundos"
+      - "Fallback: PostMon (http://api.postmon.com.br/v1/cep/{cep})"
+      - "Formatação automática: 12345678 → 12345-678"
+
+  - id: "RN-RF043-002"
+    titulo: "Geocodificação Automática com Google Maps API"
+    descricao: "Endereço completo é convertido automaticamente em coordenadas geográficas (latitude/longitude) para exibição em mapa e cálculo de distâncias"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "api_externa"
+      mensagem_erro: "Erro ao geocodificar endereço"
+      http_code: 500
+    detalhes:
+      - "Geocodificação ocorre após salvar ou modificar endereço"
+      - "Latitude: DECIMAL(10,8), entre -90 e +90"
+      - "Longitude: DECIMAL(11,8), entre -180 e +180"
+      - "Precisão aceitável: ROOFTOP ou RANGE_INTERPOLATED"
+      - "Fallback: OpenStreetMap Nominatim"
+
+  - id: "RN-RF043-003"
+    titulo: "Cálculo Automático de Frete com Múltiplas Transportadoras"
+    descricao: "Sistema consulta automaticamente APIs de transportadoras (Correios, Jadlog, Total Express) e retorna prazo e valor de frete para cada modalidade"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "business_rule"
+      mensagem_erro: "Peso deve ser >0 e <100 kg / Dimensões soma ≤200 cm"
+      http_code: 400
+    detalhes:
+      - "Consulta paralela a todas as APIs (Task.WhenAll)"
+      - "Parâmetros: CEP origem, CEP destino, peso (kg), dimensões (cm), valor declarado (R$)"
+      - "Peso: >0 e <100 kg"
+      - "Dimensões: soma (altura + largura + profundidade) ≤200 cm"
+      - "Ordenação: mais barato → mais rápido → melhor custo-benefício"
+      - "Cache: 6 horas"
+      - "Fallback: permitir frete manual se todas APIs falharem"
+
+  - id: "RN-RF043-004"
+    titulo: "Endereço Padrão por Tipo de Solicitação"
+    descricao: "Usuário pode marcar um endereço como 'Padrão' para ser pré-selecionado automaticamente em novas solicitações"
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "unique_constraint"
+      mensagem_erro: "Endereço padrão não pode ser excluído. Defina outro como padrão primeiro"
+      http_code: 400
+    detalhes:
+      - "Campo: FlEnderecoPadrao (boolean)"
+      - "Apenas 1 endereço padrão por empresa/filial (ClienteId)"
+      - "Ao marcar novo padrão, desmarcar anterior automaticamente"
+      - "Endereço padrão não pode ser excluído (FlEnderecoPadrao=1 e FlExcluido=1 → erro 400)"
+
+  - id: "RN-RF043-005"
+    titulo: "Histórico Completo de Entregas por Endereço"
+    descricao: "Sistema registra todas as entregas realizadas em cada endereço com status, evidências, problemas e avaliação do recebedor"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "foreign_key"
+      mensagem_erro: "Endereço ou Solicitação não encontrado"
+      http_code: 404
+    detalhes:
+      - "Tabela: EntregaHistorico"
+      - "Campos obrigatórios: EnderecoEntregaId, SolicitacaoId, DataEnvio, Status, Transportadora"
+      - "Status: ENUM (Entregue, EmTransito, Devolvido, Extraviado)"
+      - "Evidências opcionais: EvidenciaFotoUrl, AssinaturaDigitalUrl, ComprovanteUrl"
+      - "Avaliação: 1-5 estrelas (opcional)"
+      - "ProblemaReportado: máximo 500 caracteres"
+      - "Query: últimas 10 entregas por endereço"
+
+  - id: "RN-RF043-006"
+    titulo: "Notificações de Rastreamento em Tempo Real"
+    descricao: "Sistema se integra com webhooks de transportadoras e envia notificações automáticas a cada mudança de status da entrega"
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "webhook_signature"
+      mensagem_erro: "Signature inválida (HMAC-SHA256)"
+      http_code: 401
+    detalhes:
+      - "Webhooks: /api/webhooks/rastreamento/correios, /jadlog, /totalexpress"
+      - "Eventos: Postado, EmTransito, SaiuParaEntrega, Entregue, TentativaEntrega, EnderecoIncorreto, Devolvido"
+      - "Validação: HMAC-SHA256 signature"
+      - "Idempotência: ignorar eventos duplicados (mesmo timestamp)"
+      - "Notificações: SignalR (push), e-mail (eventos importantes), SMS (apenas SaiuParaEntrega e Entregue)"
+      - "Persistência: tabela RastreamentoEvento"
+      - "Fallback: polling a cada 1 hora (Hangfire)"
+
+  - id: "RN-RF043-007"
+    titulo: "Mapa de Calor de Entregas por Região"
+    descricao: "Dashboard exibe mapa de calor mostrando concentração de entregas por bairro/cidade para análise estratégica de logística"
+    criticidade: "BAIXA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "performance"
+      mensagem_erro: "Máximo 10.000 pontos no mapa"
+      http_code: 400
+    detalhes:
+      - "Biblioteca: Google Maps Heatmap Layer ou Leaflet + Heatmap.js"
+      - "Agregação por: 3 casas decimais (~100m de raio)"
+      - "Cores: Verde (<10 entregas/mês), Amarelo (10-50), Vermelho (>50)"
+      - "Filtros: período, status, transportadora"
+      - "Performance: máximo 10.000 pontos (senão agregar por CEP)"
+
+  - id: "RN-RF043-008"
+    titulo: "Autocomplete de Endereços Salvos"
+    descricao: "Campo de busca com autocomplete exibe sugestões de endereços salvos conforme usuário digita CEP, cidade, bairro ou nome fantasia"
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: true
+    validacao:
+      tipo: "min_length"
+      mensagem_erro: "Mínimo 3 caracteres"
+      http_code: 400
+    detalhes:
+      - "Trigger: após 3 caracteres digitados"
+      - "Debounce: 300ms"
+      - "Busca fuzzy: algoritmo Levenshtein (FuzzySharp library)"
+      - "Campos: CEP, Logradouro, Bairro, Cidade, NomeFantasia, Referencia"
+      - "Ordenação: endereços mais usados primeiro (COUNT entregas DESC)"
+      - "Máximo: 10 resultados"
+      - "Filtro: FlExcluido=0 (apenas ativos)"
+
+  - id: "RN-RF043-009"
+    titulo: "Validação de Endereço Duplicado"
+    descricao: "Antes de salvar novo endereço, sistema verifica se já existe endereço idêntico ou muito similar para evitar duplicatas"
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "fuzzy_match"
+      mensagem_erro: "Endereço similar encontrado. Deseja reutilizar?"
+      http_code: 409
+    detalhes:
+      - "Verificação: CEP exato + Número + ClienteId"
+      - "Fuzzy match: ≥90% similaridade (Levenshtein) para Logradouro, Bairro, Cidade"
+      - "Modal: Reutilizar Existente | Salvar Novo | Cancelar"
+      - "Log de tentativa de duplicação (tabela AuditLog)"
+      - "Filtro: FlExcluido=0 (ignorar excluídos)"
+
+  - id: "RN-RF043-010"
+    titulo: "Exportação de Relatório de Entregas"
+    descricao: "Sistema permite exportar relatório completo de entregas em Excel/PDF com filtros personalizados"
+    criticidade: "BAIXA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: true
+    validacao:
+      tipo: "range"
+      mensagem_erro: "Período máximo: 1 ano / Máximo 10.000 registros"
+      http_code: 400
+    detalhes:
+      - "Formatos: Excel (.xlsx) via EPPlus, PDF (.pdf) via QuestPDF"
+      - "Período máximo: 1 ano (365 dias)"
+      - "Máximo: 10.000 registros (senão sugerir filtrar ou paginar)"
+      - "Excel: formatação condicional (verde=entregue, vermelho=devolvido, amarelo=em trânsito)"
+      - "Colunas: Código, DataEnvio, DataPrevisao, DataEntrega, Endereço, Transportadora, Rastreio, Status, Avaliacao, CustoFrete"
+      - "Totalizadores: TotalEntregas, Entregues (qtd e %), Devolvidas (qtd e %), CustoTotal, CustoMedio, AvaliacaoMedia"
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "GES.ENDERECOS_ENTREGA.VIEW"
+    descricao: "Visualizar endereços de entrega"
+    roles_autorizadas:
+      - "Todos"
+    endpoint: "GET /api/v1/enderecos-entrega"
+
+  - permission_code: "GES.ENDERECOS_ENTREGA.CREATE"
+    descricao: "Cadastrar novo endereço de entrega"
+    roles_autorizadas:
+      - "Solicitante"
+      - "Comprador"
+      - "Gestor"
+      - "Super Admin"
+    endpoint: "POST /api/v1/enderecos-entrega"
+
+  - permission_code: "GES.ENDERECOS_ENTREGA.EDIT"
+    descricao: "Editar endereço de entrega existente"
+    roles_autorizadas:
+      - "Comprador"
+      - "Gestor"
+      - "Super Admin"
+    endpoint: "PUT /api/v1/enderecos-entrega/{id}"
+
+  - permission_code: "GES.ENDERECOS_ENTREGA.DELETE"
+    descricao: "Excluir endereço de entrega (soft delete)"
+    roles_autorizadas:
+      - "Gestor"
+      - "Super Admin"
+    endpoint: "DELETE /api/v1/enderecos-entrega/{id}"
+
+  - permission_code: "GES.ENDERECOS_ENTREGA.SET_DEFAULT"
+    descricao: "Marcar endereço como padrão"
+    roles_autorizadas:
+      - "Comprador"
+      - "Gestor"
+      - "Super Admin"
+    endpoint: "PATCH /api/v1/enderecos-entrega/{id}/set-default"
+
+  - permission_code: "GES.ENDERECOS_ENTREGA.VIEW_HISTORY"
+    descricao: "Visualizar histórico de entregas do endereço"
+    roles_autorizadas:
+      - "Comprador"
+      - "Gestor"
+      - "Auditor"
+      - "Super Admin"
+    endpoint: "GET /api/v1/enderecos-entrega/{id}/historico"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  - method: "GET"
+    route: "/api/v1/enderecos-entrega"
+    descricao: "Listar endereços com paginação e filtros"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaRead"
+    request_dto: "GetEnderecosEntregaQuery"
+    response_dto: "PaginatedListDto<EnderecoEntregaDto>"
+
+  - method: "GET"
+    route: "/api/v1/enderecos-entrega/{id}"
+    descricao: "Obter endereço por ID"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaRead"
+    request_dto: null
+    response_dto: "EnderecoEntregaDto"
+
+  - method: "POST"
+    route: "/api/v1/enderecos-entrega"
+    descricao: "Criar novo endereço"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaCreate"
+    request_dto: "CreateEnderecoEntregaCommand"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/v1/enderecos-entrega/{id}"
+    descricao: "Atualizar endereço existente"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaUpdate"
+    request_dto: "UpdateEnderecoEntregaCommand"
+    response_dto: "Unit"
+
+  - method: "DELETE"
+    route: "/api/v1/enderecos-entrega/{id}"
+    descricao: "Excluir endereço (soft delete)"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaDelete"
+    request_dto: null
+    response_dto: "Unit"
+
+  - method: "PATCH"
+    route: "/api/v1/enderecos-entrega/{id}/set-default"
+    descricao: "Marcar endereço como padrão"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaSetDefault"
+    request_dto: null
+    response_dto: "Unit"
+
+  - method: "GET"
+    route: "/api/v1/enderecos-entrega/validar-cep/{cep}"
+    descricao: "Validar CEP via ViaCEP"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaRead"
+    request_dto: null
+    response_dto: "ValidacaoCepDto"
+
+  - method: "POST"
+    route: "/api/v1/enderecos-entrega/geocodificar"
+    descricao: "Geocodificar endereço (obter lat/long)"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaCreate"
+    request_dto: "GeocodificarEnderecoCommand"
+    response_dto: "GeocodificacaoDto"
+
+  - method: "GET"
+    route: "/api/v1/enderecos-entrega/{id}/historico"
+    descricao: "Obter histórico de entregas do endereço"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaViewHistory"
+    request_dto: null
+    response_dto: "List<EntregaHistoricoDto>"
+
+  - method: "POST"
+    route: "/api/webhooks/rastreamento/{transportadora}"
+    descricao: "Receber webhook de transportadora (Correios, Jadlog, TotalExpress)"
+    autenticacao: false  # Autenticação via HMAC signature
+    authorization_policy: null
+    request_dto: "WebhookRastreamentoDto"
+    response_dto: "Unit"
+
+  - method: "GET"
+    route: "/api/v1/enderecos-entrega/relatorio/entregas"
+    descricao: "Exportar relatório de entregas (Excel/PDF)"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaRead"
+    request_dto: "ExportarRelatorioEntregasQuery"
+    response_dto: "byte[]"
+
+  - method: "GET"
+    route: "/api/v1/enderecos-entrega/mapa-calor"
+    descricao: "Obter dados para mapa de calor de entregas"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaRead"
+    request_dto: "GetMapaCalorQuery"
+    response_dto: "MapaCalorDto"
+
+  - method: "POST"
+    route: "/api/v1/enderecos-entrega/calcular-frete"
+    descricao: "Calcular frete com múltiplas transportadoras"
+    autenticacao: true
+    authorization_policy: "EnderecosEntregaRead"
+    request_dto: "CalcularFreteCommand"
+    response_dto: "List<FreteDto>"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Taxa de Sucesso de Entrega"
+    descricao: "Percentual de entregas bem-sucedidas (Entregue)"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Tempo Médio de Entrega"
+    descricao: "Tempo entre DataEnvio e DataEntrega"
+    meta: "<= 5 dias úteis"
+    log_obrigatorio: true
+
+  - nome: "Custo Médio de Frete"
+    descricao: "Custo médio por entrega"
+    meta: "<= R$ 50,00"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Reuso de Endereços"
+    descricao: "Percentual de entregas em endereços já cadastrados"
+    meta: ">= 70%"
+    log_obrigatorio: true
+
+  - nome: "Precisão de Geocodificação"
+    descricao: "Percentual de endereços com precisão ROOFTOP"
+    meta: ">= 90%"
+    log_obrigatorio: true
+
+  - nome: "Tempo de Resposta ViaCEP"
+    descricao: "Tempo médio de validação de CEP"
+    meta: "<= 2s"
+    log_obrigatorio: true
+
+  - nome: "Disponibilidade APIs Transportadoras"
+    descricao: "Uptime das APIs de frete"
+    meta: ">= 99%"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Sucesso Webhook"
+    descricao: "Percentual de webhooks processados com sucesso"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Performance Query Autocomplete"
+    descricao: "Tempo de resposta da busca fuzzy"
+    meta: "<= 500ms"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "API ViaCEP Indisponível"
+    threshold: "3 falhas consecutivas"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "log"
+      - "fallback_automatico"
+    acao: "Trocar para API alternativa (PostMon)"
+
+  - evento: "Google Maps Quota Excedida"
+    threshold: ">90% da cota mensal"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "signalr"
+    acao: "Alertar admin, considerar OpenStreetMap"
+
+  - evento: "Webhook Falha"
+    threshold: "5 falhas consecutivas"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "log"
+    acao: "Ativar polling manual (Hangfire)"
+
+  - evento: "Entrega Atrasada"
+    threshold: "Prazo vencido >2 dias"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "signalr"
+    acao: "Notificar solicitante e gestor"
+
+  - evento: "Taxa de Devolução Alta"
+    threshold: ">10% em um endereço"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "signalr"
+    acao: "Investigar endereço (incorreto, portaria fechada)"
+
+  - evento: "Custo Frete Acima da Média"
+    threshold: ">R$ 100,00"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "log"
+    acao: "Sugerir renegociação com transportadora"
+
+  - evento: "Endereço Sem Geocodificação"
+    threshold: "48h sem lat/long"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "log"
+    acao: "Retry automático de geocodificação"

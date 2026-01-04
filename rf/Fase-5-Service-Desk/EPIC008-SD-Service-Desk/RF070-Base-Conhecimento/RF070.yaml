@@ -1,0 +1,526 @@
+# =============================================
+# RF-070: Base de Conhecimento
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# Data: 2025-12-30
+# =============================================
+
+rf:
+  id: "RF070"
+  nome: "Base de Conhecimento"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 5 - Service Desk"
+  epic: "EPIC008-SD"
+  status: "aprovado"
+
+descricao:
+  objetivo: "Especificar o Módulo de Base de Conhecimento (Knowledge Base) para criar, organizar, publicar e gerenciar artigos técnicos, tutoriais, procedimentos, FAQs e documentação de suporte que auxiliam na resolução de chamados, reduzem tempo de atendimento e promovem autoatendimento pelos usuários finais."
+  problema_resolvido: "Centralização de conhecimento disperso (documentos Word, e-mails, memória de analistas) em plataforma colaborativa com busca inteligente, controle de qualidade e métricas de efetividade, aumentando eficiência operacional e promovendo autoatendimento."
+  publico_afetado: "Analistas de Service Desk, Especialistas Técnicos, Gestores de Conhecimento, Usuários Finais, Auditores."
+
+escopo:
+  incluso:
+    - "CRUD de artigos de conhecimento (criar, visualizar, atualizar, excluir lógico)"
+    - "Editor rico WYSIWYG com formatação avançada, imagens, vídeos e código"
+    - "Sistema de busca full-text com ranking por relevância"
+    - "Categorização hierárquica (árvore N níveis) com relacionamento many-to-many"
+    - "Sistema de votação (Útil/Não Útil) com comentários e métricas de utilidade"
+    - "Versionamento completo de conteúdo com histórico before/after"
+    - "Workflow de aprovação configurável por categoria"
+    - "Gestão de anexos (upload, download, preview inline)"
+    - "Sugestão automática de artigos relacionados"
+    - "Integração com RF-073 (Gestão de Chamados) para sugestão de artigos durante atendimento"
+    - "Portal self-service público para autoatendimento"
+    - "Analytics e relatórios (artigos mais acessados, taxa de conversão, coverage)"
+    - "Tags dinâmicas com autocomplete"
+    - "Suporte multi-idioma (pt-BR, en-US, es-ES)"
+    - "Exportação massiva (PDF, DOCX, HTML, Markdown, JSON)"
+    - "Sistema de notificações e subscrição por categoria"
+    - "API REST/GraphQL para integração com sistemas externos"
+    - "Controle de acesso baseado em permissões (RBAC)"
+    - "Auditoria completa de operações com retenção de 7 anos"
+    - "Isolamento multi-tenant (ClienteId)"
+  fora:
+    - "Interface visual específica (responsabilidade do Frontend)"
+    - "Tecnologia, framework ou linguagem de implementação"
+    - "Layout, UX ou identidade visual (definidos pelo Design System)"
+    - "Estratégia de deploy ou infraestrutura (responsabilidade de DevOps)"
+    - "Motor de busca específico (ElasticSearch/Azure Cognitive Search - decisão técnica)"
+    - "Algoritmos de ML/IA para tags automáticas (feature opcional)"
+    - "Chatbot integrado (pode ser adicionado posteriormente)"
+    - "Gamificação (ranking de autores, badges - feature opcional)"
+
+entidades:
+  - nome: "Artigo"
+    descricao: "Artigo de conhecimento com título, resumo, problema, solução, categorias, tags, anexos, versionamento e workflow."
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "Categoria"
+    descricao: "Categoria hierárquica para organização de artigos (árvore N níveis)."
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "Votacao"
+    descricao: "Votação de usuário em artigo (Útil/Não Útil) com comentário opcional."
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "VersaoArtigo"
+    descricao: "Histórico completo de versões de artigo com before/after."
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "Anexo"
+    descricao: "Arquivo anexo vinculado a artigo (PDF, DOCX, imagens, vídeos)."
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "Tag"
+    descricao: "Tag/palavra-chave para classificação e busca de artigos."
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+
+regras_negocio:
+  - id: "RN-RF070-01"
+    descricao: "Título Único por Categoria - Dentro de uma mesma categoria, não podem existir dois artigos ativos com títulos idênticos (case-insensitive)."
+    tipo: "unicidade"
+    campos_afetados: ["Titulo", "CategoriaId"]
+    obrigatorio: true
+
+  - id: "RN-RF070-02"
+    descricao: "Conteúdo Mínimo Obrigatório - Todo artigo DEVE conter: Título (10-200 chars), Resumo (50-500 chars), Problema (min 100 chars), Solução (min 200 chars), 1+ categoria."
+    tipo: "validacao"
+    campos_afetados: ["Titulo", "Resumo", "Problema", "Solucao", "Categorias"]
+    obrigatorio: true
+
+  - id: "RN-RF070-03"
+    descricao: "Limite de Categorias por Artigo - Cada artigo pode pertencer a no máximo 5 categorias simultaneamente."
+    tipo: "validacao"
+    campos_afetados: ["Categorias"]
+    obrigatorio: true
+
+  - id: "RN-RF070-04"
+    descricao: "Workflow de Aprovação por Categoria - Artigos em categorias críticas (Segurança, Compliance, LGPD) SEMPRE requerem aprovação antes de publicação."
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "Categorias"]
+    obrigatorio: true
+
+  - id: "RN-RF070-05"
+    descricao: "Score de Utilidade Mínimo - Artigos com score < 60% após 20+ votações devem ser sinalizados para revisão."
+    tipo: "regra_negocio"
+    campos_afetados: ["ScoreUtilidade", "TotalVotacoes"]
+    obrigatorio: true
+
+  - id: "RN-RF070-06"
+    descricao: "Isolamento Multi-Tenant - Todos os artigos, categorias, votações e anexos DEVEM ser isolados por ClienteId."
+    tipo: "seguranca"
+    campos_afetados: ["ClienteId"]
+    obrigatorio: true
+
+  - id: "RN-RF070-07"
+    descricao: "Versionamento Automático - Atualização em campos críticos (Título, Problema, Solução, Causa Raiz) DEVE gerar nova versão."
+    tipo: "regra_negocio"
+    campos_afetados: ["Titulo", "Problema", "Solucao", "CausaRaiz"]
+    obrigatorio: true
+
+  - id: "RN-RF070-08"
+    descricao: "Artigos Obsoletos - Artigos publicados sem acessos há 180+ dias devem ser marcados como obsoletos."
+    tipo: "regra_negocio"
+    campos_afetados: ["UltimoAcesso", "Status"]
+    obrigatorio: true
+
+  - id: "RN-RF070-09"
+    descricao: "Anexos - Tamanho e Tipos - Limite de 500MB por arquivo, tipos permitidos: pdf, docx, xlsx, pptx, png, jpg, jpeg, gif, mp4, zip."
+    tipo: "validacao"
+    campos_afetados: ["TamanhoBytes", "TipoMIME"]
+    obrigatorio: true
+
+  - id: "RN-RF070-10"
+    descricao: "Permissões de Edição - Usuário pode editar apenas artigos que criou, exceto se tiver permissão kb:artigos:update_all."
+    tipo: "seguranca"
+    campos_afetados: ["UsuarioCriadorId", "Permissoes"]
+    obrigatorio: true
+
+  - id: "RN-RF070-11"
+    descricao: "Busca Full-Text - Performance - Busca deve retornar resultados em < 500ms (P95) mesmo em bases com 50.000+ artigos."
+    tipo: "performance"
+    campos_afetados: []
+    obrigatorio: true
+
+  - id: "RN-RF070-12"
+    descricao: "Auditoria de Operações Críticas - CREATE, UPDATE, DELETE, PUBLISH, APPROVE devem ser auditadas com registro completo e retenção de 7 anos."
+    tipo: "seguranca"
+    campos_afetados: []
+    obrigatorio: true
+
+  - id: "RN-RF070-13"
+    descricao: "Portal Self-Service - Acesso Público - Portal deve permitir busca/visualização de artigos públicos sem autenticação."
+    tipo: "regra_negocio"
+    campos_afetados: ["NivelAcesso"]
+    obrigatorio: true
+
+  - id: "RN-RF070-14"
+    descricao: "Integração com Chamados - Sugestão Automática - Ao criar chamado, sistema deve sugerir até 5 artigos relacionados."
+    tipo: "integracao"
+    campos_afetados: []
+    obrigatorio: true
+
+  - id: "RN-RF070-15"
+    descricao: "Tags - Autocomplete e Sugestão - Sistema deve sugerir tags existentes via autocomplete, evitando duplicação."
+    tipo: "usabilidade"
+    campos_afetados: ["Tags"]
+    obrigatorio: true
+
+estados:
+  - id: "rascunho"
+    descricao: "Artigo criado, ainda não finalizado. Visível apenas para criador e gestores."
+  - id: "aguardando_revisao"
+    descricao: "Artigo enviado para aprovação, aguardando atribuição de revisor."
+  - id: "em_revisao"
+    descricao: "Artigo sendo revisado por aprovador."
+  - id: "aprovado"
+    descricao: "Artigo aprovado, pronto para publicação."
+  - id: "publicado"
+    descricao: "Artigo ativo e visível na base de conhecimento."
+  - id: "rejeitado"
+    descricao: "Artigo rejeitado pelo aprovador, retorna para criador com feedback."
+  - id: "arquivado"
+    descricao: "Artigo removido da visualização pública, mas mantido para histórico."
+  - id: "obsoleto"
+    descricao: "Artigo sem acessos há 180+ dias, sinalizado para revisão."
+
+transicoes:
+  permitidas:
+    - de: "rascunho"
+      para: "aguardando_revisao"
+    - de: "rascunho"
+      para: "publicado"
+      condicao: "Se não requer aprovação e usuário tem kb:artigos:publish"
+    - de: "aguardando_revisao"
+      para: "em_revisao"
+    - de: "aguardando_revisao"
+      para: "rascunho"
+    - de: "em_revisao"
+      para: "aprovado"
+    - de: "em_revisao"
+      para: "rejeitado"
+    - de: "aprovado"
+      para: "publicado"
+    - de: "publicado"
+      para: "arquivado"
+    - de: "publicado"
+      para: "rascunho"
+      condicao: "Para edição"
+    - de: "rejeitado"
+      para: "rascunho"
+    - de: "rejeitado"
+      para: "arquivado"
+    - de: "arquivado"
+      para: "publicado"
+      condicao: "Reativação"
+    - de: "obsoleto"
+      para: "arquivado"
+    - de: "obsoleto"
+      para: "publicado"
+      condicao: "Após atualização"
+  proibidas:
+    - de: "rascunho"
+      para: "aprovado"
+      motivo: "Deve passar por revisão se requerida"
+    - de: "rejeitado"
+      para: "publicado"
+      motivo: "Deve voltar a Rascunho primeiro"
+    - de: "arquivado"
+      para: "aprovado"
+      motivo: "Reativação vai direto para Publicado"
+    - de: "obsoleto"
+      para: "aguardando_revisao"
+      motivo: "Deve ser atualizado e republicado"
+
+permissoes:
+  - codigo: "kb:artigos:read"
+    descricao: "Visualizar artigos publicados"
+  - codigo: "kb:artigos:read_all"
+    descricao: "Visualizar todos artigos (incluindo rascunhos)"
+  - codigo: "kb:artigos:create"
+    descricao: "Criar novos artigos"
+  - codigo: "kb:artigos:update"
+    descricao: "Editar artigos próprios"
+  - codigo: "kb:artigos:update_all"
+    descricao: "Editar qualquer artigo"
+  - codigo: "kb:artigos:delete"
+    descricao: "Excluir artigos"
+  - codigo: "kb:artigos:publish"
+    descricao: "Publicar artigos sem aprovação"
+  - codigo: "kb:artigos:approve"
+    descricao: "Aprovar artigos no workflow"
+  - codigo: "kb:artigos:archive"
+    descricao: "Arquivar artigos obsoletos"
+  - codigo: "kb:categorias:manage"
+    descricao: "Gerenciar árvore de categorias"
+  - codigo: "kb:analytics:view"
+    descricao: "Visualizar analytics e relatórios"
+  - codigo: "kb:anexos:upload"
+    descricao: "Fazer upload de anexos"
+  - codigo: "kb:configuracoes:manage"
+    descricao: "Configurar feature flags e limites"
+
+integracoes:
+  internas:
+    - "Autenticação (JWT Bearer Token)"
+    - "Multi-Tenancy (ClienteId)"
+    - "Auditoria (7 anos de retenção)"
+    - "RBAC (Permissões granulares)"
+    - "i18n (pt-BR, en-US, es-ES)"
+    - "RF-073 (Gestão de Chamados - sugestão automática)"
+    - "RF-074 (Gestão de Tickets - vinculação)"
+    - "Sistema de Notificações"
+    - "Analytics e Relatórios"
+  externas:
+    - sistema: "ElasticSearch ou Azure Cognitive Search"
+      tipo: "Motor de Busca Full-Text"
+      obrigatoria: true
+    - sistema: "Azure Blob Storage"
+      tipo: "Armazenamento de Anexos"
+      obrigatoria: true
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  criptografia_transito: true
+  criptografia_repouso: true
+  rate_limiting: true
+  validacao_entrada: true
+  protecao_xss: true
+  protecao_csrf: true
+
+rastreabilidade:
+  dependencias_entrada:
+    - "RF-073 (Gestão de Chamados)"
+    - "RF-074 (Gestão de Tickets)"
+    - "Sistema de Autenticação"
+    - "Sistema de Permissões (RBAC)"
+    - "Sistema de Auditoria"
+    - "Sistema de i18n"
+    - "Azure Blob Storage"
+    - "Motor de Busca Full-Text"
+  dependencias_saida:
+    - "RF-073 (Gestão de Chamados) - consome ArtigoRelacionadoSugeridoEvent"
+    - "RF-074 (Gestão de Tickets) - vinculação de artigos"
+    - "RF-071 (Pesquisa de Satisfação) - referência artigos consultados"
+    - "Portal Self-Service"
+    - "Sistema de Notificações"
+    - "Analytics e Relatórios"
+  ucs_esperados:
+    - "UC00 - Listar Artigos de Conhecimento"
+    - "UC01 - Criar Artigo de Conhecimento"
+    - "UC02 - Visualizar Artigo de Conhecimento"
+    - "UC03 - Editar Artigo de Conhecimento"
+    - "UC04 - Arquivar Artigo de Conhecimento"
+    - "UC05 - Buscar Artigos (Full-Text)"
+    - "UC06 - Votar em Artigo (Útil/Não Útil)"
+    - "UC07 - Aprovar Artigo (Workflow)"
+    - "UC08 - Visualizar Histórico de Versões"
+    - "UC09 - Gerenciar Categorias"
+    - "UC10 - Gerenciar Anexos"
+
+eventos_dominio:
+  - nome: "ArtigoCriadoEvent"
+    quando: "Após criação bem-sucedida de artigo"
+    dados: "ArtigoId, ClienteId, UsuarioId, Titulo, Status, DataCriacao"
+    consumidores: "Sistema de Notificações, Analytics"
+
+  - nome: "ArtigoAtualizadoEvent"
+    quando: "Após atualização de artigo"
+    dados: "ArtigoId, CamposAlterados, VersaoAnterior, VersaoNova, Motivo"
+    consumidores: "Versionamento, Auditoria, Notificações"
+
+  - nome: "ArtigoPublicadoEvent"
+    quando: "Artigo transiciona para estado Publicado"
+    dados: "ArtigoId, Titulo, Categorias, Tags, DataPublicacao"
+    consumidores: "Indexador de Busca, Notificações, RF-073 (Chamados)"
+
+  - nome: "ArtigoArquivadoEvent"
+    quando: "Artigo arquivado"
+    dados: "ArtigoId, Motivo, ScoreUtilidade, UltimoAcesso"
+    consumidores: "Analytics, Auditoria"
+
+  - nome: "ArtigoAprovadoEvent"
+    quando: "Artigo aprovado no workflow"
+    dados: "ArtigoId, AprovadorId, NivelAprovacao, Comentarios"
+    consumidores: "Workflow Engine, Notificações"
+
+  - nome: "ArtigoRejeitadoEvent"
+    quando: "Artigo rejeitado no workflow"
+    dados: "ArtigoId, AprovadorId, MotivoRejeicao, Comentarios"
+    consumidores: "Workflow Engine, Notificações (criador)"
+
+  - nome: "ArtigoAcessadoEvent"
+    quando: "Artigo visualizado por usuário"
+    dados: "ArtigoId, UsuarioId, IP, UserAgent, OrigemAcesso, TempoLeitura"
+    consumidores: "Analytics, Mecanismo de Recomendação"
+
+  - nome: "ArtigoVotadoEvent"
+    quando: "Usuário vota em artigo"
+    dados: "ArtigoId, UsuarioId, Voto, Comentario"
+    consumidores: "Analytics, Sistema de Qualidade"
+
+  - nome: "CategoriaAlteradaEvent"
+    quando: "Categorias de artigo modificadas"
+    dados: "ArtigoId, CategoriasAntigas, CategoriasNovas"
+    consumidores: "Indexador de Busca, Cache Invalidation"
+
+  - nome: "AnexoAdicionadoEvent"
+    quando: "Anexo adicionado a artigo"
+    dados: "ArtigoId, AnexoId, NomeArquivo, Tamanho, TipoMIME"
+    consumidores: "Auditoria, Storage Service"
+
+  - nome: "ArtigoObsoletoDetectadoEvent"
+    quando: "Job detecta artigo obsoleto"
+    dados: "ArtigoId, DiasSeçãoAcesso, UltimoAcesso"
+    consumidores: "Sistema de Notificações (gestor)"
+
+  - nome: "ArtigoRelacionadoSugeridoEvent"
+    quando: "Sistema sugere artigo relacionado a chamado"
+    dados: "ArtigoId, ChamadoId, ScoreSimilaridade"
+    consumidores: "RF-073 (Chamados), Analytics"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar artigo de conhecimento"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar artigos de conhecimento"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar artigo de conhecimento"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar artigo de conhecimento"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Arquivar artigo de conhecimento (soft delete)"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar campos obrigatórios (título, resumo, problema, solução, categoria)"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar unicidade de título por categoria"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar limite de 5 categorias por artigo"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar tamanho e tipo de anexos"
+      required: true
+    - id: "RF-VAL-05"
+      title: "Validar score de utilidade mínimo (60%)"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento multi-tenant (ClienteId)"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC granulares"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria de operações críticas (retenção 7 anos)"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Validação de entrada e sanitização HTML"
+      required: true
+    - id: "RF-SEC-05"
+      title: "Upload seguro de anexos (validação MIME, scan vírus)"
+      required: true
+    - id: "RF-SEC-06"
+      title: "Rate limiting (100 req/min)"
+      required: true
+
+  funcionalidades_especificas:
+    - id: "RF-FUNC-01"
+      title: "Editor rico WYSIWYG com formatação avançada"
+      required: true
+    - id: "RF-FUNC-02"
+      title: "Busca full-text com ranking por relevância (< 500ms P95)"
+      required: true
+    - id: "RF-FUNC-03"
+      title: "Categorização hierárquica (many-to-many)"
+      required: true
+    - id: "RF-FUNC-04"
+      title: "Sistema de votação (Útil/Não Útil) com comentários"
+      required: true
+    - id: "RF-FUNC-05"
+      title: "Versionamento completo com histórico before/after"
+      required: true
+    - id: "RF-FUNC-06"
+      title: "Workflow de aprovação configurável por categoria"
+      required: true
+    - id: "RF-FUNC-07"
+      title: "Gestão de anexos (upload, download, preview)"
+      required: true
+    - id: "RF-FUNC-08"
+      title: "Sugestão automática de artigos relacionados"
+      required: true
+    - id: "RF-FUNC-09"
+      title: "Integração com RF-073 (sugestão ao criar chamado)"
+      required: true
+    - id: "RF-FUNC-10"
+      title: "Portal self-service público"
+      required: true
+    - id: "RF-FUNC-11"
+      title: "Analytics e relatórios (dashboard)"
+      required: true
+    - id: "RF-FUNC-12"
+      title: "Tags dinâmicas com autocomplete"
+      required: true
+    - id: "RF-FUNC-13"
+      title: "Multi-idioma (pt-BR, en-US, es-ES)"
+      required: true
+    - id: "RF-FUNC-14"
+      title: "Exportação massiva (PDF, DOCX, HTML, Markdown, JSON)"
+      required: true
+    - id: "RF-FUNC-15"
+      title: "Subscrição e notificações por categoria"
+      required: true
+    - id: "RF-FUNC-16"
+      title: "Detecção automática de artigos obsoletos (180 dias)"
+      required: true
+
+exclusions:
+  rf_items:
+    - id: "RF-EXC-01"
+      descricao: "Interface visual específica (responsabilidade Frontend)"
+    - id: "RF-EXC-02"
+      descricao: "Implementação técnica (framework, linguagem)"
+    - id: "RF-EXC-03"
+      descricao: "Motor de busca específico (decisão técnica)"
+    - id: "RF-EXC-04"
+      descricao: "Algoritmos ML/IA (feature opcional)"
+    - id: "RF-EXC-05"
+      descricao: "Chatbot integrado (feature futura)"
+    - id: "RF-EXC-06"
+      descricao: "Gamificação (feature opcional)"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0: Separação RF/RL completa. Removido todo conteúdo legado (movido para RL-RF070.yaml). Adequação ao template RF.yaml v2.0."
+
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial com conteúdo misto (moderno + legado)"

@@ -1,0 +1,606 @@
+rf_id: RF107
+rf_title: "Marcadores Localização QRCode"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+epic: EPIC003-CAD-Cadastros-Base
+fase: Fase-2-Cadastros-e-Servicos-Transversais
+
+# ==============================================================================
+# OBJETIVO
+# ==============================================================================
+
+objetivo: |
+  Especificar o comportamento esperado do Módulo de Marcadores Localização QRCode,
+  responsável por gerar, gerenciar e processar códigos QR únicos para rastreamento
+  de ativos físicos em tempo real, garantindo rastreabilidade completa, conformidade
+  com LGPD e eficiência operacional.
+
+# ==============================================================================
+# ESCOPO
+# ==============================================================================
+
+escopo:
+  dentro:
+    - Geração automática de QR Code único por ativo com validação de dígito Luhn
+    - Impressão de etiquetas PDF com QR Code + dados do ativo
+    - Leitura via aplicativo mobile (PWA) com captura simultânea de GPS
+    - Check-in/Check-out de ativos entre localizações
+    - Histórico completo de leituras com timestamps e geolocalização
+    - Geolocalização em tempo real com precisão mínima de 10 metros
+    - Inventário bulk (até 1.000 QR Codes por sessão)
+    - Alertas de desvio quando ativo sai de localização autorizada
+    - Integração com Gestão de Ativos (RF014) e Locais/Endereços (RF015)
+    - Relatórios de rastreamento e movimentações
+    - Auditoria completa com retenção de 24 meses (LGPD)
+    - Isolamento multi-tenant (ClienteId em todas as operações)
+
+  fora:
+    - Interface visual específica ou layout de telas
+    - Tecnologia de geração de QR Code (ZXing, QRCoder, etc.)
+    - Provedor de mapas (Google Maps, Azure Maps, etc.)
+    - Estratégia de armazenamento de imagens (Blob, FileSystem, etc.)
+    - Framework mobile específico (PWA, React Native, Flutter, etc.)
+    - Estratégia de deploy ou infraestrutura
+
+# ==============================================================================
+# CONCEITOS E DEFINIÇÕES
+# ==============================================================================
+
+conceitos:
+  - termo: "QR Code Corporativo"
+    definicao: |
+      Código visual 2D contendo ClienteId, AtivoId e CheckDigit (Algoritmo Luhn),
+      codificado em Base64URL. Diferencia-se de QR Code público por incluir
+      validação e contexto multi-tenant.
+
+  - termo: "Check-in"
+    definicao: "Operação que registra entrada de ativo em localização com GPS e timestamp."
+
+  - termo: "Check-out"
+    definicao: "Operação que registra saída de ativo de localização anterior."
+
+  - termo: "Geolocalização"
+    definicao: "Captura de coordenadas GPS (latitude, longitude) com precisão mínima de 10 metros."
+
+  - termo: "Inventário Bulk"
+    definicao: |
+      Processo de leitura em lote de múltiplos QR Codes (até 1.000) para sincronizar
+      estado físico com estado no sistema.
+
+  - termo: "Histórico de Leituras"
+    definicao: "Registro imutável de todas as interações com QR Code (quem leu, quando, onde)."
+
+  - termo: "Etiqueta QRCode"
+    definicao: |
+      Artefato físico impresso contendo QR Code + Nome Ativo + Código Patrimonial, gerado em PDF.
+
+  - termo: "CheckDigit"
+    definicao: |
+      Dígito verificador calculado via Algoritmo de Luhn para validar autenticidade do QR Code.
+
+# ==============================================================================
+# FUNCIONALIDADES COBERTAS
+# ==============================================================================
+
+funcionalidades:
+  - id: FUNC-001
+    titulo: "Gerar QR Code único para ativo"
+    descricao: "Sistema deve gerar QR Code único com validação Luhn"
+    prioridade: CRÍTICA
+
+  - id: FUNC-002
+    titulo: "Imprimir etiqueta PDF com QR Code"
+    descricao: "Gerar PDF com QR Code + dados do ativo para impressão"
+    prioridade: ALTA
+
+  - id: FUNC-003
+    titulo: "Ler QR Code via aplicativo mobile"
+    descricao: "PWA mobile deve ler QR Code com câmera e capturar GPS"
+    prioridade: CRÍTICA
+
+  - id: FUNC-004
+    titulo: "Registrar check-in de ativo em localização"
+    descricao: "Registrar entrada de ativo com GPS e timestamp"
+    prioridade: ALTA
+
+  - id: FUNC-005
+    titulo: "Registrar check-out de ativo de localização"
+    descricao: "Registrar saída de ativo com timestamp"
+    prioridade: ALTA
+
+  - id: FUNC-006
+    titulo: "Consultar histórico de leituras de QR Code"
+    descricao: "Exibir trilha completa de movimentações"
+    prioridade: MÉDIA
+
+  - id: FUNC-007
+    titulo: "Visualizar localização atual de ativo em mapa"
+    descricao: "Exibir mapa com última localização conhecida"
+    prioridade: MÉDIA
+
+  - id: FUNC-008
+    titulo: "Executar inventário bulk (até 1.000 QR Codes)"
+    descricao: "Processar leitura em lote para auditoria"
+    prioridade: ALTA
+
+  - id: FUNC-009
+    titulo: "Receber alertas quando ativo sai de localização autorizada"
+    descricao: "Notificar desvios de localização"
+    prioridade: MÉDIA
+
+  - id: FUNC-010
+    titulo: "Exportar relatório de movimentações"
+    descricao: "Gerar relatório de rastreamento em CSV/PDF"
+    prioridade: BAIXA
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF107-001"
+    titulo: "QRCode deve ser único (GUID codificado em Base64URL)"
+    descricao: |
+      Cada QR Code gerado deve ser único no escopo do Cliente, codificado em Base64URL
+      para segurança e compactação, sem colisões possíveis mesmo após bilhões de gerações.
+    criticidade: CRÍTICA
+    criterios_aceite:
+      - "QR Code gerado deve ter entre 22-44 caracteres Base64URL"
+      - "Não pode haver dois QR Codes iguais para o mesmo Cliente"
+      - "Caracteres permitidos: A-Za-z0-9-_ (sem +, /, =)"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "formato_validacao"
+      mensagem_erro: "QRCode inválido ou duplicado"
+      http_code: 400
+
+  - id: "RN-RF107-002"
+    titulo: "QRCode deve conter ClienteId + AtivoId + CheckDigit"
+    descricao: |
+      A estrutura interna do QR Code, quando decodificado, deve ser:
+      [ClienteId(4)][AtivoId(8)][CheckDigit(2)], totalizando 14 dígitos numéricos.
+    criticidade: CRÍTICA
+    criterios_aceite:
+      - "Decodificação deve resultar em 14 dígitos numéricos"
+      - "Primeiros 4 dígitos = ClienteId"
+      - "Dígitos 5-12 = AtivoId"
+      - "Últimos 2 dígitos = CheckDigit"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "estrutura_validacao"
+      mensagem_erro: "Estrutura interna do QRCode inválida"
+      http_code: 400
+
+  - id: "RN-RF107-003"
+    titulo: "Check-digit calculado via Algoritmo de Luhn"
+    descricao: |
+      O dígito verificador dos 12 primeiros dígitos do QR Code (ClienteId + AtivoId)
+      é calculado usando o Algoritmo de Luhn.
+    criticidade: CRÍTICA
+    criterios_aceite:
+      - "QR Code com checksum incorreto deve ser rejeitado"
+      - "Validação deve ocorrer antes de qualquer operação no banco de dados"
+      - "Erro de validação deve retornar mensagem específica"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "checksum_validacao"
+      mensagem_erro: "QRCode falsificado ou com erro de checksum"
+      http_code: 400
+
+  - id: "RN-RF107-004"
+    titulo: "Etiqueta deve conter QRCode + Nome Ativo + Código Patrimonial"
+    descricao: |
+      Quando impressa, a etiqueta física deve conter: (1) Código QR 40x40mm no mínimo,
+      (2) Nome do Ativo legível, (3) Código Patrimonial (Ativo.Codigo).
+    criticidade: ALTA
+    criterios_aceite:
+      - "PDF gerado deve ter QR Code visível (mínimo 40x40mm)"
+      - "Nome do ativo deve aparecer abaixo do QR Code"
+      - "Código patrimonial deve ser legível"
+      - "Data de geração deve estar presente"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "formato_pdf"
+      mensagem_erro: "Etiqueta PDF inválida"
+      http_code: 500
+
+  - id: "RN-RF107-005"
+    titulo: "Leitura de QRCode deve registrar Usuário, Data/Hora, GPS"
+    descricao: |
+      Toda leitura de QR Code via aplicativo mobile deve registrar automaticamente:
+      (1) Usuário autenticado, (2) Data/hora UTC, (3) Coordenadas GPS com precisão mínima 10m.
+    criticidade: CRÍTICA
+    criterios_aceite:
+      - "Leitura sem GPS deve ser rejeitada ou marcada como baixa confiabilidade"
+      - "Data/hora deve ser UTC"
+      - "Usuário deve estar autenticado"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "campo_obrigatorio"
+      mensagem_erro: "GPS ou autenticação ausente"
+      http_code: 400
+
+  - id: "RN-RF107-006"
+    titulo: "Check-in sem check-out prévio deve alertar"
+    descricao: |
+      Se um ativo realiza Check-in em localização X sem ter realizado Check-out
+      na localização anterior Y, o sistema deve alertar o usuário.
+    criticidade: ALTA
+    criterios_aceite:
+      - "Sistema deve verificar último status do ativo"
+      - "Se último status = CHECK_IN, exibir alerta"
+      - "Usuário deve poder confirmar ou cancelar operação"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "estado_validacao"
+      mensagem_erro: "Ativo já em check-in sem checkout anterior"
+      http_code: 409
+
+  - id: "RN-RF107-007"
+    titulo: "Geolocalização deve ter precisão mínima de 10 metros"
+    descricao: |
+      Toda leitura de QR Code capturando geolocalização GPS deve ter precisão (accuracy)
+      de no máximo 10 metros. Leituras com precisão inferior (> 10m) devem ser rejeitadas
+      ou marcadas como baixa confiabilidade.
+    criticidade: MÉDIA
+    criterios_aceite:
+      - "Accuracy > 10m → marcado como BAIXA"
+      - "Accuracy <= 10m → marcado como ALTA"
+      - "Leituras com baixa confiabilidade devem ter alerta visual"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "range_validacao"
+      mensagem_erro: "Precisão GPS insuficiente"
+      http_code: 400
+
+  - id: "RN-RF107-008"
+    titulo: "Histórico de leituras mantido por 24 meses"
+    descricao: |
+      Todos os registros de leitura de QR Code devem ser mantidos por 24 meses (730 dias).
+      Após esse período, devem ser anonimizados conforme política LGPD.
+    criticidade: ALTA
+    criterios_aceite:
+      - "Leituras com mais de 24 meses devem ser anonimizadas"
+      - "Anonimização deve ocorrer automaticamente (job diário)"
+      - "Dados anonimizados: UsuarioId, Latitude, Longitude"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "politica_retencao"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF107-009"
+    titulo: "Inventário bulk deve processar até 1000 QRCodes por sessão"
+    descricao: |
+      Operação de inventário que lê múltiplos QR Codes (até 1.000) em uma única sessão
+      deve completar em menos de 5 minutos, processando lotes de 100 QR Codes em paralelo.
+    criticidade: MÉDIA
+    criterios_aceite:
+      - "Máximo 1.000 QR Codes por sessão"
+      - "Processamento em lotes de 100"
+      - "Tempo total < 5 minutos"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "limite_quantidade"
+      mensagem_erro: "Máximo de 1000 QR Codes por sessão excedido"
+      http_code: 400
+
+  - id: "RN-RF107-010"
+    titulo: "Auditoria de todas as operações de QRCode"
+    descricao: |
+      Todas as operações sobre QR Codes (criação, leitura, check-in, check-out, impressão,
+      exclusão) devem ser registradas em tabela de auditoria com: Usuário, Tipo de Operação,
+      Data/Hora UTC, IP da Requisição, ClienteId.
+    criticidade: CRÍTICA
+    criterios_aceite:
+      - "Todas as operações devem gerar registro de auditoria"
+      - "Registro deve conter: Usuário, Data/Hora, IP, Operação"
+      - "Auditoria deve ser imutável (sem deleção)"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "auditoria_obrigatoria"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF107-011"
+    titulo: "Isolamento por tenant"
+    descricao: |
+      Um usuário só pode acessar QR Codes do seu próprio Cliente (tenant).
+      Todas as queries devem filtrar por ClienteId automaticamente.
+    criticidade: CRÍTICA
+    criterios_aceite:
+      - "Tentativa de acesso cruzado entre tenants → não permitido"
+      - "Query sem filtro de ClienteId → deve falhar"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "tenant_isolation"
+      mensagem_erro: "Acesso negado: tenant diferente"
+      http_code: 403
+
+  - id: "RN-RF107-012"
+    titulo: "Permissões RBAC"
+    descricao: "Cada operação exige permissão explícita conforme matriz de permissões."
+    criticidade: CRÍTICA
+    criterios_aceite:
+      - "Operação sem permissão → retorna 403"
+      - "Permissão validada antes de processar operação"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "permissao_validacao"
+      mensagem_erro: "Permissão negada para esta operação"
+      http_code: 403
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "qrcode:qrcode:create"
+    descricao: "Criar novo QRCode"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gerente Ativos"
+    operacao: "Criar QRCode"
+
+  - permission_code: "qrcode:qrcode:read"
+    descricao: "Visualizar QRCode"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gerente Ativos"
+      - "Operacional"
+      - "Visualizador"
+    operacao: "Ler QRCode"
+
+  - permission_code: "qrcode:qrcode:print"
+    descricao: "Imprimir etiquetas"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gerente Ativos"
+      - "Operacional"
+    operacao: "Imprimir Etiqueta"
+
+  - permission_code: "qrcode:checkin:execute"
+    descricao: "Fazer check-in de ativo"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gerente Ativos"
+      - "Operacional"
+    operacao: "Check-in"
+
+  - permission_code: "qrcode:checkout:execute"
+    descricao: "Fazer check-out de ativo"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gerente Ativos"
+      - "Operacional"
+    operacao: "Check-out"
+
+  - permission_code: "qrcode:inventario:execute"
+    descricao: "Executar inventário bulk"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gerente Ativos"
+    operacao: "Inventário Bulk"
+
+  - permission_code: "qrcode:qrcode:delete"
+    descricao: "Excluir QRCode"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    operacao: "Excluir QRCode"
+
+# ==============================================================================
+# ESTADOS DA ENTIDADE
+# ==============================================================================
+
+estados:
+  - estado: "ATIVO"
+    descricao: "QR Code gerado e ativo"
+    transicoes_permitidas:
+      - "INATIVO"
+      - "EXCLUIDO"
+
+  - estado: "INATIVO"
+    descricao: "QR Code desativado"
+    transicoes_permitidas:
+      - "ATIVO"
+      - "EXCLUIDO"
+
+  - estado: "EXCLUIDO"
+    descricao: "Excluído logicamente"
+    transicoes_permitidas: []
+
+# ==============================================================================
+# EVENTOS DE DOMÍNIO
+# ==============================================================================
+
+eventos_dominio:
+  - evento: "qrcode.criado"
+    quando: "Após criação de QR Code"
+    payload:
+      - QRCodeId
+      - ClienteId
+      - AtivoId
+      - UsuarioId
+      - DataCriacao
+
+  - evento: "qrcode.lido"
+    quando: "Após leitura via mobile"
+    payload:
+      - QRCodeId
+      - UsuarioId
+      - Latitude
+      - Longitude
+      - DataHoraLeitura
+
+  - evento: "qrcode.checkin"
+    quando: "Após check-in de ativo"
+    payload:
+      - QRCodeId
+      - Localizacao
+      - UsuarioId
+      - DataHoraCheckIn
+
+  - evento: "qrcode.checkout"
+    quando: "Após check-out de ativo"
+    payload:
+      - QRCodeId
+      - UsuarioId
+      - DataHoraCheckOut
+
+  - evento: "qrcode.impresso"
+    quando: "Após geração de etiqueta PDF"
+    payload:
+      - QRCodeId
+      - UsuarioId
+      - DataHoraImpressao
+
+  - evento: "qrcode.excluido"
+    quando: "Após exclusão lógica"
+    payload:
+      - QRCodeId
+      - UsuarioId
+      - DataHoraExclusao
+
+# ==============================================================================
+# CRITÉRIOS GLOBAIS DE ACEITE
+# ==============================================================================
+
+criterios_globais_aceite:
+  - "Nenhuma operação pode violar isolamento de tenant (ClienteId)"
+  - "Nenhuma regra de negócio pode ser ignorada"
+  - "Erros devem ser previsíveis e rastreáveis"
+  - "Auditoria deve registrar quem, quando e o que mudou"
+  - "GPS deve ter precisão mínima de 10 metros"
+  - "CheckDigit deve ser validado antes de qualquer operação"
+  - "Histórico de leituras deve ser mantido por 24 meses"
+
+# ==============================================================================
+# SEGURANÇA
+# ==============================================================================
+
+seguranca:
+  protecoes:
+    - "Validação CheckDigit (Luhn) antes de acessar banco de dados"
+    - "Tenant Isolation (ClienteId) em todas as queries"
+    - "HTTPS Obrigatório (TLS 1.3 mínimo)"
+    - "Autenticação JWT com renovação a cada 30 minutos"
+    - "GPS Spoofing Detection (movimento > 500km em < 1 min)"
+    - "Rate Limiting (máximo 1000 leituras/usuário/hora)"
+    - "Auditoria Imutável com replicação geográfica"
+    - "CORS Restritivo (apenas frontend autorizado)"
+    - "SQL Injection Protection (queries parametrizadas)"
+    - "XSS Protection (sanitização automática)"
+
+  testes_obrigatorios:
+    - "SQL Injection"
+    - "XSS (Cross-Site Scripting)"
+    - "CSRF (Cross-Site Request Forgery)"
+    - "Validação de permissões entre tenants"
+    - "GPS Spoofing"
+    - "Rate Limiting"
+    - "Tenant Isolation"
+    - "Falsificação de CheckDigit"
+    - "Token Expiration"
+    - "Bruteforce QRCode"
+
+# ==============================================================================
+# ARTEFATOS DERIVADOS
+# ==============================================================================
+
+artefatos_derivados:
+  - artefato: "UC-RF107.md"
+    tipo: "Casos de Uso"
+    status: "Pendente"
+    obrigatorio: true
+
+  - artefato: "MD-RF107.md"
+    tipo: "Modelo de Dados"
+    status: "Pendente"
+    obrigatorio: true
+
+  - artefato: "WF-RF107.md"
+    tipo: "Fluxos de Tela"
+    status: "Pendente"
+    obrigatorio: true
+
+  - artefato: "MT-RF107.yaml"
+    tipo: "Massas de Teste"
+    status: "Pendente"
+    obrigatorio: true
+
+  - artefato: "TC-RF107.yaml"
+    tipo: "Casos de Teste"
+    status: "Pendente"
+    obrigatorio: true
+
+  - artefato: "RL-RF107.md"
+    tipo: "Referência ao Legado"
+    status: "A criar"
+    obrigatorio: true
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_regras_negocio: 12
+  total_permissoes_rbac: 7
+  total_funcionalidades: 10
+  total_estados: 3
+  total_eventos_dominio: 6
+  total_artefatos_derivados: 6

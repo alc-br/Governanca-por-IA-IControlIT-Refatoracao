@@ -1,0 +1,688 @@
+# Template de Referência ao Legado (RL-RF095.yaml)
+# Versão: 2.0
+# Data: 2025-12-31
+# RF Relacionado: RF-095
+
+rf_id: RF095
+titulo: "Auditoria de Acesso e Segurança"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "4.5"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2008 R2"
+  multi_tenant: false  # Bancos separados por cliente
+  auditoria: "partial"  # Apenas eventos críticos via triggers
+
+# =============================================
+# REFERENCIAS AO LEGADO (DESTINO OBRIGATÓRIO)
+# =============================================
+
+referencias:
+  # ------------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF095-001"
+    tipo: "tabela"
+    nome: "TB_LOG_ACESSO"
+    caminho: "Database/dbo.TB_LOG_ACESSO"
+    descricao: |
+      Tabela de registro de tentativas de login com campos:
+      - ID_LOG (int identity)
+      - DT_ACESSO (datetime)
+      - ID_USUARIO (int)
+      - NM_USUARIO (varchar 100)
+      - TP_ACESSO (varchar 20) - LOGIN_SUCESSO, LOGIN_FALHA, LOGOUT
+      - TP_DISPOSITIVO (varchar 50)
+      - ENDERECO_IP (varchar 15)
+      - MOTIVO_FALHA (varchar 255)
+
+      Problemas identificados:
+      - Sem índice em DT_ACESSO (queries lentas)
+      - ENDERECO_IP varchar(15) não suporta IPv6
+      - Sem geolocalização (país, estado, cidade)
+      - Sem ClienteId (multi-tenancy)
+      - Sem retenção governada (deletado manualmente)
+      - Logs em plaintext sem criptografia
+
+    destino: "substituido"
+    justificativa: |
+      Tabela será completamente redesenhada para incluir:
+      - Multi-tenancy (ClienteId)
+      - Geolocalização completa (país, estado, cidade)
+      - Suporte IPv6
+      - Retenção governada de 10 anos
+      - Criptografia AES-256
+      - Índices otimizados para queries temporais
+      - Metadata de dispositivo (navegador, versão, sistema operacional)
+
+    rf_item_relacionado: "RN-RF095-001"
+    uc_relacionado: "UC01-registrar-tentativa-login"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF095-002"
+    tipo: "tabela"
+    nome: "TB_LOG_OPERACAO"
+    caminho: "Database/dbo.TB_LOG_OPERACAO"
+    descricao: |
+      Tabela de registro de operações CRUD com campos:
+      - ID_LOG_OP (int identity)
+      - DT_OPERACAO (datetime)
+      - ID_USUARIO (int)
+      - TP_OPERACAO (varchar 10) - INSERT, UPDATE, DELETE
+      - NM_TABELA (varchar 50)
+      - ID_ENTIDADE (int)
+      - VALOR_ANTERIOR (text) - Não estruturado
+      - VALOR_NOVO (text) - Não estruturado
+
+      Problemas identificados:
+      - VALOR_ANTERIOR/VALOR_NOVO em TEXT (não estruturado, difícil query)
+      - Sem CorrelationId (impossível correlacionar eventos)
+      - Sem ClienteId (multi-tenancy)
+      - Auditoria parcial (apenas triggers em tabelas críticas)
+      - Sem metadata de contexto (IP, resultado da operação)
+
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada para auditoria completa:
+      - Todas operações CRUD auditadas (não apenas triggers)
+      - Dados estruturados em JSON (DadosAntes/DadosDepois)
+      - CorrelationId para correlação de eventos
+      - Multi-tenancy (ClienteId)
+      - Metadata completo (IP, resultado, usuário, timestamp UTC)
+      - Integração com SIEM (envio automático)
+
+    rf_item_relacionado: "RN-RF095-003"
+    uc_relacionado: "UC02-rastrear-acao-usuario"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF095-003"
+    tipo: "tabela"
+    nome: "TB_POLITICA_SEGURANCA"
+    caminho: "Database/dbo.TB_POLITICA_SEGURANCA"
+    descricao: |
+      Tabela de políticas de segurança (estrutura simplória):
+      - ID_POLITICA (int identity)
+      - DESCRICAO (varchar 255)
+      - DT_CRIACAO (datetime)
+      - FL_ATIVA (bit)
+
+      Problemas identificados:
+      - Estrutura simplória (apenas descrição textual)
+      - Sem suporte a regras complexas (MFA, horário, geolocalização)
+      - Sem versionamento
+      - Sem rastreabilidade de aplicação
+      - Políticas aplicadas manualmente
+
+    destino: "substituido"
+    justificativa: |
+      Tabela expandida para suporte completo a políticas:
+      - Suporte a múltiplos tipos de políticas (IP, MFA, horário, geo)
+      - Versionamento de políticas
+      - Rastreabilidade de aplicação (quando/quem foi bloqueado)
+      - Aplicação automática em runtime
+      - Integração com RBAC e feature flags
+
+    rf_item_relacionado: "RN-RF095-008"
+    uc_relacionado: "UC13-aplicar-politica-seguranca"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF095-004"
+    tipo: "tabela"
+    nome: "TB_PERMISSAO_USUARIO"
+    caminho: "Database/dbo.TB_PERMISSAO_USUARIO"
+    descricao: |
+      Tabela de permissões de usuário:
+      - ID_PERMISSAO (int identity)
+      - ID_USUARIO (int)
+      - CD_PERMISSAO (varchar 100)
+      - DT_ATRIBUICAO (datetime)
+      - DT_VENCIMENTO (datetime nullable)
+
+      Problemas identificados:
+      - Sem validação de SOD (conflitos descobertos em auditorias)
+      - Sem suporte a JIT (elevação temporária)
+      - Sem workflow de certificação trimestral
+      - Sem rastreabilidade de aprovações
+
+    destino: "assumido"
+    justificativa: |
+      Tabela será MANTIDA mas EXPANDIDA com:
+      - Validação automática de SOD em runtime
+      - Suporte a JIT (DuracaoMinutos, Aprovador, Justificativa)
+      - Workflow de certificação trimestral (DataUltimaCertificacao, CertificadoPor)
+      - Rastreabilidade completa de mudanças (auditoria)
+      - Estados (Ativo, Pendente, Rejeitado, Expirado)
+
+    rf_item_relacionado: "RN-RF095-004"
+    uc_relacionado: "UC04-validar-sod"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ------------------------------------------------------------------------------
+  # CÓDIGO LEGADO (VB.NET)
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF095-005"
+    tipo: "regra_negocio"
+    nome: "Logging de Login Manual (Global.asax.vb)"
+    caminho: "ic1_legado/IControlIT/Global.asax.vb"
+    descricao: |
+      Sistema legado registrava login via evento Application_AuthenticateRequest
+      no Global.asax.vb, escrevendo em arquivo de texto no formato:
+      [YYYY-MM-DD HH:MM:SS] LOGIN - Usuario: [NM_USUARIO], IP: [IP], Resultado: [SUCESSO/FALHA]
+
+      Problemas identificados:
+      - Arquivo de texto não estruturado (difícil query)
+      - Sem correlação de eventos
+      - Sem retenção governada (deletado quando disco enche)
+      - Sem criptografia
+      - Sem multi-tenancy
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por middleware de auditoria em .NET 10:
+      - Interceptor automático em pipeline de autenticação
+      - Logging estruturado em banco de dados
+      - Retenção de 10 anos
+      - Criptografia AES-256
+      - Multi-tenancy (ClienteId)
+      - Envio para SIEM
+
+    rf_item_relacionado: "RN-RF095-001"
+    uc_relacionado: "UC01-registrar-tentativa-login"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF095-006"
+    tipo: "regra_negocio"
+    nome: "Auditoria CRUD via Triggers SQL"
+    caminho: "Database/Triggers/*"
+    descricao: |
+      Sistema legado auditava operações críticas (DELETE, UPDATE de tabelas sensíveis)
+      via triggers SQL que salvavam em TB_LOG_OPERACAO.
+
+      Triggers existiam apenas em ~20% das tabelas (não cobertura completa).
+
+      Problemas identificados:
+      - Cobertura parcial (muitas tabelas sem auditoria)
+      - Triggers podem ser desabilitados facilmente
+      - Performance impact em tabelas grandes
+      - Difícil manutenção (código SQL espalhado)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por interceptor EF Core:
+      - Auditoria automática em TODAS entidades
+      - Aspect-Oriented Programming (AOP)
+      - Centralizado (código único)
+      - Não pode ser desabilitado facilmente
+      - Melhor performance (async/await)
+      - Metadata completo (usuário, IP, timestamp, antes/depois)
+
+    rf_item_relacionado: "RN-RF095-003"
+    uc_relacionado: "UC02-rastrear-acao-usuario"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF095-007"
+    tipo: "regra_negocio"
+    nome: "Validação Manual de SOD"
+    caminho: "Processo manual (auditoria trimestral)"
+    descricao: |
+      Validação de conflitos de Segregação de Funções era feita manualmente
+      por auditores em revisões trimestrais.
+
+      Auditores exportavam permissões para Excel, cruzavam com matriz de conflitos
+      e reportavam violações para correção.
+
+      Problemas identificados:
+      - Conflitos descobertos meses depois da atribuição
+      - Processo manual propenso a erros
+      - Sem bloqueio em tempo real
+      - Difícil rastrear histórico de violações
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação automática em runtime:
+      - Matriz de conflitos SOD em banco de dados
+      - Validação antes de atribuir permissão
+      - Bloqueio automático se conflito detectado
+      - Relatório automático mensal de violações
+      - Histórico completo de tentativas bloqueadas
+
+    rf_item_relacionado: "RN-RF095-004"
+    uc_relacionado: "UC04-validar-sod"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF095-008"
+    tipo: "regra_negocio"
+    nome: "Certificação de Acessos via Email/Planilha"
+    caminho: "Processo manual (RH + TI)"
+    descricao: |
+      Revisão de permissões era feita manualmente:
+      1. TI exporta permissões para Excel
+      2. Envia email para cada gerente
+      3. Gerente responde email com aprovações/rejeições
+      4. TI processa respostas manualmente
+      5. Revoga permissões rejeitadas
+
+      Processo demorava ~3 meses para completar.
+
+      Problemas identificados:
+      - Sem rastreabilidade (emails perdidos)
+      - Demorado (3 meses por ciclo)
+      - Propenso a erros (dados em planilha)
+      - Sem workflow formal
+      - Sem alertas de não-resposta
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por workflow digital integrado:
+      - Interface web para gerentes
+      - Rastreabilidade completa (banco de dados)
+      - Alertas automáticos de não-resposta
+      - Revogação automática em 72h se rejeitado
+      - Relatório de certificação auditável
+      - Prazo reduzido para 30 dias
+
+    rf_item_relacionado: "RN-RF095-006"
+    uc_relacionado: "UC08-certificar-permissoes"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # ------------------------------------------------------------------------------
+  # FUNCIONALIDADES AUSENTES NO LEGADO (NOVAS)
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF095-009"
+    tipo: "funcionalidade_ausente"
+    nome: "Detecção de Força Bruta"
+    caminho: "N/A (não existia)"
+    descricao: |
+      Sistema legado NÃO possuía detecção automática de força bruta.
+      Bloqueio de IPs era feito manualmente via firewall por administradores
+      após detectarem múltiplas tentativas falhadas em logs.
+
+    destino: "descartado"
+    justificativa: |
+      Comportamento legado (ausência de funcionalidade) é DESCARTADO.
+      Sistema moderno implementa detecção automática (RN-RF095-002):
+      - 5 falhas em 15 min gera alerta
+      - 10 falhas bloqueia IP por 60 min
+      - Desbloqueio manual ou expiração automática
+
+    rf_item_relacionado: "RN-RF095-002"
+    uc_relacionado: "UC03-detectar-forca-bruta"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF095-010"
+    tipo: "funcionalidade_ausente"
+    nome: "Detecção de Anomalias (UEBA)"
+    caminho: "N/A (não existia)"
+    descricao: |
+      Sistema legado NÃO possuía análise comportamental de usuários.
+      Anomalias eram detectadas manualmente por administradores ao
+      revisar logs periodicamente.
+
+    destino: "descartado"
+    justificativa: |
+      Comportamento legado (ausência) é DESCARTADO.
+      Sistema moderno implementa UEBA automático (RN-RF095-007):
+      - Análise de padrões históricos (90 dias)
+      - Score de anomalia 0.0-1.0
+      - Alertas automáticos para score > 0.7
+      - Integração com Azure ML
+
+    rf_item_relacionado: "RN-RF095-007"
+    uc_relacionado: "UC03-analisar-anomalias"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF095-011"
+    tipo: "funcionalidade_ausente"
+    nome: "Acessos Privilegiados com JIT"
+    caminho: "N/A (não existia)"
+    descricao: |
+      Sistema legado concedia permissões administrativas permanentemente.
+      Não havia concessão temporária ou aprovação dual-control.
+
+    destino: "descartado"
+    justificativa: |
+      Comportamento legado (permissões permanentes) é DESCARTADO.
+      Sistema moderno implementa JIT (RN-RF095-005):
+      - Concessão temporária (máximo 4h)
+      - Aprovação obrigatória de outro admin
+      - Revogação automática ao expirar
+      - Rastreabilidade completa de ações privilegiadas
+
+    rf_item_relacionado: "RN-RF095-005"
+    uc_relacionado: "UC05-solicitar-jit"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF095-012"
+    tipo: "funcionalidade_ausente"
+    nome: "Dashboard de Segurança"
+    caminho: "N/A (não existia)"
+    descricao: |
+      Sistema legado não possuía dashboard de segurança.
+      Administradores consultavam logs via queries SQL diretas no
+      SQL Server Management Studio.
+
+    destino: "descartado"
+    justificativa: |
+      Comportamento legado (ausência) é DESCARTADO.
+      Sistema moderno implementa dashboard em tempo real (RN-RF095-012):
+      - Atualização a cada 5 minutos
+      - Métricas: logins, usuários online, alertas, eventos
+      - Filtros dinâmicos (usuário, IP, entidade, ação)
+      - Acesso restrito a perfis de Segurança/Auditoria
+
+    rf_item_relacionado: "RN-RF095-012"
+    uc_relacionado: "UC12-visualizar-dashboard"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF095-013"
+    tipo: "funcionalidade_ausente"
+    nome: "Integração com SIEM"
+    caminho: "N/A (não existia)"
+    descricao: |
+      Sistema legado não enviava logs para SIEM centralizado.
+      Cada cliente tinha logs isolados sem correlação com outras fontes.
+
+    destino: "descartado"
+    justificativa: |
+      Comportamento legado (ausência) é DESCARTADO.
+      Sistema moderno implementa integração SIEM:
+      - Envio automático para Azure Sentinel/Splunk
+      - Formato estruturado (JSON)
+      - Correlação com eventos de outras fontes
+      - Alertas unificados
+
+    rf_item_relacionado: "RN-RF095-010"
+    uc_relacionado: "UC14-enviar-siem"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF095-014"
+    tipo: "funcionalidade_ausente"
+    nome: "Retenção Governada de 10 Anos"
+    caminho: "~2 anos (deletado manualmente)"
+    descricao: |
+      Sistema legado mantinha logs até disco encher (~2 anos).
+      Deletado manualmente sem critério formal ou backup.
+
+      NÃO CONFORMIDADE: LGPD, ISO 27001, SOX 404 exigem 7-10 anos.
+
+    destino: "descartado"
+    justificativa: |
+      Comportamento legado (retenção inadequada) é DESCARTADO.
+      Sistema moderno implementa retenção de 10 anos (RN-RF095-011):
+      - Hot storage: <90 dias (acesso em <1s)
+      - Warm storage: 90 dias-1 ano (acesso em <5s)
+      - Cold storage: >1 ano (acesso em <30s)
+      - Deleção automática após 10 anos com backup final
+
+    rf_item_relacionado: "RN-RF095-011"
+    uc_relacionado: "UC15-arquivar-logs"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+# =============================================
+# GAP ANALYSIS
+# =============================================
+
+gap_analysis:
+  - item: "Logging de Login"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: arquivo de texto | Moderno: banco estruturado + geolocalização"
+
+  - item: "Detecção de Força Bruta"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade - automação completa"
+
+  - item: "Auditoria de CRUD"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: parcial (triggers) | Moderno: completo (todas entidades)"
+
+  - item: "Detecção de Anomalias (UEBA)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade - Azure ML"
+
+  - item: "Validação de SOD"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: manual trimestral | Moderno: automático runtime"
+
+  - item: "Acessos Privilegiados (JIT)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade - concessão temporária"
+
+  - item: "Certificação de Acessos"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: email/planilha | Moderno: workflow digital"
+
+  - item: "Dashboard de Segurança"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade - tempo real"
+
+  - item: "Alertas Automáticos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade - <1 min"
+
+  - item: "Investigação Forense"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: manual (queries SQL) | Moderno: correlação automática + timeline"
+
+  - item: "Integração SIEM"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade - Azure Sentinel/Splunk"
+
+  - item: "Retenção de Logs"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: ~2 anos (não conforme) | Moderno: 10 anos (conforme)"
+
+# =============================================
+# DECISÕES DE MODERNIZAÇÃO
+# =============================================
+
+decisoes_modernizacao:
+  - decisao: "Migrar de arquivos de texto para banco estruturado"
+    motivo: |
+      - Arquivos de texto não permitem queries eficientes
+      - Impossível correlacionar eventos
+      - Difícil aplicar retenção governada
+      - Não suporta multi-tenancy
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Implementar detecção automática de anomalias (UEBA)"
+    motivo: |
+      - Conformidade PCI-DSS 12.3.10
+      - Prevenção de insider threats
+      - Impossível fazer manualmente com milhares de usuários
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "Integração com SIEM (Azure Sentinel)"
+    motivo: |
+      - Correlação com eventos de outras fontes
+      - Dashboards corporativos de segurança
+      - Conformidade ISO 27001 A.12.4
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "Validação de SOD em runtime"
+    motivo: |
+      - Validação manual propensa a erros
+      - Conformidade SOX 404 exige controles automáticos
+      - Prevenção de fraudes
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Retenção governada de 10 anos"
+    motivo: |
+      - Conformidade LGPD Artigo 16, ISO 27001, SOX 404
+      - Sistema legado deletava logs prematuramente (não conforme)
+      - Suporte a investigações forenses históricas
+    impacto: "alto"
+    data: "2025-12-31"
+
+# =============================================
+# RISCOS DE MIGRAÇÃO
+# =============================================
+
+riscos_migracao:
+  - risco: "Perda de dados históricos de logs"
+    impacto: "critico"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Migrar logs existentes (arquivos de texto + TB_LOG_ACESSO/OPERACAO)
+      - Executar script de importação antes do cutover
+      - Validar integridade de dados migrados
+      - Manter backups do legado por 12 meses
+
+  - risco: "Volume excessivo de logs (performance)"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      - Implementar particionamento temporal desde início
+      - Arquivamento automático para blob storage
+      - Índices otimizados
+      - Monitorar crescimento de disco
+
+  - risco: "Falha na integração SIEM"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Testar envio de logs em ambiente de homologação
+      - Configurar fallback (logs salvos mesmo se SIEM falhar)
+      - Alertas se SIEM não responder
+
+  - risco: "Falsos positivos em UEBA"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      - Tunning do modelo ML com dados históricos
+      - Ajuste de thresholds
+      - Revisão mensal de falsos positivos
+      - Whitelist de comportamentos esperados
+
+  - risco: "Conflitos SOD não identificados previamente"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      - Executar relatório de violações ANTES de ativar bloqueio automático
+      - Resolver violações existentes gradualmente
+      - Período de grace (aviso sem bloqueio) por 30 dias
+
+  - risco: "Performance de queries em logs antigos"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      - Índices otimizados
+      - Particionamento de tabelas
+      - Cold storage para logs >1 ano
+      - Cache de queries frequentes
+
+# =============================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# =============================================
+
+rastreabilidade:
+  - elemento_legado: "TB_LOG_ACESSO"
+    referencia_rf: "RN-RF095-001"
+    referencia_uc: "UC01-registrar-tentativa-login"
+    status: "migrado"
+
+  - elemento_legado: "TB_LOG_OPERACAO"
+    referencia_rf: "RN-RF095-003"
+    referencia_uc: "UC02-rastrear-acao-usuario"
+    status: "migrado"
+
+  - elemento_legado: "TB_POLITICA_SEGURANCA"
+    referencia_rf: "RN-RF095-008"
+    referencia_uc: "UC13-aplicar-politica-seguranca"
+    status: "migrado"
+
+  - elemento_legado: "TB_PERMISSAO_USUARIO"
+    referencia_rf: "RN-RF095-004"
+    referencia_uc: "UC04-validar-sod"
+    status: "migrado"
+
+  - elemento_legado: "Global.asax.vb (logging)"
+    referencia_rf: "RN-RF095-001"
+    referencia_uc: "UC01-registrar-tentativa-login"
+    status: "migrado"
+
+  - elemento_legado: "Triggers SQL (auditoria)"
+    referencia_rf: "RN-RF095-003"
+    referencia_uc: "UC02-rastrear-acao-usuario"
+    status: "migrado"
+
+  - elemento_legado: "Validação manual SOD"
+    referencia_rf: "RN-RF095-004"
+    referencia_uc: "UC04-validar-sod"
+    status: "migrado"
+
+  - elemento_legado: "Certificação email/planilha"
+    referencia_rf: "RN-RF095-006"
+    referencia_uc: "UC08-certificar-permissoes"
+    status: "migrado"
+
+# =============================================
+# METADADOS
+# =============================================
+
+metadados:
+  total_itens_legado: 14
+  itens_assumidos: 1   # TB_PERMISSAO_USUARIO (expandida)
+  itens_substituidos: 7  # Tabelas e código legado
+  itens_descartados: 6  # Funcionalidades ausentes (novas)
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"  # Todos os itens têm destino definido
+
+# =============================================
+# CHANGELOG
+# =============================================
+
+changelog:
+  - versao: "2.0"
+    data: "2025-12-31"
+    descricao: "Criação estruturada com 100% de itens com destino definido"
+    autor: "IControlIT Architect Agent"
+
+  - versao: "1.0"
+    data: "2025-12-31"
+    descricao: "Template inicial de referência ao legado"
+    autor: "IControlIT Architect Agent"

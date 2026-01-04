@@ -1,0 +1,366 @@
+rf_id: RF100
+rf_title: "Dashboards e KPIs com Análise Preditiva"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+autor: "Agência ALC - alc.dev.br"
+
+# ==============================================================================
+# ITENS LEGADO RASTREADOS
+# ==============================================================================
+
+itens_legado:
+  # ------------------------------------------------------------------------------
+  # TELAS ASPX
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF100-001"
+    tipo: "tela"
+    titulo: "RelatorioExecutivo.aspx"
+    caminho_legado: "ic1_legado/IControlIT/RelatoriosBI/RelatorioExecutivo.aspx"
+    descricao: |
+      Tela legada que exibia relatórios estáticos de KPIs (custos mensais, SLA, contratos)
+      usando Crystal Reports. Apenas dados históricos, sem forecasting ou análise preditiva.
+      Usuário selecionava cliente, período e tipo de relatório (Custos/SLA/Contratos/Ativos).
+      Geração síncrona travava navegador (timeout 30s). Exportação manual para PDF/Excel.
+    regras_implicitas:
+      - "Apenas dados passados eram exibidos (histórico até data atual)"
+      - "Sem detecção de anomalias automática"
+      - "Usuário identificava anomalias visualmente nos gráficos"
+      - "Geração síncrona bloqueava navegador"
+      - "Exportação via Crystal Reports (lenta)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por dashboard Angular moderno com forecasting ML, anomaly detection em tempo real e visualizações interativas D3.js/Power BI Embedded"
+    rastreabilidade:
+      rf_moderno: "RF-100 - Seção 4 (Funcionalidades)"
+      uc_moderno: "UC-RF100 (Dashboards Preditivos)"
+    migracao_moderna:
+      componente_angular: "dashboards-preditivos.component.ts"
+      rota_frontend: "/admin/dashboards-preditivos"
+
+  - id: "LEG-RF100-002"
+    tipo: "tela"
+    titulo: "DashboardKPI.aspx"
+    caminho_legado: "ic1_legado/IControlIT/DashboardsBI/DashboardKPI.aspx"
+    descricao: |
+      Dashboard com gráficos de KPIs usando Telerik Charts. Exibia custos, SLA médio,
+      total de ativos. Gráficos estáticos sem drill-down ou interatividade avançada.
+      Refresh manual (botão "Atualizar"). Sem confidence bands ou previsões futuras.
+      Sem alertas automáticos de anomalias.
+    regras_implicitas:
+      - "Gráficos Telerik Charts sem interatividade avançada"
+      - "Sem confidence bands (apenas histórico)"
+      - "Refresh manual necessário"
+      - "Sem alertas automáticos"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por componente Angular com forecasting (confidence bands), anomaly detection em tempo real, clustering visualization e what-if analysis"
+    rastreabilidade:
+      rf_moderno: "RF-100 - Seção 4 (Funcionalidades)"
+      uc_moderno: "UC-RF100 (Dashboard Inteligente)"
+    migracao_moderna:
+      componente_angular: "dashboard-inteligente.component.ts"
+      rota_frontend: "/analytics/forecast-analysis"
+
+  # ------------------------------------------------------------------------------
+  # WEBSERVICES
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF100-003"
+    tipo: "webservice"
+    titulo: "WSRelatorio.asmx - GetRelatorioExecutivo"
+    caminho_legado: "ic1_legado/IControlIT/WebService/WSRelatorio.asmx.vb"
+    metodos:
+      - nome: "GetRelatorioExecutivo"
+        parametros: "idCliente As Integer"
+        retorno: "DataSet"
+    descricao: |
+      Webservice VB.NET que retornava dados históricos de relatório executivo.
+      Sem forecasting, apenas histórico até data atual. Query SQL montada dinamicamente
+      a partir de configuração em KPI_Config. Sem cache, recalculava toda vez.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por REST API com forecasting ML e cache Redis 24h"
+    rastreabilidade:
+      rf_moderno: "RF-100 - Seção 5 (API Endpoints)"
+      endpoint_moderno: "GET /api/ml/dashboards/{id}"
+    migracao_moderna:
+      command_cqrs: "GetDashboardQuery"
+      handler: "GetDashboardQueryHandler"
+
+  - id: "LEG-RF100-004"
+    tipo: "webservice"
+    titulo: "WSRelatorio.asmx - CalculaKPI"
+    caminho_legado: "ic1_legado/IControlIT/WebService/WSRelatorio.asmx.vb"
+    metodos:
+      - nome: "CalculaKPI"
+        parametros: "idKPI As Integer, dtInicio As Date, dtFim As Date"
+        retorno: "Decimal"
+    descricao: |
+      Webservice que calculava KPI baseado em fórmula SQL fixa armazenada em
+      KPI_Config.Ds_Formula. Sem aprendizado de máquina, apenas agregações SQL.
+      Exemplo: AVG(tempo_resolucao), SUM(custos), COUNT(ativos).
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por modelos ML treinados (Prophet/ARIMA) com forecasting e intervalo de confiança 95%"
+    rastreabilidade:
+      rf_moderno: "RF-100 - RN-100-001 (Forecast Requer 12 Meses)"
+      regra_moderna: "RN-100-004 (Confiança 95%)"
+    migracao_moderna:
+      handler: "ForecastCommandHandler"
+      validacao: "ForecastCommandValidator (mínimo 12 meses histórico)"
+
+  - id: "LEG-RF100-005"
+    tipo: "webservice"
+    titulo: "WSRelatorio.asmx - ExportarRelatorio"
+    caminho_legado: "ic1_legado/IControlIT/WebService/WSRelatorio.asmx.vb"
+    metodos:
+      - nome: "ExportarRelatorio"
+        parametros: "idRelatorio As Integer, tipo As String (PDF/Excel)"
+        retorno: "Byte()"
+    descricao: |
+      Webservice que exportava relatório gerado para PDF ou Excel usando Crystal Reports.
+      Processamento síncrono, travava navegador em relatórios grandes (>10k linhas).
+      Timeout 30s configurado no Web.config.
+    destino: "ASSUMIDO"
+    justificativa: "Funcionalidade mantida mas modernizada com exportação assíncrona via Hangfire (timeout 10s)"
+    rastreabilidade:
+      rf_moderno: "RF-100 - Seção 5 (API Endpoints)"
+      endpoint_moderno: "POST /api/ml/export"
+    migracao_moderna:
+      handler: "ExportDashboardCommandHandler"
+      background_job: "Hangfire job para exportações pesadas"
+
+  # ------------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF100-006"
+    tipo: "stored_procedure"
+    titulo: "pa_Calcula_KPI"
+    caminho_legado: "ic1_legado/Database/Procedures/pa_Calcula_KPI.sql"
+    parametros_entrada:
+      - "@Id_KPI INT"
+      - "@Dt_Inicio DATETIME"
+      - "@Dt_Fim DATETIME"
+    parametros_saida:
+      - "@Resultado DECIMAL(15,2) OUTPUT"
+    descricao: |
+      Stored procedure que calculava KPI baseado em fórmula SQL fixa.
+      Executava query dinâmica construída a partir de KPI_Config.Ds_Formula.
+      Sem otimização, podia levar >10s em tabelas grandes.
+      Sem forecasting, apenas agregação histórica.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Lógica movida para Application Layer (CQRS Handler) com modelos ML treinados (Prophet/ARIMA)"
+    rastreabilidade:
+      rf_moderno: "RF-100 - RN-100-001 (Forecast)"
+      regra_moderna: "RN-100-004 (Confiança 95%)"
+    migracao_moderna:
+      handler: "ForecastCommandHandler"
+      validacao: "ForecastCommandValidator (12 meses mínimo)"
+
+  - id: "LEG-RF100-007"
+    tipo: "stored_procedure"
+    titulo: "pa_Detecta_Anomalia_Manual"
+    caminho_legado: "**NÃO EXISTE** (detecção era hard-coded em VB.NET)"
+    parametros_entrada: []
+    parametros_saida: []
+    descricao: |
+      Não havia stored procedure específica. Detecção de anomalias era feita via
+      regras hard-coded em VB.NET code-behind: "If valor > 10000 Then alerta = True".
+      Sem aprendizado, sem adaptação ao histórico do cliente.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por Z-score dinâmico + Isolation Forest (RN-100-002) com threshold configurável"
+    rastreabilidade:
+      rf_moderno: "RF-100 - RN-100-002 (Anomaly Detection)"
+      regra_moderna: "RN-100-002 (Threshold Configurável)"
+    migracao_moderna:
+      handler: "AnomalyDetectionService"
+      algoritmo: "Z-score + Isolation Forest"
+
+  # ------------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF100-008"
+    tipo: "tabela"
+    titulo: "[dbo].[Metricas]"
+    schema_legado: "[dbo].[Metricas]"
+    problemas_identificados:
+      - "Falta Foreign Key para validar Id_Cliente"
+      - "Sem campos de auditoria (Created, Modified)"
+      - "Sem multi-tenancy (cada cliente tinha banco separado)"
+      - "Sem índices para queries de forecasting"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tabela redesenhada como MetricDataPoint com multi-tenancy (ClienteId), auditoria e índices para ML"
+    rastreabilidade:
+      rf_moderno: "RF-100 - RN-100-009 (Multi-tenancy)"
+      md_moderno: "MD-RF100.md - Tabela MetricDataPoint"
+    migracao_moderna:
+      tabela_moderna: "MetricDataPoint"
+      migration_ef_core: "20251231_CreateMetricDataPointTable.cs"
+
+  - id: "LEG-RF100-009"
+    tipo: "tabela"
+    titulo: "[dbo].[KPI_Config]"
+    schema_legado: "[dbo].[KPI_Config]"
+    problemas_identificados:
+      - "Fórmulas SQL hard-coded sem versionamento"
+      - "Mudanças em configuração não auditadas"
+      - "Sem suporte a modelos ML (apenas fórmulas SQL)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tabela redesenhada como KpiConfiguration + ModelMetrics (tracking de performance de modelos ML)"
+    rastreabilidade:
+      rf_moderno: "RF-100 - RN-100-003 (Retreinamento Mensal)"
+      md_moderno: "MD-RF100.md - Tabela ModelMetrics"
+    migracao_moderna:
+      tabela_moderna: "KpiConfiguration + ModelMetrics"
+      migration_ef_core: "20251231_CreateKpiConfigurationTable.cs"
+
+  - id: "LEG-RF100-010"
+    tipo: "tabela"
+    titulo: "[dbo].[Relatorio_Executivo]"
+    schema_legado: "[dbo].[Relatorio_Executivo]"
+    problemas_identificados:
+      - "Armazenava relatórios estáticos gerados (PDF/Excel)"
+      - "Não era consulta em tempo real"
+      - "Dados desatualizados após geração"
+    destino: "DESCARTADO"
+    justificativa: "Relatórios agora gerados em tempo real via forecasting ML, não armazenados"
+    rastreabilidade:
+      rf_moderno: "RF-100 - Seção 4 (Funcionalidades)"
+      md_moderno: "N/A (não migrada)"
+    migracao_moderna:
+      tabela_moderna: "N/A (descartada)"
+      migration_ef_core: "N/A"
+
+  # ------------------------------------------------------------------------------
+  # REGRAS IMPLÍCITAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF100-011"
+    tipo: "regra_negocio"
+    titulo: "Detecção de Anomalia Manual (Hard-coded)"
+    localizacao_codigo: "ic1_legado/IControlIT/DashboardsBI/DashboardKPI.aspx.vb - Linha 245"
+    descricao: |
+      Regra de negócio hard-coded no code-behind VB.NET:
+      "Se custo > R$10.000 então alerta = True, cor = Red".
+      Sem aprendizado ou adaptação ao histórico do cliente.
+      Threshold fixo não se ajustava a variação sazonal.
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por Z-score dinâmico (RN-100-002) que se adapta ao histórico (média + desvio padrão)"
+    rastreabilidade:
+      rf_moderno: "RF-100 - RN-100-002 (Anomaly Detection)"
+      regra_moderna: "RN-100-002 (Threshold Configurável)"
+    migracao_moderna:
+      validador: "AnomalyDetectionService"
+      linha_codigo: "Z-score = (valor - média) / desvio_padrão"
+
+  - id: "LEG-RF100-012"
+    tipo: "regra_negocio"
+    titulo: "Cálculo de SLA Manual (Stored Procedure)"
+    localizacao_codigo: "ic1_legado/Database/Procedures/pa_Calcula_SLA.sql"
+    descricao: |
+      Stored procedure com fórmula SQL:
+      "SLA = AVG(tempo_resolucao) FROM Tickets WHERE status = 'Resolvido'".
+      Sem forecasting de SLA futuro, apenas histórico.
+    destino: "ASSUMIDO"
+    justificativa: "Regra mantida mas complementada com forecasting de SLA (RN-100-001) para prever SLA em 3, 6, 12 meses"
+    rastreabilidade:
+      rf_moderno: "RF-100 - RN-100-001 (Forecast)"
+      regra_moderna: "RN-100-001 (12 Meses Mínimo)"
+    migracao_moderna:
+      validador: "ForecastCommandHandler"
+      linha_codigo: "Forecast SLA usando Prophet com sazonalidade"
+
+# ==============================================================================
+# BANCOS LEGADOS MAPEADOS
+# ==============================================================================
+
+bancos_legados:
+  - nome: "IControlIT_Cliente01"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "Metricas"
+      - "KPI_Config"
+      - "Relatorio_Executivo"
+    destino: "CONSOLIDADO"
+    justificativa: "Migrado para banco único com multi-tenancy (Row-Level Security via ClienteId). Reduz complexidade operacional e custos de licenciamento SQL Server"
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod) com multi-tenancy"
+
+  - nome: "IControlIT_Cliente02"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "Metricas"
+      - "KPI_Config"
+    destino: "CONSOLIDADO"
+    justificativa: "Consolidado no mesmo banco moderno com isolamento por ClienteId"
+    banco_moderno: "IControlIT.db (multi-tenant)"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF100-001"
+    titulo: "Ausência Total de Forecasting"
+    severidade: "CRÍTICA"
+    descricao: |
+      Sistema legado não possuía capacidade de prever custos futuros ou KPIs.
+      Gestores tomavam decisões baseados apenas em histórico passado, sem visibilidade
+      de tendências futuras. Planejamento orçamentário era manual em Excel.
+    impacto: "Decisões estratégicas sem base preditiva. Surpresas de custos inesperados"
+    solucao_moderna: "Forecasting automático com Prophet/ARIMA (RN-100-001) com intervalo de confiança 95%. Previsões 3, 6, 12 meses"
+
+  - id: "PROB-RF100-002"
+    titulo: "Detecção Manual de Anomalias (Regras Fixas)"
+    severidade: "ALTA"
+    descricao: |
+      Detecção de anomalias era feita via regras hard-coded ("se > 10000 então alerta").
+      Sem aprendizado, sem adaptação ao histórico do cliente. Threshold fixo não se
+      ajustava a variação sazonal (Nov-Dez tem picos naturais que geravam falsos positivos).
+    impacto: "Muitos falsos positivos (30%+). Usuários ignoravam alertas"
+    solucao_moderna: "Z-score dinâmico (RN-100-002) que se adapta ao histórico. Threshold configurável por métrica. Reduz falsos positivos para < 5%"
+
+  - id: "PROB-RF100-003"
+    titulo: "Sem Clustering de Ativos/Usuários"
+    severidade: "ALTA"
+    descricao: |
+      Ativos e usuários não eram segmentados automaticamente. Gestores não identificavam
+      padrões de uso (High-Use vs Low-Use vs Idle). Oportunidades de otimização perdidas
+      (ex: descontinuar 200 ativos Idle economizaria R$50k/mês).
+    impacto: "Desperdício de recursos. Ativos sub/super provisionados não identificados"
+    solucao_moderna: "Clustering automático K-means/DBSCAN (RN-100-005) com 3-10 clusters. Recomendações customizadas por cluster"
+
+  - id: "PROB-RF100-004"
+    titulo: "Sem Churn Prediction"
+    severidade: "ALTA"
+    descricao: |
+      Clientes em risco de cancelamento não eram identificados proativamente.
+      Cancelamentos eram surpresa. Nenhuma ação de retenção era tomada antes do churn.
+    impacto: "Churn rate 20% (alto). Perda de receita R$500k/ano"
+    solucao_moderna: "Churn prediction com score 0-100 (RN-100-006). Precisão 70%. Recomendações automáticas de retenção (desconto, upgrade suporte)"
+
+  - id: "PROB-RF100-005"
+    titulo: "Análise What-If Inexistente (Excel Manual)"
+    severidade: "MÉDIA"
+    descricao: |
+      Gestores simulavam cenários hipotéticos em Excel manualmente ("se aumentarmos equipe em 20%, qual impacto em SLA?").
+      Cálculos propensos a erros. Não consideravam correlações complexas entre KPIs.
+    impacto: "Decisões baseadas em cálculos manuais imprecisos. Tempo desperdiçado (horas por análise)"
+    solucao_moderna: "What-If Analysis em tempo real (RN-100-007). Máximo 5 cenários paralelos. Simulação < 10s com previsão de impacto em SLA, custos, receita"
+
+  - id: "PROB-RF100-006"
+    titulo: "Multi-Database Complexo (50+ Bancos SQL Server)"
+    severidade: "MÉDIA"
+    descricao: |
+      Cada cliente tinha banco SQL Server separado. Gerenciar 50+ bancos era complexo.
+      Backup, restore, migrations, upgrade SQL Server eram operações custosas e demoradas.
+      Licenciamento SQL Server caro (core-based).
+    impacto: "Complexidade operacional alta. Custos de licenciamento SQL Server elevados (R$100k+/ano)"
+    solucao_moderna: "Single-database com multi-tenancy (RN-100-009). Row-Level Security via ClienteId. Reduz custos e simplifica DevOps"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 12
+  itens_assumidos: 2  # LEG-RF100-005 (ExportarRelatorio), LEG-RF100-012 (SLA)
+  itens_substituidos: 9  # LEG-RF100-001, 002, 003, 004, 006, 007, 008, 009, 011
+  itens_descartados: 1  # LEG-RF100-010 (Relatorio_Executivo)
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"  # Todos itens têm destino definido
+  bancos_legados_mapeados: 2
+  problemas_legado_identificados: 6

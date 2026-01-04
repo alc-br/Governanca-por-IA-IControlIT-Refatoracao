@@ -1,0 +1,1581 @@
+# RF019: Gestão de Tipos de Ativos
+
+**Versão**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF016 (Categorias de Ativos) | **EPIC**: EPIC003-CAD-Cadastros-Base
+**Fase**: Fase 2 - Cadastros e Serviços Transversais
+
+---
+
+## 📋 VISÃO GERAL
+
+### Descrição
+
+O módulo de **Gestão de Tipos de Ativos** é responsável por categorizar e classificar todos os ativos de TI e Telecom gerenciados pelo sistema IControlIT. Cada ativo (equipamento, linha telefônica, software, serviço) deve obrigatoriamente estar associado a um tipo que define suas características, comportamento e regras de negócio.
+
+### Objetivo
+
+Permitir que a organização:
+
+- **Classifique ativos** em categorias (Hardware, Software, Linha Móvel, Linha Fixa, Serviços, etc.)
+- **Defina características** específicas por tipo (campos customizados)
+- **Aplique regras de negócio** diferenciadas por tipo (depreciação, manutenção, faturamento)
+- **Organize inventário** com estrutura hierárquica de tipos
+- **Padronize nomenclatura** e taxonomia de ativos
+- **Controle atributos obrigatórios** por tipo de ativo
+
+### Escopo
+
+Este requisito cobre:
+
+1. ✅ CRUD completo de tipos de ativos
+2. ✅ Hierarquia de tipos (Tipo Pai → Subtipo)
+3. ✅ Campos customizados por tipo
+4. ✅ Regras de depreciação por tipo
+5. ✅ Ícones e identificação visual
+6. ✅ Importação em massa de tipos
+7. ✅ Validações e restrições
+8. ✅ Integração com módulo de Ativos (RF-CAD-001)
+9. ✅ Auditoria de alterações
+10. ✅ Relatórios de tipos mais utilizados
+
+### Telas Legado Relacionadas
+
+| Tela | Arquivo | Descrição |
+|------|---------|-----------|
+| **Tipo de Ativo** | `Cadastro\Ativo_Tipo.aspx(.vb)` | CRUD de tipos de ativos |
+
+---
+
+## 1. Banco de Dados
+
+### 1.1 Tabela: Ativo_Tipo
+
+```sql
+CREATE TABLE Ativo_Tipo (
+    Id_Ativo_Tipo            UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    Id_Conglomerado          UNIQUEIDENTIFIER NOT NULL,
+
+    -- Identificação
+    Cd_Tipo                  VARCHAR(20) NOT NULL,                -- Código único (ex: "DESK-01", "NOTE-01")
+    Nm_Tipo                  VARCHAR(200) NOT NULL,               -- Nome (ex: "Desktop", "Notebook")
+    Ds_Tipo                  NVARCHAR(1000) NULL,                 -- Descrição detalhada
+
+    -- Hierarquia
+    Id_Tipo_Pai              UNIQUEIDENTIFIER NULL,               -- Tipo pai (para hierarquia)
+    Nivel_Hierarquia         INT NOT NULL DEFAULT 1,              -- Nível na árvore (1=raiz)
+    Caminho_Hierarquia       VARCHAR(500) NULL,                   -- Ex: "/Hardware/Computadores/Notebooks"
+
+    -- Categoria Principal
+    Categoria_Principal      VARCHAR(50) NOT NULL,                -- Hardware, Software, LinhaMovel, LinhaFixa, Servico, Licenca
+    Subcategoria             VARCHAR(50) NULL,                    -- Desktop, Notebook, Servidor, Impressora, etc.
+
+    -- Características do Tipo
+    Fl_Inventariavel         BIT NOT NULL DEFAULT 1,              -- 1=Aparece em inventário físico
+    Fl_Depreciavel           BIT NOT NULL DEFAULT 1,              -- 1=Sofre depreciação
+    Fl_Rastreavel            BIT NOT NULL DEFAULT 1,              -- 1=Requer localização física
+    Fl_Faturavel             BIT NOT NULL DEFAULT 0,              -- 1=Gera faturamento recorrente
+    Fl_Requer_Serial         BIT NOT NULL DEFAULT 1,              -- 1=Número de série obrigatório
+    Fl_Requer_IMEI           BIT NOT NULL DEFAULT 0,              -- 1=IMEI obrigatório (dispositivos móveis)
+    Fl_Requer_MAC            BIT NOT NULL DEFAULT 0,              -- 1=MAC Address obrigatório
+
+    -- Depreciação
+    Taxa_Depreciacao_Anual   DECIMAL(5,2) NULL,                   -- % ao ano (ex: 20.00 = 20%)
+    Vida_Util_Anos           INT NULL,                            -- Anos de vida útil estimada
+    Metodo_Depreciacao       VARCHAR(50) NULL,                    -- Linear, DeclinioAcelerado, SomaDigitos
+
+    -- Manutenção
+    Intervalo_Manutencao_Dias INT NULL,                           -- Dias entre manutenções preventivas
+    Fl_Requer_Calibracao     BIT NOT NULL DEFAULT 0,              -- 1=Requer calibração periódica
+
+    -- Identificação Visual
+    Icone                    VARCHAR(50) NULL,                    -- Classe CSS do ícone (ex: "fa-laptop")
+    Cor_Identificacao        VARCHAR(7) NULL,                     -- Hex color (ex: "#3498db")
+
+    -- Campos Customizados
+    Template_Campos_Custom   NVARCHAR(MAX) NULL,                  -- JSON com definição de campos extras
+
+    -- Controle
+    Ordem_Exibicao           INT NOT NULL DEFAULT 100,            -- Ordem para listagens
+    Fl_Ativo                 BIT NOT NULL DEFAULT 1,              -- 1=Ativo, 0=Inativo
+    Fl_Sistema               BIT NOT NULL DEFAULT 0,              -- 1=Tipo padrão do sistema (não editável)
+
+    -- Auditoria
+    Dt_Criacao               DATETIME NOT NULL DEFAULT GETDATE(),
+    Id_Usuario_Criacao       UNIQUEIDENTIFIER NULL,
+    Dt_Ult_Atualizacao       DATETIME NULL,
+    Id_Usuario_Atualizacao   UNIQUEIDENTIFIER NULL,
+
+    -- Constraints
+    CONSTRAINT FK_AtivoTipo_TipoPai FOREIGN KEY (Id_Tipo_Pai) REFERENCES Ativo_Tipo(Id_Ativo_Tipo),
+    CONSTRAINT UK_AtivoTipo_Codigo UNIQUE (Id_Conglomerado, Cd_Tipo),
+    CONSTRAINT CK_AtivoTipo_Categoria CHECK (Categoria_Principal IN ('Hardware', 'Software', 'LinhaMovel', 'LinhaFixa', 'Servico', 'Licenca', 'Acessorio', 'Outro')),
+    CONSTRAINT CK_AtivoTipo_MetodoDepreciacao CHECK (Metodo_Depreciacao IS NULL OR Metodo_Depreciacao IN ('Linear', 'DeclinioAcelerado', 'SomaDigitos')),
+    CONSTRAINT CK_AtivoTipo_TaxaDepreciacao CHECK (Taxa_Depreciacao_Anual IS NULL OR (Taxa_Depreciacao_Anual >= 0 AND Taxa_Depreciacao_Anual <= 100))
+);
+
+CREATE INDEX IX_AtivoTipo_Conglomerado ON Ativo_Tipo(Id_Conglomerado, Fl_Ativo);
+CREATE INDEX IX_AtivoTipo_TipoPai ON Ativo_Tipo(Id_Tipo_Pai);
+CREATE INDEX IX_AtivoTipo_Categoria ON Ativo_Tipo(Categoria_Principal, Subcategoria);
+CREATE INDEX IX_AtivoTipo_OrdemExibicao ON Ativo_Tipo(Ordem_Exibicao, Nm_Tipo);
+```
+
+---
+
+### 1.2 Tabela: Ativo_Tipo_Campo_Customizado
+
+```sql
+CREATE TABLE Ativo_Tipo_Campo_Customizado (
+    Id_Campo                 UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    Id_Ativo_Tipo            UNIQUEIDENTIFIER NOT NULL,
+
+    -- Identificação do Campo
+    Cd_Campo                 VARCHAR(50) NOT NULL,                -- Código do campo (ex: "velocidade_cpu")
+    Nm_Campo                 VARCHAR(100) NOT NULL,               -- Nome exibido (ex: "Velocidade do CPU")
+    Tipo_Dados               VARCHAR(20) NOT NULL,                -- String, Integer, Decimal, Date, Boolean, List
+
+    -- Configuração
+    Fl_Obrigatorio           BIT NOT NULL DEFAULT 0,              -- 1=Campo obrigatório no cadastro de ativo
+    Valor_Padrao             VARCHAR(500) NULL,                   -- Valor padrão
+    Valores_Lista            NVARCHAR(MAX) NULL,                  -- JSON array para campos tipo List
+    Mascara                  VARCHAR(100) NULL,                   -- Máscara de formatação
+
+    -- Validação
+    Validacao_Regex          VARCHAR(500) NULL,                   -- Expressão regular para validação
+    Mensagem_Validacao       NVARCHAR(200) NULL,                  -- Mensagem de erro customizada
+
+    -- Exibição
+    Ordem_Exibicao           INT NOT NULL DEFAULT 100,
+    Fl_Exibir_Grid           BIT NOT NULL DEFAULT 1,              -- 1=Exibir em grids de listagem
+
+    -- Controle
+    Fl_Ativo                 BIT NOT NULL DEFAULT 1,
+    Dt_Criacao               DATETIME NOT NULL DEFAULT GETDATE(),
+
+    CONSTRAINT FK_AtivoTipoCampo_AtivoTipo FOREIGN KEY (Id_Ativo_Tipo) REFERENCES Ativo_Tipo(Id_Ativo_Tipo) ON DELETE CASCADE,
+    CONSTRAINT UK_AtivoTipoCampo_Codigo UNIQUE (Id_Ativo_Tipo, Cd_Campo),
+    CONSTRAINT CK_AtivoTipoCampo_TipoDados CHECK (Tipo_Dados IN ('String', 'Integer', 'Decimal', 'Date', 'Boolean', 'List', 'Text'))
+);
+
+CREATE INDEX IX_AtivoTipoCampo_AtivoTipo ON Ativo_Tipo_Campo_Customizado(Id_Ativo_Tipo, Fl_Ativo);
+```
+
+---
+
+### 1.3 Tabela: Ativo_Tipo_Auditoria
+
+```sql
+CREATE TABLE Ativo_Tipo_Auditoria (
+    Id_Auditoria             UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    Id_Ativo_Tipo            UNIQUEIDENTIFIER NOT NULL,
+
+    -- Operação
+    Tipo_Operacao            VARCHAR(20) NOT NULL,                -- INSERT, UPDATE, DELETE
+    Dt_Operacao              DATETIME NOT NULL DEFAULT GETDATE(),
+    Id_Usuario               UNIQUEIDENTIFIER NULL,
+    Nm_Usuario               VARCHAR(200) NULL,
+    IP_Origem                VARCHAR(45) NULL,
+
+    -- Dados
+    Dados_Antes              NVARCHAR(MAX) NULL,                  -- JSON do estado anterior
+    Dados_Depois             NVARCHAR(MAX) NULL,                  -- JSON do estado posterior
+    Campos_Alterados         VARCHAR(1000) NULL,                  -- Lista de campos alterados
+
+    CONSTRAINT FK_AtivoTipoAuditoria_AtivoTipo FOREIGN KEY (Id_Ativo_Tipo) REFERENCES Ativo_Tipo(Id_Ativo_Tipo),
+    CONSTRAINT CK_AtivoTipoAuditoria_TipoOp CHECK (Tipo_Operacao IN ('INSERT', 'UPDATE', 'DELETE'))
+);
+
+CREATE INDEX IX_AtivoTipoAuditoria_AtivoTipo ON Ativo_Tipo_Auditoria(Id_Ativo_Tipo, Dt_Operacao DESC);
+CREATE INDEX IX_AtivoTipoAuditoria_Usuario ON Ativo_Tipo_Auditoria(Id_Usuario, Dt_Operacao DESC);
+```
+
+---
+
+## 2. WebServices Legado (VB.NET)
+
+### 2.1 WSAtivo.asmx - Métodos de Tipo de Ativo
+
+```vb
+Imports System.Web.Services
+Imports System.Data.SqlClient
+Imports Newtonsoft.Json
+
+<WebService(Namespace:="http://icontrolit.com.br/services/ativo")>
+<WebServiceBinding(ConformsTo:=WsiProfiles.BasicProfile1_1)>
+Public Class WSAtivo
+    Inherits System.Web.Services.WebService
+
+    Private ReadOnly connectionString As String = ConfigurationManager.ConnectionStrings("IControlIT").ConnectionString
+
+    ' ========================================
+    ' Método: ListarTiposAtivo
+    ' Descrição: Lista todos os tipos de ativos ativos
+    ' ========================================
+    <WebMethod()>
+    Public Function ListarTiposAtivo(ByVal token As String, ByVal idConglomerado As Guid) As List(Of AtivoTipoInfo)
+        Try
+            Dim usuario As Usuario = ValidarToken(token)
+
+            Dim tipos As New List(Of AtivoTipoInfo)
+
+            Using conn As New SqlConnection(connectionString)
+                conn.Open()
+
+                Dim sql As String = "SELECT Id_Ativo_Tipo, Cd_Tipo, Nm_Tipo, Ds_Tipo, Categoria_Principal, Subcategoria, Id_Tipo_Pai, Nivel_Hierarquia, Fl_Inventariavel, Fl_Depreciavel, Taxa_Depreciacao_Anual, Vida_Util_Anos, Icone, Cor_Identificacao, Ordem_Exibicao FROM Ativo_Tipo WHERE Id_Conglomerado = @IdConglomerado AND Fl_Ativo = 1 ORDER BY Ordem_Exibicao, Nm_Tipo"
+
+                Dim cmd As New SqlCommand(sql, conn)
+                cmd.Parameters.AddWithValue("@IdConglomerado", idConglomerado)
+
+                Dim dr As SqlDataReader = cmd.ExecuteReader()
+                While dr.Read()
+                    tipos.Add(New AtivoTipoInfo With {
+                        .IdAtivoTipo = DirectCast(dr("Id_Ativo_Tipo"), Guid),
+                        .CdTipo = dr("Cd_Tipo").ToString(),
+                        .NmTipo = dr("Nm_Tipo").ToString(),
+                        .DsTipo = If(IsDBNull(dr("Ds_Tipo")), "", dr("Ds_Tipo").ToString()),
+                        .CategoriaPrincipal = dr("Categoria_Principal").ToString(),
+                        .Subcategoria = If(IsDBNull(dr("Subcategoria")), "", dr("Subcategoria").ToString()),
+                        .IdTipoPai = If(IsDBNull(dr("Id_Tipo_Pai")), Nothing, DirectCast(dr("Id_Tipo_Pai"), Guid)),
+                        .NivelHierarquia = CInt(dr("Nivel_Hierarquia")),
+                        .FlInventariavel = CBool(dr("Fl_Inventariavel")),
+                        .FlDepreciavel = CBool(dr("Fl_Depreciavel")),
+                        .TaxaDepreciacaoAnual = If(IsDBNull(dr("Taxa_Depreciacao_Anual")), Nothing, CDec(dr("Taxa_Depreciacao_Anual"))),
+                        .VidaUtilAnos = If(IsDBNull(dr("Vida_Util_Anos")), Nothing, CInt(dr("Vida_Util_Anos"))),
+                        .Icone = If(IsDBNull(dr("Icone")), "", dr("Icone").ToString()),
+                        .CorIdentificacao = If(IsDBNull(dr("Cor_Identificacao")), "", dr("Cor_Identificacao").ToString()),
+                        .OrdemExibicao = CInt(dr("Ordem_Exibicao"))
+                    })
+                End While
+            End Using
+
+            Return tipos
+        Catch ex As Exception
+            Throw New Exception("Erro ao listar tipos de ativos: " & ex.Message)
+        End Try
+    End Function
+
+    ' ========================================
+    ' Método: CriarTipoAtivo
+    ' Descrição: Cria novo tipo de ativo
+    ' ========================================
+    <WebMethod()>
+    Public Function CriarTipoAtivo(ByVal token As String, ByVal idConglomerado As Guid, _
+                                   ByVal cdTipo As String, ByVal nmTipo As String, _
+                                   ByVal dsTipo As String, ByVal categoriaPrincipal As String, _
+                                   ByVal subcategoria As String, ByVal idTipoPai As Guid?, _
+                                   ByVal flInventariavel As Boolean, ByVal flDepreciavel As Boolean, _
+                                   ByVal taxaDepreciacaoAnual As Decimal?, ByVal vidaUtilAnos As Integer?, _
+                                   ByVal icone As String, ByVal corIdentificacao As String) As OperacaoResult
+        Try
+            Dim usuario As Usuario = ValidarToken(token)
+
+            If Not TemPermissao(usuario, "cadastros:ativos:tipos:create") Then
+                Throw New UnauthorizedAccessException("Usuário sem permissão para criar tipos de ativos")
+            End If
+
+            Using conn As New SqlConnection(connectionString)
+                conn.Open()
+
+                ' Verificar se código já existe
+                Dim cmdVerif As New SqlCommand("SELECT COUNT(*) FROM Ativo_Tipo WHERE Id_Conglomerado = @IdConglomerado AND Cd_Tipo = @CdTipo AND Fl_Ativo = 1", conn)
+                cmdVerif.Parameters.AddWithValue("@IdConglomerado", idConglomerado)
+                cmdVerif.Parameters.AddWithValue("@CdTipo", cdTipo)
+
+                If CInt(cmdVerif.ExecuteScalar()) > 0 Then
+                    Throw New Exception("Já existe um tipo de ativo com este código")
+                End If
+
+                ' Determinar nível hierárquico
+                Dim nivelHierarquia As Integer = 1
+                Dim caminhoHierarquia As String = "/" & nmTipo
+
+                If idTipoPai.HasValue Then
+                    Dim cmdPai As New SqlCommand("SELECT Nivel_Hierarquia, Caminho_Hierarquia FROM Ativo_Tipo WHERE Id_Ativo_Tipo = @IdTipoPai", conn)
+                    cmdPai.Parameters.AddWithValue("@IdTipoPai", idTipoPai.Value)
+                    Dim drPai As SqlDataReader = cmdPai.ExecuteReader()
+                    If drPai.Read() Then
+                        nivelHierarquia = CInt(drPai("Nivel_Hierarquia")) + 1
+                        caminhoHierarquia = drPai("Caminho_Hierarquia").ToString() & "/" & nmTipo
+                    End If
+                    drPai.Close()
+                End If
+
+                ' Inserir tipo de ativo
+                Dim idTipo As Guid = Guid.NewGuid()
+                Dim sql As String = "INSERT INTO Ativo_Tipo (Id_Ativo_Tipo, Id_Conglomerado, Cd_Tipo, Nm_Tipo, Ds_Tipo, Categoria_Principal, Subcategoria, Id_Tipo_Pai, Nivel_Hierarquia, Caminho_Hierarquia, Fl_Inventariavel, Fl_Depreciavel, Taxa_Depreciacao_Anual, Vida_Util_Anos, Icone, Cor_Identificacao, Dt_Criacao, Id_Usuario_Criacao) VALUES (@IdTipo, @IdConglomerado, @CdTipo, @NmTipo, @DsTipo, @Categoria, @Subcategoria, @IdTipoPai, @NivelHierarquia, @CaminhoHierarquia, @FlInventariavel, @FlDepreciavel, @TaxaDepreciacao, @VidaUtil, @Icone, @Cor, GETDATE(), @IdUsuario)"
+
+                Dim cmd As New SqlCommand(sql, conn)
+                cmd.Parameters.AddWithValue("@IdTipo", idTipo)
+                cmd.Parameters.AddWithValue("@IdConglomerado", idConglomerado)
+                cmd.Parameters.AddWithValue("@CdTipo", cdTipo)
+                cmd.Parameters.AddWithValue("@NmTipo", nmTipo)
+                cmd.Parameters.AddWithValue("@DsTipo", If(String.IsNullOrEmpty(dsTipo), DBNull.Value, dsTipo))
+                cmd.Parameters.AddWithValue("@Categoria", categoriaPrincipal)
+                cmd.Parameters.AddWithValue("@Subcategoria", If(String.IsNullOrEmpty(subcategoria), DBNull.Value, subcategoria))
+                cmd.Parameters.AddWithValue("@IdTipoPai", If(idTipoPai.HasValue, idTipoPai.Value, DBNull.Value))
+                cmd.Parameters.AddWithValue("@NivelHierarquia", nivelHierarquia)
+                cmd.Parameters.AddWithValue("@CaminhoHierarquia", caminhoHierarquia)
+                cmd.Parameters.AddWithValue("@FlInventariavel", flInventariavel)
+                cmd.Parameters.AddWithValue("@FlDepreciavel", flDepreciavel)
+                cmd.Parameters.AddWithValue("@TaxaDepreciacao", If(taxaDepreciacaoAnual.HasValue, taxaDepreciacaoAnual.Value, DBNull.Value))
+                cmd.Parameters.AddWithValue("@VidaUtil", If(vidaUtilAnos.HasValue, vidaUtilAnos.Value, DBNull.Value))
+                cmd.Parameters.AddWithValue("@Icone", If(String.IsNullOrEmpty(icone), DBNull.Value, icone))
+                cmd.Parameters.AddWithValue("@Cor", If(String.IsNullOrEmpty(corIdentificacao), DBNull.Value, corIdentificacao))
+                cmd.Parameters.AddWithValue("@IdUsuario", usuario.IdUsuario)
+                cmd.ExecuteNonQuery()
+
+                ' Registrar auditoria
+                RegistrarAuditoriaTipoAtivo(conn, idTipo, "INSERT", usuario.IdUsuario, usuario.NmUsuario, Nothing, JsonConvert.SerializeObject(New With {
+                    .CdTipo = cdTipo,
+                    .NmTipo = nmTipo,
+                    .CategoriaPrincipal = categoriaPrincipal
+                }))
+
+                Return New OperacaoResult With {
+                    .Sucesso = True,
+                    .Mensagem = "Tipo de ativo criado com sucesso",
+                    .Id = idTipo
+                }
+            End Using
+        Catch ex As Exception
+            Return New OperacaoResult With {
+                .Sucesso = False,
+                .Mensagem = "Erro ao criar tipo de ativo: " & ex.Message
+            }
+        End Try
+    End Function
+
+    ' ========================================
+    ' Método: AtualizarTipoAtivo
+    ' Descrição: Atualiza tipo de ativo existente
+    ' ========================================
+    <WebMethod()>
+    Public Function AtualizarTipoAtivo(ByVal token As String, ByVal idTipo As Guid, _
+                                      ByVal nmTipo As String, ByVal dsTipo As String, _
+                                      ByVal taxaDepreciacaoAnual As Decimal?, _
+                                      ByVal vidaUtilAnos As Integer?) As OperacaoResult
+        Try
+            Dim usuario As Usuario = ValidarToken(token)
+
+            If Not TemPermissao(usuario, "cadastros:ativos:tipos:update") Then
+                Throw New UnauthorizedAccessException("Usuário sem permissão para atualizar tipos de ativos")
+            End If
+
+            Using conn As New SqlConnection(connectionString)
+                conn.Open()
+
+                ' Buscar dados anteriores para auditoria
+                Dim cmdAntes As New SqlCommand("SELECT Nm_Tipo, Ds_Tipo, Taxa_Depreciacao_Anual, Vida_Util_Anos FROM Ativo_Tipo WHERE Id_Ativo_Tipo = @IdTipo", conn)
+                cmdAntes.Parameters.AddWithValue("@IdTipo", idTipo)
+                Dim drAntes As SqlDataReader = cmdAntes.ExecuteReader()
+
+                Dim dadosAntes As String = ""
+                If drAntes.Read() Then
+                    dadosAntes = JsonConvert.SerializeObject(New With {
+                        .NmTipo = drAntes("Nm_Tipo").ToString(),
+                        .DsTipo = If(IsDBNull(drAntes("Ds_Tipo")), "", drAntes("Ds_Tipo").ToString()),
+                        .TaxaDepreciacao = If(IsDBNull(drAntes("Taxa_Depreciacao_Anual")), Nothing, CDec(drAntes("Taxa_Depreciacao_Anual"))),
+                        .VidaUtil = If(IsDBNull(drAntes("Vida_Util_Anos")), Nothing, CInt(drAntes("Vida_Util_Anos")))
+                    })
+                End If
+                drAntes.Close()
+
+                ' Atualizar
+                Dim sql As String = "UPDATE Ativo_Tipo SET Nm_Tipo = @NmTipo, Ds_Tipo = @DsTipo, Taxa_Depreciacao_Anual = @TaxaDepreciacao, Vida_Util_Anos = @VidaUtil, Dt_Ult_Atualizacao = GETDATE(), Id_Usuario_Atualizacao = @IdUsuario WHERE Id_Ativo_Tipo = @IdTipo"
+
+                Dim cmd As New SqlCommand(sql, conn)
+                cmd.Parameters.AddWithValue("@IdTipo", idTipo)
+                cmd.Parameters.AddWithValue("@NmTipo", nmTipo)
+                cmd.Parameters.AddWithValue("@DsTipo", If(String.IsNullOrEmpty(dsTipo), DBNull.Value, dsTipo))
+                cmd.Parameters.AddWithValue("@TaxaDepreciacao", If(taxaDepreciacaoAnual.HasValue, taxaDepreciacaoAnual.Value, DBNull.Value))
+                cmd.Parameters.AddWithValue("@VidaUtil", If(vidaUtilAnos.HasValue, vidaUtilAnos.Value, DBNull.Value))
+                cmd.Parameters.AddWithValue("@IdUsuario", usuario.IdUsuario)
+
+                Dim linhasAfetadas As Integer = cmd.ExecuteNonQuery()
+
+                If linhasAfetadas = 0 Then
+                    Throw New Exception("Tipo de ativo não encontrado")
+                End If
+
+                ' Registrar auditoria
+                Dim dadosDepois As String = JsonConvert.SerializeObject(New With {
+                    .NmTipo = nmTipo,
+                    .DsTipo = dsTipo,
+                    .TaxaDepreciacao = taxaDepreciacaoAnual,
+                    .VidaUtil = vidaUtilAnos
+                })
+
+                RegistrarAuditoriaTipoAtivo(conn, idTipo, "UPDATE", usuario.IdUsuario, usuario.NmUsuario, dadosAntes, dadosDepois)
+
+                Return New OperacaoResult With {
+                    .Sucesso = True,
+                    .Mensagem = "Tipo de ativo atualizado com sucesso"
+                }
+            End Using
+        Catch ex As Exception
+            Return New OperacaoResult With {
+                .Sucesso = False,
+                .Mensagem = "Erro ao atualizar tipo de ativo: " & ex.Message
+            }
+        End Try
+    End Function
+
+    ' ========================================
+    ' Método: ExcluirTipoAtivo
+    ' Descrição: Exclui tipo de ativo (soft delete)
+    ' ========================================
+    <WebMethod()>
+    Public Function ExcluirTipoAtivo(ByVal token As String, ByVal idTipo As Guid) As OperacaoResult
+        Try
+            Dim usuario As Usuario = ValidarToken(token)
+
+            If Not TemPermissao(usuario, "cadastros:ativos:tipos:delete") Then
+                Throw New UnauthorizedAccessException("Usuário sem permissão para excluir tipos de ativos")
+            End If
+
+            Using conn As New SqlConnection(connectionString)
+                conn.Open()
+
+                ' Verificar se há ativos usando este tipo
+                Dim cmdVerif As New SqlCommand("SELECT COUNT(*) FROM Ativo WHERE Id_Ativo_Tipo = @IdTipo AND Fl_Ativo = 1", conn)
+                cmdVerif.Parameters.AddWithValue("@IdTipo", idTipo)
+
+                If CInt(cmdVerif.ExecuteScalar()) > 0 Then
+                    Throw New Exception("Não é possível excluir este tipo pois existem ativos associados")
+                End If
+
+                ' Verificar se há subtipos
+                Dim cmdSubtipos As New SqlCommand("SELECT COUNT(*) FROM Ativo_Tipo WHERE Id_Tipo_Pai = @IdTipo AND Fl_Ativo = 1", conn)
+                cmdSubtipos.Parameters.AddWithValue("@IdTipo", idTipo)
+
+                If CInt(cmdSubtipos.ExecuteScalar()) > 0 Then
+                    Throw New Exception("Não é possível excluir este tipo pois existem subtipos associados")
+                End If
+
+                ' Buscar dados para auditoria
+                Dim cmdDados As New SqlCommand("SELECT Cd_Tipo, Nm_Tipo FROM Ativo_Tipo WHERE Id_Ativo_Tipo = @IdTipo", conn)
+                cmdDados.Parameters.AddWithValue("@IdTipo", idTipo)
+                Dim drDados As SqlDataReader = cmdDados.ExecuteReader()
+
+                Dim dadosAntes As String = ""
+                If drDados.Read() Then
+                    dadosAntes = JsonConvert.SerializeObject(New With {
+                        .CdTipo = drDados("Cd_Tipo").ToString(),
+                        .NmTipo = drDados("Nm_Tipo").ToString()
+                    })
+                End If
+                drDados.Close()
+
+                ' Soft delete
+                Dim sql As String = "UPDATE Ativo_Tipo SET Fl_Ativo = 0, Dt_Ult_Atualizacao = GETDATE(), Id_Usuario_Atualizacao = @IdUsuario WHERE Id_Ativo_Tipo = @IdTipo"
+
+                Dim cmd As New SqlCommand(sql, conn)
+                cmd.Parameters.AddWithValue("@IdTipo", idTipo)
+                cmd.Parameters.AddWithValue("@IdUsuario", usuario.IdUsuario)
+                cmd.ExecuteNonQuery()
+
+                ' Registrar auditoria
+                RegistrarAuditoriaTipoAtivo(conn, idTipo, "DELETE", usuario.IdUsuario, usuario.NmUsuario, dadosAntes, Nothing)
+
+                Return New OperacaoResult With {
+                    .Sucesso = True,
+                    .Mensagem = "Tipo de ativo excluído com sucesso"
+                }
+            End Using
+        Catch ex As Exception
+            Return New OperacaoResult With {
+                .Sucesso = False,
+                .Mensagem = "Erro ao excluir tipo de ativo: " & ex.Message
+            }
+        End Try
+    End Function
+
+    ' ========================================
+    ' Função auxiliar: Registrar auditoria
+    ' ========================================
+    Private Sub RegistrarAuditoriaTipoAtivo(ByVal conn As SqlConnection, ByVal idTipo As Guid, _
+                                           ByVal tipoOp As String, ByVal idUsuario As Guid, _
+                                           ByVal nmUsuario As String, ByVal dadosAntes As String, _
+                                           ByVal dadosDepois As String)
+        Dim sql As String = "INSERT INTO Ativo_Tipo_Auditoria (Id_Ativo_Tipo, Tipo_Operacao, Id_Usuario, Nm_Usuario, IP_Origem, Dados_Antes, Dados_Depois) VALUES (@IdTipo, @TipoOp, @IdUsuario, @NmUsuario, @IP, @DadosAntes, @DadosDepois)"
+
+        Dim cmd As New SqlCommand(sql, conn)
+        cmd.Parameters.AddWithValue("@IdTipo", idTipo)
+        cmd.Parameters.AddWithValue("@TipoOp", tipoOp)
+        cmd.Parameters.AddWithValue("@IdUsuario", idUsuario)
+        cmd.Parameters.AddWithValue("@NmUsuario", nmUsuario)
+        cmd.Parameters.AddWithValue("@IP", GetClientIP())
+        cmd.Parameters.AddWithValue("@DadosAntes", If(String.IsNullOrEmpty(dadosAntes), DBNull.Value, dadosAntes))
+        cmd.Parameters.AddWithValue("@DadosDepois", If(String.IsNullOrEmpty(dadosDepois), DBNull.Value, dadosDepois))
+        cmd.ExecuteNonQuery()
+    End Sub
+
+    Private Function GetClientIP() As String
+        Return HttpContext.Current.Request.UserHostAddress
+    End Function
+
+End Class
+
+' ========================================
+' Classes de retorno
+' ========================================
+
+Public Class AtivoTipoInfo
+    Public Property IdAtivoTipo As Guid
+    Public Property CdTipo As String
+    Public Property NmTipo As String
+    Public Property DsTipo As String
+    Public Property CategoriaPrincipal As String
+    Public Property Subcategoria As String
+    Public Property IdTipoPai As Guid?
+    Public Property NivelHierarquia As Integer
+    Public Property FlInventariavel As Boolean
+    Public Property FlDepreciavel As Boolean
+    Public Property TaxaDepreciacaoAnual As Decimal?
+    Public Property VidaUtilAnos As Integer?
+    Public Property Icone As String
+    Public Property CorIdentificacao As String
+    Public Property OrdemExibicao As Integer
+End Class
+
+Public Class OperacaoResult
+    Public Property Sucesso As Boolean
+    Public Property Mensagem As String
+    Public Property Id As Guid?
+End Class
+```
+
+---
+
+## 3. Regras de Negócio
+
+### RN-CAD-013-01: Código Único por Conglomerado
+- **Descrição**: O código do tipo de ativo deve ser único dentro do conglomerado
+- **Justificativa**: Evitar duplicidade e confusão na identificação
+- **Implementação**: UNIQUE constraint em (Id_Conglomerado, Cd_Tipo)
+
+### RN-CAD-013-02: Hierarquia de Tipos
+- **Descrição**: Tipos podem ter hierarquia pai-filho com até 5 níveis de profundidade
+- **Justificativa**: Organização lógica (ex: Hardware → Computadores → Notebooks → Notebooks Dell)
+- **Implementação**: Campo Id_Tipo_Pai e validação de profundidade máxima
+
+### RN-CAD-013-03: Validação de Categoria
+- **Descrição**: Categoria principal deve ser um dos valores permitidos: Hardware, Software, LinhaMovel, LinhaFixa, Servico, Licenca, Acessorio, Outro
+- **Justificativa**: Padronização e integração com outros módulos
+- **Implementação**: CHECK constraint na coluna Categoria_Principal
+
+### RN-CAD-013-04: Depreciação Obrigatória para Hardware
+- **Descrição**: Tipos de categoria "Hardware" devem obrigatoriamente ter taxa de depreciação e vida útil definidas
+- **Justificativa**: Compliance contábil e fiscal
+- **Implementação**: Validação no CriarTipoAtivoCommand para Categoria_Principal = 'Hardware'
+
+### RN-CAD-013-05: Não Permitir Exclusão com Ativos Associados
+- **Descrição**: Tipo de ativo não pode ser excluído se houver ativos cadastrados usando este tipo
+- **Justificativa**: Integridade referencial e histórico
+- **Implementação**: Verificação de COUNT em Ativo antes de permitir soft delete
+
+### RN-CAD-013-06: Campos Customizados por Tipo
+- **Descrição**: Cada tipo pode ter campos customizados específicos (ex: tipo "Notebook" pode ter campo "Tamanho da Tela")
+- **Justificativa**: Flexibilidade para diferentes necessidades de catalogação
+- **Implementação**: Tabela Ativo_Tipo_Campo_Customizado com definição de campos dinâmicos
+
+### RN-CAD-013-07: Taxa de Depreciação Válida
+- **Descrição**: Taxa de depreciação anual deve estar entre 0% e 100%
+- **Justificativa**: Valores fora deste range não fazem sentido contábil
+- **Implementação**: CHECK constraint (Taxa_Depreciacao_Anual >= 0 AND Taxa_Depreciacao_Anual <= 100)
+
+### RN-CAD-013-08: Tipos de Sistema Não Editáveis
+- **Descrição**: Tipos marcados com Fl_Sistema = 1 não podem ser editados ou excluídos
+- **Justificativa**: Preservar tipos padrão do sistema
+- **Implementação**: Validação em AtualizarTipoAtivoCommand e ExcluirTipoAtivoCommand
+
+### RN-CAD-013-09: Recalcular Hierarquia ao Mudar Pai
+- **Descrição**: Ao alterar o tipo pai, recalcular Nivel_Hierarquia e Caminho_Hierarquia de todos os descendentes
+- **Justificativa**: Manter consistência da árvore hierárquica
+- **Implementação**: Procedure recursiva ou query CTE para atualização em cascata
+
+### RN-CAD-013-10: Auditoria Completa de Alterações
+- **Descrição**: Todas as operações (INSERT, UPDATE, DELETE) devem ser auditadas com dados antes/depois
+- **Justificativa**: Rastreabilidade e compliance
+- **Implementação**: Tabela Ativo_Tipo_Auditoria populada via trigger ou service
+
+### RN-CAD-013-11: Ícone e Cor para Identificação Visual
+- **Descrição**: Cada tipo deve ter ícone (Font Awesome) e cor hex para exibição visual em interfaces
+- **Justificativa**: Melhorar UX e identificação rápida
+- **Implementação**: Campos Icone (varchar) e Cor_Identificacao (varchar(7) hex color)
+
+### RN-CAD-013-12: Ordem de Exibição Customizável
+- **Descrição**: Tipos devem ser ordenáveis via campo Ordem_Exibicao para controle de listagens
+- **Justificativa**: Permitir que tipos mais usados apareçam primeiro
+- **Implementação**: Campo Ordem_Exibicao (int) com ORDER BY nas queries
+
+### RN-CAD-013-13: Não Permitir Loop Hierárquico
+- **Descrição**: Ao definir tipo pai, validar que não cria loop (ex: A → B → C → A)
+- **Justificativa**: Prevenir estrutura inválida
+- **Implementação**: Validação recursiva percorrendo a hierarquia até a raiz
+
+### RN-CAD-013-14: Importação em Massa com Validação
+- **Descrição**: Permitir importação de tipos via CSV/Excel com validação de duplicidades e hierarquia
+- **Justificativa**: Carga inicial e migrações
+- **Implementação**: ImportarTiposAtivoCommand com parsing e validação linha a linha
+
+### RN-CAD-013-15: Soft Delete com Possibilidade de Restauração
+- **Descrição**: Exclusão lógica (Fl_Ativo = 0) com possibilidade de restauração posterior
+- **Justificativa**: Prevenir perda de dados acidental
+- **Implementação**: UPDATE Fl_Ativo ao invés de DELETE físico
+
+---
+
+## 4. REST API Moderna (.NET 10)
+
+### 4.1 AtivoTipoController
+
+```csharp
+using IControlIT.API.Application.Commands.AtivoTipo;
+using IControlIT.API.Application.Queries.AtivoTipo;
+using MediatR;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace IControlIT.API.Web.Controllers
+{
+    [ApiController]
+    [Route("api/ativos/tipos")]
+    [Authorize]
+    public class AtivoTipoController : ControllerBase
+    {
+        private readonly IMediator _mediator;
+        private readonly ILogger<AtivoTipoController> _logger;
+
+        public AtivoTipoController(IMediator mediator, ILogger<AtivoTipoController> logger)
+        {
+            _mediator = mediator;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Lista todos os tipos de ativos ativos do conglomerado
+        /// </summary>
+        [HttpGet]
+        [Authorize(Policy = "cadastros:ativos:tipos:read")]
+        public async Task<ActionResult<List<AtivoTipoDto>>> ListarTipos([FromQuery] Guid idConglomerado)
+        {
+            var query = new ListarTiposAtivoQuery(idConglomerado);
+            var result = await _mediator.Send(query);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Busca tipo de ativo por ID
+        /// </summary>
+        [HttpGet("{id}")]
+        [Authorize(Policy = "cadastros:ativos:tipos:read")]
+        public async Task<ActionResult<AtivoTipoDetalhadoDto>> BuscarPorId(Guid id)
+        {
+            var query = new BuscarTipoAtivoPorIdQuery(id);
+            var result = await _mediator.Send(query);
+
+            if (result == null)
+                return NotFound(new { mensagem = "Tipo de ativo não encontrado" });
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Cria novo tipo de ativo
+        /// </summary>
+        [HttpPost]
+        [Authorize(Policy = "cadastros:ativos:tipos:create")]
+        public async Task<ActionResult<OperacaoResult>> Criar([FromBody] CriarTipoAtivoCommand command)
+        {
+            var result = await _mediator.Send(command);
+
+            if (!result.Sucesso)
+                return BadRequest(result);
+
+            return CreatedAtAction(nameof(BuscarPorId), new { id = result.Id }, result);
+        }
+
+        /// <summary>
+        /// Atualiza tipo de ativo existente
+        /// </summary>
+        [HttpPut("{id}")]
+        [Authorize(Policy = "cadastros:ativos:tipos:update")]
+        public async Task<ActionResult<OperacaoResult>> Atualizar(Guid id, [FromBody] AtualizarTipoAtivoCommand command)
+        {
+            command.IdTipo = id;
+            var result = await _mediator.Send(command);
+
+            if (!result.Sucesso)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Exclui tipo de ativo (soft delete)
+        /// </summary>
+        [HttpDelete("{id}")]
+        [Authorize(Policy = "cadastros:ativos:tipos:delete")]
+        public async Task<ActionResult<OperacaoResult>> Excluir(Guid id)
+        {
+            var command = new ExcluirTipoAtivoCommand(id);
+            var result = await _mediator.Send(command);
+
+            if (!result.Sucesso)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Lista hierarquia de tipos (árvore)
+        /// </summary>
+        [HttpGet("hierarquia")]
+        [Authorize(Policy = "cadastros:ativos:tipos:read")]
+        public async Task<ActionResult<List<AtivoTipoHierarquiaDto>>> ListarHierarquia([FromQuery] Guid idConglomerado)
+        {
+            var query = new ListarHierarquiaTiposQuery(idConglomerado);
+            var result = await _mediator.Send(query);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Importa tipos de ativos em massa via CSV
+        /// </summary>
+        [HttpPost("importar")]
+        [Authorize(Policy = "cadastros:ativos:tipos:import")]
+        public async Task<ActionResult<ImportacaoResult>> Importar([FromForm] IFormFile arquivo, [FromQuery] Guid idConglomerado)
+        {
+            var command = new ImportarTiposAtivoCommand(idConglomerado, arquivo);
+            var result = await _mediator.Send(command);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Lista campos customizados de um tipo
+        /// </summary>
+        [HttpGet("{id}/campos-customizados")]
+        [Authorize(Policy = "cadastros:ativos:tipos:read")]
+        public async Task<ActionResult<List<CampoCustomizadoDto>>> ListarCamposCustomizados(Guid id)
+        {
+            var query = new ListarCamposCustomizadosTipoQuery(id);
+            var result = await _mediator.Send(query);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Adiciona campo customizado a um tipo
+        /// </summary>
+        [HttpPost("{id}/campos-customizados")]
+        [Authorize(Policy = "cadastros:ativos:tipos:update")]
+        public async Task<ActionResult<OperacaoResult>> AdicionarCampoCustomizado(Guid id, [FromBody] AdicionarCampoCustomizadoCommand command)
+        {
+            command.IdTipo = id;
+            var result = await _mediator.Send(command);
+            return Ok(result);
+        }
+    }
+}
+```
+
+---
+
+### 4.2 CriarTipoAtivoCommand
+
+```csharp
+using IControlIT.API.Domain.Entities;
+using IControlIT.API.Infrastructure.Data;
+using MediatR;
+
+namespace IControlIT.API.Application.Commands.AtivoTipo
+{
+    public record CriarTipoAtivoCommand(
+        Guid IdConglomerado,
+        string CdTipo,
+        string NmTipo,
+        string? DsTipo,
+        string CategoriaPrincipal,
+        string? Subcategoria,
+        Guid? IdTipoPai,
+        bool FlInventariavel,
+        bool FlDepreciavel,
+        decimal? TaxaDepreciacaoAnual,
+        int? VidaUtilAnos,
+        string? Icone,
+        string? CorIdentificacao
+    ) : IRequest<OperacaoResult>;
+
+    public class CriarTipoAtivoCommandHandler : IRequestHandler<CriarTipoAtivoCommand, OperacaoResult>
+    {
+        private readonly IControlITDbContext _context;
+        private readonly ICurrentUserService _currentUser;
+
+        public CriarTipoAtivoCommandHandler(IControlITDbContext context, ICurrentUserService currentUser)
+        {
+            _context = context;
+            _currentUser = currentUser;
+        }
+
+        public async Task<OperacaoResult> Handle(CriarTipoAtivoCommand request, CancellationToken cancellationToken)
+        {
+            // Validar permissão
+            if (!_currentUser.HasPermission("cadastros:ativos:tipos:create"))
+            {
+                return new OperacaoResult
+                {
+                    Sucesso = false,
+                    Mensagem = "Usuário sem permissão para criar tipos de ativos"
+                };
+            }
+
+            // Verificar se código já existe
+            var tipoExistente = await _context.AtivoTipos
+                .FirstOrDefaultAsync(t => t.IdConglomerado == request.IdConglomerado
+                    && t.CdTipo == request.CdTipo
+                    && t.FlAtivo, cancellationToken);
+
+            if (tipoExistente != null)
+            {
+                return new OperacaoResult
+                {
+                    Sucesso = false,
+                    Mensagem = "Já existe um tipo de ativo com este código"
+                };
+            }
+
+            // Validar categoria Hardware requer depreciação
+            if (request.CategoriaPrincipal == "Hardware" && (!request.FlDepreciavel || !request.TaxaDepreciacaoAnual.HasValue))
+            {
+                return new OperacaoResult
+                {
+                    Sucesso = false,
+                    Mensagem = "Tipos de categoria Hardware devem ter depreciação e taxa de depreciação definidas"
+                };
+            }
+
+            // Determinar nível hierárquico e caminho
+            int nivelHierarquia = 1;
+            string caminhoHierarquia = "/" + request.NmTipo;
+
+            if (request.IdTipoPai.HasValue)
+            {
+                var tipoPai = await _context.AtivoTipos.FindAsync(request.IdTipoPai.Value);
+                if (tipoPai != null)
+                {
+                    nivelHierarquia = tipoPai.NivelHierarquia + 1;
+                    caminhoHierarquia = tipoPai.CaminhoHierarquia + "/" + request.NmTipo;
+
+                    // Validar profundidade máxima (5 níveis)
+                    if (nivelHierarquia > 5)
+                    {
+                        return new OperacaoResult
+                        {
+                            Sucesso = false,
+                            Mensagem = "Hierarquia de tipos não pode ter mais de 5 níveis"
+                        };
+                    }
+                }
+            }
+
+            // Criar tipo
+            var tipo = new Domain.Entities.AtivoTipo
+            {
+                IdAtivoTipo = Guid.NewGuid(),
+                IdConglomerado = request.IdConglomerado,
+                CdTipo = request.CdTipo,
+                NmTipo = request.NmTipo,
+                DsTipo = request.DsTipo,
+                CategoriaPrincipal = request.CategoriaPrincipal,
+                Subcategoria = request.Subcategoria,
+                IdTipoPai = request.IdTipoPai,
+                NivelHierarquia = nivelHierarquia,
+                CaminhoHierarquia = caminhoHierarquia,
+                FlInventariavel = request.FlInventariavel,
+                FlDepreciavel = request.FlDepreciavel,
+                TaxaDepreciacaoAnual = request.TaxaDepreciacaoAnual,
+                VidaUtilAnos = request.VidaUtilAnos,
+                Icone = request.Icone,
+                CorIdentificacao = request.CorIdentificacao,
+                FlAtivo = true,
+                DtCriacao = DateTime.Now,
+                IdUsuarioCriacao = _currentUser.UserId
+            };
+
+            _context.AtivoTipos.Add(tipo);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            return new OperacaoResult
+            {
+                Sucesso = true,
+                Mensagem = "Tipo de ativo criado com sucesso",
+                Id = tipo.IdAtivoTipo
+            };
+        }
+    }
+}
+```
+
+---
+
+## 5. Tecnologias Recomendadas
+
+### Backend (.NET 10)
+- **ASP.NET Core 8.0**: Framework web moderno
+- **Entity Framework Core 10.0**: ORM para acesso ao banco
+- **MediatR**: CQRS pattern (Commands/Queries)
+- **FluentValidation**: Validação de comandos
+- **AutoMapper**: Mapeamento Entity → DTO
+- **Serilog**: Logging estruturado
+
+### Frontend (Angular 18)
+- **Angular Material**: Componentes UI (tables, dialogs, tree)
+- **Angular Tree Component**: Exibição hierárquica de tipos
+- **NGRX**: Gerenciamento de estado
+- **RxJS**: Programação reativa
+- **ng-select**: Dropdowns com busca
+
+### Banco de Dados
+- **SQL Server 2019+**: Banco relacional
+- **Índices**: Performance em queries de hierarquia
+- **Triggers**: Auditoria automática (opcional)
+
+### Ferramentas
+- **Swagger/OpenAPI**: Documentação da API
+- **xUnit**: Testes unitários
+- **Bogus**: Geração de dados de teste
+
+---
+
+## 6. Casos de Uso
+
+### UC-CAD-013-01: Criar Tipo de Ativo
+
+**Ator Principal**: Administrador do Sistema
+
+**Pré-condições**:
+- Usuário autenticado com permissão `cadastros:ativos:tipos:create`
+
+**Fluxo Principal**:
+1. Administrador acessa "Cadastros > Ativos > Tipos de Ativos"
+2. Sistema exibe lista de tipos cadastrados em formato de árvore hierárquica
+3. Administrador clica em "Novo Tipo"
+4. Sistema exibe formulário:
+   - Código (obrigatório)
+   - Nome (obrigatório)
+   - Descrição (opcional)
+   - Categoria Principal (dropdown: Hardware, Software, Linha Móvel, etc.)
+   - Subcategoria (opcional)
+   - Tipo Pai (dropdown com tipos existentes, opcional)
+   - Inventariável? (checkbox, padrão SIM)
+   - Depreciável? (checkbox, padrão SIM)
+   - Taxa de Depreciação Anual (%, obrigatório se Depreciável)
+   - Vida Útil (anos, obrigatório se Depreciável)
+   - Ícone (seletor de ícones Font Awesome)
+   - Cor (color picker)
+5. Administrador preenche:
+   - Código: "NOTE-CORP"
+   - Nome: "Notebook Corporativo"
+   - Categoria: Hardware
+   - Subcategoria: Notebook
+   - Depreciável: SIM
+   - Taxa: 20%
+   - Vida Útil: 5 anos
+   - Ícone: fa-laptop
+   - Cor: #3498db
+6. Administrador clica em "Salvar"
+7. Sistema valida dados:
+   - Código único no conglomerado ✓
+   - Categoria válida ✓
+   - Taxa entre 0-100% ✓
+8. Sistema cria tipo de ativo com Id único
+9. Sistema registra auditoria (INSERT)
+10. Sistema exibe mensagem: "Tipo de ativo criado com sucesso"
+11. Sistema atualiza lista com novo tipo
+
+**Fluxos Alternativos**:
+- **FA01**: Se código já existe:
+  - Sistema exibe erro: "Já existe um tipo com este código"
+  - Retorna ao passo 5
+- **FA02**: Se categoria Hardware sem depreciação:
+  - Sistema exibe erro: "Tipos Hardware devem ter depreciação definida"
+  - Retorna ao passo 5
+- **FA03**: Se hierarquia exceder 5 níveis:
+  - Sistema exibe erro: "Hierarquia não pode ter mais de 5 níveis"
+  - Retorna ao passo 5
+
+**Pós-condições**:
+- Tipo de ativo criado e disponível para associação a ativos
+- Auditoria registrada
+
+---
+
+### UC-CAD-013-02: Listar Tipos em Hierarquia
+
+**Ator Principal**: Usuário do Sistema
+
+**Pré-condições**:
+- Usuário autenticado com permissão `cadastros:ativos:tipos:read`
+
+**Fluxo Principal**:
+1. Usuário acessa "Cadastros > Ativos > Tipos de Ativos"
+2. Sistema busca tipos do conglomerado do usuário
+3. Sistema monta árvore hierárquica com base em Id_Tipo_Pai
+4. Sistema exibe árvore:
+   ```
+   📦 Hardware
+      ├─ 💻 Computadores
+      │   ├─ 🖥️ Desktops
+      │   │   └─ Desktop Corporativo
+      │   ├─ 💻 Notebooks
+      │   │   ├─ Notebook Corporativo
+      │   │   └─ Notebook Executivo
+      │   └─ 🖥️ Servidores
+      ├─ 📱 Dispositivos Móveis
+      │   ├─ Smartphones
+      │   └─ Tablets
+      └─ 🖨️ Periféricos
+   📱 Linhas Móveis
+      ├─ Voz + Dados
+      └─ M2M/IoT
+   ```
+5. Usuário pode expandir/recolher nós
+6. Ao clicar em um tipo, sistema exibe detalhes no painel lateral:
+   - Código
+   - Nome
+   - Descrição
+   - Categoria
+   - Taxa de depreciação
+   - Quantidade de ativos deste tipo
+   - Botões: Editar, Excluir, Adicionar Subtipo
+
+**Fluxos Alternativos**:
+- **FA01**: Se não houver tipos cadastrados:
+  - Sistema exibe mensagem: "Nenhum tipo cadastrado. Clique em 'Novo' para criar"
+
+**Pós-condições**:
+- Usuário visualiza hierarquia de tipos
+
+---
+
+## 7. Oportunidades de Modernização
+
+### OM-CAD-013-01: Drag-and-Drop para Reorganizar Hierarquia
+- **Descrição**: Interface de arrastar e soltar para reorganizar tipos na árvore
+- **Benefício**: UX melhorada para gestão de hierarquia
+- **Tecnologia**: Angular CDK Drag & Drop, NGRX para state management
+
+### OM-CAD-013-02: Sugestão Automática de Taxa de Depreciação
+- **Descrição**: IA sugere taxa baseada em histórico de tipos similares
+- **Benefício**: Padronização e compliance contábil
+- **Tecnologia**: Azure ML, regression model treinado com dados históricos
+
+### OM-CAD-013-03: Templates de Tipos Prontos
+- **Descrição**: Biblioteca de templates pré-configurados (ex: "Desktop Padrão", "Servidor Web")
+- **Benefício**: Acelerar setup inicial
+- **Tecnologia**: Seed data JSON, importação one-click
+
+### OM-CAD-013-04: Visualização Gráfica de Hierarquia
+- **Descrição**: Diagrama visual (D3.js) da árvore de tipos com estatísticas
+- **Benefício**: Visão holística da taxonomia de ativos
+- **Tecnologia**: D3.js, Charts.js
+
+### OM-CAD-013-05: Versionamento de Tipos
+- **Descrição**: Histórico de versões de tipos com possibilidade de rollback
+- **Benefício**: Rastreabilidade de mudanças em definições
+- **Tecnologia**: Temporal Tables SQL Server
+
+### OM-CAD-013-06: Importação de Taxonomias Padrão (UNSPSC)
+- **Descrição**: Importar classificações padrão UNSPSC (United Nations Standard Products and Services Code)
+- **Benefício**: Compliance com padrões internacionais de catalogação
+- **Tecnologia**: Parser UNSPSC CSV, mapeamento automático
+
+### OM-CAD-013-07: Ícones Customizados (Upload)
+- **Descrição**: Permitir upload de ícones SVG customizados ao invés de apenas Font Awesome
+- **Benefício**: Identidade visual personalizada
+- **Tecnologia**: Azure Blob Storage para SVGs, sanitização de upload
+
+### OM-CAD-013-08: Relatório de Tipos Mais Utilizados
+- **Descrição**: Dashboard mostrando tipos com mais ativos, custos agregados, tendências
+- **Benefício**: Insights sobre composição do parque de ativos
+- **Tecnologia**: Power BI Embedded, queries agregadas
+
+---
+
+## 8. Referências ao Legado
+
+### 8.1 Arquivos VB.NET do Sistema Legado
+
+| Arquivo Legado | Descrição | Localização Provável |
+|---|---|---|
+| `Ativo_Tipo.aspx` | Página de cadastro de tipos | `/Cadastro/Ativo_Tipo.aspx` |
+| `Ativo_Tipo.aspx.vb` | Code-behind | `/Cadastro/Ativo_Tipo.aspx.vb` |
+| `clsAtivoTipo.vb` | Classe de negócio | `/App_Code/clsAtivoTipo.vb` |
+| `AtivoTipoDAL.vb` | Data Access Layer | `/App_Code/DAL/AtivoTipoDAL.vb` |
+
+### 8.2 Stored Procedures Legadas
+
+| Stored Procedure | Descrição | Substituída por |
+|---|---|---|
+| `sp_AtivoTipo_Listar` | Lista tipos ativos | `ListarTiposAtivoQuery` |
+| `sp_AtivoTipo_Insert` | Insere tipo | `CriarTipoAtivoCommand` |
+| `sp_AtivoTipo_Update` | Atualiza tipo | `AtualizarTipoAtivoCommand` |
+| `sp_AtivoTipo_Delete` | Soft delete | `ExcluirTipoAtivoCommand` |
+| `sp_AtivoTipo_BuscarPorId` | Busca por ID | `BuscarTipoAtivoPorIdQuery` |
+
+### 8.3 Tabelas Legadas
+
+| Tabela Legada | Tabela Moderna | Observações |
+|---|---|---|
+| `TB_ATIVO_TIPO` | `Ativo_Tipo` | Adicionados campos de hierarquia, ícone, cor, auditoria |
+| - | `Ativo_Tipo_Campo_Customizado` | Nova tabela para campos dinâmicos |
+| - | `Ativo_Tipo_Auditoria` | Nova tabela para trilha de auditoria |
+
+### 8.4 Mapeamento de Colunas
+
+| Coluna Legado | Coluna Moderna | Alteração |
+|---|---|---|
+| `ID_TIPO` | `Id_Ativo_Tipo` | Renomeado |
+| `COD_TIPO` | `Cd_Tipo` | Renomeado |
+| `NOME_TIPO` | `Nm_Tipo` | Renomeado |
+| `DESCRICAO` | `Ds_Tipo` | Renomeado |
+| `TAXA_DEPREC` | `Taxa_Depreciacao_Anual` | Renomeado |
+| - | `Id_Tipo_Pai` | **NOVO**: Suporte a hierarquia |
+| - | `Nivel_Hierarquia` | **NOVO**: Profundidade na árvore |
+| - | `Caminho_Hierarquia` | **NOVO**: Path completo |
+| - | `Icone` | **NOVO**: Identificação visual |
+| - | `Cor_Identificacao` | **NOVO**: Cor hex |
+| - | `Template_Campos_Custom` | **NOVO**: Campos dinâmicos JSON |
+
+---
+
+## 9. Testes
+
+### 9.1 Testes Unitários
+
+```csharp
+using Xunit;
+using Moq;
+using FluentAssertions;
+using IControlIT.API.Application.Commands.AtivoTipo;
+
+namespace IControlIT.API.Tests.Unit.Commands
+{
+    public class CriarTipoAtivoCommandHandlerTests
+    {
+        [Fact]
+        public async Task Handle_DeveCriarTipo_QuandoDadosValidos()
+        {
+            // Arrange
+            var mockContext = new Mock<IControlITDbContext>();
+            var mockCurrentUser = new Mock<ICurrentUserService>();
+
+            mockCurrentUser.Setup(u => u.HasPermission("cadastros:ativos:tipos:create")).Returns(true);
+            mockCurrentUser.Setup(u => u.UserId).Returns(Guid.NewGuid());
+
+            var handler = new CriarTipoAtivoCommandHandler(mockContext.Object, mockCurrentUser.Object);
+
+            var command = new CriarTipoAtivoCommand(
+                Guid.NewGuid(),
+                "NOTE-01",
+                "Notebook Corporativo",
+                "Notebooks para uso corporativo",
+                "Hardware",
+                "Notebook",
+                null,
+                true,
+                true,
+                20.00m,
+                5,
+                "fa-laptop",
+                "#3498db"
+            );
+
+            // Act
+            var result = await handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.Sucesso.Should().BeTrue();
+            result.Mensagem.Should().Be("Tipo de ativo criado com sucesso");
+            result.Id.Should().NotBe(Guid.Empty);
+        }
+
+        [Fact]
+        public async Task Handle_DeveRetornarErro_QuandoCodigoDuplicado()
+        {
+            // Arrange
+            var mockContext = new Mock<IControlITDbContext>();
+            var mockCurrentUser = new Mock<ICurrentUserService>();
+
+            // Setup: simular tipo existente com mesmo código
+            var tipoExistente = new AtivoTipo { CdTipo = "NOTE-01", FlAtivo = true };
+            mockContext.Setup(c => c.AtivoTipos.FirstOrDefaultAsync(It.IsAny<Expression>(), It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(tipoExistente);
+
+            var handler = new CriarTipoAtivoCommandHandler(mockContext.Object, mockCurrentUser.Object);
+
+            var command = new CriarTipoAtivoCommand(
+                Guid.NewGuid(),
+                "NOTE-01",
+                "Outro Notebook",
+                null,
+                "Hardware",
+                null,
+                null,
+                true,
+                true,
+                20m,
+                5,
+                null,
+                null
+            );
+
+            // Act
+            var result = await handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.Sucesso.Should().BeFalse();
+            result.Mensagem.Should().Contain("Já existe um tipo");
+        }
+
+        [Fact]
+        public async Task Handle_DeveRetornarErro_QuandoHardwareSemDepreciacao()
+        {
+            // Arrange
+            var mockContext = new Mock<IControlITDbContext>();
+            var mockCurrentUser = new Mock<ICurrentUserService>();
+
+            mockCurrentUser.Setup(u => u.HasPermission("cadastros:ativos:tipos:create")).Returns(true);
+
+            var handler = new CriarTipoAtivoCommandHandler(mockContext.Object, mockCurrentUser.Object);
+
+            var command = new CriarTipoAtivoCommand(
+                Guid.NewGuid(),
+                "DESK-01",
+                "Desktop",
+                null,
+                "Hardware",
+                null,
+                null,
+                true,
+                false,  // Depreciável = false
+                null,   // Sem taxa
+                null,
+                null,
+                null
+            );
+
+            // Act
+            var result = await handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.Sucesso.Should().BeFalse();
+            result.Mensagem.Should().Contain("Hardware devem ter depreciação");
+        }
+
+        [Fact]
+        public async Task Handle_DeveCalcularNivelHierarquico_QuandoTemTipoPai()
+        {
+            // Arrange
+            var mockContext = new Mock<IControlITDbContext>();
+            var mockCurrentUser = new Mock<ICurrentUserService>();
+
+            var tipoPai = new AtivoTipo
+            {
+                IdAtivoTipo = Guid.NewGuid(),
+                NmTipo = "Computadores",
+                NivelHierarquia = 1,
+                CaminhoHierarquia = "/Computadores"
+            };
+
+            mockContext.Setup(c => c.AtivoTipos.FindAsync(It.IsAny<Guid>())).ReturnsAsync(tipoPai);
+
+            var handler = new CriarTipoAtivoCommandHandler(mockContext.Object, mockCurrentUser.Object);
+
+            var command = new CriarTipoAtivoCommand(
+                Guid.NewGuid(),
+                "NOTE-01",
+                "Notebooks",
+                null,
+                "Hardware",
+                null,
+                tipoPai.IdAtivoTipo,  // Com tipo pai
+                true,
+                true,
+                20m,
+                5,
+                null,
+                null
+            );
+
+            // Act
+            var result = await handler.Handle(command, CancellationToken.None);
+
+            // Assert
+            result.Sucesso.Should().BeTrue();
+            // Verificar que NivelHierarquia = 2 e Caminho = "/Computadores/Notebooks"
+        }
+    }
+}
+```
+
+---
+
+### 9.2 Testes de Integração
+
+```csharp
+using Xunit;
+using Microsoft.AspNetCore.Mvc.Testing;
+using System.Net.Http.Json;
+
+namespace IControlIT.API.Tests.Integration
+{
+    public class AtivoTipoIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+    {
+        private readonly HttpClient _client;
+
+        public AtivoTipoIntegrationTests(WebApplicationFactory<Program> factory)
+        {
+            _client = factory.CreateClient();
+        }
+
+        [Fact]
+        public async Task GET_ListarTipos_DeveRetornar200_QuandoAutenticado()
+        {
+            // Arrange
+            var idConglomerado = Guid.NewGuid();
+
+            // Act
+            var response = await _client.GetAsync($"/api/ativos/tipos?idConglomerado={idConglomerado}");
+
+            // Assert
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<List<AtivoTipoDto>>();
+            result.Should().NotBeNull();
+        }
+
+        [Fact]
+        public async Task POST_Criar_DeveCriarTipo_QuandoDadosValidos()
+        {
+            // Arrange
+            var command = new
+            {
+                IdConglomerado = Guid.NewGuid(),
+                CdTipo = "TEST-001",
+                NmTipo = "Tipo Teste",
+                CategoriaPrincipal = "Hardware",
+                FlInventariavel = true,
+                FlDepreciavel = true,
+                TaxaDepreciacaoAnual = 20.00,
+                VidaUtilAnos = 5
+            };
+
+            // Act
+            var response = await _client.PostAsJsonAsync("/api/ativos/tipos", command);
+
+            // Assert
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<OperacaoResult>();
+            result.Should().NotBeNull();
+            result.Sucesso.Should().BeTrue();
+            result.Id.Should().NotBe(Guid.Empty);
+        }
+
+        [Fact]
+        public async Task DELETE_Excluir_DeveRetornar400_QuandoHaAtivosAssociados()
+        {
+            // Arrange
+            var idTipo = Guid.NewGuid();  // Tipo com ativos associados
+
+            // Act
+            var response = await _client.DeleteAsync($"/api/ativos/tipos/{idTipo}");
+
+            // Assert
+            response.StatusCode.Should().Be(System.Net.HttpStatusCode.BadRequest);
+            var result = await response.Content.ReadFromJsonAsync<OperacaoResult>();
+            result.Mensagem.Should().Contain("existem ativos associados");
+        }
+    }
+}
+```
+
+---
+
+## 10. Documentação Adicional
+
+### 10.1 Diagrama ER (Entity-Relationship)
+
+```
+┌─────────────────────────────┐
+│  Ativo_Tipo                 │
+├─────────────────────────────┤
+│ PK Id_Ativo_Tipo            │
+│    Cd_Tipo                  │
+│    Nm_Tipo                  │
+│    Categoria_Principal      │
+│ FK Id_Tipo_Pai              │───┐ (self-reference)
+│    Nivel_Hierarquia         │   │
+│    Caminho_Hierarquia       │   │
+│    Fl_Depreciavel           │   │
+│    Taxa_Depreciacao_Anual   │   │
+│    Icone                    │   │
+│    Cor_Identificacao        │   │
+│    ...                      │   │
+└─────────────────────────────┘   │
+         │                        │
+         │ 1                      │
+         │                        │
+         │ N                      │
+         ▼                        │
+┌─────────────────────────────┐◄──┘
+│  Ativo                      │
+├─────────────────────────────┤
+│ PK Id_Ativo                 │
+│ FK Id_Ativo_Tipo            │
+│    Numero_Serie             │
+│    ...                      │
+└─────────────────────────────┘
+
+         │ 1
+         │
+         │ N
+         ▼
+┌─────────────────────────────┐
+│  Ativo_Tipo_Campo_Custom    │
+├─────────────────────────────┤
+│ PK Id_Campo                 │
+│ FK Id_Ativo_Tipo            │
+│    Cd_Campo                 │
+│    Nm_Campo                 │
+│    Tipo_Dados               │
+│    Fl_Obrigatorio           │
+│    ...                      │
+└─────────────────────────────┘
+```
+
+---
+
+### 10.2 Exemplo de Hierarquia JSON
+
+```json
+{
+  "tipos": [
+    {
+      "id": "guid-hardware",
+      "codigo": "HW",
+      "nome": "Hardware",
+      "nivel": 1,
+      "filhos": [
+        {
+          "id": "guid-computadores",
+          "codigo": "HW-COMP",
+          "nome": "Computadores",
+          "nivel": 2,
+          "filhos": [
+            {
+              "id": "guid-notebooks",
+              "codigo": "HW-COMP-NOTE",
+              "nome": "Notebooks",
+              "nivel": 3,
+              "filhos": [
+                {
+                  "id": "guid-note-corp",
+                  "codigo": "NOTE-CORP",
+                  "nome": "Notebook Corporativo",
+                  "nivel": 4,
+                  "taxaDepreciacao": 20.0,
+                  "vidaUtil": 5,
+                  "icone": "fa-laptop",
+                  "cor": "#3498db",
+                  "filhos": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 10.3 FAQ (Perguntas Frequentes)
+
+**1. Qual a diferença entre Categoria e Tipo?**
+
+Categoria é a classificação macro (Hardware, Software, Linha Móvel), enquanto Tipo é a especificação detalhada (ex: Notebook Corporativo, Servidor Web). Um tipo sempre pertence a uma categoria.
+
+**2. Posso ter hierarquia infinita de tipos?**
+
+Não. O sistema limita a 5 níveis de profundidade para evitar complexidade excessiva. Exemplo: Hardware → Computadores → Notebooks → Notebooks Dell → Dell Latitude 7490.
+
+**3. O que acontece se eu excluir um tipo que tem ativos associados?**
+
+O sistema impede a exclusão retornando erro. Você deve primeiro reclassificar os ativos para outro tipo.
+
+**4. Como funciona a depreciação por tipo?**
+
+Cada tipo pode ter uma taxa de depreciação anual (%) e vida útil (anos). Quando um ativo é criado com este tipo, essas configurações são aplicadas automaticamente para cálculo contábil.
+
+**5. Posso criar campos customizados por tipo?**
+
+Sim! Use a tabela `Ativo_Tipo_Campo_Customizado` para definir campos extras. Exemplo: tipo "Notebook" pode ter campo "Tamanho da Tela (polegadas)".
+
+---
+
+### 10.4 Checklist de Implementação
+
+- [ ] **Banco de Dados**
+  - [ ] Criar tabela `Ativo_Tipo`
+  - [ ] Criar tabela `Ativo_Tipo_Campo_Customizado`
+  - [ ] Criar tabela `Ativo_Tipo_Auditoria`
+  - [ ] Criar índices de performance
+  - [ ] Criar constraints e validações
+  - [ ] Inserir tipos padrão do sistema (seed data)
+
+- [ ] **Backend (.NET 10)**
+  - [ ] Criar entidade `AtivoTipo`
+  - [ ] Implementar `CriarTipoAtivoCommand` + Handler
+  - [ ] Implementar `AtualizarTipoAtivoCommand` + Handler
+  - [ ] Implementar `ExcluirTipoAtivoCommand` + Handler
+  - [ ] Implementar `ListarTiposAtivoQuery` + Handler
+  - [ ] Implementar `ListarHierarquiaTiposQuery` + Handler
+  - [ ] Implementar `BuscarTipoAtivoPorIdQuery` + Handler
+  - [ ] Implementar validações (FluentValidation)
+  - [ ] Configurar AutoMapper (Entity → DTO)
+  - [ ] Configurar permissões policy-based
+
+- [ ] **Frontend (Angular 18)**
+  - [ ] Criar componente `ativo-tipo-lista`
+  - [ ] Criar componente `ativo-tipo-form` (criar/editar)
+  - [ ] Criar componente `ativo-tipo-hierarquia` (tree view)
+  - [ ] Criar serviço `ativo-tipo.service.ts`
+  - [ ] Criar actions, reducers, effects NGRX
+  - [ ] Implementar validações de formulário
+  - [ ] Integrar Angular Tree Component
+  - [ ] Implementar color picker e icon picker
+
+- [ ] **Testes**
+  - [ ] Testes unitários para commands
+  - [ ] Testes unitários para queries
+  - [ ] Testes de integração para controller
+  - [ ] Testes de validação de hierarquia
+
+- [ ] **Documentação**
+  - [ ] Atualizar README.md
+  - [ ] Documentar API (Swagger)
+  - [ ] Criar guia de uso para administradores
+
+- [ ] **Migração de Dados**
+  - [ ] Criar script de migração de `TB_ATIVO_TIPO` para `Ativo_Tipo`
+  - [ ] Validar integridade pós-migração
+
+---
+
+**FIM DO DOCUMENTO RF-063**
+
+**Versão**: 2.0
+**Última Atualização**: 2025-11-04
+**Autor**: Equipe IControlIT + Claude AI
+**Status**: Completo (10 seções)

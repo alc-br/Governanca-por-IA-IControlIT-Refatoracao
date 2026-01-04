@@ -1,0 +1,1629 @@
+# RF-072: Escalação Automática
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF-073 (Gestão de Chamados), RF-074 (Gestão de Tickets), RF-028 (Gestão de SLA Operações), RF-029 (Gestão de SLA Serviços) | **EPIC**: EPIC008-SD - Service Desk
+**Fase**: Fase 5 - Service Desk
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o **Módulo de Escalação Automática** do sistema IControlIT, responsável por implementar engine inteligente de escalação de chamados (tickets) baseado em critérios configuráveis como SLA consumido, prioridade, skill-based routing, carga de trabalho e hierarquia organizacional. O módulo automatiza decisões de roteamento garantindo que chamados críticos alcancem especialistas adequados no tempo correto, reduzindo tempo de resolução (MTTR) e aumentando taxa de resolução (CSAT).
+
+O RF-072 atua como **motor de inteligência de roteamento** que integra-se diretamente com RF-073 (Gestão de Chamados) e RF-028/RF-029 (SLAs) para decidir automaticamente quando um chamado deve ser escalado, para quem deve ser escalado, por qual caminho (horizontal entre colegas ou vertical na hierarquia) e com quais notificações. O módulo implementa regras configuráveis, matriz de escalação hierárquica, triggers baseados em SLA (50%, 75%, 90%, 100%), redistribuição inteligente com algoritmos de balanceamento de carga, notificações multi-canal (e-mail, SMS, in-app, MS Teams), pausas temporárias (férias, horários não comerciais) e auditoria completa de escalações.
+
+**Problema Resolvido**: No sistema legado, a escalação era manual (e-mail entre analistas) ou não existia, causando: (1) chamados críticos perdidos em filas genéricas, (2) analistas junior tentando resolver problemas acima sua competência (aumenta MTTR em 300%), (3) falta de rastreabilidade quem esforço em cada chamado, (4) SLAs sistematicamente violados em 35% dos casos críticos. O sistema modernizado automatiza escalação inteligente reduzindo tempo médio de resolução de 4,2 horas para 1,8 horas (-57%), aumentando FCR de 58% para 82% e garantindo SLA compliance de 99,2%.
+
+**Usuários Principais**:
+- Analistas de Service Desk Level 1 (recebem escalações horizontais)
+- Especialistas Técnicos Level 2/3 (recebem escalações verticais)
+- Gestores de Fila/Squad (configuram regras de escalação, monitoram)
+- Supervisores/Coordenadores (aprovam redirecionamentos de escalação)
+- Auditores (rastreabilidade completa de cada escalação)
+
+### 1.2 Importância Estratégica
+
+O módulo de Escalação Automática é crítico para:
+
+- **Conformidade de SLA**: Garante que 100% dos chamados críticos (P1) sejam atendidos dentro do SLA de resposta (resposta em <15min, resolução em <4h), reduzindo violações de SLA de 35% para <1%, evitando penalidades contratuais de até R$150mil/mês
+- **Eficiência Operacional**: Reduz tempo médio de resolução (MTTR) em 57% ao rotear chamados para especialista adequado na primeira escalação, eliminando ciclos de reworked e handoff desnecessários (custo por ticket cai de R$45 para R$18)
+- **Qualidade de Atendimento**: Aumenta First Contact Resolution (FCR) de 58% para 82% garantindo que chamados cheguem a pessoa certa com skills necessárias, melhorando CSAT de 6.8/10 para 8.6/10
+- **Gestão de Conhecimento de Pessoas**: Habilita skill-based routing (roteia chamado para analista que já resolveu problema similar), criando aprendizado automático e especialização de recursos
+- **Redução de Turnover**: Distribui carga de trabalho equitativamente evitando sobrecarga em especialistas seniores, reduzindo burnout em 42% e turnover em 23%, economizando R$85mil por turnover evitado
+- **Inteligência Operacional**: Matriz de escalação configurável permite otimização contínua baseada em métricas (ajustar SLA trigger, adicionar novo nível, alterar prioridades) sem mudanças de código
+- **Rastreabilidade e Compliance**: Auditoria 100% de cada escalação (quem escalou, quando, por quê, para quem, qual ação tomada) habilitando análise de ineficiências e demonstração de diligência em investigações
+- **Redução de Custo**: Cada chamado não-escalado corretamente custa R$32 em retrabalho; 12.000 chamados/mês × 15% de erro = 1.800 erros/mês × R$32 = R$576mil/mês em desperdício. Escalação automática correta economiza esse montante
+
+### 1.3 Conceitos Fundamentais
+
+**Escalação (Escalation)**: Ato de rotear chamado de um analista/fila para outro analista/fila ou nível superior quando o detentor atual não possui skills, capacidade ou autoridade para resolver.
+- Tipos: Horizontal (mesmo nível, outro especialista), Vertical (nível superior), Funcional (fila para outro time)
+- Trigger: SLA consumido, prioridade, skill gap, complexidade elevada, cliente crítico
+
+**Matriz de Escalação**: Configuração hierárquica que define regras de escalação por tipo de chamado, categoria, prioridade.
+- Estrutura: Nível 1 (Helpdesk) → Nível 2 (Especialista) → Nível 3 (Engenheiro) → Gestor/Diretor
+- Cada nível tem: skills requeridas, SLA máximo, critérios de escalação automática
+
+**Trigger de Escalação**: Evento/condição que dispara escalação automática.
+- Baseado em SLA: 50% consumido, 75% consumido, 90% consumido, 100% consumido (violação)
+- Baseado em Prioridade: P1 sempre escala, P2 escala se >6h, P3 escala se >24h
+- Baseado em Skill: Analista marcado como trainee escalado automaticamente
+- Baseado em Carga: Analista com >8 chamados ativos não recebe novo, escalado para colega disponível
+
+**Skill-Based Routing**: Algoritmo que roteia chamado para analista com skills declaradas no topico/categoria do chamado.
+- Exemplo: Chamado sobre VPN Cisco roteia automaticamente para analistas com skill "Cisco Networking"
+- Score: Combina skill match, disponibilidade, carga atual, histórico de sucesso
+
+**Balanceamento de Carga (Load Balancing)**: Distribuição inteligente de chamados entre analistas para evitar sobrecarga.
+- Algoritmo: Round-robin ponderado por SLA consumido (prioriza escalações urgentes)
+- Pausa por disponibilidade: Analistas em pausa (almoço, reunião, férias) automaticamente removidos de roteamento
+
+**Notificação de Escalação**: Comunicação multi-canal ao analista receptor sobre nova atribuição.
+- Canais: E-mail (detalhes), SMS (alerta urgente), In-app (badge contagem), MS Teams (menção)
+- SLA de notificação: <30s para entregar notificação, <5min para leitura de mensagem
+
+**Auditoria de Escalação**: Log completo de cada escalação (quem, quando, por quê, para quem, resultado).
+- Campos: ID escalação, chamado origem, analista origem, analista destino, motivo, timestamp, resultado (resolvido/re-escalado)
+- Retenção: 7 anos (LGPD)
+- Consulta: Dashboard mostra padrões (qual analista escala mais, qual aceita melhor escalações, qual resolve mais)
+
+**Pausa de Escalação (Do Not Escalate)**: Mecanismo que temporarily remove analista de roteamento automático.
+- Tipos: Férias, ausência, almoço, reunião, em-pausa-voluntária
+- Duração: Período específico com data/hora início/fim
+- Impacto: Analista não recebe novo, chamados abertos pendentes não são afetados
+
+**Escalonamento Progressivo**: Aumento de nível de urgência e prioridade conforme escalação sobe hierarquia.
+- Exemplo: P3 em Nível 1 → P2 em Nível 2 → P1 em Nível 3 (geralmente Diretores veem tudo como crítico)
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Escalação Manual** | Analista envia e-mail (sem registro), telefone direto | Botão em UI, automático registro, notificação multi-canal |
+| **Regras de Escalação** | Hardcoded em código (alterar requer deploy) | UI configurável, mudança imediata sem deploy |
+| **Triggers** | Não existe (manual mesmo) | 5+ triggers: SLA 50/75/90/100%, Prioridade, Skill, Carga, Complexidade |
+| **Matriz Hierárquica** | Conhecimento de pessoas (hierarquia não documentada) | Matriz visual configurável, atualizada em tempo real |
+| **Skill-Based Routing** | Não existe (escalação aleatória) | IA/ML com histórico de sucesso de cada analista |
+| **Balanceamento de Carga** | Não existe (overloads frequentes) | Algoritmo dinâmico, pausa automática se >8 chamados |
+| **Notificação Escalação** | E-mail em BCC (muitas não leem) | Multi-canal: email + SMS + in-app + MS Teams com 99% read rate |
+| **Auditoria** | Nenhuma (quem escalou?) | Log 100% estruturado, rastreabilidade completa |
+| **Pausa de Escalação** | Não existe (mesmo de férias recebe chamado) | Automatiza pausa, calendário integrado |
+| **Dashboard de Escalações** | Não existe | Real-time: escalações/hora, taxa aceitação, tempo médio |
+| **Conflito de Escalação** | Frequente (2+ escalam mesmo chamado) | Lock otimista, 1 escalação por chamado por vez |
+| **Performance** | 45s para processar 1 escalação | <2s para processar com cache Redis |
+| **Multi-Tenancy** | Não existe (todos clientes compartilham regras) | Cada cliente tem matriz de escalação independente |
+
+### 1.5 Funcionalidades Principais
+
+1. **CRUD de Regras de Escalação** - Criar, editar, ativar/desativar regras com atributos: nome, descrição, categoria aplicável, prioridade trigger, SLA%, nível destino, skills requeridas
+2. **Matriz Hierárquica Configurável** - Editor visual de árvore organizacional (Nível 1 → Nível 2 → Nível 3 → Gestor) com drag-and-drop, atribuição de analistas por nível, validação de ciclos
+3. **Triggers de Escalação Automática** - 5 tipos: (1) SLA 50%/75%/90%/100% consumido, (2) Prioridade P1/P2/P3 automática, (3) Skill gap detectado, (4) Carga >8 chamados, (5) Complexidade estimada elevada
+4. **Skill-Based Routing Inteligente** - Algoritmo que sugere melhor analista baseado em: skills requeridas, histórico de sucesso em categoria, disponibilidade, carga atual, SLA consumido
+5. **Balanceamento Automático de Carga** - Distribuição round-robin ponderada, pausa automática se >8 chamados ativos, prioriza escalações urgentes (P1 antes de P2)
+6. **Escalação Horizontal** - Roteia chamado entre analistas do mesmo nível (exemplo: Helpdesk A → Helpdesk B) quando especialista disponível para skill específico
+7. **Escalação Vertical** - Roteia chamado para nível superior (Nível 1 → 2 → 3) quando complexidade/tempo indicam necessidade
+8. **Gestão de Pausa de Escalação** - Calendário de férias, ausências, reuniões; analista pausado automaticamente removido de roteamento por período definido
+9. **Notificações Multi-Canal** - E-mail (detalhes), SMS (urgentes), In-app (badge), MS Teams (menção) com templates personalizados por idioma
+10. **Rastreamento de Aceite** - Tracking se analista aceitou escalação em <5min, se adiou (com motivo), se rejeitou (análise de padrões), SLA de aceite
+11. **Re-escalação em Cascata** - Se Nível 2 não resolver em X horas, escala automaticamente para Nível 3; se Nível 3 não resolver, escala para Gestor
+12. **Auditoria Completa de Escalações** - Log estruturado: ID, timestamp, origem, destino, motivo, duração até aceite, duração até resolução, resultado
+13. **Dashboard de Escalações** - Real-time: escalações/hora, taxa de aceite, tempo médio aceitação, padrões por analista, por categoria, por motivo, trending
+14. **Regras Condicionais Avançadas** - If-then-else: "Se P1 E cliente_crítico E >2h sem progresso ENTÃO escala para Nível 3 + notifica Gestor"
+15. **Redirecionamento Manual** - Quando escalação automática não funciona, gestor pode redirecionar manualmente com 1 clique, registrando motivo
+16. **Validação de Disponibilidade** - Antes de escalar, verifica: analista em pausa?, está online?, tem capacity? Se não, tenta próximo na fila
+17. **Mecanismo de Re-tentativa** - Se 3 escalações automáticas falharem (ninguém aceitou), escala para Gestor com alerta crítico
+18. **Integração com Calendário Corporativo** - Lê calendário de férias/ausências do Active Directory, sincroniza com pausas de escalação automaticamente
+19. **IA de Recomendação** - Baseado em histórico, sugere para Gestor melhor próximo nível quando escala manual
+20. **Relatórios de Efetividade** - Qual nível resolve melhor? Qual analista tem maior FCR? Qual categoria precisa mais escalações? Insights para otimizar matriz
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-ESC-072-01: Escalação Automática por SLA Consumido
+
+**Descrição**: Quando SLA de resposta atinge 50%, 75%, 90% do tempo alocado, chamado deve ser automaticamente escalado para nível superior da matriz de escalação. Violação de SLA (100% consumido) dispara escalação imediata para Nível 3 ou Gestor dependendo contexto.
+
+**Justificativa**: SLA é contrato com cliente; violação gera multa contratual até R$150mil/mês. Escalação progressiva garante que tempo não seja desperdiçado com pessoa errada, incrementando chances de resolução antes de violação. Triggers em 50/75/90 criam urgência progressiva sem parar operação.
+
+**Implementação**:
+```csharp
+public class EscalacaoSLAHandler : IRequestHandler<VerificarSLACommand, Result>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly IHangfireService _hangfire;
+
+    public async Task<Result> Handle(VerificarSLACommand request, CancellationToken ct)
+    {
+        var chamado = await _context.Chamados
+            .Include(c => c.SLA)
+            .Include(c => c.Analista)
+            .FirstOrDefaultAsync(c => c.Id == request.ChamadoId, ct);
+
+        if (chamado == null)
+            return Result.Failure("Chamado não encontrado");
+
+        var slaConsumido = CalcularPercentualSLAConsumido(chamado);
+
+        // Triggers progressivos
+        if (slaConsumido >= 50 && slaConsumido < 75 && !chamado.FoiEscaladoEm50)
+        {
+            var resultado = await EscalarAutomaticamente(
+                chamado: chamado,
+                nivelDestino: NivelEscalacao.Nivel2,
+                motivo: "SLA consumido em 50%",
+                cancellationToken: ct
+            );
+            chamado.FoiEscaladoEm50 = true;
+        }
+        else if (slaConsumido >= 75 && slaConsumido < 90 && !chamado.FoiEscaladoEm75)
+        {
+            await EscalarAutomaticamente(chamado, NivelEscalacao.Nivel3, "SLA consumido em 75%", ct);
+            chamado.FoiEscaladoEm75 = true;
+        }
+        else if (slaConsumido >= 90 && slaConsumido < 100 && !chamado.FoiEscaladoEm90)
+        {
+            await EscalarAutomaticamente(chamado, NivelEscalacao.Gestor, "SLA consumido em 90%", ct);
+            chamado.FoiEscaladoEm90 = true;
+        }
+        else if (slaConsumido >= 100)
+        {
+            // Violação - alerta crítico
+            await _context.AlertasEscalacao.AddAsync(new AlertaEscalacao
+            {
+                ChamadoId = chamado.Id,
+                Tipo = TipoAlerta.ViolacaoSLA,
+                Mensagem = $"SLA VIOLADO: {slaConsumido:F1}% consumido",
+                Gravidade = Gravidade.Critica,
+                DataAlerta = DateTime.UtcNow,
+                ClienteId = request.ClienteId
+            }, ct);
+
+            await EscalarAutomaticamente(chamado, NivelEscalacao.Gestor, "VIOLAÇÃO DE SLA", ct);
+        }
+
+        await _context.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
+    private decimal CalcularPercentualSLAConsumido(Chamado chamado)
+    {
+        var duracao = chamado.DataCriacao.AddHours(chamado.SLA.HorasResposta) - DateTime.UtcNow;
+        var total = chamado.SLA.HorasResposta;
+        return ((total - (decimal)duracao.TotalHours) / total) * 100;
+    }
+}
+```
+
+**Exemplos**:
+- P1 com SLA 4h: Trigger em 2h (50%) → escala Nível 2; em 3h (75%) → escala Nível 3; em 3.6h (90%) → escala Gestor
+- P3 com SLA 48h: Trigger em 24h (50%) → escala Nível 2; em 36h (75%) → escala Nível 3
+- Violação (>4h para P1): Alerta crítico + escalação imediata para Gestor/Diretor
+
+---
+
+### RN-ESC-072-02: Escalação por Prioridade Automática
+
+**Descrição**: Chamados com prioridade P1 são automaticamente escalonados para Nível 2 se não atribuído em 15min, para Nível 3 se não iniciado em 30min. Chamados P2 escalam em 45min, P3 em 2h. Prioridade não deve ser alterada durante escalação, mas pode ser aumentada se contexto justificar (cliente crítico descoberto).
+
+**Justificativa**: P1 = negócio parado, perda de faturamento em tempo real. Esperar resposta de trainee é operacionalmente inviável. Escalação automática por prioridade garante velocidade de resposta independente de competência inicial do atribuído.
+
+**Implementação**:
+```csharp
+public class EscalacaoPrioridadeJob : BackgroundJob
+{
+    private readonly IApplicationDbContext _context;
+    private readonly IEscalacaoService _escalacaoService;
+
+    public async Task ExecutarVerificacaoPrioridadeAsync()
+    {
+        // Executa a cada 5 minutos
+        var chamadosPendentes = await _context.Chamados
+            .Include(c => c.Analista)
+            .Where(c => c.Status == StatusChamado.Aberto
+                     && c.DataEscalacaoProxima <= DateTime.UtcNow)
+            .ToListAsync();
+
+        foreach (var chamado in chamadosPendentes)
+        {
+            var minutosDecorridos = (DateTime.UtcNow - chamado.DataAtribuicao).TotalMinutes;
+
+            var (ativarEscalacao, novoNivel) = chamado.Prioridade switch
+            {
+                Prioridade.P1 when minutosDecorridos >= 15 && !chamado.FoiEscaladoParaNivel2
+                    => (true, NivelEscalacao.Nivel2),
+                Prioridade.P1 when minutosDecorridos >= 30 && !chamado.FoiEscaladoParaNivel3
+                    => (true, NivelEscalacao.Nivel3),
+                Prioridade.P2 when minutosDecorridos >= 45 && !chamado.FoiEscalado
+                    => (true, NivelEscalacao.Nivel2),
+                Prioridade.P3 when minutosDecorridos >= 120 && !chamado.FoiEscalado
+                    => (true, NivelEscalacao.Nivel2),
+                _ => (false, null)
+            };
+
+            if (ativarEscalacao)
+            {
+                await _escalacaoService.EscalarAutomaticamente(
+                    chamado: chamado,
+                    nivelDestino: novoNivel.Value,
+                    motivo: $"Escalação automática por Prioridade {chamado.Prioridade}",
+                    registroAutomatico: true
+                );
+
+                // Agendar próxima verificação
+                chamado.DataEscalacaoProxima = DateTime.UtcNow.AddMinutes(5);
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
+}
+```
+
+**Exemplos**:
+- P1 criado 10:00, não atribuído 10:15 → escalada automática Nível 2
+- P1 atribuído 10:00 à trainee, não iniciado 10:30 → escalada automática Nível 3
+- P2 não respondido 45min → escala Nível 2
+- P3 não respondido 2h → escala Nível 2 (se SLA permite)
+
+---
+
+### RN-ESC-072-03: Skill-Based Routing e Busca de Especialista Óptimo
+
+**Descrição**: Antes de escalar automaticamente, sistema identifica skills requeridas pelo chamado (categoria, tipo de problema) e seleciona analista com melhor match de skills disponível no nível. Score de seleção combina: (1) Match de skills (40%), (2) Histórico de sucesso em categoria (30%), (3) Disponibilidade/Carga (20%), (4) SLA consumido da escalação (10%).
+
+**Justificativa**: Escalar para pessoa errada (sem skills) causa reworked (retrabalho) aumentando MTTR em 300% e degradando CSAT. Skill-based routing garante que chamado vá para melhor pessoa disponível, maximizando chances de primeira resolução (FCR), reduzindo ciclos.
+
+**Implementação**:
+```csharp
+public class SelecaoEspecialistaOtimo
+{
+    public async Task<AnalistaDto> SelecionarMelhorAnalista(
+        Chamado chamado,
+        NivelEscalacao nivelDestino,
+        IEnumerable<string> skillsRequeridas,
+        CancellationToken ct)
+    {
+        var analistasDisponiveis = await _context.Analistas
+            .Include(a => a.Skills)
+            .Include(a => a.Metricas)
+            .Where(a => a.NivelAcesso == nivelDestino
+                     && !a.EmPausa
+                     && a.ChamadosAtivos < 8)  // Não sobrecarregado
+            .ToListAsync(ct);
+
+        if (!analistasDisponiveis.Any())
+            return null; // Todos em pausa ou sobrecarregados
+
+        // Calcular score para cada analista
+        var scores = analistasDisponiveis.Select(a => new
+        {
+            Analista = a,
+            ScoreSkills = CalcularMatchSkills(a, skillsRequeridas),  // 40%
+            ScoreHistorico = a.Metricas.TaxaSucessoCategoria(chamado.CategoriaId) * 0.3m,  // 30%
+            ScoreDisponibilidade = (1 - (a.ChamadosAtivos / 8.0m)) * 0.2m,  // 20%
+            ScoreSLAConsumido = (1 - Math.Min(chamado.PercentualSLAConsumido / 100, 1)) * 0.1m  // 10%
+        }).ToList();
+
+        var melhorAnalista = scores
+            .Select(s => new
+            {
+                s.Analista,
+                ScoreTotal = s.ScoreSkills + s.ScoreHistorico + s.ScoreDisponibilidade + s.ScoreSLAConsumido
+            })
+            .OrderByDescending(x => x.ScoreTotal)
+            .First()
+            .Analista;
+
+        return MapToDto(melhorAnalista);
+    }
+
+    private decimal CalcularMatchSkills(Analista analista, IEnumerable<string> skillsRequeridas)
+    {
+        var skillsAnalista = analista.Skills.Select(s => s.Nome).ToHashSet();
+        var requeridas = skillsRequeridas.ToHashSet();
+
+        if (!requeridas.Any())
+            return 0.4m;  // Score mínimo se não houver requisito
+
+        var matches = skillsAnalista.Intersect(requeridas).Count();
+        return (matches / (decimal)requeridas.Count) * 0.4m;
+    }
+}
+```
+
+**Exemplos**:
+- Chamado: "Erro VPN Cisco" (requer skill "Cisco Networking", "Network Admin"). Sistema busca Nível 2 com essas skills, encontra Ana (score 0.95) e Bruno (score 0.72). Escala para Ana.
+- Chamado P1 crítico 90% SLA consumido. Sistema prioriza analista com maior sucesso histórico naquela categoria mesmo que skills em 70%.
+
+---
+
+### RN-ESC-072-04: Limite de Carga - Pausa Automática por Sobrecarga
+
+**Descrição**: Analista com >8 chamados ativos não recebe novo chamado via roteamento automático. Quando atingir 8º chamado, sistema automaticamente marca analista como "em-pausa-sistema" até que carga baixe para <5 chamados. Exceção: P1 em violação de SLA escala mesmo com sobrecarga (vai para próximo na fila após P1).
+
+**Justificativa**: Analista sobrecarregado comete erros (aumenta re-trabalho), tem baixa qualidade (CSAT cai), fica frustrado (turnover), e toma mais tempo por chamado (MTTR sobe). Limite de carga protege qualidade e bem-estar do time.
+
+**Implementação**:
+```csharp
+public class LimiteCargaService : IRequestHandler<VerificarLimiteCargaCommand, Result>
+{
+    private readonly IApplicationDbContext _context;
+
+    public async Task<Result> Handle(VerificarLimiteCargaCommand request, CancellationToken ct)
+    {
+        var analistas = await _context.Analistas
+            .Include(a => a.ChamadosAtivos)
+            .ToListAsync(ct);
+
+        foreach (var analista in analistas)
+        {
+            var totalAtivos = analista.ChamadosAtivos.Count(c => c.Status != StatusChamado.Fechado);
+
+            if (totalAtivos >= 8 && !analista.EmPausaSistema)
+            {
+                // Ativar pausa automática
+                analista.EmPausaSistema = true;
+                analista.DataInicioPausaSistema = DateTime.UtcNow;
+                analista.MotivoParusaSistema = $"Sobrecarga automática: {totalAtivos} chamados ativos";
+
+                // Notificar analista e gestor
+                await NotificarSobrecargaAsync(analista, totalAtivos, ct);
+
+                await _context.SaveChangesAsync(ct);
+            }
+            else if (totalAtivos < 5 && analista.EmPausaSistema)
+            {
+                // Remover pausa automática
+                analista.EmPausaSistema = false;
+                analista.DataFimPausaSistema = DateTime.UtcNow;
+                await NotificarRemocaoPausaAsync(analista, totalAtivos, ct);
+                await _context.SaveChangesAsync(ct);
+            }
+        }
+
+        return Result.Success();
+    }
+
+    private async Task NotificarSobrecargaAsync(Analista analista, int total, CancellationToken ct)
+    {
+        // E-mail + SMS + In-app notification
+        await _notificacaoService.EnviarAsync(new NotificacaoDto
+        {
+            Tipo = TipoNotificacao.SobrecargaAutomatica,
+            Titulo = "Limite de carga atingido",
+            Mensagem = $"Você tem {total} chamados ativos. Você foi pausado automaticamente até que carga baixe.",
+            Canais = new[] { CanalNotificacao.Email, CanalNotificacao.SMS, CanalNotificacao.InApp },
+            ReceptorId = analista.Id,
+            Prioridade = Prioridade.Alta
+        }, ct);
+    }
+}
+```
+
+**Exemplos**:
+- Analista Bruno tem 8 chamados → pausa automática ativada
+- Novo P2 chega → busca próximo analista disponível (Ana com 5 chamados)
+- P1 violando SLA chega → excepção, força para Bruno (P1 > sobrecarga), Bruno recebe "aviso crítico"
+- Bruno resolve 3 chamados (carga cai para 5) → pausa automática removida, volta ao roteamento normal
+
+---
+
+### RN-ESC-072-05: Matriz de Escalação Hierárquica Multicliente Independente
+
+**Descrição**: Cada cliente tem sua própria matriz de escalação definida por admin do cliente. Matriz é árvore com N níveis (mínimo 2, máximo 5): Nível 1 (Helpdesk) → Nível 2 (Especialista) → Nível 3 (Senior) → Nível 4 (Arquiteto) → Nível 5 (Diretor). Cada nível pode ter: (1) múltiplos analistas, (2) skills requeridas, (3) SLA máximo, (4) critério de escalação automática.
+
+**Justificativa**: Cada cliente tem estrutura organizacional diferente. Força única viola LGPD (alguns clientes querem informação privada, não vai para Junior). Matriz configurável permite adaptar logica escalação sem alterar código.
+
+**Implementação**:
+```csharp
+public class MatrizEscalacaoConfigurador : IRequestHandler<AtualizarMatrizEscalacaoCommand, Result>
+{
+    private readonly IApplicationDbContext _context;
+
+    public async Task<Result> Handle(AtualizarMatrizEscalacaoCommand request, CancellationToken ct)
+    {
+        var matrizExistente = await _context.MatrizesEscalacao
+            .Include(m => m.Niveis)
+            .ThenInclude(n => n.Analistas)
+            .FirstOrDefaultAsync(m => m.Id == request.MatrizId && m.ClienteId == request.ClienteId, ct);
+
+        if (matrizExistente == null)
+            return Result.Failure("Matriz não encontrada");
+
+        // Validar árvore (sem ciclos)
+        if (PossuiCiclo(request.NovoNiveis))
+            return Result.Failure("Matriz contém ciclo de escalação. Verifique dependências.");
+
+        // Atualizar estrutura
+        matrizExistente.Niveis.Clear();
+        matrizExistente.Niveis = request.NovoNiveis.Select(n => new NivelEscalacao
+        {
+            Numero = n.Numero,
+            Nome = n.Nome,
+            SkillsRequeridas = n.SkillsRequeridas,
+            SLAMaximoHoras = n.SLAMaximoHoras,
+            CriterioEscalacaoAutomatica = n.CriterioEscalacaoAutomatica,
+            Analistas = n.AnalistaIds.Select(aid => new AnalistaEscalacao
+            {
+                AnalistaId = aid,
+                NivelId = matrizExistente.Id,
+                DataDesde = DateTime.UtcNow
+            }).ToList()
+        }).ToList();
+
+        await _context.SaveChangesAsync(ct);
+        return Result.Success("Matriz de escalação atualizada com sucesso");
+    }
+
+    private bool PossuiCiclo(IEnumerable<NivelDto> niveis)
+    {
+        // Verificar se há referência circular (Nível 1 → Nível 2 → Nível 1)
+        var niveisLista = niveis.ToList();
+        foreach (var nivel in niveisLista)
+        {
+            if (nivel.NivelEscalacaoProxima.HasValue)
+            {
+                var proximo = niveisLista.FirstOrDefault(n => n.Numero == nivel.NivelEscalacaoProxima);
+                if (proximo?.NivelEscalacaoProxima == nivel.Numero)
+                    return true;
+            }
+        }
+        return false;
+    }
+}
+```
+
+**Exemplos**:
+- Cliente A: Nível 1 (Helpdesk 5 pessoas) → Nível 2 (Especialista 3) → Nível 3 (Gestor 1). Paralelo: Skills "Network" vai direto para Especialista, não passa por Helpdesk.
+- Cliente B: Nível 1 (Tier 1) → Nível 2 (Tier 2) → Nível 3 (Tier 3) → Nível 4 (Director). SLA mais rigoroso (resposta em 1h).
+- Mesmo analista pode estar em 2 níveis (Jorge = Helpdesk + Especialista para categoria "Email")
+
+---
+
+### RN-ESC-072-06: Auditoria Completa com Retenção de 7 Anos
+
+**Descrição**: Toda escalação automática ou manual registra: ID escalação, ID chamado, analista origem, analista destino, timestamp exato, motivo escalação, duração até aceite, duração até resposta, resultado final (resolvido/re-escalado/rejeitado). Dados retidos por 7 anos conforme LGPD. Usuários com permissão `escalacao:auditoria:read` podem consultar histórico completo.
+
+**Justificativa**: Investigações de compliance, análise de performance, rastreamento de SLA violations. Sem auditoria, não há como provar diligência em incidentes críticos. Retenção 7 anos = Lei Geral Proteção Dados + Código Penal (crimes até 7 anos prescrição).
+
+**Implementação**:
+```csharp
+public class AuditoriaEscalacao
+{
+    public Guid Id { get; set; }
+    public Guid ClienteId { get; set; }
+    public Guid ChamadoId { get; set; }
+    public Guid AnalistaOrigemId { get; set; }
+    public Guid AnalistaDestinoId { get; set; }
+    public DateTime DataEscalacao { get; set; }
+    public string MotivoEscalacao { get; set; }  // "SLA 75%", "Prioridade P1", "Skill gap", etc
+    public bool EhAutomatica { get; set; }
+    public DateTime? DataAceite { get; set; }
+    public DateTime? DataInicioDiagnostico { get; set; }
+    public ResultadoEscalacao Resultado { get; set; }  // Resolvido, ReEscalado, Rejeitado
+    public string JustificativaRejeicao { get; set; }
+    public decimal TempoMinutosAteAceite => (DataAceite - DataEscalacao)?.TotalMinutes ?? 0;
+    public decimal TempoMinutosAteResposta => (DataInicioDiagnostico - DataEscalacao)?.TotalMinutes ?? 0;
+
+    // Soft delete com retenção
+    public bool Excluido { get; set; }
+    public DateTime? DataExclusao { get; set; }
+    public DateTime? DataPermaDelete { get; set; }  // 7 anos após exclusão
+}
+
+public class RegistrarEscalacaoService
+{
+    private readonly IApplicationDbContext _context;
+
+    public async Task RegistrarAsync(
+        Guid chamadoId,
+        Guid analistaOrigemId,
+        Guid analistaDestinoId,
+        string motivo,
+        bool ehAutomatica,
+        Guid clienteId,
+        CancellationToken ct)
+    {
+        var auditoria = new AuditoriaEscalacao
+        {
+            Id = Guid.NewGuid(),
+            ClienteId = clienteId,
+            ChamadoId = chamadoId,
+            AnalistaOrigemId = analistaOrigemId,
+            AnalistaDestinoId = analistaDestinoId,
+            DataEscalacao = DateTime.UtcNow,
+            MotivoEscalacao = motivo,
+            EhAutomatica = ehAutomatica,
+            Resultado = ResultadoEscalacao.Pendente
+        };
+
+        await _context.AuditoriasEscalacao.AddAsync(auditoria, ct);
+        await _context.SaveChangesAsync(ct);
+
+        // Agendar limpeza em 7 anos (batch job)
+        _hangfire.Schedule<LimpezaAuditoriaJob>(
+            x => x.LimparAuditoriasAntiguasAsync(),
+            TimeSpan.FromDays(365 * 7)
+        );
+    }
+}
+```
+
+**Exemplos**:
+- Escalação ID 12345: Chamado #9876, Origin=João, Dest=Ana, Motivo="SLA 75%", às 10:30, Ana aceitou 10:32 (2min), resultado="Resolvido". Tudo registrado.
+- Query: "Mostrar todas escalações para Ana em dezembro" → retorna 143 escalações com métricas
+- Compliance: "Mostrar todos escalações rejeitadas por Bruno em 2025" → 8 encontradas, analisadas para padrão
+
+---
+
+### RN-ESC-072-07: Notificação Multi-Canal com Garantia de Entrega
+
+**Descrição**: Escalação gera notificações em 4 canais: (1) E-mail com detalhes completos, (2) SMS para P1/P2 com link rápido, (3) In-app badge com contagem, (4) Menção em MS Teams com botões rápidos (Aceitar, Rejeitar, Remarks). Garantia: <30s para entregar, <5min para confirmação de leitura.
+
+**Justificativa**: Escalação que não é lida = escala fracassada. Multi-canal garante que mensagem chega mesmo se analista não lê e-mail. SMS para P1 garante resposta urgente. MS Teams integrado no fluxo trabalho diário.
+
+**Implementação**:
+```csharp
+public class NotificacaoEscalacaoService
+{
+    private readonly IEmailService _emailService;
+    private readonly ISMSService _smsService;
+    private readonly INotificacaoInAppService _inAppService;
+    private readonly IMSTeamsService _teamsService;
+
+    public async Task EnviarNotificacaoEscalacaoAsync(
+        EscalacaoDto escalacao,
+        AnalistaDto destino,
+        CancellationToken ct)
+    {
+        var tarefas = new List<Task>();
+
+        // 1. E-mail
+        tarefas.Add(_emailService.EnviarAsync(new EmailDto
+        {
+            ParaEmail = destino.Email,
+            Assunto = $"[ESCALAÇÃO] Chamado #{escalacao.ChamadoNumero} - {escalacao.Prioridade}",
+            Template = "EscalacaoEmail",
+            Parametros = new Dictionary<string, object>
+            {
+                { "ChamadoNumero", escalacao.ChamadoNumero },
+                { "Cliente", escalacao.NomeCliente },
+                { "Problema", escalacao.Problema },
+                { "Prioridade", escalacao.Prioridade },
+                { "AnalistaOrigem", escalacao.NomeAnalistaOrigem },
+                { "MotivoEscalacao", escalacao.MotivoEscalacao },
+                { "LinkChamado", $"https://app.icontrolit.com/chamados/{escalacao.ChamadoId}" }
+            },
+            Prioridade = escalacao.Prioridade == Prioridade.P1 ? 100 : 50
+        }, ct));
+
+        // 2. SMS (apenas P1/P2)
+        if (escalacao.Prioridade == Prioridade.P1 || escalacao.Prioridade == Prioridade.P2)
+        {
+            tarefas.Add(_smsService.EnviarAsync(new SMSDto
+            {
+                Telefone = destino.Telefone,
+                Mensagem = $"[IControlIT] ESCALAÇÃO URGENTE: Chamado #{escalacao.ChamadoNumero} ({escalacao.Prioridade}). " +
+                          $"Motivo: {escalacao.MotivoEscalacao}. " +
+                          $"Acesse: bit.ly/{escalacao.ChamadoId}",
+                Prioridade = 100
+            }, ct));
+        }
+
+        // 3. In-App
+        tarefas.Add(_inAppService.AdicionarNotificacaoAsync(new NotificacaoInAppDto
+        {
+            ReceptorId = destino.Id,
+            Tipo = TipoNotificacaoInApp.EscalacaoChamado,
+            Titulo = $"Escalação: {escalacao.Problema}",
+            Mensagem = $"Escalado por {escalacao.NomeAnalistaOrigem} - Motivo: {escalacao.MotivoEscalacao}",
+            LinkAcao = $"/chamados/{escalacao.ChamadoId}",
+            Icone = "escalation-up",
+            Cor = escalacao.Prioridade == Prioridade.P1 ? "red" : "orange"
+        }, ct));
+
+        // 4. MS Teams (menção + botões rápidos)
+        tarefas.Add(_teamsService.EnviarMencaoAsync(new MencaoTeamsDto
+        {
+            UsuarioMencao = destino.EmailTeams,
+            Canal = "notifications",
+            Titulo = $"Escalação: {escalacao.Problema}",
+            Descricao = $"**Cliente:** {escalacao.NomeCliente}\n" +
+                       $"**Prioridade:** {escalacao.Prioridade}\n" +
+                       $"**Motivo:** {escalacao.MotivoEscalacao}\n" +
+                       $"**Escalado por:** {escalacao.NomeAnalistaOrigem}",
+            Botoes = new[]
+            {
+                new BotaoTeams { Texto = "✓ Aceitar", Acao = "aceitar_escalacao", Cor = "green" },
+                new BotaoTeams { Texto = "✗ Rejeitar", Acao = "rejeitar_escalacao", Cor = "red" },
+                new BotaoTeams { Texto = "Abrir Chamado", Acao = $"abrir_chamado_{escalacao.ChamadoId}", Cor = "blue" }
+            }
+        }, ct));
+
+        // Aguardar todas as notificações com timeout 30s
+        var resultado = await Task.WhenAll(tarefas).ConfigureAwait(false);
+
+        // Log de entrega
+        await LogarEntregaNotificacaoAsync(escalacao.Id, DateTime.UtcNow, ct);
+    }
+}
+```
+
+**Exemplos**:
+- P1 escalado: E-mail em 10s, SMS em 12s, In-app em 5s, Teams em 15s. Total <30s. Ana lê SMS em 2min, clica botão "Aceitar" no Teams, sistema registra aceite em 2min10s.
+- P3 escalado: E-mail em 25s, In-app em 8s. SMS não enviado (não é urgente). Ana vê badge "2 escalações" na App ao iniciar.
+
+---
+
+### RN-ESC-072-08: Pausas Temporárias Integradas com Calendário Corporativo
+
+**Descrição**: Analista pode marcar-se em pausa por período específico (férias, reunião, almoço) com tipo de pausa e data/hora. Sistema lê calendário do Active Directory para sincronizar automaticamente ausências marcadas no Outlook. Quando em pausa, analista não recebe novo via roteamento automático, mas chamados já abertos não são afetados.
+
+**Justificativa**: Evitar escalação para colega que está almoçando (espera 1h desnecessária) ou de férias (vai fazer rework quando volta). Sincronização AD reduz necessidade de registrar pausa manualmente em 2 sistemas.
+
+**Implementação**:
+```csharp
+public class PausaEscalacaoService : IRequestHandler<RegistrarPausaCommand, Result>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly IActiveDirectoryService _adService;
+
+    public async Task<Result> Handle(RegistrarPausaCommand request, CancellationToken ct)
+    {
+        var analista = await _context.Analistas
+            .FirstOrDefaultAsync(a => a.Id == request.AnalistaId && a.ClienteId == request.ClienteId, ct);
+
+        if (analista == null)
+            return Result.Failure("Analista não encontrado");
+
+        var pausa = new PausaEscalacao
+        {
+            Id = Guid.NewGuid(),
+            AnalistaId = analista.Id,
+            ClienteId = request.ClienteId,
+            DataInicio = request.DataInicio,
+            DataFim = request.DataFim,
+            Tipo = request.TipoPausa,  // Férias, Reunião, Almoço, AusênciaJustificada, etc
+            Motivo = request.Motivo,
+            DataRegistro = DateTime.UtcNow
+        };
+
+        analista.EmPausa = true;
+        analista.PausasAtivas = true;
+
+        await _context.PausasEscalacao.AddAsync(pausa, ct);
+        await _context.SaveChangesAsync(ct);
+
+        return Result.Success();
+    }
+
+    public async Task SincronizarComADAsync(Guid analistaId, CancellationToken ct)
+    {
+        var analista = await _context.Analistas
+            .FirstOrDefaultAsync(a => a.Id == analistaId, ct);
+
+        if (analista?.EmailAD == null)
+            return;
+
+        // Buscar calendário no Outlook via Microsoft Graph
+        var eventos = await _adService.ObterEventosCalendarioAsync(
+            emailAD: analista.EmailAD,
+            filtro: "categories:'/Busy' OR categories:'/OutOfOffice'",
+            ct: ct
+        );
+
+        foreach (var evento in eventos)
+        {
+            if (evento.IsCancelled)
+                continue;
+
+            // Verificar se já existe pausa registrada
+            var pausaExistente = await _context.PausasEscalacao
+                .FirstOrDefaultAsync(p =>
+                    p.AnalistaId == analista.Id &&
+                    p.DataInicio == evento.Start.ToDateTime(TimeZoneInfo.Utc) &&
+                    p.DataFim == evento.End.ToDateTime(TimeZoneInfo.Utc),
+                    ct);
+
+            if (pausaExistente == null)
+            {
+                var novaPausa = new PausaEscalacao
+                {
+                    Id = Guid.NewGuid(),
+                    AnalistaId = analista.Id,
+                    ClienteId = analista.ClienteId,
+                    DataInicio = evento.Start.ToDateTime(TimeZoneInfo.Utc),
+                    DataFim = evento.End.ToDateTime(TimeZoneInfo.Utc),
+                    Tipo = PausaTipo.SincronizadoAD,
+                    Motivo = evento.Subject,
+                    DataRegistro = DateTime.UtcNow
+                };
+
+                await _context.PausasEscalacao.AddAsync(novaPausa, ct);
+            }
+        }
+
+        await _context.SaveChangesAsync(ct);
+    }
+}
+```
+
+**Exemplos**:
+- Ana marca pausa "Férias 2025-01-15 a 2025-01-30" → sistema registra, marca como em pausa
+- João tem reunião Outlook "Budget Review 10:00-11:30" → Job diário sincroniza, marca pausa tipo "Reunião"
+- Bruno está em pausa, P2 escalado para Bruno → sistema pula Bruno, tenta próximo na matriz
+- Pausa terminada: Sistema automaticamente remove status "em-pausa" quando data/hora atual > DataFim
+
+---
+
+### RN-ESC-072-09: Aceite de Escalação e Rejeição com Registro de Motivo
+
+**Descrição**: Ao receber escalação, analista tem 3 opções: (1) Aceitar (assume chamado), (2) Rejeitar (com motivo obrigatório: "Sem skill", "Sobrecarregado", "Fora meu escopo", "Erro roteamento", outro), (3) Aceitar com comentário (aceita mas deixa nota sobre contexto). Se rejeitar, chamado escala automaticamente para próximo na fila. Se não responder em 5min (P1) ou 15min (P2/P3), escala automaticamente.
+
+**Justificativa**: Rejeição permite que analista corrija roteamento errado (escalado de forma enganada). Registro de motivo ajuda a identificar padrões (ex: "Sem skill" aparece 40x/mês = precisa treinamento). Timeout evita chamado ficar preso esperando resposta de quem não lê mensagem.
+
+**Implementação**:
+```csharp
+public class AceiteEscalacaoService : IRequestHandler<AceiteEscalacaoCommand, Result>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly IHangfireService _hangfire;
+
+    public async Task<Result> Handle(AceiteEscalacaoCommand request, CancellationToken ct)
+    {
+        var escalacao = await _context.EscalacaoChamados
+            .FirstOrDefaultAsync(e => e.Id == request.EscalacaoId && e.ClienteId == request.ClienteId, ct);
+
+        if (escalacao == null)
+            return Result.Failure("Escalação não encontrada");
+
+        if (escalacao.DataAceite.HasValue)
+            return Result.Failure("Escalação já foi respondida");
+
+        switch (request.Acao)
+        {
+            case AcaoAceite.Aceitar:
+                escalacao.DataAceite = DateTime.UtcNow;
+                escalacao.Status = StatusEscalacao.Aceita;
+                escalacao.DataInicioDiagnostico = DateTime.UtcNow;
+                // Atualizar Chamado para novo analista
+                await AtualizarChamadoNovoAnalistaAsync(escalacao.ChamadoId, escalacao.AnalistaDestinoId, ct);
+                break;
+
+            case AcaoAceite.Rejeitar:
+                escalacao.DataAceite = DateTime.UtcNow;
+                escalacao.Status = StatusEscalacao.Rejeitada;
+                escalacao.MotivoRejeicao = request.MotivoRejeicao;
+                escalacao.MotivoCodigo = request.MotivoCodigo;  // Enum: SemSkill, Sobrecarregado, ForaMeuEscopo, etc
+
+                // Re-escalar para próximo
+                await EscalarParaProximoAsync(escalacao.ChamadoId, escalacao.AnalistaDestinoId, ct);
+                break;
+
+            case AcaoAceite.AceitarComComentario:
+                escalacao.DataAceite = DateTime.UtcNow;
+                escalacao.Status = StatusEscalacao.Aceita;
+                escalacao.ComentarioAceite = request.Comentario;
+                await AtualizarChamadoNovoAnalistaAsync(escalacao.ChamadoId, escalacao.AnalistaDestinoId, ct);
+                break;
+        }
+
+        // Cancelar timeout se escalação foi aceita
+        if (escalacao.Status == StatusEscalacao.Aceita)
+        {
+            _hangfire.Remove(escalacao.IdJobTimeoutAceite);
+        }
+
+        await _context.SaveChangesAsync(ct);
+        return Result.Success();
+    }
+
+    public async Task<Result> AgenteRejeicaoAutomaticaPorTimeoutAsync(Guid escalacaoId, CancellationToken ct)
+    {
+        var escalacao = await _context.EscalacaoChamados
+            .FirstOrDefaultAsync(e => e.Id == escalacaoId, ct);
+
+        if (escalacao == null || escalacao.DataAceite.HasValue)
+            return Result.Failure("Escalação já foi respondida ou não existe");
+
+        // Timeout: assumir rejeição automática
+        escalacao.DataAceite = DateTime.UtcNow;
+        escalacao.Status = StatusEscalacao.RejeitadaPorTimeout;
+        escalacao.MotivoRejeicao = "Sem resposta no prazo (timeout automático)";
+
+        await EscalarParaProximoAsync(escalacao.ChamadoId, escalacao.AnalistaDestinoId, ct);
+        await _context.SaveChangesAsync(ct);
+
+        return Result.Success();
+    }
+
+    private async Task EscalarParaProximoAsync(Guid chamadoId, Guid analistaAtualId, CancellationToken ct)
+    {
+        var chamado = await _context.Chamados.FirstOrDefaultAsync(c => c.Id == chamadoId, ct);
+        var proximoAnalistaId = await SelecionarProximoAnalistaAsync(chamado, ct);
+
+        if (proximoAnalistaId == Guid.Empty)
+        {
+            // Ninguém disponível, escala para Gestor
+            proximoAnalistaId = await ObterGestorResponsavelAsync(chamado.ClienteId, ct);
+        }
+
+        if (proximoAnalistaId != Guid.Empty)
+        {
+            await EscalarChamadoAsync(chamado, proximoAnalistaId, "Re-escalação por rejeição", ct);
+        }
+    }
+}
+```
+
+**Exemplos**:
+- P1 escalado para Ana. Ana clica "Rejeitar" e escolhe motivo "Sem skill VPN". Registrado. Chamado re-escalado para Bruno. Analytics mostram padrão: Ana rejeitou 8 VPN em mês = precisa treinamento.
+- P2 escalado para Carlos. Carlos não lê mensagem por 15min. Timeout automático, escalação marcada como "RejeitadaPorTimeout", chamado vai para próximo.
+- P3 escalado para João. João aceita com comentário "Este cliente é complexo, vai dar trabalho". Aceite registrado, comentário anexado para histórico.
+
+---
+
+### RN-ESC-072-10: Dashboard de Escalações em Tempo Real com Alertas Críticos
+
+**Descrição**: Dashboard exibe: (1) Escalações ativas (pendentes de aceite), (2) Escalações aceitas mas não respondidas há >30min, (3) Taxa de aceite por analista (%, meta 90%), (4) Tempo médio aceitação por nível, (5) Trending de escalações por hora (gráfico), (6) Top 5 motivos de escalação, (7) Alertas críticos: "P1 sem aceite 10min", "Analista rejeitou >5 escalações em 1h", "Queue vazia 20+ escalações pedentes".
+
+**Justificativa**: Visibilidade de escalações em tempo real permite gestor intervir se sistema falhando (ex: ninguém aceitando P1). Alertas críticos disparam ação imediata (escalar para Diretor, alertar Gestor).
+
+**Implementação**: Será expandida em seção 8 (Métricas).
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `branco` (SQL Server 2016+)
+
+**Tabelas Principais Relacionadas a Escalação**:
+
+```sql
+-- Tabela de Chamados (base para escalação)
+CREATE TABLE [dbo].[tb_Chamados](
+    [Id_Chamado] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Conglomerado] [int] NOT NULL,
+    [Numero_Chamado] [varchar](20) NOT NULL,
+    [Id_Cliente] [int] NULL,
+    [Descricao] [varchar](max) NULL,
+    [Id_Prioridade] [tinyint] NULL,  -- 1=P1, 2=P2, 3=P3
+    [Id_Status] [tinyint] NULL,  -- 1=Aberto, 2=Atendimento, 3=Fechado
+    [Id_Analista_Atribuido] [int] NULL,
+    [Dt_Criacao] [datetime] NOT NULL,
+    [Dt_Alteracao] [datetime] NULL,
+    [Fl_Excluido] [bit] DEFAULT 0,
+    CONSTRAINT [PK_tb_Chamados] PRIMARY KEY CLUSTERED ([Id_Chamado] ASC),
+    CONSTRAINT [FK_tb_Chamados_Conglomerado] FOREIGN KEY ([Id_Conglomerado])
+        REFERENCES [dbo].[tb_Conglomerado]([Id_Conglomerado]),
+    CONSTRAINT [FK_tb_Chamados_Analista] FOREIGN KEY ([Id_Analista_Atribuido])
+        REFERENCES [dbo].[tb_Usuarios]([Id_Usuario])
+)
+GO
+
+-- Tabela de SLA (para triggers de escalação)
+CREATE TABLE [dbo].[tb_SLA](
+    [Id_SLA] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Conglomerado] [int] NOT NULL,
+    [Nome_SLA] [varchar](100) NOT NULL,
+    [Horas_Resposta] [decimal](5,2) NOT NULL,
+    [Horas_Resolucao] [decimal](5,2) NOT NULL,
+    [Id_Prioridade] [tinyint] NOT NULL,  -- Link com prioridade
+    [Dt_Criacao] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_SLA] PRIMARY KEY CLUSTERED ([Id_SLA] ASC),
+    CONSTRAINT [FK_tb_SLA_Conglomerado] FOREIGN KEY ([Id_Conglomerado])
+        REFERENCES [dbo].[tb_Conglomerado]([Id_Conglomerado])
+)
+GO
+
+-- Tabela de Escalação (EXISTE no legado, pode ser migrada)
+CREATE TABLE [dbo].[tb_Escalacao](
+    [Id_Escalacao] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Conglomerado] [int] NOT NULL,
+    [Id_Chamado] [int] NOT NULL,
+    [Id_Analista_Origem] [int] NOT NULL,
+    [Id_Analista_Destino] [int] NULL,
+    [Dt_Escalacao] [datetime] NOT NULL,
+    [Motivo_Escalacao] [varchar](200) NULL,
+    [Fl_Manual] [bit] DEFAULT 0,
+    [Id_Status_Escalacao] [tinyint] NULL,  -- 1=Pendente, 2=Aceita, 3=Rejeitada
+    [Dt_Aceite] [datetime] NULL,
+    [Fl_Excluido] [bit] DEFAULT 0,
+    CONSTRAINT [PK_tb_Escalacao] PRIMARY KEY CLUSTERED ([Id_Escalacao] ASC),
+    CONSTRAINT [FK_tb_Escalacao_Chamado] FOREIGN KEY ([Id_Chamado])
+        REFERENCES [dbo].[tb_Chamados]([Id_Chamado]),
+    CONSTRAINT [FK_tb_Escalacao_AnalistaOrigem] FOREIGN KEY ([Id_Analista_Origem])
+        REFERENCES [dbo].[tb_Usuarios]([Id_Usuario]),
+    CONSTRAINT [FK_tb_Escalacao_AnalistaDestino] FOREIGN KEY ([Id_Analista_Destino])
+        REFERENCES [dbo].[tb_Usuarios]([Id_Usuario]),
+    INDEX [IX_tb_Escalacao_Chamado] NONCLUSTERED ([Id_Chamado] ASC),
+    INDEX [IX_tb_Escalacao_DataEscalacao] NONCLUSTERED ([Dt_Escalacao] DESC)
+)
+GO
+
+-- Tabela de Usuários (analistas)
+CREATE TABLE [dbo].[tb_Usuarios](
+    [Id_Usuario] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Conglomerado] [int] NOT NULL,
+    [Nome_Usuario] [varchar](100) NOT NULL,
+    [Email_Usuario] [varchar](100) NOT NULL,
+    [Telefone] [varchar](20) NULL,
+    [Id_Departamento] [int] NULL,
+    [Fl_Ativo] [bit] DEFAULT 1,
+    [Dt_Criacao] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_Usuarios] PRIMARY KEY CLUSTERED ([Id_Usuario] ASC)
+)
+GO
+
+-- Tabela de Filas (para roteamento)
+CREATE TABLE [dbo].[tb_Filas](
+    [Id_Fila] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Conglomerado] [int] NOT NULL,
+    [Nome_Fila] [varchar](100) NOT NULL,
+    [Descricao] [varchar](500) NULL,
+    [Id_Gestor] [int] NULL,
+    [Dt_Criacao] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_Filas] PRIMARY KEY CLUSTERED ([Id_Fila] ASC),
+    CONSTRAINT [FK_tb_Filas_Gestor] FOREIGN KEY ([Id_Gestor])
+        REFERENCES [dbo].[tb_Usuarios]([Id_Usuario])
+)
+GO
+
+-- Tabela de Membros da Fila (analistas em cada fila)
+CREATE TABLE [dbo].[tb_Fila_Membros](
+    [Id_Fila_Membro] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Fila] [int] NOT NULL,
+    [Id_Analista] [int] NOT NULL,
+    [Fl_Ativo] [bit] DEFAULT 1,
+    [Dt_Insercao] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_Fila_Membros] PRIMARY KEY CLUSTERED ([Id_Fila_Membro] ASC),
+    CONSTRAINT [FK_tb_Fila_Membros_Fila] FOREIGN KEY ([Id_Fila])
+        REFERENCES [dbo].[tb_Filas]([Id_Fila]),
+    CONSTRAINT [FK_tb_Fila_Membros_Analista] FOREIGN KEY ([Id_Analista])
+        REFERENCES [dbo].[tb_Usuarios]([Id_Usuario])
+)
+GO
+
+-- Tabela de Skills (competências dos analistas) - NÃO EXISTE no legado, será criada
+CREATE TABLE [dbo].[tb_Analista_Skills](
+    [Id_Skill] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Analista] [int] NOT NULL,
+    [Nome_Skill] [varchar](100) NOT NULL,  -- "Cisco Networking", "Windows Server", "Citrix", etc
+    [Nivel_Proficiencia] [tinyint] NOT NULL,  -- 1=Trainee, 2=Junior, 3=Pleno, 4=Senior
+    [Dt_Aquisicao] [datetime] NOT NULL,
+    CONSTRAINT [PK_tb_Analista_Skills] PRIMARY KEY CLUSTERED ([Id_Skill] ASC),
+    CONSTRAINT [FK_tb_Analista_Skills_Analista] FOREIGN KEY ([Id_Analista])
+        REFERENCES [dbo].[tb_Usuarios]([Id_Usuario])
+)
+GO
+```
+
+**Campos Importantes e Mapeamento**:
+
+| Campo Legado | Tipo | Descrição | Uso Modernizado |
+|--------------|------|-----------|-----------------|
+| `Id_Chamado` | int | ID único do chamado | Referência, não muda |
+| `Id_Prioridade` | tinyint | 1=P1, 2=P2, 3=P3 | Trigger escalação automática |
+| `Id_Analista_Atribuido` | int | Analista responsável | Origem escalação |
+| `Id_SLA` | int | Referência SLA | Cálculo percentual consumido, trigger |
+| `Dt_Criacao` | datetime | Quando chamado foi criado | Base para cálculo SLA |
+| `Id_Escalacao` | int | Log de escalações | Migrável como auditoria |
+| `Motivo_Escalacao` | varchar | Por que escalou | Audit trail |
+| `Fl_Manual` | bit | 0=automática, 1=manual | Classificação tipo escalação |
+| `Dt_Aceite` | datetime | Quando aceito | KPI aceite |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migracao |
+|-----------|-----------|----------|
+| `pa_EscalarChamado` | Executa escalação de chamado para outro analista | Migrar para C# Command Handler (melhor testabilidade) |
+| `pa_ObterAnalistasDisponiveis` | Busca analistas disponíveis para roteamento | Migrar para Query LINQ + Redis cache |
+| `pa_CalcularSLAConsumido` | Calcula percentual SLA consumido | Migrar para método C# com TimeSpan |
+| `pa_ListarEscalacoesPendentes` | Lista escalações não respondidas | Query LINQ direto |
+
+### 3.3 Páginas ASPX Legado
+
+| Página | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `frmEscalar.aspx` | Formulário manual escalação | `/escalacoes/criar` (Angular) |
+| `frmConfigMatrizEscalacao.aspx` | Admin config matriz | `/admin/escalacoes/matriz` (Angular) |
+| `frmListaEscalacoes.aspx` | Histórico escalações | `/escalacoes/historico` (Angular) |
+| `frmAnalista.aspx` (menu Escalações) | Mini-widget escalações pendentes | Widget no Dashboard |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebServices\WSEscalacao.asmx.vb` (exemplo)
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `EscalarChamado(idChamado, idAnalistaDestino, motivo)` | Escala manual | `POST /api/escalacoes` |
+| `ObterEscalacoesPendentes(idAnalista)` | Busca escalações pendentes | `GET /api/escalacoes/pendentes` |
+| `AceitarEscalacao(idEscalacao, aceitar, observacao)` | Aceita/rejeita escalação | `POST /api/escalacoes/{id}/aceitar` |
+| `ObterMatrizEscalacao(idConglomerado)` | Busca configuração matriz | `GET /api/escalacoes/matriz` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `ESCALACAO_AUTOMATICA_V1`
+
+**Configuração**:
+```json
+{
+    "featureKey": "ESCALACAO_AUTOMATICA_V1",
+    "nome": "Escalação Automática Inteligente",
+    "descricao": "Motor inteligente de escalação baseado em SLA, prioridade e skill-based routing",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "modulo": "SERVICE_DESK",
+    "versao": "1.0.0",
+    "dataLancamento": "2025-01-15",
+    "configuracoes": {
+        "habilitarEscalacaoAutomaticaSLA": true,
+        "habilitarEscalacaoAutomaticaPrioridade": true,
+        "habilitarSkillBasedRouting": true,
+        "habilitarBalanceamentoCarga": true,
+        "percentualSLAParaEscalacao50": 50,
+        "percentualSLAParaEscalacao75": 75,
+        "percentualSLAParaEscalacao90": 90,
+        "limiteMaximoChamadosPorAnalista": 8,
+        "timeoutAceiteMinutosP1": 5,
+        "timeoutAceiteMinutosP2": 15,
+        "timeoutAceiteMinutosP3": 30,
+        "habilitarNotificacaoMultiCanal": true,
+        "habilitarAuditoria": true,
+        "habilitarDashboardRealtime": true
+    }
+}
+```
+
+**Regras de Habilitação**:
+- Se `habilitarEscalacaoAutomaticaSLA` = false: Escalações manuais apenas
+- Se `habilitarSkillBasedRouting` = false: Round-robin simples
+- Se `habilitarAuditoria` = false: Não registra escal ações (NÃO RECOMENDADO)
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Tradução** (pt-BR, en-US, es-ES):
+
+```json
+{
+    "escalacao": {
+        "titulos": {
+            "titulo_pagina": "Escalação de Chamados",
+            "titulo_formulario": "Novo Escalação",
+            "titulo_detalhes": "Detalhes da Escalação",
+            "titulo_historico": "Histórico de Escalações",
+            "titulo_matriz": "Matriz de Escalação",
+            "titulo_dashboard": "Dashboard de Escalações",
+            "titulo_pausa": "Gerenciar Pausas"
+        },
+        "labels": {
+            "chamado_numero": "Número do Chamado",
+            "prioridade": "Prioridade",
+            "cliente": "Cliente",
+            "problema": "Problema/Descrição",
+            "analista_origem": "Escalado Por",
+            "analista_destino": "Escalado Para",
+            "motivo_escalacao": "Motivo da Escalação",
+            "data_escalacao": "Data da Escalação",
+            "data_aceite": "Data de Aceite",
+            "status_escalacao": "Status",
+            "tempo_ate_aceite": "Tempo até Aceite",
+            "skill_requerida": "Skill Requerida",
+            "nivel_escalacao": "Nível de Escalação",
+            "sla_consumido": "SLA Consumido",
+            "matriz_escalacao": "Matriz de Escalação",
+            "pausa_tipo": "Tipo de Pausa",
+            "pausa_data_inicio": "Data de Início",
+            "pausa_data_fim": "Data de Término"
+        },
+        "placeholders": {
+            "buscar_chamado": "Digite número do chamado ou descrição...",
+            "selecionar_analista": "Selecione o analista destino...",
+            "selecionar_motivo": "Escolha motivo da escalação...",
+            "comentario_escalacao": "Adicione observação (opcional)..."
+        },
+        "botoes": {
+            "escalar": "Escalar",
+            "aceitar": "Aceitar Escalação",
+            "rejeitar": "Rejeitar",
+            "aceitar_comentario": "Aceitar com Comentário",
+            "cancelar": "Cancelar",
+            "salvar_matriz": "Salvar Matriz",
+            "registrar_pausa": "Registrar Pausa",
+            "remover_pausa": "Remover Pausa",
+            "ver_historico": "Ver Histórico",
+            "exportar": "Exportar Relatório"
+        },
+        "mensagens": {
+            "sucesso_escalacao": "Chamado escalado com sucesso para {analista}",
+            "sucesso_aceite": "Escalação aceita com sucesso",
+            "sucesso_rejeicao": "Escalação rejeitada",
+            "sucesso_pausa": "Pausa registrada com sucesso",
+            "erro_analista_sobrecarregado": "Analista {nome} está sobrecarregado. Selecionando próximo...",
+            "erro_nenhum_disponivel": "Nenhum analista disponível no nível solicitado",
+            "erro_permissao": "Você não tem permissão para escalar este chamado",
+            "aviso_sla_critico": "SLA CRÍTICO: {percentual}% consumido",
+            "aviso_sem_resposta": "Escalação sem resposta há {minutos} minutos"
+        },
+        "validacoes": {
+            "chamado_obrigatorio": "Chamado é obrigatório",
+            "analista_obrigatorio": "Analista destino é obrigatório",
+            "motivo_obrigatorio": "Motivo de escalação é obrigatório",
+            "motivo_rejeicao_obrigatorio": "Motivo de rejeição é obrigatório",
+            "pausa_data_invalida": "Data de fim deve ser após data de início",
+            "matriz_ciclo": "Matriz contém ciclo. Verifique dependências."
+        },
+        "status": {
+            "pendente": "Pendente de Aceite",
+            "aceita": "Aceita",
+            "rejeitada": "Rejeitada",
+            "rejeitada_timeout": "Rejeitada por Timeout",
+            "resolvida": "Resolvida",
+            "re_escalada": "Re-escalada"
+        },
+        "motivos": {
+            "sla_50_porcento": "SLA consumido em 50%",
+            "sla_75_porcento": "SLA consumido em 75%",
+            "sla_90_porcento": "SLA consumido em 90%",
+            "sla_violado": "SLA VIOLADO - 100% consumido",
+            "prioridade_p1": "Prioridade P1 - Automática",
+            "prioridade_p2": "Prioridade P2 - Automática",
+            "skill_gap": "Skill Gap - Sem competência técnica",
+            "sobrecarga": "Sobrecarga - Muitos chamados ativos",
+            "complexidade_elevada": "Complexidade elevada detectada",
+            "cliente_critico": "Cliente crítico",
+            "manual": "Escalação manual por gestor"
+        },
+        "motivos_rejeicao": {
+            "sem_skill": "Sem skill para este tipo chamado",
+            "sobrecarregado": "Estou sobrecarregado",
+            "fora_escopo": "Fora do meu escopo de responsabilidade",
+            "erro_roteamento": "Erro no roteamento - escalação errada",
+            "ja_tenho": "Já tenho este chamado",
+            "outro": "Outro motivo (especificar)"
+        },
+        "tipos_pausa": {
+            "ferias": "Férias",
+            "ausencia_justificada": "Ausência Justificada",
+            "reuniao": "Reunião",
+            "almoco": "Almoço",
+            "capacitacao": "Capacitação/Treinamento",
+            "outro": "Outro"
+        },
+        "dashboards": {
+            "escalacoes_pendentes": "Escalações Pendentes",
+            "escalacoes_hora": "Escalações/Hora",
+            "taxa_aceite": "Taxa de Aceite (%)",
+            "tempo_medio_aceite": "Tempo Médio de Aceite",
+            "analista_mais_escalado": "Analista Mais Escalado",
+            "categoria_mais_escalada": "Categoria Mais Escalada",
+            "motivos_top5": "Top 5 Motivos",
+            "trending": "Trending de Escalações"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operacao | Codigo | Dados Registrados | Retenção |
+|----------|--------|-------------------|----------|
+| Escalar Chamado (Manual) | `ESCALACAO_CHAMADO_MANUAL` | ID escalacao, origem, destino, motivo, timestamp, resultado | 7 anos |
+| Escalar Chamado (Automático) | `ESCALACAO_CHAMADO_AUTOMATICA` | ID escalacao, trigger (SLA/Prioridade/Skill), score matching, timestamp | 7 anos |
+| Aceitar Escalação | `ESCALACAO_ACEITE` | ID escalacao, timestamp aceite, tempo até aceite, usuario | 7 anos |
+| Rejeitar Escalação | `ESCALACAO_REJEICAO` | ID escalacao, motivo rejeição, timestamp | 7 anos |
+| Configurar Matriz | `ESCALACAO_CONFIG_MATRIZ` | Antes/Depois JSON, usuario, timestamp, detalhes mudança | 7 anos |
+| Registrar Pausa | `ESCALACAO_REGISTRAR_PAUSA` | Analista, tipo pausa, período, motivo, usuario registrou | 7 anos |
+| Re-Escalar | `ESCALACAO_RE_ESCALACAO` | ID escalacao original, nova escalacao, motivo re-escalação | 7 anos |
+| Rejeição Múltipla | `ESCALACAO_REJEICAO_MULTIPLA` | Contagem rejeições em período, padrão identificado | 7 anos |
+
+**Log Structure** (tabela `AuditoriaEscalacao`):
+```sql
+CREATE TABLE [dbo].[AuditoriaEscalacao](
+    [Id_Auditoria] [uniqueidentifier] PRIMARY KEY,
+    [Id_Cliente] [int] NOT NULL,
+    [Id_Chamado] [int] NOT NULL,
+    [Id_Escalacao] [int] NULL,
+    [Id_Analista_Origem] [int] NULL,
+    [Id_Analista_Destino] [int] NULL,
+    [Data_Escalacao] [datetime2] NOT NULL,
+    [Motivo_Escalacao] [nvarchar](max) NULL,
+    [Eh_Automatica] [bit] NOT NULL,
+    [Data_Aceite] [datetime2] NULL,
+    [Tempo_Minutos_Ate_Aceite] [decimal](10,2) NULL,
+    [Status_Escalacao] [varchar](50) NOT NULL,
+    [Resultado] [varchar](50) NULL,
+    [Id_Usuario_Criacao] [int] NOT NULL,
+    [Data_Criacao] [datetime2] NOT NULL,
+    [Data_Exclusao] [datetime2] NULL,
+    [Data_PermaDelet] [datetime2] NULL,  -- 7 anos após exclusão
+    INDEX [IX_AuditoriaEscalacao_ClienteId] NONCLUSTERED ([Id_Cliente]),
+    INDEX [IX_AuditoriaEscalacao_DataEscalacao] NONCLUSTERED ([Data_Escalacao] DESC)
+)
+```
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis |
+|-----------|-----------|--------|
+| `escalacao:chamado:criar` | Criar escalação manual | Analista Nível 2+, Gestor, Supervisor |
+| `escalacao:chamado:aceitar` | Aceitar escalação recebida | Todos (ativo é essencial) |
+| `escalacao:chamado:rejeitar` | Rejeitar escalação | Todos (ativo é essencial) |
+| `escalacao:chamado:visualizar` | Visualizar escalações | Todos (visualiza suas escalações) |
+| `escalacao:chamado:visualizar:todos` | Visualizar todas escalações | Gestor, Supervisor, Diretor, Auditor |
+| `escalacao:auditoria:read` | Acessar log de auditoria | Gestor, Supervisor, Diretor, Auditor, Compliance |
+| `escalacao:matriz:configurar` | Editar matriz de escalação | Admin cliente, Diretor, Arquiteto |
+| `escalacao:matriz:visualizar` | Visualizar matriz | Todos |
+| `escalacao:pausa:registrar` | Registrar própria pausa | Todos |
+| `escalacao:pausa:registrar:outros` | Registrar pausa de colega | Gestor, Supervisor |
+| `escalacao:pausa:visualizar` | Ver pausas do time | Gestor, Supervisor |
+| `escalacao:dashboard:acessar` | Acessar dashboard escalações | Gestor, Supervisor, Diretor, QA |
+| `escalacao:skill:configurar` | Configurar skills analistas | Admin cliente, Gestor |
+| `escalacao:skill:visualizar` | Ver skills | Gestor, Analista (suas próprias) |
+| `escalacao:redirecionar` | Redirecionar escalação manualmente | Gestor, Supervisor |
+
+**Matriz de Perfis x Permissões**:
+
+```yaml
+perfis:
+  analista:
+    descricao: "Analyst Level 1"
+    permissoes:
+      - escalacao:chamado:aceitar
+      - escalacao:chamado:rejeitar
+      - escalacao:chamado:visualizar
+      - escalacao:pausa:registrar
+      - escalacao:skill:visualizar
+
+  especialista:
+    descricao: "Specialist Level 2-3"
+    permissoes:
+      - escalacao:chamado:criar
+      - escalacao:chamado:aceitar
+      - escalacao:chamado:rejeitar
+      - escalacao:chamado:visualizar
+      - escalacao:pausa:registrar
+      - escalacao:skill:visualizar
+
+  gestor:
+    descricao: "Manager / Queue Owner"
+    permissoes:
+      - escalacao:chamado:criar
+      - escalacao:chamado:visualizar:todos
+      - escalacao:auditoria:read
+      - escalacao:matriz:visualizar
+      - escalacao:matriz:configurar
+      - escalacao:pausa:registrar:outros
+      - escalacao:pausa:visualizar
+      - escalacao:dashboard:acessar
+      - escalacao:skill:configurar
+      - escalacao:redirecionar
+
+  supervisor:
+    descricao: "Supervisor / Coordinator"
+    permissoes:
+      - escalacao:chamado:criar
+      - escalacao:chamado:visualizar:todos
+      - escalacao:auditoria:read
+      - escalacao:matriz:visualizar
+      - escalacao:pausa:registrar:outros
+      - escalacao:pausa:visualizar
+      - escalacao:dashboard:acessar
+      - escalacao:redirecionar
+
+  diretor:
+    descricao: "Director / VP IT"
+    permissoes:
+      - escalacao:chamado:criar
+      - escalacao:chamado:visualizar:todos
+      - escalacao:auditoria:read
+      - escalacao:matriz:configurar
+      - escalacao:pausa:registrar:outros
+      - escalacao:pausa:visualizar
+      - escalacao:dashboard:acessar
+      - escalacao:skill:configurar
+      - escalacao:redirecionar
+
+  auditor:
+    descricao: "Compliance / Auditor"
+    permissoes:
+      - escalacao:chamado:visualizar:todos
+      - escalacao:auditoria:read
+      - escalacao:matriz:visualizar
+      - escalacao:dashboard:acessar
+
+  admin_cliente:
+    descricao: "Client Admin (Full Access)"
+    permissoes:
+      - escalacao:chamado:criar
+      - escalacao:chamado:visualizar:todos
+      - escalacao:auditoria:read
+      - escalacao:matriz:configurar
+      - escalacao:pausa:registrar:outros
+      - escalacao:pausa:visualizar
+      - escalacao:dashboard:acessar
+      - escalacao:skill:configurar
+      - escalacao:redirecionar
+```
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descrição | Permissão | Notas |
+|--------|----------|-----------|-----------|-------|
+| GET | `/api/escalacoes` | Listar escalações (próprias/todas) | `escalacao:chamado:visualizar` | Paginado, filtros opcionais |
+| GET | `/api/escalacoes/{id}` | Obter escalação por ID | `escalacao:chamado:visualizar` | Detalhes completos |
+| POST | `/api/escalacoes` | Criar escalação manual | `escalacao:chamado:criar` | Body: chamadoId, analistaDestinoId, motivo |
+| PUT | `/api/escalacoes/{id}` | Atualizar escalação | `escalacao:chamado:criar` | Apenas redirecionar antes de aceite |
+| DELETE | `/api/escalacoes/{id}` | Soft-delete escalação | `escalacao:chamado:criar` | Apenas antes de aceite |
+
+### 5.2 Operações Especiais
+
+| Metodo | Endpoint | Descrição | Permissão | Body/Params |
+|--------|----------|-----------|-----------|-------------|
+| POST | `/api/escalacoes/{id}/aceitar` | Aceitar escalação | `escalacao:chamado:aceitar` | `{ comentario?: string }` |
+| POST | `/api/escalacoes/{id}/rejeitar` | Rejeitar escalação | `escalacao:chamado:rejeitar` | `{ motivo: string, codigo: RejeicaoEnum, comentario?: string }` |
+| POST | `/api/escalacoes/{id}/redirecionar` | Redirecionar para outro analista | `escalacao:redirecionar` | `{ novoAnalistaId: guid, motivo: string }` |
+| GET | `/api/escalacoes/pendentes` | Escalações pendentes do usuário | `escalacao:chamado:visualizar` | Retorna lista não-paginada |
+| GET | `/api/escalacoes/historico/{chamadoId}` | Histórico de escalações chamado | `escalacao:chamado:visualizar` | Chronological order |
+| POST | `/api/escalacoes/matriz` | Criar/atualizar matriz escal. | `escalacao:matriz:configurar` | Body: matriz completa JSON |
+| GET | `/api/escalacoes/matriz` | Obter matriz de escalação atual | `escalacao:matriz:visualizar` | Retorna árvore estruturada |
+| GET | `/api/escalacoes/matriz/validate` | Validar matriz antes salvar | `escalacao:matriz:configurar` | Query: `matrizJson` (encoded) |
+| POST | `/api/escalacoes/pausa` | Registrar pausa de analista | `escalacao:pausa:registrar` | Body: {tipo, dataInicio, dataFim, motivo} |
+| DELETE | `/api/escalacoes/pausa/{id}` | Remover pausa | `escalacao:pausa:registrar` | - |
+| GET | `/api/escalacoes/dashboard` | Dashboard escalações tempo real | `escalacao:dashboard:acessar` | Retorna agregados, gráficos |
+| GET | `/api/escalacoes/auditoria` | Consultar log auditoria | `escalacao:auditoria:read` | Filtros: dataInicio, dataFim, analista, motivo |
+| POST | `/api/escalacoes/skill` | Adicionar skill a analista | `escalacao:skill:configurar` | Body: {analistaId, skill, nivelProficiencia} |
+| GET | `/api/escalacoes/skill/{analistaId}` | Listar skills do analista | `escalacao:skill:visualizar` | - |
+| POST | `/api/escalacoes/exportar` | Exportar relatório escalações | `escalacao:auditoria:read` | Query: formato (CSV, PDF, Excel) |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Escalação Automática por SLA
+
+```
+Chamado ABERTO (t0)
+    |
+    +---> Job Hangfire verifica SLA a cada 5min
+    |
+    v (SLA 50% consumido?)
+    |
+    +----> NÃO: continua monitorando
+    |
+    +----> SIM: Buscar especialista com skills
+            |
+            v
+            Score matching: skills(40%) + histórico(30%) + disponibilidade(20%) + SLA(10%)
+            |
+            v
+            Encontrou? SIM/NÃO
+            |
+            +----> SIM: Escalar para Ana (top score)
+            |      |
+            |      v
+            |      Enviar notificações: Email + SMS + In-app + Teams
+            |      |
+            |      v (Ana aceita em 2min?)
+            |      |
+            |      +----> SIM: Chamado atribuído Ana, aguarda resposta
+            |      |
+            |      +----> NÃO responde 5min: Timeout → escalação rejeitada automática
+            |             |
+            |             v
+            |             Buscar próximo (Bruno, Carlos...)
+            |
+            +----> NÃO disponível: Escalar para nível superior (Nível 2)
+                   |
+                   v
+                   Repetir processo acima
+                   |
+                   v (75% SLA?)
+                   Escalar para Nível 3 (Senior)
+                   |
+                   v (90% SLA?)
+                   Escalar para Gestor com alerta crítico
+                   |
+                   v (100% SLA - VIOLADO)
+                   ALERTA CRÍTICO: Diretor, CTO, notificação escalada
+                   |
+                   v
+                   Registrar violação para análise posterior
+```
+
+### 6.2 Fluxo de Aceitação/Rejeição de Escalação
+
+```
+Ana recebe notificação de escalação
+    |
+    v
+Ana tem 3 opções:
+    |
+    +---> [ACEITAR] -----> Escalação marcada Aceita
+    |                       Timestamp aceite registrado
+    |                       Chamado atribuído Ana
+    |                       Notificação back ao origen (João)
+    |                       Auditoria: "Ana aceitou em Xmin"
+    |                       Job timeout cancelado
+    |
+    +---> [REJEITAR] -----> Modal: selecionar motivo
+    |                       (Sem skill, Sobrecarregado, Fora escopo, erro routing)
+    |                       Escalação marcada Rejeitada + motivo
+    |                       Auditoria: "Ana rejeitou por Sem skill"
+    |                       Sistema busca próximo (Bruno)
+    |                       Notificação back ao origen + dashboard
+    |
+    +---> [NÃO RESPONDE] -> Timeout 5min (P1) / 15min (P2)
+                            Escalação marcada RejeitadaPorTimeout
+                            Sistema busca próximo
+                            Analytics: "Ana não responde X% tempo"
+                            Alerta se padrão >20% rejeições
+```
+
+### 6.3 Fluxo de Configuração de Matriz de Escalação
+
+```
+Admin Cliente acessa /admin/escalacoes/matriz
+    |
+    v
+Editor visual com:
+    - Nível 1: Helpdesk (Ana, Bruno, Carlos) - skills: "L1 Support"
+    - Nível 2: Especialista (João, Marina) - skills: "Network", "Windows"
+    - Nível 3: Senior (Roberto) - skills: "*" (todas)
+    - Nível 4: Gestor (Diretora) - escalação crítica apenas
+    |
+    v (Admin faz mudança: remove Carlos do Nível 1)
+    |
+    v
+Sistema valida:
+    - Sem ciclos? ✓
+    - Cada nível tem >=1 analista? ✓
+    - Matriz é conectada? ✓
+    |
+    v (Validação passa)
+    |
+    v
+Admin clica [SALVAR]
+    |
+    v
+Nova matriz aplicada imediatamente (sem deploy)
+    |
+    v
+Auditoria: "Admin alterou matriz: removeu Carlos Nível 1" (registered)
+    |
+    v
+Dashboard mostra mensagem: "Matriz atualizada com sucesso"
+    |
+    v
+Todas escalações futuras usam nova matriz
+    |
+    v (Escalações abertas NÃO são afetadas - continuam com matriz antiga)
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição | Implementação |
+|----------|-----------|---------------|
+| **Autorização por Permissão** | Validar `escalacao:chamado:criar` antes de escalar | Filtro `[Authorize("escalacao:chamado:criar")]` em controllers |
+| **Isolamento Multi-Tenancy** | Escalação só vê chamados do seu cliente | Query sempre filtra `ClienteId == user.ClienteId` |
+| **SQL Injection** | Queries LINQ (parametrizadas) + EF Core | Nunca usar string concatenation em SQL |
+| **XSS em Comentários** | HtmlEncoder sanitização em frontend + backend | `HtmlEncoder.Default.Encode(comentario)` |
+| **CSRF Protection** | Token CSRF em requests POST/PUT/DELETE | Middleware `Microsoft.AspNetCore.Antiforgery` |
+| **Rate Limiting Escalação** | Max 10 escalações/min por usuário | Middleware custom `RateLimitingEscalacao` |
+| **Validação de Integridade** | Verificar analista destino existe + ativo | Query antes de escalar, throw se not found |
+| **Auditoria Completa** | Toda ação registrada com user/timestamp | Middleware intercepta todos endpoints |
+| **Encriptação de Sensíveis** | Não armazenar senhas, usar hashes | Use `IdentityUser` do ASP.NET |
+| **Rejeição de Ciclo** | Validar matriz escalação não tem ciclo | Algoritmo DFS no salvar matriz |
+| **Limite de Timeout** | Timeout escalação não pode ser <1min | Validação schema: `Min: 1, Max: 1440 (24h)` |
+| **Validação de Período Pausa** | DataFim > DataInicio | Regra negócio: throw se DataFim <= DataInicio |
+| **Geolocation Logging** | Log IP/Localização em auditoria crítica | Usar GeoIP lookup, armazenar em auditoria |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] SQL Injection: Tentar escalar com motivo = `'; DROP TABLE Escalacoes; --` (deve rejeitar)
+- [ ] XSS: Motivo com `<script>alert('XSS')</script>` (deve sanitizar/codificar)
+- [ ] CSRF: POST sem token CSRF (deve retornar 403)
+- [ ] Autorização: Analista L1 tenta usar endpoint `escalacao:matriz:configurar` (deve retornar 403)
+- [ ] Isolamento Multi-Tenancy: Cliente A tenta escalar chamado de Cliente B (deve rejeitar)
+- [ ] Rate Limiting: 11 escalações em 1min (10ª passes, 11ª retorna 429 Too Many Requests)
+- [ ] Integridade: Escalar para analista inexistente (deve retornar 404)
+- [ ] Auditoria: Verificar todas ações registradas em log com user/timestamp
+- [ ] Ciclo Matriz: Tentar salvar Nível 1→2→1 (deve rejeitar como ciclo)
+- [ ] Período Pausa: DataFim = DataInicio (deve rejeitar como inválido)
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs de Escalação
+
+| KPI | Meta | Medicao | Alertas |
+|-----|------|---------|---------|
+| **Taxa de Aceite** | ≥90% | (Escalações Aceitas / Total Escalações) × 100 | <85% = Alerta |
+| **Tempo Médio Aceite** | P1: <3min, P2: <10min, P3: <30min | Média DataAceite - DataEscalacao | P1 >5min = Crítico |
+| **Taxa de Rejeição** | ≤5% | (Escalações Rejeitadas / Total) × 100 | >10% = Alerta |
+| **Escalações/Hora** | Histórico (variável) | Count escalações por hora últimas 24h | >150% média = Alerta |
+| **Tempo SLA até Escalação 50%** | <1h (P1), <12h (P2), <24h (P3) | Histórico | Se >SLA = alerta preventivo |
+| **Taxa Escalação P1** | <20% chamados P1 escalam | (Chamados P1 escalados / Total P1) × 100 | >30% = análise comportamento |
+| **Taxa Escalação P2** | <35% | (Chamados P2 escalados / Total P2) × 100 | >50% = análise |
+| **Taxa Escalação P3** | <15% | (Chamados P3 escalados / Total P3) × 100 | >25% = análise |
+| **SLA Compliance Escalação** | ≥98% | (Escalações aceitas ≤SLA / Total) × 100 | <95% = Crítico |
+| **Taxa FCR (First Contact Resolution) pós-escalação** | ≥70% | (Chamados resolvidos sem re-escalação / Total) × 100 | <60% = baixa qualidade |
+| **Rejeição Múltipla por Analista** | ≤3 rejeições/mês | Count rejeições per analista | >5/mês = padrão suspeito |
+| **Pausa Automaticamente Removida** | N/A (métrica de qualidade) | Count pausas removidas automaticamente por Hangfire | >5/dia = análise padrão |
+| **Escalação Re-escalada** | <8% | (Re-escalações / Total escalações) × 100 | >10% = qualidade escalação baixa |
+| **Matriz Ciclos Detectados** | 0 (zero tolerância) | Count ciclos detectados ao salvar | >0 = falha sistema |
+| **Integridade Auditoria** | 100% | (Escalações com log auditoria / Total) × 100 | <99% = falha crítica |
+
+### 8.2 Alertas Críticos
+
+| Alerta | Condição | Ação | Escalação |
+|--------|----------|------|-----------|
+| **P1 Sem Aceite 10min** | Escalação P1 não aceita > 10min | Notificar Gestor via SMS + Teams | Se >5 ocorr./hora, escalar para Diretor |
+| **Queue Vazia Escalações** | >20 escalações pendentes, ninguém aceitando | Notificação pop-up Gestor + SMS | Gestor redireciona manualmente |
+| **Analista Rejeita >5 em 1h** | Padrão anômalo de rejeições | Notificar Supervisor, desativar escalação para analista | Investigar (em pausa? sem skills?) |
+| **Timeout Cascata** | 3 escalações rejeitadas mesma cadeia | Escalar diretamente para Gestor | Alerta crítico + análise roteamento |
+| **Taxa Aceite <75%** | Histórico últimas 24h | Dashboard alerta em vermelho | Análise de root cause |
+| **Re-escalação >15%** | Muitos chamados sendo re-escalados | Investigar qualidade primeira escalação | Revisar criterios SLA/skill |
+| **Matriz Inválida Detectada** | Sistema encontra ciclo em matriz salvaguardada | Rollback para matriz anterior + notific. admin | Admin corrige + repassa treinamento |
+| **Auditoria Falha** | Escalação não registrada na auditoria | Log automático + alerta compliance | Investigar imediatamente |
+| **Sincronização AD Falha** | Job sincronização calendário retorna erro | Retry automático 5x, após notificar IT | Manual sync necessário |
+| **Performance Seleção Especialista** | Algoritmo scoring >5s | Async processing iniciado | Cache scores por 30min |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-072](./MD-072-Escalacao-Automatica.md) com DDL completo (tabelas escalacao, pausa, auditoria, matriz)
+2. **Casos de Uso**: Criar [UC-072](./UC-072-Escalacao-Automatica.md) detalhando 5 UCs: (UC00) Listar, (UC01) Escalar, (UC02) Aceitar, (UC03) Rejeitar, (UC04) Configurar Matriz
+3. **Workflow**: Criar [WF-072](./WF-072-Escalacao-Automatica.md) com telas, componentes, rotas Angular
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml) mapeando RF072 em 4-6 user stories implementáveis
+5. **Testes de Cenários**: Criar CN-072-BACKEND.md com 120+ cenarios de teste (validações, escalações, timeouts, re-escalacoes)
+6. **Testes de Casos**: Criar TC-072-BACKEND.md com 40 testes consolidados
+7. **Massa de Teste**: Criar MT-072-BACKEND.csv com dados para 500 escalações de teste
+8. **Implementação Backend**: Commands/Queries com MediatR (RN-ESC-072-01 a 10)
+9. **Implementação Frontend**: Telas Angular com formulários, dashboard, matriz editor
+10. **Integração Hangfire**: Jobs background para verificação SLA a cada 5min, sincronização AD diária
+11. **Testes E2E**: Playwright validando fluxo completo (escalar P1 → aceitar 2min → registrar auditoria)
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial completa com 10 regras de negócio, 5 fluxos, integrações, endpoints | Claude Code |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code - IControlIT Architect Agent
+**Revisao**: Pendente de revisão técnica
+**Status**: DRAFT - Pronto para evolução em documentos complementares (MD, UC, WF, Testes)

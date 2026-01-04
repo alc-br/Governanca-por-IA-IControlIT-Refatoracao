@@ -1,0 +1,930 @@
+# RF076: Manutenção Preventiva e Corretiva
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF028 (Gestão de Ativos), RF073 (Gestão de Chamados)
+**EPIC**: EPIC011-INT-Integracoes
+**Fase**: Fase 6 - Ativos, Auditoria e Integrações
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descrição Geral
+
+Este requisito especifica o módulo de **Manutenção Preventiva e Corretiva** do sistema IControlIT, responsável pelo gerenciamento completo do ciclo de vida das manutenções de ativos. O módulo integra-se com a gestão de ativos (RF028), permitindo agendamento automático de manutenções preventivas, criação de ordens de serviço corretivas, controle de peças e materiais utilizados, e cálculo de indicadores de confiabilidade (MTBF e MTTR).
+
+O sistema modernizado (.NET 10 + Angular 19) substitui os processos manuais do legado VB.NET, oferecendo automação de workflows, integração com Hangfire para agendamentos recorrentes, e conformidade com normas ISO 55000 (Asset Management).
+
+### 1.2 Importância Estratégica
+
+O módulo de Manutenção é crítico para:
+- **Conformidade**: Alinhamento com ISO 55000, ABNT NBR ISO 55000 e legislação de segurança ocupacional
+- **Disponibilidade**: Redução de downtime através de manutenção preventiva, aumentando disponibilidade dos ativos
+- **Controle de Custos**: Rastreabilidade de gastos com peças, materiais e horas de mão de obra
+- **Eficiência Operacional**: Automação de agendamentos e notificações reduz carga administrativa
+- **Rastreabilidade**: Histórico completo de intervenções para auditoria e compliance
+- **Precisão de Dados**: Cálculo automatizado de MTBF/MTTR para análise de tendências
+
+### 1.3 Conceitos Fundamentais
+
+**Manutenção Preventiva**: Intervenção planejada em ativo antes de falha, baseada em calendário ou contadores (horas, km)
+- Exemplos: Revisão anual, troca de óleo a cada 50h de operação
+
+**Manutenção Corretiva**: Intervenção não planejada para restaurar ativo à operação após falha
+- Exemplos: Reparo de bomba queimada, substituição de componente danificado
+
+**Ordem de Serviço (OS)**: Documento que autoriza e documenta uma intervenção de manutenção com escopo, recursos e cronograma definidos
+
+**Plano de Manutenção**: Conjunto de manutenções preventivas agendadas para um ativo ou classe de ativos
+
+**MTBF (Mean Time Between Failures)**: Tempo médio entre falhas consecutivas - indicador de confiabilidade
+**MTTR (Mean Time To Repair)**: Tempo médio para reparar - indicador de eficiência de manutenção
+
+**Peças/Materiais**: Itens consumíveis ou reparáveis utilizados na manutenção
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET) | Modernizado (.NET 10 + Angular) |
+|---------|-----------------|--------------------------------|
+| **Agendamento** | Manual em calendário/email | Automático via Hangfire com notificações |
+| **Ordens de Serviço** | Formulários ASPX estáticos | Fluxo dinâmico com workflow de aprovação |
+| **Controle de Peças** | Registros em Excel/banco desorganizado | Integração com inventário e controle de custos |
+| **Alertas** | Sem alertas automáticos | Sistema inteligente de alertas por regra |
+| **Histórico** | Busca por banco legado lenta | Relatórios otimizados com filtros avançados |
+| **Cálculo MTBF/MTTR** | Manual em relatórios | Cálculo automático em tempo real |
+| **Aprovações** | Email com aprovação informal | Workflow estruturado com rastreabilidade |
+| **Multi-tenancy** | Não implementado | Isolamento completo por cliente |
+
+### 1.5 Funcionalidades Principais
+
+1. **CRUD Planos de Manutenção** - Criar, listar, editar e inativar planos preventivos por ativo
+2. **Agendamento Automático** - Gerar ordens de manutenção preventiva via Hangfire conforme plano
+3. **Gestão de Ordens de Serviço** - Criar, aprovar, executar e fechar ordens (preventivas e corretivas)
+4. **Controle de Peças/Materiais** - Registrar itens utilizados, custos e saídas de inventário
+5. **Workflow de Aprovação** - Encaminhamento de ordens com permissões e status estruturados
+6. **Cálculo de MTBF/MTTR** - Computar indicadores automaticamente a partir de histórico
+7. **Alertas de Vencimento** - Notificar quando manutenção preventiva está vencida
+8. **Histórico de Manutenções** - Registrar todas as intervenções por ativo com rastreabilidade
+9. **Relatórios de Custos** - Análise de gastos por ativo, período e tipo de manutenção
+10. **Integração com RF028** - Atualizar status de ativo conforme manutenção (operacional/em manutenção/indisponível)
+
+---
+
+## 2. REGRAS DE NEGÓCIO
+
+### RN-MAN-076-01: Criação de Plano de Manutenção Preventiva
+
+**Descrição**: Um plano de manutenção preventiva deve especificar a periodicidade e checklist de atividades para um ativo. A periodicidade pode ser baseada em calendário (dias, semanas, meses) ou em contadores (horas de operação, quilometragem).
+
+**Justificativa**: Padronização dos intervalos de manutenção conforme recomendações do fabricante, normas técnicas (ISO 55000) e boas práticas de engenharia de manutenção.
+
+**Implementação**:
+```csharp
+public class PlanoManutencaoCommand
+{
+    public int IdAtivo { get; set; }
+    public string NomePlano { get; set; }
+    public TipoPeriodicidade Periodicidade { get; set; } // Calendário, Horas, Quilometragem
+    public int IntervaloDias { get; set; }
+    public int IntervaloHoras { get; set; }
+    public int IntervaloKm { get; set; }
+    public List<ChecklistItem> Checklist { get; set; }
+    public DateTime DataProximaManutenção { get; set; }
+}
+
+public void ValidarPlano(PlanoManutencaoCommand cmd)
+{
+    if (!cmd.NomePlano?.Any() ?? true) throw new ValidationException("Nome obrigatório");
+    if (cmd.IntervaloDias <= 0 && cmd.IntervaloHoras <= 0 && cmd.IntervaloKm <= 0)
+        throw new ValidationException("Defina pelo menos um tipo de intervalo");
+    if (!cmd.Checklist?.Any() ?? true) throw new ValidationException("Mínimo 1 item no checklist");
+}
+```
+
+**Exemplos**:
+- ✓ Plano válido: Compressor com manutenção a cada 30 dias OU 500 horas
+- ✗ Inválido: Plano sem checklist definido
+
+---
+
+### RN-MAN-076-02: Agendamento Automático de Manutenção Preventiva
+
+**Descrição**: Ao ativar um plano de manutenção, o sistema deve gerar automaticamente ordens de manutenção preventiva usando Hangfire para agendamento recorrente. A primeira ordem é criada imediatamente; as subsequentes seguem a periodicidade definida.
+
+**Justificativa**: Automação reduz carga administrativa e garante que manutenções preventivas nunca sejam esquecidas, aumentando confiabilidade dos ativos.
+
+**Implementação**:
+```csharp
+public class AgendadorManutencaoService
+{
+    private readonly IBackgroundJobClient _jobClient;
+
+    public void AgencharPlano(PlanoManutencao plano)
+    {
+        var proximaData = CalcularProximaData(plano);
+
+        RecurringJob.AddOrUpdate(
+            $"manutencao-{plano.Id}",
+            () => CriarOrdemManutencao(plano.Id),
+            Cron.DayInterval(plano.IntervaloDias),
+            TimeZoneInfo.Local
+        );
+
+        CriarOrdemManutencao(plano.Id); // Imediato
+    }
+
+    private void CriarOrdemManutencao(int idPlano)
+    {
+        var ordem = new OrdemServico
+        {
+            IdPlano = idPlano,
+            Tipo = TipoManutencao.Preventiva,
+            Status = StatusOrdem.Agendada,
+            DataPrevista = DateTime.Now.AddDays(3)
+        };
+        _context.OrdensServico.Add(ordem);
+        _context.SaveChanges();
+
+        PublicarEvento(new OrdemCriadaEvent { Ordem = ordem });
+    }
+}
+```
+
+**Exemplos**:
+- ✓ Plano ativo: Gera ordem a cada 30 dias automaticamente
+- ✗ Plano inativo: Não gera novas ordens
+
+---
+
+### RN-MAN-076-03: Status de Ordem de Serviço e Transições
+
+**Descrição**: Uma ordem de serviço passa por estados bem definidos: Agendada → Aprovada → Em Execução → Concluída → Fechada. Transições inválidas são rejeitadas.
+
+**Justificativa**: Controle de workflow garante que ordens sejam executadas conforme processo aprovado e permita auditoria de cada transição.
+
+**Validação**:
+```sql
+-- Estados válidos
+ALTER TABLE [OrdemServico] ADD CONSTRAINT [CK_Status_Valido]
+CHECK ([Status] IN ('Agendada', 'Aprovada', 'EmExecucao', 'Concluida', 'Fechada'));
+
+-- Transições permitidas (OrdemServico -> Status, ProximoStatus)
+-- Agendada -> Aprovada (por aprovador)
+-- Aprovada -> EmExecucao (por técnico)
+-- EmExecucao -> Concluida (por técnico)
+-- Concluida -> Fechada (por gerente)
+```
+
+**Exemplos**:
+- ✓ Transição válida: Agendada → Aprovada
+- ✗ Transição inválida: Concluída → Agendada (não reverter)
+
+---
+
+### RN-MAN-076-04: Peças e Materiais Utilizados
+
+**Descrição**: Toda peça ou material utilizado em uma manutenção deve ser registrado na ordem de serviço com quantidade, custo unitário e referência no catálogo de peças. A saída de inventário é automática ao fechar a ordem.
+
+**Justificativa**: Rastreabilidade de custos, controle de inventário e documentação para auditoria e análise de despesas.
+
+**Implementação**:
+```csharp
+public class ItemOrdemCommand
+{
+    public int IdOrdem { get; set; }
+    public int IdPeca { get; set; }
+    public int Quantidade { get; set; }
+    public decimal CustoUnitario { get; set; }
+    public string Descricao { get; set; }
+
+    public void Validar()
+    {
+        if (Quantidade <= 0) throw new ValidationException("Quantidade deve ser > 0");
+        if (CustoUnitario < 0) throw new ValidationException("Custo não pode ser negativo");
+    }
+}
+
+public void FecharOrdem(int idOrdem)
+{
+    var ordem = _context.OrdensServico.Include(x => x.Itens).First(x => x.Id == idOrdem);
+
+    foreach (var item in ordem.Itens)
+    {
+        _inventarioService.SairInventario(item.IdPeca, item.Quantidade, ordem.Id);
+    }
+
+    ordem.Status = StatusOrdem.Fechada;
+    _context.SaveChanges();
+}
+```
+
+**Exemplos**:
+- ✓ Item válido: 2 peças × R$ 150,00 = R$ 300,00 (referência: compressor-seal-123)
+- ✗ Inválido: Quantidade 0, custo negativo
+
+---
+
+### RN-MAN-076-05: Cálculo Automático de MTBF (Mean Time Between Failures)
+
+**Descrição**: MTBF é calculado como o tempo médio entre falhas consecutivas de um ativo. Fórmula: (Total Horas de Operação) / (Número de Falhas). Deve ser atualizado sempre que uma ordem corretiva é fechada.
+
+**Justificativa**: MTBF é um indicador crítico de confiabilidade. Maior MTBF indica ativo mais confiável e menor necessidade de manutenção emergencial.
+
+**Implementação**:
+```csharp
+public decimal CalcularMTBF(int idAtivo)
+{
+    var ordensCorrativas = _context.OrdensServico
+        .Where(x => x.IdAtivo == idAtivo && x.Tipo == TipoManutencao.Corretiva)
+        .OrderBy(x => x.DataFechamento)
+        .ToList();
+
+    if (ordensCorrativas.Count <= 1) return 0; // Insuficiente dados
+
+    var horasOperacao = CalcularHorasOperacao(idAtivo);
+    return horasOperacao / (decimal)ordensCorrativas.Count;
+}
+
+private decimal CalcularHorasOperacao(int idAtivo)
+{
+    var periodosOperacao = _context.HistoricoOperacao
+        .Where(x => x.IdAtivo == idAtivo && x.Status == "Operacional")
+        .ToList();
+
+    return periodosOperacao.Sum(x => (x.DataFim - x.DataInicio).TotalHours);
+}
+```
+
+**Exemplos**:
+- ✓ Ativo com 1000 horas operadas e 4 falhas: MTBF = 250 horas
+- ✗ Ativo com 1 falha: MTBF não calculável (retorna 0)
+
+---
+
+### RN-MAN-076-06: Cálculo Automático de MTTR (Mean Time To Repair)
+
+**Descrição**: MTTR é o tempo médio para reparar uma falha. Fórmula: (Total Horas de Reparo) / (Número de Falhas). Horas de reparo são do estado Em Execução até Concluída.
+
+**Justificativa**: MTTR indica eficiência da equipe de manutenção. Menor MTTR significa reparos mais rápidos e menor downtime.
+
+**Implementação**:
+```csharp
+public decimal CalcularMTTR(int idAtivo)
+{
+    var ordensCorrativas = _context.OrdensServico
+        .Where(x => x.IdAtivo == idAtivo && x.Tipo == TipoManutencao.Corretiva && x.Status == StatusOrdem.Fechada)
+        .ToList();
+
+    if (ordensCorrativas.Count == 0) return 0;
+
+    var totalHorasReparo = ordensCorrativas.Sum(x =>
+        x.DataConclusao.HasValue && x.DataInicio.HasValue
+            ? (x.DataConclusao.Value - x.DataInicio.Value).TotalHours
+            : 0
+    );
+
+    return totalHorasReparo / (decimal)ordensCorrativas.Count;
+}
+```
+
+**Exemplos**:
+- ✓ Ativo com 4 reparos (8h, 12h, 6h, 10h): MTTR = 9 horas
+- ✗ Nenhum reparo concluído: MTTR = 0
+
+---
+
+### RN-MAN-076-07: Alertas de Manutenção Vencida
+
+**Descrição**: O sistema deve monitorar ordens de manutenção preventiva agendadas. Se não forem executadas até 7 dias após a data prevista, deve gerar alerta automático e notificar responsável.
+
+**Justificativa**: Conformidade com cronograma de manutenção preventiva, evitando atrasos que comprometam a confiabilidade do ativo.
+
+**Implementação**:
+```csharp
+[Scheduled("0 9 * * *")] // Daily at 9 AM
+public async Task VerificarManutencoesvencidas()
+{
+    var ordensvencidas = _context.OrdensServico
+        .Where(x => x.Tipo == TipoManutencao.Preventiva
+            && x.Status == StatusOrdem.Agendada
+            && x.DataPrevista < DateTime.Now.AddDays(-7))
+        .ToList();
+
+    foreach (var ordem in ordensvencidas)
+    {
+        var alerta = new Alerta
+        {
+            Tipo = TipoAlerta.ManutencaoVencida,
+            IdOrdem = ordem.Id,
+            Mensagem = $"Manutenção preventiva vencida: {ordem.Descricao}",
+            Severidade = "Alta"
+        };
+        _context.Alertas.Add(alerta);
+        await _notificacaoService.NotificarAsync(ordem.IdResponsavel, alerta);
+    }
+
+    await _context.SaveChangesAsync();
+}
+```
+
+**Exemplos**:
+- ✓ Ordem prevista para 01/12/2025, hoje é 10/12/2025: Alerta disparado
+- ✗ Ordem prevista para 10/12/2025, hoje é 08/12/2025: Sem alerta
+
+---
+
+### RN-MAN-076-08: Integração com RF028 - Status de Ativo
+
+**Descrição**: Quando uma ordem de manutenção passa para "Em Execução", o status do ativo associado deve mudar para "Em Manutenção". Quando concluída, volta para "Operacional" ou "Indisponível" conforme configurado.
+
+**Justificativa**: Mantém consistência entre módulos e reflete estado real do ativo no sistema.
+
+**Implementação**:
+```csharp
+public async Task IniciarExecucaoOrdem(int idOrdem)
+{
+    var ordem = await _context.OrdensServico.FindAsync(idOrdem);
+    var ativo = await _context.Ativos.FindAsync(ordem.IdAtivo);
+
+    ordem.Status = StatusOrdem.EmExecucao;
+    ativo.Status = StatusAtivo.EmManutencao;
+    ativo.DataUltimaAlteracao = DateTime.Now;
+
+    PublicarEvento(new StatusAtivoAlteradoEvent { IdAtivo = ativo.Id, NovoStatus = StatusAtivo.EmManutencao });
+
+    await _context.SaveChangesAsync();
+}
+
+public async Task ConcluirOrdem(int idOrdem, StatusAtivo statusFinal = StatusAtivo.Operacional)
+{
+    var ordem = await _context.OrdensServico.FindAsync(idOrdem);
+    var ativo = await _context.Ativos.FindAsync(ordem.IdAtivo);
+
+    ordem.Status = StatusOrdem.Concluida;
+    ordem.DataConclusao = DateTime.Now;
+    ativo.Status = statusFinal;
+
+    PublicarEvento(new StatusAtivoAlteradoEvent { IdAtivo = ativo.Id, NovoStatus = statusFinal });
+
+    await _context.SaveChangesAsync();
+}
+```
+
+**Exemplos**:
+- ✓ Ordem iniciada: Ativo muda de Operacional → Em Manutenção
+- ✗ Ordem não iniciada: Status de ativo inalterado
+
+---
+
+### RN-MAN-076-09: Permissões e Autorização por Tipo de Ordem
+
+**Descrição**: Diferentes operações requerem permissões específicas. Aprovador pode aprovar, técnico pode executar, gerente pode fechar. Usuários sem permissão devem ter operação rejeitada.
+
+**Justificativa**: Controle de acesso baseado em função (RBAC) garante segregação de deveres e conformidade com políticas de autorização.
+
+**Validação**:
+```
+- Criar ordem: man:ordem:create
+- Aprovar ordem: man:ordem:approve (requer rol "Aprovador")
+- Executar ordem: man:ordem:execute (requer rol "Técnico")
+- Fechar ordem: man:ordem:close (requer rol "Gerente")
+- Visualizar ordem: man:ordem:read (qualquer usuário autenticado)
+```
+
+**Exemplos**:
+- ✓ Técnico executa ordem: Permissão man:ordem:execute validada
+- ✗ Técnico tenta aprovar: Rejeitado (sem permissão man:ordem:approve)
+
+---
+
+### RN-MAN-076-10: Relatório de Custos de Manutenção
+
+**Descrição**: O sistema deve gerar relatório consolidado de custos por período, ativo e tipo de manutenção. Total de custo inclui: peças/materiais + mão de obra (se registrada) + encargos.
+
+**Justificativa**: Visibilidade de gastos é essencial para orçamento, análise de ROI de ativos e identificação de oportunidades de redução de custos.
+
+**Implementação**:
+```csharp
+public class RelatorioManutencaoDto
+{
+    public int IdAtivo { get; set; }
+    public string NomeAtivo { get; set; }
+    public decimal CustoTotal { get; set; }
+    public decimal CustoMateriais { get; set; }
+    public decimal CustoMaoDeObra { get; set; }
+    public int QuantidadeOrdensPreventivas { get; set; }
+    public int QuantidadeOrdensCorretivas { get; set; }
+}
+
+public async Task<List<RelatorioManutencaoDto>> GerarRelatorio(
+    DateTime dataInicio,
+    DateTime dataFim,
+    int? idAtivo = null)
+{
+    var query = _context.OrdensServico
+        .Where(x => x.DataFechamento >= dataInicio && x.DataFechamento <= dataFim)
+        .Where(x => x.Status == StatusOrdem.Fechada);
+
+    if (idAtivo.HasValue) query = query.Where(x => x.IdAtivo == idAtivo.Value);
+
+    var ordens = await query.ToListAsync();
+
+    return ordens
+        .GroupBy(x => x.IdAtivo)
+        .Select(g => new RelatorioManutencaoDto
+        {
+            IdAtivo = g.Key,
+            NomeAtivo = g.First().Ativo.Nome,
+            CustoTotal = g.Sum(x => CalcularCustoTotal(x)),
+            CustoMateriais = g.Sum(x => x.Itens.Sum(i => i.Quantidade * i.CustoUnitario)),
+            CustoMaoDeObra = g.Sum(x => x.HorasMaoDeObra * x.CustoHoraAO),
+            QuantidadeOrdensPreventivas = g.Count(x => x.Tipo == TipoManutencao.Preventiva),
+            QuantidadeOrdensCorretivas = g.Count(x => x.Tipo == TipoManutencao.Corretiva)
+        })
+        .ToList();
+}
+```
+
+**Exemplos**:
+- ✓ Relatório dezembro 2025: Compressor = 12 preventivas (R$5k) + 3 corretivas (R$8k) = R$13k total
+- ✗ Período sem ordens fechadas: Relatório vazio
+
+---
+
+## 3. REFERÊNCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IControlIT_Legado`
+
+**Tabelas Principais**:
+
+```sql
+-- Tabela de Ordens de Manutenção
+CREATE TABLE [dbo].[OrdemManutencao](
+    [Id_Ordem] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Ativo] [int] NOT NULL,
+    [Nu_Ordem] [varchar](30) NOT NULL,
+    [Ds_Tipo] [varchar](50), -- 'Preventiva', 'Corretiva'
+    [Ds_Status] [varchar](50),
+    [Dt_Solicitacao] [datetime] NOT NULL,
+    [Dt_Prevista] [datetime],
+    [Dt_Execucao] [datetime],
+    [Dt_Fechamento] [datetime],
+    [Nu_Horas] [numeric](10,2),
+    [Vl_Total] [numeric](15,2),
+    [Id_Usuario_Criacao] [int],
+    [Dt_Criacao] [datetime],
+    CONSTRAINT [PK_OrdemManutencao] PRIMARY KEY ([Id_Ordem])
+);
+
+-- Tabela de Itens de Manutenção
+CREATE TABLE [dbo].[OrdemManutencaoItem](
+    [Id_Item] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Ordem] [int] NOT NULL,
+    [Id_Peca] [int],
+    [Ds_Item] [varchar](200),
+    [Qt_Quantidade] [int],
+    [Vl_Unitario] [numeric](15,2),
+    [Vl_Total] [numeric](15,2),
+    CONSTRAINT [PK_OrdemManutencaoItem] PRIMARY KEY ([Id_Item]),
+    CONSTRAINT [FK_Item_Ordem] FOREIGN KEY ([Id_Ordem]) REFERENCES [OrdemManutencao]([Id_Ordem])
+);
+
+-- Tabela de Planos de Manutenção
+CREATE TABLE [dbo].[PlanoManutencao](
+    [Id_Plano] [int] IDENTITY(1,1) NOT NULL,
+    [Id_Ativo] [int] NOT NULL,
+    [Ds_Plano] [varchar](100),
+    [Nu_Intervalo_Dias] [int],
+    [Fl_Ativo] [bit],
+    [Dt_Proxima] [datetime],
+    CONSTRAINT [PK_PlanoManutencao] PRIMARY KEY ([Id_Plano]),
+    CONSTRAINT [FK_Plano_Ativo] FOREIGN KEY ([Id_Ativo]) REFERENCES [Ativo]([Id_Ativo])
+);
+```
+
+**Campos Importantes**:
+
+| Campo Legado | Descrição | Uso no Modernizado |
+|--------------|-----------|-------------------|
+| `[Id_Ordem]` | ID único | Mapeado para OrdemServico.Id |
+| `[Nu_Ordem]` | Número sequencial | Mantido como NumeracaoOrdem |
+| `[Ds_Status]` | Status textual | Enum StatusOrdem (Agendada, Aprovada, etc.) |
+| `[Vl_Total]` | Valor total da ordem | Recalculado como soma de Itens + MãoDeObra |
+| `[Nu_Horas]` | Horas registradas | Migrado para HorasExecutadas |
+| `[Id_Peca]` | Referência de peça | FK para Peca, com validação de catálogo |
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descrição | Migração |
+|-----------|-----------|----------|
+| `pa_manutencao_listar` | Listar ordens com filtros | Substitui por Query com LINQ + paginação |
+| `pa_manutencao_gerar_agenda` | Gerar próximas ordens | Substitui por RecurringJob (Hangfire) |
+| `pa_atualizar_status_ativo` | Atualiza status quando ordem muda | Integrado via Event Sourcing/Domain Events |
+
+### 3.3 Telas ASPX
+
+| Pagina | Descrição | Tela Moderna |
+|--------|-----------|--------------|
+| `OrdemManutencao.aspx` | Listagem de ordens | `/manutenção/ordens` (Angular) |
+| `OrdemManutencaoDetalhes.aspx` | Detalhes e edição | `/manutenção/ordens/:id` |
+| `PlanoManutencao.aspx` | Gestão de planos | `/manutenção/planos` |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSManutencao.asmx.vb`
+
+| Método | Descrição | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `ListarOrdens()` | Retorna ordens com filtros | `GET /api/manutencao/ordens?skip=0&take=20` |
+| `CriarOrdem()` | Cria nova ordem | `POST /api/manutencao/ordens` |
+| `AtualizarStatus()` | Altera status | `PATCH /api/manutencao/ordens/{id}/status` |
+| `CalcularMTBF()` | Calcula MTBF do ativo | `GET /api/manutencao/ativos/{id}/mtbf` |
+
+---
+
+## 4. INTEGRAÇÕES OBRIGATÓRIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `MANUTENCAO_PREVENTIVA_CORRETIVA`
+
+**Configuração**:
+```json
+{
+    "featureKey": "MANUTENCAO_PREVENTIVA_CORRETIVA",
+    "nome": "Manutenção Preventiva e Corretiva",
+    "descricao": "Gestão completa de ordens e planos de manutenção com agendamento automático",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "configuracoesAdicionais": {
+        "hangfireAgendamentoAtivo": true,
+        "alertasAutomaticosAtivo": true
+    }
+}
+```
+
+**Nota**: Quando desabilitado, agendamentos Hangfire não são criados e alertas não são disparados. Ordens existentes continuam operacionais.
+
+---
+
+### 4.2 Internacionalização (i18n)
+
+**Chaves de Tradução**:
+
+```json
+{
+    "manutencao": {
+        "titulo": "Manutenção",
+        "menu": {
+            "ordens": "Ordens de Serviço",
+            "planos": "Planos de Manutenção"
+        },
+        "ordens": {
+            "title": "Ordens de Serviço",
+            "form": {
+                "idAtivo": "Ativo",
+                "tipo": "Tipo de Manutenção",
+                "status": "Status",
+                "dataPrevista": "Data Prevista",
+                "descricao": "Descrição",
+                "responsavel": "Responsável"
+            },
+            "messages": {
+                "criacaoSucesso": "Ordem criada com sucesso",
+                "atualizacaoSucesso": "Ordem atualizada com sucesso",
+                "aprovacaoSucesso": "Ordem aprovada",
+                "erroAprovacao": "Erro ao aprovar ordem"
+            },
+            "validation": {
+                "ativoObrigatorio": "Ativo é obrigatório",
+                "tipoObrigatorio": "Tipo de manutenção é obrigatório",
+                "dataInvalida": "Data prevista não pode ser no passado"
+            }
+        },
+        "planos": {
+            "title": "Planos de Manutenção",
+            "form": {
+                "nomePlano": "Nome do Plano",
+                "periodicidade": "Periodicidade",
+                "intervalo": "Intervalo",
+                "checklist": "Checklist de Atividades"
+            },
+            "messages": {
+                "criacaoSucesso": "Plano criado com sucesso",
+                "agendar": "Plano agendado no sistema"
+            }
+        },
+        "alertas": {
+            "manutencaoVencida": "Manutenção preventiva vencida",
+            "proximoVencimento": "Manutenção próxima do vencimento (5 dias)"
+        },
+        "relatorios": {
+            "custosManutenção": "Relatório de Custos",
+            "mtbf": "Confiabilidade (MTBF)",
+            "mttr": "Eficiência (MTTR)"
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operações Auditadas**:
+
+| Operação | Código | Dados Registrados |
+|----------|--------|-------------------|
+| Criar Ordem | `MAN_ORDEM_CREATE` | ID, Tipo, ID Ativo, Status Inicial |
+| Aprovar Ordem | `MAN_ORDEM_APPROVE` | ID Ordem, Usuário Aprovador, Data Aprovação |
+| Iniciar Execução | `MAN_ORDEM_EXECUTE` | ID Ordem, Técnico, Data Início, Status Anterior/Novo |
+| Fechar Ordem | `MAN_ORDEM_CLOSE` | ID Ordem, Gerente, Data Fechamento, Custo Total |
+| Adicionar Peça | `MAN_ITEM_CREATE` | ID Ordem, ID Peça, Quantidade, Custo |
+| Criar Plano | `MAN_PLANO_CREATE` | ID Ativo, Nome Plano, Periodicidade |
+| Ativar Plano | `MAN_PLANO_ACTIVATE` | ID Plano, Data Ativação |
+
+**Retenção**: 7 anos (conforme Lei LGPD e normas de auditoria ISO 55000)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissões**:
+
+| Permissão | Descrição | Perfis |
+|-----------|-----------|--------|
+| `man:ordem:create` | Criar ordem de manutenção | Gerente, Técnico, Admin |
+| `man:ordem:read` | Visualizar ordem | Todos os usuários |
+| `man:ordem:update` | Editar ordem | Gerente, Admin |
+| `man:ordem:approve` | Aprovar ordem | Aprovador, Gerente, Admin |
+| `man:ordem:execute` | Executar/iniciar ordem | Técnico, Admin |
+| `man:ordem:close` | Fechar ordem | Gerente, Admin |
+| `man:plano:create` | Criar plano | Gerente, Admin |
+| `man:plano:read` | Visualizar plano | Todos os usuários |
+| `man:plano:update` | Editar plano | Gerente, Admin |
+| `man:plano:activate` | Ativar plano | Gerente, Admin |
+| `man:relatorio:read` | Visualizar relatórios | Gerente, Admin |
+| `man:peca:read` | Consultar peças | Técnico, Gerente, Admin |
+
+**Nota**: Técnico pode criar ordens corretivas imediatamente, mas ordens preventivas requerem aprovação. Relatórios são restritos a Gerente+.
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal - Ordens de Serviço
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/manutencao/ordens` | Listar ordens com filtros | `man:ordem:read` |
+| GET | `/api/manutencao/ordens/{id}` | Obter ordem por ID | `man:ordem:read` |
+| POST | `/api/manutencao/ordens` | Criar ordem (preventiva/corretiva) | `man:ordem:create` |
+| PUT | `/api/manutencao/ordens/{id}` | Atualizar ordem | `man:ordem:update` |
+| DELETE | `/api/manutencao/ordens/{id}` | Inativar ordem | `man:ordem:delete` |
+
+### 5.2 Operações de Workflow
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| PATCH | `/api/manutencao/ordens/{id}/approve` | Aprovar ordem | `man:ordem:approve` |
+| PATCH | `/api/manutencao/ordens/{id}/execute` | Iniciar execução | `man:ordem:execute` |
+| PATCH | `/api/manutencao/ordens/{id}/close` | Fechar ordem | `man:ordem:close` |
+| POST | `/api/manutencao/ordens/{id}/itens` | Adicionar peça/material | `man:ordem:update` |
+
+### 5.3 Planos de Manutenção
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/manutencao/planos` | Listar planos | `man:plano:read` |
+| GET | `/api/manutencao/planos/{id}` | Obter plano por ID | `man:plano:read` |
+| POST | `/api/manutencao/planos` | Criar plano | `man:plano:create` |
+| PUT | `/api/manutencao/planos/{id}` | Atualizar plano | `man:plano:update` |
+| PATCH | `/api/manutencao/planos/{id}/agendar` | Agendar/ativar plano | `man:plano:activate` |
+| DELETE | `/api/manutencao/planos/{id}` | Desativar plano | `man:plano:activate` |
+
+### 5.4 Indicadores e Relatórios
+
+| Método | Endpoint | Descrição | Permissão |
+|--------|----------|-----------|-----------|
+| GET | `/api/manutencao/ativos/{id}/mtbf` | Calcular MTBF | `man:relatorio:read` |
+| GET | `/api/manutencao/ativos/{id}/mttr` | Calcular MTTR | `man:relatorio:read` |
+| GET | `/api/manutencao/relatorio/custos` | Relatório de custos | `man:relatorio:read` |
+| GET | `/api/manutencao/relatorio/historico` | Histórico de manutenções | `man:relatorio:read` |
+| GET | `/api/manutencao/alertas` | Listar alertas ativos | `man:ordem:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Manutenção Preventiva (Agendada)
+
+```
+Usuário acessa /manutenção/planos
+    |
+    v
+Cria novo Plano com Periodicidade (30 dias)
+    |
+    v
+Sistema agenda no Hangfire
+    |
+    v (A cada 30 dias)
+Hangfire cria Ordem Preventiva (Status: Agendada)
+    |
+    v
+Ordem enviada para Aprovador
+    |
+    +--- Aprovador aprova ---> Status: Aprovada
+    |
+    +--- Aprovador nega ---> Status: Rejeitada (Fim)
+    |
+    v (se Aprovada)
+Técnico executa Ordem
+    |
+    v
+Status: Em Execução, Ativo passa para "Em Manutenção"
+    |
+    v
+Técnico registra Peças/Materiais utilizados
+    |
+    v
+Técnico marca como Concluída
+    |
+    v
+Status: Concluída, Ativo volta para "Operacional"
+    |
+    v
+Gerente fecha Ordem (Status: Fechada)
+    |
+    v
+Auditoria registra MTBF/MTTR atualizado
+    |
+    v
+Fim
+```
+
+### 6.2 Fluxo de Manutenção Corretiva (Emergencial)
+
+```
+Ativo falha / Técnico detecta problema
+    |
+    v
+Técnico cria Ordem Corretiva via /api/manutencao/ordens
+    |
+    v
+Status: Agendada (sem necessidade de aprovação)
+    |
+    v
+Técnico imediatamente inicia execução
+    |
+    v
+Status: Em Execução, Ativo passa para "Em Manutenção"
+    |
+    v
+Técnico registra Peças/Materiais utilizados
+    |
+    v
+Técnico marca como Concluída
+    |
+    v
+Status: Concluída, Ativo volta para "Operacional"
+    |
+    v
+Gerente revisa e fecha Ordem (Status: Fechada)
+    |
+    v
+Auditoria registra falha, MTBF/MTTR atualizado
+    |
+    v
+Sistema envia notificação de falha para análise
+    |
+    v
+Fim
+```
+
+### 6.3 Fluxo de Alerta de Manutenção Vencida
+
+```
+Sistema executa verificação diária (9:00 AM)
+    |
+    v
+Busca ordens Preventivas com Status "Agendada"
+    |
+    v
+Verifica: DataPrevista < (Hoje - 7 dias) ?
+    |
+    +--- NÃO ---> Sem alerta, fim
+    |
+    v (SIM)
+Cria Alerta tipo "ManutencaoVencida" (Severidade: Alta)
+    |
+    v
+Notificação enviada para Responsável
+    |
+    v
+Email: "Manutenção preventiva vencida: [Ativo] - [DataPrevista]"
+    |
+    v
+Alerta aparece no Dashboard do usuário
+    |
+    v
+Usuário clica e é direcionado para Ordem
+    |
+    v
+Fim
+```
+
+---
+
+## 7. SEGURANÇA
+
+### 7.1 Proteções Implementadas
+
+| Proteção | Descrição |
+|----------|-----------|
+| **Validação de Permissões** | Cada operação valida RBAC antes de executar (middleware de autorização) |
+| **Validação de Entrada** | Todos os campos de entrada validam tipo, tamanho e formato |
+| **SQL Injection Prevention** | Uso de Parameterized Queries em LINQ, sem concatenação SQL |
+| **CSRF Token** | Formulários Angular incluem X-CSRF-Token validado no backend |
+| **Auditoria Completa** | Todas as operações CUD registradas com usuário, timestamp e dados antes/depois |
+| **Isolamento Multi-tenancy** | Queries filtradas por ClienteId; usuários veem apenas dados seu cliente |
+| **Soft Delete** | Ordens não são deletadas fisicamente; Fl_Excluido = 1 com data |
+| **Criptografia em Trânsito** | HTTPS/TLS para todas comunicações API |
+| **Rate Limiting** | Limite de 100 req/min por usuário em endpoints críticos |
+| **Logging de Segurança** | Tentativas de acesso não autorizado registradas para análise |
+
+### 7.2 Testes de Segurança Obrigatórios
+
+- [ ] SQL Injection: Testar com ' OR '1'='1 em todos os filtros
+- [ ] XSS: Testar com <script>alert('xss')</script> em campos texto
+- [ ] CSRF: Tentar requisição POST sem token válido deve ser rejeitada
+- [ ] Validação de Permissões: Técnico não consegue aprovar (falta permissão man:ordem:approve)
+- [ ] Acesso Negado: Usuário do cliente A não vê dados do cliente B
+- [ ] Validação de Entrada: Quantidade negativa deve ser rejeitada
+- [ ] Integridade de Dados: Status inválido deve ser rejeitado
+- [ ] Rate Limiting: 101ª requisição em 1 min deve retornar 429
+- [ ] Auditoria: Toda operação deve deixar rastro em Auditoria
+- [ ] Dados Sensíveis: Não aparecer em logs/erros; apenas ID anônimo
+
+---
+
+## 8. MÉTRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medição |
+|-----|------|---------|
+| **MTBF (Confiabilidade)** | > 500 horas | (Total Horas Operação) / (Nº Falhas) |
+| **MTTR (Eficiência)** | < 8 horas | (Total Horas Reparo) / (Nº Reparos) |
+| **Disponibilidade de Ativo** | > 95% | ((Total Horas - Horas Manutenção) / Total Horas) × 100 |
+| **Cumprimento Agenda Preventiva** | > 90% | (Ordens Preventivas Executadas / Agendadas) × 100 |
+| **Custo Médio por Ordem** | < R$ 5.000 | Soma Custos / Número Ordens |
+| **Tempo Médio de Aprovação** | < 2 dias | Data Aprovação - Data Solicitação |
+| **Taxa de Rejeição** | < 5% | (Ordens Rejeitadas / Total) × 100 |
+| **Tempo de Resposta API** | < 500ms | Latência P95 de requisições |
+| **Uptime do Sistema** | > 99.5% | Horas Disponível / Horas Totais × 100 |
+| **Precisão de Custos** | 100% | Custo Registrado = Peças + MO (diferença < 1%) |
+
+### 8.2 Alertas
+
+| Alerta | Condição | Ação |
+|--------|----------|------|
+| **MTBF Crítico** | MTBF < 100 horas | Investigar causa de falhas frequentes; análise de RCM |
+| **MTTR Alto** | MTTR > 12 horas | Revisar procedimentos; aumentar treinamento técnico |
+| **Disponibilidade Baixa** | Disponibilidade < 90% | Revisar plano de manutenção; aumentar frequência preventiva |
+| **Manutenção Vencida** | DataPrevista < (Hoje - 7 dias) | Notificar responsável; executar ordem ou reprogramar |
+| **Custo Anormal** | Custo > (Média × 2) | Revisar ordem; validar preços de peças |
+| **Falha na Aprovação** | Ordem em Aprovação > 5 dias | Escalar para gerente; liberar sem aprovação se crítico |
+| **Timeout API** | Resposta > 5 segundos | Investigar performance; verificar índices banco dados |
+| **Erro de Integração** | Falha ao atualizar status ativo | Retry automático; alertar DevOps |
+| **Peça Indisponível** | Material não encontrado em inventário | Avisar técnico; gerar requisição de compra |
+| **Acesso Não Autorizado** | 5 tentativas falhas | Bloquear usuário por 15 min; revisar tentativa |
+
+---
+
+## 9. PRÓXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF076](./MD-RF076-Manutencao-Preventiva-e-Corretiva.md)
+2. **Casos de Uso**: Criar [UC-RF076](./UC-RF076-Manutencao-Preventiva-e-Corretiva.md) com 5 UCs (listar, criar, aprovar, executar, fechar)
+3. **Fluxos de Trabalho**: Criar [WF-RF076](./WF-RF076-Manutencao-Preventiva-e-Corretiva.md) com wireframes e componentes
+4. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml) com histórias de usuário testáveis
+5. **Implementação Backend**: Commands (Criar, Aprovar, Executar, Fechar Ordem), Queries (Listar, Detalhar), Handlers
+6. **Implementação Frontend**: Telas Angular, componentes de listagem, formulários, workflow visual
+7. **Testes Automatizados**: Cenários em 3 camadas (Sistema, Backend, E2E)
+8. **Documentação de Teste**: TC-RF076-SISTEMA.md, TC-RF076-BACKEND.md, TC-RF076-E2E.md
+
+---
+
+## CHANGELOG
+
+| Versão | Data | Descrição | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versão inicial com 10 regras, 13 endpoints, 4 integrações obrigatórias | Claude Architect |
+
+---
+
+**Última Atualização**: 2025-12-28
+**Autor**: IControlIT Architect Agent
+**Revisão**: Pendente
+**Status Completude**: 100% - Documento RF076 conforme template RF.md

@@ -1,0 +1,723 @@
+rf_id: RF088
+rf_title: "Aprovações e Workflows"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+epic: "EPIC003-CAD-Cadastros-Base"
+fase: "Fase 2 - Cadastros e Serviços Transversais"
+
+# ==============================================================================
+# ESCOPO
+# ==============================================================================
+
+escopo:
+  dentro:
+    - "Designer visual de workflows (drag-and-drop, sem código)"
+    - "Configuração de estados customizados (não hardcoded)"
+    - "Transições condicionais (regras de negócio configuráveis)"
+    - "Aprovação sequencial (um após o outro)"
+    - "Aprovação paralela (múltiplos aprovadores com quórum)"
+    - "Alçada de autorização (por valor, categoria, departamento)"
+    - "Delegação de aprovação (temporária, com expiração)"
+    - "SLA de aprovação (alertas T-24h, escalação T+0)"
+    - "Notificações multi-canal (e-mail, SMS, in-app)"
+    - "Histórico imutável (auditoria 7 anos LGPD)"
+    - "Dashboard de pendências (por aprovador)"
+    - "Controle de acesso RBAC + Policies dinâmicas"
+    - "Isolamento multi-tenant (aprovações por empresa)"
+    - "Auditoria completa de todas as operações"
+
+  fora:
+    - "Interface visual específica (apenas contrato de API)"
+    - "Tecnologia, framework ou linguagem"
+    - "Layout, UX ou identidade visual"
+    - "Estratégia de deploy ou infraestrutura"
+    - "Aprovações em sistemas externos (integração futura)"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF088-001"
+    titulo: "Workflow deve ter pelo menos um estado inicial e um final"
+    descricao: |
+      Todo workflow criado deve ter obrigatoriamente um estado inicial (ponto de entrada)
+      e um ou mais estados finais (onde documento fica em repouso permanente).
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "estrutural"
+      mensagem_erro: "Workflow deve ter exatamente um estado inicial e pelo menos um estado final"
+      http_code: 400
+
+  - id: "RN-RF088-002"
+    titulo: "Transição condicional deve bloquear movimento se condição não atende"
+    descricao: |
+      Quando uma transição é configurada com condição (ex: "valor < 100000"),
+      o sistema deve bloquear a ação se a condição não for atendida.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "regra_condicional"
+      mensagem_erro: "Transição bloqueada: condição não atendida"
+      http_code: 400
+
+  - id: "RN-RF088-003"
+    titulo: "Aprovação paralela requer quórum conforme configuração"
+    descricao: |
+      Quando uma transição é configurada com múltiplos aprovadores paralelos,
+      a movimentação deve respeitar o quórum configurado: "qualquer um aprova",
+      "todos devem aprovar", "2 de 3 aprovam", etc.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "quorum"
+      mensagem_erro: "Quórum não atingido para aprovação"
+      http_code: 400
+
+  - id: "RN-RF088-004"
+    titulo: "Delegação deve respeitar data de expiração e ser auditada"
+    descricao: |
+      Quando um aprovador delega sua responsabilidade, a delegação é válida apenas
+      até a data de expiração especificada. Após expiração, aprovações retornam ao
+      aprovador original. Todas as delegações são registradas em auditoria.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "temporal"
+      mensagem_erro: "Delegação expirada ou inválida"
+      http_code: 400
+
+  - id: "RN-RF088-005"
+    titulo: "SLA de Aprovação dispara alerta em T-24h e escalação em T+0"
+    descricao: |
+      Cada aprovação pendente tem SLA configurado (ex: 48 horas). Sistema dispara
+      alerta de e-mail em T-24h (24 horas antes do vencimento). Se SLA vence (T+0),
+      aprovação é automaticamente escalada para supervisor do aprovador.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "temporal_automatica"
+      mensagem_erro: "SLA vencido - aprovação escalada"
+      http_code: null
+
+  - id: "RN-RF088-006"
+    titulo: "Aprovador só pode exercer aprovação se tiver permissão RBAC explícita"
+    descricao: |
+      Um usuário só pode executar uma ação de aprovação se sua role incluir
+      explicitamente a permissão workflow:[recurso]:approve. Mesmo que seja o
+      aprovador designado no workflow, sem permissão RBAC não consegue executar.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "permissao_rbac"
+      mensagem_erro: "Permissão negada"
+      http_code: 403
+
+  - id: "RN-RF088-007"
+    titulo: "Estados finais são imutáveis; documentos não podem sair de estado final"
+    descricao: |
+      Quando um documento chega a um estado final (Aprovado, Rejeitado, Cancelado),
+      ele permanece imutável. Não há transição de saída possível.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "estado_final"
+      mensagem_erro: "Documento em estado final não pode transicionar"
+      http_code: 400
+
+  - id: "RN-RF088-008"
+    titulo: "Notificações devem incluir contexto mínimo (Who, What, When, Why, How)"
+    descricao: |
+      Toda notificação enviada (e-mail, SMS, in-app) deve incluir informações essenciais:
+      quem deve agir, qual é o documento/ação, prazo, por que está pendente e como tomar ação.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "estrutura_notificacao"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF088-009"
+    titulo: "Rejeição é irrevogável; documento volta ao estado anterior"
+    descricao: |
+      Quando um aprovador rejeita um documento em workflow, a rejeição é irrevogável
+      e o documento retorna automaticamente ao estado imediatamente anterior.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "irrevogabilidade"
+      mensagem_erro: "Rejeição não pode ser desfeita"
+      http_code: 400
+
+  - id: "RN-RF088-010"
+    titulo: "Histórico de Aprovação deve ser imutável e conservado 7 anos (LGPD)"
+    descricao: |
+      Uma vez criada, uma entrada no histórico de aprovação (AuditAprovacao) nunca
+      pode ser alterada ou deletada. Deleção física é proibida. Dados de aprovação
+      devem ser retidos por mínimo 7 anos para conformidade LGPD.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "imutabilidade"
+      mensagem_erro: "Histórico de aprovação não pode ser modificado"
+      http_code: 403
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "workflow:design:create"
+    descricao: "Criar workflows"
+    roles_autorizadas:
+      - "Administrador"
+      - "Analista Processos"
+    endpoints:
+      - "POST /api/workflows"
+
+  - permission_code: "workflow:design:read"
+    descricao: "Visualizar workflows"
+    roles_autorizadas:
+      - "Todos"
+    endpoints:
+      - "GET /api/workflows"
+      - "GET /api/workflows/{id}"
+
+  - permission_code: "workflow:design:update"
+    descricao: "Editar workflows"
+    roles_autorizadas:
+      - "Administrador"
+      - "Analista Processos"
+    endpoints:
+      - "PUT /api/workflows/{id}"
+      - "POST /api/workflows/{id}/states"
+      - "POST /api/workflows/{id}/transitions"
+
+  - permission_code: "workflow:design:delete"
+    descricao: "Deletar workflows"
+    roles_autorizadas:
+      - "Administrador"
+    endpoints:
+      - "DELETE /api/workflows/{id}"
+
+  - permission_code: "workflow:approval:read"
+    descricao: "Visualizar aprovações"
+    roles_autorizadas:
+      - "Todos"
+    endpoints:
+      - "GET /api/approvals"
+      - "GET /api/approvals/{id}"
+
+  - permission_code: "workflow:approval:approve"
+    descricao: "Executar aprovação"
+    roles_autorizadas:
+      - "Aprovadores (role-based)"
+    endpoints:
+      - "POST /api/approvals/{id}/approve"
+
+  - permission_code: "workflow:approval:reject"
+    descricao: "Rejeitar documento"
+    roles_autorizadas:
+      - "Aprovadores (role-based)"
+    endpoints:
+      - "POST /api/approvals/{id}/reject"
+
+  - permission_code: "workflow:delegation:create"
+    descricao: "Criar delegação"
+    roles_autorizadas:
+      - "Aprovadores"
+    endpoints:
+      - "POST /api/delegations"
+
+  - permission_code: "workflow:delegation:revoke"
+    descricao: "Revogar delegação própria"
+    roles_autorizadas:
+      - "Todos (sua delegação)"
+    endpoints:
+      - "DELETE /api/delegations/{id}"
+
+  - permission_code: "workflow:delegation:admin"
+    descricao: "Revogar delegação de outros"
+    roles_autorizadas:
+      - "Administrador"
+    endpoints:
+      - "DELETE /api/delegations/{id}"
+
+  - permission_code: "workflow:dashboard:view"
+    descricao: "Visualizar dashboard de pendências"
+    roles_autorizadas:
+      - "Todos"
+    endpoints:
+      - "GET /api/dashboard/pending-approvals"
+
+  - permission_code: "workflow:sla:configure"
+    descricao: "Configurar SLA"
+    roles_autorizadas:
+      - "Administrador"
+    endpoints:
+      - "PUT /api/sla/config"
+
+  - permission_code: "workflow:sla:view"
+    descricao: "Visualizar SLA compliance"
+    roles_autorizadas:
+      - "Analista"
+      - "Administrador"
+    endpoints:
+      - "GET /api/sla/dashboard"
+      - "GET /api/sla/escalations"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  # Workflows
+  - method: "GET"
+    route: "/api/workflows"
+    descricao: "Listar workflows"
+    autenticacao: true
+    authorization_policy: "workflow:design:read"
+    request_dto: null
+    response_dto: "PaginatedListDto<WorkflowDefinitionDto>"
+
+  - method: "GET"
+    route: "/api/workflows/{id}"
+    descricao: "Obter workflow por ID"
+    autenticacao: true
+    authorization_policy: "workflow:design:read"
+    request_dto: null
+    response_dto: "WorkflowDefinitionDto"
+
+  - method: "POST"
+    route: "/api/workflows"
+    descricao: "Criar workflow"
+    autenticacao: true
+    authorization_policy: "workflow:design:create"
+    request_dto: "CreateWorkflowCommand"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/workflows/{id}"
+    descricao: "Atualizar workflow"
+    autenticacao: true
+    authorization_policy: "workflow:design:update"
+    request_dto: "UpdateWorkflowCommand"
+    response_dto: "void"
+
+  - method: "DELETE"
+    route: "/api/workflows/{id}"
+    descricao: "Deletar workflow"
+    autenticacao: true
+    authorization_policy: "workflow:design:delete"
+    request_dto: null
+    response_dto: "void"
+
+  # Aprovações
+  - method: "GET"
+    route: "/api/approvals"
+    descricao: "Listar aprovações do usuário"
+    autenticacao: true
+    authorization_policy: "workflow:approval:read"
+    request_dto: null
+    response_dto: "PaginatedListDto<ApprovalInstanceDto>"
+
+  - method: "GET"
+    route: "/api/approvals/{id}"
+    descricao: "Obter detalhes da aprovação"
+    autenticacao: true
+    authorization_policy: "workflow:approval:read"
+    request_dto: null
+    response_dto: "ApprovalInstanceDto"
+
+  - method: "POST"
+    route: "/api/approvals/{id}/approve"
+    descricao: "Aprovar documento"
+    autenticacao: true
+    authorization_policy: "workflow:approval:approve"
+    request_dto: "ApproveCommand"
+    response_dto: "void"
+
+  - method: "POST"
+    route: "/api/approvals/{id}/reject"
+    descricao: "Rejeitar documento"
+    autenticacao: true
+    authorization_policy: "workflow:approval:reject"
+    request_dto: "RejectCommand"
+    response_dto: "void"
+
+  # Delegações
+  - method: "GET"
+    route: "/api/delegations"
+    descricao: "Listar delegações do usuário"
+    autenticacao: true
+    authorization_policy: "workflow:delegation:create"
+    request_dto: null
+    response_dto: "List<DelegationDto>"
+
+  - method: "POST"
+    route: "/api/delegations"
+    descricao: "Criar delegação"
+    autenticacao: true
+    authorization_policy: "workflow:delegation:create"
+    request_dto: "CreateDelegationCommand"
+    response_dto: "Guid"
+
+  - method: "DELETE"
+    route: "/api/delegations/{id}"
+    descricao: "Revogar delegação"
+    autenticacao: true
+    authorization_policy: "workflow:delegation:revoke"
+    request_dto: null
+    response_dto: "void"
+
+  # SLA
+  - method: "GET"
+    route: "/api/sla/config"
+    descricao: "Obter configurações de SLA"
+    autenticacao: true
+    authorization_policy: "workflow:sla:configure"
+    request_dto: null
+    response_dto: "SlaConfigurationDto"
+
+  - method: "PUT"
+    route: "/api/sla/config"
+    descricao: "Atualizar SLA"
+    autenticacao: true
+    authorization_policy: "workflow:sla:configure"
+    request_dto: "UpdateSlaConfigCommand"
+    response_dto: "void"
+
+  - method: "GET"
+    route: "/api/sla/dashboard"
+    descricao: "Dashboard SLA compliance"
+    autenticacao: true
+    authorization_policy: "workflow:sla:view"
+    request_dto: null
+    response_dto: "SlaDashboardDto"
+
+  - method: "GET"
+    route: "/api/dashboard/pending-approvals"
+    descricao: "Aprovações pendentes por aprovador"
+    autenticacao: true
+    authorization_policy: "workflow:dashboard:view"
+    request_dto: null
+    response_dto: "PendingApprovalsDashboardDto"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Tempo Médio de Ciclo"
+    descricao: "Tempo médio de ciclo de aprovação (DataAprovacao - DataCriacao)"
+    meta: "< 4 horas"
+    log_obrigatorio: true
+
+  - nome: "SLA Compliance"
+    descricao: "Percentual de aprovações dentro do SLA"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Rejeição"
+    descricao: "Percentual de aprovações rejeitadas"
+    meta: "5-15%"
+    log_obrigatorio: true
+
+  - nome: "Tempo de Escalação"
+    descricao: "Tempo entre SLA vencido e escalação executada"
+    meta: "< 30 minutos"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Delegação"
+    descricao: "Percentual de aprovações delegadas"
+    meta: "10-30%"
+    log_obrigatorio: true
+
+  - nome: "Notificação Delivery Rate"
+    descricao: "Taxa de entrega de notificações (e-mails entregues / enviados)"
+    meta: ">= 99%"
+    log_obrigatorio: true
+
+  - nome: "Dashboard Load Time"
+    descricao: "Tempo de carregamento do dashboard de pendências"
+    meta: "< 2 segundos"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "SLA Crítico"
+    threshold: "Aprovação com 1 hora para vencer"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "sms"
+      - "in-app"
+
+  - evento: "Aprovador Indisponível"
+    threshold: "Sem ação em 24h + sem delegação"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+
+  - evento: "Fila de Pendências"
+    threshold: "> 50 documentos aguardando aprovação"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+  - evento: "Taxa de Rejeição Alta"
+    threshold: "> 30% em período"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+
+  - evento: "Tentativa Não Autorizada"
+    threshold: "Usuário tenta aprovar documento não atribuído"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "audit_log"
+
+  - evento: "Histórico Crítico"
+    threshold: "Auditoria table > 90% capacidade"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+
+# ==============================================================================
+# INTEGRAÇÕES OBRIGATÓRIAS
+# ==============================================================================
+
+integracoes_obrigatorias:
+  - tipo: "feature_flags"
+    feature_key: "WORKFLOW_APPROVALS"
+    subfeatures:
+      - "WORKFLOW_DESIGNER"
+      - "WORKFLOW_SLA"
+      - "WORKFLOW_PARALLEL_APPROVAL"
+      - "WORKFLOW_NOTIFICATIONS"
+
+  - tipo: "i18n"
+    chaves_obrigatorias:
+      - "workflows.common.*"
+      - "workflows.designer.*"
+      - "workflows.approvals.*"
+      - "workflows.delegations.*"
+      - "workflows.sla.*"
+      - "workflows.messages.*"
+      - "workflows.validation.*"
+      - "workflows.errors.*"
+    idiomas:
+      - "pt-BR"
+      - "en-US"
+      - "es-ES"
+
+  - tipo: "auditoria"
+    operacoes:
+      - "WFL_WORKFLOW_CREATE"
+      - "WFL_WORKFLOW_UPDATE"
+      - "WFL_WORKFLOW_DELETE"
+      - "WFL_APPROVAL_CREATE"
+      - "WFL_APPROVAL_APPROVE"
+      - "WFL_APPROVAL_REJECT"
+      - "WFL_DELEGATION_CREATE"
+      - "WFL_DELEGATION_REVOKE"
+      - "WFL_SLA_ESCALATE"
+      - "WFL_APPROVAL_UNAUTHORIZED_ATTEMPT"
+    retencao: "7 anos (LGPD Lei 13.709/2018)"
+
+  - tipo: "rbac"
+    nota_critica: "Aprovações usam Policy (regra dinâmica), não apenas Role (perfil estático)"
+
+# ==============================================================================
+# ESTADOS DA ENTIDADE
+# ==============================================================================
+
+estados:
+  workflow_definition:
+    - nome: "Draft"
+      descricao: "Workflow em edição, não publicado"
+      final: false
+    - nome: "Active"
+      descricao: "Workflow ativo, pode ser usado em aprovações"
+      final: false
+    - nome: "Inactive"
+      descricao: "Workflow desativado temporariamente"
+      final: false
+    - nome: "Archived"
+      descricao: "Workflow arquivado (apenas histórico)"
+      final: true
+
+  approval_instance:
+    - nome: "Pending"
+      descricao: "Aguardando ação do aprovador"
+      final: false
+    - nome: "Approved"
+      descricao: "Aprovado pelo aprovador"
+      final: true
+    - nome: "Rejected"
+      descricao: "Rejeitado pelo aprovador"
+      final: true
+    - nome: "Delegated"
+      descricao: "Delegado para outro usuário"
+      final: false
+    - nome: "Escalated"
+      descricao: "SLA vencido, escalado para supervisor"
+      final: false
+    - nome: "Expired"
+      descricao: "SLA vencido sem escalação"
+      final: true
+
+# ==============================================================================
+# EVENTOS DE DOMÍNIO
+# ==============================================================================
+
+eventos_dominio:
+  - nome: "workflow.created"
+    quando: "Após criação de workflow"
+    payload:
+      - "WorkflowId"
+      - "Name"
+      - "CreatedBy"
+
+  - nome: "workflow.updated"
+    quando: "Após atualização de workflow"
+    payload:
+      - "WorkflowId"
+      - "ChangedFields"
+
+  - nome: "approval.created"
+    quando: "Após criação de aprovação"
+    payload:
+      - "ApprovalId"
+      - "DocumentId"
+      - "ApproverId"
+      - "DeadlineAt"
+
+  - nome: "approval.approved"
+    quando: "Após aprovação de documento"
+    payload:
+      - "ApprovalId"
+      - "DocumentId"
+      - "ApprovedBy"
+      - "Timestamp"
+
+  - nome: "approval.rejected"
+    quando: "Após rejeição de documento"
+    payload:
+      - "ApprovalId"
+      - "DocumentId"
+      - "RejectedBy"
+      - "Reason"
+
+  - nome: "delegation.created"
+    quando: "Após criação de delegação"
+    payload:
+      - "DelegationId"
+      - "ApproverId"
+      - "DelegateUserId"
+      - "ExpiresAt"
+
+  - nome: "sla.alert_sent"
+    quando: "Quando alerta SLA é enviado (T-24h)"
+    payload:
+      - "ApprovalId"
+      - "ApproverId"
+      - "DeadlineAt"
+
+  - nome: "sla.escalated"
+    quando: "Quando SLA vence e escalação ocorre"
+    payload:
+      - "ApprovalId"
+      - "EscalatedTo"
+      - "Reason"
+
+# ==============================================================================
+# RASTREABILIDADE
+# ==============================================================================
+
+rastreabilidade:
+  dependencias_upstream: []
+  dependencias_downstream:
+    - "RF-Financeiro (futuro)"
+    - "RF-Contratos (futuro)"
+    - "RF-Service-Desk (futuro)"
+
+  artefatos_derivados:
+    - tipo: "UC"
+      arquivo: "UC-RF088.md"
+      status: "pendente"
+    - tipo: "MD"
+      arquivo: "MD-RF088.md"
+      status: "pendente"
+    - tipo: "WF"
+      arquivo: "WF-RF088.md"
+      status: "pendente"
+    - tipo: "TC"
+      arquivo: "TC-RF088-*.md"
+      status: "pendente"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  versao_rf: "2.0"
+  versao_governanca: "2.0"
+  data_criacao: "2025-12-28"
+  data_migracao: "2025-12-31"
+  autor_original: "Claude Code"
+  autor_migracao: "Claude Code - Migração v1.0 → v2.0"
+  total_rns: 10
+  total_endpoints: 19
+  total_permissoes_rbac: 12
+  total_integracoes_obrigatorias: 4
+  total_kpis: 7
+  total_alertas: 6
+  total_eventos_dominio: 8

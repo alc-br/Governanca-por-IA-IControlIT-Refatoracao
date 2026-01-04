@@ -1,0 +1,536 @@
+rf_id: RF059
+rf_title: "Gestão de Status e Tipos Genéricos"
+versao_governanca: "2.0"
+data_migracao: "2025-12-30"
+epic: "EPIC003-CAD-Cadastros-Base"
+fase: "Fase-2-Cadastros-e-Servicos-Transversais"
+
+# ==============================================================================
+# RESUMO EXECUTIVO
+# ==============================================================================
+
+objetivo: |
+  Especificar o sistema de gestão centralizada de listas parametrizáveis de status, tipos e categorias genéricas
+  utilizadas em todo o sistema IControlIT. O módulo permite criar, editar, inativar e configurar domínios de
+  classificação sem necessidade de alteração de código, proporcionando flexibilidade operacional e adaptação por cliente.
+
+escopo_incluido:
+  - "CRUD completo de domínios de tipos"
+  - "CRUD completo de itens dentro de cada domínio"
+  - "Controle de transições permitidas entre status"
+  - "Ativação e inativação de itens (soft delete)"
+  - "Ordenação customizada para exibição"
+  - "Associação de cores e ícones"
+  - "Configuração de valores padrão por domínio"
+  - "Internacionalização completa (pt-BR, en-US, es-ES)"
+  - "Histórico de alterações com versionamento"
+  - "Validação de dependências"
+  - "Import/Export de configurações JSON"
+  - "Multi-tenancy rigoroso"
+  - "Auditoria imutável"
+  - "Cache in-memory com invalidação automática"
+
+escopo_excluido:
+  - "Interface visual específica"
+  - "Tecnologia de implementação"
+  - "Layout e UX"
+  - "Estratégia de deploy"
+  - "Geração de diagramas visuais de workflow"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF059-01"
+    titulo: "Código de Domínio Único por Cliente"
+    descricao: |
+      O código do domínio deve ser único dentro do escopo do cliente (ClienteId).
+      Não é permitido criar dois domínios com o mesmo código para o mesmo cliente.
+      Validação case-insensitive ocorre antes da persistência.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "unicidade"
+      mensagem_erro: "Domínio com código {codigo} já existe"
+      http_code: 400
+
+  - id: "RN-RF059-02"
+    titulo: "Código de Item Único por Domínio"
+    descricao: |
+      O código do item deve ser único dentro do domínio.
+      Não é permitido criar dois itens com o mesmo código no mesmo domínio.
+      Validação case-insensitive.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "unicidade"
+      mensagem_erro: "Item com código {codigo} já existe neste domínio"
+      http_code: 400
+
+  - id: "RN-RF059-03"
+    titulo: "Validação de Transição de Estado"
+    descricao: |
+      Antes de aplicar mudança de status em qualquer entidade do sistema, o módulo valida se a transição
+      está configurada na tabela TransicaoPermitida. Transições não configuradas são bloqueadas.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "regra_negocio"
+      mensagem_erro: "Transição de {origem} para {destino} não permitida"
+      http_code: 400
+
+  - id: "RN-RF059-04"
+    titulo: "Inativação com Validação de Dependências"
+    descricao: |
+      Antes de inativar um item de domínio, o sistema verifica se existem registros ativos usando esse item.
+      Se houver dependências, a inativação é bloqueada com erro HTTP 409 Conflict.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "integridade_referencial"
+      mensagem_erro: "Não é possível inativar. Existem {count} registro(s) usando este item"
+      http_code: 409
+
+  - id: "RN-RF059-05"
+    titulo: "Ordenação Customizada com Reindexação Automática"
+    descricao: |
+      Ao alterar a ordem de um item, o sistema reindexada automaticamente todos os outros itens do domínio
+      para evitar gaps ou duplicatas. Ordenação sempre sequencial.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "reindexacao"
+      mensagem_erro: "Ordem inválida (negativa ou zero)"
+      http_code: 400
+
+  - id: "RN-RF059-06"
+    titulo: "Apenas Um Valor Padrão por Domínio"
+    descricao: |
+      Cada domínio pode ter apenas um item marcado como Padrao = true.
+      Ao marcar um item como padrão, o sistema automaticamente desmarca o item anterior.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "regra_negocio"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF059-07"
+    titulo: "Internacionalização Obrigatória"
+    descricao: |
+      Todos os itens de domínio devem ter traduções cadastradas para pelo menos pt-BR.
+      Traduções para en-US e es-ES são opcionais mas recomendadas.
+      Sistema usa fallback pt-BR → en-US → es-ES.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "campo_obrigatorio"
+      mensagem_erro: "Tradução pt-BR obrigatória"
+      http_code: 400
+
+  - id: "RN-RF059-08"
+    titulo: "Multi-tenancy com Itens Globais e Customizados"
+    descricao: |
+      Itens podem ser globais (sistema) ou customizados (cliente).
+      Itens globais têm ClienteId = NULL e são visíveis para todos.
+      Itens customizados têm ClienteId específico e visíveis apenas dentro do tenant.
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "isolamento_multi_tenant"
+      mensagem_erro: "Acesso negado a recurso de outro cliente"
+      http_code: 403
+
+  - id: "RN-RF059-09"
+    titulo: "Histórico Completo de Alterações"
+    descricao: |
+      Toda criação, edição ou inativação é registrada na tabela HistoricoDominioTipo
+      com snapshot JSON de DadosAntes e DadosDepois. Histórico imutável retido por 7 anos.
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "auditoria"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF059-10"
+    titulo: "Cache In-Memory com Invalidação Automática"
+    descricao: |
+      Domínios e itens são armazenados em cache (Redis) com TTL de 24 horas.
+      Ao criar, editar ou excluir, o cache é invalidado automaticamente.
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "performance"
+      mensagem_erro: null
+      http_code: null
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "SIS.DOMINIOS.VIEW"
+    descricao: "Listar domínios"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor"
+      - "Operador"
+    endpoint: "GET /api/dominios"
+
+  - permission_code: "SIS.DOMINIOS.CREATE"
+    descricao: "Criar novo domínio"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "POST /api/dominios"
+
+  - permission_code: "SIS.DOMINIOS.UPDATE"
+    descricao: "Editar domínio existente"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "PUT /api/dominios/{id}"
+
+  - permission_code: "SIS.DOMINIOS.DELETE"
+    descricao: "Inativar domínio (soft delete)"
+    roles_autorizadas:
+      - "Super Admin"
+    endpoint: "DELETE /api/dominios/{id}"
+
+  - permission_code: "SIS.DOMINIOS.ITEMS.CREATE"
+    descricao: "Criar novo item de domínio"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "POST /api/dominios/{dominioId}/itens"
+
+  - permission_code: "SIS.DOMINIOS.ITEMS.UPDATE"
+    descricao: "Editar item de domínio"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "PUT /api/dominios/itens/{id}"
+
+  - permission_code: "SIS.DOMINIOS.ITEMS.DELETE"
+    descricao: "Inativar item (soft delete)"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "DELETE /api/dominios/itens/{id}"
+
+  - permission_code: "SIS.DOMINIOS.WORKFLOW.MANAGE"
+    descricao: "Configurar transições permitidas"
+    roles_autorizadas:
+      - "Super Admin"
+    endpoint: "POST /api/dominios/{dominioId}/transicoes"
+
+  - permission_code: "SIS.DOMINIOS.EXPORT"
+    descricao: "Exportar configurações em JSON"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "GET /api/dominios/export"
+
+  - permission_code: "SIS.DOMINIOS.IMPORT"
+    descricao: "Importar configurações de JSON"
+    roles_autorizadas:
+      - "Super Admin"
+    endpoint: "POST /api/dominios/import"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  # Domínios
+  - method: "GET"
+    route: "/api/dominios"
+    descricao: "Listar todos os domínios"
+    autenticacao: true
+    authorization_policy: "DominiosRead"
+    request_dto: null
+    response_dto: "PaginatedListDto<DominioDto>"
+    query_params:
+      - "pageNumber: int"
+      - "pageSize: int"
+      - "search: string (opcional)"
+
+  - method: "GET"
+    route: "/api/dominios/{id}"
+    descricao: "Obter domínio por ID"
+    autenticacao: true
+    authorization_policy: "DominiosRead"
+    request_dto: null
+    response_dto: "DominioDto"
+
+  - method: "POST"
+    route: "/api/dominios"
+    descricao: "Criar novo domínio"
+    autenticacao: true
+    authorization_policy: "DominiosCreate"
+    request_dto: "CreateDominioCommand"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/dominios/{id}"
+    descricao: "Atualizar domínio"
+    autenticacao: true
+    authorization_policy: "DominiosUpdate"
+    request_dto: "UpdateDominioCommand"
+    response_dto: "void"
+
+  - method: "DELETE"
+    route: "/api/dominios/{id}"
+    descricao: "Inativar domínio (soft delete)"
+    autenticacao: true
+    authorization_policy: "DominiosDelete"
+    request_dto: null
+    response_dto: "void"
+
+  # Itens de Domínio
+  - method: "GET"
+    route: "/api/dominios/{dominioId}/itens"
+    descricao: "Listar itens do domínio"
+    autenticacao: true
+    authorization_policy: "DominiosRead"
+    request_dto: null
+    response_dto: "List<ItemDominioDto>"
+    query_params:
+      - "apenasAtivos: bool (default: true)"
+
+  - method: "GET"
+    route: "/api/dominios/itens/{id}"
+    descricao: "Obter item por ID"
+    autenticacao: true
+    authorization_policy: "DominiosRead"
+    request_dto: null
+    response_dto: "ItemDominioDto"
+
+  - method: "POST"
+    route: "/api/dominios/{dominioId}/itens"
+    descricao: "Criar novo item"
+    autenticacao: true
+    authorization_policy: "DominiosItemsCreate"
+    request_dto: "CreateItemDominioCommand"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/dominios/itens/{id}"
+    descricao: "Atualizar item"
+    autenticacao: true
+    authorization_policy: "DominiosItemsUpdate"
+    request_dto: "UpdateItemDominioCommand"
+    response_dto: "void"
+
+  - method: "PATCH"
+    route: "/api/dominios/itens/{id}/ordem"
+    descricao: "Alterar ordem do item"
+    autenticacao: true
+    authorization_policy: "DominiosItemsUpdate"
+    request_dto: "{ novaOrdem: int }"
+    response_dto: "void"
+
+  - method: "DELETE"
+    route: "/api/dominios/itens/{id}"
+    descricao: "Inativar item (soft delete)"
+    autenticacao: true
+    authorization_policy: "DominiosItemsDelete"
+    request_dto: null
+    response_dto: "void"
+
+  # Transições
+  - method: "GET"
+    route: "/api/dominios/{dominioId}/transicoes"
+    descricao: "Listar transições permitidas"
+    autenticacao: true
+    authorization_policy: "DominiosRead"
+    request_dto: null
+    response_dto: "List<TransicaoPermitidaDto>"
+
+  - method: "POST"
+    route: "/api/dominios/{dominioId}/transicoes"
+    descricao: "Criar transição"
+    autenticacao: true
+    authorization_policy: "DominiosWorkflowManage"
+    request_dto: "CreateTransicaoCommand"
+    response_dto: "Guid"
+
+  - method: "DELETE"
+    route: "/api/dominios/transicoes/{id}"
+    descricao: "Remover transição"
+    autenticacao: true
+    authorization_policy: "DominiosWorkflowManage"
+    request_dto: null
+    response_dto: "void"
+
+  - method: "POST"
+    route: "/api/dominios/transicoes/validar"
+    descricao: "Validar se transição é permitida"
+    autenticacao: true
+    authorization_policy: "DominiosRead"
+    request_dto: "{ dominioId: Guid, itemOrigemId: Guid, itemDestinoId: Guid }"
+    response_dto: "{ permitida: bool, requerJustificativa: bool, requerAprovacao: bool }"
+
+  # Configurações
+  - method: "GET"
+    route: "/api/dominios/export"
+    descricao: "Exportar configurações em JSON"
+    autenticacao: true
+    authorization_policy: "DominiosExport"
+    request_dto: null
+    response_dto: "application/json (file download)"
+
+  - method: "POST"
+    route: "/api/dominios/import"
+    descricao: "Importar configurações de JSON"
+    autenticacao: true
+    authorization_policy: "DominiosImport"
+    request_dto: "multipart/form-data (JSON file)"
+    response_dto: "{ sucessos: int, erros: int, mensagens: string[] }"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Taxa de Cache Hit"
+    descricao: "Percentual de queries atendidas por cache"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Tempo de Resposta API"
+    descricao: "Tempo médio de resposta dos endpoints"
+    meta: "<= 100ms"
+    log_obrigatorio: true
+
+  - nome: "Quantidade de Domínios Customizados"
+    descricao: "Média de domínios criados por cliente"
+    meta: ">= 3"
+    log_obrigatorio: false
+
+  - nome: "Taxa de Uso de Traduções"
+    descricao: "Percentual de itens com 3 idiomas"
+    meta: ">= 80%"
+    log_obrigatorio: false
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "Cache hit rate < 90%"
+    threshold: "1 hora"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+  - evento: "Tempo resposta > 200ms"
+    threshold: "5 minutos"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "pagerduty"
+
+  - evento: "Tentativa de exclusão com dependências"
+    threshold: "> 10/dia"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+
+# ==============================================================================
+# INTEGRAÇÕES OBRIGATÓRIAS
+# ==============================================================================
+
+integracoes:
+  central_funcionalidades:
+    codigo: "SIS.DOMINIOS"
+    nome: "Gestão de Status e Tipos"
+    modulo: "Sistema"
+    rota: "/sistema/dominios"
+
+  i18n:
+    chaves_obrigatorias:
+      - "dominios.titulo"
+      - "dominios.criar"
+      - "dominios.itens.titulo"
+      - "dominios.transicoes.titulo"
+      - "dominios.validacao.codigo_duplicado"
+    idiomas:
+      - "pt-BR"
+      - "en-US"
+      - "es-ES"
+
+  auditoria:
+    codigos_operacao:
+      - "SIS_DOMINIO_CRIADO"
+      - "SIS_DOMINIO_EDITADO"
+      - "SIS_DOMINIO_INATIVADO"
+      - "SIS_ITEM_CRIADO"
+      - "SIS_ITEM_EDITADO"
+      - "SIS_ITEM_INATIVADO"
+      - "SIS_TRANSICAO_CRIADA"
+      - "SIS_TRANSICAO_REMOVIDA"
+    retencao: "7 anos"
+
+  cache:
+    provider: "Redis"
+    chaves:
+      - "dominio:{dominioId}"
+      - "dominio:{dominioId}:itens"
+    ttl: "24 horas"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_regras_negocio: 10
+  total_endpoints_api: 17
+  total_permissoes_rbac: 10
+  total_integracoes_obrigatorias: 4
+  linhas_documentacao_md: 454

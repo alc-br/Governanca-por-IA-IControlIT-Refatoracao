@@ -1,0 +1,518 @@
+# =============================================
+# RF-106 - Gestão de Marcações e Tags
+# Versão: 2.0
+# Data: 2025-12-31
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF106"
+  nome: "Gestão de Marcações e Tags"
+  versao: "2.0"
+  data: "2025-12-31"
+  fase: "Fase 2 - Cadastros e Serviços Transversais"
+  epic: "EPIC003-CAD-Cadastros-Base"
+  status: "aprovado"  # draft | aprovado | em_desenvolvimento | concluido
+
+descricao:
+  objetivo: |
+    Implementar um sistema completo de gestão de tags (marcações) que permita categorizar,
+    organizar e localizar entidades do sistema (Ativos, Contratos, Usuários, Chamados, Documentos)
+    através de marcações personalizáveis, hierárquicas e inteligentes.
+  problema_resolvido: |
+    Dificuldade em categorizar e localizar entidades sem alterar estrutura hierárquica corporativa.
+    Falta de dimensões analíticas para relatórios e dashboards. Esforço manual excessivo em
+    categorização sem consistência taxonomômica.
+  publico_afetado: "Todos os usuários do sistema que trabalham com Ativos, Contratos, Chamados, Usuários ou Documentos"
+
+escopo:
+  incluso:
+    - "CRUD de tags (criar, listar, visualizar, editar, excluir)"
+    - "Hierarquia de tags (pai/filho, até 3 níveis)"
+    - "Aplicação de tags a múltiplas entidades (Ativo, Contrato, Chamado, Usuário, Documento)"
+    - "Auto-complete com busca incremental (ElasticSearch < 200ms)"
+    - "Sugestões inteligentes via Machine Learning (Azure ML ou sklearn)"
+    - "Nuvem de tags (tag cloud) com Chart.js"
+    - "Fusão de tags duplicadas sem perda de dados"
+    - "Renomeação em lote"
+    - "Dashboard de uso e estatísticas (< 500ms)"
+    - "Exportação de dados (CSV/Excel)"
+    - "Auditoria completa de operações (retenção 3 anos)"
+    - "Permissões RBAC granulares (10 permissões)"
+    - "Multi-tenancy (ClienteId)"
+    - "Soft delete (FlExcluido)"
+    - "Internacionalização (pt-BR, en-US, es-ES)"
+  fora:
+    - "Interface visual específica ou wireframes detalhados"
+    - "Tecnologia de implementação (é contrato, não solução)"
+    - "Layout, UX ou identidade visual"
+    - "Estratégia de deploy ou infraestrutura"
+    - "Integração com sistemas externos não documentados"
+    - "Funcionalidades de IA além de sugestões de tags"
+
+entidades:
+  - nome: "Tag"
+    descricao: "Entidade principal de marcação com suporte a hierarquia, cor, ícone e metadados"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "Id (UNIQUEIDENTIFIER)"
+      - "ClienteId (UNIQUEIDENTIFIER)"
+      - "Nm_Tag (NVARCHAR 100) UNIQUE por cliente"
+      - "Descricao (NVARCHAR MAX)"
+      - "HexColor (VARCHAR 7) opcional"
+      - "IconClass (VARCHAR 50) opcional"
+      - "ParentTagId (UNIQUEIDENTIFIER) opcional"
+      - "UsageCount (INT)"
+      - "FlExcluido (BIT)"
+
+  - nome: "EntityTag"
+    descricao: "Tabela de relacionamento polimórfico entre tags e entidades"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+    campos_principais:
+      - "Id (UNIQUEIDENTIFIER)"
+      - "ClienteId (UNIQUEIDENTIFIER)"
+      - "TagId (UNIQUEIDENTIFIER)"
+      - "EntityType (VARCHAR 50)" # Ativo, Contrato, Chamado, Usuario, Documento
+      - "EntityId (UNIQUEIDENTIFIER)"
+      - "CriadoEm (DATETIME2)"
+      - "CriadoPor (NVARCHAR 450)"
+
+  - nome: "TagAudit"
+    descricao: "Auditoria completa de operações em tags com retenção mínima 3 anos"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+    campos_principais:
+      - "Id (UNIQUEIDENTIFIER)"
+      - "ClienteId (UNIQUEIDENTIFIER)"
+      - "TagId (UNIQUEIDENTIFIER)"
+      - "Action (VARCHAR 20)" # CREATE, UPDATE, DELETE, APPLY, REMOVE, MERGE
+      - "OldValue (NVARCHAR MAX) JSON"
+      - "NewValue (NVARCHAR MAX) JSON"
+      - "UserId (NVARCHAR 450)"
+      - "CreatedAt (DATETIME2)"
+      - "IpAddress (VARCHAR 50)"
+
+regras_negocio:
+  - id: "RN-RF106-01"
+    descricao: "Unicidade de nomes por cliente - Uma tag não pode ter o mesmo nome que outra tag ativa do mesmo cliente (case-insensitive)"
+    tipo: "unicidade"
+    campos_afetados: ["Nm_Tag", "ClienteId", "FlExcluido"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Campo nome ausente → rejeição HTTP 400"
+      - "Nome duplicado (case-insensitive) → rejeição HTTP 400"
+      - "Nome válido e único → aceito"
+
+  - id: "RN-RF106-02"
+    descricao: "Validação de cor e ícone - HexColor deve ser #RRGGBB, IconClass deve ser FontAwesome válido (opcionais)"
+    tipo: "validacao"
+    campos_afetados: ["HexColor", "IconClass"]
+    obrigatorio: true
+    criterio_aceite:
+      - "HexColor sem # → rejeição HTTP 400"
+      - "IconClass não FontAwesome → rejeição HTTP 400"
+      - "Valores válidos ou ausentes → aceito"
+
+  - id: "RN-RF106-03"
+    descricao: "Hierarquia sem ciclos - Validação impede ciclos na hierarquia (Tag A não pode ser pai de B, B de C, e C de A)"
+    tipo: "regra_negocio"
+    campos_afetados: ["ParentTagId"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Tentativa de criar ciclo → rejeição HTTP 400"
+      - "Hierarquia válida sem ciclos → aceito"
+
+  - id: "RN-RF106-04"
+    descricao: "Profundidade máxima de hierarquia - Não pode exceder 3 níveis (avô, pai, filho)"
+    tipo: "regra_negocio"
+    campos_afetados: ["ParentTagId"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Tag no nível 3 tenta ter filho → rejeição HTTP 400"
+      - "Tag com profundidade <= 3 → aceito"
+
+  - id: "RN-RF106-05"
+    descricao: "Soft delete de tags - Exclusão marca FlExcluido=1 sem remover registro. Tags excluídas não aparecem em listas."
+    tipo: "regra_negocio"
+    campos_afetados: ["FlExcluido"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Exclusão marca FlExcluido = 1"
+      - "Tag excluída não aparece em queries normais"
+      - "Auditoria registra exclusão"
+
+  - id: "RN-RF106-06"
+    descricao: "Aplicação de tags múltiplas por entidade - Entidade pode ter 0 a N tags. Índice composto evita duplicatas."
+    tipo: "regra_negocio"
+    campos_afetados: ["ClienteId", "EntityType", "EntityId", "TagId"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Entidade com 0 tags → válido"
+      - "Entidade com N tags diferentes → válido"
+      - "Tentativa aplicar mesma tag 2x → rejeição HTTP 409"
+
+  - id: "RN-RF106-07"
+    descricao: "Auto-complete com ElasticSearch - Resposta < 200ms (p95), até 10 resultados ordenados por relevância + frequência"
+    tipo: "performance"
+    campos_afetados: ["Nm_Tag", "UsageCount"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Resposta em < 200ms (p95)"
+      - "Resultados ordenados por relevância + frequência"
+      - "Máximo 10 resultados"
+
+  - id: "RN-RF106-08"
+    descricao: "Sugestões baseadas em ML - Retorna 3-5 tags sugeridas com confidence, timeout 2s"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+    criterio_aceite:
+      - "Retorna 3-5 sugestões"
+      - "Ordenadas por confiança (confidence)"
+      - "Timeout 2s (fallback se ML não responde)"
+
+  - id: "RN-RF106-09"
+    descricao: "Filtros AND/OR em buscas - Busca com operador lógico AND (todas as tags) ou OR (qualquer tag)"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+    criterio_aceite:
+      - "Operador AND: apenas entidades com todas as tags"
+      - "Operador OR: entidades com pelo menos uma tag"
+
+  - id: "RN-RF106-10"
+    descricao: "Auditoria de alterações - Toda operação registrada com timestamp UTC, usuário, ação, valores antes/depois, ClienteId. Retenção mínima 3 anos."
+    tipo: "auditoria"
+    campos_afetados: []
+    obrigatorio: true
+    criterio_aceite:
+      - "Toda operação gera registro de auditoria"
+      - "Registro imutável"
+      - "Retenção mínima 3 anos"
+
+  - id: "RN-RF106-11"
+    descricao: "Fusão de tags (merge) - Consolida origem em destino, remove duplicatas, soft delete origem, auditoria"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+    criterio_aceite:
+      - "Todas entidades origem reatribuídas para destino"
+      - "Duplicatas removidas"
+      - "Origem soft deleted"
+
+  - id: "RN-RF106-12"
+    descricao: "Renomeação em lote - Renomear múltiplas tags em operação atômica com validação de conflitos"
+    tipo: "regra_negocio"
+    campos_afetados: ["Nm_Tag"]
+    obrigatorio: true
+    criterio_aceite:
+      - "Validação de conflitos pré-rename"
+      - "Operação atômica (rollback em caso de erro)"
+
+  - id: "RN-RF106-13"
+    descricao: "Dashboard de uso - Métricas agregadas: contagem por entidade, última alteração, usuário frequente, tendência 30 dias. Carregamento < 500ms."
+    tipo: "performance"
+    campos_afetados: []
+    obrigatorio: true
+    criterio_aceite:
+      - "Carregamento < 500ms"
+      - "Dados em tempo real ou cache (max 5 min)"
+
+  - id: "RN-RF106-14"
+    descricao: "Sincronização assíncrona ElasticSearch - Atualização via MediatR/message queue, não bloqueia HTTP, ElasticSearch atualizado em até 5s"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+    criterio_aceite:
+      - "Operação não bloqueia resposta HTTP"
+      - "ElasticSearch atualizado em até 5s"
+      - "Retry automático em caso de falha"
+
+  - id: "RN-RF106-15"
+    descricao: "Exportação de dados por tag - Download CSV/Excel com colunas: EntityType, EntityId, EntityName, AppliedAt, AppliedBy"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+    criterio_aceite:
+      - "Formato CSV ou Excel"
+      - "Download como attachment"
+
+estados:
+  - id: "active"
+    descricao: "Tag ativa, disponível para uso"
+  - id: "deleted"
+    descricao: "Tag excluída logicamente (FlExcluido=1), não aparece em listas"
+
+transicoes:
+  permitidas:
+    - de: "active"
+      para: "deleted"
+      condicao: "Exclusão por usuário com permissão tags:tag:delete"
+  proibidas: []
+
+permissoes:
+  - codigo: "tags:tag:create"
+    descricao: "Criar nova tag"
+    perfis: ["Admin", "Gerente", "Analista Sênior"]
+  - codigo: "tags:tag:read"
+    descricao: "Visualizar tags"
+    perfis: ["Todos (público)"]
+  - codigo: "tags:tag:update"
+    descricao: "Editar tag"
+    perfis: ["Admin", "Gerente"]
+  - codigo: "tags:tag:delete"
+    descricao: "Excluir tag (soft delete)"
+    perfis: ["Admin"]
+  - codigo: "tags:tag:merge"
+    descricao: "Fundir duas tags"
+    perfis: ["Admin"]
+  - codigo: "tags:entitytag:create"
+    descricao: "Aplicar tag a entidade"
+    perfis: ["Admin", "Gerente", "Usuário (próprias)"]
+  - codigo: "tags:entitytag:delete"
+    descricao: "Remover tag de entidade"
+    perfis: ["Admin", "Gerente", "Proprietário"]
+  - codigo: "tags:dashboard:view"
+    descricao: "Acessar dashboard de tags"
+    perfis: ["Admin", "Gerente", "Analista"]
+  - codigo: "tags:export:download"
+    descricao: "Exportar dados por tag"
+    perfis: ["Admin", "Gerente"]
+  - codigo: "tags:suggestions:view"
+    descricao: "Ver sugestões de ML"
+    perfis: ["Todos"]
+
+integracoes:
+  internas:
+    - "Autenticacao (JWT)"
+    - "Multi-Tenancy (ClienteId)"
+    - "Auditoria (TagAudit, 3 anos retenção)"
+    - "Permissões RBAC (10 permissões)"
+    - "Internacionalização (pt-BR, en-US, es-ES)"
+    - "Central de Funcionalidades (TAGS_MANAGEMENT, TAGS_SUGGESTIONS, TAGS_ELASTICSEARCH, TAGS_HIERARCHY)"
+  externas:
+    - sistema: "ElasticSearch"
+      tipo: "Search Engine"
+      obrigatoria: false
+      descricao: "Auto-complete < 200ms. Fallback para LIKE em SQL se não disponível."
+    - sistema: "Azure ML ou sklearn"
+      tipo: "Machine Learning"
+      obrigatoria: false
+      descricao: "Sugestões inteligentes 3-5 tags. Timeout 2s. Opcional se feature flag desabilitada."
+
+eventos_dominio:
+  - nome: "TagCreated"
+    quando: "Após criação de tag"
+    payload: ["TagId", "ClienteId", "Nome", "Cor", "Ícone", "ParentTagId"]
+  - nome: "TagUpdated"
+    quando: "Após atualização de tag"
+    payload: ["TagId", "ClienteId", "Campos alterados (antes/depois)"]
+  - nome: "TagDeleted"
+    quando: "Após exclusão de tag"
+    payload: ["TagId", "ClienteId", "Nome"]
+  - nome: "EntityTagCreated"
+    quando: "Após aplicação de tag a entidade"
+    payload: ["TagId", "EntityType", "EntityId", "ClienteId", "UserId"]
+  - nome: "EntityTagDeleted"
+    quando: "Após remoção de tag de entidade"
+    payload: ["TagId", "EntityType", "EntityId", "ClienteId", "UserId"]
+  - nome: "TagsMerged"
+    quando: "Após fusão de tags"
+    payload: ["SourceTagId", "DestinationTagId", "ClienteId", "MergedCount"]
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  protecoes:
+    - "SQL Injection: Parametrização obrigatória EF Core (LINQ), ElasticSearch Query DSL"
+    - "XSS: HtmlEncoder.Default.Encode() ao renderizar, tags plain text"
+    - "CSRF Protection: AntiforgeryToken em POSTs"
+    - "Rate limiting: Throttling /api/tags/search (max 10 req/s por usuário)"
+    - "Timeout ElasticSearch: Fallback LIKE em SQL se ES não responde em 5s"
+    - "Criptografia transit: HTTPS obrigatório (TLS 1.2+)"
+
+endpoints:
+  crud_principal:
+    - metodo: "GET"
+      path: "/api/tags"
+      descricao: "Listar tags com paginação"
+      permissao: "tags:tag:read"
+    - metodo: "GET"
+      path: "/api/tags/{id}"
+      descricao: "Obter tag por ID"
+      permissao: "tags:tag:read"
+    - metodo: "GET"
+      path: "/api/tags/{id}/children"
+      descricao: "Listar tags filhas (hierarquia)"
+      permissao: "tags:tag:read"
+    - metodo: "POST"
+      path: "/api/tags"
+      descricao: "Criar nova tag"
+      permissao: "tags:tag:create"
+    - metodo: "PUT"
+      path: "/api/tags/{id}"
+      descricao: "Atualizar tag"
+      permissao: "tags:tag:update"
+    - metodo: "DELETE"
+      path: "/api/tags/{id}"
+      descricao: "Excluir tag (soft delete)"
+      permissao: "tags:tag:delete"
+    - metodo: "GET"
+      path: "/api/tags/{id}/usage"
+      descricao: "Obter contagem de uso por tipo"
+      permissao: "tags:dashboard:view"
+
+  operacoes_especiais:
+    - metodo: "POST"
+      path: "/api/tags/search"
+      descricao: "Busca com auto-complete (ElasticSearch)"
+      permissao: "tags:tag:read"
+    - metodo: "POST"
+      path: "/api/tags/{id}/apply"
+      descricao: "Aplicar tag a entidade"
+      permissao: "tags:entitytag:create"
+    - metodo: "DELETE"
+      path: "/api/tags/{id}/remove/{entityType}/{entityId}"
+      descricao: "Remover tag de entidade"
+      permissao: "tags:entitytag:delete"
+    - metodo: "POST"
+      path: "/api/tags/{sourceId}/merge/{destinationId}"
+      descricao: "Fundir duas tags"
+      permissao: "tags:tag:merge"
+    - metodo: "POST"
+      path: "/api/tags/batch-rename"
+      descricao: "Renomear múltiplas tags"
+      permissao: "tags:tag:update"
+    - metodo: "GET"
+      path: "/api/tags/{id}/export"
+      descricao: "Exportar entidades com tag"
+      permissao: "tags:export:download"
+    - metodo: "GET"
+      path: "/api/tags/suggestions"
+      descricao: "Sugestões de tags (ML)"
+      permissao: "tags:suggestions:view"
+    - metodo: "GET"
+      path: "/api/tags/cloud"
+      descricao: "Nuvem de tags (agregações)"
+      permissao: "tags:dashboard:view"
+    - metodo: "GET"
+      path: "/api/tags/dashboard"
+      descricao: "Dashboard completo"
+      permissao: "tags:dashboard:view"
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00 - Listar tags"
+    - "UC01 - Criar tag"
+    - "UC02 - Visualizar tag"
+    - "UC03 - Editar tag"
+    - "UC04 - Excluir tag"
+    - "UC05 - Aplicar tag a entidade"
+    - "UC06 - Remover tag de entidade"
+    - "UC07 - Buscar tags (auto-complete)"
+    - "UC08 - Fundir tags duplicadas"
+    - "UC09 - Dashboard de tags"
+    - "UC10 - Exportar dados por tag"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar tag"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar tags"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar tag"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar tag"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Excluir tag (soft delete)"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar campos obrigatórios (Nm_Tag)"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar unicidade de nome por cliente"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar formato HexColor (#RRGGBB)"
+      required: false
+    - id: "RF-VAL-04"
+      title: "Validar formato IconClass (FontAwesome)"
+      required: false
+    - id: "RF-VAL-05"
+      title: "Validar hierarquia sem ciclos"
+      required: true
+    - id: "RF-VAL-06"
+      title: "Validar profundidade máxima (3 níveis)"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant (ClienteId)"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC (10 permissões)"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Proteção SQL Injection"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Proteção XSS"
+      required: true
+    - id: "RF-SEC-05"
+      title: "Rate limiting auto-complete"
+      required: true
+
+  performance:
+    - id: "RF-PERF-01"
+      title: "Auto-complete < 200ms (p95)"
+      required: true
+    - id: "RF-PERF-02"
+      title: "Dashboard < 500ms"
+      required: true
+    - id: "RF-PERF-03"
+      title: "Sincronização assíncrona ElasticSearch"
+      required: true
+
+exclusions:
+  rf_items: []
+
+metricas:
+  kpis:
+    - nome: "Taxa de Cobertura de Tags"
+      meta: "80%"
+      medicao: "(Entidades com ≥1 tag / Total entidades) × 100"
+    - nome: "Tempo de Auto-Complete"
+      meta: "< 200ms (p95)"
+      medicao: "ElasticSearch query latency via APM"
+    - nome: "Acurácia de Sugestões ML"
+      meta: "70%"
+      medicao: "(Sugestões aceitas / Total sugeridas) × 100"
+    - nome: "Taxa de Duplicação"
+      meta: "< 5%"
+      medicao: "Algoritmo Levenshtein em batch, relatório mensal"
+    - nome: "Performance de Dashboard"
+      meta: "< 500ms"
+      medicao: "APM latency (ElasticSearch aggs + BD query)"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração para formato v2.0 - Separação RF/RL. Requisito moderno sem referências ao legado. 15 regras de negócio, 11 seções obrigatórias, 4 integrações, 18 endpoints."
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Claude Code"
+    descricao: "Versão inicial com 15 regras de negócio, 4 integrações, 13 endpoints, 4 fluxos principais. Continha mistura de referências ao legado."

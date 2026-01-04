@@ -1,0 +1,421 @@
+# =============================================
+# RF038 - Gestão de SLA Solicitações
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF038"
+  nome: "Gestão de SLA Solicitações"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 5 - Service Desk"
+  epic: "EPIC008-SD"
+  status: "em_desenvolvimento"
+
+descricao:
+  objetivo: "Implementar sistema completo de SLA para solicitações de TI com cálculo automático, monitoramento em tempo real e compliance contratual"
+  problema_resolvido: "Gestão manual de prazos via planilhas, sem alertas automáticos ou rastreabilidade"
+  publico_afetado: "Atendentes, supervisores, gerentes, diretores e clientes de TI"
+
+escopo:
+  incluso:
+    - "Configuração de SLA por tipo e prioridade"
+    - "Cálculo automático de prazos"
+    - "Monitoramento em tempo real"
+    - "Alertas escalonados (50%, 80%, 100%, breach)"
+    - "Escalação automática"
+    - "Pausa e retomada de SLA"
+    - "Extensão de prazo com aprovação"
+    - "Dashboard em tempo real"
+    - "Relatórios de compliance e MTTR"
+    - "Registro de não-conformidades"
+    - "SLA diferenciado por cliente"
+    - "Notificações push (SignalR)"
+  fora:
+    - "Design de interface"
+    - "Tecnologia de implementação"
+    - "Estratégia de deploy"
+    - "Integração com CRM/ERP externo"
+
+entidades:
+  - nome: "sla_configuracao"
+    descricao: "Configuração de SLA por tipo de solicitação e prioridade"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "sla_solicitacao"
+    descricao: "Tracking de SLA para cada solicitação"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "sla_pausa"
+    descricao: "Registro de pausas e retomadas de SLA"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "sla_extensao"
+    descricao: "Solicitações de extensão de prazo"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "sla_nao_conformidade"
+    descricao: "Registro de breaches de SLA"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "sla_calendario_feriado"
+    descricao: "Calendário de feriados corporativos"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF038-001"
+    descricao: "Cálculo automático de prazo considerando tipo, prioridade, horário de atendimento e feriados"
+    tipo: "regra_negocio"
+    campos_afetados: ["data_limite", "tipo_solicitacao", "prioridade", "horario_atendimento"]
+    obrigatorio: true
+    criticidade: "CRITICA"
+
+  - id: "RN-RF038-002"
+    descricao: "Alertas escalonados em 4 níveis (50%, 80%, 100%, breach)"
+    tipo: "regra_negocio"
+    campos_afetados: ["percentual_decorrido", "status_alerta"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF038-003"
+    descricao: "Escalação automática quando prazo é ultrapassado sem resolução"
+    tipo: "regra_negocio"
+    campos_afetados: ["responsavel_id", "nivel_escalacao"]
+    obrigatorio: true
+    criticidade: "CRITICA"
+
+  - id: "RN-RF038-004"
+    descricao: "Pausa e retomada de SLA com recálculo automático de prazo"
+    tipo: "regra_negocio"
+    campos_afetados: ["status_sla", "motivo_pausa", "data_limite"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF038-005"
+    descricao: "Horário de atendimento configurável (8x5, 12x5, 24x7, customizado)"
+    tipo: "validacao"
+    campos_afetados: ["horario_atendimento", "dias_semana", "hora_inicio", "hora_fim"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF038-006"
+    descricao: "Calendário de feriados exclui dias do cálculo de SLA"
+    tipo: "regra_negocio"
+    campos_afetados: ["data_feriado", "tipo_feriado", "abrangencia"]
+    obrigatorio: true
+    criticidade: "MEDIA"
+
+  - id: "RN-RF038-007"
+    descricao: "Extensão de prazo requer justificativa e aprovação (máximo 2 por solicitação)"
+    tipo: "validacao"
+    campos_afetados: ["novo_prazo", "justificativa", "aprovador_id"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF038-008"
+    descricao: "Dashboard em tempo real com cores por proximidade do prazo (verde/amarelo/vermelho/preto)"
+    tipo: "regra_negocio"
+    campos_afetados: ["percentual_decorrido", "cor_indicador"]
+    obrigatorio: true
+    criticidade: "MEDIA"
+
+  - id: "RN-RF038-009"
+    descricao: "Relatório de compliance calcula taxa de cumprimento de SLA"
+    tipo: "regra_negocio"
+    campos_afetados: ["taxa_cumprimento", "total_finalizadas", "total_dentro_prazo"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF038-010"
+    descricao: "Notificações push (SignalR) para supervisores em eventos críticos"
+    tipo: "regra_negocio"
+    campos_afetados: ["evento_sla", "destinatario_id"]
+    obrigatorio: true
+    criticidade: "MEDIA"
+
+  - id: "RN-RF038-011"
+    descricao: "Análise de tendências identifica melhoria ou piora sustentada (3+ meses)"
+    tipo: "regra_negocio"
+    campos_afetados: ["tendencia", "taxa_mes_atual", "taxa_3_meses_anteriores"]
+    obrigatorio: false
+    criticidade: "BAIXA"
+
+  - id: "RN-RF038-012"
+    descricao: "Heatmap de horários críticos exibe volume de breaches por dia/hora"
+    tipo: "regra_negocio"
+    campos_afetados: ["dia_semana", "horario", "quantidade_breaches"]
+    obrigatorio: false
+    criticidade: "BAIXA"
+
+  - id: "RN-RF038-013"
+    descricao: "SLA diferenciado por nível de cliente (Bronze/Prata/Ouro/Platinum com ajuste -20%/-40%/-50%)"
+    tipo: "regra_negocio"
+    campos_afetados: ["nivel_cliente", "fator_ajuste_sla"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+  - id: "RN-RF038-014"
+    descricao: "Breach gera automaticamente não-conformidade que requer análise de causa raiz e plano de ação"
+    tipo: "regra_negocio"
+    campos_afetados: ["nao_conformidade_id", "causa_raiz", "plano_acao"]
+    obrigatorio: true
+    criticidade: "CRITICA"
+
+  - id: "RN-RF038-015"
+    descricao: "Cálculo de MTTR por tipo, prioridade e equipe (deve ser < 80% do SLA)"
+    tipo: "regra_negocio"
+    campos_afetados: ["mttr", "sla_configurado"]
+    obrigatorio: true
+    criticidade: "ALTA"
+
+estados:
+  # Estados de Configuração de SLA
+  - id: "draft"
+    descricao: "Configuração criada, não ativa"
+    tipo: "configuracao"
+  - id: "active"
+    descricao: "Configuração ativa e em uso"
+    tipo: "configuracao"
+  - id: "inactive"
+    descricao: "Configuração desativada"
+    tipo: "configuracao"
+  - id: "deleted"
+    descricao: "Excluída logicamente"
+    tipo: "configuracao"
+
+  # Estados de Solicitação em Relação a SLA
+  - id: "dentro_prazo"
+    descricao: "0-50% do prazo decorrido (verde)"
+    tipo: "solicitacao"
+  - id: "em_alerta"
+    descricao: "50-80% do prazo decorrido (amarelo)"
+    tipo: "solicitacao"
+  - id: "critico"
+    descricao: "80-100% do prazo decorrido (vermelho)"
+    tipo: "solicitacao"
+  - id: "breach"
+    descricao: "Prazo ultrapassado (preto)"
+    tipo: "solicitacao"
+  - id: "pausado"
+    descricao: "SLA pausado temporariamente"
+    tipo: "solicitacao"
+  - id: "finalizado"
+    descricao: "Solicitação resolvida"
+    tipo: "solicitacao"
+
+transicoes:
+  permitidas:
+    - de: "draft"
+      para: "active"
+      condicao: "Aprovação"
+    - de: "active"
+      para: "inactive"
+      condicao: "Desativação manual"
+    - de: "inactive"
+      para: "active"
+      condicao: "Reativação"
+    - de: "dentro_prazo"
+      para: "em_alerta"
+      condicao: "50% do prazo decorrido"
+    - de: "em_alerta"
+      para: "critico"
+      condicao: "80% do prazo decorrido"
+    - de: "critico"
+      para: "breach"
+      condicao: "100% do prazo ultrapassado"
+    - de: "*"
+      para: "pausado"
+      condicao: "Pausa manual com permissão"
+    - de: "pausado"
+      para: "estado_anterior"
+      condicao: "Retomada"
+
+  proibidas:
+    - de: "deleted"
+      para: "active"
+      motivo: "Configuração excluída não pode ser reativada"
+    - de: "breach"
+      para: "dentro_prazo"
+      motivo: "Breach não pode reverter sem nova solicitação"
+
+permissoes:
+  - codigo: "sla.config.view_any"
+    descricao: "Visualizar configurações de SLA"
+    roles_padrao: ["Atendente", "Supervisor", "Gerente"]
+  - codigo: "sla.config.create"
+    descricao: "Criar configuração de SLA"
+    roles_padrao: ["Supervisor", "Gerente"]
+  - codigo: "sla.config.update"
+    descricao: "Editar configuração de SLA"
+    roles_padrao: ["Supervisor", "Gerente"]
+  - codigo: "sla.config.delete"
+    descricao: "Excluir configuração de SLA"
+    roles_padrao: ["Gerente", "Administrador"]
+  - codigo: "sla.pausar"
+    descricao: "Pausar SLA de solicitação"
+    roles_padrao: ["Supervisor", "Gerente"]
+  - codigo: "sla.retomar"
+    descricao: "Retomar SLA de solicitação"
+    roles_padrao: ["Supervisor", "Gerente"]
+  - codigo: "sla.extensao.solicitar"
+    descricao: "Solicitar extensão de prazo"
+    roles_padrao: ["Supervisor", "Gerente"]
+  - codigo: "sla.extensao.aprovar"
+    descricao: "Aprovar extensão de prazo"
+    roles_padrao: ["Gerente", "Diretor"]
+  - codigo: "sla.dashboard.view"
+    descricao: "Visualizar dashboard de monitoramento"
+    roles_padrao: ["Supervisor", "Gerente", "Diretor"]
+  - codigo: "sla.relatorios.gerar"
+    descricao: "Gerar relatórios de SLA"
+    roles_padrao: ["Supervisor", "Gerente", "Diretor"]
+  - codigo: "sla.nao_conformidade.view"
+    descricao: "Visualizar não-conformidades"
+    roles_padrao: ["Supervisor", "Gerente", "Diretor"]
+  - codigo: "sla.nao_conformidade.tratar"
+    descricao: "Preencher análise de causa raiz e plano de ação"
+    roles_padrao: ["Supervisor", "Gerente"]
+
+integracoes:
+  internas:
+    - "Autenticacao JWT"
+    - "Multi-Tenancy (fornecedor)"
+    - "Auditoria completa"
+    - "Notificações (SignalR)"
+    - "Hangfire Jobs"
+  externas:
+    - sistema: "Google Calendar"
+      tipo: "API"
+      obrigatoria: false
+      descricao: "Importação de feriados"
+    - sistema: "Outlook Calendar"
+      tipo: "API"
+      obrigatoria: false
+      descricao: "Importação de feriados"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_entrada: true
+  protecao_injecao_sql: true
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-Listar-Configuracoes-SLA"
+    - "UC01-Criar-Configuracao-SLA"
+    - "UC02-Editar-Configuracao-SLA"
+    - "UC03-Inativar-Configuracao-SLA"
+    - "UC04-Pausar-SLA"
+    - "UC05-Retomar-SLA"
+    - "UC06-Solicitar-Extensao-Prazo"
+    - "UC07-Aprovar-Rejeitar-Extensao"
+    - "UC08-Visualizar-Dashboard"
+    - "UC09-Gerar-Relatorio-Compliance"
+    - "UC10-Visualizar-Nao-Conformidades"
+    - "UC11-Tratar-Nao-Conformidade"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar configuração de SLA"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar configurações de SLA"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar configuração de SLA"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar configuração de SLA"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Excluir configuração de SLA"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar campos obrigatórios (tipo, prioridade, prazo)"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar horário de atendimento (mínimo 4h/dia)"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar motivo de pausa (mínimo 10 caracteres)"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar justificativa de extensão (mínimo 20 caracteres)"
+      required: true
+    - id: "RF-VAL-05"
+      title: "Validar limite de 2 extensões por solicitação"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant (fornecedor)"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC granulares"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria de todas as operações"
+      required: true
+
+  funcionalidades:
+    - id: "RF-FUNC-01"
+      title: "Cálculo automático de prazo de SLA"
+      required: true
+    - id: "RF-FUNC-02"
+      title: "Alertas escalonados (50%, 80%, 100%, breach)"
+      required: true
+    - id: "RF-FUNC-03"
+      title: "Escalação automática em breach"
+      required: true
+    - id: "RF-FUNC-04"
+      title: "Pausa e retomada de SLA"
+      required: true
+    - id: "RF-FUNC-05"
+      title: "Extensão de prazo com aprovação"
+      required: true
+    - id: "RF-FUNC-06"
+      title: "Dashboard em tempo real (SignalR)"
+      required: true
+    - id: "RF-FUNC-07"
+      title: "Relatórios de compliance e MTTR"
+      required: true
+    - id: "RF-FUNC-08"
+      title: "Registro de não-conformidades"
+      required: true
+    - id: "RF-FUNC-09"
+      title: "SLA diferenciado por nível de cliente"
+      required: true
+    - id: "RF-FUNC-10"
+      title: "Notificações push (SignalR)"
+      required: true
+
+exclusions:
+  rf_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0→v2.0: separação RF/RL, estrutura canônica, 15 RNs formalizadas"
+  - versao: "1.0"
+    data: "2025-01-14"
+    autor: "Architect Agent"
+    descricao: "Versão inicial com conteúdo legado misturado"

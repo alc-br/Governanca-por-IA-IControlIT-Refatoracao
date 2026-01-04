@@ -1,0 +1,499 @@
+# Template de Referência ao Legado (RL-RF024.yaml)
+# Versão: 2.0
+# Data: 2025-12-30
+
+rf_id: RF024
+titulo: "Gestão de Departamentos e Estrutura Organizacional"
+
+legado:
+  sistema: "ASP.NET Web Forms + VB.NET"
+  versao: "IControlIT v1 (Legacy)"
+  arquitetura: "Monolítica WebForms Multi-Database"
+  banco_dados: "SQL Server 2012 (1 banco por cliente)"
+  multi_tenant: false
+  auditoria: "partial"
+
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+referencias:
+  # TELAS ASPX
+  - id: "LEG-RF024-001"
+    tipo: "tela"
+    nome: "Departamento.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastros/Departamento.aspx"
+    descricao: |
+      Tela lista flat departamentos ordenada alfabeticamente.
+      CRUD básico sem hierarquia recursiva.
+      Campos: txtNome (200 chars), txtSigla (10 chars), ddlLider (sem validação FK), ddlStatus (Ativo/Inativo).
+      Problema: Aceita código duplicado, líder GUID inválido, sem organograma visual.
+    destino: "substituido"
+    justificativa: |
+      Substituída por componente Angular com hierarquia recursiva, organograma D3.js interativo,
+      validação FluentValidation (código único, líder FK válida).
+    rf_item_relacionado: "RN-RF024-001"
+    uc_relacionado: "UC01-criar-departamento"
+    migracao_moderna:
+      componente_angular: "departamentos-create.component.ts"
+      rota_frontend: "/configuracoes/departamentos/create"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # WEBSERVICES SOAP
+  - id: "LEG-RF024-002"
+    tipo: "webservice"
+    nome: "DepartamentoService.asmx - CadastrarDepartamento"
+    caminho: "ic1_legado/IControlIT/Services/DepartamentoService.asmx"
+    metodos:
+      - nome: "CadastrarDepartamento"
+        parametros: "nome: String, sigla: String"
+        retorno: "Guid"
+    descricao: |
+      Webmethod SOAP cria departamento flat sem Id_Departamento_Pai.
+      INSERT SQL inline sem validação código único, sem criar grupo Azure AD.
+      Aceita líder GUID texto livre sem validar FK Usuario.
+    destino: "substituido"
+    justificativa: |
+      Substituído por REST API POST /api/v1/departamentos com CreateDepartamentoCommand,
+      FluentValidation (código [TIPO]-[NOME] regex, líder FK validada),
+      sincronização automática Azure AD via Microsoft Graph.
+    rf_item_relacionado: "RN-RF024-001"
+    uc_relacionado: "UC01-criar-departamento"
+    migracao_moderna:
+      command_cqrs: "CreateDepartamentoCommand"
+      handler: "CreateDepartamentoCommandHandler"
+      endpoint: "POST /api/v1/departamentos"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF024-003"
+    tipo: "webservice"
+    nome: "DepartamentoService.asmx - AlocarUsuarioDepartamento"
+    caminho: "ic1_legado/IControlIT/Services/DepartamentoService.asmx"
+    metodos:
+      - nome: "AlocarUsuarioDepartamento"
+        parametros: "idUsuario: Guid, idDepartamento: Guid"
+        retorno: "Boolean"
+    descricao: |
+      UPDATE Usuario.Id_Departamento FK única sem suporte dotted-line.
+      Sem percentual alocação, sem validação soma <=100%, sem histórico temporal (Dt_Inicio/Dt_Fim).
+      UPDATE sobrescreve lotação anterior perdendo origem.
+    destino: "substituido"
+    justificativa: |
+      Substituído por tabela Usuario_Departamento N:N com Tipo_Lotacao (Principal/DottedLine/Temporaria),
+      Percentual_Alocacao DECIMAL(5,2), trigger validação SUM<=100%, campos Dt_Inicio/Dt_Fim.
+    rf_item_relacionado: "RN-RF024-007"
+    uc_relacionado: "UC06-alocar-colaborador"
+    migracao_moderna:
+      tabela: "Usuario_Departamento"
+      trigger: "trg_Usuario_Departamento_ValidarAlocacao"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF024-004"
+    tipo: "webservice"
+    nome: "DepartamentoService.asmx - ListarDepartamentos"
+    caminho: "ic1_legado/IControlIT/Services/DepartamentoService.asmx"
+    metodos:
+      - nome: "ListarDepartamentos"
+        parametros: "(sem parâmetros)"
+        retorno: "DataSet"
+    descricao: |
+      SELECT flat sem hierarquia recursiva, sem caminho hierárquico completo, sem qtd_colaboradores.
+      Retorna DataSet ADO.NET sem paginação (TODAS linhas - problema performance >1000 registros).
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/v1/departamentos com GetDepartamentosQuery, paginação Skip().Take(),
+      PaginatedListDto<DepartamentoDto> tipado, filtros (tipo, nível, líder), CTE recursivo hierarquia.
+    rf_item_relacionado: "RN-RF024-002"
+    uc_relacionado: "UC00-listar-departamentos"
+    migracao_moderna:
+      query_cqrs: "GetDepartamentosQuery"
+      handler: "GetDepartamentosQueryHandler"
+      endpoint: "GET /api/v1/departamentos"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF024-005"
+    tipo: "webservice"
+    nome: "DepartamentoService.asmx - ObterOrganograma"
+    caminho: "ic1_legado/IControlIT/Services/DepartamentoService.asmx"
+    metodos:
+      - nome: "ObterOrganograma"
+        parametros: "(sem parâmetros)"
+        retorno: "String (XML)"
+    descricao: |
+      Retorna NotImplementedException("Organograma não disponível no sistema legado").
+      Funcionalidade NUNCA implementada - usuários visualizam lista flat em DataGridView.
+    destino: "descartado"
+    justificativa: |
+      Método legado descartado. Sistema moderno implementa organograma do zero com D3.js v7 interativo
+      (zoom, pan, collapse/expand, busca, filtro, export PNG/PDF/SVG).
+    rf_item_relacionado: "RN-RF024-009"
+    uc_relacionado: "UC05-visualizar-organograma"
+    migracao_moderna:
+      query_cqrs: "GetOrganogramaQuery"
+      handler: "GetOrganogramaQueryHandler"
+      endpoint: "GET /api/v1/departamentos/organograma"
+      componente_angular: "organograma-visual.component.ts (D3.js)"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF024-006"
+    tipo: "webservice"
+    nome: "DepartamentoService.asmx - TransferirColaborador"
+    caminho: "ic1_legado/IControlIT/Services/DepartamentoService.asmx"
+    metodos:
+      - nome: "TransferirColaborador"
+        parametros: "idUsuario: Guid, idDepartamentoDestino: Guid"
+        retorno: "Boolean"
+    descricao: |
+      UPDATE Usuario.Id_Departamento direto sem workflow aprovação, sem histórico origem/destino/motivo.
+      Sem notificação líderes envolvidos, sem validação departamento destino existe,
+      sem atualização Qtd_Colaboradores, sem sincronização Azure AD.
+    destino: "substituido"
+    justificativa: |
+      Substituído por workflow aprovação multinível: tabela Departamento_Movimentacao,
+      Status_Aprovacao enum (Pendente → Aprovado_Origem → Aprovado_Destino → Aprovado_RH),
+      notificações multicanal, sincronização Azure AD automática.
+    rf_item_relacionado: "RN-RF024-006"
+    uc_relacionado: "UC08-aprovar-movimentacao"
+    migracao_moderna:
+      command_cqrs: "CreateMovimentacaoCommand"
+      handler: "CreateMovimentacaoCommandHandler"
+      tabela: "Departamento_Movimentacao"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF024-007"
+    tipo: "webservice"
+    nome: "DepartamentoService.asmx - SincronizarActiveDirectory"
+    caminho: "ic1_legado/IControlIT/Services/DepartamentoService.asmx"
+    metodos:
+      - nome: "SincronizarActiveDirectory"
+        parametros: "(sem parâmetros)"
+        retorno: "Boolean"
+    descricao: |
+      Retorna NotImplementedException("Sincronização AD não disponível").
+      Grupos Active Directory criados manualmente via console AD / PowerShell mensal - alta taxa inconsistência.
+    destino: "descartado"
+    justificativa: |
+      Método legado descartado. Sistema moderno implementa sincronização automática do zero:
+      job Hangfire diário (Cron "0 3 * * *"), Microsoft Graph SDK .NET, Client Credentials Flow,
+      permissões Group.ReadWrite.All + User.Read.All, armazenamento Azure_AD_Object_Id.
+    rf_item_relacionado: "RN-RF024-005"
+    uc_relacionado: "UC09-sincronizar-azuread"
+    migracao_moderna:
+      job_hangfire: "SincronizarAzureADJob"
+      api: "Microsoft Graph SDK .NET"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # STORED PROCEDURES
+  - id: "LEG-RF024-008"
+    tipo: "stored_procedure"
+    nome: "sp_ListarDepartamentos"
+    caminho: "Database IControlIT_Cliente01 > Stored Procedures > dbo.sp_ListarDepartamentos"
+    parametros_entrada:
+      - "@Status VARCHAR(20) = 'Ativo'"
+    parametros_saida: []
+    descricao: |
+      Procedure retorna lista flat departamentos filtrados por status.
+      SELECT sem JOIN Usuario (validar líder), sem cálculo Qtd_Colaboradores, sem caminho hierárquico.
+      Ordenação alfabética, sem paginação (retorna TODAS linhas).
+    destino: "substituido"
+    justificativa: |
+      Substituído por EF Core LINQ com Include(Lider), Include(DepartamentosFilhos),
+      paginação Skip().Take(), filtros dinâmicos (tipo, nível, líder), ordenação hierárquica.
+    rf_item_relacionado: "RN-RF024-002"
+    migracao_moderna:
+      query_cqrs: "GetDepartamentosQuery"
+      ef_core: "LINQ with Include/ThenInclude"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # TABELAS LEGADAS
+  - id: "LEG-RF024-009"
+    tipo: "tabela"
+    nome: "Tabela Departamento (Estrutura Flat)"
+    caminho: "Database IControlIT_Cliente01 > Tables > dbo.Departamento"
+    descricao: |
+      Tabela legado departamentos com estrutura flat (sem hierarquia).
+      Campos principais: Id_Departamento GUID PK, Nome NVARCHAR(200), Sigla NVARCHAR(10),
+      Id_Usuario_Lider GUID nullable sem FK validada, Status NVARCHAR(20) enum string, Dt_Cadastro, Dt_Atualizacao.
+      SEM campos hierarquia (Id_Departamento_Pai, Nivel_Hierarquia, Caminho_Hierarquico).
+      SEM campos Azure AD, SEM multi-tenancy, SEM soft delete.
+    schema_legado: "[dbo].[Departamento]"
+    problemas_identificados:
+      - "Falta campo Id_Departamento_Pai (hierarquia recursiva)"
+      - "Falta campo Nivel_Hierarquia (profundidade árvore)"
+      - "Falta campo Caminho_Hierarquico (breadcrumb)"
+      - "Falta campo Tipo_Departamento (enum Diretoria/Gerencia/Coordenacao)"
+      - "Falta campo Qtd_Colaboradores (contador automático)"
+      - "Falta campos Azure AD (Azure_AD_Object_Id, AD_Distinguished_Name, Dt_Ultima_Sincronizacao_AD)"
+      - "FK Id_Usuario_Lider sem validação (aceita GUIDs inválidos)"
+      - "Campo Status enum string sem CHECK constraint (aceita 'ativo', 'ATIVO', 'Active')"
+      - "Sem soft delete (flag Fl_Ativo booleano)"
+      - "Sem multi-tenancy (campo Id_Conglomerado)"
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com campos hierarquia (IdDepartamentoPai nullable, NivelHierarquia INT, CaminhoHierarquico NVARCHAR(500)),
+      Azure AD (AzureADObjectId NVARCHAR(100)), multi-tenancy (IdConglomerado Guid FK),
+      soft delete (FlAtivo BIT), auditoria (Created, CreatedBy, LastModified, LastModifiedBy),
+      FK validada (IdUsuarioLider → Usuario), constraint CHECK TipoDepartamento enum,
+      trigger atualizar NivelHierarquia/CaminhoHierarquico automaticamente.
+    rf_item_relacionado: "RN-RF024-002"
+    md_moderno: "MD-RF024.md - Tabela Departamento"
+    migracao_moderna:
+      tabela_moderna: "Departamento"
+      migration_ef_core: "20251230_CreateDepartamentoTable.cs"
+      script_migracao: "script-migrar-hierarquia-departamento.sql"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF024-010"
+    tipo: "tabela"
+    nome: "Tabela Usuario (Campo FK Único Id_Departamento)"
+    caminho: "Database IControlIT_Cliente01 > Tables > dbo.Usuario"
+    descricao: |
+      Tabela Usuario com campo FK único Id_Departamento (lotação única, não suporta estrutura matricial).
+      UPDATE Id_Departamento sobrescreve lotação anterior perdendo histórico origem.
+      Sem percentual alocação, sem tipo lotação, sem vigência temporal (Dt_Inicio/Dt_Fim).
+    schema_legado: "[dbo].[Usuario]"
+    problemas_identificados:
+      - "FK única Id_Departamento (não suporta estrutura matricial dotted-line)"
+      - "Sem percentual alocação (impossível alocar 70% GER-PROJETOS + 30% GER-DEV)"
+      - "Sem tipo lotação (Principal/DottedLine/Temporaria)"
+      - "Sem vigência temporal (Dt_Inicio, Dt_Fim)"
+      - "UPDATE sobrescreve lotação anterior (perde histórico origem)"
+    destino: "substituido"
+    justificativa: |
+      Campo Usuario.Id_Departamento removido. Criada tabela Usuario_Departamento N:N com campos:
+      Id_Usuario (FK Usuario), Id_Departamento (FK Departamento), Tipo_Lotacao enum,
+      Percentual_Alocacao DECIMAL(5,2), Dt_Inicio DATE, Dt_Fim DATE nullable, Fl_Ativo BIT.
+      Trigger validação SUM(Percentual_Alocacao) WHERE Fl_Ativo <=100, ROLLBACK se exceder.
+    rf_item_relacionado: "RN-RF024-007"
+    md_moderno: "MD-RF024.md - Tabela Usuario_Departamento"
+    migracao_moderna:
+      tabela_moderna: "Usuario_Departamento"
+      migration_ef_core: "20251230_CreateUsuarioDepartamentoTable.cs"
+      script_migracao: "script-migrar-lotacoes-unicas-para-n-n.sql"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # REGRAS IMPLÍCITAS
+  - id: "LEG-RF024-011"
+    tipo: "regra_negocio"
+    nome: "Código Departamento Sem Validação Unicidade"
+    caminho: "ic1_legado/IControlIT/Cadastros/Departamento.aspx.vb"
+    titulo: "Código Departamento Sem Validação Unicidade"
+    localizacao_codigo: "Departamento.aspx.vb - btnSalvar_Click - Linha 78"
+    descricao: |
+      Sistema legado NÃO valida se código departamento já existe para o conglomerado.
+      Permite cadastrar múltiplos departamentos com mesmo código "DIR-TI" causando ambiguidade relatórios.
+    destino: "assumido"
+    justificativa: |
+      Regra assumida e corrigida em RN-RF024-001 com validação FluentValidation + constraint UNIQUE (Codigo_Departamento, Id_Conglomerado).
+    rf_item_relacionado: "RN-RF024-001"
+    regra_moderna: "RN-RF024-001"
+    migracao_moderna:
+      validador: "CreateDepartamentoCommandValidator"
+      linha_codigo: "RuleFor(x => x.CodigoDepartamento).Matches(@\"^[A-Z]{3,5}-[A-Z0-9]{2,20}$\")"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF024-012"
+    tipo: "regra_negocio"
+    nome: "Líder Pode Ser GUID Inválido"
+    caminho: "ic1_legado/IControlIT/Services/DepartamentoService.asmx.vb"
+    titulo: "Líder Pode Ser GUID Inválido"
+    localizacao_codigo: "DepartamentoService.asmx.vb - CadastrarDepartamento - Linha 45"
+    descricao: |
+      Campo Id_Usuario_Lider aceita qualquer GUID sem verificar IF EXISTS (SELECT 1 FROM Usuario WHERE Id_Usuario = @IdLider AND Fl_Ativo = 1).
+      Sistema permite cadastrar departamento com líder inexistente ou inativo.
+    destino: "assumido"
+    justificativa: |
+      Regra assumida e corrigida em RN-RF024-004 com FK validada EF Core, FluentValidation Must(BeValidUsuario), HTTP 422 se líder inválido.
+    rf_item_relacionado: "RN-RF024-004"
+    regra_moderna: "RN-RF024-004"
+    migracao_moderna:
+      validador: "CreateDepartamentoCommandValidator"
+      linha_codigo: "RuleFor(x => x.IdUsuarioLider).MustAsync(BeValidUsuario)"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF024-013"
+    tipo: "regra_negocio"
+    nome: "Transferência Sem Aprovação Líder"
+    caminho: "ic1_legado/IControlIT/Services/DepartamentoService.asmx.vb"
+    titulo: "Transferência Sem Aprovação Líder"
+    localizacao_codigo: "DepartamentoService.asmx.vb - TransferirColaborador - Linha 112"
+    descricao: |
+      Transferências executadas via UPDATE Usuario.Id_Departamento direto sem aprovação líder origem/destino.
+      Qualquer Admin pode transferir colaboradores unilateralmente sem notificar gestores.
+    destino: "substituido"
+    justificativa: |
+      Regra redesenhada em RN-RF024-006 com workflow aprovação multinível sequencial (Pendente → Aprovado_Origem → Aprovado_Destino → Aprovado_RH),
+      notificações multicanal, tabela Departamento_Movimentacao.
+    rf_item_relacionado: "RN-RF024-006"
+    regra_moderna: "RN-RF024-006"
+    migracao_moderna:
+      command: "CreateMovimentacaoCommand"
+      handler: "AprovarMovimentacaoOrigemCommandHandler"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF024-014"
+    tipo: "regra_negocio"
+    nome: "Lotação Única Sobrescreve Histórico"
+    caminho: "ic1_legado/IControlIT/Services/DepartamentoService.asmx.vb"
+    titulo: "Lotação Única Sobrescreve Histórico"
+    localizacao_codigo: "DepartamentoService.asmx.vb - AlocarUsuarioDepartamento - Linha 88"
+    descricao: |
+      Campo único Usuario.Id_Departamento atualizado via UPDATE sobrescreve lotação anterior sem manter histórico.
+      Impossível rastrear em qual departamento colaborador estava alocado em 01/01/2024 para auditoria.
+    destino: "substituido"
+    justificativa: |
+      Regra redesenhada em tabela Usuario_Departamento N:N com Dt_Inicio/Dt_Fim/Fl_Ativo.
+      Lotação antiga desativada (Fl_Ativo=0), nova criada (Fl_Ativo=1), histórico completo preservado.
+    rf_item_relacionado: "RN-RF024-007"
+    regra_moderna: "RN-RF024-007"
+    migracao_moderna:
+      tabela: "Usuario_Departamento"
+      trigger: "trg_Usuario_Departamento_AtualizarQtdColaboradores"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF024-015"
+    tipo: "regra_negocio"
+    nome: "Organograma Retorna NotImplementedException"
+    caminho: "ic1_legado/IControlIT/Services/DepartamentoService.asmx.vb"
+    titulo: "Organograma Retorna NotImplementedException"
+    localizacao_codigo: "DepartamentoService.asmx.vb - ObterOrganograma - Linha 134"
+    descricao: |
+      WebMethod ObterOrganograma() retorna NotImplementedException.
+      Funcionalidade NUNCA implementada - usuários gerenciam hierarquia em planilhas Excel externas.
+    destino: "descartado"
+    justificativa: |
+      Método legado descartado completamente. Funcionalidade implementada do zero em RN-RF024-009 com organograma D3.js interativo.
+    rf_item_relacionado: "RN-RF024-009"
+    regra_moderna: "RN-RF024-009"
+    migracao_moderna:
+      query: "GetOrganogramaQuery"
+      componente: "organograma-visual.component.ts (D3.js v7)"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# Bancos Legados Mapeados
+bancos_legados:
+  - nome: "IControlIT_Cliente01"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "Departamento"
+      - "Usuario (campo Id_Departamento)"
+    destino: "consolidado"
+    justificativa: "Migrado para banco único SQLite dev / SQL Server moderno (prod) com multi-tenancy (Id_Conglomerado)"
+    banco_moderno: "IControlIT.db (SQLite dev) / IControlIT SQL Server (prod)"
+
+  - nome: "IControlIT_Cliente02"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "Departamento"
+      - "Usuario (campo Id_Departamento)"
+    destino: "consolidado"
+    justificativa: "Migrado para banco único com Row-Level Security via Id_Conglomerado"
+    banco_moderno: "IControlIT.db (SQLite dev) / IControlIT SQL Server (prod)"
+
+  - nome: "IControlIT_Cliente03"
+    servidor: "SQL-LEGADO-02"
+    tabelas_relacionadas:
+      - "Departamento"
+      - "Usuario (campo Id_Departamento)"
+    destino: "consolidado"
+    justificativa: "Migrado para banco único com isolamento lógico multi-tenant"
+    banco_moderno: "IControlIT.db (SQLite dev) / IControlIT SQL Server (prod)"
+
+# Problemas Legado Identificados
+problemas_legado:
+  - id: "PROB-RF024-001"
+    titulo: "Estrutura Flat Sem Hierarquia Recursiva"
+    severidade: "CRÍTICA"
+    descricao: |
+      Tabela Departamento sem campo Id_Departamento_Pai impossibilita modelar hierarquia Diretoria > Gerência > Coordenação.
+      Usuários gerenciam hierarquia mentalmente via planilhas Excel externas - alta taxa de erro.
+    impacto: "Impossível gerar organograma visual, impossível filtrar por nível hierárquico, relatórios sem contexto estrutura organizacional"
+    solucao_moderna: "Campo IdDepartamentoPai nullable self-referencing FK, trigger CTE recursivo atualizar NivelHierarquia/CaminhoHierarquico automaticamente"
+
+  - id: "PROB-RF024-002"
+    titulo: "Lotação Única Não Suporta Estrutura Matricial"
+    severidade: "ALTA"
+    descricao: |
+      Campo único Usuario.Id_Departamento FK simples não suporta dotted-line (estrutura matricial).
+      Impossível alocar colaborador 70% GER-PROJETOS + 30% GER-DEV para projetos temporários.
+    impacto: "Gestão inadequada recursos compartilhados, impossível rastrear alocação parcial colaboradores, relatórios headcount imprecisos"
+    solucao_moderna: "Tabela Usuario_Departamento N:N com Tipo_Lotacao (Principal/DottedLine/Temporaria), Percentual_Alocacao DECIMAL(5,2), trigger validação SUM<=100%"
+
+  - id: "PROB-RF024-003"
+    titulo: "Sem Workflow Aprovação Movimentações"
+    severidade: "ALTA"
+    descricao: |
+      Transferências executadas via UPDATE direto sem aprovação líder origem/destino, sem histórico origem/destino/motivo.
+      Qualquer Admin pode transferir colaboradores unilateralmente causando desorganização equipes.
+    impacto: "Falta controle movimentações, impossível rastrear compliance eSocial/RAIS, impossível calcular turnover departamental"
+    solucao_moderna: "Tabela Departamento_Movimentacao com Status_Aprovacao enum multinível, workflow sequencial (Origem → Destino → RH), notificações multicanal"
+
+  - id: "PROB-RF024-004"
+    titulo: "Organograma Visual Inexistente"
+    severidade: "MÉDIA"
+    descricao: |
+      WebMethod ObterOrganograma() retorna NotImplementedException.
+      Funcionalidade NUNCA implementada - usuários visualizam lista flat DataGridView alfabética.
+    impacto: "Falta visualização intuitiva estrutura organizacional, gestores dependem planilhas Excel externas, onboarding novos colaboradores complexo"
+    solucao_moderna: "Organograma D3.js v7 interativo (zoom, pan, collapse/expand, busca, filtro tipo, export PNG/PDF/SVG), endpoint GET /api/v1/departamentos/organograma DTO recursivo"
+
+  - id: "PROB-RF024-005"
+    titulo: "Sincronização Active Directory Manual"
+    severidade: "ALTA"
+    descricao: |
+      WebMethod SincronizarActiveDirectory() retorna NotImplementedException.
+      Grupos AD criados manualmente via PowerShell mensal - alta taxa inconsistência (departamentos deletados com grupos órfãos, colaboradores em grupo errado).
+    impacto: "Inconsistência permissões corporativas, falhas acesso recursos compartilhados, overhead TI scripts manuais mensais"
+    solucao_moderna: "Job Hangfire diário (Cron '0 3 * * *'), Microsoft Graph SDK .NET, autenticação Client Credentials Flow, permissões Group.ReadWrite.All"
+
+  - id: "PROB-RF024-006"
+    titulo: "Sem Validação Referências Circulares Hierarquia"
+    severidade: "CRÍTICA"
+    descricao: |
+      Sistema permite criar loops infinitos hierarquia (A → B → C → A) pois não valida Id_Departamento_Pai recursivamente.
+      Queries CTE recursivo entram em loop infinito travando SQL Server.
+    impacto: "Travamento sistema, queries timeout, impossível renderizar organograma, corrupção estrutura organizacional"
+    solucao_moderna: "Algoritmo detecção loops via HashSet visitados, validação em CreateDepartamentoCommandHandler ANTES de salvar, HTTP 422 se loop detectado"
+
+# Metadados
+metadados:
+  total_itens_legado: 15
+  itens_assumidos: 2
+  itens_substituidos: 11
+  itens_descartados: 2
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+
+# Changelog
+changelog:
+  - versao: "2.0"
+    data: "2025-12-30"
+    descricao: "Referência completa ao legado com 100% destinos preenchidos (ASSUMIDO/SUBSTITUÍDO/DESCARTADO)"
+    autor: "Agência ALC - alc.dev.br"

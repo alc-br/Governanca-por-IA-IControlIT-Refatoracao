@@ -1,0 +1,420 @@
+rf_id: RF039
+rf_title: "Gestão de Bilhetes Telefônicos"
+versao_governanca: "2.0"
+data_migracao: "2025-12-30"
+
+# ==============================================================================
+# CONTEXTO: AUSÊNCIA DE SISTEMA LEGADO DEDICADO
+# ==============================================================================
+
+contexto_legado:
+  sistema_dedicado: false
+  descricao: |
+    O sistema legado IControlIT NÃO possuía módulo dedicado de gestão de bilhetes telefônicos.
+    Todo o processo era realizado MANUALMENTE através de planilhas Excel, download manual de
+    faturas dos portais das operadoras e análises visuais esporádicas.
+  metodo_gestao: "Planilhas Excel + Processos Manuais"
+  local_arquivos: "\\\\server\\telefonia\\{ano}\\{mes}\\"
+  tempo_fechamento_mensal: "3-5 dias (40 horas de trabalho manual)"
+
+# ==============================================================================
+# ITENS LEGADO RASTREADOS (PROCESSOS MANUAIS)
+# ==============================================================================
+
+itens_legado:
+  # ------------------------------------------------------------------------------
+  # PROCESSO MANUAL 1: DOWNLOAD DE FATURAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-001"
+    tipo: "processo_manual"
+    titulo: "Download Manual de Faturas das Operadoras"
+    descricao: |
+      Processo realizado mensalmente pelo Analista de TI. Após receber e-mail da operadora
+      informando disponibilidade da fatura, acessava portal web da operadora, realizava login,
+      navegava até seção de faturas, localizava arquivo CSV do mês e realizava download manual.
+      Arquivo era salvo em pasta compartilhada \\server\telefonia\{ano}\{mes}\
+    responsavel: "Analista de TI"
+    frequencia: "Mensal (após e-mail da operadora)"
+    tempo_medio: "30-60 minutos por operadora"
+    problemas_identificados:
+      - "Dependia de e-mail da operadora (atraso se e-mail não chegasse)"
+      - "Esquecimentos frequentes (necessidade de lembretes manuais)"
+      - "Senhas expiradas causavam bloqueio de acesso"
+      - "Nenhum controle de versão (arquivos sobrescritos)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por importação automatizada via FTP/API com job Hangfire diário"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Importação Automatizada)"
+      regra_moderna: "RN-BIL-039-01"
+    migracao_moderna:
+      job_hangfire: "ImportarFaturasTelefonicasJob (executa diariamente às 03:00 UTC)"
+      credenciais_criptografadas: "AES-256 no banco de dados"
+      retry_automatico: "3 tentativas com backoff exponencial"
+
+  # ------------------------------------------------------------------------------
+  # PROCESSO MANUAL 2: ABERTURA EM EXCEL
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-002"
+    tipo: "processo_manual"
+    titulo: "Abertura e Formatação Manual em Excel"
+    descricao: |
+      Após download do CSV, analista abria arquivo no Excel, aplicava filtros automáticos,
+      ajustava largura de colunas, formatava números para moeda (R$), aplicava formatação
+      condicional (valores >R$ 500 em vermelho) e salvava como XLSX. Macros VBA personalizadas
+      auxiliavam na formatação mas quebravam com mudanças no layout da fatura.
+    responsavel: "Analista de TI"
+    tempo_medio: "15-30 minutos"
+    problemas_identificados:
+      - "Macros VBA quebravam se operadora mudasse layout da fatura"
+      - "Formatação manual inconsistente (cada analista aplicava diferente)"
+      - "Sem validação de dados (números mal formatados passavam despercebidos)"
+      - "Arquivos XLSX com tamanho elevado (>50MB para faturas grandes)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por parser inteligente que detecta formato automaticamente e normaliza dados"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Parser Inteligente Multi-Formato)"
+      regra_moderna: "RN-BIL-039-02"
+    migracao_moderna:
+      parser: "VivoEmpresasCSVParser, TimBrasilCSVParser, ClaroCSVParser, OiCSVParser"
+      detecção_automatica: "Análise das primeiras 10 linhas do arquivo"
+      normalizacao_numeros: "Formato E.164 padrão (+5511987654321)"
+
+  # ------------------------------------------------------------------------------
+  # PROCESSO MANUAL 3: ANÁLISE DE CUSTOS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-003"
+    tipo: "processo_manual"
+    titulo: "Análise Manual de Custos com Tabela Dinâmica"
+    descricao: |
+      Analista criava tabela dinâmica (pivot) no Excel para agrupar custos por ramal, tipo de
+      ligação, destino. Calculava total de custos, média de minutos, custo por minuto. Criava
+      gráficos manuais (barras, pizza) e copiava para PowerPoint para apresentação aos gestores.
+      Todo mês esse processo era REPETIDO do zero (nenhum template automatizado).
+    responsavel: "Analista de TI + Gestor Financeiro"
+    tempo_medio: "2-4 horas"
+    ferramentas: "Excel (tabela dinâmica), PowerPoint (apresentação)"
+    problemas_identificados:
+      - "Processo repetitivo mensal (nenhuma automação)"
+      - "Gráficos estáticos (não atualizavam com novos dados)"
+      - "Comparação mês a mês manual (fórmulas =(B2-A2)/A2)"
+      - "Erros em fórmulas causavam dados incorretos em apresentações"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por dashboard interativo em tempo real com gráficos dinâmicos"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Análise de Custos por Categoria)"
+      regra_moderna: "RN-BIL-039-14"
+    migracao_moderna:
+      dashboard_angular: "bilhetes-dashboard.component.ts"
+      graficos_apexcharts: "Evolução de custos, segmentação por categoria, tendências"
+      atualizacao: "Tempo real (dados atualizados a cada importação)"
+
+  # ------------------------------------------------------------------------------
+  # PROCESSO MANUAL 4: IDENTIFICAÇÃO DE ANOMALIAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-004"
+    tipo: "processo_manual"
+    titulo: "Identificação Visual e Subjetiva de Anomalias"
+    descricao: |
+      Analista ordenava planilha por custo (decrescente) e verificava visualmente linhas com
+      valores elevados. Critérios subjetivos: custo >R$ 500 por ramal → investigar manualmente,
+      ligações para 0900/0300 → destacar em vermelho e enviar e-mail para gestor. Ligações
+      internacionais não justificadas → consultar gestor por e-mail. NENHUM critério quantitativo
+      ou baseline de comparação.
+    responsavel: "Analista de TI"
+    tempo_medio: "1-2 horas"
+    problemas_identificados:
+      - "Critérios subjetivos (sem score de risco quantitativo)"
+      - "Detecção retroativa (apenas após fechamento da fatura)"
+      - "Falsos positivos frequentes (ramais de vendas com uso legítimo elevado)"
+      - "Anomalias sutis não detectadas (loops de chamada com duração curta)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por algoritmo de machine learning com score de risco (0-100) e baseline de 90 dias"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Detecção de Anomalias)"
+      regra_moderna: "RN-BIL-039-08"
+    migracao_moderna:
+      algoritmo: "Machine learning com baseline personalizado por número"
+      score_risco: "0-100 (>70 alerta, >90 bloqueio automático)"
+      diagnostico_automatico: "Loop de chamada, fraude, uso indevido, problema técnico"
+
+  # ------------------------------------------------------------------------------
+  # PROCESSO MANUAL 5: ALERTAS DE NÚMEROS PREMIUM
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-005"
+    tipo: "processo_manual"
+    titulo: "Alerta Manual de Números Premium (Retroativo)"
+    descricao: |
+      Após identificar visualmente ligações para 0900/0300 na planilha (destacadas em vermelho),
+      analista enviava e-mail manual para gestor do usuário informando "Detectado uso de número
+      premium em {data} por {usuario}. Custo: R$ {valor}. Favor justificar." Resposta era
+      OPCIONAL e não havia workflow de acompanhamento.
+    responsavel: "Analista de TI"
+    tempo_medio: "15-30 minutos (redação e envio de e-mails)"
+    problemas_identificados:
+      - "Alerta retroativo (após custo já gerado, não preventivo)"
+      - "E-mail manual (sem automação)"
+      - "Justificativa opcional (muitos usuários ignoravam)"
+      - "Sem rastreabilidade (e-mail pode ser deletado)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por alerta automático em tempo real com justificativa obrigatória em 48h"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Alertas de Números Premium)"
+      regra_moderna: "RN-BIL-039-04"
+    migracao_moderna:
+      alerta_automatico: "SignalR em tempo real + e-mail estruturado"
+      workflow: "Justificativa obrigatória em 48h, escalação para compliance se não fornecida"
+      auditoria: "Registro completo com código BIL_NUMERO_PREMIUM_DETECTADO"
+
+  # ------------------------------------------------------------------------------
+  # PROCESSO MANUAL 6: ALERTAS DE ROAMING
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-006"
+    tipo: "processo_manual"
+    titulo: "Alerta Manual de Roaming (Inexistente)"
+    descricao: |
+      NÃO EXISTIA processo de alerta de roaming. Usuários descobriam que estavam em roaming
+      apenas ao receber a fatura fechada (30-45 dias após o uso), quando custo já estava
+      consolidado. Casos de funcionários em viagem internacional gerando custos de R$ 5.000-10.000
+      em roaming sem controle prévio foram frequentes.
+    responsavel: "N/A (não existia)"
+    problemas_identificados:
+      - "Ausência total de controle proativo"
+      - "Descoberta retroativa (após custo gerado)"
+      - "Custos elevados sem possibilidade de intervenção preventiva"
+    destino: "NOVO (não existia no legado)"
+    justificativa: "Funcionalidade 100% nova - SMS imediato ao usuário em roaming + e-mail gestor + bloqueio se custo >R$ 2.000"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Alertas de Roaming Internacional)"
+      regra_moderna: "RN-BIL-039-05"
+    migracao_moderna:
+      sms_gateway: "Envio imediato via gateway SMS ao detectar código país ≠ +55"
+      monitoramento_tempo_real: "Custo acumulado calculado incrementalmente"
+      bloqueio_preventivo: "Configurável - se custo >R$ 2.000, bloqueia dados, mantém voz"
+
+  # ------------------------------------------------------------------------------
+  # PROCESSO MANUAL 7: RATEIO POR CENTRO DE CUSTO
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-007"
+    tipo: "processo_manual"
+    titulo: "Rateio Manual por Centro de Custo em Excel"
+    descricao: |
+      Analista financeiro utilizava VLOOKUP no Excel para vincular cada ramal ao seu centro de
+      custo (planilha auxiliar mantida manualmente). Somava custos por centro de custo, calculava
+      proporcionalidade de custos fixos (trunk, assinatura) com fórmula manual. Processo demorava
+      3-5 dias e tinha taxa de erro de 15-20% (soma dos rateios ≠ 100% do total da fatura).
+    responsavel: "Analista Financeiro"
+    tempo_medio: "3-5 dias (40 horas de trabalho manual)"
+    ferramentas: "Excel (VLOOKUP, SUMIF, fórmulas manuais)"
+    problemas_identificados:
+      - "Ramais sem centro de custo vinculado → rateio proporcional genérico (incorreto)"
+      - "Erros de digitação em fórmulas → divergências contábeis"
+      - "Soma dos rateios ≠ 100% do total (falta de validação matemática)"
+      - "Retrabalho frequente para corrigir erros"
+      - "Sem rastreabilidade (qual bilhete gerou qual lançamento contábil)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por rateio automático com FK para centro de custo e validação matemática 100%"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Rateio Automático)"
+      regra_moderna: "RN-BIL-039-06"
+    migracao_moderna:
+      vinculo_fk: "Cada número/ramal vinculado obrigatoriamente a um CentroCustoId"
+      validacao_matematica: "Soma dos rateios = 100% do total da fatura (bloqueio se divergente)"
+      rastreabilidade_completa: "Cada bilhete → centro de custo → conta contábil → lançamento ERP"
+
+  # ------------------------------------------------------------------------------
+  # PROCESSO MANUAL 8: INTEGRAÇÃO COM ERP
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-008"
+    tipo: "processo_manual"
+    titulo: "Integração Manual com ERP (SAP)"
+    descricao: |
+      Após rateio em Excel, analista financeiro exportava resumo (total por centro de custo) para
+      arquivo TXT. Acessava SAP manualmente, navegava até módulo FI (Financeiro), selecionava
+      opção "Importar Lançamentos", carregava arquivo TXT e confirmava importação. Processo tinha
+      taxa de erro de 10% (lançamentos duplicados, conta contábil incorreta, erro de importação).
+    responsavel: "Analista Financeiro"
+    tempo_medio: "2 horas"
+    problemas_identificados:
+      - "Erro de importação → retrabalho manual"
+      - "Lançamentos duplicados (importação executada 2x sem perceber)"
+      - "Conta contábil incorreta (mapeamento manual suscetível a erro)"
+      - "Sem rastreabilidade (qual lançamento veio de qual bilhete)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por integração automática via API REST com retry e validação"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Exportação para ERP)"
+      regra_moderna: "RN-BIL-039-11"
+    migracao_moderna:
+      integracao_api: "API REST do SAP/TOTVS/Protheus (configurável)"
+      retry_automatico: "3 tentativas com backoff exponencial (1min, 5min, 15min)"
+      validacao: "Status code 200 do ERP → confirmação de sucesso"
+      notificacao_erro: "E-mail automático para equipe contábil em caso de falha"
+
+  # ------------------------------------------------------------------------------
+  # PROCESSO MANUAL 9: RELATÓRIOS PARA GESTORES
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-009"
+    tipo: "processo_manual"
+    titulo: "Relatórios Mensais Manuais para Gestores"
+    descricao: |
+      Analista de TI criava apresentação PowerPoint com gráficos copiados do Excel (Ctrl+C, Ctrl+V).
+      Conteúdo: total de custos do mês, comparação com mês anterior, top 5 ramais com maior custo
+      (apenas valores totais, sem drill-down). Apresentação era enviada por e-mail para gestores.
+      Quando gestor pedia detalhamento, era necessário refazer análise manualmente.
+    responsavel: "Analista de TI"
+    tempo_medio: "1-2 horas"
+    ferramentas: "Excel + PowerPoint + E-mail"
+    problemas_identificados:
+      - "Gráficos estáticos (não atualizavam com novos dados)"
+      - "Sem drill-down (gestor não conseguia detalhar)"
+      - "Perguntas dos gestores exigiam retrabalho manual"
+      - "Versões da apresentação enviadas por e-mail (sem versionamento)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por dashboard interativo com drill-down, filtros dinâmicos e exportação automática"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Relatório Top 10 Consumidores)"
+      regra_moderna: "RN-BIL-039-09"
+    migracao_moderna:
+      dashboard_interativo: "bilhetes-reports.component.ts (Angular)"
+      drill_down: "Clique em qualquer número → detalhamento completo de chamadas"
+      exportacao: "PDF/Excel automático com um clique"
+
+  # ------------------------------------------------------------------------------
+  # FUNCIONALIDADE NOVA 10: NORMALIZAÇÃO DE NÚMEROS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-010"
+    tipo: "funcionalidade_nova"
+    titulo: "Normalização de Números para Formato E.164"
+    descricao: |
+      Funcionalidade 100% NOVA. No legado, números telefônicos eram armazenados em formatos
+      variados: "(11) 9876-5432", "11 98765432", "5511987654321", sem padronização. Isso
+      dificultava comparações, relatórios e análises.
+    destino: "NOVO (não existia no legado)"
+    justificativa: "Garantir consistência de dados e facilitar análises"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Normalização de Números)"
+      regra_moderna: "RN-BIL-039-03"
+    migracao_moderna:
+      formato_padrao: "+5511987654321 (E.164)"
+      validacao_ddd: "Lista ANATEL (11-99)"
+      validacao_digitos: "Móvel=9, Fixo=8, 0800=7"
+
+  # ------------------------------------------------------------------------------
+  # FUNCIONALIDADE NOVA 11: OCR DE PDFs
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-011"
+    tipo: "funcionalidade_nova"
+    titulo: "Processamento OCR de PDFs Escaneados"
+    descricao: |
+      Funcionalidade 100% NOVA. No legado, faturas em PDF escaneado eram IGNORADAS (não processadas).
+      Operadoras menores que não forneciam CSV exigiam digitação manual ou eram simplesmente não
+      processadas.
+    destino: "NOVO (não existia no legado)"
+    justificativa: "Permitir processamento de qualquer fatura, independente do formato"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Processamento OCR de PDFs)"
+      regra_moderna: "RN-BIL-039-13"
+    migracao_moderna:
+      motor_ocr: "Azure Cognitive Services (primeira opção) ou Tesseract (fallback gratuito)"
+      validacao_confianca: "Confiança >90% por campo → aprovação automática"
+      revisao_manual: "Confiança 70-90% → interface web para revisão"
+
+  # ------------------------------------------------------------------------------
+  # FUNCIONALIDADE NOVA 12: COMPARAÇÃO USO VS PLANO
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-012"
+    tipo: "funcionalidade_nova"
+    titulo: "Comparação Uso Real vs Plano Contratado"
+    descricao: |
+      Funcionalidade 100% NOVA. No legado, não havia comparação entre uso real e plano contratado.
+      Linhas com planos superdimensionados (sub-uso) ou subdimensionados (excesso com custos extras)
+      não eram identificadas.
+    destino: "NOVO (não existia no legado)"
+    justificativa: "Otimizar custos identificando planos inadequados"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Comparação Uso vs Plano)"
+      regra_moderna: "RN-BIL-039-07"
+    migracao_moderna:
+      classificacao_uso: "Sub-uso (<50%), Adequado (50-90%), Excesso (>100%)"
+      recomendacao: "Upgrade/downgrade se economia >R$ 50/mês"
+
+  # ------------------------------------------------------------------------------
+  # FUNCIONALIDADE NOVA 13: SIMULADOR DE PLANOS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-013"
+    tipo: "funcionalidade_nova"
+    titulo: "Simulador de Planos Alternativos"
+    descricao: |
+      Funcionalidade 100% NOVA. No legado, não havia simulador de planos. Decisões de mudança de
+      plano eram tomadas sem embasamento quantitativo (apenas "achismos").
+    destino: "NOVO (não existia no legado)"
+    justificativa: "Embasar decisões de mudança de plano com análise quantitativa"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Simulador de Planos)"
+      regra_moderna: "RN-BIL-039-10"
+    migracao_moderna:
+      uso_medio: "Últimos 3 meses (minutos, SMS, dados)"
+      ranking: "5 planos mais econômicos"
+      economia_anual: "Projeção de economia em 12 meses"
+
+  # ------------------------------------------------------------------------------
+  # FUNCIONALIDADE NOVA 14: ANÁLISE DE HORÁRIO DE PICO
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-014"
+    tipo: "funcionalidade_nova"
+    titulo: "Análise de Horário de Pico e Dimensionamento de Troncos"
+    descricao: |
+      Funcionalidade 100% NOVA. No legado, não havia análise de horário de pico. Quantidade de
+      troncos contratados era arbitrária (sem embasamento em dados reais de ligações simultâneas).
+    destino: "NOVO (não existia no legado)"
+    justificativa: "Otimizar quantidade de troncos baseado em análise de pico real"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Análise de Horário de Pico)"
+      regra_moderna: "RN-BIL-039-12"
+    migracao_moderna:
+      heatmap: "Ligações simultâneas por dia da semana e hora"
+      taxa_congestionamento: "(pico - capacidade) / capacidade"
+      recomendacao: "Ajuste de troncos se congestionamento >10%"
+
+  # ------------------------------------------------------------------------------
+  # FUNCIONALIDADE NOVA 15: POLÍTICA DE USO ACEITÁVEL
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF039-015"
+    tipo: "funcionalidade_nova"
+    titulo: "Política de Uso Aceitável e Score de Compliance"
+    descricao: |
+      Funcionalidade 100% NOVA. No legado, não havia política de uso aceitável formalizada.
+      Violações (uso pessoal excessivo) não eram detectadas ou reportadas sistematicamente.
+    destino: "NOVO (não existia no legado)"
+    justificativa: "Garantir uso adequado de recursos corporativos"
+    rastreabilidade:
+      rf_moderno: "RF-039 - Seção 4 (Funcionalidades: Política de Uso Aceitável)"
+      regra_moderna: "RN-BIL-039-15"
+    migracao_moderna:
+      score_conformidade: "0-100 calculado mensalmente"
+      violacoes_criticas: "Justificativa obrigatória em 72h"
+      relatorio_mensal: "Enviado automaticamente para RH/gestores"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 15
+  itens_processo_manual: 9
+  itens_funcionalidade_nova: 6
+  itens_substituidos: 9
+  itens_novos: 6
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+
+  tempo_economizado_mensal: "40 horas (3-5 dias de trabalho manual)"
+  reducao_erros: "100% (rateio validado matematicamente)"
+  economia_media_mensal: "R$ 5.000 (detecção proativa de anomalias)"
+
+  ganhos_principais:
+    - "Automação 95% do processo"
+    - "Tempo de fechamento: 40h → 0h"
+    - "Alertas em tempo real (não retroativos)"
+    - "Machine learning detecta anomalias"
+    - "Rastreabilidade completa (7 anos)"

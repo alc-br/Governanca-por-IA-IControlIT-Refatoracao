@@ -1,0 +1,1310 @@
+# RF054: Gestão de Lotes de Auditoria
+
+**Versao**: 1.0 | **Data**: 2025-12-28
+**RF Relacionado**: RF034, RF035 | **EPIC**: EPIC010-AUD-Auditoria-Avancada
+**Fase**: Fase 6 - Ativos, Auditoria e Integrações
+
+---
+
+## 1. RESUMO EXECUTIVO
+
+### 1.1 Descricao Geral
+
+O **RF054 - Gestão de Lotes de Auditoria** especifica o módulo de processamento em lote de auditorias de faturas de telecomunicações para o sistema IControlIT. Este sistema é responsável por orquestrar o processo de criação, distribuição e processamento de lotes de faturas destinadas à auditoria, garantindo rastreabilidade, controle de qualidade e continuidade operacional.
+
+Este requisito implementa a camada de orquestração que conecta a coleta de faturas (RF032) com a auditoria de itens (RF034) e consolidação de resultados (RF035), utilizando padrão de background jobs (Hangfire) com monitoramento em tempo real (SignalR) e notificações assíncronas (Azure Service Bus).
+
+### 1.2 Importancia Estrategica
+
+O módulo de gestão de lotes é crítico para:
+
+- **Escalabilidade Operacional**: Permite processamento de centenas de milhares de faturas em lotes controlados, evitando sobrecarga do sistema
+- **Rastreabilidade Completa**: Auditoria de auditoria - cada decisão de lote é registrada, rastreável e reversível
+- **Eficiência de Recursos**: Distribuição inteligente de lotes entre auditores para otimizar tempo e qualidade
+- **Continuidade de Negócio**: Reprocessamento automático em caso de erro, com histórico completo de tentativas
+- **Conformidade Regulatória**: Registro imutável de todas operações de lote para atender LGPD, SOX e compliance tributário
+- **ROI da Auditoria**: Dados de produtividade do auditor, tempo médio por item, taxa de glosa para tomada de decisão
+
+### 1.3 Conceitos Fundamentais
+
+**Lote de Auditoria (Audit Batch)**: Conjunto de faturas agrupadas por critérios específicos (período, operadora, filial, centro de custo) destinado a ser auditado por um auditor ou grupo de auditores. Ciclo de vida: criação → processamento → consolidação → arquivo.
+
+**Background Job (Job em Segundo Plano)**: Tarefa assíncrona executada fora do contexto HTTP via Hangfire. Permite operações longas sem bloquear interface.
+
+**Critério de Lote**: Regra que seleciona faturas automaticamente (período, operadora, filial, centro de custo).
+
+**Estado do Lote**: Máquina de estados - Criado → Aguardando → Processando → Concluído → Arquivado, com estados alternativos Cancelado e Erro.
+
+### 1.4 Legado vs Modernizado
+
+| Aspecto | Legado (VB.NET + ASPX) | Modernizado (.NET 10 + Angular 19) |
+|---------|------------------------|-------------------------------------|
+| **Processamento de Lote** | Síncrono, tela travada | Assíncrono via Hangfire (background jobs) |
+| **Monitoramento** | Sem feedback em tempo real | SignalR para atualização real-time de progresso |
+| **Persistência de Jobs** | Memória do servidor (perda em restart) | Banco de dados (resiliente, recuperável) |
+| **Distribuição de Carga** | Uma máquina, sem scaling | Múltiplos workers Hangfire (escalável) |
+| **Notificações** | E-mail manual | Azure Service Bus + E-mail automático |
+| **Reprocessamento** | Manual, sem histórico | Automático com retry policy, histórico completo |
+| **Estados do Lote** | Strings em campo TEXT | State Machine (CQRS pattern) com validação |
+| **Auditoria de Auditoria** | Sem rastreamento | Auditoria completa de operações de lote |
+| **Dashboard** | Relatório estático SSRS | Dashboard Angular em tempo real |
+| **Multi-tenancy** | Sem isolamento | ClienteId + Row-Level Security automático |
+
+### 1.5 Funcionalidades Principais
+
+1. **Gestão de Lotes (CRUD)** - Criar, listar, consultar, atualizar, cancelar com validações completas
+2. **Seleção Automática de Faturas** - Algoritmo que seleciona faturas por critérios de negócio
+3. **Atribuição de Auditor** - Manual ou automática (distribuição inteligente por carga)
+4. **Processamento Assíncrono** - Hangfire background job sem bloquear interface
+5. **Monitoramento de Progresso** - SignalR para atualizações em tempo real (0-100%, itens, ETA)
+6. **Notificações** - E-mail e Azure Service Bus para eventos assíncronos
+7. **Reprocessamento** - Retry automático com exponential backoff, máximo 3 tentativas
+8. **Consolidação de Resultados** - Integração com RF035 para consolidar itens auditados
+9. **Histórico de Lotes** - Arquivo permanente para auditoria regulatória
+10. **Relatórios de Lote** - Resumo executivo, qtd faturas, tempo médio, taxa de glosa
+11. **Cancelamento com Rollback** - Cancelar lote com reversão de alterações
+12. **Dashboard em Tempo Real** - Visualização de fila, progresso, alertas (SLA, timeout)
+13. **Integração Completa** - RF034 (itens) e RF035 (resumos) via events
+
+---
+
+## 2. REGRAS DE NEGOCIO
+
+### RN-LOT-054-01: Obrigatoriedade de Critérios de Seleção
+
+**Descricao**: Toda criação de lote deve possuir ao menos um critério de seleção (período, operadora, filial ou centro de custo). Nenhum lote sem critério.
+
+**Justificativa**: Critérios garantem escopo bem definido, evitando auditorias aleatórias ou duplicadas.
+
+**Implementacao**:
+```csharp
+public class CreateAuditBatchCommand
+{
+    public required string ClienteId { get; set; }
+    public required string BatchName { get; set; }
+    public required DateTime PeriodoInicio { get; set; }
+    public required DateTime PeriodoFim { get; set; }
+    public List<int> OperadoraIds { get; set; } = new();
+    public List<int> FilialIds { get; set; } = new();
+    public List<int> CentroCustoIds { get; set; } = new();
+
+    public bool IsValid()
+    {
+        return OperadoraIds.Count > 0
+            || FilialIds.Count > 0
+            || CentroCustoIds.Count > 0;
+    }
+}
+
+public class CreateAuditBatchCommandHandler : ICommandHandler<CreateAuditBatchCommand>
+{
+    public async Task Handle(CreateAuditBatchCommand cmd)
+    {
+        if (!cmd.IsValid())
+            throw new BusinessException("Lote deve ter ao menos um critério");
+        // Criar lote
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Válido: Lote com período + operadora
+- ✅ Válido: Lote com filial + centro custo
+- ❌ Inválido: Lote sem nenhum critério
+
+---
+
+### RN-LOT-054-02: Lote Imutável Após Processamento Iniciado
+
+**Descricao**: Após processamento iniciado (status "Em Processamento"), critérios do lote não podem ser alterados. Editável apenas em estados "Criado" e "Cancelado".
+
+**Justificativa**: Integridade de dados. Alterações durante processamento causam perda ou duplicação.
+
+**Implementacao**:
+```csharp
+public class UpdateAuditBatchCommand
+{
+    public string BatchId { get; set; }
+    public string ClienteId { get; set; }
+    public string NewBatchName { get; set; }
+}
+
+public class UpdateAuditBatchCommandHandler : ICommandHandler<UpdateAuditBatchCommand>
+{
+    public async Task Handle(UpdateAuditBatchCommand cmd)
+    {
+        var batch = await _repository.GetByIdAsync(cmd.BatchId);
+
+        if (batch.Status != AuditBatchStatus.Created
+            && batch.Status != AuditBatchStatus.Cancelled)
+        {
+            throw new BusinessException(
+                $"Lote no status '{batch.Status}' não pode ser editado");
+        }
+
+        batch.Update(cmd.NewBatchName);
+        await _repository.SaveAsync(batch);
+    }
+}
+```
+
+**Exemplos**:
+- ✅ Permitido: Editar lote em status "Criado"
+- ❌ Bloqueado: Editar lote em status "Em Processamento"
+
+---
+
+### RN-LOT-054-03: Seleção Automática de Faturas por Critérios
+
+**Descricao**: Ao ativar lote para processamento, sistema automaticamente seleciona todas faturas que correspondem aos critérios e ainda não foram auditadas.
+
+**Justificativa**: Automação reduz erro humano, garante consistência, evita reauditoria.
+
+**Implementacao**:
+```csharp
+public class SelectInvoicesForBatchCommand
+{
+    public string BatchId { get; set; }
+    public string ClienteId { get; set; }
+}
+
+public class SelectInvoicesForBatchCommandHandler : ICommandHandler<SelectInvoicesForBatchCommand>
+{
+    public async Task Handle(SelectInvoicesForBatchCommand cmd)
+    {
+        var batch = await _repository.GetByIdAsync(cmd.BatchId);
+
+        var invoices = await _invoiceRepository.GetInvoicesByAsync(
+            clienteId: cmd.ClienteId,
+            periodoInicio: batch.PeriodoInicio,
+            periodoFim: batch.PeriodoFim,
+            operadoraIds: batch.OperadoraIds,
+            filialIds: batch.FilialIds,
+            centroCustoIds: batch.CentroCustoIds,
+            auditedOnly: false // Não auditadas ainda
+        );
+
+        batch.SelectInvoices(invoices);
+        await _repository.SaveAsync(batch);
+
+        await _auditService.LogAsync(
+            action: "BATCH_INVOICES_SELECTED",
+            details: new { BatchId = batch.Id, Count = invoices.Count }
+        );
+    }
+}
+```
+
+**Exemplos**:
+- Lote "Jan 2025 - Vivo": Seleciona 5.000 faturas Vivo de janeiro não auditadas
+- Lote "SP - Admin": Seleciona 2.500 faturas filial SP + custo Admin não auditadas
+- Lote "Nacional": Seleciona 50.000 faturas do período não auditadas
+
+---
+
+### RN-LOT-054-04: Atribuição Manual ou Automática de Auditor
+
+**Descricao**: Lote pode ser atribuído a auditor específico (manual) ou distribuído automaticamente entre auditores com menor carga.
+
+**Justificativa**: Flexibilidade. Alguns lotes para especialista; outros para balancear carga.
+
+**Implementacao**:
+```csharp
+public class AssignAuditBatchCommand
+{
+    public string BatchId { get; set; }
+    public string ClienteId { get; set; }
+    public string? AuditorUserId { get; set; } // null = atribuir automaticamente
+}
+
+public class AssignAuditBatchCommandHandler : ICommandHandler<AssignAuditBatchCommand>
+{
+    public async Task Handle(AssignAuditBatchCommand cmd)
+    {
+        var batch = await _repository.GetByIdAsync(cmd.BatchId);
+
+        string assignedAuditorId;
+
+        if (!string.IsNullOrEmpty(cmd.AuditorUserId))
+        {
+            var auditor = await _userRepository.GetByIdAsync(cmd.AuditorUserId);
+            if (auditor?.Roles.Contains("Auditor") != true)
+                throw new BusinessException("Usuário não é auditor");
+
+            assignedAuditorId = cmd.AuditorUserId;
+        }
+        else
+        {
+            // Atribuição automática: auditor com menor carga
+            assignedAuditorId = await GetAuditorWithLowestWorkloadAsync();
+        }
+
+        batch.AssignToAuditor(assignedAuditorId);
+        await _repository.SaveAsync(batch);
+
+        await _notificationService.SendEmailAsync(
+            toUserId: assignedAuditorId,
+            subject: "Novo Lote de Auditoria Atribuído",
+            body: $"Lote '{batch.Name}' com {batch.InvoiceCount} faturas foi atribuído"
+        );
+    }
+
+    private async Task<string> GetAuditorWithLowestWorkloadAsync()
+    {
+        var auditors = await _userRepository.GetAllAuditorsAsync();
+        var workloads = new Dictionary<string, int>();
+
+        foreach (var auditor in auditors)
+        {
+            var activeBatches = await _repository.CountActiveBatchesByAuditorAsync(auditor.Id);
+            workloads[auditor.Id] = activeBatches;
+        }
+
+        return workloads.OrderBy(x => x.Value).First().Key;
+    }
+}
+```
+
+**Exemplos**:
+- Manual: Manager seleciona "João" para lote de operadora X
+- Automática: Sistema distribui lote para "Maria" que tem 1 lote ativo (menor carga)
+
+---
+
+### RN-LOT-054-05: Máquina de Estados do Lote
+
+**Descricao**: Lote segue máquina de estados bem definida. Transições inválidas são bloqueadas.
+
+**Justificativa**: Integridade de fluxo. Impossível ir de "Concluído" para "Aguardando Processamento".
+
+**Implementacao**:
+```csharp
+public enum AuditBatchStatus
+{
+    Created = 1,
+    WaitingForProcessing = 2,
+    Processing = 3,
+    Completed = 4,
+    Cancelled = 5,
+    Error = 6,
+    Archived = 7
+}
+
+public class AuditBatch : AggregateRoot
+{
+    public AuditBatchStatus Status { get; private set; }
+
+    public void StartProcessing()
+    {
+        if (Status != AuditBatchStatus.WaitingForProcessing)
+            throw new InvalidOperationException(
+                $"Não é possível iniciar processamento de lote no status {Status}");
+        Status = AuditBatchStatus.Processing;
+    }
+
+    public void Complete()
+    {
+        if (Status != AuditBatchStatus.Processing)
+            throw new InvalidOperationException(
+                $"Não é possível completar lote no status {Status}");
+        Status = AuditBatchStatus.Completed;
+    }
+
+    public void Cancel()
+    {
+        if (Status == AuditBatchStatus.Archived)
+            throw new InvalidOperationException("Lote arquivado não pode ser cancelado");
+        Status = AuditBatchStatus.Cancelled;
+    }
+
+    public void Archive()
+    {
+        if (Status != AuditBatchStatus.Completed)
+            throw new InvalidOperationException(
+                $"Apenas lote concluído pode ser arquivado, status: {Status}");
+        Status = AuditBatchStatus.Archived;
+    }
+}
+```
+
+Diagrama de transições: Created → WaitingForProcessing → Processing → Completed → Archived, com Cancelled acessível de vários estados.
+
+---
+
+### RN-LOT-054-06: Processamento Assíncrono com Hangfire
+
+**Descricao**: Processamento de lote é executado em background job Hangfire, não bloqueando requisição HTTP. Job persistido em banco para recuperação em falha.
+
+**Justificativa**: Lotes com milhares de faturas levariam minutos. Assíncrono mantém interface responsiva.
+
+**Implementacao**:
+```csharp
+public class ProcessAuditBatchCommand
+{
+    public string BatchId { get; set; }
+    public string ClienteId { get; set; }
+}
+
+public class ProcessAuditBatchCommandHandler : ICommandHandler<ProcessAuditBatchCommand>
+{
+    private readonly IBackgroundJobClient _backgroundJobClient;
+
+    public async Task Handle(ProcessAuditBatchCommand cmd)
+    {
+        var batch = await _repository.GetByIdAsync(cmd.BatchId);
+
+        batch.MarkAsProcessing();
+        await _repository.SaveAsync(batch);
+
+        var jobId = _backgroundJobClient.Enqueue<AuditBatchProcessor>(
+            processor => processor.ProcessBatchAsync(
+                cmd.BatchId, cmd.ClienteId, CancellationToken.None)
+        );
+
+        batch.SetHangfireJobId(jobId);
+        await _repository.SaveAsync(batch);
+
+        return new { JobId = jobId, Status = "Processamento iniciado" };
+    }
+}
+
+public class AuditBatchProcessor
+{
+    private readonly IHubContext<AuditBatchHub> _hubContext;
+
+    public async Task ProcessBatchAsync(string batchId, string clienteId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var batch = await _repository.GetByIdAsync(batchId);
+            var invoices = batch.GetSelectedInvoices();
+
+            for (int i = 0; i < invoices.Count; i++)
+            {
+                await _auditService.ProcessInvoiceAsync(invoices[i]);
+
+                int progress = ((i + 1) * 100) / invoices.Count;
+                await _hubContext.Clients.Group($"batch-{batchId}")
+                    .SendAsync("BatchProgress", new
+                    {
+                        BatchId = batchId,
+                        Progress = progress,
+                        ProcessedCount = i + 1,
+                        TotalCount = invoices.Count,
+                        EstimatedTimeRemaining = CalculateETA(i, invoices.Count)
+                    });
+            }
+
+            batch.MarkAsCompleted();
+            await _repository.SaveAsync(batch);
+        }
+        catch (Exception ex)
+        {
+            batch.MarkAsError(ex.Message);
+            await _repository.SaveAsync(batch);
+            throw; // Hangfire tentará retry automaticamente
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Lote com 10.000 faturas: Enfileirado imediatamente, processado em ~5 minutos em background
+- Cliente recebe resposta em <100ms, pode navegar enquanto lote processa
+- Progresso: 0% → 25% → 50% → 75% → 100% (atualizado via SignalR)
+
+---
+
+### RN-LOT-054-07: Monitoramento de Progresso com SignalR
+
+**Descricao**: Enquanto lote processa, cliente recebe atualizações em tempo real via WebSocket (SignalR): progresso percentual, itens processados, tempo estimado, alertas.
+
+**Justificativa**: Feedback visual mantém usuário informado, cria responsividade.
+
+**Implementacao**:
+```csharp
+public class AuditBatchHub : Hub
+{
+    public async Task JoinBatchGroup(string batchId)
+    {
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"batch-{batchId}");
+    }
+
+    public async Task LeaveBatchGroup(string batchId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"batch-{batchId}");
+    }
+}
+
+// Frontend Angular
+export class AuditBatchMonitorComponent implements OnInit
+{
+    progress$ = new Subject<number>();
+    processedCount$ = new Subject<number>();
+    estimatedTime$ = new Subject<string>();
+
+    constructor(private signalRService: SignalRService)
+    {
+        this.signalRService.onBatchProgress().subscribe(data => {
+            this.progress$.next(data.progress);
+            this.processedCount$.next(`${data.processedCount}/${data.totalCount}`);
+            this.estimatedTime$.next(data.estimatedTimeRemaining);
+        });
+    }
+}
+```
+
+**Exemplos**:
+- Usuário abre dashboard, vê lote com 0% completo
+- Cada 5 segundos, dashboard atualiza: 15% → 30% → 45% → 100%
+- Ao 100%, página exibe botão "Ver Resultados"
+
+---
+
+### RN-LOT-054-08: Reprocessamento Automático com Retry Policy
+
+**Descricao**: Se job Hangfire falhar, é automaticamente reenfileirado até 3 vezes com exponential backoff (1 min, 5 min, 15 min). Após 3 falhas, lote vai para status "Erro" e requer intervenção manual.
+
+**Justificativa**: Falhas temporárias (timeout, pico) devem ser toleradas. Falhas permanentes reportadas.
+
+**Implementacao**:
+```csharp
+[AutomaticRetry(Attempts = 3, DelaysInSeconds = new[] { 60, 300, 900 })]
+public async Task ProcessBatchAsync(string batchId, string clienteId, CancellationToken cancellationToken)
+{
+    // Se falhar, Hangfire reexecuta automaticamente com delays crescentes
+    // Tentativa 1: imediato
+    // Falha → aguarda 60s → Tentativa 2
+    // Falha → aguarda 300s → Tentativa 3
+    // Falha → Status Error
+}
+
+public class AuditBatchJobFailedEventHandler : IJobFailedEventHandler
+{
+    public async Task OnJobFailedAsync(JobFailedEvent jobFailedEvent)
+    {
+        await _alertService.SendAlertAsync(
+            type: AlertType.AuditBatchProcessingFailed,
+            severity: AlertSeverity.High,
+            message: $"Lote {jobFailedEvent.JobId} falhou após 3 tentativas"
+        );
+    }
+}
+```
+
+**Exemplos**:
+- Falha por timeout tentativa 1 → retry em 1 minuto
+- Falha por timeout tentativa 2 → retry em 5 minutos
+- Falha por timeout tentativa 3 → Status Error, requer investigação
+
+---
+
+### RN-LOT-054-09: Integração com RF034 (Itens de Auditoria)
+
+**Descricao**: Quando item é auditado dentro de lote, é criado registro em RF034 vinculado ao lote, com referência bidirecional.
+
+**Justificativa**: Rastreabilidade. Cada item de auditoria deve saber de qual lote veio.
+
+**Implementacao**:
+```csharp
+public class CreateAuditItemCommand
+{
+    public string BatchId { get; set; }
+    public string ClienteId { get; set; }
+    public int InvoiceId { get; set; }
+    public decimal AmountBilled { get; set; }
+    public decimal AmountContractual { get; set; }
+}
+
+public class CreateAuditItemCommandHandler : ICommandHandler<CreateAuditItemCommand>
+{
+    public async Task Handle(CreateAuditItemCommand cmd)
+    {
+        var batch = await _batchRepository.GetByIdAsync(cmd.BatchId);
+        if (batch.Status != AuditBatchStatus.Processing)
+            throw new BusinessException("Lote não está em processamento");
+
+        var auditItem = new AuditItem
+        {
+            BatchId = cmd.BatchId,
+            InvoiceId = cmd.InvoiceId,
+            AmountBilled = cmd.AmountBilled,
+            AmountContractual = cmd.AmountContractual
+        };
+
+        await _auditItemRepository.SaveAsync(auditItem);
+
+        batch.IncrementProcessedItemCount();
+        await _batchRepository.SaveAsync(batch);
+    }
+}
+
+public class AuditItem : Entity
+{
+    public string BatchId { get; set; } // FK para RF054
+    public AuditBatch Batch { get; set; } // Navegação
+    public int InvoiceId { get; set; }
+    public decimal AmountBilled { get; set; }
+    public decimal AmountContractual { get; set; }
+    public decimal Difference => AmountBilled - AmountContractual;
+}
+```
+
+**Exemplos**:
+- Fatura #1001 auditada no lote "Jan-Vivo" → AuditItem criado com BatchId="jan-vivo"
+- Relatório agrupa itens: 500 faturas Vivo, 250 faturas Claro, etc.
+
+---
+
+### RN-LOT-054-10: Consolidação Automática com RF035
+
+**Descricao**: Quando lote marcado como "Concluído", sistema automaticamente convoca RF035 para consolidar resultados do lote em resumo.
+
+**Justificativa**: Fluxo sem lacunas. Conclusão de lote dispara imediatamente consolidação.
+
+**Implementacao**:
+```csharp
+public class CompleteBatchCommand
+{
+    public string BatchId { get; set; }
+    public string ClienteId { get; set; }
+}
+
+public class CompleteBatchCommandHandler : ICommandHandler<CompleteBatchCommand>
+{
+    private readonly IPublisher _publisher;
+
+    public async Task Handle(CompleteBatchCommand cmd)
+    {
+        var batch = await _repository.GetByIdAsync(cmd.BatchId);
+
+        batch.MarkAsCompleted();
+        await _repository.SaveAsync(batch);
+
+        var auditBatchCompletedEvent = new AuditBatchCompletedEvent(
+            batchId: batch.Id,
+            clienteId: cmd.ClienteId,
+            itemCount: batch.ProcessedItemCount,
+            completedAt: DateTime.UtcNow
+        );
+
+        await _publisher.Publish(auditBatchCompletedEvent);
+
+        await _notificationService.SendEmailAsync(
+            toUserId: batch.AuditorId,
+            subject: "Lote Concluído",
+            body: $"Lote '{batch.Name}' concluído com {batch.ProcessedItemCount} itens"
+        );
+    }
+}
+
+// Listener em RF035
+public class AuditBatchCompletedEventHandler : INotificationHandler<AuditBatchCompletedEvent>
+{
+    public async Task Handle(AuditBatchCompletedEvent @event, CancellationToken cancellationToken)
+    {
+        var summary = new AuditSummary
+        {
+            BatchId = @event.BatchId,
+            ClienteId = @event.ClienteId,
+            ItemCount = @event.ItemCount,
+            TotalAmountGlossed = ... // Somar glosas de todos itens do lote
+        };
+
+        await _summarySummaryRepository.SaveAsync(summary);
+    }
+}
+```
+
+**Exemplos**:
+- Lote "Jan-2025-Nacional" completado com 50.000 itens
+- Evento dispara → RF035 cria AuditSummary consolidado
+- Manager pode visualizar resumo no mesmo dia
+
+---
+
+### RN-LOT-054-11: Histórico e Auditoria Completa de Operações
+
+**Descricao**: Toda operação de lote é registrada em tabela de auditoria com timestamp, usuário, antes/depois. Histórico imutável, retenção 5 anos (compliance).
+
+**Justificativa**: SOX, LGPD, auditoria interna. Qualquer decisão de auditoria deve ser rastreável.
+
+**Implementacao**:
+```csharp
+public class AuditLog : Entity
+{
+    public string ClienteId { get; set; }
+    public string AggregateId { get; set; } // ID do lote
+    public string AggregateType { get; set; } // "AuditBatch"
+    public string Action { get; set; } // "BATCH_CREATED", "BATCH_STARTED"
+    public string UserId { get; set; }
+    public DateTime Timestamp { get; set; }
+    public string? OldValueJson { get; set; }
+    public string? NewValueJson { get; set; }
+    public string IpAddress { get; set; }
+}
+
+public class AuditBatchCreatedEvent : INotification
+{
+    public string BatchId { get; set; }
+    public string ClienteId { get; set; }
+    public string CreatedByUserId { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public AuditBatch BatchData { get; set; }
+}
+
+public class AuditLogEventHandler : INotificationHandler<AuditBatchCreatedEvent>
+{
+    public async Task Handle(AuditBatchCreatedEvent @event, CancellationToken cancellationToken)
+    {
+        var auditLog = new AuditLog
+        {
+            ClienteId = @event.ClienteId,
+            AggregateId = @event.BatchId,
+            AggregateType = nameof(AuditBatch),
+            Action = "BATCH_CREATED",
+            UserId = @event.CreatedByUserId,
+            Timestamp = @event.CreatedAt,
+            NewValueJson = JsonConvert.SerializeObject(@event.BatchData),
+            IpAddress = _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString()
+        };
+
+        await _auditLogRepository.SaveAsync(auditLog);
+    }
+}
+
+public class AuditLogArchiveJob
+{
+    [DisableConcurrentExecution("30:00")]
+    public async Task ArchiveOldLogsAsync()
+    {
+        var fiveYearsAgo = DateTime.UtcNow.AddYears(-5);
+        await _auditLogRepository.ArchiveLogsOlderThanAsync(fiveYearsAgo);
+    }
+}
+```
+
+**Exemplos**:
+- Lote criado 01/01/2025 10:00 → Registro de auditoria com JSON do lote
+- Lote cancelado 01/01/2025 11:30 → Novo registro com status "Cancelado"
+- Query: "Quem cancelou lote X?" → Resposta: João Silva em 01/01/2025 11:30
+
+---
+
+### RN-LOT-054-12: Notificações Assíncronas via Azure Service Bus
+
+**Descricao**: Eventos críticos de lote (iniciado, concluído, erro) publicados em fila Azure Service Bus para sistemas externos (e-mail, webhooks, BI).
+
+**Justificativa**: Desacoplamento. Notificações não devem bloquear processamento de lote.
+
+**Implementacao**:
+```csharp
+public class PublishAuditBatchEventCommand
+{
+    public string EventType { get; set; } // "BatchStarted", "BatchCompleted", "BatchError"
+    public string BatchId { get; set; }
+    public string ClienteId { get; set; }
+    public Dictionary<string, object> Payload { get; set; }
+}
+
+public class PublishBatchEventCommandHandler : ICommandHandler<PublishAuditBatchEventCommand>
+{
+    private readonly IAsyncPublisher _serviceBusPublisher;
+
+    public async Task Handle(PublishAuditBatchEventCommand cmd)
+    {
+        var message = new ServiceBusMessage(JsonConvert.SerializeObject(cmd.Payload))
+        {
+            Subject = cmd.EventType,
+            ContentType = "application/json",
+            MessageId = Guid.NewGuid().ToString(),
+            CorrelationId = cmd.BatchId
+        };
+
+        await _serviceBusPublisher.PublishAsync("audit-batch-events", message);
+
+        // Subscribers em Service Bus:
+        // - Serviço de Notificação: envia e-mail
+        // - Serviço de BI: atualiza data warehouse
+        // - Serviço de Webhook: chama integrações customizadas
+    }
+}
+
+[Function("SendAuditBatchNotificationEmail")]
+public async Task SendEmailAsync(
+    [ServiceBusTrigger("audit-batch-events", "email-subscription")] ServiceBusReceivedMessage message)
+{
+    var batchEvent = JsonConvert.DeserializeObject<AuditBatchEvent>(message.Body.ToString());
+
+    if (batchEvent.EventType == "BatchCompleted")
+    {
+        await _emailService.SendAsync(
+            to: batchEvent.AuditorEmail,
+            subject: $"Lote {batchEvent.BatchName} - Conclusão",
+            body: $"Seu lote foi concluído com {batchEvent.ItemCount} itens"
+        );
+    }
+}
+```
+
+**Exemplos**:
+- Lote iniciado → Evento publicado em Service Bus
+- Serviço de e-mail recebe → Envia notificação ao auditor
+- Serviço de BI recebe → Atualiza dashboard com novo lote
+
+---
+
+### RN-LOT-054-13: Cancelamento de Lote com Rollback
+
+**Descricao**: Lote pode ser cancelado em qualquer momento (exceto "Arquivado"). Cancelamento reverte itens de auditoria criados, retorna faturas para "não auditadas".
+
+**Justificativa**: Auditoria de auditoria. Se lote foi cancelado, itens dele não devem contar como auditados.
+
+**Implementacao**:
+```csharp
+public class CancelAuditBatchCommand
+{
+    public string BatchId { get; set; }
+    public string ClienteId { get; set; }
+    public string Reason { get; set; }
+}
+
+public class CancelAuditBatchCommandHandler : ICommandHandler<CancelAuditBatchCommand>
+{
+    public async Task Handle(CancelAuditBatchCommand cmd)
+    {
+        var batch = await _repository.GetByIdAsync(cmd.BatchId);
+
+        if (batch.Status == AuditBatchStatus.Archived)
+            throw new BusinessException("Lote arquivado não pode ser cancelado");
+
+        var auditItems = await _auditItemRepository.GetByBatchIdAsync(cmd.BatchId);
+
+        await _auditItemRepository.DeleteRangeAsync(auditItems);
+
+        var invoiceIds = auditItems.Select(x => x.InvoiceId).ToList();
+        await _invoiceRepository.MarkAsNotAuditedAsync(invoiceIds);
+
+        batch.Cancel();
+        batch.CancellationReason = cmd.Reason;
+        await _repository.SaveAsync(batch);
+
+        await _notificationService.SendEmailAsync(
+            toUserId: batch.AuditorId,
+            subject: "Lote Cancelado",
+            body: $"Lote '{batch.Name}' foi cancelado. Razão: {cmd.Reason}"
+        );
+
+        await _auditService.LogAsync(
+            action: "BATCH_CANCELLED",
+            details: new { BatchId = batch.Id, Reason = cmd.Reason }
+        );
+    }
+}
+```
+
+**Exemplos**:
+- Lote em processamento → Manager clica "Cancelar" → Itens revertidos, faturas retornam ao pool
+- Lote concluído por erro → Cancelar → Resumo não é gerado, lote volta para "Aguardando"
+
+---
+
+### RN-LOT-054-14: SLA e Alertas de Timeout
+
+**Descricao**: Cada lote tem SLA esperado baseado em tamanho. Se exceder SLA, alerta disparado. Se 2x SLA, lote é automaticamente cancelado.
+
+**Justificativa**: Proteção contra deadlock. Lote travado não deve bloquear sistema indefinidamente.
+
+**Implementacao**:
+```csharp
+public class AuditBatch : AggregateRoot
+{
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ProcessingStartedAt { get; set; }
+    public int InvoiceCount { get; set; }
+
+    public TimeSpan CalculateExpectedSLA()
+    {
+        // SLA: 10 segundos por 1000 faturas
+        return TimeSpan.FromSeconds((InvoiceCount / 1000.0) * 10);
+    }
+
+    public TimeSpan GetElapsedTime()
+    {
+        if (ProcessingStartedAt == null) return TimeSpan.Zero;
+        return DateTime.UtcNow - ProcessingStartedAt.Value;
+    }
+}
+
+public class AuditBatchSLACheckJob
+{
+    [DisableConcurrentExecution("05:00")]
+    public async Task CheckSLAAsync()
+    {
+        var processingBatches = await _repository.GetAllInStatusAsync(AuditBatchStatus.Processing);
+
+        foreach (var batch in processingBatches)
+        {
+            var elapsed = batch.GetElapsedTime();
+            var sla = batch.CalculateExpectedSLA();
+
+            if (elapsed > sla && elapsed < sla.Multiply(2))
+            {
+                await _alertService.SendAlertAsync(
+                    type: AlertType.AuditBatchSLAWarning,
+                    severity: AlertSeverity.Warning,
+                    message: $"Lote {batch.Id} ultrapassou SLA por {elapsed - sla}"
+                );
+            }
+            else if (elapsed > sla.Multiply(2))
+            {
+                await _alertService.SendAlertAsync(
+                    type: AlertType.AuditBatchSLACritical,
+                    severity: AlertSeverity.Critical,
+                    message: $"Lote {batch.Id} foi cancelado por timeout (SLA 2x)"
+                );
+
+                var cmd = new CancelAuditBatchCommand
+                {
+                    BatchId = batch.Id,
+                    ClienteId = batch.ClienteId,
+                    Reason = "Timeout automático (SLA 2x excedido)"
+                };
+                await _handler.Handle(cmd);
+            }
+        }
+    }
+}
+```
+
+**Exemplos**:
+- Lote com 5.000 faturas → SLA: 50 segundos
+- Após 50s → Alerta amarelo para admin
+- Após 100s → Alerta vermelho + cancelamento automático
+
+---
+
+## 3. REFERENCIAS AO LEGADO
+
+### 3.1 Banco de Dados Legado
+
+**Banco**: `IControlIT_Base` (SQL Server 2019+)
+
+**Tabelas Principais**:
+
+```sql
+CREATE TABLE [dbo].[tb_AuditoriaBatch](
+    [ID_AuditoriaBatch] [int] IDENTITY(1,1) NOT NULL,
+    [ID_Conglomerado] [int] NOT NULL,
+    [NM_Batch] [varchar](255) NOT NULL,
+    [DT_Inicio] [datetime] NOT NULL,
+    [DT_Fim] [datetime] NULL,
+    [QT_Faturas] [int] NOT NULL DEFAULT 0,
+    [QT_Processadas] [int] NOT NULL DEFAULT 0,
+    [ST_Lote] [varchar](50) NOT NULL,
+    [ID_Auditor] [int] NULL,
+    [ID_JobHangfire] [varchar](100) NULL,
+    [VL_TotalGlosa] [numeric](15,2) NULL,
+    [PC_Progresso] [numeric](5,2) DEFAULT 0,
+    [DS_Erro] [varchar](max) NULL,
+    [DT_Criacao] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    [ID_UsuarioCriacao] [int] NOT NULL,
+    [DT_Atualizacao] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    [ID_UsuarioAtualizacao] [int] NOT NULL,
+    CONSTRAINT [PK_tb_AuditoriaBatch] PRIMARY KEY CLUSTERED ([ID_AuditoriaBatch] ASC),
+    CONSTRAINT [FK_tb_AuditoriaBatch_tb_Conglomerado]
+        FOREIGN KEY ([ID_Conglomerado]) REFERENCES [dbo].[tb_Conglomerado]([ID_Conglomerado]),
+    CONSTRAINT [FK_tb_AuditoriaBatch_tb_Usuario_Auditor]
+        FOREIGN KEY ([ID_Auditor]) REFERENCES [dbo].[tb_Usuario]([ID_Usuario])
+);
+
+CREATE TABLE [dbo].[tb_AuditoriaBatchCriteria](
+    [ID_Criterio] [int] IDENTITY(1,1) NOT NULL,
+    [ID_AuditoriaBatch] [int] NOT NULL,
+    [TP_Criterio] [varchar](50) NOT NULL,
+    [VL_Criterio] [varchar](max) NOT NULL,
+    [DT_Criacao] [datetime] NOT NULL DEFAULT GETUTCDATE(),
+    CONSTRAINT [PK_tb_AuditoriaBatchCriteria] PRIMARY KEY CLUSTERED ([ID_Criterio] ASC),
+    CONSTRAINT [FK_tb_AuditoriaBatchCriteria_tb_AuditoriaBatch]
+        FOREIGN KEY ([ID_AuditoriaBatch]) REFERENCES [dbo].[tb_AuditoriaBatch]([ID_AuditoriaBatch])
+        ON DELETE CASCADE
+);
+
+CREATE TABLE [dbo].[tb_AuditoriaBatchInvoices](
+    [ID_BatchInvoice] [int] IDENTITY(1,1) NOT NULL,
+    [ID_AuditoriaBatch] [int] NOT NULL,
+    [ID_Fatura] [int] NOT NULL,
+    [ST_Processamento] [varchar](50) NOT NULL DEFAULT 'PENDENTE',
+    [DT_Processamento] [datetime] NULL,
+    CONSTRAINT [PK_tb_AuditoriaBatchInvoices] PRIMARY KEY CLUSTERED ([ID_BatchInvoice] ASC),
+    CONSTRAINT [FK_tb_AuditoriaBatchInvoices_tb_AuditoriaBatch]
+        FOREIGN KEY ([ID_AuditoriaBatch]) REFERENCES [dbo].[tb_AuditoriaBatch]([ID_AuditoriaBatch]),
+    CONSTRAINT [FK_tb_AuditoriaBatchInvoices_tb_Fatura]
+        FOREIGN KEY ([ID_Fatura]) REFERENCES [dbo].[tb_Fatura]([ID_Fatura])
+);
+```
+
+### 3.2 Stored Procedures Legado
+
+| Procedure | Descricao | Migracao |
+|-----------|-----------|----------|
+| `pa_AuditoriaBatch_Create` | Criar novo lote | Handler CQRS `CreateAuditBatchCommandHandler` |
+| `pa_AuditoriaBatch_SelectInvoices` | Selecionar faturas por critério | Query Handler `SelectInvoicesForBatchQueryHandler` |
+| `pa_AuditoriaBatch_UpdateStatus` | Atualizar status do lote | Command Handler `UpdateAuditBatchStatusCommandHandler` |
+| `pa_AuditoriaBatch_GetProgress` | Obter progresso | Query Handler `GetBatchProgressQueryHandler` |
+| `pa_AuditoriaBatch_Archive` | Arquivar lote | Command Handler `ArchiveAuditBatchCommandHandler` |
+
+### 3.3 Telas ASPX Legado
+
+| Pagina | Descricao | Tela Moderna (Angular) |
+|--------|-----------|----------------------|
+| `AuditoriaBatch.aspx` | Listagem de lotes | `/audit-batches` |
+| `AuditoriaBatchCreate.aspx` | Criar novo lote | `/audit-batches/create` |
+| `AuditoriaBatchEdit.aspx` | Editar lote | `/audit-batches/{id}/edit` |
+| `AuditoriaBatchMonitor.aspx` | Monitorar progresso | `/audit-batches/{id}/monitor` |
+| `AuditoriaBatchDetail.aspx` | Detalhes do lote | `/audit-batches/{id}` |
+
+### 3.4 WebServices Legado (VB.NET)
+
+**Arquivo**: `D:\IC2\ic1_legado\WebService\WSAuditoriaBatch.asmx.vb`
+
+| Metodo | Descricao | Endpoint Moderno |
+|--------|-----------|-----------------|
+| `CreateBatch()` | Criar novo lote | `POST /api/audit-batches` |
+| `SelectInvoicesForBatch()` | Selecionar faturas | `POST /api/audit-batches/{id}/select-invoices` |
+| `StartProcessing()` | Iniciar processamento | `POST /api/audit-batches/{id}/start` |
+| `GetBatchProgress()` | Obter progresso | `GET /api/audit-batches/{id}/progress` |
+| `CancelBatch()` | Cancelar lote | `POST /api/audit-batches/{id}/cancel` |
+| `GetBatchDetails()` | Obter detalhes | `GET /api/audit-batches/{id}` |
+
+---
+
+## 4. INTEGRACOES OBRIGATORIAS
+
+### 4.1 Central de Funcionalidades (Feature Flags)
+
+**FeatureKey**: `AUDITORIA_GESTAO_LOTES`
+
+**Configuracao**:
+```json
+{
+    "featureKey": "AUDITORIA_GESTAO_LOTES",
+    "nome": "Gestão de Lotes de Auditoria",
+    "descricao": "Habilita criação, processamento e monitoramento de lotes de auditoria com Hangfire",
+    "habilitado": true,
+    "isSystemFeature": false,
+    "modulo": "Auditoria"
+}
+```
+
+**Nota**: Feature flag controla visibilidade. Quando desabilitado, menu fica oculto, mas dados históricos acessíveis.
+
+---
+
+### 4.2 Internacionalizacao (i18n)
+
+**Chaves de Traducao**:
+
+```json
+{
+    "auditoria": {
+        "lotes": {
+            "title": "Gestão de Lotes de Auditoria",
+            "subtitle": "Criar, monitorar e processar lotes para auditoria de faturas",
+            "form": {
+                "labels": {
+                    "batchName": "Nome do Lote",
+                    "periodoInicio": "Período Inicial",
+                    "periodoFim": "Período Final",
+                    "operadora": "Operadora",
+                    "filial": "Filial",
+                    "centroCusto": "Centro de Custo",
+                    "auditor": "Auditor Responsável",
+                    "distribuirAutomaticamente": "Distribuir Automaticamente"
+                }
+            },
+            "messages": {
+                "success": {
+                    "created": "Lote criado com sucesso",
+                    "updated": "Lote atualizado com sucesso",
+                    "cancelled": "Lote cancelado com sucesso",
+                    "started": "Processamento iniciado com sucesso"
+                },
+                "error": {
+                    "notFound": "Lote não encontrado",
+                    "invalidStatus": "Operação não permitida neste status",
+                    "processingFailed": "Erro ao processar lote"
+                }
+            },
+            "statuses": {
+                "created": "Criado",
+                "waitingForProcessing": "Aguardando",
+                "processing": "Em Processamento",
+                "completed": "Concluído",
+                "cancelled": "Cancelado",
+                "error": "Erro",
+                "archived": "Arquivado"
+            }
+        }
+    }
+}
+```
+
+---
+
+### 4.3 Auditoria
+
+**Operacoes Auditadas**:
+
+| Operacao | Codigo | Dados Registrados |
+|----------|--------|-------------------|
+| Criar Lote | `AUDITORIA_BATCH_CREATE` | Nome, Critérios, Auditor, Período |
+| Iniciar Processamento | `AUDITORIA_BATCH_START` | Batch ID, Job ID Hangfire, Início |
+| Completar Lote | `AUDITORIA_BATCH_COMPLETE` | Batch ID, Qtd Itens, Tempo Total |
+| Cancelar Lote | `AUDITORIA_BATCH_CANCEL` | Batch ID, Razão, Itens Revertidos |
+| Atualizar Status | `AUDITORIA_BATCH_STATUS_UPDATE` | Batch ID, Status Anterior, Status Novo |
+| Atribuir Auditor | `AUDITORIA_BATCH_ASSIGN` | Batch ID, Auditor ID, Método |
+| Reprocessar Lote | `AUDITORIA_BATCH_REPROCESS` | Batch ID, Tentativa #, Razão |
+| Arquivar Lote | `AUDITORIA_BATCH_ARCHIVE` | Batch ID, Data Arquivo |
+| Erro em Processamento | `AUDITORIA_BATCH_ERROR` | Batch ID, Mensagem Erro, Stack Trace |
+
+**Retencao**: 5 anos (conforme LGPD + conformidade tributária)
+
+---
+
+### 4.4 Controle de Acesso (RBAC)
+
+**Permissoes**:
+
+| Permissao | Descricao | Perfis |
+|-----------|-----------|--------|
+| `auditoria:batch:create` | Criar novo lote | Gerente Auditoria, Admin |
+| `auditoria:batch:read` | Visualizar lotes | Auditor, Gerente Auditoria, Admin |
+| `auditoria:batch:update` | Editar lote (Criado/Cancelado) | Gerente Auditoria, Admin |
+| `auditoria:batch:delete` | Deletar lote (Criado) | Admin |
+| `auditoria:batch:start` | Iniciar processamento | Gerente Auditoria, Admin |
+| `auditoria:batch:cancel` | Cancelar lote | Gerente Auditoria, Admin |
+| `auditoria:batch:assign` | Atribuir auditor | Gerente Auditoria, Admin |
+| `auditoria:batch:monitor` | Monitorar progresso | Auditor, Gerente Auditoria, Admin |
+| `auditoria:batch:export` | Exportar relatório | Gerente Auditoria, Admin |
+| `auditoria:batch:reprocess` | Reprocessar lote | Admin |
+
+---
+
+## 5. ENDPOINTS DA API
+
+### 5.1 CRUD Principal
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| GET | `/api/audit-batches` | Listar lotes com filtros | `auditoria:batch:read` |
+| GET | `/api/audit-batches/{id}` | Obter lote por ID | `auditoria:batch:read` |
+| POST | `/api/audit-batches` | Criar novo lote | `auditoria:batch:create` |
+| PUT | `/api/audit-batches/{id}` | Atualizar lote | `auditoria:batch:update` |
+| DELETE | `/api/audit-batches/{id}` | Deletar lote | `auditoria:batch:delete` |
+
+### 5.2 Operacoes Especiais
+
+| Metodo | Endpoint | Descricao | Permissao |
+|--------|----------|-----------|-----------|
+| POST | `/api/audit-batches/{id}/select-invoices` | Selecionar faturas | `auditoria:batch:update` |
+| POST | `/api/audit-batches/{id}/start` | Iniciar processamento | `auditoria:batch:start` |
+| POST | `/api/audit-batches/{id}/cancel` | Cancelar lote com rollback | `auditoria:batch:cancel` |
+| POST | `/api/audit-batches/{id}/assign` | Atribuir auditor | `auditoria:batch:assign` |
+| GET | `/api/audit-batches/{id}/progress` | Obter progresso (WebSocket) | `auditoria:batch:monitor` |
+| POST | `/api/audit-batches/{id}/reprocess` | Reprocessar lote | `auditoria:batch:reprocess` |
+| GET | `/api/audit-batches/{id}/items` | Listar itens de auditoria | `auditoria:batch:read` |
+| GET | `/api/audit-batches/{id}/summary` | Obter resumo consolidado | `auditoria:batch:read` |
+| POST | `/api/audit-batches/{id}/export` | Exportar em PDF/Excel | `auditoria:batch:export` |
+| GET | `/api/audit-batches/history` | Histórico de lotes arquivados | `auditoria:batch:read` |
+| GET | `/api/audit-batches/dashboard` | Dashboard em tempo real | `auditoria:batch:monitor` |
+| POST | `/api/audit-batches/bulk-create` | Criar múltiplos lotes | `auditoria:batch:create` |
+| GET | `/api/audit-batches/sla-metrics` | Métricas de SLA | `auditoria:batch:read` |
+
+---
+
+## 6. FLUXOS PRINCIPAIS
+
+### 6.1 Fluxo de Criação e Processamento de Lote
+
+```
+Usuario (Gerente Auditoria) acessa /audit-batches
+    ↓
+[Tela de Listagem]
+    ↓ (clica "Novo Lote")
+[Tela de Criação]
+    ↓ (seleciona: período, operadora, filial, centro custo)
+CreateAuditBatchCommand enviado
+    ↓ (validação: ao menos 1 critério?)
+    +--- [Inválido] --→ Erro: "Selecione critério"
+    ↓ [Válido]
+Lote criado no status "Criado"
+    ↓ (Usuario clica "Iniciar Processamento")
+SelectInvoicesForBatchCommand
+    ↓
+Algoritmo busca faturas que correspondem aos critérios
+    ↓ (encontrou 10.000 faturas)
+Faturas associadas ao lote
+    ↓
+ProcessAuditBatchCommand
+    ↓
+Job Hangfire enfileirado (resposta <100ms)
+    ↓ (cliente redirecionado para /audit-batches/{id}/monitor)
+SignalR conecta ao hub "AuditBatchHub"
+    ↓ (background worker processa job)
+[Worker Hangfire - Processing]
+    ↓
+    0% → 25% → 50% → 75% → 100%
+    ↓ (SignalR notifica cliente a cada 5%)
+Dashboard atualiza em tempo real
+    ↓ (100% completo)
+Job termina, lote → status "Concluído"
+    ↓
+Evento "AuditBatchCompletedEvent" publicado
+    ↓ (RF035 subscriber recebe)
+AuditSummary criado automaticamente
+    ↓
+E-mail enviado ao auditor: "Lote concluído"
+    ↓
+[Fim]
+```
+
+### 6.2 Fluxo de Cancelamento com Rollback
+
+```
+Usuario vê lote "Em Processamento" clica "Cancelar"
+    ↓
+Dialog de confirmação: "Tem certeza? Itens serão revertidos"
+    ↓ (clica OK)
+CancelAuditBatchCommand
+    ↓ (validação: status != Arquivado?)
+    +--- [Arquivado] --→ Erro: "Não pode cancelar"
+    ↓ [OK]
+Buscar todos itens de auditoria do lote (RF034)
+    ↓ (encontrou 5.000 itens)
+Deletar 5.000 itens de auditoria
+    ↓
+Marcar 5.000 faturas como "não auditadas"
+    ↓
+Lote → status "Cancelado"
+    ↓
+Auditoria registrada
+    ↓
+E-mail ao auditor: "Lote foi cancelado"
+    ↓
+[Fim - Rollback Completo]
+```
+
+### 6.3 Fluxo de Reprocessamento Automático com Retry
+
+```
+Job Hangfire processando lote...
+    ↓
+[Worker] Processa 50%, sucesso
+    ↓
+[Worker] Tenta fatura #5001 → Timeout na API
+    ↓
+Exception dispara → Hangfire reexecuta automaticamente
+    ↓ (aguarda 60 segundos)
+[Tentativa 2] Job reexecutado
+    ↓
+[Worker 2] Retoma do ponto (idempotência)
+    ↓
+[Worker 2] Processa faturas restantes → OK
+    ↓
+Lote completo, status "Concluído"
+    ↓
+Sem intervenção manual necessária
+    ↓
+[Fim - Auto Recovery]
+```
+
+---
+
+## 7. SEGURANCA
+
+### 7.1 Protecoes Implementadas
+
+| Protecao | Descricao |
+|----------|-----------|
+| **Row-Level Security (RLS)** | Usuários veem apenas lotes de seu ClienteId. Multi-tenancy automática. |
+| **RBAC (Role-Based Access Control)** | Auditor não pode cancelar; apenas Gerente Auditoria pode. |
+| **Validação de Input** | Todos campos validados contra tipos, ranges, enums. |
+| **Idempotência** | Operações repetidas não causam duplicação. Job IDs garantem unicidade. |
+| **Auditoria de Auditoria** | Toda ação registrada em tabela imutável: quem, quando, o quê, de onde. |
+| **Criptografia de Dados Sensíveis** | IPs, detalhes de erro em auditoria criptografados em repouso. |
+| **Rate Limiting** | Máximo 10 lotes por usuário por hora (proteção contra DOS). |
+| **Timeout e Circuit Breaker** | Jobs com timeout >1h interrompidos. Circuit breaker em chamadas externas. |
+| **Validação de Integridade Referencial** | Lote não pode referenciar auditor inexistente. FKs garantem integridade. |
+| **Anti-Tampering** | Status de lote é state machine imutável. Não é campo TEXT editável. |
+
+### 7.2 Testes de Seguranca Obrigatorios
+
+- [ ] SQL Injection em campos de seleção de critérios
+- [ ] XSS em nome do lote (armazenar `<script>`)
+- [ ] CSRF Protection (token validado em POST/PUT/DELETE)
+- [ ] Validacao de permissoes (auditor não consegue deletar lote)
+- [ ] Rate limiting (10º lote em 1 minuto → bloqueado)
+- [ ] Isolation entre clientes (cliente A não vê lotes de cliente B)
+- [ ] Validacao de status (não pode editar lote "Arquivado")
+- [ ] Auditoria de auditoria (ação registrada com IP e usuário)
+
+---
+
+## 8. METRICAS E INDICADORES
+
+### 8.1 KPIs
+
+| KPI | Meta | Medicao |
+|-----|------|---------|
+| **Taxa de Conclusão de Lote** | 95% | Qtd lotes concluídos / Qtd lotes criados |
+| **Tempo Médio de Processamento** | <5 min para 10k faturas | (Data fim - Data início) / Qtd itens |
+| **Taxa de Sucesso (sem erro)** | 99% | Qtd lotes concluídos / Qtd lotes processados |
+| **Cumprimento de SLA** | 90% | Qtd lotes dentro do SLA / Qtd lotes total |
+| **Distribuição de Carga** | Diferença <10% | Max workload - Min workload / Média |
+| **Produtividade do Auditor** | 200-300 itens/hora | Qtd itens auditados / Qtd horas trabalhadas |
+| **Taxa de Glosa** | 2-5% | Qtd itens com divergência / Qtd itens auditados |
+| **ROI da Auditoria** | >500% | (Valor recuperado / Custo auditoria) * 100 |
+| **Disponibilidade do Sistema** | 99.9% | Horas operacional / Horas total |
+| **P95 de Latência de Progresso** | <1s | SignalR latency P95 percentile |
+
+### 8.2 Alertas
+
+| Alerta | Condicao | Acao |
+|--------|----------|------|
+| **Lote Excedeu SLA** | Tempo > SLA esperado | Notificar admin via e-mail + Slack |
+| **Job Falhou 3 Vezes** | Retry exaurido | Marcar Error, requerer intervenção manual |
+| **Taxa de Erro Alta** | 5% de faturas com erro | Pausar lote, investigar raiz cause |
+| **Auditor Inativo** | Lote atribuído há >2 horas sem progresso | Sugerir redistribuição automática |
+| **Banco de Dados Lento** | Query > 5s | Escalar para DBA, considerar índices |
+| **Fila Hangfire Crescendo** | Jobs enfileirados > 1000 | Aumentar workers ou alertar sobrecarga |
+| **Memória do Worker Alto** | >80% RAM do worker | Reiniciar worker (graceful shutdown) |
+| **Timeout em API Externa** | Operadora API sem resposta > 30s | Fallback modo offline, retentar depois |
+
+---
+
+## 9. PROXIMOS PASSOS
+
+1. **Modelo de Dados**: Criar [MD-RF054](./MD-RF054-Gestao-de-Lotes-Auditoria.md)
+2. **Casos de Uso**: Criar [UC-RF054](./UC-RF054-Gestao-de-Lotes-Auditoria.md)
+3. **Implementacao Backend**: Commands/Queries/Handlers
+4. **Implementacao Frontend**: Telas Angular
+5. **Integracao Hangfire**: Setup de background jobs
+6. **Integracao SignalR**: Monitoramento em tempo real
+7. **Integracao Azure Service Bus**: Eventos assíncronos
+8. **Testes**: Executar cenarios documentados
+9. **User Stories**: Criar [user-stories.yaml](./user-stories.yaml)
+
+---
+
+## CHANGELOG
+
+| Versao | Data | Descricao | Autor |
+|--------|------|-----------|-------|
+| 1.0 | 2025-12-28 | Versao inicial do RF054 com 14 regras, endpoints e integrações | Claude Code |
+
+---
+
+**Ultima Atualizacao**: 2025-12-28
+**Autor**: Claude Code (Architect Agent)
+**Revisao**: Pendente

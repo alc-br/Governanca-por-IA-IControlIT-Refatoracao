@@ -1,0 +1,599 @@
+# RF-026: Gestão Completa de Faturas de Telecom e TI
+
+**Versão**: 1.0
+**Última Atualização**: 17/12/2025
+**Status**: ✅ Documentação Completa (5 seções)
+**Fase**: Fase 2 - Serviços Essenciais
+**EPIC**: GES - Gestão
+**Prioridade**: CRÍTICA
+**Complexidade**: MUITO ALTA
+
+[← Voltar](../README.md)
+
+---
+
+## 📋 1. RESUMO EXECUTIVO
+
+### Descrição Geral
+
+Sistema completo de gestão de faturas de serviços de Telecom (telefonia móvel, fixa, internet, links dedicados) e TI (cloud computing, licenças SaaS, suporte técnico) com importação automatizada de layouts personalizados por operadora, conciliação inteligente contra contratos, auditoria de cobranças indevidas, rateio multi-dimensional por centro de custo e contestação formal com workflow de aprovação. Suporta OCR de PDFs, integração com APIs de operadoras (Vivo, Claro, TIM, Oi), dashboard executivo de curva de gastos e alertas preditivos de estouro de budget.
+
+**Objetivo Principal**: Eliminar erros de cobrança (economia média 12-18% do valor total de faturas), automatizar conciliação que hoje leva 40 horas/mês para 2 horas/mês, garantir rastreabilidade total de gastos para compliance (LGPD, SOX), identificar oportunidades de renegociação de contratos (análise de consumo real vs. contratado) e fornecer visibilidade gerencial de custos de Telecom/TI que representam 8-15% do OPEX total das empresas.
+
+### Contexto: Legado vs. Modernização
+
+| Aspecto | Legado (VB.NET) | Modernização (.NET 10) |
+|---------|----------------|----------------------|
+| **Importação** | Upload manual CSV (1 layout fixo, quebra sempre) | Multi-layout engine com templates por operadora + OCR de PDF |
+| **Conciliação** | Manual em planilha Excel (40h/mês, erros 15%) | Algoritmo ML automático com 98% acurácia em 2h/mês |
+| **Auditoria** | Checklist papel (descobre erro após pagar) | Regras configuráveis executadas pré-pagamento |
+| **Rateio** | Planilha Excel com VLOOKUP (recalculo = 8h) | Motor multi-dimensional em tempo real (segundos) |
+| **Contestação** | Email manual + telefone (sem rastreamento) | Workflow integrado com portal operadora + histórico completo |
+| **Relatórios** | Excel estático exportado semanalmente | Dashboards Chart.js tempo real + BI drill-down |
+| **Alertas** | Nenhum (descobre estouro ao fechar mês) | Alertas preditivos 7/15/30 dias antes limite |
+| **APIs Operadoras** | Nenhuma integração | Consumo automático APIs Vivo/Claro/TIM |
+| **OCR PDF** | Não suportado (exige CSV da operadora) | Azure Form Recognizer extrai dados de PDF scaneado |
+| **Mobile** | Nenhum app | MAUI app para aprovar contestações on-the-go |
+
+### 10 Funcionalidades Principais
+
+1. **Importação Multi-Layout**: Engine inteligente com 15+ templates pré-configurados (Vivo, Claro, TIM, Oi, Embratel, Level 3, AWS, Azure, Google Cloud) + builder visual para criar layouts customizados
+2. **OCR de PDF Automatizado**: Azure Form Recognizer + custom model treinado com 10.000+ faturas reais para extrair campos-chave (valor total, linhas, consumo, impostos) com 95% acurácia
+3. **Conciliação Inteligente**: Algoritmo de matching difuso (Levenshtein distance) para reconciliar linhas/ativos com contratos mesmo com divergências (ex: "(11) 98765-4321" vs. "11987654321" vs. "+55 11 98765-4321")
+4. **Auditoria Configurável**: 25+ regras pré-definidas (ex: linha cobrada sem contrato, valor >15% da média histórica, serviço cancelado mas cobrado, roaming internacional não autorizado)
+5. **Workflow de Contestação**: Fluxo completo - identificar erro → criar ticket → enviar para operadora → acompanhar SLA → receber crédito → validar próxima fatura
+6. **Rateio Multi-Dimensional**: Motor distribuição de custos por 5 dimensões (Centro Custo, Projeto, Departamento, Geolocalização, Tipo Serviço) com regras de percentual fixo, proporcional ao consumo ou misto
+7. **Dashboard Executivo**: Gráficos - curva de gastos 12 meses, top 10 maiores contas, distribuição por tipo serviço, variação MoM/YoY, forecast 3 meses, oportunidades economia
+8. **Alertas Preditivos**: Machine Learning prevê estouro de budget com 30 dias antecedência baseado em tendências históricas + consumo atual projetado
+9. **Integração APIs Operadoras**: Consumo automático APIs (quando disponíveis) para baixar faturas, consultar consumo em tempo real, enviar contestações e verificar status de tickets
+10. **Aprovação Mobile**: App MAUI para gestores aprovarem contestações, rateios e pagamentos via smartphone com notificações push e assinatura digital
+
+### Impacto de Negócio
+
+- **Economia Direta:** Recuperação de 12-18% em cobranças indevidas (média R$180k/ano para empresa com R$1,5M/ano Telecom)
+- **Eficiência Operacional:** Redução de 95% no tempo de conciliação (de 40h/mês para 2h/mês) = R$42k/ano economia RH
+- **Compliance:** Rastreabilidade total (LGPD, SOX) elimina 100% das não-conformidades em auditorias
+- **ROI:** Sistema paga-se em 3 meses com economia em cobranças + eficiência
+- **Visibilidade:** Dashboards permitem renegociação proativa de contratos (economia adicional 8-12%)
+
+---
+
+## 📐 2. REGRAS DE NEGÓCIO
+
+### RN-FAT-026-01: Importação Suporta Múltiplos Layouts
+
+**Descrição**: Sistema DEVE suportar importação de faturas em múltiplos formatos (CSV, XLS, XLSX, TXT, PDF) com templates configuráveis por operadora/fornecedor. Cada template define mapeamento de colunas, delimitadores, encoding e regras de validação.
+
+**Templates Padrão**: Sistema vem com 15+ templates pré-configurados:
+- Telecom: Vivo Empresas, Claro Corporate, TIM Corporate, Oi Soluções, Embratel, Level 3
+- Cloud: AWS Billing, Azure Cost Management, Google Cloud Billing
+- SaaS: Microsoft 365, Salesforce, Adobe Creative Cloud
+
+**Builder Visual**: Usuário administrador pode criar novos templates via interface drag-and-drop sem código:
+1. Upload arquivo exemplo
+2. Marcar linha de cabeçalho
+3. Mapear colunas (Campo Sistema ← Coluna Arquivo)
+4. Definir regras transformação (ex: remover "R$", converter data "DD/MM/AAAA" → ISO)
+5. Validar com 10 linhas amostra
+6. Salvar template reutilizável
+
+**Validação**: Sistema detecta automaticamente encoding (UTF-8, ISO-8859-1, Windows-1252) e delimitador (`,`, `;`, `\t`, `|`).
+
+**Erro**: 400 Bad Request se arquivo não corresponde a nenhum template conhecido + sugestão de template mais próximo.
+
+### RN-FAT-026-02: OCR de PDF com Azure Form Recognizer
+
+**Descrição**: Se arquivo é PDF (não estruturado), sistema DEVE extrair dados via OCR usando Azure Form Recognizer com custom model treinado com 10.000+ faturas reais brasileiras.
+
+**Campos Extraídos**:
+- Identificação: Número fatura, data emissão, data vencimento, operadora, CNPJ
+- Valores: Total bruto, descontos, acréscimos, total líquido, impostos (ICMS, PIS, COFINS)
+- Detalhamento: Linhas/ativos cobrados, consumo individual, valores por serviço
+
+**Confiança Mínima**: Sistema aceita apenas campos com confidence score ≥ 85%. Campos <85% marcados para revisão manual.
+
+**Revisão Manual**: UI exibe PDF lado a lado com dados extraídos. Usuário corrige campos marcados amarelo e valida.
+
+**Re-treinamento**: Sistema coleta correções manuais para re-treinar modelo mensalmente (active learning loop).
+
+### RN-FAT-026-03: Conciliação Automática de Linhas com Contratos
+
+**Descrição**: Ao importar fatura, sistema DEVE automaticamente tentar conciliar cada linha/ativo cobrado com:
+1. Contrato vigente correspondente
+2. Ativo registrado no sistema (se linha telefônica, chip, etc.)
+3. Centro de custo/departamento responsável
+
+**Algoritmo de Matching**:
+- **Exato**: Número linha/IMEI/serial number match exato → conciliação automática
+- **Fuzzy**: Se não houver match exato, usa Levenshtein distance com threshold 90% similaridade
+- **Manual**: Se fuzzy <90%, marca para conciliação manual com sugestões top 3
+
+**Status Conciliação**: Cada item fatura recebe status:
+- ✅ **Conciliado** - Match automático encontrado
+- ⚠️ **Revisar** - Match fuzzy requer confirmação
+- ❌ **Não Conciliado** - Nenhum match encontrado (possível cobrança indevida)
+
+**Relatório**: Sistema gera relatório pós-importação: X% conciliado, Y% revisar, Z% não conciliado.
+
+### RN-FAT-026-04: Auditoria Pré-Pagamento com Regras Configuráveis
+
+**Descrição**: Sistema DEVE executar auditoria automática ANTES da aprovação para pagamento, aplicando regras configuráveis (biblioteca padrão + custom).
+
+**25 Regras Pré-Definidas**:
+1. **Linha sem contrato**: Item cobrado não vinculado a contrato vigente
+2. **Valor >15% média**: Valor item >15% da média histórica 6 meses
+3. **Serviço cancelado**: Item de linha/ativo marcado como cancelado/inativo
+4. **Roaming não autorizado**: Cobrança roaming sem workflow aprovação prévia
+5. **Limite excedido**: Consumo >120% do plano contratado sem notificação
+6. **Duplicidade**: Mesmo item cobrado 2x (match número + período)
+7. **Data inválida**: Cobrança período anterior à ativação ou posterior ao cancelamento
+8. **ICMS suspeito**: Alíquota ICMS diferente da praticada no estado
+9. **Assinatura duplicada**: 2+ assinaturas para mesma linha
+10. **Serviço VAS não solicitado**: Valor agregado (ringtone, horóscopo) não autorizado
+... (15 regras adicionais)
+
+**Custom Rules Engine**: Usuário pode criar regras via interface visual:
+- **Condição**: Campo X operador Y valor
+- **Ação**: Se verdadeiro → marcar como "Auditoria Falhou" + mensagem personalizada
+
+**Severidade**: Cada regra tem severidade (Alta, Média, Baixa):
+- Alta: Bloqueia aprovação até resolução
+- Média: Permite aprovação mas exige justificativa
+- Baixa: Apenas alerta informativo
+
+**Relatório Auditoria**: PDF exportável com todas as não-conformidades encontradas + valor total suspeito.
+
+### RN-FAT-026-05: Workflow de Contestação Formal
+
+**Descrição**: Quando auditoria identifica cobrança indevida, usuário DEVE poder criar contestação formal com workflow de aprovação e integração com operadora.
+
+**Fluxo Contestação**:
+1. **Criação**: Selecionar itens auditoria + anexar evidências (ex: email cancelamento)
+2. **Aprovação Interna**: Gerente departamento aprova contestação
+3. **Envio Operadora**: Sistema envia via API (se disponível) ou gera email formal + anexos
+4. **Acompanhamento SLA**: Sistema rastreia prazo resposta operadora (5/10/15 dias úteis conforme SLA contratual)
+5. **Resposta Operadora**: Registrar resposta (aceito total, aceito parcial, negado) + justificativa
+6. **Crédito Próxima Fatura**: Validar se crédito apareceu na fatura seguinte
+7. **Fechamento**: Marcar contestação como resolvida ou escalar para jurídico/Anatel
+
+**Prazo SLA Alerta**: Se operadora não responde em 80% do prazo SLA, sistema envia alerta automático para gestor + escala para supervisor.
+
+**Histórico Completo**: Timeline visual com todos os eventos (criação, aprovação, envio, resposta, crédito) e responsáveis.
+
+**Taxa Sucesso**: Dashboard KPI mostrando % contestações aceitas, valor médio recuperado, tempo médio resolução por operadora.
+
+### RN-FAT-026-06: Rateio Multi-Dimensional Automático
+
+**Descrição**: Sistema DEVE calcular rateio de custos automaticamente com suporte a 5 dimensões (Centro Custo, Projeto, Departamento, Geolocalização, Tipo Serviço) e regras configuráveis.
+
+**Tipos de Rateio**:
+1. **Percentual Fixo**: Ex: 60% Depto A, 40% Depto B
+2. **Proporcional ao Consumo**: Distribui valor total proporcionalmente ao consumo real de cada unidade
+3. **Misto**: Combina fixo + proporcional (ex: assinatura fixa rateada igualmente, consumo rateado proporcionalmente)
+4. **Por Ativo**: Cada linha/ativo já tem centro custo pré-definido
+5. **Hierárquico**: Rateia nível 1 (empresas) → nível 2 (filiais) → nível 3 (centros custo)
+
+**Regras de Rateio**: Usuário cria regras via UI:
+- **Se** Tipo Serviço = "Telefonia Móvel" **E** Valor > R$100 → Ratear 70% Usuário, 30% Empresa
+- **Se** Centro Custo = "TI" → 100% Projeto "Transformação Digital"
+
+**Validação**: Sistema valida que soma percentuais = 100% antes de salvar regra.
+
+**Recalculo Automático**: Se alterar regra, sistema oferece opção recalcular rateios de faturas anteriores (últimos 12 meses).
+
+**Exportação Contábil**: Gera lançamentos contábeis em formato CSV/TXT para importar em ERP (SAP, TOTVS, Protheus) com códigos contábeis mapeados por dimensão.
+
+### RN-FAT-026-07: Dashboard Executivo com KPIs Críticos
+
+**Descrição**: Sistema DEVE exibir dashboard executivo com 10+ KPIs principais atualizados em tempo real via SignalR.
+
+**KPIs Principais**:
+1. **Gasto Total Mês**: Valor total faturas aprovadas no mês
+2. **Variação MoM**: % variação vs. mês anterior (green ↓, red ↑)
+3. **Variação YoY**: % variação vs. mesmo mês ano anterior
+4. **Top 10 Maiores Contas**: Ranking linhas/ativos por valor
+5. **Distribuição por Tipo**: Pie chart - telefonia móvel, fixa, internet, cloud, SaaS
+6. **Curva de Gastos 12 Meses**: Line chart evolução temporal
+7. **Forecast 3 Meses**: Previsão ML baseada em tendências
+8. **Taxa Economia Auditoria**: % valor recuperado em contestações
+9. **Taxa Conciliação**: % itens conciliados automaticamente
+10. **Alertas Ativos**: Contador de alertas críticos pendentes
+
+**Drill-Down**: Todos os gráficos permitem drill-down (ex: clica em "Telefonia Móvel" → lista detalhada linhas móveis).
+
+**Exportação**: Dashboard exportável em PDF (snapshot mensal) ou Excel (dados brutos).
+
+**Permissões**: Visibilidade configurável por perfil (executivo vê consolidado, gestor vê apenas seu centro custo).
+
+### RN-FAT-026-08: Alertas Preditivos de Estouro de Budget
+
+**Descrição**: Sistema DEVE usar Machine Learning para prever estouros de budget com 7/15/30 dias de antecedência.
+
+**Modelo ML**: Random Forest Regressor treinado com:
+- Features: Consumo histórico 12 meses, sazonalidade, crescimento headcount, novos contratos, cancelamentos
+- Target: Valor total fatura mês N+1
+
+**Threshold Alerta**: Dispara alerta se previsão >90% do budget aprovado.
+
+**Canais Notificação**:
+- **7 dias antes**: Email para controller + gestor TI
+- **15 dias antes**: Email + push notification mobile
+- **30 dias antes**: Email + push + in-app notification + dashboard highlight
+
+**Ação Recomendada**: Alerta inclui sugestões automáticas:
+- "Consumo voz +35% vs. média → revisar plano corporativo"
+- "5 novas linhas ativadas sem planejamento → validar necessidade"
+- "Roaming internacional R$12k (usual R$2k) → bloquear roaming preventivamente"
+
+**Feedback Loop**: Sistema registra se alerta resultou em ação corretiva e aprimora modelo com essas informações.
+
+### RN-FAT-026-09: Integração com APIs de Operadoras
+
+**Descrição**: Sistema DEVE integrar com APIs REST de operadoras (quando disponíveis) para automatizar download de faturas, consulta de consumo e envio de contestações.
+
+**APIs Suportadas**:
+- **Vivo Empresas API**: Download faturas PDF/XML, consulta consumo em tempo real, abertura de tickets
+- **Claro Corporate API**: Download faturas, histórico chamadas, gestão de linhas
+- **TIM Corporate Portal**: Web scraping automatizado (não possui API oficial)
+
+**Autenticação**: OAuth 2.0 com refresh token automático (válido 90 dias) + armazenamento seguro em Azure Key Vault.
+
+**Polling Automático**: Hangfire job executa diariamente às 02:00 UTC verificando novas faturas disponíveis nas APIs.
+
+**Fallback Manual**: Se API falha 3x consecutivas, sistema envia email para usuário fazer upload manual + notifica equipe TI.
+
+**Rate Limiting**: Respeita rate limits das APIs (ex: Vivo 100 req/min) com retry backoff exponencial (Polly policy).
+
+### RN-FAT-026-10: Aprovação Mobile com Assinatura Digital
+
+**Descrição**: Gestores DEVEM poder aprovar pagamentos de faturas, contestações e rateios via app mobile MAUI com assinatura digital.
+
+**App MAUI Features**:
+- Login biométrico (FaceID, TouchID, digital)
+- Push notifications de faturas pendentes
+- Visualizar resumo fatura (valor, período, variação vs. mês anterior)
+- Drill-down em itens principais
+- Aprovar/Rejeitar com justificativa obrigatória se rejeitar
+- Assinatura digital via DocuSign Mobile SDK
+
+**Assinatura Digital**: Integração DocuSign para workflow legalmente válido:
+1. Fatura pronta para aprovação → gera PDF
+2. Envia para DocuSign com template pré-configurado
+3. Gestor assina via app mobile
+4. Callback webhook atualiza status fatura para "Aprovada"
+
+**Offline Mode**: App permite visualizar faturas já baixadas mesmo sem internet. Aprovações ficam em fila e sincronizam quando reconectar.
+
+**Auditoria**: Toda ação no app mobile é logada (timestamp, geolocalização GPS, device ID, IP) para compliance SOX.
+
+### RN-FAT-026-11: Isolamento Multi-Tenant Obrigatório
+
+**Descrição**: TODAS as queries e operações DEVEM filtrar por `ClienteId` obtido do JWT token do usuário logado.
+
+**Segurança**: Usuário de Cliente A NÃO pode ver/editar/deletar faturas de Cliente B mesmo se descobrir o ID.
+
+**Performance**: Índice composto (ClienteId, DataEmissao DESC) otimiza queries mais comuns.
+
+### RN-FAT-026-12: Soft Delete Obrigatório
+
+**Descrição**: Sistema NUNCA deve fazer DELETE físico de faturas. Exclusão lógica via flag `FlExcluido = TRUE`.
+
+**Motivo**: Preservar histórico completo para auditorias fiscais (obrigatório manter 7 anos conforme legislação).
+
+**Queries**: Todas as queries incluem `WHERE FlExcluido = 0` por padrão (EF Core Query Filter global).
+
+### RN-FAT-026-13: Histórico de Versões de Fatura
+
+**Descrição**: Se fatura é reimportada ou corrigida manualmente, sistema DEVE criar nova versão preservando versões anteriores.
+
+**Versionamento**: Tabela `Fatura_Versao` com campos:
+- Numero_Versao (1, 2, 3...)
+- Data_Versao
+- Usuario_Responsavel
+- Motivo_Alteracao (obrigatório se v2+)
+- Snapshot_Dados (JSON completo da versão)
+
+**Comparação**: UI permite comparar versões lado a lado (diff highlighting).
+
+**Restauração**: Administrador pode restaurar versão anterior com justificativa.
+
+### RN-FAT-026-14: Integração com ERP Financeiro
+
+**Descrição**: Sistema DEVE sincronizar faturas aprovadas com ERP financeiro via API REST ou arquivo CSV/TXT.
+
+**Formatos Suportados**:
+- **SAP**: IDoc INVOIC02
+- **TOTVS Protheus**: TXT layout CNAB
+- **API REST genérica**: JSON payload
+
+**Dados Sincronizados**:
+- Cabeçalho fatura (número, fornecedor, valor total, vencimento)
+- Rateio contábil (centro custo, conta contábil, percentual)
+- Anexos (PDF fatura original)
+
+**Retry Policy**: Polly com 3 tentativas (backoff 2s, 4s, 8s) se falha.
+
+**Dead Letter Queue**: Eventos não sincronizados após 3 tentativas vão para DLQ (Azure Service Bus) para reprocessamento manual.
+
+### RN-FAT-026-15: Campos Obrigatórios por Status
+
+**Descrição**: Campos obrigatórios variam por status da fatura:
+
+**Rascunho** (importação em andamento):
+- Apenas: Arquivo_Original, Data_Importacao
+
+**Aguardando Conciliação**:
+- + Operadora, Periodo_Referencia, Data_Emissao, Valor_Total
+
+**Aguardando Auditoria**:
+- + Resultado_Conciliacao (% conciliado)
+
+**Aguardando Aprovação**:
+- + Resultado_Auditoria (aprovado/reprovado), Rateio_Calculado
+
+**Aprovada**:
+- + Aprovador_Id, Data_Aprovacao, Assinatura_Digital_Id
+
+**Paga**:
+- + Data_Pagamento, Numero_Documento_Pagamento
+
+**Validação**: FluentValidation com regras condicionais baseadas em status.
+
+---
+
+## 🗄️ 3. BANCO DE DADOS LEGADO
+
+### Contexto do Sistema Legado
+
+Sistema legado VB.NET/ASP.NET Web Forms tinha gestão rudimentar de faturas com problemas críticos:
+1. **Importação Manual**: Upload único arquivo CSV com layout fixo - quebrava a cada mudança da operadora
+2. **Sem Conciliação Automática**: Controlador comparava manualmente em planilha Excel
+3. **Auditoria Manual**: Checklist em papel impresso - descobria erros após pagar
+4. **Rateio em Excel**: VLOOKUP complexos - recalcular = 8 horas de trabalho
+5. **Sem Workflow**: Aprovação por email - nenhum histórico rastreável
+
+### Estrutura Legado Existente
+
+**Fatura** (tabela principal):
+- Campos: Id_Fatura, Num_Fatura, Dt_Emissao, Dt_Vencimento, Id_Operadora, Valor_Total, Observacao, Fl_Paga
+- Não tinha: Status workflow, versões, auditoria automática, OCR metadata
+
+**Fatura_Detalhe** (linhas fatura):
+- Campos: Id_Fatura, Numero_Linha, Descricao_Servico, Valor, Qtde
+- Não tinha: Conciliação com contrato/ativo, resultado auditoria
+
+**Fatura_Rateio** (rateio manual):
+- Campos: Id_Fatura, Id_Centro_Custo, Percentual, Valor
+- Não tinha: Regras automáticas, multi-dimensional, recalculo
+
+**Tabelas Ausentes**:
+- Não existiam `Fatura_Auditoria` (regras), `Fatura_Contestacao` (workflow), `Fatura_Versao` (histórico), `Fatura_Importacao_Log` (rastreamento uploads), `Fatura_Anexos` (PDFs)
+
+### Migração para Sistema Moderno
+
+Sistema moderno introduz 12 tabelas:
+
+**Fatura (Evoluída)**:
+Adicionados 40+ campos incluindo Status workflow (Enum: Rascunho, Conciliacao, Auditoria, Aprovacao, Aprovada, Paga, Contestada, Cancelada), OCR metadata (OCR_Confidence, OCR_Raw_JSON), Impostos detalhados (ICMS, PIS, COFINS, ISS), Integração ERP (ERP_Sincronizado, ERP_Documento_Numero, ERP_Data_Sync), Versionamento (Numero_Versao, Versao_Atual_Flag).
+
+**Fatura_Detalhe (Evoluída)**:
+Adicionados campos Conciliacao (Conciliado, Id_Contrato_Item, Id_Ativo, Match_Score), Auditoria (Auditoria_Status, Auditoria_Regras_Falhas JSON), Rateio (Rateio_Centro_Custo, Rateio_Projeto, Rateio_Departamento).
+
+**Fatura_Auditoria_Regra (Nova)**:
+Biblioteca de regras de auditoria (Id, Nome_Regra, Descricao, Severidade, Condicao_SQL, Ativa, Parametros_JSON).
+
+**Fatura_Auditoria_Resultado (Nova)**:
+Log de execução de regras por fatura (Id_Fatura, Id_Regra, Passou, Valor_Suspeito, Mensagem_Detalhada, Dt_Execucao).
+
+**Fatura_Contestacao (Nova)**:
+Workflow completo de contestação (Id_Fatura, Itens_Contestados JSON, Valor_Total_Contestado, Status workflow, Aprovador_Interno_Id, Dt_Envio_Operadora, Resposta_Operadora, Credito_Recebido, Dt_Fechamento).
+
+**Fatura_Rateio_Regra (Nova)**:
+Regras configuráveis de rateio (Nome_Regra, Tipo rateio, Dimensoes JSON, Percentuais, Ativa).
+
+**Fatura_Importacao_Template (Nova)**:
+Templates de layouts (Nome_Template, Operadora, Formato, Mapeamento_Colunas JSON, Regras_Transformacao JSON, Ativo).
+
+**Fatura_Importacao_Log (Nova)**:
+Histórico de uploads (Arquivo_Nome, Template_Usado, Linhas_Total, Linhas_Sucesso, Linhas_Erro, Erros_JSON, Dt_Importacao, Usuario_Id).
+
+**Fatura_Anexos (Nova)**:
+Armazena PDFs originais (Tipo documento, Azure_Blob_URL, SHA256_Hash, Tamanho_Bytes, Dt_Upload).
+
+**Fatura_Aprovacao (Nova)**:
+Workflow aprovação (Id_Fatura, Nivel_Aprovacao 1/2/3, Aprovador_Id, Status, Justificativa_Rejeicao, DocuSign_Envelope_Id, Dt_Assinatura).
+
+**Fatura_KPI_Snapshot (Nova)**:
+Snapshots diários de KPIs para dashboard histórico (Dt_Snapshot, Gasto_Total, Taxa_Conciliacao, Taxa_Auditoria, Valor_Contestado, ClienteId).
+
+**Fatura_Previsao_ML (Nova)**:
+Armazena previsões do modelo ML (Mes_Referencia, Valor_Previsto, Confidence_Interval, Alertas_Gerados JSON, Dt_Previsao).
+
+---
+
+## 🔌 4. WEBSERVICES LEGADO
+
+### Contexto
+
+Sistema legado VB.NET utilizava Web Services SOAP básicos com limitações severas:
+- Importação apenas CSV layout fixo
+- Sem auditoria automática
+- Processamento síncrono (timeout em arquivos >5MB)
+
+### Web Services SOAP Existentes
+
+**Endpoint Base**: `http://servidor/IControlIT/Fatura.asmx`
+**Protocolo**: SOAP 1.1
+**Autenticação**: Windows Authentication
+
+#### Métodos Principais
+
+**1. ImportarFatura()**
+- **Entrada**: Arquivo CSV Base64, IdOperadora
+- **Saída**: IdFatura (INT) ou Exception
+- **Lógica**: Parse linha por linha, INSERT em Fatura + Fatura_Detalhe
+- **Problema**: Layout fixo quebrava a cada mudança da operadora, timeout em arquivos >1000 linhas
+
+**2. ConsultarFaturas()**
+- **Entrada**: Filtros (Operadora, Periodo, Status)
+- **Saída**: Array de FaturaDto
+- **Problema**: Sem paginação, query lenta (>5s com 500 faturas)
+
+**3. AprovarFatura()**
+- **Entrada**: IdFatura, IdUsuario
+- **Saída**: Boolean
+- **Problema**: Sem workflow (aprovação direta), sem assinatura digital, sem auditoria de quem aprovou
+
+**4. RatearFatura()**
+- **Entrada**: IdFatura, Array<RateioDto>
+- **Saída**: Boolean
+- **Problema**: Rateio manual item por item, sem validação soma 100%, sem regras reutilizáveis
+
+### Evolução para REST API Moderna
+
+Sistema moderno substitui SOAP por REST API (.NET 10 Web API) com 25+ endpoints:
+
+**Importação**:
+- `POST /api/v1/faturas/importar` - Upload multi-layout (CSV/XLS/PDF) com auto-detect
+- `POST /api/v1/faturas/importar/ocr` - OCR de PDF via Azure Form Recognizer
+- `GET /api/v1/faturas/templates` - Listar templates disponíveis
+- `POST /api/v1/faturas/templates` - Criar template customizado (builder visual)
+
+**CRUD**:
+- `GET /api/v1/faturas` - Listar com paginação cursor-based
+- `GET /api/v1/faturas/{id}` - Buscar por ID com detalhes completos
+- `PUT /api/v1/faturas/{id}` - Atualizar (cria nova versão)
+- `DELETE /api/v1/faturas/{id}` - Soft delete
+
+**Conciliação**:
+- `POST /api/v1/faturas/{id}/conciliar` - Executar conciliação automática
+- `GET /api/v1/faturas/{id}/conciliacao` - Resultado detalhado
+- `PUT /api/v1/faturas/{id}/conciliacao/manual` - Corrigir match manual
+
+**Auditoria**:
+- `POST /api/v1/faturas/{id}/auditar` - Executar regras de auditoria
+- `GET /api/v1/faturas/{id}/auditoria` - Resultados com falhas destacadas
+- `GET /api/v1/faturas/regras-auditoria` - Listar regras configuradas
+- `POST /api/v1/faturas/regras-auditoria` - Criar regra customizada
+
+**Contestação**:
+- `POST /api/v1/faturas/{id}/contestacoes` - Criar contestação
+- `PUT /api/v1/faturas/contestacoes/{id}/aprovar` - Aprovar envio operadora
+- `POST /api/v1/faturas/contestacoes/{id}/enviar` - Enviar para operadora (API/email)
+- `GET /api/v1/faturas/contestacoes` - Listar contestações ativas
+- `PUT /api/v1/faturas/contestacoes/{id}/fechar` - Fechar com resultado
+
+**Rateio**:
+- `POST /api/v1/faturas/{id}/ratear` - Calcular rateio com regras automáticas
+- `GET /api/v1/faturas/{id}/rateio` - Visualizar rateio calculado
+- `POST /api/v1/faturas/regras-rateio` - Criar regra reutilizável
+- `POST /api/v1/faturas/{id}/rateio/recalcular` - Recalcular com novas regras
+
+**Aprovação**:
+- `POST /api/v1/faturas/{id}/aprovar` - Aprovar para pagamento (multi-nível)
+- `POST /api/v1/faturas/{id}/rejeitar` - Rejeitar com justificativa
+- `GET /api/v1/faturas/pendentes-aprovacao` - Fila aprovação por usuário
+- `POST /api/v1/faturas/{id}/docusign` - Enviar para assinatura digital
+
+**Dashboard/Analytics**:
+- `GET /api/v1/faturas/dashboard` - KPIs principais (gasto total, variação MoM/YoY)
+- `GET /api/v1/faturas/dashboard/curva-gastos` - Série temporal 12 meses
+- `GET /api/v1/faturas/dashboard/top-contas` - Ranking maiores valores
+- `GET /api/v1/faturas/dashboard/forecast` - Previsão ML 3 meses
+- `GET /api/v1/faturas/dashboard/alertas` - Alertas preditivos ativos
+
+**Tecnologias REST Moderno**:
+- **.NET 10 Minimal APIs**: Performance otimizada
+- **MediatR CQRS**: Separação comando/query
+- **Hangfire**: Jobs background (importação, auditoria, ML)
+- **Azure Form Recognizer**: OCR de PDFs
+- **ML.NET**: Modelo previsão gastos
+- **DocuSign API**: Assinatura digital
+- **SignalR**: Dashboard tempo real
+- **Polly**: Resiliência integrações APIs operadoras
+
+---
+
+## 🔗 5. REFERÊNCIAS AO LEGADO
+
+### Mapeamento de Conceitos
+
+| Conceito Legado | Conceito Moderno | Observações |
+|----------------|------------------|-------------|
+| Upload CSV manual | Engine multi-layout + OCR | Suporta 15+ formatos |
+| Conciliação Excel | Algoritmo fuzzy matching | 98% acurácia automática |
+| Checklist papel auditoria | Rules engine 25+ regras | Pré-pagamento |
+| Rateio VLOOKUP | Motor multi-dimensional | Tempo real |
+| Aprovação email | Workflow + DocuSign | Rastreável + legal |
+| Planilha Excel reports | Dashboard Chart.js | Tempo real + drill-down |
+| Sem alertas | ML preditivo 30 dias | Previne estouros |
+| Sem integração operadoras | APIs Vivo/Claro/TIM | Download automático |
+
+### Funcionalidades Legado → Moderno
+
+| ID | Funcionalidade Legado | Funcionalidade Moderna | Status |
+|----|----------------------|------------------------|--------|
+| WS01 | ImportarFatura (CSV fixo) | POST /api/v1/faturas/importar (multi-layout) | 🔄 Evoluído |
+| WS02 | ConsultarFaturas (sem paginação) | GET /api/v1/faturas?cursor=X&size=50 | 🔄 Otimizado |
+| WS03 | AprovarFatura (direto) | POST /api/v1/faturas/{id}/aprovar (workflow) | 🔄 + Workflow |
+| WS04 | RatearFatura (manual) | POST /api/v1/faturas/{id}/ratear (automático) | 🔄 Inteligente |
+| N/A | OCR de PDF | POST /api/v1/faturas/importar/ocr | ✅ Nova |
+| N/A | Conciliação automática | POST /api/v1/faturas/{id}/conciliar | ✅ Nova |
+| N/A | Auditoria rules engine | POST /api/v1/faturas/{id}/auditar | ✅ Nova |
+| N/A | Workflow contestação | POST /api/v1/faturas/{id}/contestacoes | ✅ Nova |
+| N/A | Dashboard executivo | GET /api/v1/faturas/dashboard | ✅ Nova |
+| N/A | Previsão ML gastos | GET /api/v1/faturas/dashboard/forecast | ✅ Nova |
+| N/A | App mobile aprovação | MAUI + DocuSign | ✅ Nova |
+| N/A | Integração APIs operadoras | Hangfire jobs | ✅ Nova |
+
+### Telas Legado vs. Moderno
+
+| Tela ASP.NET WebForms | Angular Moderno | Melhorias |
+|-----------------------|-----------------|-----------|
+| Fatura\Upload.aspx | /faturas/importar | Multi-layout picker + OCR preview |
+| Fatura\Lista.aspx | /faturas | Filtros avançados + status workflow |
+| Fatura\Detalhes.aspx | /faturas/{id} | Timeline versões + auditoria visual |
+| Fatura\Rateio.aspx | /faturas/{id}/rateio | Regras automáticas + preview |
+| N/A | /faturas/contestacoes | Workflow completo + SLA tracking |
+| N/A | /dashboard/faturas | Gráficos Chart.js tempo real |
+| N/A (Excel) | /faturas/templates/builder | Visual template builder drag-drop |
+
+### Migração de Dados
+
+**Faturas Legado**: 2.400 faturas migradas (24 meses × 100/mês) preservando dados essenciais.
+
+**Recalculos**: Auditoria e rateio NÃO recalculados retroativamente (dados originais preservados).
+
+**Status Normalização**: Faturas pagas marcadas como "Paga", pendentes como "Aguardando Aprovação".
+
+**Validação**: Script pós-migração valida 100% integridade (FKs, valores, períodos).
+
+---
+
+## 📚 REFERÊNCIAS TÉCNICAS
+
+### Documentação Relacionada
+
+- [ROADMAP-BASE.md](../../../../ROADMAP-BASE.md)
+- [RF-027: Gestão de Aditivos Contratos](../RF027-Gestao-de-Aditivos-Contratos/RF027.md)
+- [RF-028: Gestão de SLA Operações](../RF028-Gestao-de-SLA-Operacoes/RF028.md)
+
+### Tecnologias Utilizadas
+
+- **.NET 10**: Framework backend
+- **Entity Framework Core 10**: ORM
+- **MediatR**: CQRS pattern
+- **Hangfire**: Background jobs
+- **Azure Form Recognizer**: OCR
+- **ML.NET**: Machine Learning
+- **DocuSign API**: Assinatura digital
+- **SignalR**: Real-time dashboards
+- **Chart.js**: Gráficos interativos
+- **Azure Service Bus**: DLQ contestações
+- **Polly**: Resiliência
+
+---
+
+**Última Revisão**: 17/12/2025
+**Revisado Por**: Equipe IControlIT Architect
+**Próxima Revisão**: 17/03/2026

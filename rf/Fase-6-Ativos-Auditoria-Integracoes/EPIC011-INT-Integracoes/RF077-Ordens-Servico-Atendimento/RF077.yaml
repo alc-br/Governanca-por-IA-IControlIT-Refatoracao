@@ -1,0 +1,338 @@
+rf:
+  id: RF077
+  nome: Ordens de Serviço e Atendimento
+  versao: '2.0'
+  data: '2025-01-14'
+  fase: Fase 6 - Ativos, Auditoria e Integrações
+  epic: EPIC011-INT-Integracoes
+  status: aprovado
+descricao:
+  objetivo: Especificar módulo completo de gestão de ordens de serviço (OS) incluindo criação, agendamento, execução, rastreamento
+    de tempo, consumo de materiais, coleta de evidências digitais e finalização com assinatura digital.
+  problema_resolvido: Falta de rastreabilidade de atividades de manutenção, impossibilidade de comprovar conclusão de serviços
+    (sem assinatura digital), dupla alocação de técnicos (sem validação de conflitos), cálculo impreciso de custos (sem registro
+    de pausas) e ausência de validação de evidências (fotos sem EXIF).
+  publico_afetado: Técnicos de campo, supervisores de manutenção, gerentes de operações, clientes/solicitantes de serviço.
+escopo:
+  incluso:
+  - CRUD completo de Ordens de Serviço
+  - Gestão de Tipos de OS parametrizados
+  - Agendamento com validação automática de disponibilidade de técnico
+  - Checklist dinâmico baseado em tipo de OS
+  - Registro de tempo automatizado (início, pausa, retomada, conclusão)
+  - Consumo de materiais com redução automática de estoque
+  - Upload de fotos/evidências com validação EXIF obrigatória
+  - Assinatura digital obrigatória para conclusão
+  - Validação de conformidade com SLA de atendimento
+  - Relatórios de produtividade por técnico
+  - Controle de transições de estado
+  - Auditoria completa (retenção 7 anos - LGPD)
+  - Multi-tenancy (isolamento por ClienteId)
+  - RBAC (permissões por role)
+  - i18n (pt-BR, en, es)
+  - Central de Funcionalidades (feature flags)
+  fora:
+  - Interface visual específica (Angular 19 é implementação)
+  - Tecnologia de assinatura digital (Signpad, canvas, outro)
+  - Formato de exportação de relatórios (PDF/Excel opcional)
+  - Integração com GPS/localização mobile (futuro)
+  - Estratégia de deploy ou infraestrutura
+entidades:
+- nome: OrdemServico
+  descricao: Ordem de serviço principal (instalação, reparo, configuração, etc.)
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: TipoOS
+  descricao: Tipos parametrizados de OS (Instalação, Configuração, Movimentação, Reparo, Retirada)
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: ChecklistItem
+  descricao: Itens do checklist associados a um tipo de OS
+  multi_tenant: true
+  soft_delete: false
+  auditoria: false
+- nome: RegistroPausaRetomada
+  descricao: Registro de pausas e retomadas durante execução de OS
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: MaterialConsumido
+  descricao: Materiais/peças consumidos durante execução de OS
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: AssinaturaDigital
+  descricao: Assinatura digital de conclusão de OS com hash SHA-256
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: FotoEvidencia
+  descricao: Fotos anexadas a OS com metadados EXIF validados
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+regras_negocio:
+- id: RN-RF077-001
+  descricao: Validação de transição de estados (Rascunho → Pendente Aprovação → Aprovada → Agendada → Em Execução → Concluída
+    | Cancelada). Estados Concluída e Cancelada são terminais.
+  tipo: regra_negocio
+  campos_afetados:
+  - Status
+  obrigatorio: true
+  prioridade: CRÍTICA
+- id: RN-RF077-002
+  descricao: Obrigatoriedade de checklist completo antes de conclusão. Todos os itens devem estar preenchidos.
+  tipo: validacao
+  campos_afetados:
+  - ChecklistItems
+  obrigatorio: true
+  prioridade: CRÍTICA
+- id: RN-RF077-003
+  descricao: Assinatura digital obrigatória em conclusão com timestamp UTC, nome signatário e hash SHA-256.
+  tipo: validacao
+  campos_afetados:
+  - AssinaturaDigital
+  obrigatorio: true
+  prioridade: CRÍTICA
+- id: RN-RF077-004
+  descricao: Agendamento requer disponibilidade de técnico. Sistema valida automaticamente conflitos de horário.
+  tipo: validacao
+  campos_afetados:
+  - TecnicoId
+  - DataHoraInicio
+  - DataHoraFim
+  obrigatorio: true
+  prioridade: ALTA
+- id: RN-RF077-005
+  descricao: Duração real não pode exceder estimada em >20% sem justificativa textual obrigatória.
+  tipo: validacao
+  campos_afetados:
+  - DuracaoRealMinutos
+  - DuracaoEstimadaMinutos
+  - JustificativaAtraso
+  obrigatorio: true
+  prioridade: MÉDIA
+- id: RN-RF077-006
+  descricao: Consumo de materiais reduz estoque automaticamente APENAS após conclusão. Falta de estoque bloqueia conclusão.
+  tipo: regra_negocio
+  campos_afetados:
+  - MateriaisConsumidos
+  - SaldoEstoque
+  obrigatorio: true
+  prioridade: ALTA
+- id: RN-RF077-007
+  descricao: Conformidade com SLA de atendimento. Sistema valida prazo de resposta ao iniciar execução e registra violação
+    se aplicável.
+  tipo: regra_negocio
+  campos_afetados:
+  - SlaAtendimentoId
+  - IndicadorSlaViolado
+  - TempoRespostaRealHoras
+  obrigatorio: true
+  prioridade: CRÍTICA
+- id: RN-RF077-008
+  descricao: Rastreamento de tempo com pausa/retomada auditada. Cada pausa registrada com timestamp UTC e motivo.
+  tipo: regra_negocio
+  campos_afetados:
+  - RegistrosPausa
+  obrigatorio: true
+  prioridade: ALTA
+- id: RN-RF077-009
+  descricao: Validação de fotos/evidências com metadados EXIF obrigatórios (data/hora captura). Fotos sem EXIF são rejeitadas.
+  tipo: validacao
+  campos_afetados:
+  - FotosEvidencia
+  - MetadadosExif
+  obrigatorio: true
+  prioridade: MÉDIA
+- id: RN-RF077-010
+  descricao: Relatórios de produtividade por técnico baseados APENAS em OS concluídas (total, tempo médio, conformidade SLA,
+    custo materiais).
+  tipo: regra_negocio
+  campos_afetados:
+  - Status
+  - TecnicoId
+  - DuracaoRealMinutos
+  - MateriaisConsumidos
+  obrigatorio: true
+  prioridade: MÉDIA
+estados:
+- id: Rascunho
+  descricao: OS criada, ainda não enviada para aprovação
+- id: PendenteAprovacao
+  descricao: Aguardando aprovação de supervisor/gerente
+- id: Aprovada
+  descricao: Aprovada, pronta para agendamento
+- id: Agendada
+  descricao: Data/hora/técnico definidos
+- id: EmExecucao
+  descricao: Técnico executando atividades
+- id: Concluida
+  descricao: Finalizada com assinatura digital (estado terminal)
+- id: Cancelada
+  descricao: Cancelada antes da conclusão (estado terminal)
+transicoes:
+  permitidas:
+  - de: Rascunho
+    para: PendenteAprovacao
+  - de: Rascunho
+    para: Cancelada
+  - de: PendenteAprovacao
+    para: Aprovada
+  - de: PendenteAprovacao
+    para: Cancelada
+  - de: Aprovada
+    para: Agendada
+  - de: Aprovada
+    para: Cancelada
+  - de: Agendada
+    para: EmExecucao
+  - de: Agendada
+    para: Cancelada
+  - de: EmExecucao
+    para: Concluida
+  - de: EmExecucao
+    para: Cancelada
+  proibidas:
+  - de: Concluida
+    para: '*'
+  - de: Cancelada
+    para: '*'
+  - de: Rascunho
+    para: Concluida
+  - de: PendenteAprovacao
+    para: EmExecucao
+permissoes:
+- codigo: osv:os:view_any
+  descricao: Listar ordens de serviço
+- codigo: osv:os:view
+  descricao: Visualizar detalhes de ordem de serviço
+- codigo: osv:os:create
+  descricao: Criar nova ordem de serviço
+- codigo: osv:os:update
+  descricao: Editar ordem de serviço
+- codigo: osv:os:delete
+  descricao: Cancelar ordem de serviço
+- codigo: osv:os:agendar
+  descricao: Agendar data/hora/técnico
+- codigo: osv:os:executar
+  descricao: Iniciar execução (pausar/retomar)
+- codigo: osv:os:concluir
+  descricao: Finalizar com assinatura digital
+- codigo: osv:checklist:atualizar
+  descricao: Preencher checklist
+- codigo: osv:material:consumir
+  descricao: Registrar consumo de materiais
+- codigo: osv:foto:upload
+  descricao: Anexar fotos/evidências
+- codigo: osv:relatorio:read
+  descricao: Visualizar relatórios de produtividade
+integracoes:
+  internas:
+  - Autenticacao OAuth 2.0
+  - Multi-Tenancy (ClienteId)
+  - Auditoria (AuditableEntity)
+  - RBAC (Permissões por Role)
+  - i18n (Transloco pt-BR/en/es)
+  - 'Central de Funcionalidades (FeatureKey: OSV_ORDENS_SERVICO)'
+  externas:
+  - sistema: RF028 - Gestão de SLA
+    tipo: Integração Interna
+    obrigatoria: true
+  - sistema: RF012 - Gestão de Usuários
+    tipo: Integração Interna
+    obrigatoria: true
+  - sistema: RF076 - Manutenção Preventiva
+    tipo: Integração Interna
+    obrigatoria: false
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_entrada: true
+  sanitizacao_sql: true
+  validacao_xss: true
+  rate_limiting: true
+  cors_restritivo: true
+  https_obrigatorio: true
+  hash_assinatura: SHA-256
+  criptografia_fotos: true
+rastreabilidade:
+  ucs_esperados:
+  - UC00 - Listar Ordens de Serviço
+  - UC01 - Criar Ordem de Serviço
+  - UC02 - Visualizar Detalhes de Ordem
+  - UC03 - Editar Ordem de Serviço
+  - UC04 - Agendar Ordem de Serviço
+  - UC05 - Executar Ordem de Serviço
+  - UC06 - Concluir Ordem de Serviço com Assinatura
+catalog:
+  crud:
+  - id: RF077-CRUD-01
+    title: Criar ordem de serviço
+    required: true
+  - id: RF077-CRUD-02
+    title: Listar ordens de serviço com filtros
+    required: true
+  - id: RF077-CRUD-03
+    title: Visualizar detalhes de ordem de serviço
+    required: true
+  - id: RF077-CRUD-04
+    title: Atualizar ordem de serviço
+    required: true
+  - id: RF077-CRUD-05
+    title: Cancelar ordem de serviço
+    required: true
+  validacoes:
+  - id: RF077-VAL-01
+    title: Validar campos obrigatórios
+    required: true
+  - id: RF077-VAL-02
+    title: Validar transição de estado
+    required: true
+  - id: RF077-VAL-03
+    title: Validar disponibilidade de técnico
+    required: true
+  - id: RF077-VAL-04
+    title: Validar checklist completo antes de conclusão
+    required: true
+  - id: RF077-VAL-05
+    title: Validar assinatura digital obrigatória
+    required: true
+  - id: RF077-VAL-06
+    title: Validar metadados EXIF em fotos
+    required: true
+  seguranca:
+  - id: RF077-SEC-01
+    title: Isolamento de tenant (ClienteId)
+    required: true
+  - id: RF077-SEC-02
+    title: Permissões RBAC por operação
+    required: true
+  - id: RF077-SEC-03
+    title: Hash SHA-256 de assinatura digital
+    required: true
+  - id: RF077-SEC-04
+    title: Criptografia de fotos em blob storage
+    required: true
+exclusions:
+  rf_items:
+  - id: EX-RF077-01
+    justificativa: Interface visual específica (responsabilidade de WF-RF077)
+  - id: EX-RF077-02
+    justificativa: Tecnologia de assinatura (definida na implementação)
+  - id: EX-RF077-03
+    justificativa: Formato de exportação de relatórios (PDF/Excel opcional)
+  - id: EX-RF077-04
+    justificativa: GPS/localização mobile (funcionalidade futura)
+historico:
+- versao: '2.0'
+  data: '2025-01-14'
+  autor: Agência ALC - alc.dev.br
+  descricao: 'Migração v1.0 → v2.0: Remoção de código, estruturação YAML sincronizada com RF077.md, separação RF/RL'
+- versao: '1.0'
+  data: '2025-12-28'
+  autor: IControlIT Architect Agent
+  descricao: Versão inicial (com violações de Governança v2.0)

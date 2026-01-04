@@ -1,0 +1,686 @@
+# =============================================
+# RL-RF012 — Referência ao Legado
+# Gestão de Usuários do Sistema
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF012
+titulo: "Gestão de Usuários do Sistema"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms (IControlIT v1.0)"
+  versao: "1.0"
+  arquitetura: "Monolítica ASP.NET Web Forms"
+  banco_dados: "SQL Server"
+  multi_tenant: true
+  auditoria: "partial"  # Apenas Dt_Ultimo_Acesso, sem logs detalhados
+
+# =============================================
+# PROBLEMAS IDENTIFICADOS NO LEGADO (10)
+# =============================================
+problemas_legado:
+  - id: "PROB-001"
+    titulo: "Segurança de Senhas (MD5 Inseguro)"
+    descricao: "MD5 é algoritmo quebrado desde 2004, facilmente reversível com rainbow tables. Não oferece segurança adequada para senhas."
+    gravidade: "critica"
+    destino: "substituido"
+    justificativa: "Substituído por BCrypt work factor 12. Migração obrigatória forçando troca de senha no primeiro login pós-migração."
+
+  - id: "PROB-002"
+    titulo: "SQL Injection"
+    descricao: "Uso de SQL dinâmico via classe cls_DB sem parametrização adequada. Vulnerável a ataques SQL Injection."
+    gravidade: "critica"
+    destino: "substituido"
+    justificativa: "Substituído por Entity Framework Core com queries parametrizadas (LINQ, Raw SQL parametrizado)."
+
+  - id: "PROB-003"
+    titulo: "Performance (ViewState Pesado)"
+    descricao: "ViewState do ASP.NET Web Forms adiciona 50-200KB por request. PostBacks constantes degradam UX."
+    gravidade: "alta"
+    destino: "substituido"
+    justificativa: "Substituído por Angular SPA sem ViewState. Comunicação via API REST."
+
+  - id: "PROB-004"
+    titulo: "Auditoria Limitada"
+    descricao: "Apenas campo Dt_Ultimo_Acesso na tabela Usuario. Sem histórico de alterações, sem logs de acesso (sucesso/falha), sem IP/geolocalização."
+    gravidade: "alta"
+    destino: "substituido"
+    justificativa: "Criada tabela Usuario_Historico_Acesso com auditoria completa (IP, geolocalização, dispositivo, motivo falha)."
+
+  - id: "PROB-005"
+    titulo: "Permissões Simplificadas"
+    descricao: "RadioButtonLists com apenas 2 valores (Revogar/Permitir). Falta granularidade. Permissões armazenadas em campos separados (não extensível)."
+    gravidade: "media"
+    destino: "substituido"
+    justificativa: "Substituído por campo Permissoes_Customizadas (JSON) permitindo permissões granulares extensíveis."
+
+  - id: "PROB-006"
+    titulo: "Falta MFA"
+    descricao: "Nenhuma autenticação de dois fatores. Vulnerável a roubo de credenciais."
+    gravidade: "alta"
+    destino: "substituido"
+    justificativa: "Implementado MFA via TOTP (RFC 6238) com QR Code para Google Authenticator/Authy."
+
+  - id: "PROB-007"
+    titulo: "Falta Detecção de Login Suspeito"
+    descricao: "Sem geolocalização de IP, sem alertas de login anômalo (país diferente, horário incomum)."
+    gravidade: "media"
+    destino: "substituido"
+    justificativa: "Implementado detecção com geolocalização via API ipapi.co. Notificação por e-mail em caso de suspeita."
+
+  - id: "PROB-008"
+    titulo: "Sem Histórico de Senhas (Reutilização Infinita)"
+    descricao: "Tabela Usuario_Historico_Senha existe mas sem limite de registros e sem validação de reutilização."
+    gravidade: "media"
+    destino: "substituido"
+    justificativa: "Implementado limite de 12 senhas com validação obrigatória de não-reutilização."
+
+  - id: "PROB-009"
+    titulo: "Sem Integração Active Directory"
+    descricao: "Cada usuário deve ser criado manualmente no IControlIT. Duplicação de esforço em empresas com AD corporativo."
+    gravidade: "baixa"
+    destino: "substituido"
+    justificativa: "Implementada integração AD via LDAP (PrincipalContext) com sincronização automática de dados."
+
+  - id: "PROB-010"
+    titulo: "Sessões sem Limite"
+    descricao: "Não há controle de múltiplas sessões simultâneas por usuário. Usuário pode logar em infinitos dispositivos."
+    gravidade: "baixa"
+    destino: "substituido"
+    justificativa: "Implementado limite de 5 sessões simultâneas (6ª sessão invalida a mais antiga)."
+
+# =============================================
+# REFERÊNCIAS AO LEGADO (Destino Obrigatório)
+# =============================================
+referencias:
+  - id: "LEG-RF012-001"
+    tipo: "webservice"
+    nome: "WSAuth.asmx.vb::Login()"
+    caminho: "ic1_legado/IControlIT/WS/WSAuth.asmx.vb"
+    descricao: |
+      Autentica usuário via credenciais (login/senha MD5).
+      Retorna session cookie ASP.NET.
+      Wrapper para WSUsuario.Autenticar().
+    destino: "substituido"
+    justificativa: "Substituído por endpoint REST POST /api/auth/login retornando JWT tokens (access + refresh)."
+    rf_item_relacionado: "RN-RF012-05"
+    uc_relacionado: "UC02-RF012"
+
+  - id: "LEG-RF012-002"
+    tipo: "webservice"
+    nome: "WSAuth.asmx.vb::Logout()"
+    caminho: "ic1_legado/IControlIT/WS/WSAuth.asmx.vb"
+    descricao: |
+      Invalida sessão ASP.NET e limpa cookies de autenticação.
+    destino: "substituido"
+    justificativa: "Substituído por endpoint REST POST /api/auth/logout que revoga refresh token."
+    rf_item_relacionado: "RN-RF012-12"
+    uc_relacionado: "UC02-RF012"
+
+  - id: "LEG-RF012-003"
+    tipo: "webservice"
+    nome: "WSUsuario.asmx.vb::Autenticar()"
+    caminho: "ic1_legado/IControlIT/WS/WSUsuario.asmx.vb"
+    descricao: |
+      Valida credenciais usando MD5 hash.
+      Incrementa Tentativas_Falhas, bloqueia após 5 tentativas.
+      Atualiza Dt_Ultimo_Acesso em caso de sucesso.
+      Retorna DataSet com dados do usuário.
+    destino: "substituido"
+    justificativa: "Substituído por endpoint POST /api/auth/login com BCrypt, JWT e auditoria completa em Usuario_Historico_Acesso."
+    rf_item_relacionado: "RN-RF012-02, RN-RF012-03, RN-RF012-13"
+    uc_relacionado: "UC02-RF012"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF012-004"
+    tipo: "webservice"
+    nome: "WSUsuario.asmx.vb::Listar_Usuarios()"
+    caminho: "ic1_legado/IControlIT/WS/WSUsuario.asmx.vb"
+    descricao: |
+      Lista usuários com filtros opcionais (perfil, status).
+      Retorna DataSet com campos: Id_Usuario, Nm_Usuario, Email, Login, Nm_Perfil, Fl_Ativo, Fl_Bloqueado.
+    destino: "substituido"
+    justificativa: "Substituído por endpoint REST GET /api/usuarios com paginação, filtros avançados e resposta JSON."
+    rf_item_relacionado: "Funcionalidade CRUD (Seção 4)"
+    uc_relacionado: "UC00-RF012"
+
+  - id: "LEG-RF012-005"
+    tipo: "webservice"
+    nome: "WSUsuario.asmx.vb::Criar_Usuario()"
+    caminho: "ic1_legado/IControlIT/WS/WSUsuario.asmx.vb"
+    descricao: |
+      Cria novo usuário com senha temporária.
+      Define Fl_Primeiro_Acesso = 1 para forçar troca.
+      Valida unicidade de login e email no conglomerado.
+    destino: "substituido"
+    justificativa: "Substituído por endpoint REST POST /api/usuarios com validação FluentValidation e senha temporária BCrypt."
+    rf_item_relacionado: "RN-RF012-01, RN-RF012-14"
+    uc_relacionado: "UC01-RF012"
+
+  - id: "LEG-RF012-006"
+    tipo: "webservice"
+    nome: "WSUsuario.asmx.vb::Alterar_Senha()"
+    caminho: "ic1_legado/IControlIT/WS/WSUsuario.asmx.vb"
+    descricao: |
+      Valida senha atual (MD5), atualiza com novo MD5.
+      Registra no histórico Usuario_Historico_Senha (sem limite).
+      Define Dt_Expiracao_Senha para 90 dias no futuro.
+    destino: "substituido"
+    justificativa: "Substituído por endpoint REST PUT /api/usuarios/{id}/senha com BCrypt, validação de força de senha e histórico limitado (12 senhas)."
+    rf_item_relacionado: "RN-RF012-02, RN-RF012-07, RN-RF012-04"
+    uc_relacionado: "UC02-RF012"
+    complexidade: "alta"
+    risco_migracao: "medio"
+
+  - id: "LEG-RF012-007"
+    tipo: "webservice"
+    nome: "WSUsuario.asmx.vb::Desbloquear_Usuario()"
+    caminho: "ic1_legado/IControlIT/WS/WSUsuario.asmx.vb"
+    descricao: |
+      Desbloqueia usuário bloqueado por tentativas falhas.
+      Zera Tentativas_Falhas, define Fl_Bloqueado = 2, limpa Dt_Bloqueio.
+    destino: "substituido"
+    justificativa: "Substituído por endpoint REST POST /api/usuarios/{id}/unlock com adição de desbloqueio automático após 15 minutos."
+    rf_item_relacionado: "RN-RF012-03"
+    uc_relacionado: "UC03-RF012"
+
+  - id: "LEG-RF012-008"
+    tipo: "tela"
+    nome: "Usuario.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastro/Usuario.aspx"
+    descricao: |
+      Tela de CRUD de usuários usando ASP.NET Web Forms com AjaxControlToolkit.
+      15 campos (Login, Senha, Idioma, Grupo, Perfil, Acesso, Permissões, Detalhamento, Status, Nome, Chave).
+      Validação RequiredFieldValidator + ValidatorCalloutExtender.
+      AutoPostBack no campo Perfil (reload página).
+      ViewState pesado (50-100KB).
+    destino: "substituido"
+    justificativa: "Substituído por telas Angular 19 Standalone Components com Reactive Forms, validação client-side e comunicação API REST."
+    rf_item_relacionado: "Funcionalidade CRUD (Seção 4), WF-RF012.md"
+    uc_relacionado: "UC00-RF012, UC01-RF012, UC03-RF012"
+    complexidade: "alta"
+    risco_migracao: "medio"
+
+  - id: "LEG-RF012-009"
+    tipo: "stored_procedure"
+    nome: "sp_Validar_Usuario_Login"
+    caminho: "Database/dbo.sp_Validar_Usuario_Login"
+    descricao: |
+      Stored procedure que valida login/senha usando MD5.
+      Chamada por WSUsuario.Autenticar().
+    destino: "descartado"
+    justificativa: "Lógica migrada para Application Layer (.NET 10) usando Entity Framework Core e BCrypt. Stored procedures de lógica de negócio violam Clean Architecture."
+    rf_item_relacionado: null
+    uc_relacionado: null
+
+  - id: "LEG-RF012-010"
+    tipo: "stored_procedure"
+    nome: "sp_Bloquear_Usuario_Automatico"
+    caminho: "Database/dbo.sp_Bloquear_Usuario_Automatico"
+    descricao: |
+      Stored procedure que bloqueia usuário após 5 tentativas falhas.
+      Chamada por WSUsuario.Autenticar().
+    destino: "descartado"
+    justificativa: "Lógica migrada para Application Layer usando Commands/Handlers (MediatR). Manutenibilidade superior."
+    rf_item_relacionado: null
+    uc_relacionado: null
+
+  - id: "LEG-RF012-011"
+    tipo: "stored_procedure"
+    nome: "sp_Sincronizar_Usuario_AD"
+    caminho: "Database/dbo.sp_Sincronizar_Usuario_AD"
+    descricao: |
+      Stored procedure que sincroniza dados do Active Directory.
+      (Se existir no legado - verificar).
+    destino: "descartado"
+    justificativa: "Lógica migrada para Application Layer usando PrincipalContext (.NET) ou Microsoft Graph API."
+    rf_item_relacionado: null
+    uc_relacionado: null
+
+# =============================================
+# TELAS LEGADAS (Detalhamento)
+# =============================================
+telas:
+  - id: "LEG-RF012-008"
+    nome: "Usuario.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastro/Usuario.aspx"
+    responsabilidade: "CRUD de usuários do sistema com gestão básica de permissões"
+    campos:
+      - nome: "Login (txtDescricao)"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "RequiredFieldValidator, MaxLength=50, único por conglomerado"
+
+      - nome: "Senha (btnReiniciarSenha)"
+        tipo: "Button"
+        obrigatorio: false
+        validacao: "Confirmação JavaScript, gera senha temporária"
+
+      - nome: "Idioma (cboIdioma)"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "RequiredFieldValidator"
+
+      - nome: "Grupo (cboUsuarioGrupo)"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "RequiredFieldValidator"
+
+      - nome: "Perfil (cboUsuarioPerfil)"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "RequiredFieldValidator, AutoPostBack=true (reload página)"
+
+      - nome: "Acesso (cboUsuarioPerfilAcesso)"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "RequiredFieldValidator"
+
+      - nome: "Permissão de Incluir (optIncluir)"
+        tipo: "RadioButtonList"
+        obrigatorio: false
+        validacao: "1=Revogar, 2=Permitir"
+
+      - nome: "Permissão de Alterar (optAlterar)"
+        tipo: "RadioButtonList"
+        obrigatorio: false
+        validacao: "1=Revogar, 2=Permitir"
+
+      - nome: "Permissão de Excluir (optExcluir)"
+        tipo: "RadioButtonList"
+        obrigatorio: false
+        validacao: "1=Revogar, 2=Permitir"
+
+      - nome: "Conta de outro usuário (optDetalhamentoConta)"
+        tipo: "RadioButtonList"
+        obrigatorio: false
+        validacao: "1=Revogar, 2=Permitir (controla Detalhamento_Conta)"
+
+      - nome: "Contatos de outro usuário (optDetalhamentoContato)"
+        tipo: "RadioButtonList"
+        obrigatorio: false
+        validacao: "1=Revogar, 2=Permitir (controla Detalhamento_Contato)"
+
+      - nome: "Status para acesso (optStatusUsuario)"
+        tipo: "RadioButtonList"
+        obrigatorio: false
+        validacao: "1=Revogar, 3=Permitir (valor 3 específico legado)"
+
+      - nome: "Permissão para Requisição"
+        tipo: "ListBox Duplo"
+        obrigatorio: false
+        validacao: "Origem/Destino com botões de mover (UI antiga)"
+
+      - nome: "Nome (txtNmConsumidor)"
+        tipo: "TextBox"
+        obrigatorio: false
+        validacao: "Readonly, vinculação opcional com consumidor"
+
+      - nome: "Chave do banco (txtIdentificacao)"
+        tipo: "TextBox"
+        obrigatorio: false
+        validacao: "Readonly, exibe GUID do usuário"
+
+    comportamentos_implicitos:
+      - "AutoPostBack no Perfil recarrega página (ruim para UX)"
+      - "Senha Temporária gerada ao clicar botão Reiniciar com confirm() JS"
+      - "ViewState pesado (50-100KB) em todos os DropDownLists e RadioButtonLists"
+      - "ValidatorCalloutExtender (AjaxControlToolkit) para feedback visual de erros"
+
+# =============================================
+# TABELAS LEGADAS
+# =============================================
+tabelas:
+  - nome: "Usuario"
+    finalidade: "Armazenar dados de usuários do sistema com autenticação e permissões"
+    problemas:
+      - "Password_Hash usa MD5 (inseguro)"
+      - "Falta campos MFA (MFA_Secret, Fl_MFA_Habilitado, Telefone_MFA)"
+      - "Falta campos Active Directory (AD_Object_GUID, AD_Sam_Account_Name, Fl_Usuario_AD)"
+      - "Falta campo Permissoes_Customizadas (JSON)"
+      - "Fl_Ativo usa valores 1/2 (esperado 0/1 boolean)"
+      - "Fl_Bloqueado usa valores 1/2 (esperado 0/1 boolean)"
+      - "Fl_Desativado usa valores 1/2/3 (sem validação CHECK)"
+      - "Detalhamento_Conta e Detalhamento_Contato sem validação CHECK (aceita qualquer INT)"
+
+  - nome: "Usuario_Historico_Senha"
+    finalidade: "Histórico de senhas alteradas (prevenir reutilização)"
+    problemas:
+      - "Sem limite de registros (pode crescer infinitamente)"
+      - "Não há validação no código legado para prevenir reutilização das últimas 12 senhas"
+      - "Hashes armazenados em MD5 (inseguro)"
+
+  - nome: "(inexistente) Usuario_Sessao"
+    finalidade: "[Nova] Armazenar sessões ativas (JWT refresh tokens, dispositivo, geolocalização)"
+    problemas:
+      - "Não existe no legado. Legado usa ASP.NET Session State (in-memory ou SQL Server)"
+
+  - nome: "(inexistente) Usuario_Historico_Acesso"
+    finalidade: "[Nova] Auditoria de todos os acessos (sucesso/falha, IP, geolocalização)"
+    problemas:
+      - "Não existe no legado. Apenas campo Dt_Ultimo_Acesso na tabela Usuario"
+
+  - nome: "(inexistente) Usuario_Reset_Senha"
+    finalidade: "[Nova] Tokens de reset de senha via e-mail (válido 1h, uso único)"
+    problemas:
+      - "Não existe no legado. Reset feito manualmente por admin via botão Reiniciar Senha"
+
+# =============================================
+# REGRAS DE NEGÓCIO IMPLÍCITAS NO LEGADO
+# =============================================
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: "Bloqueio após 5 tentativas falhas (sem desbloqueio automático, apenas manual)"
+    fonte: "WSUsuario.asmx.vb::Autenticar() linhas 45-60"
+    destino: "substituido"
+    justificativa: "Substituído com desbloqueio automático após 15 minutos (RN-RF012-03)"
+
+  - id: "RL-RN-002"
+    descricao: "Senha MD5 sem validação de força (aceita qualquer senha, inclusive '123')"
+    fonte: "WSUsuario.asmx.vb::Alterar_Senha() linhas 120-135"
+    destino: "substituido"
+    justificativa: "Substituído com política de senha forte: mínimo 8 chars, maiúscula, minúscula, número, especial (RN-RF012-02)"
+
+  - id: "RL-RN-003"
+    descricao: "Expiração de senha 90 dias (sem notificação antecipada)"
+    fonte: "WSUsuario.asmx.vb::Alterar_Senha() linha 145"
+    destino: "assumido"
+    justificativa: "Assumido com adição de notificação 7 dias antes da expiração (RN-RF012-04)"
+
+  - id: "RL-RN-004"
+    descricao: "Detalhamento de Conta/Contato (valores 1=Básico, 2=Intermediário, 3=Completo)"
+    fonte: "Stored procedure pa_Usuario linhas 78-92"
+    destino: "assumido"
+    justificativa: "Assumido com adição de constraint CHECK no banco (valores 1, 2 ou 3 apenas) (RN-RF012-16)"
+
+  - id: "RL-RN-005"
+    descricao: "Status Desativado (1=Ativo, 2=Inativo, 3=Desativado Permanente sem validação de permissão)"
+    fonte: "Stored procedure pa_Usuario linhas 103-115"
+    destino: "substituido"
+    justificativa: "Substituído com permissão específica usuarios:reativar_permanente (apenas Super Admin) (RN-RF012-17)"
+
+  - id: "RL-RN-006"
+    descricao: "Permissões customizadas via RadioButtonList (Incluir/Alterar/Excluir) em campos separados"
+    fonte: "Tela Usuario.aspx controles optIncluir, optAlterar, optExcluir"
+    destino: "substituido"
+    justificativa: "Substituído com campo Permissoes_Customizadas (JSON) permitindo permissões granulares extensíveis (RN-RF012-06)"
+
+# =============================================
+# GAP ANALYSIS (LEGADO x MODERNO)
+# =============================================
+gap_analysis:
+  - item: "Hash de Senha"
+    existe_legado: true
+    valor_legado: "MD5 (inseguro)"
+    existe_moderno: true
+    valor_moderno: "BCrypt work factor 12"
+    notas: "⚠️ Migração obrigatória forçando troca de senha no primeiro login"
+
+  - item: "MFA"
+    existe_legado: false
+    existe_moderno: true
+    valor_moderno: "TOTP via Google Authenticator/Authy"
+    notas: "🆕 Nova funcionalidade"
+
+  - item: "Histórico de Senhas"
+    existe_legado: true
+    valor_legado: "Sem limite de registros"
+    existe_moderno: true
+    valor_moderno: "Últimas 12 senhas (limite fixo)"
+    notas: "⚠️ Limpeza de histórico legado + migração MD5→BCrypt"
+
+  - item: "Prevenção Reutilização Senha"
+    existe_legado: false
+    existe_moderno: true
+    valor_moderno: "Proíbe reutilização das últimas 12"
+    notas: "🆕 Nova regra (RN-RF012-07)"
+
+  - item: "Active Directory"
+    existe_legado: false
+    existe_moderno: true
+    valor_moderno: "Autenticação LDAP + sincronização automática"
+    notas: "🆕 Nova integração (RN-RF012-09)"
+
+  - item: "Detecção Login Suspeito"
+    existe_legado: false
+    existe_moderno: true
+    valor_moderno: "IP/país/horário anômalo com notificação e-mail"
+    notas: "🆕 Nova funcionalidade (RN-RF012-10)"
+
+  - item: "Auditoria"
+    existe_legado: true
+    valor_legado: "Apenas Dt_Ultimo_Acesso"
+    existe_moderno: true
+    valor_moderno: "Histórico completo (sucesso/falha, IP, geolocalização, dispositivo)"
+    notas: "🆕 Nova tabela Usuario_Historico_Acesso (RN-RF012-13)"
+
+  - item: "Sessões Múltiplas"
+    existe_legado: true
+    valor_legado: "Sem limite"
+    existe_moderno: true
+    valor_moderno: "Máximo 5 sessões simultâneas"
+    notas: "🆕 Nova regra (RN-RF012-12)"
+
+  - item: "Reset Senha"
+    existe_legado: true
+    valor_legado: "Manual (botão admin)"
+    existe_moderno: true
+    valor_moderno: "Automático via e-mail com token (1h válido)"
+    notas: "🆕 Nova tabela Usuario_Reset_Senha (RN-RF012-11)"
+
+  - item: "Tokens JWT"
+    existe_legado: false
+    valor_legado: "Session cookies ASP.NET"
+    existe_moderno: true
+    valor_moderno: "Access token (8h) + Refresh token (30 dias)"
+    notas: "⚠️ Arquitetura completamente diferente"
+
+  - item: "Permissões Customizadas"
+    existe_legado: true
+    valor_legado: "Campos separados (optIncluir, optAlterar, optExcluir)"
+    existe_moderno: true
+    valor_moderno: "JSON estruturado em Permissoes_Customizadas"
+    notas: "⚠️ Migração de dados necessária"
+
+  - item: "Desbloqueio Automático"
+    existe_legado: false
+    existe_moderno: true
+    valor_moderno: "Timeout 15 minutos"
+    notas: "🆕 Nova regra (RN-RF012-03)"
+
+  - item: "Notificação Senha Expirada"
+    existe_legado: false
+    existe_moderno: true
+    valor_moderno: "E-mail 7 dias antes da expiração"
+    notas: "🆕 Nova funcionalidade (RN-RF012-04)"
+
+  - item: "Validação Força Senha"
+    existe_legado: false
+    existe_moderno: true
+    valor_moderno: "Mínimo 8 chars, maiúscula, minúscula, número, especial"
+    notas: "🆕 Nova validação (RN-RF012-02)"
+
+# =============================================
+# DECISÕES DE MODERNIZAÇÃO
+# =============================================
+decisoes_modernizacao:
+  - decisao: "Migração de Senhas MD5 → BCrypt"
+    motivo: |
+      MD5 é inseguro (quebrado desde 2004), facilmente reversível com rainbow tables.
+      BCrypt é padrão moderno com custo computacional ajustável (work factor 12).
+      Estratégia: criar coluna temporária Password_Hash_MD5, marcar Fl_Primeiro_Acesso=1,
+      validar via MD5 no primeiro login pós-migração e gerar BCrypt, limpar backup após 90 dias.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Substituir Session Cookies por JWT"
+    motivo: |
+      Session State ASP.NET não escala (dependência de servidor específico).
+      JWT permite stateless authentication e suporte a múltiplos dispositivos.
+      Implementar endpoints /api/auth/login (emite JWT) e /api/auth/refresh (renova token).
+      Access token 8h, Refresh token 30 dias armazenado em Usuario_Sessao.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Criar Tabela Usuario_Historico_Acesso"
+    motivo: |
+      Legado não possui auditoria de acessos (apenas Dt_Ultimo_Acesso).
+      Compliance e segurança exigem logs detalhados.
+      Registrar TODOS os acessos (sucesso/falha) via middleware.
+      Integrar com API de geolocalização (ipapi.co) para detectar país/cidade.
+      Enviar e-mail se login suspeito.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Limite de 12 Senhas no Histórico"
+    motivo: |
+      Legado não limita histórico (pode crescer infinitamente).
+      NIST recomenda 12-24 senhas anteriores.
+      Ao alterar senha: deletar hash mais antigo se já existirem 12 registros.
+      Trigger ou lógica aplicação para garantir limite.
+    impacto: "baixo"
+    data: "2025-12-30"
+
+  - decisao: "Integração Active Directory (Opcional)"
+    motivo: |
+      Empresas grandes possuem AD corporativo.
+      Duplicar usuários é retrabalho.
+      Sincronização automática reduz overhead administrativo.
+      Campo Fl_Usuario_AD=1 indica usuário gerenciado pelo AD.
+      Autenticação via LDAP (PrincipalContext ou Microsoft Graph API).
+      Sincronização diária (job): atualiza nome, email, grupos.
+      Desligamento no AD marca Fl_Ativo=0 no IControlIT.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "MFA via TOTP (Opcional)"
+    motivo: |
+      Aumentar segurança para administradores.
+      TOTP é padrão (RFC 6238), compatível com Google Authenticator, Authy.
+      Campo Fl_MFA_Habilitado=1 exige código TOTP após login com senha.
+      Secret armazenado em MFA_Secret (Base32-encoded).
+      QR Code gerado via formato otpauth://totp/...
+      Janela de validação: ±1 período (90 segundos total).
+    impacto: "baixo"
+    data: "2025-12-30"
+
+# =============================================
+# RISCOS DE MIGRAÇÃO
+# =============================================
+riscos_migracao:
+  - risco: "Usuários não conseguem logar após migração MD5→BCrypt"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: "Testes paralelos, validação MD5 legado no 1º login, forçar troca senha"
+
+  - risco: "Performance degradada (BCrypt mais lento que MD5)"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: "Work factor 12 balanceado, usar async/await, cache em memória para permissões"
+
+  - risco: "Histórico de senhas legado corrompido"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: "Validar integridade antes de migrar, manter backup por 90 dias"
+
+  - risco: "API de Geolocalização indisponível"
+    impacto: "baixo"
+    probabilidade: "media"
+    mitigacao: "Fallback: registrar apenas IP sem geolocalização, retry com backoff exponencial"
+
+  - risco: "Active Directory inacessível"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: "Fallback: autenticação local (senha BCrypt), job de sincronização com retry"
+
+  - risco: "JWT tokens roubados (XSS)"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: "httpOnly cookies para refresh token, sanitização de outputs, CSP headers"
+
+  - risco: "Crescimento rápido da tabela Usuario_Historico_Acesso"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: "Particionamento por mês, retenção de 12 meses, archive para cold storage"
+
+  - risco: "Usuários não entendem MFA"
+    impacto: "baixo"
+    probabilidade: "media"
+    mitigacao: "Tutorial guiado (tooltips), suporte técnico, SMS como backup"
+
+  - risco: "Sessões simultâneas não invalidadas corretamente"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: "Testes E2E, validação de revogação de refresh tokens"
+
+# =============================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# =============================================
+rastreabilidade:
+  - elemento_legado: "WSAuth.asmx.vb::Login()"
+    referencia_rf: "RN-RF012-02, RN-RF012-05"
+    referencia_uc: "UC02-RF012"
+    status: "migrado"
+
+  - elemento_legado: "WSAuth.asmx.vb::Logout()"
+    referencia_rf: "RN-RF012-12"
+    referencia_uc: "UC02-RF012"
+    status: "migrado"
+
+  - elemento_legado: "WSUsuario.asmx.vb::Autenticar()"
+    referencia_rf: "RN-RF012-02, RN-RF012-03, RN-RF012-13"
+    referencia_uc: "UC02-RF012"
+    status: "migrado"
+
+  - elemento_legado: "WSUsuario.asmx.vb::Listar_Usuarios()"
+    referencia_rf: "Funcionalidade CRUD (Seção 4)"
+    referencia_uc: "UC00-RF012"
+    status: "migrado"
+
+  - elemento_legado: "WSUsuario.asmx.vb::Criar_Usuario()"
+    referencia_rf: "RN-RF012-01, RN-RF012-14"
+    referencia_uc: "UC01-RF012"
+    status: "migrado"
+
+  - elemento_legado: "WSUsuario.asmx.vb::Alterar_Senha()"
+    referencia_rf: "RN-RF012-02, RN-RF012-07, RN-RF012-04"
+    referencia_uc: "UC02-RF012"
+    status: "migrado"
+
+  - elemento_legado: "WSUsuario.asmx.vb::Desbloquear_Usuario()"
+    referencia_rf: "RN-RF012-03"
+    referencia_uc: "UC03-RF012"
+    status: "migrado"
+
+  - elemento_legado: "Tela Usuario.aspx"
+    referencia_rf: "Funcionalidade CRUD (Seção 4), WF-RF012.md"
+    referencia_uc: "UC00-RF012, UC01-RF012, UC03-RF012"
+    status: "migrado"
+
+  - elemento_legado: "Tabela Usuario (campos MD5, sem MFA/AD)"
+    referencia_rf: "RN-RF012-02 (BCrypt), RN-RF012-08 (MFA), RN-RF012-09 (AD)"
+    referencia_uc: "N/A"
+    status: "migrado"
+
+  - elemento_legado: "sp_Validar_Usuario_Login"
+    referencia_rf: null
+    referencia_uc: null
+    status: "descartado"
+
+  - elemento_legado: "sp_Bloquear_Usuario_Automatico"
+    referencia_rf: null
+    referencia_uc: null
+    status: "descartado"
+
+# =============================================
+# CHANGELOG
+# =============================================
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Criação inicial do RL-RF012.yaml com estruturação completa de 10 problemas legado, 11 referências com destino obrigatório, 6 RNs implícitas, gap analysis detalhada, 6 decisões de modernização, 9 riscos e rastreabilidade completa."
+    autor: "Agência ALC - alc.dev.br"

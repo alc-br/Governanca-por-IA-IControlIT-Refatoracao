@@ -1,0 +1,580 @@
+# RL-RF018 — Referência ao Legado - Gestão de Cargos (Estruturado)
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF018
+titulo: "Gestão de Cargos"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "IControlIT v1.0"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server"
+  multi_tenant: false
+  auditoria: "partial"  # Apenas criação e última atualização
+
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+referencias:
+  - id: "LEG-RF018-001"
+    tipo: "tela"
+    nome: "TelaCargos.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastros/TelaCargos.aspx"
+    descricao: |
+      CRUD básico de cargos.
+      Campos: Cd_Cargo, Nm_Cargo, Ds_Cargo, Id_Cargo_Superior, Vl_Alcada, Fl_Ativo.
+      Problemas: Permite código duplicado, não valida ciclo, permite alçada inconsistente.
+    destino: "substituido"
+    justificativa: |
+      Substituído por componentes Angular standalone (CargoListComponent, CargoFormComponent).
+      Validações migradas para FluentValidation no backend.
+      Validação de ciclo e alçada agora são obrigatórias.
+    rf_item_relacionado: "RN-RF018-001, RN-RF018-002, RN-RF018-003, RN-RF018-004"
+    uc_relacionado: "UC00, UC01, UC02, UC03, UC04"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF018-002"
+    tipo: "tela"
+    nome: "TelaCargos_Editar.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastros/TelaCargos_Editar.aspx"
+    descricao: |
+      Formulário de edição de cargo.
+      Permite editar código após criação (risco de quebra de integridade).
+      Não registra valores antigos (auditoria incompleta).
+    destino: "substituido"
+    justificativa: |
+      Substituído por modal CargoFormComponent com validação reactiva.
+      Código é read-only após criação (RN-RF018-001).
+      Auditoria completa com Audit.NET (RN-RF018-010).
+    rf_item_relacionado: "RN-RF018-001, RN-RF018-010"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF018-003"
+    tipo: "tela"
+    nome: "TelaCargos_Hierarquia.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastros/TelaCargos_Hierarquia.aspx"
+    descricao: |
+      Visualização de árvore organizacional.
+      Usa stored procedure recursiva (lento, timeout em hierarquias grandes).
+      Não permite editar hierarquia.
+    destino: "substituido"
+    justificativa: |
+      Substituído por visualização com d3.js tree (performance otimizada).
+      Query LINQ com closure para performance.
+      Permite editar hierarquia inline (RN-RF018-003).
+    rf_item_relacionado: "RN-RF018-003, RN-RF018-004"
+    uc_relacionado: "UC-hierarquia"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF018-004"
+    tipo: "tela"
+    nome: "TelaCargos_Competencia.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastros/TelaCargos_Competencia.aspx"
+    descricao: |
+      Matriz de competências por cargo.
+      Não valida nível (aceita 0 ou > 5).
+      Permite duplicação da mesma competência.
+      Não diferencia obrigatória de desejável.
+    destino: "substituido"
+    justificativa: |
+      Substituído por grid com validação completa.
+      Nível 1-5 obrigatório (RN-RF018-007).
+      Não permite duplicação.
+      Campo FlObrigatoria para diferenciar competências.
+    rf_item_relacionado: "RN-RF018-007"
+    uc_relacionado: "UC-competencias"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF018-005"
+    tipo: "tela"
+    nome: "TelaCargos_FaixaSalarial.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastros/TelaCargos_FaixaSalarial.aspx"
+    descricao: |
+      Gerenciamento de salários (piso/teto).
+      Não valida ordem (permite Piso > Teto).
+      Não valida salário mínimo legal.
+      Não mantém histórico completo.
+    destino: "substituido"
+    justificativa: |
+      Substituído por componente com histórico completo.
+      Validação de ordem obrigatória (RN-RF018-008).
+      Validação de salário mínimo legal.
+      Tabela FaixaSalarialCargo com histórico e vigência.
+    rf_item_relacionado: "RN-RF018-008"
+    uc_relacionado: "UC-faixas"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF018-006"
+    tipo: "webservice"
+    nome: "WSCargo.asmx.vb - ListarCargos()"
+    caminho: "ic1_legado/IControlIT/Services/WSCargo.asmx.vb"
+    descricao: |
+      Retorna lista de cargos.
+      Sem paginação (retorna todos os registros).
+      Sem filtros.
+      Sem multi-tenancy.
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/v1/cargos com paginação obrigatória (20/página).
+      Filtros por nome e status.
+      Multi-tenancy obrigatório (RN-RF018-011).
+    rf_item_relacionado: "RN-RF018-011"
+    uc_relacionado: "UC00"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF018-007"
+    tipo: "webservice"
+    nome: "WSCargo.asmx.vb - ObterCargo(id)"
+    caminho: "ic1_legado/IControlIT/Services/WSCargo.asmx.vb"
+    descricao: |
+      Retorna cargo por ID.
+      Sem validação de multi-tenancy (permite acesso cruzado).
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/v1/cargos/{id} com validação de ClienteId.
+      Retorna HTTP 403 se tentar acessar cargo de outro tenant.
+    rf_item_relacionado: "RN-RF018-011"
+    uc_relacionado: "UC02"
+    complexidade: "baixa"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF018-008"
+    tipo: "webservice"
+    nome: "WSCargo.asmx.vb - InserirCargo(...)"
+    caminho: "ic1_legado/IControlIT/Services/WSCargo.asmx.vb"
+    descricao: |
+      Cria novo cargo.
+      Não valida código único (permite duplicados).
+      Não valida ciclo em hierarquia.
+      Não valida alçada crescente.
+    destino: "substituido"
+    justificativa: |
+      Substituído por POST /api/v1/cargos com validação completa.
+      FluentValidation + validação de ciclo + validação de alçada.
+      Retorna HTTP 400/409 para violações.
+    rf_item_relacionado: "RN-RF018-001, RN-RF018-003, RN-RF018-004"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF018-009"
+    tipo: "webservice"
+    nome: "WSCargo.asmx.vb - AtualizarCargo(...)"
+    caminho: "ic1_legado/IControlIT/Services/WSCargo.asmx.vb"
+    descricao: |
+      Edita cargo existente.
+      Permite alterar código (risco de quebra).
+      Não registra valores antigos (auditoria incompleta).
+    destino: "substituido"
+    justificativa: |
+      Substituído por PUT /api/v1/cargos/{id}.
+      Código é read-only após criação.
+      Auditoria completa com valores antes/depois.
+    rf_item_relacionado: "RN-RF018-001, RN-RF018-010"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF018-010"
+    tipo: "webservice"
+    nome: "WSCargo.asmx.vb - DeletarCargo(id)"
+    caminho: "ic1_legado/IControlIT/Services/WSCargo.asmx.vb"
+    descricao: |
+      Deleta cargo (físico).
+      Não verifica se há ocupantes.
+      Perda irreversível de dados.
+      Violação LGPD (retenção 7 anos).
+    destino: "substituido"
+    justificativa: |
+      Substituído por DELETE /api/v1/cargos/{id} com soft delete.
+      Verifica ocupantes antes de inativar (RN-RF018-005).
+      Marca FlExcluido = true (sem perda de dados).
+      Retenção de auditoria 7 anos (LGPD).
+    rf_item_relacionado: "RN-RF018-005, RN-RF018-010"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF018-011"
+    tipo: "webservice"
+    nome: "WSCargo.asmx.vb - ObterHierarquia()"
+    caminho: "ic1_legado/IControlIT/Services/WSCargo.asmx.vb"
+    descricao: |
+      Retorna árvore organizacional.
+      Usa stored procedure pa_Cargo_Montar_Arvore (lenta).
+      Timeout em hierarquias grandes.
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/v1/cargos/hierarquia/arvore.
+      Query LINQ com closure para performance.
+      Sem timeout (otimizado).
+    rf_item_relacionado: "RN-RF018-003"
+    uc_relacionado: "UC-hierarquia"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF018-012"
+    tipo: "webservice"
+    nome: "WSCargo.asmx.vb - ValidarCiclo(idCargo, idSuperior)"
+    caminho: "ic1_legado/IControlIT/Services/WSCargo.asmx.vb"
+    descricao: |
+      Valida ciclo em hierarquia.
+      Implementação incompleta (não detecta todos os casos).
+      Permite ciclos A→B→C→A.
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação de grafo com DFS (Depth-First Search).
+      Detecta todos os ciclos possíveis.
+      Rejeita qualquer tentativa de criar ciclo.
+    rf_item_relacionado: "RN-RF018-003"
+    uc_relacionado: "UC-hierarquia"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF018-013"
+    tipo: "webservice"
+    nome: "WSCargo.asmx.vb - SincronizarAD()"
+    caminho: "ic1_legado/IControlIT/Services/WSCargo.asmx.vb"
+    descricao: |
+      Sincroniza com Active Directory.
+      Sincronização manual (não automática).
+      Sem log de sincronização.
+    destino: "descartado"
+    justificativa: |
+      Funcionalidade será implementada em RF separado (Sincronização AD).
+      Não faz parte do escopo do RF018 moderno.
+      Sincronização automática será via job agendado.
+    rf_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF018-014"
+    tipo: "stored_procedure"
+    nome: "pa_Cargo_Listar"
+    caminho: "Database/dbo.pa_Cargo_Listar"
+    descricao: |
+      Retorna lista de cargos com hierarquia.
+      Sem paginação.
+      Performance ruim com muitos registros.
+    destino: "substituido"
+    justificativa: |
+      Substituído por Query LINQ com Specification Pattern.
+      Paginação obrigatória.
+      Performance otimizada.
+    rf_item_relacionado: "RN-RF018-011"
+    uc_relacionado: "UC00"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF018-015"
+    tipo: "stored_procedure"
+    nome: "pa_Cargo_Montar_Arvore"
+    caminho: "Database/dbo.pa_Cargo_Montar_Arvore"
+    descricao: |
+      Constrói árvore organizacional recursiva.
+      Performance ruim (timeout em hierarquias grandes).
+      Sem limite de profundidade.
+    destino: "substituido"
+    justificativa: |
+      Substituído por closure LINQ com performance otimizada.
+      Limite de profundidade (10 níveis).
+      Sem timeout.
+    rf_item_relacionado: "RN-RF018-003"
+    uc_relacionado: "UC-hierarquia"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF018-016"
+    tipo: "stored_procedure"
+    nome: "pa_Cargo_Validar_Ciclo"
+    caminho: "Database/dbo.pa_Cargo_Validar_Ciclo"
+    descricao: |
+      Verifica ciclos em hierarquia.
+      Implementação incompleta (não detecta todos os casos).
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação de grafo no agregado.
+      Algoritmo DFS completo.
+      Detecta todos os ciclos.
+    rf_item_relacionado: "RN-RF018-003"
+    uc_relacionado: "UC-hierarquia"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF018-017"
+    tipo: "stored_procedure"
+    nome: "pa_Cargo_Alcada_Efetiva"
+    caminho: "Database/dbo.pa_Cargo_Alcada_Efetiva"
+    descricao: |
+      Retorna alçada efetiva (própria ou superior).
+      Performance ruim (recursão).
+    destino: "substituido"
+    justificativa: |
+      Substituído por método no agregado + query otimizada.
+      Performance melhorada.
+    rf_item_relacionado: "RN-RF018-004"
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF018-018"
+    tipo: "regra_negocio"
+    nome: "Código único por conglomerado"
+    caminho: "ic1_legado/IControlIT/Cadastros/TelaCargos.aspx.vb"
+    descricao: |
+      Regra implícita: Código deveria ser único.
+      Implementação falha (permite duplicados).
+    destino: "assumido"
+    justificativa: |
+      Regra assumida e corrigida no RF moderno (RN-RF018-001).
+      Constraint UNIQUE (Codigo, ClienteId) + validação FluentValidation.
+    rf_item_relacionado: "RN-RF018-001"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF018-019"
+    tipo: "regra_negocio"
+    nome: "Hierarquia sem ciclos"
+    caminho: "ic1_legado/IControlIT/Cadastros/TelaCargos.aspx.vb"
+    descricao: |
+      Regra implícita: Hierarquia deveria ser acíclica.
+      Implementação ausente (permite ciclos).
+    destino: "assumido"
+    justificativa: |
+      Regra assumida e implementada no RF moderno (RN-RF018-003).
+      Validação de grafo com DFS.
+    rf_item_relacionado: "RN-RF018-003"
+    uc_relacionado: "UC-hierarquia"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF018-020"
+    tipo: "regra_negocio"
+    nome: "Alçada monotônica crescente"
+    caminho: "Não documentado (regra implícita)"
+    descricao: |
+      Regra implícita: Supervisor deveria ter alçada >= subordinado.
+      Implementação ausente.
+    destino: "assumido"
+    justificativa: |
+      Regra assumida e implementada no RF moderno (RN-RF018-004).
+      Validação ao alterar alçada ou hierarquia.
+    rf_item_relacionado: "RN-RF018-004"
+    uc_relacionado: "UC-hierarquia"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+# Tabelas Legadas
+tabelas:
+  - nome: "Cargo"
+    finalidade: "Armazenamento principal de cargos"
+    problemas:
+      - "Falta campo Id_Conglomerado (multi-tenancy)"
+      - "Constraint de unicidade fraca (permite duplicados)"
+      - "Delete físico (violação LGPD)"
+      - "Auditoria parcial (apenas criação e última atualização)"
+
+  - nome: "Rl_Cargo_Competencia"
+    finalidade: "Competências por cargo"
+    problemas:
+      - "Permite duplicação da mesma competência"
+      - "FK constraint fraca"
+      - "Sem campo FlObrigatoria"
+
+# Regras Implícitas
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: "Código de cargo deveria ser único, mas sistema não valida adequadamente"
+    fonte: "TelaCargos.aspx.vb, linha ~120 (validação comentada)"
+
+  - id: "RL-RN-002"
+    descricao: "Hierarquia deveria ser acíclica, mas sistema não valida ciclos"
+    fonte: "WSCargo.asmx.vb, método ValidarCiclo() incompleto"
+
+  - id: "RL-RN-003"
+    descricao: "Alçada de supervisor deveria ser >= alçada de subordinado"
+    fonte: "Não documentado, regra implícita de negócio"
+
+  - id: "RL-RN-004"
+    descricao: "Cargo com ocupantes não deveria ser deletado"
+    fonte: "TelaCargos.aspx.vb, método DeletarCargo() não verifica"
+
+  - id: "RL-RN-005"
+    descricao: "Faixa salarial deveria ter Piso < Teto"
+    fonte: "TelaCargos_FaixaSalarial.aspx.vb, validação ausente"
+
+  - id: "RL-RN-006"
+    descricao: "Competências deveriam ter nível 1-5"
+    fonte: "TelaCargos_Competencia.aspx.vb, validação ausente"
+
+  - id: "RL-RN-007"
+    descricao: "Auditoria deveria registrar antes/depois"
+    fonte: "Sem interceptor de auditoria, apenas log simples"
+
+# Gap Analysis
+gap_analysis:
+  - item: "Multi-tenancy"
+    existe_legado: false
+    existe_moderno: true
+    notas: "CRÍTICO: Legado permite acesso cruzado"
+
+  - item: "Soft Delete"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado perde dados históricos (violação LGPD)"
+
+  - item: "Validação de código único"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado permite duplicados (bug conhecido)"
+
+  - item: "Validação de ciclo"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado permite ciclos (bug crítico)"
+
+  - item: "Validação de alçada"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado permite alçada inconsistente"
+
+  - item: "Auditoria completa"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado só registra criação/atualização (parcial)"
+
+  - item: "Paginação"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado retorna todos os registros (performance ruim)"
+
+  - item: "Histórico de faixa salarial"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não mantém histórico completo"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Multi-tenancy obrigatório (ClienteId)"
+    motivo: "Legado não possui isolamento de dados, risco de acesso cruzado"
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Soft Delete obrigatório (FlExcluido)"
+    motivo: "Compliance LGPD (retenção 7 anos), rastreabilidade"
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Validação de ciclo em hierarquia"
+    motivo: "Legado permite ciclos, causa timeout em relatórios"
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Alçada monotônica crescente"
+    motivo: "Evita inconsistência lógica (subordinado > supervisor)"
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Histórico de faixa salarial"
+    motivo: "Rastreabilidade, análise temporal"
+    impacto: "baixo"
+    data: "2025-12-30"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Dados sem ClienteId"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: "Script de migração para atribuir ClienteId baseado em contexto"
+
+  - risco: "Registros deletados fisicamente"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: "Perda irreversível, aceitar como dado perdido"
+
+  - risco: "Códigos duplicados"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: "Identificar duplicados, solicitar decisão ao cliente"
+
+  - risco: "Ciclos em hierarquia"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: "Script de detecção, quebrar ciclos manualmente"
+
+  - risco: "Alçadas inconsistentes"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: "Ajustar alçadas manualmente para respeitar monotonicidade"
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "TelaCargos.aspx"
+    referencia_rf: "RN-RF018-001 a RN-RF018-005"
+    referencia_uc: "UC01, UC03"
+    status: "migrado"
+
+  - elemento_legado: "TelaCargos_Hierarquia.aspx"
+    referencia_rf: "RN-RF018-003, RN-RF018-004"
+    referencia_uc: "UC-hierarquia"
+    status: "migrado"
+
+  - elemento_legado: "WSCargo.asmx.vb"
+    referencia_rf: "Todos os endpoints REST API"
+    referencia_uc: "Todos os UCs"
+    status: "migrado"
+
+  - elemento_legado: "pa_Cargo_Listar"
+    referencia_rf: "GET /api/v1/cargos"
+    referencia_uc: "UC00"
+    status: "migrado"
+
+  - elemento_legado: "pa_Cargo_Montar_Arvore"
+    referencia_rf: "GET /api/v1/cargos/hierarquia/arvore"
+    referencia_uc: "UC-hierarquia"
+    status: "migrado"
+
+# Metadados
+metadados:
+  total_referencias: 20
+  itens_assumidos: 3  # LEG-RF018-018, LEG-RF018-019, LEG-RF018-020
+  itens_substituidos: 16  # Todos os outros exceto SincronizarAD
+  itens_descartados: 1  # LEG-RF018-013 (SincronizarAD)
+  itens_a_revisar: 0
+  cobertura_destinos: 100%  # 100% dos itens com campo destino preenchido
+
+# Changelog
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Criação do documento de referência ao legado estruturado (100% com destinos)"
+    autor: "Agência ALC - alc.dev.br"
