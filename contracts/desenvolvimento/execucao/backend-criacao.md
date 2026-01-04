@@ -96,6 +96,234 @@ Se criar branch de `dev` quando `dev` tem conflitos:
 
 ---
 
+## CONSULTA OBRIGATÓRIA À BASE DE CONHECIMENTO
+
+Antes de criar a TODO LIST e iniciar qualquer implementação, o agente **DEVE**:
+
+### 1. LER Base de Conhecimento Backend
+
+```bash
+# Ler arquivo completo
+cat docs/base-conhecimento/backend.yaml
+```
+
+### 2. PROCURAR Problemas Similares
+
+Verificar se há problemas conhecidos relacionados a:
+- Tecnologias que serão usadas (EF Core, AutoMapper, CQRS, etc.)
+- Padrões que serão aplicados (multi-tenancy, auditoria, etc.)
+- Funcionalidades similares já implementadas
+
+### 3. CONSULTAR Erros Comuns
+
+Revisar seção `erros_comuns:` para antecipar problemas frequentes
+
+### 4. VALIDAR Padrões Obrigatórios
+
+Confirmar conhecimento dos padrões em `padroes:` antes de implementar
+
+### 5. EXECUTAR Checklist Pré-Execução
+
+Validar todos os itens em `checklist_pre_execucao:` do YAML
+
+**IMPORTANTE:**
+- Esta consulta é **OBRIGATÓRIA** e **BLOQUEANTE**
+- Se encontrar problema similar, aplicar solução conhecida
+- Se encontrar padrão obrigatório, seguir exatamente como documentado
+- Declarar: "Base de conhecimento consultada: [N] problemas conhecidos revisados"
+
+---
+
+## ATUALIZAÇÃO OBRIGATÓRIA DA BASE DE CONHECIMENTO (AO FINAL)
+
+Ao encontrar dificuldade **RELEVANTE** durante implementação, o agente **DEVE**:
+
+### Critério de Relevância
+
+Documentar SE E SOMENTE SE:
+- ✅ Problema levou > 30min para resolver
+- ✅ Erro não estava documentado em `erros_comuns:`
+- ✅ Solução não é óbvia (não está na documentação oficial)
+- ✅ Problema pode se repetir em outros RFs
+
+NÃO documentar:
+- ❌ Erros triviais (typo, import faltando)
+- ❌ Problemas específicos de um RF único
+- ❌ Soluções óbvias
+
+### Template de Documentação
+
+```yaml
+problemas:
+  - problema: "Descrição clara e concisa"
+    contexto: "RFXXX ou cenário genérico"
+    sintoma: "Mensagem de erro ou comportamento observado"
+    causa_raiz: "Análise técnica do por quê"
+    solucao: |
+      Passo a passo da solução:
+      1. Primeiro passo
+      2. Segundo passo
+      3. Código exemplo (se aplicável)
+    arquivos_afetados:
+      - "backend/caminho/arquivo.cs"
+    data_registro: "YYYY-MM-DD"
+    tags: [categoria, tecnologia, padrao]
+```
+
+**AÇÃO OBRIGATÓRIA:**
+- Adicionar novo problema ao final de `problemas:` em `docs/base-conhecimento/backend.yaml`
+- Declarar: "Base de conhecimento atualizada: novo problema documentado"
+
+---
+
+## CONSULTA E REGISTRO DE DECISÕES TÉCNICAS (DECISIONS.md)
+
+O agente **DEVE** interagir com `docs/DECISIONS.md` durante a execução:
+
+### 1. CONSULTA OBRIGATÓRIA (Antes de Implementar)
+
+Antes de iniciar implementação, o agente **DEVE**:
+
+```bash
+# Ler decisões técnicas registradas
+cat docs/DECISIONS.md
+```
+
+**Verificar decisões relacionadas a:**
+- Padrões arquiteturais (CQRS, Clean Architecture, DDD)
+- Escolhas de tecnologia (EF Core, AutoMapper, MediatR)
+- Regras de negócio globais (multi-tenancy, auditoria)
+- Decisões anteriores que impactam o RF atual
+
+**Declaração obrigatória:**
+> "DECISIONS.md consultado: [N] decisões técnicas revisadas"
+
+### 2. IDENTIFICAÇÃO DE DECISÕES IMPLÍCITAS (Durante Implementação)
+
+Durante implementação, o agente **DEVE PARAR e ALERTAR** quando identificar:
+
+#### Situações que exigem registro em DECISIONS.md:
+
+**a) Escolha entre abordagens técnicas equivalentes**
+- Exemplo: "Usar AutoMapper vs mapear manualmente"
+- Exemplo: "Repository pattern vs acesso direto ao DbContext"
+
+**b) Desvio de padrão existente**
+- Exemplo: "Handler sem validação explícita (diferente do padrão)"
+- Exemplo: "Quebrar regra de multi-tenancy para caso específico"
+
+**c) Trade-offs relevantes**
+- Exemplo: "Performance vs manutenibilidade"
+- Exemplo: "Complexidade vs flexibilidade"
+
+**d) Decisões difíceis de reverter**
+- Exemplo: "Estrutura de migration (mudança de schema)"
+- Exemplo: "Mudança em contrato de API pública"
+
+**e) Introdução de nova dependência**
+- Exemplo: "Adicionar pacote NuGet não utilizado antes"
+- Exemplo: "Integração com serviço externo"
+
+### 3. PROCEDIMENTO DE ALERTA (OBRIGATÓRIO)
+
+Quando identificar decisão implícita, o agente **DEVE**:
+
+**PASSO 1: PARAR implementação**
+- NÃO prosseguir silenciosamente
+- NÃO assumir decisão por conta própria
+
+**PASSO 2: ALERTAR usuário**
+```
+⚠️ DECISÃO TÉCNICA IDENTIFICADA
+
+Contexto: [Descrever situação]
+Decisão implícita: [O que está sendo decidido]
+Alternativas:
+  - Opção A: [Descrição] - Vantagens: [...] - Desvantagens: [...]
+  - Opção B: [Descrição] - Vantagens: [...] - Desvantagens: [...]
+
+Recomendação: [Qual opção o agente sugere e por quê]
+
+Esta decisão deve ser registrada em docs/DECISIONS.md?
+```
+
+**PASSO 3: AGUARDAR confirmação do usuário**
+- Usuário decide qual opção
+- Usuário decide se registra em DECISIONS.md
+
+### 4. REGISTRO DE DECISÃO (Se Solicitado)
+
+Se usuário solicitar registro, o agente **DEVE** adicionar ao final de `docs/DECISIONS.md`:
+
+**Template ADR:**
+```markdown
+### ADR-XXX: [Título da Decisão]
+
+**Data:** YYYY-MM-DD
+**Status:** Aceita
+**RF Relacionado:** RFXXX (se aplicável)
+
+**Contexto:**
+[Descrever problema ou situação que motivou a decisão]
+
+**Decisão:**
+[Descrever decisão tomada]
+
+**Alternativas Consideradas:**
+- [Alternativa 1]: [Motivo de rejeição]
+- [Alternativa 2]: [Motivo de rejeição]
+
+**Consequências:**
+- Positivas: [Impactos positivos]
+- Negativas: [Impactos negativos ou trade-offs]
+
+**Responsável:** Agente Claude + [Nome do usuário]
+```
+
+**IMPORTANTE:**
+- Numerar sequencialmente (verificar último ADR registrado)
+- Incluir RF relacionado se aplicável
+- Ser conciso mas completo
+- Declarar: "Decisão técnica registrada: ADR-XXX em DECISIONS.md"
+
+### 5. EXEMPLOS DE DECISÕES QUE DEVEM SER REGISTRADAS
+
+**Exemplo 1: Escolha de Padrão de Mapeamento**
+```
+ADR-015: Usar AutoMapper para todos os DTOs
+
+Contexto: RF028 precisa mapear entre entidades e DTOs
+Decisão: Usar AutoMapper com profiles configurados
+Alternativa rejeitada: Mapear manualmente (mais verboso, menos DRY)
+Consequência: +1 dependência, -código boilerplate
+```
+
+**Exemplo 2: Exceção à Regra de Multi-Tenancy**
+```
+ADR-016: Tabela de Configurações Globais sem ClienteId
+
+Contexto: RF030 precisa de configurações compartilhadas entre todos os clientes
+Decisão: Criar tabela GlobalSettings SEM ClienteId
+Alternativa rejeitada: Duplicar configurações por cliente (redundante)
+Consequência: Quebra padrão multi-tenancy, requer controle de acesso especial
+```
+
+### 6. DECISÕES QUE NÃO PRECISAM SER REGISTRADAS
+
+**NÃO registrar:**
+- ❌ Aplicação de padrão já estabelecido em ARCHITECTURE.md
+- ❌ Seguir convenção já definida em CONVENTIONS.md
+- ❌ Decisões triviais (nome de variável, formatação)
+- ❌ Decisões reversíveis sem impacto (refactoring local)
+
+**Registrar:**
+- ✅ Exceções a padrões estabelecidos
+- ✅ Introdução de novos padrões
+- ✅ Escolhas com trade-offs significativos
+- ✅ Decisões que afetam múltiplos RFs
+
+---
+
 ## TODO LIST OBRIGATORIA (LER PRIMEIRO)
 
 > **ATENCAO:** O agente DEVE criar esta todo list IMEDIATAMENTE apos ativar o contrato.

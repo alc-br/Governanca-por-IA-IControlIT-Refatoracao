@@ -1,4 +1,48 @@
-Executar frontend do RFXXX conforme CONTRATO DE EXECUÇÃO – FRONTEND.
+MODO AUTONOMIA TOTAL: DETECTAR E EXECUTAR CONTRATO CORRETO AUTOMATICAMENTE
+
+PASSO 1 (AUTOMÁTICO): LER STATUS.yaml DO RFXXX
+
+Ler STATUS.yaml e verificar campo execucao.frontend:
+
+```yaml
+execucao:
+  frontend: ???  # Pode estar vazio, null, ou com dados
+```
+
+PASSO 2 (AUTOMÁTICO): DECIDIR CONTRATO CORRETO
+
+REGRA DE DETECÇÃO AUTOMÁTICA:
+
+IF execucao.frontend está VAZIO, NULL ou NÃO EXISTE:
+  → FRONTEND NOVO (primeira vez)
+  → LER E EXECUTAR: docs/contracts/desenvolvimento/execucao/frontend-criacao.md
+  → Criar frontend completo do zero
+  → NÃO PERGUNTAR, EXECUTAR DIRETAMENTE
+
+ELSE IF execucao.frontend JÁ TEM DADOS (data, status, commit, etc.):
+  → ADEQUAÇÃO (frontend já existe)
+  → LER E EXECUTAR: docs/contracts/desenvolvimento/execucao/frontend-adequacao.md
+  → Ajustar frontend existente
+  → NÃO PERGUNTAR, EXECUTAR DIRETAMENTE
+
+IMPORTANTE:
+- NÃO perguntar ao usuário qual contrato usar
+- NÃO solicitar confirmação
+- DETECTAR automaticamente pela presença de dados em execucao.frontend
+- EXECUTAR imediatamente o contrato correto
+- DECLARAR qual contrato foi selecionado (para transparência)
+
+EXEMPLO DE DECLARAÇÃO:
+"STATUS.yaml verificado: execucao.frontend está vazio → FRONTEND NOVO detectado.
+Executando docs/contracts/desenvolvimento/execucao/frontend-criacao.md automaticamente."
+
+OU
+
+"STATUS.yaml verificado: execucao.frontend tem dados → ADEQUAÇÃO detectada.
+Executando docs/contracts/desenvolvimento/execucao/frontend-adequacao.md automaticamente."
+
+---
+
 Seguir CLAUDE.md.
 
 PRE-REQUISITOS OBRIGATORIOS (BLOQUEANTES):

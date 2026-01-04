@@ -96,6 +96,238 @@ Se criar branch de `dev` quando `dev` tem conflitos:
 
 ---
 
+## CONSULTA OBRIGATÓRIA À BASE DE CONHECIMENTO
+
+Antes de criar a TODO LIST e iniciar qualquer implementação, o agente **DEVE**:
+
+### 1. LER Base de Conhecimento Frontend
+
+```bash
+# Ler arquivo completo
+cat docs/base-conhecimento/frontend.yaml
+```
+
+### 2. PROCURAR Problemas Similares
+
+Verificar se há problemas conhecidos relacionados a:
+- Tecnologias que serão usadas (Angular, PrimeNG, HttpClient, etc.)
+- Padrões que serão aplicados (standalone components, lazy loading, etc.)
+- Funcionalidades UI similares já implementadas
+
+### 3. CONSULTAR Erros Comuns
+
+Revisar seção `erros_comuns:` para antecipar problemas frequentes
+
+### 4. VALIDAR Padrões Obrigatórios
+
+Confirmar conhecimento dos padrões em `padroes:` antes de implementar
+
+### 5. REVISAR Layout Padrão
+
+Consultar `layout_padrao:` para estrutura de página, botões e cores
+
+### 6. EXECUTAR Checklist Pré-Execução
+
+Validar todos os itens em `checklist_pre_execucao:` do YAML
+
+**IMPORTANTE:**
+- Esta consulta é **OBRIGATÓRIA** e **BLOQUEANTE**
+- Se encontrar problema similar, aplicar solução conhecida
+- Se encontrar padrão obrigatório, seguir exatamente como documentado
+- Declarar: "Base de conhecimento consultada: [N] problemas conhecidos revisados"
+
+---
+
+## ATUALIZAÇÃO OBRIGATÓRIA DA BASE DE CONHECIMENTO (AO FINAL)
+
+Ao encontrar dificuldade **RELEVANTE** durante implementação, o agente **DEVE**:
+
+### Critério de Relevância
+
+Documentar SE E SOMENTE SE:
+- ✅ Problema levou > 30min para resolver
+- ✅ Erro não estava documentado em `erros_comuns:`
+- ✅ Solução não é óbvia (não está na documentação oficial)
+- ✅ Problema pode se repetir em outros RFs
+
+NÃO documentar:
+- ❌ Erros triviais (typo, import faltando)
+- ❌ Problemas específicos de um RF único
+- ❌ Soluções óbvias
+
+### Template de Documentação
+
+```yaml
+problemas:
+  - problema: "Descrição clara e concisa"
+    contexto: "RFXXX ou cenário genérico"
+    sintoma: "Erro no console, UI ou comportamento"
+    causa_raiz: "Análise técnica do por quê"
+    solucao: |
+      Passo a passo da solução:
+      1. Primeiro passo
+      2. Segundo passo
+      3. Código exemplo (se aplicável)
+    arquivos_afetados:
+      - "frontend/src/app/caminho/arquivo.ts"
+    data_registro: "YYYY-MM-DD"
+    tags: [categoria, tecnologia, ui]
+```
+
+**AÇÃO OBRIGATÓRIA:**
+- Adicionar novo problema ao final de `problemas:` em `docs/base-conhecimento/frontend.yaml`
+- Declarar: "Base de conhecimento atualizada: novo problema documentado"
+
+---
+
+## CONSULTA E REGISTRO DE DECISÕES TÉCNICAS (DECISIONS.md)
+
+O agente **DEVE** interagir com `docs/DECISIONS.md` durante a execução:
+
+### 1. CONSULTA OBRIGATÓRIA (Antes de Implementar)
+
+Antes de iniciar implementação, o agente **DEVE**:
+
+```bash
+# Ler decisões técnicas registradas
+cat docs/DECISIONS.md
+```
+
+**Verificar decisões relacionadas a:**
+- Padrões de UI/UX (layout padrão, componentes PrimeNG)
+- Escolhas de tecnologia (Angular standalone, lazy loading, state management)
+- Regras de navegação e roteamento
+- Decisões anteriores que impactam o RF atual
+
+**Declaração obrigatória:**
+> "DECISIONS.md consultado: [N] decisões técnicas revisadas"
+
+### 2. IDENTIFICAÇÃO DE DECISÕES IMPLÍCITAS (Durante Implementação)
+
+Durante implementação, o agente **DEVE PARAR e ALERTAR** quando identificar:
+
+#### Situações que exigem registro em DECISIONS.md:
+
+**a) Escolha entre abordagens técnicas equivalentes**
+- Exemplo: "Usar Signals vs Observables para state management"
+- Exemplo: "Criar service compartilhado vs service por feature"
+
+**b) Desvio de padrão de UI existente**
+- Exemplo: "Usar modal ao invés de página separada (diferente do padrão)"
+- Exemplo: "Layout customizado diferente do card padrão"
+
+**c) Trade-offs de UX**
+- Exemplo: "Paginação server-side vs client-side"
+- Exemplo: "Validação eager vs lazy em formulários"
+
+**d) Decisões difíceis de reverter**
+- Exemplo: "Estrutura de rotas (mudança afeta navegação global)"
+- Exemplo: "Mudança em componente shared usado em vários lugares"
+
+**e) Introdução de nova dependência ou componente**
+- Exemplo: "Adicionar biblioteca de gráficos não utilizada antes"
+- Exemplo: "Criar novo componente shared genérico"
+
+### 3. PROCEDIMENTO DE ALERTA (OBRIGATÓRIO)
+
+Quando identificar decisão implícita, o agente **DEVE**:
+
+**PASSO 1: PARAR implementação**
+- NÃO prosseguir silenciosamente
+- NÃO assumir decisão por conta própria
+
+**PASSO 2: ALERTAR usuário**
+```
+⚠️ DECISÃO TÉCNICA IDENTIFICADA
+
+Contexto: [Descrever situação]
+Decisão implícita: [O que está sendo decidido]
+Alternativas:
+  - Opção A: [Descrição] - Vantagens: [...] - Desvantagens: [...]
+  - Opção B: [Descrição] - Vantagens: [...] - Desvantagens: [...]
+
+Recomendação: [Qual opção o agente sugere e por quê]
+
+Esta decisão deve ser registrada em docs/DECISIONS.md?
+```
+
+**PASSO 3: AGUARDAR confirmação do usuário**
+- Usuário decide qual opção
+- Usuário decide se registra em DECISIONS.md
+
+### 4. REGISTRO DE DECISÃO (Se Solicitado)
+
+Se usuário solicitar registro, o agente **DEVE** adicionar ao final de `docs/DECISIONS.md`:
+
+**Template ADR:**
+```markdown
+### ADR-XXX: [Título da Decisão]
+
+**Data:** YYYY-MM-DD
+**Status:** Aceita
+**RF Relacionado:** RFXXX (se aplicável)
+
+**Contexto:**
+[Descrever problema ou situação que motivou a decisão]
+
+**Decisão:**
+[Descrever decisão tomada]
+
+**Alternativas Consideradas:**
+- [Alternativa 1]: [Motivo de rejeição]
+- [Alternativa 2]: [Motivo de rejeição]
+
+**Consequências:**
+- Positivas: [Impactos positivos]
+- Negativas: [Impactos negativos ou trade-offs]
+
+**Responsável:** Agente Claude + [Nome do usuário]
+```
+
+**IMPORTANTE:**
+- Numerar sequencialmente (verificar último ADR registrado)
+- Incluir RF relacionado se aplicável
+- Ser conciso mas completo
+- Declarar: "Decisão técnica registrada: ADR-XXX em DECISIONS.md"
+
+### 5. EXEMPLOS DE DECISÕES QUE DEVEM SER REGISTRADAS
+
+**Exemplo 1: Escolha de Gerenciamento de Estado**
+```
+ADR-020: Usar Signals para state local de componentes
+
+Contexto: RF035 precisa gerenciar estado complexo de formulário
+Decisão: Usar Angular Signals ao invés de Observables
+Alternativa rejeitada: RxJS Observables (mais verboso para casos simples)
+Consequência: Melhor performance, sintaxe mais simples, menos código
+```
+
+**Exemplo 2: Exceção ao Layout Padrão**
+```
+ADR-021: Dashboard com layout grid customizado
+
+Contexto: RF040 (Dashboard) requer layout diferente do card padrão
+Decisão: Criar layout grid responsivo customizado
+Alternativa rejeitada: Forçar card padrão (limitaria visualização)
+Consequência: Quebra consistência visual, requer CSS específico
+```
+
+### 6. DECISÕES QUE NÃO PRECISAM SER REGISTRADAS
+
+**NÃO registrar:**
+- ❌ Aplicação de layout padrão já estabelecido
+- ❌ Seguir padrão de componentes PrimeNG já usado
+- ❌ Decisões triviais (cores, espaçamento)
+- ❌ Decisões reversíveis sem impacto (refactoring local)
+
+**Registrar:**
+- ✅ Exceções a padrões de UI/UX estabelecidos
+- ✅ Introdução de novos padrões de componentes
+- ✅ Escolhas com trade-offs de UX significativos
+- ✅ Decisões que afetam navegação ou estrutura global
+
+---
+
 ## TODO LIST OBRIGATORIA (LER PRIMEIRO)
 
 > **ATENCAO:** O agente DEVE criar esta todo list IMEDIATAMENTE apos ativar o contrato.

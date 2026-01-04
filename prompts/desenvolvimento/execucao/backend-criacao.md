@@ -1,4 +1,48 @@
-Executar backend do RFXXX conforme CONTRATO DE EXECUCAO – BACKEND.
+MODO AUTONOMIA TOTAL: DETECTAR E EXECUTAR CONTRATO CORRETO AUTOMATICAMENTE
+
+PASSO 1 (AUTOMÁTICO): LER STATUS.yaml DO RFXXX
+
+Ler STATUS.yaml e verificar campo execucao.backend:
+
+```yaml
+execucao:
+  backend: ???  # Pode estar vazio, null, ou com dados
+```
+
+PASSO 2 (AUTOMÁTICO): DECIDIR CONTRATO CORRETO
+
+REGRA DE DETECÇÃO AUTOMÁTICA:
+
+IF execucao.backend está VAZIO, NULL ou NÃO EXISTE:
+  → BACKEND NOVO (primeira vez)
+  → LER E EXECUTAR: docs/contracts/desenvolvimento/execucao/backend-criacao.md
+  → Criar backend completo do zero
+  → NÃO PERGUNTAR, EXECUTAR DIRETAMENTE
+
+ELSE IF execucao.backend JÁ TEM DADOS (data, status, commit, etc.):
+  → ADEQUAÇÃO (backend já existe)
+  → LER E EXECUTAR: docs/contracts/desenvolvimento/execucao/backend-adequacao.md
+  → Ajustar backend existente
+  → NÃO PERGUNTAR, EXECUTAR DIRETAMENTE
+
+IMPORTANTE:
+- NÃO perguntar ao usuário qual contrato usar
+- NÃO solicitar confirmação
+- DETECTAR automaticamente pela presença de dados em execucao.backend
+- EXECUTAR imediatamente o contrato correto
+- DECLARAR qual contrato foi selecionado (para transparência)
+
+EXEMPLO DE DECLARAÇÃO:
+"STATUS.yaml verificado: execucao.backend está vazio → BACKEND NOVO detectado.
+Executando docs/contracts/desenvolvimento/execucao/backend-criacao.md automaticamente."
+
+OU
+
+"STATUS.yaml verificado: execucao.backend tem dados → ADEQUAÇÃO detectada.
+Executando docs/contracts/desenvolvimento/execucao/backend-adequacao.md automaticamente."
+
+---
+
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 Seguir CLAUDE.md.
 

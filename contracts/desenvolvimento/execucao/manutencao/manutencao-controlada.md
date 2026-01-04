@@ -103,6 +103,106 @@ Se criar branch de `dev` quando `dev` tem conflitos:
 
 ---
 
+## CONSULTA OBRIGATÓRIA À BASE DE CONHECIMENTO
+
+Antes de criar a TODO LIST e iniciar análise do erro, o agente **DEVE**:
+
+### 1. IDENTIFICAR Camada do Erro
+
+Determinar se o erro está em:
+- Backend (.NET, EF Core, handlers, etc.) → Consultar `backend.yaml`
+- Frontend (Angular, componentes, rotas, etc.) → Consultar `frontend.yaml`
+- Ambos → Consultar ambos os arquivos
+
+### 2. LER Base de Conhecimento Apropriada
+
+```bash
+# Se erro no backend
+cat docs/base-conhecimento/backend.yaml
+
+# Se erro no frontend
+cat docs/base-conhecimento/frontend.yaml
+
+# Se erro em ambos (ler os dois)
+cat docs/base-conhecimento/backend.yaml
+cat docs/base-conhecimento/frontend.yaml
+```
+
+### 3. PROCURAR Erro Similar
+
+Verificar se erro já foi enfrentado e resolvido antes:
+- Buscar em `problemas:` por sintomas similares
+- Buscar em `erros_comuns:` por mensagem de erro
+- Buscar em `troubleshooting:` por categoria
+
+### 4. APLICAR Solução Conhecida (se encontrada)
+
+Se encontrar problema similar:
+- ✅ Aplicar solução documentada
+- ✅ Validar que resolve o erro
+- ✅ Declarar: "Solução aplicada da base de conhecimento: [descrição]"
+- ✅ Pular para merge e commit
+
+Se NÃO encontrar:
+- ✅ Prosseguir com investigação normal
+- ✅ Documentar solução ao final (ver próxima seção)
+
+**IMPORTANTE:**
+- Esta consulta é **OBRIGATÓRIA** antes de investigar
+- Pode economizar horas de debugging
+- Declarar: "Base de conhecimento consultada: [backend/frontend/ambos]"
+
+---
+
+## ATUALIZAÇÃO OBRIGATÓRIA DA BASE DE CONHECIMENTO (AO FINAL)
+
+Ao resolver erro **RELEVANTE** que NÃO estava documentado, o agente **DEVE**:
+
+### Critério de Relevância para Manutenção
+
+Documentar SE E SOMENTE SE:
+- ✅ Investigação levou > 30min
+- ✅ Erro NÃO estava em `erros_comuns:` ou `problemas:`
+- ✅ Causa raiz não era óbvia
+- ✅ Erro pode ocorrer novamente em outros RFs ou cenários
+
+NÃO documentar:
+- ❌ Erros triviais (config local, dependência faltando)
+- ❌ Bugs de código específico do RF (não se repete)
+- ❌ Erros já documentados
+
+### Qual Base Atualizar
+
+- Erro em backend → Atualizar `docs/base-conhecimento/backend.yaml`
+- Erro em frontend → Atualizar `docs/base-conhecimento/frontend.yaml`
+- Erro em ambos → Atualizar ambos os arquivos
+
+### Template de Documentação
+
+```yaml
+problemas:
+  - problema: "Descrição clara do erro enfrentado"
+    contexto: "Manutenção RFXXX ou cenário genérico"
+    sintoma: "Mensagem de erro exata ou comportamento observado"
+    causa_raiz: "Análise técnica: por que ocorreu"
+    solucao: |
+      Passo a passo da correção:
+      1. Primeiro passo da investigação
+      2. Identificação da causa
+      3. Correção aplicada (com código se aplicável)
+    arquivos_afetados:
+      - "backend/ou/frontend/caminho/arquivo"
+    data_registro: "YYYY-MM-DD"
+    tags: [manutencao, categoria, tecnologia]
+```
+
+**AÇÃO OBRIGATÓRIA:**
+- Adicionar novo problema ao final de `problemas:` no YAML apropriado
+- Declarar: "Base de conhecimento atualizada: [backend/frontend] - novo problema documentado"
+- Incluir essa atualização no commit da correção
+
+---
+
 ## TODO LIST OBRIGATORIA (LER PRIMEIRO)
 
 > **ATENCAO:** O agente DEVE criar esta todo list IMEDIATAMENTE apos ativar o contrato.

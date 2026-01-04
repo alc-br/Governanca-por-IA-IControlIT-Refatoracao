@@ -4,7 +4,7 @@ Ele fica nesse endereço \docs\rf\Fase*\EPIC*\RF*
 
 ---
 
-Executar **VALIDADOR-CONTRATO-ADEQUACAO-COMPLETA-UC** para o RF informado acima.
+Executar **docs\contracts\documentacao\validacao\uc.md** para o RF informado acima.
 Seguir CLAUDE.md.
 
 ## ⚠️ MODO READ-ONLY

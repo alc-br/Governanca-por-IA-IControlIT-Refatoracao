@@ -1,0 +1,293 @@
+# BASE DE CONHECIMENTO - FRONTEND (Angular 18 + PrimeNG)
+
+# Este arquivo armazena problemas conhecidos e suas soluções para consulta rápida
+# antes de criações, adequações ou correções no frontend.
+
+# FORMATO:
+# - problema: Descrição clara do problema enfrentado
+#   contexto: Quando/onde ocorre (RF, componente, rota)
+#   sintoma: Como o erro se manifesta (console, UI, comportamento)
+#   causa_raiz: Por que aconteceu
+#   solucao: Como resolver (passo a passo se necessário)
+#   arquivos_afetados: Lista de arquivos relacionados
+#   data_registro: YYYY-MM-DD
+#   tags: [categoria1, categoria2]
+
+# ==============================================================================
+# PROBLEMAS CONHECIDOS E SOLUÇÕES
+# ==============================================================================
+
+problemas:
+  # Exemplo de problema (REMOVER após primeiro uso real)
+  - problema: "Rota não carrega após adicionar novo módulo ao menu"
+    contexto: "RF006 - Adicionar rota /management/clientes ao menu"
+    sintoma: "Navegação falha, página em branco, erro 404 no console"
+    causa_raiz: "Rota não registrada em app.routes.ts ou módulo não importado"
+    solucao: |
+      1. Adicionar rota em app.routes.ts:
+         {
+           path: 'management/clientes',
+           loadComponent: () => import('./pages/management/clientes/clientes.component')
+             .then(m => m.ClientesComponent)
+         }
+
+      2. Adicionar item ao menu em menu.service.ts:
+         {
+           label: 'Clientes',
+           icon: 'pi pi-users',
+           routerLink: ['/management/clientes']
+         }
+    arquivos_afetados:
+      - "frontend/src/app/app.routes.ts"
+      - "frontend/src/app/core/services/menu.service.ts"
+    data_registro: "2026-01-03"
+    tags: [routing, menu, navegacao]
+
+# ==============================================================================
+# PADRÕES E BOAS PRÁTICAS
+# ==============================================================================
+
+padroes:
+  - nome: "Componentes standalone obrigatórios"
+    descricao: "Todos os componentes devem ser standalone (Angular 18+)"
+    exemplo: |
+      @Component({
+        selector: 'app-clientes',
+        standalone: true,
+        imports: [CommonModule, TableModule, ButtonModule, FormsModule],
+        templateUrl: './clientes.component.html'
+      })
+      export class ClientesComponent implements OnInit { }
+    tags: [component, standalone, angular18]
+
+  - nome: "Lazy loading de rotas"
+    descricao: "Usar loadComponent para carregamento sob demanda"
+    exemplo: |
+      {
+        path: 'clientes',
+        loadComponent: () => import('./clientes/clientes.component')
+          .then(m => m.ClientesComponent)
+      }
+    tags: [routing, lazy-loading, performance]
+
+  - nome: "Serviços com HttpClient"
+    descricao: "Todo serviço HTTP deve usar tipagem e tratamento de erro"
+    exemplo: |
+      @Injectable({ providedIn: 'root' })
+      export class ClienteService {
+        constructor(private http: HttpClient) {}
+
+        getClientes(): Observable<Cliente[]> {
+          return this.http.get<Cliente[]>('/api/clientes')
+            .pipe(
+              catchError(this.handleError)
+            );
+        }
+
+        private handleError(error: HttpErrorResponse) {
+          // Log + mensagem amigável
+        }
+      }
+    tags: [service, http, error-handling]
+
+  - nome: "PrimeNG Table padrão"
+    descricao: "Usar p-table com paginação, ordenação e filtros"
+    exemplo: |
+      <p-table [value]="clientes"
+               [paginator]="true"
+               [rows]="10"
+               [showCurrentPageReport]="true"
+               responsiveLayout="scroll">
+        <ng-template pTemplate="header">
+          <tr>
+            <th pSortableColumn="nome">Nome <p-sortIcon field="nome"></p-sortIcon></th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-cliente>
+          <tr>
+            <td>{{ cliente.nome }}</td>
+          </tr>
+        </ng-template>
+      </p-table>
+    tags: [primeng, table, ui]
+
+# ==============================================================================
+# ERROS COMUNS E SOLUÇÕES RÁPIDAS
+# ==============================================================================
+
+erros_comuns:
+  - erro: "NullInjectorError: No provider for HttpClient"
+    causa: "HttpClientModule não importado ou provideHttpClient não configurado"
+    solucao: |
+      Em app.config.ts:
+      export const appConfig: ApplicationConfig = {
+        providers: [
+          provideHttpClient(),
+          // ...
+        ]
+      };
+    tags: [http, dependency-injection]
+
+  - erro: "Can't bind to 'ngModel' since it isn't a known property"
+    causa: "FormsModule não importado no componente standalone"
+    solucao: |
+      Adicionar FormsModule ao array imports do componente:
+      imports: [CommonModule, FormsModule, ...]
+    tags: [forms, ngmodel, imports]
+
+  - erro: "ExpressionChangedAfterItHasBeenCheckedError"
+    causa: "Mudança de estado durante detecção de mudanças (ngAfterViewInit, etc.)"
+    solucao: |
+      Usar setTimeout ou ChangeDetectorRef:
+
+      constructor(private cdr: ChangeDetectorRef) {}
+
+      ngAfterViewInit() {
+        setTimeout(() => {
+          this.algumaPropriedade = valor;
+        });
+      }
+    tags: [change-detection, lifecycle]
+
+  - erro: "Rota /management/xxx retorna 404"
+    causa: "Rota não registrada em app.routes.ts ou ordem de rotas incorreta"
+    solucao: |
+      1. Verificar se rota está em app.routes.ts
+      2. Verificar se rota específica vem ANTES de rotas genéricas
+      3. Verificar se loadComponent está correto
+    tags: [routing, 404]
+
+  - erro: "PrimeNG componente não renderiza"
+    causa: "Módulo PrimeNG não importado no componente standalone"
+    solucao: |
+      Importar módulo específico no componente:
+
+      imports: [TableModule, ButtonModule, InputTextModule, ...]
+    tags: [primeng, imports]
+
+# ==============================================================================
+# CHECKLIST PRÉ-EXECUÇÃO
+# ==============================================================================
+
+checklist_pre_execucao:
+  - item: "Verificar se WF-RFXXX.md existe e está validado"
+    obrigatorio: true
+
+  - item: "Verificar se UC-RFXXX.md existe e está validado"
+    obrigatorio: true
+
+  - item: "Confirmar que backend está aprovado 100% (STATUS.yaml)"
+    obrigatorio: true
+
+  - item: "Validar que contratos de API do backend estão prontos"
+    obrigatorio: true
+
+  - item: "Confirmar que npm install foi executado (node_modules atualizado)"
+    obrigatorio: false
+
+  - item: "Validar que não há erros de compilação (ng build --configuration development)"
+    obrigatorio: true
+
+# ==============================================================================
+# TROUBLESHOOTING RÁPIDO
+# ==============================================================================
+
+troubleshooting:
+  build_falha:
+    - "Executar npm install (dependências podem estar desatualizadas)"
+    - "Limpar cache: npm cache clean --force"
+    - "Remover node_modules e package-lock.json, reinstalar"
+    - "Verificar se TypeScript version é compatível (package.json)"
+
+  testes_falhando:
+    - "Verificar se TestBed está configurado corretamente (imports, providers)"
+    - "Verificar se HttpClientTestingModule está importado em testes HTTP"
+    - "Verificar se dependências estão mockadas (services injetados)"
+
+  hot_reload_nao_funciona:
+    - "Reiniciar ng serve"
+    - "Verificar se há erros de compilação no terminal"
+    - "Limpar cache do navegador (Ctrl+Shift+Delete)"
+    - "Verificar se arquivo foi salvo corretamente"
+
+  api_erro_cors:
+    - "Verificar proxy.conf.json configurado corretamente"
+    - "Verificar se backend permite origem (CORS policy)"
+    - "Verificar se URL da API está correta (environment.ts)"
+
+# ==============================================================================
+# PADRÃO DE LAYOUT E ESTILO
+# ==============================================================================
+
+layout_padrao:
+  estrutura_pagina: |
+    <div class="card">
+      <div class="card-header">
+        <h2>Título da Página</h2>
+        <p-button label="Nova Ação" icon="pi pi-plus"></p-button>
+      </div>
+
+      <div class="card-body">
+        <!-- Filtros (se aplicável) -->
+        <div class="filters mb-3">
+          <input pInputText placeholder="Buscar..." />
+        </div>
+
+        <!-- Tabela ou conteúdo principal -->
+        <p-table [value]="items" ...>
+        </p-table>
+      </div>
+    </div>
+
+  botoes_padrao:
+    - "Novo: pi-plus (primário)"
+    - "Editar: pi-pencil (secundário)"
+    - "Excluir: pi-trash (danger)"
+    - "Salvar: pi-check (success)"
+    - "Cancelar: pi-times (secondary)"
+    - "Voltar: pi-arrow-left (secondary)"
+
+  cores_padrao:
+    - "Primário: uso do tema PrimeNG (--primary-color)"
+    - "Sucesso: p-button-success"
+    - "Perigo: p-button-danger"
+    - "Aviso: p-button-warning"
+
+# ==============================================================================
+# REFERÊNCIAS RÁPIDAS
+# ==============================================================================
+
+referencias:
+  documentacao:
+    - "docs/ARCHITECTURE.md - Stack e padrões arquiteturais"
+    - "docs/CONVENTIONS.md - Nomenclatura e padrões de código"
+    - "docs/COMPLIANCE.md - Regras de validação obrigatórias"
+    - "docs/contracts/desenvolvimento/execucao/frontend-criacao.md - Contrato criação"
+    - "docs/contracts/desenvolvimento/execucao/frontend-adequacao.md - Contrato adequação"
+
+  comandos_uteis:
+    - "npm start - Dev server (porta 4200)"
+    - "npm run build - Build de produção"
+    - "npm run test - Executar testes unitários (Jest)"
+    - "npm run e2e - Executar testes E2E (Playwright)"
+    - "ng generate component [nome] - Criar componente standalone"
+    - "ng generate service [nome] - Criar serviço"
+
+  urls_locais:
+    - "http://localhost:4200 - Aplicação frontend"
+    - "http://localhost:5000 - API backend (DEV)"
+    - "http://localhost:4200/admin/management/sla-operacoes - Exemplo de layout padrão"
+
+# ==============================================================================
+# NOTAS IMPORTANTES
+# ==============================================================================
+
+notas:
+  - "SEMPRE usar componentes standalone (Angular 18+)"
+  - "SEMPRE seguir layout padrão (ver /management/sla-operacoes)"
+  - "SEMPRE adicionar rota ao menu após criar componente"
+  - "SEMPRE validar que backend está pronto antes de criar frontend"
+  - "SEMPRE usar PrimeNG para componentes UI (não criar do zero)"
+  - "SEMPRE usar lazy loading para rotas (loadComponent)"
+  - "NUNCA importar módulos antigos (NgModule) em componentes standalone"
+  - "NUNCA usar HttpClientModule diretamente (usar provideHttpClient em app.config.ts)"

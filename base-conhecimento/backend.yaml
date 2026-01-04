@@ -1,0 +1,172 @@
+# BASE DE CONHECIMENTO - BACKEND (.NET 8 + EF Core)
+
+# Este arquivo armazena problemas conhecidos e suas soluções para consulta rápida
+# antes de criações, adequações ou correções no backend.
+
+# FORMATO:
+# - problema: Descrição clara do problema enfrentado
+#   contexto: Quando/onde ocorre (RF, cenário, operação)
+#   sintoma: Como o erro se manifesta (mensagem, comportamento)
+#   causa_raiz: Por que aconteceu
+#   solucao: Como resolver (passo a passo se necessário)
+#   arquivos_afetados: Lista de arquivos relacionados
+#   data_registro: YYYY-MM-DD
+#   tags: [categoria1, categoria2]
+
+# ==============================================================================
+# PROBLEMAS CONHECIDOS E SOLUÇÕES
+# ==============================================================================
+
+problemas:
+  # Exemplo de problema (REMOVER após primeiro uso real)
+  - problema: "AutoMapper não ignora propriedades de multi-tenancy durante mapeamento"
+    contexto: "RF016 - Criação de handler com DTOs"
+    sintoma: "Erro ao tentar mapear ClienteId/EmpresaId do DTO para entidade"
+    causa_raiz: "AutoMapper tenta mapear todas as propriedades por padrão, incluindo ClienteId"
+    solucao: |
+      Adicionar ignores explícitos no perfil AutoMapper:
+
+      CreateMap<ClienteDto, Cliente>()
+        .ForMember(dest => dest.ClienteId, opt => opt.Ignore())
+        .ForMember(dest => dest.CriadoEm, opt => opt.Ignore())
+        .ForMember(dest => dest.CriadoPor, opt => opt.Ignore())
+        .ForMember(dest => dest.AlteradoEm, opt => opt.Ignore())
+        .ForMember(dest => dest.AlteradoPor, opt => opt.Ignore())
+        .ForMember(dest => dest.DeletedAt, opt => opt.Ignore());
+    arquivos_afetados:
+      - "backend/Application/Mappings/ClienteProfile.cs"
+    data_registro: "2026-01-03"
+    tags: [automapper, multi-tenancy, dto]
+
+# ==============================================================================
+# PADRÕES E BOAS PRÁTICAS
+# ==============================================================================
+
+padroes:
+  - nome: "Handlers CQRS obrigatórios"
+    descricao: "Todo handler deve herdar de IRequestHandler e ter validação"
+    exemplo: |
+      public class CriarClienteCommandHandler
+        : IRequestHandler<CriarClienteCommand, Result<ClienteDto>>
+      {
+          private readonly IApplicationDbContext _context;
+          private readonly ICurrentUserService _currentUser;
+
+          // Validar ClienteId obrigatório
+          // Validar permissões
+          // Aplicar multi-tenancy
+      }
+    tags: [cqrs, handler, validacao]
+
+  - nome: "Multi-tenancy obrigatório em queries"
+    descricao: "Toda query deve filtrar por ClienteId do usuário logado"
+    exemplo: |
+      var clientes = await _context.Clientes
+          .Where(c => c.ClienteId == _currentUser.ClienteId)
+          .ToListAsync();
+    tags: [multi-tenancy, query, seguranca]
+
+  - nome: "Auditoria automática"
+    descricao: "CriadoPor/AlteradoPor preenchidos automaticamente via SaveChangesAsync"
+    exemplo: |
+      // Implementado em ApplicationDbContext.SaveChangesAsync
+      // Não preencher manualmente
+    tags: [auditoria, dbcontext]
+
+# ==============================================================================
+# ERROS COMUNS E SOLUÇÕES RÁPIDAS
+# ==============================================================================
+
+erros_comuns:
+  - erro: "DbUpdateException: Cannot insert duplicate key"
+    causa: "PK ou UNIQUE constraint violada"
+    solucao: "Verificar se ID já existe antes de inserir, ou usar Upsert pattern"
+    tags: [database, pk, unique]
+
+  - erro: "InvalidOperationException: Sequence contains no elements"
+    causa: "Usar First() ou Single() em query vazia"
+    solucao: "Usar FirstOrDefault() ou SingleOrDefault() e validar null"
+    tags: [linq, query]
+
+  - erro: "UnauthorizedAccessException em handler"
+    causa: "ClienteId do comando diferente do usuário logado"
+    solucao: "Validar _currentUser.ClienteId == command.ClienteId no início do handler"
+    tags: [seguranca, multi-tenancy]
+
+  - erro: "Migration não aplica mudanças no banco"
+    causa: "Migration criada mas não executada, ou banco em estado inconsistente"
+    solucao: |
+      1. dotnet ef database update (aplicar pending migrations)
+      2. Se falhar, verificar __EFMigrationsHistory
+      3. Se necessário, dropar banco e recriar (DEV only)
+    tags: [ef-core, migration]
+
+# ==============================================================================
+# CHECKLIST PRÉ-EXECUÇÃO
+# ==============================================================================
+
+checklist_pre_execucao:
+  - item: "Verificar se MD-RFXXX.md existe e está validado"
+    obrigatorio: true
+
+  - item: "Verificar se UC-RFXXX.md existe e está validado"
+    obrigatorio: true
+
+  - item: "Confirmar que migrations anteriores foram aplicadas (dotnet ef database update)"
+    obrigatorio: true
+
+  - item: "Validar que não há merge conflicts no branch atual"
+    obrigatorio: true
+
+  - item: "Confirmar que STATUS.yaml.documentacao.uc = true"
+    obrigatorio: true
+
+# ==============================================================================
+# TROUBLESHOOTING RÁPIDO
+# ==============================================================================
+
+troubleshooting:
+  build_falha:
+    - "Verificar se todos os pacotes NuGet estão restaurados (dotnet restore)"
+    - "Verificar se namespace está correto (Application, Domain, Infrastructure)"
+    - "Verificar se using statements estão completos"
+
+  testes_falhando:
+    - "Verificar se banco de testes está limpo (usar InMemory database)"
+    - "Verificar se multi-tenancy está mockado corretamente (ClienteId fixo)"
+    - "Verificar se ICurrentUserService está configurado no DI de testes"
+
+  ef_core_erro:
+    - "Verificar connection string em appsettings.Development.json"
+    - "Verificar se DbContext está registrado no DI (ApplicationDbContext)"
+    - "Verificar se migration foi criada (dotnet ef migrations add)"
+
+# ==============================================================================
+# REFERÊNCIAS RÁPIDAS
+# ==============================================================================
+
+referencias:
+  documentacao:
+    - "docs/ARCHITECTURE.md - Stack e padrões arquiteturais"
+    - "docs/CONVENTIONS.md - Nomenclatura e padrões de código"
+    - "docs/COMPLIANCE.md - Regras de validação obrigatórias"
+    - "docs/contracts/desenvolvimento/execucao/backend-criacao.md - Contrato criação"
+    - "docs/contracts/desenvolvimento/execucao/backend-adequacao.md - Contrato adequação"
+
+  comandos_uteis:
+    - "dotnet build - Build do projeto"
+    - "dotnet test - Executar testes"
+    - "dotnet ef database update - Aplicar migrations"
+    - "dotnet ef migrations add [Nome] - Criar migration"
+    - "dotnet ef migrations remove - Remover última migration"
+
+# ==============================================================================
+# NOTAS IMPORTANTES
+# ==============================================================================
+
+notas:
+  - "SEMPRE validar ClienteId em handlers (multi-tenancy)"
+  - "NUNCA preencher campos de auditoria manualmente (automático via DbContext)"
+  - "SEMPRE usar soft delete (DeletedAt) ao invés de DELETE físico"
+  - "SEMPRE validar permissões antes de executar comando"
+  - "NUNCA expor IDs internos em DTOs públicos (usar GUIDs ou IDs ofuscados)"
