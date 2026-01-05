@@ -1,0 +1,698 @@
+# =============================================
+# UC - Casos de Uso (Contrato Comportamental)
+# RF058 - Gestão de Tipos de Bilhetes
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+uc:
+  rf: "RF058"
+  versao: "2.0"
+  data: "2025-12-31"
+
+casos_de_uso:
+
+  - id: "UC00"
+    nome: "Listar Tipos de Bilhetes"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      rf_items:
+        - "RN-RF058-007"  # Multi-tenancy
+        - "RN-RF058-008"  # Soft Delete
+        - "RN-RF058-011"  # Permissões
+        - "RN-RF058-012"  # Filtros de Listagem
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa a funcionalidade pelo menu 'Cadastros > Tipos de Bilhetes'"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema valida permissão CAD.TIPOS_BILHETES.VIEW"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Sistema carrega tipos de bilhetes do tenant (WHERE EmpresaId = {usuário.EmpresaId} AND Excluido = false)"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Sistema aplica paginação padrão (10 itens/página) e ordenação por Nome (A-Z)"
+          required: true
+        - id: "FP-UC00-005"
+          title: "Sistema exibe grid com colunas: Nome, Descrição, Status, Ações"
+          required: true
+        - id: "FA-UC00-001"
+          title: "Buscar por Nome ou Descrição"
+          required: false
+        - id: "FA-UC00-002"
+          title: "Ordenar por coluna"
+          required: false
+        - id: "FA-UC00-003"
+          title: "Filtrar por Status (Ativo/Inativo/Todos)"
+          required: false
+        - id: "FE-UC00-001"
+          title: "Usuário sem permissão → acesso negado (HTTP 403)"
+          required: true
+        - id: "FE-UC00-002"
+          title: "Nenhum registro → estado vazio exibido"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.TIPOS_BILHETES.VIEW"
+
+    gatilho: "Usuário acessa menu Cadastros > Tipos de Bilhetes"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "listar_tipos_bilhetes_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "aplicar_paginacao_ordenacao"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_grid"
+
+    fluxos_alternativos:
+      - id: "FA-UC00-01"
+        condicao: "usuario_aplica_busca"
+        resultado: "lista_filtrada_por_nome_ou_descricao"
+      - id: "FA-UC00-02"
+        condicao: "usuario_aplica_ordenacao"
+        resultado: "lista_reordenada"
+      - id: "FA-UC00-03"
+        condicao: "usuario_filtra_status"
+        resultado: "lista_filtrada_por_status"
+
+    fluxos_excecao:
+      - id: "FE-UC00-01"
+        condicao: "sem_permissao"
+        resultado: "acesso_negado_http_403"
+      - id: "FE-UC00-02"
+        condicao: "nenhum_registro"
+        resultado: "estado_vazio_exibido"
+
+    regras_aplicadas:
+      - "RN-RF058-007"  # Multi-tenancy
+      - "RN-RF058-008"  # Soft Delete
+      - "RN-RF058-011"  # Permissões
+      - "RN-RF058-012"  # Filtros
+
+    resultado_final:
+      estado: "lista_exibida"
+
+  - id: "UC01"
+    nome: "Criar Tipo de Bilhete"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RN-RF058-001"  # Nome Único
+        - "RN-RF058-002"  # Tamanho Mínimo Nome
+        - "RN-RF058-003"  # Tamanho Máximo Nome
+        - "RN-RF058-004"  # Formato de Nome
+        - "RN-RF058-005"  # Descrição Obrigatória
+        - "RN-RF058-006"  # Tamanho Máximo Descrição
+        - "RN-RF058-007"  # Multi-tenancy
+        - "RN-RF058-009"  # Auditoria
+        - "RN-RF058-010"  # Status Padrão
+        - "RN-RF058-011"  # Permissões
+      uc_items:
+        - id: "FP-UC01-001"
+          title: "Usuário clica em 'Novo Tipo de Bilhete'"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema valida permissão CAD.TIPOS_BILHETES.CREATE"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Sistema exibe formulário de criação"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Usuário preenche Nome e Descrição"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Usuário clica em 'Salvar'"
+          required: true
+        - id: "FP-UC01-006"
+          title: "Sistema valida dados (RN-RF058-001 a RN-RF058-006)"
+          required: true
+        - id: "FP-UC01-007"
+          title: "Sistema valida Nome único no tenant (case-insensitive)"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Sistema preenche automaticamente: EmpresaId, DataCriacao, UsuarioCriacaoId, Ativo=true, Excluido=false"
+          required: true
+        - id: "FP-UC01-009"
+          title: "Sistema persiste registro no banco"
+          required: true
+        - id: "FP-UC01-010"
+          title: "Sistema registra auditoria (CREATE: TIPO_BILHETE_CREATED)"
+          required: true
+        - id: "FP-UC01-011"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FP-UC01-012"
+          title: "Sistema redireciona para listagem ou limpa formulário"
+          required: true
+        - id: "FA-UC01-001"
+          title: "Salvar e criar outro"
+          required: false
+        - id: "FA-UC01-002"
+          title: "Cancelar criação"
+          required: false
+        - id: "FE-UC01-001"
+          title: "Nome vazio ou < 3 caracteres → erro"
+          required: true
+        - id: "FE-UC01-002"
+          title: "Nome > 100 caracteres → erro"
+          required: true
+        - id: "FE-UC01-003"
+          title: "Nome com caracteres especiais inválidos → erro"
+          required: true
+        - id: "FE-UC01-004"
+          title: "Nome duplicado (case-insensitive) → erro"
+          required: true
+        - id: "FE-UC01-005"
+          title: "Descrição vazia ou < 10 caracteres → erro"
+          required: true
+        - id: "FE-UC01-006"
+          title: "Descrição > 500 caracteres → erro"
+          required: true
+        - id: "FE-UC01-007"
+          title: "Erro inesperado ao salvar → HTTP 500"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.TIPOS_BILHETES.CREATE"
+
+    gatilho: "Usuário clica em 'Novo Tipo de Bilhete'"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "exibir_formulario_criacao"
+      - passo: 2
+        ator: "usuario"
+        acao: "preencher_nome_descricao"
+      - passo: 3
+        ator: "usuario"
+        acao: "clicar_salvar"
+      - passo: 4
+        ator: "sistema"
+        acao: "validar_dados_regras_negocio"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_nome_unico_tenant"
+      - passo: 6
+        ator: "sistema"
+        acao: "preencher_campos_automaticos"
+      - passo: 7
+        ator: "sistema"
+        acao: "persistir_registro"
+      - passo: 8
+        ator: "sistema"
+        acao: "registrar_auditoria_create"
+      - passo: 9
+        ator: "sistema"
+        acao: "exibir_mensagem_sucesso"
+      - passo: 10
+        ator: "sistema"
+        acao: "redirecionar_listagem"
+
+    fluxos_alternativos:
+      - id: "FA-UC01-01"
+        condicao: "usuario_escolhe_salvar_e_criar_outro"
+        resultado: "registro_criado_formulario_limpo"
+      - id: "FA-UC01-02"
+        condicao: "usuario_cancela_criacao"
+        resultado: "dados_descartados_redireciona_listagem"
+
+    fluxos_excecao:
+      - id: "FE-UC01-01"
+        condicao: "validacao_nome_minimo_falhou"
+        resultado: "exibir_erro_nome_minimo_3_chars"
+      - id: "FE-UC01-02"
+        condicao: "validacao_nome_maximo_falhou"
+        resultado: "exibir_erro_nome_maximo_100_chars"
+      - id: "FE-UC01-03"
+        condicao: "validacao_formato_nome_falhou"
+        resultado: "exibir_erro_formato_nome"
+      - id: "FE-UC01-04"
+        condicao: "validacao_nome_duplicado_falhou"
+        resultado: "exibir_erro_nome_ja_existe"
+      - id: "FE-UC01-05"
+        condicao: "validacao_descricao_minimo_falhou"
+        resultado: "exibir_erro_descricao_minimo_10_chars"
+      - id: "FE-UC01-06"
+        condicao: "validacao_descricao_maximo_falhou"
+        resultado: "exibir_erro_descricao_maximo_500_chars"
+      - id: "FE-UC01-07"
+        condicao: "erro_inesperado_persistencia"
+        resultado: "exibir_erro_generico_http_500"
+
+    regras_aplicadas:
+      - "RN-RF058-001"  # Nome Único
+      - "RN-RF058-002"  # Min 3 chars
+      - "RN-RF058-003"  # Max 100 chars
+      - "RN-RF058-004"  # Formato regex
+      - "RN-RF058-005"  # Desc obrigatória
+      - "RN-RF058-006"  # Desc max 500
+      - "RN-RF058-007"  # Multi-tenancy
+      - "RN-RF058-009"  # Auditoria
+      - "RN-RF058-010"  # Status Ativo
+      - "RN-RF058-011"  # Permissões
+
+    resultado_final:
+      estado: "tipo_bilhete_criado"
+
+  - id: "UC02"
+    nome: "Visualizar Tipo de Bilhete"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      rf_items:
+        - "RN-RF058-007"  # Multi-tenancy
+        - "RN-RF058-009"  # Auditoria ACCESS
+        - "RN-RF058-011"  # Permissões
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Usuário seleciona tipo de bilhete (clica em 'Visualizar' ou nome)"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema valida permissão CAD.TIPOS_BILHETES.VIEW"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema valida tipo pertence ao tenant (WHERE Id={id} AND EmpresaId={usuário.EmpresaId})"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Sistema carrega dados do tipo de bilhete"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Sistema exibe tela de visualização (somente leitura)"
+          required: true
+        - id: "FP-UC02-006"
+          title: "Sistema registra auditoria (ACCESS: TIPO_BILHETE_ACCESSED)"
+          required: true
+        - id: "FP-UC02-007"
+          title: "Sistema exibe botões 'Editar' (se permissão) e 'Voltar'"
+          required: true
+        - id: "FE-UC02-001"
+          title: "Tipo não existe → HTTP 404"
+          required: true
+        - id: "FE-UC02-002"
+          title: "Tipo pertence a outro tenant → HTTP 404 (não vaza informação)"
+          required: true
+        - id: "FE-UC02-003"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.TIPOS_BILHETES.VIEW"
+
+    gatilho: "Usuário seleciona tipo de bilhete na listagem"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "selecionar_tipo_bilhete"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "validar_tipo_pertence_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "carregar_dados_tipo"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_tela_visualizacao"
+      - passo: 6
+        ator: "sistema"
+        acao: "registrar_auditoria_access"
+
+    fluxos_excecao:
+      - id: "FE-UC02-01"
+        condicao: "tipo_nao_existe"
+        resultado: "http_404_not_found"
+      - id: "FE-UC02-02"
+        condicao: "tipo_outro_tenant"
+        resultado: "http_404_not_found"
+      - id: "FE-UC02-03"
+        condicao: "sem_permissao"
+        resultado: "http_403_forbidden"
+
+    regras_aplicadas:
+      - "RN-RF058-007"  # Multi-tenancy
+      - "RN-RF058-009"  # Auditoria ACCESS
+      - "RN-RF058-011"  # Permissões
+
+    resultado_final:
+      estado: "dados_exibidos"
+
+  - id: "UC03"
+    nome: "Editar Tipo de Bilhete"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RN-RF058-001"  # Nome Único
+        - "RN-RF058-002"  # Tamanho Mínimo Nome
+        - "RN-RF058-003"  # Tamanho Máximo Nome
+        - "RN-RF058-004"  # Formato de Nome
+        - "RN-RF058-005"  # Descrição Obrigatória
+        - "RN-RF058-006"  # Tamanho Máximo Descrição
+        - "RN-RF058-007"  # Multi-tenancy
+        - "RN-RF058-009"  # Auditoria UPDATE
+        - "RN-RF058-011"  # Permissões
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Usuário seleciona tipo e clica em 'Editar'"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema valida permissão CAD.TIPOS_BILHETES.EDIT"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Sistema valida tipo pertence ao tenant"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Sistema carrega dados atuais"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Sistema exibe formulário preenchido"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Usuário altera campos (Nome, Descrição, Status)"
+          required: true
+        - id: "FP-UC03-007"
+          title: "Usuário clica em 'Salvar'"
+          required: true
+        - id: "FP-UC03-008"
+          title: "Sistema valida alterações (RN-RF058-001 a RN-RF058-006)"
+          required: true
+        - id: "FP-UC03-009"
+          title: "Sistema valida Nome único no tenant (excluindo próprio registro)"
+          required: true
+        - id: "FP-UC03-010"
+          title: "Sistema atualiza: Nome, Descrição, Ativo, DataAlteracao, UsuarioAlteracaoId"
+          required: true
+        - id: "FP-UC03-011"
+          title: "Sistema persiste alterações"
+          required: true
+        - id: "FP-UC03-012"
+          title: "Sistema registra auditoria (UPDATE: TIPO_BILHETE_UPDATED) com antes/depois"
+          required: true
+        - id: "FP-UC03-013"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FP-UC03-014"
+          title: "Sistema redireciona para visualização ou listagem"
+          required: true
+        - id: "FA-UC03-001"
+          title: "Cancelar edição"
+          required: false
+        - id: "FE-UC03-001"
+          title: "Nome vazio ou < 3 caracteres → erro"
+          required: true
+        - id: "FE-UC03-002"
+          title: "Nome > 100 caracteres → erro"
+          required: true
+        - id: "FE-UC03-003"
+          title: "Nome com caracteres especiais inválidos → erro"
+          required: true
+        - id: "FE-UC03-004"
+          title: "Nome duplicado com outro tipo → erro"
+          required: true
+        - id: "FE-UC03-005"
+          title: "Descrição vazia ou < 10 caracteres → erro"
+          required: true
+        - id: "FE-UC03-006"
+          title: "Descrição > 500 caracteres → erro"
+          required: true
+        - id: "FE-UC03-007"
+          title: "Conflito de edição concorrente → erro"
+          required: true
+        - id: "FE-UC03-008"
+          title: "Tipo pertence a outro tenant → HTTP 404"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.TIPOS_BILHETES.EDIT"
+
+    gatilho: "Usuário clica em 'Editar' em tipo de bilhete"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "selecionar_editar"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "validar_tipo_pertence_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "carregar_dados_atuais"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_formulario_preenchido"
+      - passo: 6
+        ator: "usuario"
+        acao: "alterar_campos"
+      - passo: 7
+        ator: "usuario"
+        acao: "clicar_salvar"
+      - passo: 8
+        ator: "sistema"
+        acao: "validar_alteracoes"
+      - passo: 9
+        ator: "sistema"
+        acao: "validar_nome_unico_excluindo_proprio"
+      - passo: 10
+        ator: "sistema"
+        acao: "atualizar_campos_data_usuario"
+      - passo: 11
+        ator: "sistema"
+        acao: "persistir_alteracoes"
+      - passo: 12
+        ator: "sistema"
+        acao: "registrar_auditoria_update_antes_depois"
+      - passo: 13
+        ator: "sistema"
+        acao: "exibir_mensagem_sucesso"
+      - passo: 14
+        ator: "sistema"
+        acao: "redirecionar"
+
+    fluxos_alternativos:
+      - id: "FA-UC03-01"
+        condicao: "usuario_cancela_edicao"
+        resultado: "alteracoes_descartadas_redireciona"
+
+    fluxos_excecao:
+      - id: "FE-UC03-01"
+        condicao: "validacao_nome_minimo_falhou"
+        resultado: "exibir_erro_nome_minimo_3_chars"
+      - id: "FE-UC03-02"
+        condicao: "validacao_nome_maximo_falhou"
+        resultado: "exibir_erro_nome_maximo_100_chars"
+      - id: "FE-UC03-03"
+        condicao: "validacao_formato_nome_falhou"
+        resultado: "exibir_erro_formato_nome"
+      - id: "FE-UC03-04"
+        condicao: "validacao_nome_duplicado_outro_tipo"
+        resultado: "exibir_erro_outro_tipo_com_este_nome"
+      - id: "FE-UC03-05"
+        condicao: "validacao_descricao_minimo_falhou"
+        resultado: "exibir_erro_descricao_minimo_10_chars"
+      - id: "FE-UC03-06"
+        condicao: "validacao_descricao_maximo_falhou"
+        resultado: "exibir_erro_descricao_maximo_500_chars"
+      - id: "FE-UC03-07"
+        condicao: "conflito_edicao_concorrente"
+        resultado: "exibir_erro_recarregue_pagina"
+      - id: "FE-UC03-08"
+        condicao: "tipo_outro_tenant"
+        resultado: "http_404_not_found"
+
+    regras_aplicadas:
+      - "RN-RF058-001"  # Nome Único
+      - "RN-RF058-002"  # Min 3 chars
+      - "RN-RF058-003"  # Max 100 chars
+      - "RN-RF058-004"  # Formato regex
+      - "RN-RF058-005"  # Desc obrigatória
+      - "RN-RF058-006"  # Desc max 500
+      - "RN-RF058-007"  # Multi-tenancy
+      - "RN-RF058-009"  # Auditoria UPDATE
+      - "RN-RF058-011"  # Permissões
+
+    resultado_final:
+      estado: "tipo_bilhete_atualizado"
+
+  - id: "UC04"
+    nome: "Inativar Tipo de Bilhete"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RN-RF058-007"  # Multi-tenancy
+        - "RN-RF058-008"  # Soft Delete
+        - "RN-RF058-009"  # Auditoria DELETE
+        - "RN-RF058-011"  # Permissões
+      uc_items:
+        - id: "FP-UC04-001"
+          title: "Usuário seleciona tipo e clica em 'Inativar'"
+          required: true
+        - id: "FP-UC04-002"
+          title: "Sistema exibe confirmação: 'Deseja realmente inativar?'"
+          required: true
+        - id: "FP-UC04-003"
+          title: "Usuário confirma ação"
+          required: true
+        - id: "FP-UC04-004"
+          title: "Sistema valida permissão CAD.TIPOS_BILHETES.DELETE"
+          required: true
+        - id: "FP-UC04-005"
+          title: "Sistema valida tipo pertence ao tenant"
+          required: true
+        - id: "FP-UC04-006"
+          title: "Sistema verifica bilhetes associados (apenas alerta, NÃO bloqueia)"
+          required: true
+        - id: "FP-UC04-007"
+          title: "Se tipo em uso, sistema exibe alerta: 'Tipo possui bilhetes. Tem certeza?'"
+          required: false
+        - id: "FP-UC04-008"
+          title: "Usuário confirma novamente (se alerta exibido)"
+          required: false
+        - id: "FP-UC04-009"
+          title: "Sistema atualiza: Excluido=true, DataAlteracao, UsuarioAlteracaoId"
+          required: true
+        - id: "FP-UC04-010"
+          title: "Sistema persiste alteração (UPDATE)"
+          required: true
+        - id: "FP-UC04-011"
+          title: "Sistema registra auditoria (DELETE: TIPO_BILHETE_DELETED)"
+          required: true
+        - id: "FP-UC04-012"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FP-UC04-013"
+          title: "Sistema remove tipo da listagem (refresh)"
+          required: true
+        - id: "FA-UC04-001"
+          title: "Cancelar exclusão"
+          required: false
+        - id: "FA-UC04-002"
+          title: "Exclusão em lote (futuro)"
+          required: false
+        - id: "FE-UC04-001"
+          title: "Tipo já inativado → HTTP 404 ou mensagem"
+          required: true
+        - id: "FE-UC04-002"
+          title: "Tipo pertence a outro tenant → HTTP 404"
+          required: true
+        - id: "FE-UC04-003"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+
+    precondicoes:
+      - permissao: "CAD.TIPOS_BILHETES.DELETE"
+
+    gatilho: "Usuário clica em 'Inativar' em tipo de bilhete"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "selecionar_inativar"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_confirmacao"
+      - passo: 3
+        ator: "usuario"
+        acao: "confirmar_acao"
+      - passo: 4
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_tipo_pertence_tenant"
+      - passo: 6
+        ator: "sistema"
+        acao: "verificar_bilhetes_associados_alerta"
+      - passo: 7
+        ator: "sistema"
+        acao: "atualizar_excluido_true_data_usuario"
+      - passo: 8
+        ator: "sistema"
+        acao: "persistir_soft_delete"
+      - passo: 9
+        ator: "sistema"
+        acao: "registrar_auditoria_delete"
+      - passo: 10
+        ator: "sistema"
+        acao: "exibir_mensagem_sucesso"
+      - passo: 11
+        ator: "sistema"
+        acao: "remover_da_listagem"
+
+    fluxos_alternativos:
+      - id: "FA-UC04-01"
+        condicao: "usuario_cancela_confirmacao"
+        resultado: "acao_descartada_retorna_listagem"
+      - id: "FA-UC04-02"
+        condicao: "usuario_seleciona_multiplos_tipos"
+        resultado: "exclusao_em_lote_futuro"
+
+    fluxos_excecao:
+      - id: "FE-UC04-01"
+        condicao: "tipo_ja_inativado"
+        resultado: "http_404_ou_mensagem_ja_inativado"
+      - id: "FE-UC04-02"
+        condicao: "tipo_outro_tenant"
+        resultado: "http_404_not_found"
+      - id: "FE-UC04-03"
+        condicao: "sem_permissao"
+        resultado: "http_403_forbidden"
+
+    regras_aplicadas:
+      - "RN-RF058-007"  # Multi-tenancy
+      - "RN-RF058-008"  # Soft Delete
+      - "RN-RF058-009"  # Auditoria DELETE
+      - "RN-RF058-011"  # Permissões
+
+    resultado_final:
+      estado: "tipo_bilhete_inativado"
+
+exclusions:
+  uc_items:
+    - "Gestão de bilhetes propriamente dita (RF separado)"
+    - "Workflow de atendimento de bilhetes"
+    - "Tarifação de bilhetes (mencionado incorretamente em v1.0 - NÃO faz parte deste RF)"
+    - "Sistema de tarifas por horário/destino/volume"
+    - "SLA e métricas de tempo"
+    - "Integração com sistemas externos de ticketing"
+    - "Dashboard e relatórios analíticos"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Recriação completa conforme template v2.0 - Separação RF/RL, cobertura 100% de 12 RNs (RN-RF058-001 a RN-RF058-012), rastreabilidade UC→RN completa"
+  - versao: "1.0"
+    data: "2025-12-18"
+    autor: "-"
+    descricao: "Versão inicial (continha escopo incorreto sobre tarifação)"

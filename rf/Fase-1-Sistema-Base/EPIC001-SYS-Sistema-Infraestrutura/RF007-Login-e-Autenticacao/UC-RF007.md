@@ -1280,6 +1280,7 @@ Se nao foi voce, recomendamos alterar sua senha.
 
 ---
 
+<<<<<<< HEAD
 ## UC09: Realizar Login com Logo Personalizada do Cliente (Tenant)
 
 **Ator Principal:** Usuário não autenticado
@@ -1460,6 +1461,8 @@ Se nao foi voce, recomendamos alterar sua senha.
 
 ---
 
+=======
+>>>>>>> 37fc47bf129ef75d7ae0f4578eaa753091016909
 ## Jobs Background
 
 Este RF utiliza **2 jobs background** para operações assíncronas:

@@ -1,0 +1,852 @@
+uc:
+  rf: "RF057"
+  titulo: "Gestão de Itens de Rateio"
+  versao: "2.0"
+  data: "2025-12-31"
+  autor: "Agência ALC - alc.dev.br"
+  epic: "EPIC007-FIN - Financeiro Processos"
+  fase: "Fase 4 - Financeiro II - Processos"
+
+casos_de_uso:
+  - id: "UC00"
+    nome: "Listar Itens de Rateio"
+    ator_principal: "gestor_financeiro"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      rf_items:
+        - "RN-RF057-001"  # Categorias de itens (LinhaMobile, LicencaSoftware, LinkDados, Equipamento)
+        - "RN-RF057-002"  # Rateio dedicado vs compartilhado
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa menu 'Financeiro' → 'Gestão de Itens de Rateio'"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema carrega grid com itens da empresa (multi-tenancy)"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Grid exibe: Número/ID, Categoria, Tipo Rateio, Custo Mensal, Status, Ações"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Usuário filtra por Categoria, Tipo Rateio, Status"
+          required: false
+        - id: "FP-UC00-005"
+          title: "Sistema atualiza grid conforme filtros"
+          required: false
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.VIEW_ANY"
+      - estado: "usuario_autenticado"
+    gatilho: "Usuario acessa menu Gestao de Itens de Rateio"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_itens_rateio"
+        descricao: "Gestor financeiro navega para Financeiro → Gestão de Itens de Rateio"
+      - passo: 2
+        ator: "sistema"
+        acao: "carrega_itens"
+        descricao: "Sistema carrega itens da empresa (multi-tenancy por EmpresaId)"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibe_grid"
+        descricao: "Grid exibe: Número/ID, Categoria (enum), Tipo Rateio (DEDICADO/COMPARTILHADO), Custo Mensal, Status"
+      - passo: 4
+        ator: "usuario"
+        acao: "aplica_filtros"
+        descricao: "Usuário filtra por Categoria, Tipo Rateio, Status (opcional)"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC00-001"
+        descricao: "Nenhum item encontrado"
+        passos:
+          - "Sistema exibe mensagem: 'Nenhum item de rateio encontrado'"
+    regras_aplicadas:
+      - "RN-RF057-001"
+      - "RN-RF057-002"
+    resultado_final:
+      estado: "grid_exibido"
+      mensagem: "Grid de itens de rateio exibido com filtros aplicáveis"
+
+  - id: "UC01"
+    nome: "Criar Item de Rateio"
+    ator_principal: "gestor_financeiro"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "RN-RF057-001"  # Categorias de itens
+        - "RN-RF057-002"  # Rateio dedicado vs compartilhado
+        - "RN-RF057-011"  # Validação soma percentuais = 100%
+      uc_items:
+        - id: "FP-UC01-001"
+          title: "Usuário clica em 'Novo Item de Rateio'"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema exibe formulário: Número*, Categoria* (enum), Tipo Rateio* (DEDICADO/COMPARTILHADO), Custo Mensal, Status"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Se DEDICADO: usuário seleciona 1 centro de custo (100%)"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Se COMPARTILHADO: usuário adiciona múltiplos CCs com percentuais"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Sistema valida soma percentuais = 100% (tolerância 0.01%)"
+          required: true
+        - id: "FP-UC01-006"
+          title: "Sistema salva item com EmpresaId (multi-tenancy) e auditoria"
+          required: true
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.CREATE"
+      - estado: "centros_custo_cadastrados"
+    gatilho: "Usuario clica em 'Novo Item de Rateio'"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_novo_item"
+        descricao: "Gestor financeiro clica em botão 'Novo Item de Rateio'"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibe_formulario"
+        descricao: "Sistema exibe formulário com campos obrigatórios"
+      - passo: 3
+        ator: "usuario"
+        acao: "preenche_dados_basicos"
+        descricao: "Usuário preenche Número, Categoria (enum), Tipo Rateio, Custo Mensal"
+      - passo: 4
+        ator: "usuario"
+        acao: "configura_alocacoes"
+        descricao: "Se DEDICADO: seleciona 1 CC (100%). Se COMPARTILHADO: adiciona múltiplos CCs com %"
+      - passo: 5
+        ator: "sistema"
+        acao: "valida_percentuais"
+        descricao: "Sistema valida soma percentuais = 100% (RN-RF057-011)"
+      - passo: 6
+        ator: "sistema"
+        acao: "salva_item"
+        descricao: "Sistema salva item com EmpresaId, auditoria completa, e registra DataInicio nas alocações"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC01-001"
+        descricao: "Soma percentuais ≠ 100%"
+        passos:
+          - "Sistema exibe erro: 'Soma dos percentuais deve ser exatamente 100%' (RN-RF057-011)"
+          - "Usuário ajusta percentuais e resubmete"
+      - id: "FE-UC01-002"
+        descricao: "Centro de custo não existe"
+        passos:
+          - "Sistema exibe erro: 'Centro de custo XYZ não encontrado'"
+          - "Usuário corrige e resubmete"
+      - id: "FE-UC01-003"
+        descricao: "Número já existe (multi-tenancy)"
+        passos:
+          - "Sistema exibe erro: 'Número já cadastrado para esta empresa'"
+          - "Usuário altera número e resubmete"
+    regras_aplicadas:
+      - "RN-RF057-001"
+      - "RN-RF057-002"
+      - "RN-RF057-011"
+    resultado_final:
+      estado: "item_criado"
+      mensagem: "Item de rateio criado com alocações configuradas"
+
+  - id: "UC02"
+    nome: "Visualizar Item de Rateio"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      rf_items:
+        - "RN-RF057-002"  # Rateio dedicado vs compartilhado
+        - "RN-RF057-003"  # Separação custos fixos e variáveis
+        - "RN-RF057-005"  # Histórico versionado de alocações
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Usuário clica em item no grid (UC00)"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema exibe detalhes: Número, Categoria, Tipo Rateio, Custo Mensal, Status"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema exibe alocações atuais com breakdown: CC + Percentual + Valor alocado"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Sistema exibe histórico de custos (últimos 12 meses): Custo Fixo + Variável + Total"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Sistema exibe histórico de mudanças de alocação (versionado)"
+          required: true
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.VIEW"
+      - estado: "item_existe"
+    gatilho: "Usuario clica em item no grid"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_item"
+        descricao: "Usuário seleciona item no grid"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibe_detalhes_basicos"
+        descricao: "Sistema exibe dados básicos do item"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibe_alocacoes_vigentes"
+        descricao: "Sistema exibe alocações vigentes (DataFim = null) com breakdown: CC A (40% = R$ 400)"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibe_historico_custos"
+        descricao: "Sistema exibe histórico de custos (12 meses) separando Fixo, Variável, Total (RN-RF057-003)"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibe_historico_alocacoes"
+        descricao: "Sistema exibe histórico versionado de mudanças de alocação (RN-RF057-005)"
+    fluxos_alternativos: []
+    fluxos_excecao: []
+    regras_aplicadas:
+      - "RN-RF057-002"
+      - "RN-RF057-003"
+      - "RN-RF057-005"
+    resultado_final:
+      estado: "detalhes_exibidos"
+      mensagem: "Detalhes completos do item exibidos com histórico"
+
+  - id: "UC03"
+    nome: "Editar Item de Rateio"
+    ator_principal: "gestor_financeiro"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "RN-RF057-002"  # Rateio dedicado vs compartilhado
+        - "RN-RF057-005"  # Histórico versionado de alocações
+        - "RN-RF057-011"  # Validação soma percentuais = 100%
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Usuário clica em 'Editar' na visualização do item (UC02)"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema exibe formulário editável (Custo Mensal, Alocações permitidos)"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Usuário altera percentuais de alocação"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Sistema valida soma percentuais = 100%"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Sistema arquiva versão anterior em HistoricoAlocacao (DataFim = hoje)"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Sistema cria nova versão vigente (DataInicio = hoje, DataFim = null)"
+          required: true
+        - id: "FP-UC03-007"
+          title: "Sistema registra UsuarioAlteracaoId para rastreabilidade"
+          required: true
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.EDIT"
+      - estado: "item_ativo"
+    gatilho: "Usuario clica em 'Editar' item"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_editar"
+        descricao: "Gestor financeiro clica em botão 'Editar' na visualização do item"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibe_formulario_editavel"
+        descricao: "Sistema exibe formulário com dados atuais (Custo Mensal e Alocações editáveis)"
+      - passo: 3
+        ator: "usuario"
+        acao: "altera_alocacoes"
+        descricao: "Usuário modifica percentuais de alocação entre CCs"
+      - passo: 4
+        ator: "sistema"
+        acao: "valida_percentuais"
+        descricao: "Sistema valida soma = 100% (RN-RF057-011)"
+      - passo: 5
+        ator: "sistema"
+        acao: "arquiva_versao_anterior"
+        descricao: "Sistema arquiva alocações anteriores em HistoricoAlocacao (DataFim = hoje) (RN-RF057-005)"
+      - passo: 6
+        ator: "sistema"
+        acao: "cria_nova_versao"
+        descricao: "Sistema cria nova versão vigente (DataInicio = hoje, DataFim = null)"
+      - passo: 7
+        ator: "sistema"
+        acao: "registra_usuario"
+        descricao: "Sistema registra UsuarioAlteracaoId para rastreabilidade (RN-RF057-005)"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC03-001"
+        descricao: "Soma percentuais ≠ 100%"
+        passos:
+          - "Sistema exibe erro: 'Soma dos percentuais deve ser exatamente 100%'"
+          - "Usuário ajusta e resubmete"
+      - id: "FE-UC03-002"
+        descricao: "Item cancelado"
+        passos:
+          - "Sistema exibe erro: 'Itens cancelados não podem ser editados'"
+          - "Sistema bloqueia edição"
+    regras_aplicadas:
+      - "RN-RF057-002"
+      - "RN-RF057-005"
+      - "RN-RF057-011"
+    resultado_final:
+      estado: "item_editado_versionado"
+      mensagem: "Item editado com histórico versionado registrado"
+
+  - id: "UC04"
+    nome: "Inativar/Cancelar Item de Rateio"
+    ator_principal: "gestor_financeiro"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "RN-RF057-001"  # Categorias de itens
+      uc_items:
+        - id: "FP-UC04-001"
+          title: "Usuário clica em 'Inativar' ou 'Cancelar' na visualização do item (UC02)"
+          required: true
+        - id: "FP-UC04-002"
+          title: "Sistema solicita confirmação (Inativar = temporário, Cancelar = permanente)"
+          required: true
+        - id: "FP-UC04-003"
+          title: "Usuário confirma ação"
+          required: true
+        - id: "FP-UC04-004"
+          title: "Sistema atualiza Status (INATIVO ou CANCELADO)"
+          required: true
+        - id: "FP-UC04-005"
+          title: "Sistema registra auditoria (DataAlteracao, UsuarioAlteracao)"
+          required: true
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.DELETE"
+      - estado: "item_ativo_ou_inativo"
+    gatilho: "Usuario clica em 'Inativar' ou 'Cancelar'"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_inativar_ou_cancelar"
+        descricao: "Gestor financeiro clica em botão 'Inativar' ou 'Cancelar'"
+      - passo: 2
+        ator: "sistema"
+        acao: "solicita_confirmacao"
+        descricao: "Sistema exibe modal: 'Tem certeza? (Inativar = temporário, Cancelar = permanente)'"
+      - passo: 3
+        ator: "usuario"
+        acao: "confirma"
+        descricao: "Usuário confirma ação"
+      - passo: 4
+        ator: "sistema"
+        acao: "atualiza_status"
+        descricao: "Sistema atualiza Status (INATIVO ou CANCELADO)"
+      - passo: 5
+        ator: "sistema"
+        acao: "registra_auditoria"
+        descricao: "Sistema registra auditoria (DataAlteracao, UsuarioAlteracao)"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC04-001"
+        descricao: "Tentar reativar item cancelado"
+        passos:
+          - "Sistema exibe erro: 'Itens cancelados não podem ser reativados' (transição proibida)"
+          - "Sistema bloqueia ação"
+    regras_aplicadas:
+      - "RN-RF057-001"
+    resultado_final:
+      estado: "item_inativado_ou_cancelado"
+      mensagem: "Item inativado/cancelado com auditoria registrada"
+
+  - id: "UC05"
+    nome: "Transferir Item entre CCs"
+    ator_principal: "gestor_financeiro"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "RN-RF057-012"  # Transferência de item dedicado entre CCs
+      uc_items:
+        - id: "FP-UC05-001"
+          title: "Usuário clica em 'Transferir' na visualização do item (UC02)"
+          required: true
+        - id: "FP-UC05-002"
+          title: "Sistema valida se item é DEDICADO (RN-RF057-012)"
+          required: true
+        - id: "FP-UC05-003"
+          title: "Sistema exibe formulário: CC Destino*, Motivo*, Data Transferência"
+          required: true
+        - id: "FP-UC05-004"
+          title: "Usuário preenche CC Destino e Motivo"
+          required: true
+        - id: "FP-UC05-005"
+          title: "Sistema cria registro em TransferenciaItem (CC Origem, CC Destino, Motivo, Data, UsuarioId)"
+          required: true
+        - id: "FP-UC05-006"
+          title: "Sistema atualiza AlocacaoItem.CentroCusto e DataInicio"
+          required: true
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.TRANSFER"
+      - estado: "item_dedicado_ativo"
+    gatilho: "Usuario clica em 'Transferir' item"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_transferir"
+        descricao: "Gestor financeiro clica em botão 'Transferir' na visualização do item"
+      - passo: 2
+        ator: "sistema"
+        acao: "valida_tipo_dedicado"
+        descricao: "Sistema valida se item.Tipo == DEDICADO (RN-RF057-012)"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibe_formulario_transferencia"
+        descricao: "Sistema exibe formulário: CC Destino*, Motivo*, Data Transferência"
+      - passo: 4
+        ator: "usuario"
+        acao: "preenche_dados_transferencia"
+        descricao: "Usuário seleciona CC Destino e informa Motivo"
+      - passo: 5
+        ator: "sistema"
+        acao: "registra_transferencia"
+        descricao: "Sistema cria registro em TransferenciaItem (CC Origem/Destino, Motivo, Data, UsuarioId)"
+      - passo: 6
+        ator: "sistema"
+        acao: "atualiza_alocacao"
+        descricao: "Sistema atualiza AlocacaoItem.CentroCusto = CC Destino e DataInicio = hoje"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC05-001"
+        descricao: "Item não é dedicado (é COMPARTILHADO)"
+        passos:
+          - "Sistema exibe erro: 'Apenas itens dedicados podem ser transferidos' (RN-RF057-012)"
+          - "Sistema bloqueia transferência"
+      - id: "FE-UC05-002"
+        descricao: "CC Destino não existe"
+        passos:
+          - "Sistema exibe erro: 'Centro de custo destino não encontrado'"
+          - "Usuário corrige e resubmete"
+    regras_aplicadas:
+      - "RN-RF057-012"
+    resultado_final:
+      estado: "item_transferido"
+      mensagem: "Item transferido com histórico registrado"
+
+  - id: "UC06"
+    nome: "Gerenciar Grupos de Itens"
+    ator_principal: "gestor_financeiro"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "RN-RF057-008"  # Grupos de itens para rateio em lote
+      uc_items:
+        - id: "FP-UC06-001"
+          title: "Usuário acessa menu 'Grupos de Itens'"
+          required: true
+        - id: "FP-UC06-002"
+          title: "Sistema exibe grid de grupos existentes"
+          required: true
+        - id: "FP-UC06-003"
+          title: "Usuário cria novo grupo: Nome*, seleciona múltiplos itens"
+          required: true
+        - id: "FP-UC06-004"
+          title: "Usuário aplica regra de rateio em lote: define alocações, sistema aplica a todos itens do grupo"
+          required: true
+        - id: "FP-UC06-005"
+          title: "Sistema valida percentuais de cada item (RN-RF057-011)"
+          required: true
+        - id: "FP-UC06-006"
+          title: "Sistema atualiza alocações de todos itens do grupo"
+          required: true
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.MANAGE_GROUPS"
+      - estado: "itens_cadastrados"
+    gatilho: "Usuario acessa menu 'Grupos de Itens'"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_grupos"
+        descricao: "Gestor financeiro navega para menu 'Grupos de Itens'"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibe_grid_grupos"
+        descricao: "Sistema exibe grid de grupos existentes (Nome, Qtd Itens)"
+      - passo: 3
+        ator: "usuario"
+        acao: "cria_grupo"
+        descricao: "Usuário clica 'Novo Grupo', define Nome e seleciona múltiplos itens"
+      - passo: 4
+        ator: "usuario"
+        acao: "aplica_regra_lote"
+        descricao: "Usuário define alocações (CCs + percentuais) e clica 'Aplicar em Lote' (RN-RF057-008)"
+      - passo: 5
+        ator: "sistema"
+        acao: "valida_percentuais_todos_itens"
+        descricao: "Sistema valida soma percentuais = 100% para cada item (RN-RF057-011)"
+      - passo: 6
+        ator: "sistema"
+        acao: "atualiza_alocacoes_grupo"
+        descricao: "Sistema atualiza alocações de todos itens do grupo, criando histórico versionado (RN-RF057-005)"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC06-001"
+        descricao: "Soma percentuais ≠ 100% para algum item"
+        passos:
+          - "Sistema exibe erro: 'Soma dos percentuais deve ser 100% para todos os itens'"
+          - "Usuário ajusta e resubmete"
+    regras_aplicadas:
+      - "RN-RF057-008"
+      - "RN-RF057-011"
+    resultado_final:
+      estado: "grupo_criado_regra_aplicada"
+      mensagem: "Grupo criado e regra aplicada em lote"
+
+  - id: "UC07"
+    nome: "Criar Exceção de Rateio"
+    ator_principal: "super_admin"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "RN-RF057-004"  # Exceções temporárias ou permanentes
+      uc_items:
+        - id: "FP-UC07-001"
+          title: "Usuário acessa visualização do item (UC02) e clica 'Criar Exceção'"
+          required: true
+        - id: "FP-UC07-002"
+          title: "Sistema exibe formulário: Motivo*, ExcluirTotalmente (checkbox), DataInicio*, DataFim"
+          required: true
+        - id: "FP-UC07-003"
+          title: "Usuário preenche Motivo e define se é temporária (com DataFim) ou permanente (DataFim = null)"
+          required: true
+        - id: "FP-UC07-004"
+          title: "Sistema cria registro em ExcecaoRateio"
+          required: true
+        - id: "FP-UC07-005"
+          title: "Se ExcluirTotalmente = true, item não participa de rateio no período da exceção"
+          required: true
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.MANAGE_EXCEPTIONS"
+      - estado: "item_ativo"
+    gatilho: "Usuario clica em 'Criar Excecao'"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_criar_excecao"
+        descricao: "Super admin clica em botão 'Criar Exceção' na visualização do item"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibe_formulario_excecao"
+        descricao: "Sistema exibe formulário: Motivo*, ExcluirTotalmente (checkbox), DataInicio*, DataFim"
+      - passo: 3
+        ator: "usuario"
+        acao: "preenche_dados_excecao"
+        descricao: "Usuário informa Motivo, marca/desmarca ExcluirTotalmente, define período (RN-RF057-004)"
+      - passo: 4
+        ator: "sistema"
+        acao: "cria_excecao"
+        descricao: "Sistema cria registro em ExcecaoRateio"
+      - passo: 5
+        ator: "sistema"
+        acao: "aplica_excecao"
+        descricao: "Se ExcluirTotalmente = true, item não participa de rateio no período da exceção (RN-RF057-004)"
+    fluxos_alternativos:
+      - id: "FA-UC07-001"
+        descricao: "Exceção permanente (DataFim = null)"
+        passos:
+          - "Usuário deixa DataFim vazio"
+          - "Sistema marca exceção como permanente"
+          - "Sistema exige confirmação adicional para exceções permanentes"
+    fluxos_excecao:
+      - id: "FE-UC07-001"
+        descricao: "DataInicio > DataFim"
+        passos:
+          - "Sistema exibe erro: 'Data início deve ser anterior à data fim'"
+          - "Usuário corrige e resubmete"
+    regras_aplicadas:
+      - "RN-RF057-004"
+    resultado_final:
+      estado: "excecao_criada"
+      mensagem: "Exceção de rateio criada e aplicada"
+
+  - id: "UC08"
+    nome: "Importar Itens via CSV"
+    ator_principal: "gestor_financeiro"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "RN-RF057-013"  # Import CSV em massa
+      uc_items:
+        - id: "FP-UC08-001"
+          title: "Usuário clica em 'Importar CSV' no grid de itens (UC00)"
+          required: true
+        - id: "FP-UC08-002"
+          title: "Sistema exibe modal com instruções de formato: Numero,Categoria,TipoRateio,CustoMensal,Alocacoes (CC1:40;CC2:30;CC3:30)"
+          required: true
+        - id: "FP-UC08-003"
+          title: "Usuário faz upload do arquivo CSV"
+          required: true
+        - id: "FP-UC08-004"
+          title: "Sistema processa arquivo linha por linha, validando cada item (formato, percentuais, CCs existentes)"
+          required: true
+        - id: "FP-UC08-005"
+          title: "Sistema exibe resultado: X itens importados com sucesso, Y erros (lista de erros por linha)"
+          required: true
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.IMPORT"
+      - estado: "arquivo_csv_valido"
+    gatilho: "Usuario clica em 'Importar CSV'"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_importar_csv"
+        descricao: "Gestor financeiro clica em botão 'Importar CSV'"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibe_instrucoes"
+        descricao: "Sistema exibe modal com formato CSV esperado (RN-RF057-013)"
+      - passo: 3
+        ator: "usuario"
+        acao: "upload_csv"
+        descricao: "Usuário faz upload do arquivo CSV"
+      - passo: 4
+        ator: "sistema"
+        acao: "processa_csv"
+        descricao: "Sistema processa linha por linha, validando formato, percentuais (RN-RF057-011), CCs existentes"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibe_resultado"
+        descricao: "Sistema exibe resultado: X sucessos, Y erros (lista de erros detalhados por linha)"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC08-001"
+        descricao: "Erro de formatação em linha do CSV"
+        passos:
+          - "Sistema registra erro: 'Linha X: Formato inválido (esperado: Numero,Categoria,TipoRateio,CustoMensal,Alocacoes)'"
+          - "Sistema continua processando próximas linhas"
+          - "Sistema exibe lista completa de erros ao final"
+      - id: "FE-UC08-002"
+        descricao: "Soma percentuais ≠ 100% em linha"
+        passos:
+          - "Sistema registra erro: 'Linha X: Soma percentuais ≠ 100%'"
+          - "Sistema continua processando próximas linhas"
+    regras_aplicadas:
+      - "RN-RF057-013"
+      - "RN-RF057-011"
+    resultado_final:
+      estado: "importacao_concluida"
+      mensagem: "Importação processada com relatório de sucessos e erros"
+
+  - id: "UC09"
+    nome: "Visualizar Dashboard de Itens"
+    ator_principal: "gestor_financeiro"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      rf_items:
+        - "RN-RF057-007"  # Detecção automática itens sem uso > 3 meses
+        - "RN-RF057-010"  # Dashboard com análises
+        - "RN-RF057-014"  # Comparativo custo mês atual vs anterior (alerta variação > 30%)
+      uc_items:
+        - id: "FP-UC09-001"
+          title: "Usuário acessa menu 'Dashboard de Itens de Rateio'"
+          required: true
+        - id: "FP-UC09-002"
+          title: "Sistema exibe KPIs: Total Itens Ativos, Custo Total do Mês"
+          required: true
+        - id: "FP-UC09-003"
+          title: "Sistema exibe Top 10 Itens Mais Caros (gráfico de barras)"
+          required: true
+        - id: "FP-UC09-004"
+          title: "Sistema exibe Itens Sem Uso (últimos 3 meses) com economia potencial (RN-RF057-007)"
+          required: true
+        - id: "FP-UC09-005"
+          title: "Sistema exibe Evolução de Custos (12 meses, gráfico de linha)"
+          required: true
+        - id: "FP-UC09-006"
+          title: "Sistema exibe Alertas de Variação Anormal (variação > 30%) (RN-RF057-014)"
+          required: true
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.VIEW_COSTS"
+      - estado: "dados_custos_existentes"
+    gatilho: "Usuario acessa Dashboard de Itens"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_dashboard"
+        descricao: "Gestor financeiro navega para Dashboard de Itens de Rateio"
+      - passo: 2
+        ator: "sistema"
+        acao: "calcula_kpis"
+        descricao: "Sistema calcula: Total Itens Ativos, Custo Total do Mês (RN-RF057-010)"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibe_top_caros"
+        descricao: "Sistema exibe Top 10 Itens Mais Caros (gráfico de barras)"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibe_itens_sem_uso"
+        descricao: "Sistema exibe itens sem uso (últimos 3 meses) com economia potencial (RN-RF057-007)"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibe_evolucao_custos"
+        descricao: "Sistema exibe gráfico de linha (12 meses) de evolução de custos (RN-RF057-010)"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibe_alertas_variacao"
+        descricao: "Sistema exibe alertas de itens com variação > 30% (RN-RF057-014)"
+    fluxos_alternativos: []
+    fluxos_excecao: []
+    regras_aplicadas:
+      - "RN-RF057-007"
+      - "RN-RF057-010"
+      - "RN-RF057-014"
+    resultado_final:
+      estado: "dashboard_exibido"
+      mensagem: "Dashboard de análises exibido com gráficos e alertas"
+
+  - id: "UC10"
+    nome: "Gerar Relatório Detalhado de Item"
+    ator_principal: "gestor_financeiro"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      rf_items:
+        - "RN-RF057-015"  # Relatório completo de item
+        - "RN-RF057-003"  # Separação custos fixos e variáveis
+        - "RN-RF057-005"  # Histórico versionado de alocações
+        - "RN-RF057-009"  # Ajustes e créditos por item
+      uc_items:
+        - id: "FP-UC10-001"
+          title: "Usuário clica em 'Gerar Relatório' na visualização do item (UC02)"
+          required: true
+        - id: "FP-UC10-002"
+          title: "Sistema solicita período (padrão: últimos 12 meses)"
+          required: true
+        - id: "FP-UC10-003"
+          title: "Sistema gera relatório completo: Dados básicos, Histórico custos (Fixo/Variável), Histórico alocações, Transferências, Ajustes, Custo total acumulado"
+          required: true
+        - id: "FP-UC10-004"
+          title: "Sistema disponibiliza relatório em PDF ou Excel"
+          required: true
+    precondicoes:
+      - permissao: "GES.ITENS_RATEIO.VIEW_COSTS"
+      - estado: "item_existe"
+    gatilho: "Usuario clica em 'Gerar Relatorio'"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_gerar_relatorio"
+        descricao: "Gestor financeiro clica em botão 'Gerar Relatório' na visualização do item"
+      - passo: 2
+        ator: "sistema"
+        acao: "solicita_periodo"
+        descricao: "Sistema exibe modal solicitando período (padrão: 12 meses, RN-RF057-015)"
+      - passo: 3
+        ator: "sistema"
+        acao: "gera_relatorio"
+        descricao: "Sistema compila dados: básicos, histórico custos (Fixo/Variável, RN-RF057-003), histórico alocações (RN-RF057-005), transferências (RN-RF057-012), ajustes (RN-RF057-009), custo total acumulado"
+      - passo: 4
+        ator: "sistema"
+        acao: "disponibiliza_arquivo"
+        descricao: "Sistema gera arquivo (PDF ou Excel) e disponibiliza para download"
+    fluxos_alternativos: []
+    fluxos_excecao: []
+    regras_aplicadas:
+      - "RN-RF057-003"
+      - "RN-RF057-005"
+      - "RN-RF057-009"
+      - "RN-RF057-015"
+    resultado_final:
+      estado: "relatorio_gerado"
+      mensagem: "Relatório detalhado gerado e disponível para download"
+
+rastreabilidade:
+  cobertura_total: "100%"
+  detalhamento:
+    - rf_item: "RN-RF057-001"
+      descricao: "Categorias de itens (LinhaMobile, LicencaSoftware, LinkDados, Equipamento)"
+      coberto_por:
+        - "UC00"
+        - "UC01"
+        - "UC04"
+    - rf_item: "RN-RF057-002"
+      descricao: "Rateio dedicado vs compartilhado (soma percentuais = 100%)"
+      coberto_por:
+        - "UC00"
+        - "UC01"
+        - "UC02"
+        - "UC03"
+    - rf_item: "RN-RF057-003"
+      descricao: "Separação custos fixos e variáveis"
+      coberto_por:
+        - "UC02"
+        - "UC10"
+    - rf_item: "RN-RF057-004"
+      descricao: "Exceções temporárias ou permanentes"
+      coberto_por:
+        - "UC07"
+    - rf_item: "RN-RF057-005"
+      descricao: "Histórico versionado de alocações"
+      coberto_por:
+        - "UC02"
+        - "UC03"
+        - "UC10"
+    - rf_item: "RN-RF057-006"
+      descricao: "Rateio proporcional ao uso real medido"
+      coberto_por:
+        - "UC01"  # (implementação futura - depende de RF separado)
+    - rf_item: "RN-RF057-007"
+      descricao: "Detecção automática itens sem uso > 3 meses (Hangfire job mensal)"
+      coberto_por:
+        - "UC09"
+    - rf_item: "RN-RF057-008"
+      descricao: "Grupos de itens para rateio em lote"
+      coberto_por:
+        - "UC06"
+    - rf_item: "RN-RF057-009"
+      descricao: "Ajustes e créditos por item"
+      coberto_por:
+        - "UC10"
+    - rf_item: "RN-RF057-010"
+      descricao: "Dashboard com análises (top caros, sem uso, evolução)"
+      coberto_por:
+        - "UC09"
+    - rf_item: "RN-RF057-011"
+      descricao: "Validação soma percentuais = 100% (tolerância 0.01%)"
+      coberto_por:
+        - "UC01"
+        - "UC03"
+        - "UC06"
+        - "UC08"
+    - rf_item: "RN-RF057-012"
+      descricao: "Transferência de item dedicado entre CCs"
+      coberto_por:
+        - "UC05"
+    - rf_item: "RN-RF057-013"
+      descricao: "Import CSV em massa"
+      coberto_por:
+        - "UC08"
+    - rf_item: "RN-RF057-014"
+      descricao: "Comparativo custo mensal (alerta variação > 30%)"
+      coberto_por:
+        - "UC09"
+    - rf_item: "RN-RF057-015"
+      descricao: "Relatório completo de item"
+      coberto_por:
+        - "UC10"
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-18"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Criação inicial - 7 UCs resumidos"
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Atualização para Governança v2.0 - 11 UCs completos (UC00-UC10) com cobertura de 100% das 15 RNs"

@@ -1,0 +1,923 @@
+# =============================================
+# UC-RF066 - Notificações e Alertas
+# Versão: 2.0
+# Data: 2025-12-31
+# =============================================
+
+uc:
+  rf: "RF066"
+  versao: "2.0"
+  data: "2025-12-31"
+  epic: "EPIC005-NOT"
+  fase: "Fase 2 - Cadastros e Serviços Transversais"
+
+casos_de_uso:
+
+  - id: "UC00"
+    nome: "Listar/Visualizar Central de Notificações"
+    ator_principal: "usuario_comum"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      rf_items:
+        - "F-NOT-066-04"
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa Central de Notificações pelo menu ou ícone de sino"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema valida permissão NOT.HISTORICO.VIEW"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Sistema carrega notificações do usuário logado"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Sistema exibe grid com colunas (canal, tipo, título, mensagem, data, status)"
+          required: true
+        - id: "FP-UC00-005"
+          title: "Sistema aplica ordenação padrão (não lidas primeiro)"
+          required: true
+        - id: "FP-UC00-006"
+          title: "Sistema aplica paginação (20 por página)"
+          required: true
+        - id: "FP-UC00-007"
+          title: "Sistema exibe contador de não lidas no header"
+          required: true
+        - id: "FA-UC00-001"
+          title: "Filtrar por Canal"
+          required: false
+        - id: "FA-UC00-002"
+          title: "Filtrar por Tipo de Notificação"
+          required: false
+        - id: "FA-UC00-003"
+          title: "Filtrar por Período"
+          required: false
+        - id: "FA-UC00-004"
+          title: "Filtrar por Status de Leitura"
+          required: false
+        - id: "FA-UC00-005"
+          title: "Filtrar por Prioridade"
+          required: false
+        - id: "FA-UC00-006"
+          title: "Buscar por Texto"
+          required: false
+        - id: "FA-UC00-007"
+          title: "Administrador visualiza histórico de outro usuário"
+          required: false
+        - id: "FA-UC00-008"
+          title: "Abrir detalhes da notificação"
+          required: false
+        - id: "FE-UC00-001"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+        - id: "FE-UC00-002"
+          title: "Nenhuma notificação encontrada → estado vazio"
+          required: true
+        - id: "FE-UC00-003"
+          title: "Erro ao carregar notificações"
+          required: true
+        - id: "FE-UC00-004"
+          title: "Conexão SignalR falhou"
+          required: true
+
+    precondicoes:
+      - permissao: "NOT.HISTORICO.VIEW"
+
+    gatilho: "Usuário acessa Central de Notificações"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_central_notificacoes"
+      - passo: 2
+        ator: "sistema"
+        acao: "valida_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "carrega_notificacoes_usuario"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibe_grid_com_colunas"
+      - passo: 5
+        ator: "sistema"
+        acao: "aplica_ordenacao_nao_lidas_primeiro"
+      - passo: 6
+        ator: "sistema"
+        acao: "aplica_paginacao"
+      - passo: 7
+        ator: "sistema"
+        acao: "exibe_contador_nao_lidas"
+
+    regras_aplicadas:
+      - id: "RN-UC-00-001"
+        origem: "RN-NOT-066-01"
+        descricao: "Isolamento Multi-Tenant"
+      - id: "RN-UC-00-002"
+        descricao: "Ordenação inteligente (não lidas primeiro)"
+      - id: "RN-UC-00-003"
+        descricao: "Paginação obrigatória (20 por página)"
+      - id: "RN-UC-00-004"
+        origem: "RN-NOT-066-05"
+        descricao: "Marcação automática como lida ao abrir detalhes"
+      - id: "RN-UC-00-005"
+        origem: "RN-NOT-066-14"
+        descricao: "Retenção de notificações (30/90 dias)"
+
+  - id: "UC01"
+    nome: "Enviar Notificação Multi-Canal"
+    ator_principal: "sistema"
+    tipo: "escrita"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "F-NOT-066-01"
+      uc_items:
+        - id: "FP-UC01-001"
+          title: "Sistema recebe SendNotificationCommand"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema valida payload"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Sistema carrega preferências do usuário"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Sistema determina canais a utilizar"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Sistema verifica quiet hours"
+          required: true
+        - id: "FP-UC01-006"
+          title: "Sistema verifica rate limiting"
+          required: true
+        - id: "FP-UC01-007"
+          title: "Sistema cria registro em Notificacao"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Sistema enfileira job Hangfire"
+          required: true
+        - id: "FP-UC01-009"
+          title: "Sistema retorna HTTP 202 Accepted"
+          required: true
+        - id: "FP-UC01-010"
+          title: "Job processa envio por canal"
+          required: true
+        - id: "FP-UC01-011"
+          title: "Sistema registra tentativas de envio"
+          required: true
+        - id: "FP-UC01-012"
+          title: "Sistema atualiza status para Enviado"
+          required: true
+        - id: "FP-UC01-013"
+          title: "Sistema dispara SignalR para InApp"
+          required: false
+        - id: "FA-UC01-001"
+          title: "Usar template de notificação (RF063)"
+          required: false
+        - id: "FA-UC01-002"
+          title: "Agrupamento inteligente aplicado"
+          required: false
+        - id: "FA-UC01-003"
+          title: "Digest diário ativo"
+          required: false
+        - id: "FA-UC01-004"
+          title: "Notificação com quick actions"
+          required: false
+        - id: "FE-UC01-001"
+          title: "Usuário destinatário não existe → HTTP 404"
+          required: true
+        - id: "FE-UC01-002"
+          title: "Template inativo → HTTP 400"
+          required: true
+        - id: "FE-UC01-003"
+          title: "Rate limiting excedido → HTTP 429"
+          required: true
+        - id: "FE-UC01-004"
+          title: "Falha em todos os canais"
+          required: true
+        - id: "FE-UC01-005"
+          title: "Falha parcial (alguns canais falharam)"
+          required: true
+        - id: "FE-UC01-006"
+          title: "Configuração de provider inválida"
+          required: true
+        - id: "FE-UC01-007"
+          title: "SignalR connection offline"
+          required: true
+
+    precondicoes:
+      - descricao: "Credenciais de providers externos configuradas"
+      - descricao: "Usuário destinatário existe"
+      - descricao: "Hangfire executando"
+
+    gatilho: "Sistema recebe comando de envio de notificação"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "recebe_send_notification_command"
+      - passo: 2
+        ator: "sistema"
+        acao: "valida_payload"
+      - passo: 3
+        ator: "sistema"
+        acao: "carrega_preferencias_usuario"
+      - passo: 4
+        ator: "sistema"
+        acao: "determina_canais"
+      - passo: 5
+        ator: "sistema"
+        acao: "verifica_quiet_hours"
+      - passo: 6
+        ator: "sistema"
+        acao: "verifica_rate_limiting"
+      - passo: 7
+        ator: "sistema"
+        acao: "cria_registro_notificacao"
+      - passo: 8
+        ator: "sistema"
+        acao: "enfileira_job_hangfire"
+      - passo: 9
+        ator: "sistema"
+        acao: "retorna_http_202_accepted"
+      - passo: 10
+        ator: "hangfire_job"
+        acao: "processa_envio_por_canal"
+      - passo: 11
+        ator: "sistema"
+        acao: "registra_tentativas_envio"
+      - passo: 12
+        ator: "sistema"
+        acao: "atualiza_status_enviado"
+      - passo: 13
+        ator: "sistema"
+        acao: "dispara_signalr_se_inapp"
+
+    regras_aplicadas:
+      - id: "RN-UC-01-001"
+        origem: "RN-NOT-066-03"
+        descricao: "Quiet hours respeitadas apenas para Baixa/Normal"
+      - id: "RN-UC-01-002"
+        origem: "RN-NOT-066-06"
+        descricao: "Rate limiting 50/24h"
+      - id: "RN-UC-01-003"
+        origem: "RN-NOT-066-12"
+        descricao: "Conformidade não pode ser bloqueada"
+      - id: "RN-UC-01-004"
+        descricao: "Multi-tenancy obrigatório"
+      - id: "RN-UC-01-005"
+        origem: "RN-NOT-066-02"
+        descricao: "Priorização de canais (InApp, Email, SMS, Push, WhatsApp)"
+      - id: "RN-UC-01-006"
+        descricao: "Processamento assíncrono obrigatório"
+
+  - id: "UC02"
+    nome: "Configurar Preferências de Canal"
+    ator_principal: "usuario_comum"
+    tipo: "escrita"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "F-NOT-066-02"
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Usuário acessa tela de preferências"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema valida permissão NOT.PREFERENCIAS.MANAGE"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema carrega preferências atuais"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Sistema exibe grid de configuração"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Usuário altera checkboxes"
+          required: true
+        - id: "FP-UC02-006"
+          title: "Usuário clica Salvar"
+          required: true
+        - id: "FP-UC02-007"
+          title: "Sistema valida regras"
+          required: true
+        - id: "FP-UC02-008"
+          title: "Sistema salva alterações"
+          required: true
+        - id: "FP-UC02-009"
+          title: "Sistema registra em auditoria"
+          required: true
+        - id: "FA-UC02-001"
+          title: "Desabilitar todos canais de um tipo"
+          required: false
+        - id: "FA-UC02-002"
+          title: "Habilitar canal que requer configuração"
+          required: false
+        - id: "FA-UC02-003"
+          title: "Configuração rápida por templates"
+          required: false
+        - id: "FA-UC02-004"
+          title: "Administrador configura preferências de outro usuário"
+          required: false
+        - id: "FE-UC02-001"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+        - id: "FE-UC02-002"
+          title: "Tentar desabilitar notificação de conformidade"
+          required: true
+        - id: "FE-UC02-003"
+          title: "Erro ao salvar preferências"
+          required: true
+        - id: "FE-UC02-004"
+          title: "Canal indisponível (provider não configurado)"
+          required: true
+
+    precondicoes:
+      - permissao: "NOT.PREFERENCIAS.MANAGE"
+
+    gatilho: "Usuário acessa configurações de notificações"
+
+    regras_aplicadas:
+      - id: "RN-UC-02-001"
+        descricao: "Ao menos um canal ativo (recomendação)"
+      - id: "RN-UC-02-002"
+        origem: "RN-NOT-066-12"
+        descricao: "Conformidade não pode ser desabilitada"
+      - id: "RN-UC-02-003"
+        descricao: "Multi-tenancy em preferências"
+      - id: "RN-UC-02-004"
+        descricao: "Auditoria de alterações (LGPD/GDPR)"
+
+  - id: "UC03"
+    nome: "Configurar Quiet Hours"
+    ator_principal: "usuario_comum"
+    tipo: "escrita"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "F-NOT-066-03"
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Usuário acessa configuração de quiet hours"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema valida permissão NOT.QUIET_HOURS.MANAGE"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Sistema carrega configuração atual"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Sistema exibe formulário"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Usuário ajusta configurações"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Usuário clica Salvar"
+          required: true
+        - id: "FP-UC03-007"
+          title: "Sistema valida horários"
+          required: true
+        - id: "FP-UC03-008"
+          title: "Sistema salva configuração"
+          required: true
+        - id: "FP-UC03-009"
+          title: "Sistema agenda job Hangfire"
+          required: true
+        - id: "FP-UC03-010"
+          title: "Sistema registra em auditoria"
+          required: true
+        - id: "FA-UC03-001"
+          title: "Desativar quiet hours"
+          required: false
+        - id: "FA-UC03-002"
+          title: "Quiet hours que atravessa meia-noite"
+          required: false
+        - id: "FA-UC03-003"
+          title: "Administrador configura quiet hours globais"
+          required: false
+        - id: "FA-UC03-004"
+          title: "Testar configuração"
+          required: false
+        - id: "FE-UC03-001"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+        - id: "FE-UC03-002"
+          title: "Horário inválido"
+          required: true
+        - id: "FE-UC03-003"
+          title: "Quiet hours muito longo (>18h)"
+          required: true
+        - id: "FE-UC03-004"
+          title: "Erro ao salvar configuração"
+          required: true
+
+    precondicoes:
+      - permissao: "NOT.QUIET_HOURS.MANAGE"
+
+    gatilho: "Usuário configura horários de silêncio"
+
+    regras_aplicadas:
+      - id: "RN-UC-03-001"
+        origem: "RN-NOT-066-03"
+        descricao: "Quiet hours apenas para Baixa/Normal"
+      - id: "RN-UC-03-002"
+        origem: "RN-NOT-066-03"
+        descricao: "Notificações acumuladas enviadas no fim do quiet hours"
+      - id: "RN-UC-03-003"
+        descricao: "Quiet hours padrão (22h-8h) para novos usuários"
+      - id: "RN-UC-03-004"
+        origem: "RN-NOT-066-12"
+        descricao: "Conformidade ignora quiet hours"
+
+  - id: "UC04"
+    nome: "Marcar Notificação como Lida/Não Lida"
+    ator_principal: "usuario_comum"
+    tipo: "escrita"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "F-NOT-066-05"
+      uc_items:
+        - id: "FP-UC04-001"
+          title: "Usuário visualiza lista de notificações"
+          required: true
+        - id: "FP-UC04-002"
+          title: "Usuário clica com botão direito"
+          required: true
+        - id: "FP-UC04-003"
+          title: "Sistema exibe menu contextual"
+          required: true
+        - id: "FP-UC04-004"
+          title: "Usuário seleciona Marcar como lida"
+          required: true
+        - id: "FP-UC04-005"
+          title: "Sistema envia comando MarkNotificationAsReadCommand"
+          required: true
+        - id: "FP-UC04-006"
+          title: "Sistema valida notificação pertence ao usuário"
+          required: true
+        - id: "FP-UC04-007"
+          title: "Sistema atualiza IsLida e DataLeitura"
+          required: true
+        - id: "FP-UC04-008"
+          title: "Sistema decrementa contador de não lidas"
+          required: true
+        - id: "FP-UC04-009"
+          title: "Sistema atualiza ícone visualmente"
+          required: true
+        - id: "FA-UC04-001"
+          title: "Marcar lida como não lida"
+          required: false
+        - id: "FA-UC04-002"
+          title: "Marcar todas como lidas"
+          required: false
+        - id: "FA-UC04-003"
+          title: "Marcação automática ao abrir detalhes"
+          required: false
+        - id: "FE-UC04-001"
+          title: "Notificação não pertence ao usuário → HTTP 403"
+          required: true
+        - id: "FE-UC04-002"
+          title: "Notificação não existe → HTTP 404"
+          required: true
+
+    precondicoes:
+      - permissao: "NOT.NOTIFICACOES.MARK_READ"
+
+    gatilho: "Usuário marca notificação manualmente"
+
+    regras_aplicadas:
+      - id: "RN-UC-04-001"
+        descricao: "Isolamento multi-tenant"
+      - id: "RN-UC-04-002"
+        descricao: "Marcação automática ao abrir detalhes"
+      - id: "RN-UC-04-003"
+        descricao: "Auditoria de marcação manual"
+
+  - id: "UC05"
+    nome: "Executar Quick Actions em Notificações"
+    ator_principal: "usuario_comum"
+    tipo: "escrita"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "F-NOT-066-06"
+      uc_items:
+        - id: "FP-UC05-001"
+          title: "Usuário recebe notificação com quick actions"
+          required: true
+        - id: "FP-UC05-002"
+          title: "Sistema exibe toast com botões de ação"
+          required: true
+        - id: "FP-UC05-003"
+          title: "Usuário clica em botão de ação"
+          required: true
+        - id: "FP-UC05-004"
+          title: "Sistema carrega QuickAction do JSON"
+          required: true
+        - id: "FP-UC05-005"
+          title: "Sistema exibe confirmação se necessário"
+          required: true
+        - id: "FP-UC05-006"
+          title: "Usuário confirma"
+          required: true
+        - id: "FP-UC05-007"
+          title: "Sistema executa requisição HTTP"
+          required: true
+        - id: "FP-UC05-008"
+          title: "Sistema recebe resposta HTTP 200"
+          required: true
+        - id: "FP-UC05-009"
+          title: "Sistema marca ActionExecuted"
+          required: true
+        - id: "FP-UC05-010"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FP-UC05-011"
+          title: "Sistema remove notificação ou marca como processada"
+          required: true
+        - id: "FA-UC05-001"
+          title: "Ação Ver Detalhes"
+          required: false
+        - id: "FA-UC05-002"
+          title: "Múltiplas quick actions"
+          required: false
+        - id: "FA-UC05-003"
+          title: "Ação requer entrada do usuário"
+          required: false
+        - id: "FE-UC05-001"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+        - id: "FE-UC05-002"
+          title: "Recurso não existe → HTTP 404"
+          required: true
+        - id: "FE-UC05-003"
+          title: "Falha ao executar ação → HTTP 500"
+          required: true
+        - id: "FE-UC05-004"
+          title: "Timeout na requisição"
+          required: true
+
+    precondicoes:
+      - descricao: "Notificação possui quick actions configuradas"
+      - descricao: "Usuário possui permissão para executar a ação"
+
+    gatilho: "Usuário clica em quick action na notificação"
+
+    regras_aplicadas:
+      - id: "RN-UC-05-001"
+        descricao: "Permissão herdada da ação"
+      - id: "RN-UC-05-002"
+        descricao: "Ação executada apenas uma vez"
+      - id: "RN-UC-05-003"
+        descricao: "Timeout padrão 30 segundos"
+
+  - id: "UC06"
+    nome: "Configurar Agrupamento Inteligente"
+    ator_principal: "administrador"
+    tipo: "escrita"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "F-NOT-066-07"
+      uc_items:
+        - id: "FP-UC06-001"
+          title: "Administrador acessa configuração de agrupamento"
+          required: true
+        - id: "FP-UC06-002"
+          title: "Sistema valida permissão NOT.AGRUPAMENTO.CONFIGURE"
+          required: true
+        - id: "FP-UC06-003"
+          title: "Sistema exibe configuração atual"
+          required: true
+        - id: "FP-UC06-004"
+          title: "Administrador ajusta configurações"
+          required: true
+        - id: "FP-UC06-005"
+          title: "Administrador clica Salvar"
+          required: true
+        - id: "FP-UC06-006"
+          title: "Sistema salva configuração"
+          required: true
+        - id: "FP-UC06-007"
+          title: "Sistema agenda job Hangfire recorrente"
+          required: true
+        - id: "FP-UC06-008"
+          title: "Job verifica e agrupa notificações"
+          required: true
+        - id: "FA-UC06-001"
+          title: "Desabilitar agrupamento"
+          required: false
+        - id: "FA-UC06-002"
+          title: "Testar com simulação"
+          required: false
+        - id: "FE-UC06-001"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+        - id: "FE-UC06-002"
+          title: "Threshold inválido"
+          required: true
+
+    precondicoes:
+      - permissao: "NOT.AGRUPAMENTO.CONFIGURE"
+
+    gatilho: "Administrador configura regras de agrupamento"
+
+    regras_aplicadas:
+      - id: "RN-UC-06-001"
+        origem: "RN-NOT-066-04"
+        descricao: "Agrupamento apenas para mesmo tipo e usuário"
+      - id: "RN-UC-06-002"
+        origem: "RN-NOT-066-04"
+        descricao: "Janela de tempo 30 minutos"
+      - id: "RN-UC-06-003"
+        origem: "RN-NOT-066-04"
+        descricao: "Threshold de 5 notificações"
+
+  - id: "UC07"
+    nome: "Ativar/Desativar Digest Diário"
+    ator_principal: "usuario_comum"
+    tipo: "escrita"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "F-NOT-066-08"
+      uc_items:
+        - id: "FP-UC07-001"
+          title: "Usuário acessa configuração de digest"
+          required: true
+        - id: "FP-UC07-002"
+          title: "Sistema valida permissão NOT.DIGEST.MANAGE"
+          required: true
+        - id: "FP-UC07-003"
+          title: "Sistema exibe configuração"
+          required: true
+        - id: "FP-UC07-004"
+          title: "Usuário ativa toggle e ajusta"
+          required: true
+        - id: "FP-UC07-005"
+          title: "Usuário clica Salvar"
+          required: true
+        - id: "FP-UC07-006"
+          title: "Sistema atualiza NotificacaoPreferencia"
+          required: true
+        - id: "FP-UC07-007"
+          title: "Sistema agenda job Hangfire diário"
+          required: true
+        - id: "FP-UC07-008"
+          title: "Job consolida e envia e-mail único"
+          required: true
+        - id: "FA-UC07-001"
+          title: "Desabilitar digest"
+          required: false
+        - id: "FE-UC07-001"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+
+    precondicoes:
+      - permissao: "NOT.DIGEST.MANAGE"
+
+    gatilho: "Usuário ativa digest diário"
+
+    regras_aplicadas:
+      - id: "RN-UC-07-001"
+        descricao: "Digest apenas para e-mails"
+      - id: "RN-UC-07-002"
+        descricao: "Horário de envio padrão 18h"
+
+  - id: "UC08"
+    nome: "Rastrear Métricas de Entrega"
+    ator_principal: "sistema"
+    tipo: "escrita"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "F-NOT-066-09"
+      uc_items:
+        - id: "FP-UC08-001"
+          title: "Provider dispara webhook"
+          required: true
+        - id: "FP-UC08-002"
+          title: "Sistema valida assinatura HMAC"
+          required: true
+        - id: "FP-UC08-003"
+          title: "Sistema identifica notificação pelo message_id"
+          required: true
+        - id: "FP-UC08-004"
+          title: "Sistema atualiza NotificacaoMetricaEntrega"
+          required: true
+        - id: "FP-UC08-005"
+          title: "Sistema atualiza status da notificação"
+          required: true
+        - id: "FA-UC08-001"
+          title: "Evento Aberto"
+          required: false
+        - id: "FA-UC08-002"
+          title: "Evento Clicado"
+          required: false
+        - id: "FE-UC08-001"
+          title: "Assinatura inválida → HTTP 401"
+          required: true
+        - id: "FE-UC08-002"
+          title: "Notificação não encontrada"
+          required: true
+
+    precondicoes:
+      - descricao: "Webhooks configurados nos providers"
+      - descricao: "Endpoints públicos no sistema"
+
+    gatilho: "Provider externo envia webhook"
+
+    regras_aplicadas:
+      - id: "RN-UC-08-001"
+        descricao: "Validação de assinatura obrigatória"
+      - id: "RN-UC-08-002"
+        descricao: "Eventos suportados (sent, delivered, opened, clicked, bounced, spam)"
+
+  - id: "UC09"
+    nome: "Configurar Retry Policy"
+    ator_principal: "administrador"
+    tipo: "escrita"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "F-NOT-066-10"
+      uc_items:
+        - id: "FP-UC09-001"
+          title: "Administrador acessa configuração de retry"
+          required: true
+        - id: "FP-UC09-002"
+          title: "Sistema valida permissão NOT.RETRY.CONFIGURE"
+          required: true
+        - id: "FP-UC09-003"
+          title: "Sistema exibe configuração"
+          required: true
+        - id: "FP-UC09-004"
+          title: "Administrador ajusta configurações"
+          required: true
+        - id: "FP-UC09-005"
+          title: "Sistema salva em SistemaConfiguracaoGeral"
+          required: true
+        - id: "FP-UC09-006"
+          title: "Próximas falhas retentam conforme política"
+          required: true
+        - id: "FA-UC09-001"
+          title: "Desabilitar retry"
+          required: false
+
+    precondicoes:
+      - permissao: "NOT.RETRY.CONFIGURE"
+
+    gatilho: "Administrador configura política de retry"
+
+    regras_aplicadas:
+      - id: "RN-UC-09-001"
+        origem: "RN-NOT-066-05"
+        descricao: "Backoff exponencial (imediata, +2min, +4min, +8min)"
+      - id: "RN-UC-09-002"
+        origem: "RN-NOT-066-05"
+        descricao: "Máximo 4 tentativas"
+
+  - id: "UC10"
+    nome: "Aplicar Rate Limiting Automático"
+    ator_principal: "sistema"
+    tipo: "validacao"
+    impacta_dados: false
+
+    covers:
+      rf_items:
+        - "F-NOT-066-11"
+      uc_items:
+        - id: "FP-UC10-001"
+          title: "Sistema recebe comando de envio"
+          required: true
+        - id: "FP-UC10-002"
+          title: "Sistema conta notificações nas últimas 24h"
+          required: true
+        - id: "FP-UC10-003"
+          title: "Sistema bloqueia se >= 50 e não é conformidade"
+          required: true
+        - id: "FP-UC10-004"
+          title: "Sistema prossegue se < 50 ou é conformidade"
+          required: true
+
+    precondicoes:
+      - descricao: "Rate limiting ativo no sistema"
+
+    gatilho: "Sistema valida rate limiting antes de enviar"
+
+    regras_aplicadas:
+      - id: "RN-UC-10-001"
+        origem: "RN-NOT-066-06"
+        descricao: "Limite 50 notificações/24h (exceto conformidade)"
+
+  - id: "UC11"
+    nome: "Gerenciar Notificações de Conformidade"
+    ator_principal: "administrador"
+    tipo: "escrita"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "F-NOT-066-12"
+      uc_items:
+        - id: "FP-UC11-001"
+          title: "Administrador acessa configuração de conformidade"
+          required: true
+        - id: "FP-UC11-002"
+          title: "Sistema valida permissão NOT.COMPLIANCE.MANAGE"
+          required: true
+        - id: "FP-UC11-003"
+          title: "Sistema exibe lista de tipos de notificação"
+          required: true
+        - id: "FP-UC11-004"
+          title: "Administrador clica Editar"
+          required: true
+        - id: "FP-UC11-005"
+          title: "Sistema exibe modal com checkbox obrigatória"
+          required: true
+        - id: "FP-UC11-006"
+          title: "Administrador marca checkbox e salva"
+          required: true
+        - id: "FP-UC11-007"
+          title: "Sistema atualiza TipoNotificacao"
+          required: true
+        - id: "FP-UC11-008"
+          title: "Próximas notificações ignoram preferências"
+          required: true
+
+    precondicoes:
+      - permissao: "NOT.COMPLIANCE.MANAGE"
+
+    gatilho: "Administrador marca tipo como obrigatório"
+
+    regras_aplicadas:
+      - id: "RN-UC-11-001"
+        origem: "RN-NOT-066-12"
+        descricao: "Conformidade não pode ser desabilitada"
+
+  - id: "UC12"
+    nome: "Dashboard de Métricas de Notificações"
+    ator_principal: "administrador"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      rf_items:
+        - "F-NOT-066-13"
+      uc_items:
+        - id: "FP-UC12-001"
+          title: "Usuário acessa dashboard"
+          required: true
+        - id: "FP-UC12-002"
+          title: "Sistema valida permissão NOT.DASHBOARD.VIEW"
+          required: true
+        - id: "FP-UC12-003"
+          title: "Sistema carrega métricas últimos 30 dias"
+          required: true
+        - id: "FP-UC12-004"
+          title: "Sistema exibe cards com métricas"
+          required: true
+        - id: "FP-UC12-005"
+          title: "Sistema exibe gráficos"
+          required: true
+        - id: "FA-UC12-001"
+          title: "Filtrar por período"
+          required: false
+
+    precondicoes:
+      - permissao: "NOT.DASHBOARD.VIEW"
+
+    gatilho: "Usuário acessa dashboard de métricas"
+
+    regras_aplicadas:
+      - id: "RN-UC-12-001"
+        descricao: "Métricas apenas do tenant do usuário"
+
+# =============================================
+# Exclusões e Histórico
+# =============================================
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão 2.0 completa com 13 UCs (100% cobertura das funcionalidades RF066)"
+  - versao: "1.0"
+    data: "2025-12-17"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial (incompleta - 4 UCs apenas)"

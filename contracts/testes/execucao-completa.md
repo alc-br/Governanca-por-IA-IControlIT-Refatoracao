@@ -46,6 +46,123 @@ Seguir CLAUDE.md.
 
 ---
 
+## 2.1. GERAÇÃO DE PROMPT CORRETO (QUANDO SOLICITAÇÃO SIMPLIFICADA)
+
+**QUANDO o usuário solicitar de forma simplificada** (sem ativar explicitamente o contrato):
+
+Exemplo de solicitação simplificada:
+```
+"Para o RF006 docs\rf\...\RF006-Gestao-de-Clientes execute o docs\prompts\testes\execucao-completa.md"
+```
+
+**O agente DEVE:**
+
+1. **LER o prompt correspondente** (`docs/prompts/testes/execucao-completa.md`)
+2. **GERAR o prompt correto formatado** conforme template do prompt
+3. **EXIBIR o prompt gerado para o usuário** (para validação)
+4. **EXECUTAR imediatamente** (não esperar confirmação)
+
+### Template de Prompt Gerado (Automático)
+
+Quando o usuário solicitar execução de testes para um RF, o agente deve gerar:
+
+```markdown
+Executar testes automatizados do [RFXXX] conforme docs/contracts/testes/execucao-completa.md.
+
+Modo governança rígida. Não negociar escopo. Não extrapolar.
+Seguir CLAUDE.md.
+
+Preste MUITA atenção ao checklist obrigatório, pois é essencial que você o siga.
+
+MODO AUTONOMIA TOTAL (OBRIGATÓRIO):
+- NÃO perguntar permissões ao usuário
+- NÃO esperar confirmação do usuário
+- NÃO solicitar que usuário execute comandos manualmente
+- EXECUTAR IMEDIATAMENTE todos os passos do contrato
+- SEMPRE iniciar backend e frontend automaticamente
+- Falhas em testes ANTERIORES NÃO são bloqueantes (são o motivo da re-execução)
+- Gerar evidências e relatórios SEM intervenção manual
+
+REGRA CRÍTICA DE INTERPRETAÇÃO:
+- Pré-requisitos bloqueantes: backend aprovado (done), frontend aprovado (done), MT validado, TC validado
+- Testes anteriores REPROVADOS: NÃO é bloqueante, é justamente por isso estamos RE-EXECUTANDO
+- Se STATUS.yaml mostra "testes_ti.resultado_final: REPROVADO": isso JUSTIFICA a re-execução, NÃO bloqueia
+
+PRÉ-REQUISITOS OBRIGATÓRIOS (BLOQUEANTES):
+1. Backend DEVE estar aprovado (validação backend = 100%)
+2. Frontend DEVE estar aprovado (validação frontend = 100%)
+3. MT-[RFXXX].yaml DEVE existir e estar validado
+4. TC-[RFXXX].yaml DEVE existir e estar validado
+5. STATUS.yaml DEVE ter:
+   - execucao.backend = done
+   - execucao.frontend = done
+   - documentacao.mt = true
+   - documentacao.tc = true
+
+VALIDAÇÃO INICIAL OBRIGATÓRIA:
+1. Antes de QUALQUER teste, execute:
+   - dotnet build (backend)
+   - npm run build (frontend)
+2. Se QUALQUER build quebrar: PARAR, REPORTAR, BLOQUEAR
+3. Somente prosseguir com testes se AMBOS os builds passarem
+
+RESPONSABILIDADE DO AGENTE:
+1. Validar pré-requisitos (backend/frontend aprovados, MT/TC validados)
+2. Buildar backend e frontend
+3. Aplicar seeds funcionais
+4. Iniciar backend e frontend (usar python run.py se disponível)
+5. Executar testes backend (dotnet test)
+6. Executar testes frontend (npm run test)
+7. VERIFICAR SE SPECS PLAYWRIGHT EXISTEM:
+   - Se NÃO: executar geração automática (docs/prompts/testes/geracao-e2e-playwright.md)
+   - Se SIM: validar cobertura completa de TC-E2E
+8. Executar testes E2E (npm run e2e)
+9. Executar testes de segurança
+10. Consolidar resultados
+11. Atribuir responsabilidade em falhas
+12. Gerar relatório consolidado
+13. Gerar evidências (screenshots, logs)
+14. Atualizar azure-test-cases-[RFXXX].csv (State conforme resultado)
+15. Atualizar STATUS.yaml (incluindo testes.azure_devops)
+16. Registrar decisão (APROVADO/REPROVADO)
+
+CRITÉRIO DE APROVAÇÃO (0% OU 100%):
+- ✅ APROVADO: Taxa de aprovação = 100% (TODOS os testes passaram)
+- ❌ REPROVADO: Taxa de aprovação < 100% (QUALQUER teste falhou)
+
+NÃO EXISTE APROVAÇÃO COM RESSALVAS.
+```
+
+### Regras de Geração
+
+1. **Substituir `[RFXXX]` pelo RF correto** (ex: RF006)
+2. **Copiar o template do prompt** (`docs/prompts/testes/execucao-completa.md`)
+3. **Exibir prompt completo** antes de executar
+4. **Não esperar confirmação** (executar imediatamente)
+
+### Exemplo Prático
+
+**Solicitação do usuário:**
+```
+Para o RF006 execute o docs\prompts\testes\execucao-completa.md
+```
+
+**O que o agente FAZ:**
+
+1. ✅ Lê `docs/prompts/testes/execucao-completa.md`
+2. ✅ Gera prompt substituindo `RFXXX` → `RF006`
+3. ✅ Exibe: "Prompt gerado para RF006 (executando imediatamente):"
+4. ✅ Exibe prompt completo formatado
+5. ✅ Executa imediatamente FASE 1 → PASSO 1.1
+
+**O que o agente NÃO FAZ:**
+
+- ❌ Executar sem gerar/exibir prompt
+- ❌ Pedir confirmação ao usuário
+- ❌ Tentar executar sem ler o prompt primeiro
+
+---
+
 ## 3. PRÉ-REQUISITOS OBRIGATÓRIOS (BLOQUEANTES)
 
 O contrato TRAVA se qualquer condição falhar:

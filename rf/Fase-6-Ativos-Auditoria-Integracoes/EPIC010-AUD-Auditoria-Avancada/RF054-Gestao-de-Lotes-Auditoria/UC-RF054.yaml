@@ -1,0 +1,278 @@
+uc:
+  rf: "RF054"
+  versao: "2.0"
+  data: "2025-12-31"
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial (resumida)"
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Reescrita completa seguindo template padrão, 13 UCs, 100% cobertura"
+
+casos_de_uso:
+  - id: "UC00"
+    nome: "Criar Lote de Auditoria"
+    ator_principal: "coordenador_gestor"
+    tipo: "crud"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "FUNC-LOT-01"
+        - "RN-LOT-054-01"
+        - "RN-LOT-054-04"
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Sistema exibe formulário de criação de lote"
+          required: true
+        - id: "FP-UC00-008"
+          title: "Sistema valida que ao menos um critério foi informado (RN-LOT-054-01)"
+          required: true
+        - id: "FP-UC00-011"
+          title: "Sistema registra operação no histórico de auditoria"
+          required: true
+
+  - id: "UC01"
+    nome: "Selecionar Faturas do Lote"
+    ator_principal: "sistema"
+    tipo: "acao"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "FUNC-LOT-02"
+        - "RN-LOT-054-03"
+        - "RN-LOT-054-06"
+      uc_items:
+        - id: "FP-UC01-003"
+          title: "Job constrói query SQL aplicando filtros"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Job valida que fatura não está em outro lote ativo (RN-LOT-054-03)"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Job transiciona lote para status WaitingForProcessing"
+          required: true
+
+  - id: "UC02"
+    nome: "Iniciar Processamento do Lote"
+    ator_principal: "coordenador_gestor_sistema"
+    tipo: "acao"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "FUNC-LOT-03"
+        - "RN-LOT-054-05"
+        - "RN-LOT-054-06"
+        - "RN-LOT-054-09"
+      uc_items:
+        - id: "FP-UC02-002"
+          title: "Sistema valida que lote não está em Processing, Completed, Cancelled, Archived"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema transiciona lote para status Processing"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Sistema enfileira N jobs Hangfire paralelos (1 job por fatura)"
+          required: true
+
+  - id: "UC03"
+    nome: "Monitorar Progresso em Tempo Real"
+    ator_principal: "auditor"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      rf_items:
+        - "FUNC-LOT-04"
+        - "RN-LOT-054-07"
+        - "RN-LOT-054-14"
+      uc_items:
+        - id: "FP-UC03-002"
+          title: "Sistema estabelece conexão WebSocket via SignalR"
+          required: true
+        - id: "FP-UC03-007"
+          title: "A cada fatura processada, servidor envia mensagem SignalR com atualização"
+          required: true
+        - id: "FP-UC03-009"
+          title: "Se SLA for atingido, sistema exibe alerta visual destacado"
+          required: true
+
+  - id: "UC04"
+    nome: "Cancelar Lote com Rollback"
+    ator_principal: "coordenador_gestor"
+    tipo: "acao"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "FUNC-LOT-05"
+        - "RN-LOT-054-13"
+      uc_items:
+        - id: "FP-UC04-004"
+          title: "Sistema transiciona lote para status Cancelled imediatamente"
+          required: true
+        - id: "FP-UC04-005"
+          title: "Sistema para todos os jobs Hangfire pendentes do lote via DeleteJob"
+          required: true
+        - id: "FP-UC04-006"
+          title: "Sistema inicia processo de rollback (soft delete RF034, desassociar faturas)"
+          required: true
+
+  - id: "UC05"
+    nome: "Arquivar Lote"
+    ator_principal: "coordenador_gestor_sistema"
+    tipo: "acao"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "FUNC-LOT-07"
+      uc_items:
+        - id: "FP-UC05-001"
+          title: "Sistema valida estado do lote (deve estar Completed)"
+          required: true
+        - id: "FP-UC05-003"
+          title: "Sistema transiciona lote para status Archived"
+          required: true
+
+  - id: "UC06"
+    nome: "Exportar Relatório de Lote"
+    ator_principal: "auditor"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      rf_items:
+        - "FUNC-LOT-08"
+      uc_items:
+        - id: "FP-UC06-002"
+          title: "Usuário seleciona formato (Excel ou PDF)"
+          required: true
+        - id: "FP-UC06-003"
+          title: "Sistema gera arquivo com cabeçalho, lista de faturas, valores totais, estatísticas, histórico"
+          required: true
+
+  - id: "UC07"
+    nome: "Reprocessar Faturas com Erro"
+    ator_principal: "coordenador_gestor"
+    tipo: "acao"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "FUNC-LOT-09"
+        - "RN-LOT-054-08"
+      uc_items:
+        - id: "FP-UC07-005"
+          title: "Sistema enfileira jobs Hangfire de retry para cada fatura selecionada"
+          required: true
+        - id: "FP-UC07-006"
+          title: "Sistema aplica retry policy exponencial (1min, 5min, 15min)"
+          required: true
+        - id: "FP-UC07-009"
+          title: "Se todas as 4 tentativas falharem, sistema marca fatura como Error permanente"
+          required: true
+
+  - id: "UC08"
+    nome: "Atribuir/Reatribuir Auditor"
+    ator_principal: "coordenador_gestor"
+    tipo: "acao"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "FUNC-LOT-10"
+        - "RN-LOT-054-04"
+      uc_items:
+        - id: "FP-UC08-002"
+          title: "Sistema filtra apenas usuários com permissão AUD.LOTES.AUDIT"
+          required: true
+        - id: "FP-UC08-004"
+          title: "Sistema valida que auditor selecionado possui permissão adequada"
+          required: true
+        - id: "FP-UC08-007"
+          title: "Sistema envia notificação para auditor antigo e novo"
+          required: true
+
+  - id: "UC09"
+    nome: "Configurar SLA e Alertas"
+    ator_principal: "coordenador_gestor"
+    tipo: "crud"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "FUNC-LOT-11"
+        - "RN-LOT-054-14"
+      uc_items:
+        - id: "FP-UC09-002"
+          title: "Usuário define timeout em horas (ex: 24h, 48h, 72h)"
+          required: true
+        - id: "FP-UC09-006"
+          title: "Sistema inicia monitoramento de tempo de processamento"
+          required: true
+        - id: "FP-UC09-009"
+          title: "Se tempo decorrido > timeout, sistema envia email, exibe alerta, registra evento"
+          required: true
+
+  - id: "UC10"
+    nome: "Visualizar Histórico de Auditoria"
+    ator_principal: "auditor"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      rf_items:
+        - "FUNC-LOT-12"
+        - "RN-LOT-054-11"
+      uc_items:
+        - id: "FP-UC10-001"
+          title: "Sistema exibe lista cronológica de eventos (mais recente primeiro)"
+          required: true
+        - id: "FP-UC10-002"
+          title: "Para cada evento, sistema exibe data/hora, usuário, IP, tipo de operação, descrição"
+          required: true
+
+  - id: "UC11"
+    nome: "Dashboard de KPIs de Lotes"
+    ator_principal: "coordenador_gestor"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      rf_items:
+        - "FUNC-LOT-13"
+      uc_items:
+        - id: "FP-UC11-002"
+          title: "Sistema calcula e exibe métricas (lotes ativos, concluídos, taxa de sucesso, glosas, tempo médio)"
+          required: true
+        - id: "FP-UC11-003"
+          title: "Sistema exibe gráficos (pizza, barras, linha)"
+          required: true
+        - id: "FP-UC11-004"
+          title: "Sistema exibe lista de lotes próximos ao timeout"
+          required: true
+
+  - id: "UC12"
+    nome: "Job: Processar Lote em Background"
+    ator_principal: "sistema"
+    tipo: "batch"
+    impacta_dados: true
+    covers:
+      rf_items:
+        - "FUNC-LOT-06"
+        - "RN-LOT-054-06"
+        - "RN-LOT-054-07"
+        - "RN-LOT-054-08"
+        - "RN-LOT-054-09"
+        - "RN-LOT-054-10"
+      uc_items:
+        - id: "FP-UC12-003"
+          title: "Job invoca endpoint de RF034 para criar item de auditoria"
+          required: true
+        - id: "FP-UC12-009"
+          title: "Job envia mensagem SignalR para clientes conectados com atualização de progresso"
+          required: true
+        - id: "FP-UC12-011"
+          title: "Quando todas as faturas são processadas, job de consolidação inicia"
+          required: true
+        - id: "FP-UC12-012"
+          title: "Job transiciona lote para status Completed"
+          required: true
