@@ -24,24 +24,24 @@ Você NÃO corrige problemas, apenas IDENTIFICA e REPORTA.
 9. **Integrações externas:** Completas?
 10. **Validador automático:** Exit code 0?
 11. **STATUS.yaml:** Seção `adequacao_uc` presente?
-12. **Relatório gerado:** Arquivos presentes?
+12. **STATUS.yaml:** `documentacao.uc = true`?
 
 ## 📂 ARQUIVOS QUE VOCÊ DEVE LER
 
 - RF.yaml (fonte da verdade)
 - UC-[RF].yaml (validar)
 - UC-[RF].md (validar)
-- STATUS.yaml (verificar seção adequacao_uc)
-- `.temp_ia/adequacao-uc-[RF]-diagnostico.md`
-- `.temp_ia/adequacao-uc-[RF]-relatorio.md`
+- STATUS.yaml (verificar seções adequacao_uc e documentacao.uc)
 
-## 🎯 CRITÉRIOS DE APROVAÇÃO
+## 🎯 CRITÉRIOS DE APROVAÇÃO (v3.0)
 
-- ✅ **APROVADO (100%):** 12/12 validações PASS + zero gaps CRÍTICOS
-- ⚠️ **APROVADO COM RESSALVAS (80-99%):** 10-11 PASS + zero CRÍTICOS + 1-3 IMPORTANTES
-- ❌ **REPROVADO (<80%):** <10 PASS OU qualquer gap CRÍTICO → reexecutar adequação
+- ✅ **APROVADO:** 12/12 validações PASS + ZERO gaps CRÍTICOS + ZERO gaps IMPORTANTES
+- ✅ **APROVADO COM ADVERTÊNCIA:** 12/12 PASS + ZERO CRÍTICOS + ZERO IMPORTANTES + gaps MENORES
+- ❌ **REPROVADO:** Qualquer FAIL OU gap CRÍTICO OU gap IMPORTANTE
 
-## 📄 RELATÓRIO QUE VOCÊ DEVE GERAR
+**Gaps MENORES NÃO reprovam** (apenas advertem).
+
+## 📄 RELATÓRIO QUE VOCÊ DEVE EXIBIR NA TELA
 
 Gere tabela com 12 validações mostrando:
 - Status (✅ PASS / ❌ FAIL / N/A)
@@ -50,15 +50,15 @@ Gere tabela com 12 validações mostrando:
 
 Depois, mostre:
 - **PONTUAÇÃO FINAL:** X/12 PASS (Z%)
-- **VEREDICTO:** ✅ APROVADO / ⚠️ APROVADO COM RESSALVAS / ❌ REPROVADO
+- **VEREDICTO:** ✅ APROVADO / ✅ APROVADO COM ADVERTÊNCIA / ❌ REPROVADO
 
 Se houver gaps, liste:
 - Descrição do gap
-- Severidade
+- Severidade (CRÍTICO, IMPORTANTE, MENOR)
 - Arquivo/linha afetado
 - Recomendação de ação
 
-**Salvar em:** `.temp_ia/validacao-uc-[RF]-relatorio.md`
+**NÃO salvar em arquivo** - apenas exibir na tela para o usuário.
 
 ## ⚠️ REGRAS IMPORTANTES
 

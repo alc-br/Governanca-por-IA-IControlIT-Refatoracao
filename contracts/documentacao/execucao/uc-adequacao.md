@@ -43,8 +43,37 @@ Executar **adequação completa** de UC-RFXXX.yaml para:
 1. ✅ **Cobertura 100%:** Todas as RNs do RF.yaml cobertas por UCs
 2. ✅ **Nomenclatura padrão:** `RN-RFXXX-NNN` em todos os arquivos
 3. ✅ **Eliminação de catálogo híbrido:** Apenas RNs reais em `covers.rf_items` e `regras_aplicadas`
-4. ✅ **Documentação de funcionalidades críticas:** Jobs, workflows, integrações
-5. ✅ **Validação automática:** Exit code 0 no `validator-rf-uc.py`
+4. ✅ **🚨 NOMENCLATURA DE FLUXOS (BLOQUEANTE):** `FA-UCNN-NNN` e `FE-UCNN-NNN` (NÃO `FA-001`, `FA-01`, etc.)
+5. ✅ **Documentação de funcionalidades críticas:** Jobs, workflows, integrações
+6. ✅ **Validação automática:** Exit code 0 no `validator-rf-uc.py`
+
+---
+
+## ⚠️ AVISO CRÍTICO: NOMENCLATURA DE FLUXOS É BLOQUEANTE
+
+**PROBLEMA RECORRENTE:** UC.md frequentemente utiliza nomenclatura **INCORRETA** para fluxos:
+
+❌ **INCORRETO (REPROVA):**
+```markdown
+**FA-01:** Filtrar por Empresa
+**FA-001:** Filtrar por Status
+**FE-01:** Erro ao Carregar Lista
+```
+
+✅ **CORRETO (APROVADO):**
+```markdown
+**FA-UC00-001:** Filtrar por Empresa
+**FA-UC00-002:** Filtrar por Status
+**FE-UC00-001:** Erro ao Carregar Lista
+```
+
+**Padrão obrigatório:**
+- **FA-UCNN-NNN** para fluxos alternativos (ex: FA-UC00-001, FA-UC01-005)
+- **FE-UCNN-NNN** para fluxos de exceção (ex: FE-UC00-001, FE-UC02-003)
+
+**Validação 3.5 BLOQUEANTE:** Se encontrar **qualquer** `FA-01`, `FA-001`, `FE-01`, `FE-001` → **REPROVAÇÃO IMEDIATA**
+
+**🔧 Etapa 5 do contrato executa migração automática obrigatória.**
 
 ---
 
@@ -86,8 +115,8 @@ Antes de ativar este contrato, VERIFICAR:
 - `docs/rf/**/UC-RFXXX.yaml` (correção completa)
 - `docs/rf/**/UC-RFXXX.md` (correção completa)
 - `docs/rf/**/STATUS.yaml` (atualização após validação)
-- `.temp_ia/adequacao-uc-RFXXX-diagnostico.md` (diagnóstico inicial)
-- `.temp_ia/adequacao-uc-RFXXX-relatorio.md` (relatório final de execução)
+- `.temp_ia/adequacao-uc-RFXXX-diagnostico.md` (diagnóstico inicial) - **OPCIONAL**
+- `.temp_ia/adequacao-uc-RFXXX-relatorio.md` (relatório final de execução) - **OPCIONAL**
 
 ✅ **Execução permitida:**
 - `python docs/tools/docs/validator-rf-uc.py` (validação)
@@ -400,7 +429,7 @@ Antes de QUALQUER ação, criar todo list EXATA:
 - [ ] 2. Análise: ler RF.yaml, UC.yaml e UC.md
 - [ ] 3. Diagnóstico: identificar gaps e problemas (UC.yaml ↔ UC.md ↔ Templates)
 - [ ] 4. Migração nomenclatura RN: RN-RFXXX-NNN
-- [ ] 5. **Migração nomenclatura fluxos: FA-UCNN-NNN e FE-UCNN-NNN** ← **NOVO BLOQUEANTE**
+- [ ] 5. **🚨 CRÍTICO: Migração nomenclatura fluxos FA-UCNN-NNN e FE-UCNN-NNN (BLOQUEANTE - Validação 3.5)**
 - [ ] 6. Limpeza catálogo: remover RF-CRUD/VAL/SEC
 - [ ] 7. Adequar UC.yaml ao template oficial
 - [ ] 8. Adequar UC.md ao template oficial
@@ -804,9 +833,11 @@ def migrate_nomenclature(file_path, rf_num):
 
 ---
 
-#### Etapa 5: Migração de Nomenclatura de Fluxos (BLOQUEANTE) ✨ NOVO
+#### Etapa 5: 🚨 Migração de Nomenclatura de Fluxos (BLOQUEANTE - Validação 3.5) ✨
 
-**Problema:** `FA-001`, `FE-001` → `FA-UC00-001`, `FE-UC00-001`
+**⚠️ PROBLEMA RECORRENTE:** UC.md frequentemente usa `FA-001`, `FA-01`, `FE-001`, `FE-01` → **REPROVA NA VALIDAÇÃO 3.5**
+
+**✅ SOLUÇÃO:** Migrar para `FA-UC00-001`, `FE-UC00-001` (padrão obrigatório)
 
 **Ação:**
 
@@ -911,6 +942,36 @@ $ python migrate_flow_nomenclature.py RF006
 # DEPOIS (0 violações)
 $ grep -E '\*\*(FA|FE)-\d{3}:\*\*' UC-RF006.md
 (sem resultados)
+```
+
+**🔍 VALIDAÇÃO OBRIGATÓRIA APÓS ETAPA 5:**
+
+```bash
+# Verificar que NÃO existem mais violações
+grep -E '\*\*(FA|FE)-0?\d{1,2}:\*\*' UC-RFXXX.md
+
+# RESULTADO ESPERADO: Vazio (0 matches)
+# Se encontrar qualquer match → ETAPA 5 FALHOU → BLOQUEAR execução
+```
+
+**Padrões que REPROVAM (encontrados frequentemente):**
+- `**FA-01:**` → ERRADO (2 dígitos)
+- `**FA-001:**` → ERRADO (3 dígitos sem UC)
+- `**FA-1:**` → ERRADO (1 dígito)
+- `**FE-01:**` → ERRADO (2 dígitos)
+- `**FE-001:**` → ERRADO (3 dígitos sem UC)
+
+**Padrão CORRETO que APROVA:**
+- `**FA-UC00-001:**` ✅
+- `**FA-UC01-005:**` ✅
+- `**FE-UC00-001:**` ✅
+- `**FE-UC02-003:**` ✅
+
+**⚠️ SE VALIDAÇÃO FALHAR:**
+- PARAR execução imediatamente
+- Reportar violações encontradas
+- NÃO prosseguir para Etapa 6
+- Corrigir manualmente ou reexecutar script
 
 $ grep -E '\*\*(FA|FE)-UC\d{2}-\d{3}:\*\*' UC-RF006.md | head -5
 **FA-UC00-001:** Usuário NÃO é Super Admin
@@ -2177,9 +2238,8 @@ Este contrato só é considerado CONCLUÍDO quando TODOS os critérios abaixo fo
 
 - [ ] Todo list completa (15 etapas) executada
 - [ ] Backup do UC original criado (`.backup-*`)
-- [ ] Diagnóstico completo gerado (`.temp_ia/adequacao-uc-RFXXX-diagnostico.md`)
 - [ ] **Nomenclatura migrada: ZERO `RN-CTR-|DEP-|FIN-`** ← BLOQUEANTE
-- [ ] **Nomenclatura de fluxos: ZERO `FA-\d{3}` ou `FE-\d{3}`** ← **NOVO BLOQUEANTE**
+- [ ] **Nomenclatura de fluxos: ZERO `FA-\d{3}` ou `FE-\d{3}`** ← **BLOQUEANTE**
 - [ ] **Catálogo limpo: ZERO `RF\d{3}-CRUD-|VAL-|SEC-`** ← BLOQUEANTE
 - [ ] **Cobertura 100%: TODAS RNs do RF em UCs** ← BLOQUEANTE
 - [ ] Entidades órfãs documentadas (se aplicável)
@@ -2189,7 +2249,8 @@ Este contrato só é considerado CONCLUÍDO quando TODOS os critérios abaixo fo
 - [ ] **UC.yaml ↔ UC.md 100% sincronizados** ← BLOQUEANTE
 - [ ] **Validação aprovada: `validator-rf-uc.py` exit code 0** ← BLOQUEANTE
 - [ ] **STATUS.yaml atualizado com flags de validação** ← OBRIGATÓRIO
-- [ ] Relatório final gerado (`.temp_ia/adequacao-uc-RFXXX-relatorio.md`)
+- [ ] Diagnóstico gerado (`.temp_ia/adequacao-uc-RFXXX-diagnostico.md`) - **OPCIONAL** (recomendado)
+- [ ] Relatório final gerado (`.temp_ia/adequacao-uc-RFXXX-relatorio.md`) - **OPCIONAL** (recomendado)
 
 ### ❌ CRITÉRIOS QUE REPROVAM IMEDIATAMENTE
 

@@ -19,11 +19,13 @@ Este contrato gera **documentação completa de Wireframes (WF)** com base nos *
 
 ### 📁 Arquivos Gerados
 
-1. **WF-RFXXX.md** - Wireframes (derivado dos UCs)
+1. **WF-RFXXX.md** - Wireframes narrativo (derivado dos UCs) - **OBRIGATÓRIO**
 2. **STATUS.yaml** - Atualização de governança
 
 ✅ **UC deve estar criado e validado** (pré-requisito)
 ⚠️ **Commit e push:** Responsabilidade do usuário (não automatizado)
+
+**⚠️ IMPORTANTE:** Apenas WF.md é obrigatório (formato narrativo). NÃO criar WF.yaml.
 
 ### 🎯 Princípios Fundamentais
 
@@ -378,7 +380,7 @@ O contrato só é considerado CONCLUÍDO quando:
 - [ ] **Responsividade:** Mobile, Tablet, Desktop documentados
 - [ ] **Acessibilidade:** WCAG AA aplicado
 - [ ] **Rastreabilidade:** UC → WF completa
-- [ ] **Arquivos prontos** (2 arquivos gerados)
+- [ ] **Arquivos prontos** (2 arquivos gerados: WF.md, STATUS.yaml)
 
 **REGRA DE BLOQUEIO:** Se QUALQUER item desta lista estiver incompleto, a execução DEVE ser considerada FALHADA.
 

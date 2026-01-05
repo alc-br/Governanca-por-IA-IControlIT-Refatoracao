@@ -425,23 +425,24 @@ adequacao_uc:
 
 ---
 
-### VALIDAÇÃO 12: Relatório Final Gerado
+### VALIDAÇÃO 12: STATUS.yaml Documentação Marcada
 
-**Objetivo:** Verificar se relatório de execução foi criado.
+**Objetivo:** Verificar se STATUS.yaml marcou documentacao.uc = true.
 
-**Arquivos esperados:**
-- `.temp_ia/adequacao-uc-RFXXX-diagnostico.md`
-- `.temp_ia/adequacao-uc-RFXXX-relatorio.md`
+**Seção esperada:**
+```yaml
+documentacao:
+  uc: true  # DEVE estar true após adequação
+```
 
 **Critério de aprovação:**
-- ✅ Ambos os arquivos existem
-- ❌ Qualquer arquivo ausente = **MENOR**
+- ✅ `documentacao.uc == true`
+- ❌ Campo ausente ou false = **IMPORTANTE**
 
 **Saída esperada:**
 ```
 ✅ VALIDAÇÃO 12: APROVADO
-   Diagnóstico: .temp_ia/adequacao-uc-RF028-diagnostico.md (existente)
-   Relatório: .temp_ia/adequacao-uc-RF028-relatorio.md (existente)
+   STATUS.yaml: documentacao.uc = true
 ```
 
 ---
@@ -472,10 +473,10 @@ adequacao_uc:
 | 8. Workflows documentados | ✅ PASS ou N/A | IMPORTANTE | N/A |
 | 9. Integrações documentadas | ✅ PASS | IMPORTANTE | 1/1 (100%) |
 | 10. Validador automático | ✅ PASS | CRÍTICO | Exit code 0 |
-| 11. STATUS.yaml | ✅ PASS | IMPORTANTE | Seção presente |
-| 12. Relatório gerado | ✅ PASS | MENOR | Arquivos presentes |
+| 11. STATUS.yaml adequacao_uc | ✅ PASS | IMPORTANTE | Seção presente |
+| 12. STATUS.yaml documentacao.uc | ✅ PASS | IMPORTANTE | true |
 
-**PONTUAÇÃO FINAL:** 13/13 PASS (100%)
+**PONTUAÇÃO FINAL:** 12/12 PASS (100%)
 
 **VEREDICTO:** ✅ **APROVADO** - UC-RFXXX está 100% conforme (ZERO GAPS)
 
@@ -502,81 +503,102 @@ Nenhuma ação corretiva necessária. UC-RFXXX pode prosseguir para próximo con
 
 ## CRITÉRIOS DE APROVAÇÃO/REPROVAÇÃO
 
-### ⚠️ REGRA DE ZERO TOLERÂNCIA
+### ⚠️ REGRA DE ZERO TOLERÂNCIA v3.0 (Ajustada)
 
-**A PARTIR DE AGORA:**
-- ✅ **APROVADO** = 12/12 validações PASS + ZERO gaps (exceto falhas técnicas Python)
-- ❌ **REPROVADO** = Qualquer validação FAIL OU qualquer gap (CRÍTICO, IMPORTANTE, **MENOR**)
+**CRITÉRIO DE APROVAÇÃO:**
+- ✅ **APROVADO** = 12/12 validações PASS + ZERO gaps CRÍTICOS + ZERO gaps IMPORTANTES
+- ❌ **REPROVADO** = Qualquer validação FAIL OU gap CRÍTICO OU gap IMPORTANTE
 
-**ÚNICA EXCEÇÃO PERMITIDA:**
+**GAPS MENORES:**
+- Gap MENOR **NÃO reprova** sozinho
+- Gap MENOR gera **ADVERTÊNCIA** e recomendação de correção
+- Múltiplos gaps MENORES podem sinalizar problema de processo
+
+**EXCEÇÃO PERMITIDA:**
 - ⚠️ Falhas técnicas do validador Python (timeout, erro de script, etc.)
-- Gaps de funcionalidade/nomenclatura **SEMPRE** reprovam
+- Nesses casos, análise manual pode aprovar se validações manuais passarem
 
 ---
 
-### ✅ APROVADO (100%) - CRITÉRIO RIGOROSO
+### ✅ APROVADO - CRITÉRIO RIGOROSO MAS PRAGMÁTICO
 
 **Exigências ABSOLUTAS:**
 - ✅ Todas as 12 validações PASS
-- ✅ ZERO gaps de qualquer severidade (CRÍTICO, IMPORTANTE, **MENOR**)
-- ✅ ZERO violações de nomenclatura (incluindo FA-001 vs FA-UC00-001)
-- ✅ ZERO jobs background não documentados
-- ✅ ZERO integrações externas incompletas
+- ✅ ZERO gaps CRÍTICOS
+- ✅ ZERO gaps IMPORTANTES
+- ✅ ZERO violações de nomenclatura FA-001 vs FA-UC00-001 (CRÍTICO)
+- ✅ ZERO jobs background não documentados (IMPORTANTE)
+- ✅ ZERO integrações externas incompletas (IMPORTANTE)
 - ✅ Validador Python exit code 0 (ou justificativa técnica)
+
+**Gaps MENORES são permitidos:**
+- ⚠️ Gaps MENORES geram ADVERTÊNCIA mas não reprovam
+- ⚠️ Devem ser corrigidos posteriormente se recorrentes
 
 **Exemplo de aprovação válida:**
 ```
 12/12 PASS
 0 gaps CRÍTICOS
 0 gaps IMPORTANTES
-0 gaps MENORES  ← OBRIGATÓRIO
-Veredicto: ✅ APROVADO
+1 gap MENOR (arquivo diagnóstico ausente)  ← PERMITIDO, gera advertência
+Veredicto: ✅ APROVADO COM ADVERTÊNCIA
 ```
 
 ---
 
-### ❌ REPROVADO (<100%) - QUALQUER GAP REPROVA
+### ❌ REPROVADO - CRITÉRIO CLARO
 
-**Motivos de REPROVAÇÃO (lista não-exaustiva):**
+**Motivos de REPROVAÇÃO:**
 - ❌ 11/12 ou menos validações PASS
-- ❌ **QUALQUER gap CRÍTICO** (ex: RN não coberta)
-- ❌ **QUALQUER gap IMPORTANTE** (ex: job não documentado)
-- ❌ **QUALQUER gap MENOR** (ex: FA-001 vs FA-UC00-001) ← **NOVO!**
-- ❌ Nomenclatura de fluxos incorreta (42 violações = REPROVADO)
-- ❌ Validador exit code ≠ 0 (exceto falhas técnicas Python)
+- ❌ **QUALQUER gap CRÍTICO** (ex: RN não coberta, nomenclatura FA-001 incorreta)
+- ❌ **QUALQUER gap IMPORTANTE** (ex: job não documentado, integração incompleta)
+- ❌ Validador exit code ≠ 0 (exceto falhas técnicas Python com análise manual)
 
-**Exemplo de reprovação por gap "menor":**
+**Exemplo de reprovação por gap CRÍTICO:**
+```
+11/12 PASS (Validação 3.5 FAIL)
+1 gap CRÍTICO: Nomenclatura FA-001 vs FA-UC00-001 (42 violações)
+0 gaps IMPORTANTES
+0 gaps MENORES
+Veredicto: ❌ REPROVADO
+Motivo: Nomenclatura de fluxos incorreta (gap CRÍTICO)
+```
+
+**Exemplo de aprovação com gap MENOR:**
 ```
 12/12 PASS
 0 gaps CRÍTICOS
 0 gaps IMPORTANTES
-3 gaps MENORES  ← REPROVA!
-  - Gap #1: Nomenclatura FA-001 vs FA-UC00-001 (42 violações)
-  - Gap #2: Falta RN-UC específicas
-  - Gap #3: Arquivo diagnóstico ausente
-Veredicto: ❌ REPROVADO
-Motivo: Nomenclatura de fluxos incorreta (gap MENOR mas BLOQUEANTE)
+1 gap MENOR: Arquivo diagnóstico ausente
+Veredicto: ✅ APROVADO COM ADVERTÊNCIA
+Motivo: Gap MENOR não bloqueia aprovação
 ```
 
 ---
 
-### 🚨 GAPS "MENORES" QUE REPROVAM
+### 🚨 CLASSIFICAÇÃO DE SEVERIDADES
 
-**ATENÇÃO:** A partir de agora, os seguintes gaps classificados como "MENOR" **REPROVAM** o RF:
-
+**CRÍTICO (BLOQUEANTE):**
 1. **Nomenclatura de Fluxos Incorreta** (FA-001 vs FA-UC00-001)
-   - Severidade antiga: MENOR
-   - Severidade nova: **BLOQUEANTE**
-   - Motivo: Quebra rastreabilidade automática, inconsistência com RF002/RF071
+   - Motivo: Quebra rastreabilidade automática, inconsistência com padrão
+2. **Cobertura RN → UC < 100%**
+   - Motivo: RN não documentada pode gerar bug
+3. **UC.yaml ↔ UC.md dessincronizados**
+   - Motivo: Fonte da verdade corrompida
 
-2. **Falta de RN-UC Específicas**
-   - Severidade antiga: MENOR
-   - Severidade nova: **BLOQUEANTE** (se recorrente em múltiplos UCs)
-   - Motivo: Boas práticas de documentação
+**IMPORTANTE (BLOQUEANTE):**
+1. **Job Background não documentado**
+   - Motivo: Impacto em operação/infraestrutura
+2. **Integração externa incompleta**
+   - Motivo: Risco de integração falhar sem documentação
+3. **Template violado** (UC.yaml ou UC.md)
+   - Motivo: Inconsistência com padrão do projeto
 
-3. **Arquivo Diagnóstico Ausente**
-   - Severidade antiga: MENOR
-   - Severidade nova: **ADVERTÊNCIA** (não reprova sozinho, mas deve ser criado)
+**MENOR (NÃO BLOQUEANTE):**
+1. **Arquivo diagnóstico ausente**
+   - Motivo: Puramente documental, não afeta funcionalidade
+2. **Arquivo relatório ausente**
+   - Motivo: Puramente documental, não afeta funcionalidade
 
 ---
 
@@ -617,11 +639,13 @@ Seguir CLAUDE.md.
 **Comportamento esperado:**
 1. Leitura de RF.yaml, UC.yaml, UC.md, STATUS.yaml
 2. Execução das 12 validações
-3. Geração de relatório de gaps (se houver)
+3. Exibição de relatório de gaps na tela (se houver)
 4. Veredicto final: APROVADO, APROVADO COM RESSALVAS, ou REPROVADO
-5. Salvar relatório em `.temp_ia/validacao-uc-RFXXX-relatorio.md`
 
-**IMPORTANTE:** Este validador NÃO corrige problemas, apenas IDENTIFICA.
+**IMPORTANTE:**
+- Este validador NÃO corrige problemas, apenas IDENTIFICA
+- Relatório é exibido na tela, não salvo em arquivo
+- Usuário vê resultado imediatamente no output do agente
 
 ---
 

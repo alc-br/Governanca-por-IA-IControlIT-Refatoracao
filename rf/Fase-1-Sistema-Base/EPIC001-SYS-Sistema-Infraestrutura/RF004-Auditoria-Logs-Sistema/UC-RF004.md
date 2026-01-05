@@ -27,15 +27,15 @@ Os UCs aqui definidos servem como **contrato comportamental**, sendo a **fonte p
 
 | ID | Nome | Ator Principal | Regras Cobertas |
 |----|------|----------------|-----------------|
-| UC00 | Listar Registros de Auditoria | Auditor, Super Admin | RN-AUD-001, RN-AUD-010 |
-| UC01 | Buscar com Filtros Avançados | Auditor, Super Admin | RN-AUD-003, RN-AUD-010, RN-AUD-014 |
-| UC02 | Visualizar Timeline de Entidade | Auditor, Super Admin | RN-AUD-002, RN-AUD-003, RN-AUD-009 |
-| UC03 | Exportar Relatórios de Compliance | Auditor, Super Admin | RN-AUD-004, RN-AUD-008 |
-| UC04 | Visualizar Dashboards Analíticos | Gerente Operações, Super Admin | RN-AUD-004 |
-| UC05 | Detectar e Visualizar Anomalias | Analista Segurança, Super Admin | RN-AUD-007, RN-AUD-012, RN-AUD-013 |
-| UC06 | Validar Integridade (Hash SHA-256) | Auditor, Super Admin | RN-AUD-005, RN-AUD-006 |
-| UC07 | Visualizar Detalhes de Registro | Auditor, Super Admin | RN-AUD-001, RN-AUD-002, RN-AUD-010, RN-AUD-011 |
-| UC08 | Gerenciar Retenção e Alertas | Administrador Sistema, Super Admin | RN-AUD-015 |
+| UC00 | Listar Registros de Auditoria | Auditor, Super Admin | RN-RF004-001, RN-RF004-010 |
+| UC01 | Buscar com Filtros Avançados | Auditor, Super Admin | RN-RF004-003, RN-RF004-010, RN-RF004-014 |
+| UC02 | Visualizar Timeline de Entidade | Auditor, Super Admin | RN-RF004-002, RN-RF004-003, RN-RF004-009 |
+| UC03 | Exportar Relatórios de Compliance | Auditor, Super Admin | RN-RF004-004, RN-RF004-008 |
+| UC04 | Visualizar Dashboards Analíticos | Gerente Operações, Super Admin | RN-RF004-004 |
+| UC05 | Detectar e Visualizar Anomalias | Analista Segurança, Super Admin | RN-RF004-007, RN-RF004-012, RN-RF004-013 |
+| UC06 | Validar Integridade (Hash SHA-256) | Auditor, Super Admin | RN-RF004-005, RN-RF004-006 |
+| UC07 | Visualizar Detalhes de Registro | Auditor, Super Admin | RN-RF004-001, RN-RF004-002, RN-RF004-010, RN-RF004-011 |
+| UC08 | Gerenciar Retenção e Alertas | Administrador Sistema, Super Admin | RN-RF004-015 |
 
 **Cobertura**: 15/15 Regras de Negócio (100%)
 
@@ -75,19 +75,19 @@ Permitir que o usuário visualize registros de auditoria disponíveis do seu pr�
 6. Sistema exibe a lista com colunas: Timestamp, Tipo, Descrição, Usuário, Entidade, IP
 
 ### Fluxos Alternativos
-- **FA-00-01: Buscar por termo** - Filtro LIKE em Descricao, Entidade, Usuario
-- **FA-00-02: Ordenar por coluna** - Alternar ASC/DESC
-- **FA-00-03: Filtrar por categoria** - WHERE Tipo = @Tipo
-- **FA-00-04: Alterar tamanho de página** - 25/50/100/200 registros
+- **FA-UC00-001: Buscar por termo** - Filtro LIKE em Descricao, Entidade, Usuario
+- **FA-UC00-002: Ordenar por coluna** - Alternar ASC/DESC
+- **FA-UC00-003: Filtrar por categoria** - WHERE Tipo = @Tipo
+- **FA-UC00-004: Alterar tamanho de página** - 25/50/100/200 registros
 
 ### Fluxos de Exceção
-- **FE-00-01: Usuário sem permissão** - HTTP 403
-- **FE-00-02: Nenhum registro** - Estado vazio
-- **FE-00-03: Erro de conexão** - Mensagem genérica + log técnico
+- **FE-UC00-001: Usuário sem permissão** - HTTP 403
+- **FE-UC00-002: Nenhum registro** - Estado vazio
+- **FE-UC00-003: Erro de conexão** - Mensagem genérica + log técnico
 
 ### Regras de Negócio
-- **RN-AUD-001**: Auditoria automática via MediatR AuditingBehaviour
-- **RN-AUD-010**: Multi-tenancy com isolamento rigoroso
+- **RN-RF004-001**: Auditoria automática via MediatR AuditingBehaviour
+- **RN-RF004-010**: Multi-tenancy com isolamento rigoroso
 - **RN-UC00-001**: Somente registros do tenant autenticado
 - **RN-UC00-002**: Paginação padrão 50 registros
 - **RN-UC00-003**: Ordenação padrão por Timestamp DESC
@@ -118,19 +118,19 @@ Permitir buscas complexas com múltiplos critérios combinados para investigaç�
 7. Sistema exibe resultados paginados
 
 ### Fluxos Alternativos
-- **FA-01-01: Salvar busca favorita**
-- **FA-01-02: Carregar busca salva**
-- **FA-01-03: Exportar resultados** (redireciona UC03)
+- **FA-UC01-001: Salvar busca favorita**
+- **FA-UC01-002: Carregar busca salva**
+- **FA-UC01-003: Exportar resultados** (redireciona UC03)
 
 ### Fluxos de Exceção
-- **FE-01-01: Critérios inválidos** - Validação de datas
-- **FE-01-02: Timeout** - Query > 30s
-- **FE-01-03: Nenhum resultado**
+- **FE-UC01-001: Critérios inválidos** - Validação de datas
+- **FE-UC01-002: Timeout** - Query > 30s
+- **FE-UC01-003: Nenhum resultado**
 
 ### Regras de Negócio
-- **RN-AUD-003**: Diff estruturado pesquisável (JSON Patch RFC 6902)
-- **RN-AUD-010**: Multi-tenancy
-- **RN-AUD-014**: Full-text search otimizado (50M+ registros)
+- **RN-RF004-003**: Diff estruturado pesquisável (JSON Patch RFC 6902)
+- **RN-RF004-010**: Multi-tenancy
+- **RN-RF004-014**: Full-text search otimizado (50M+ registros)
 - **RN-UC01-001**: Período máximo 1 ano
 - **RN-UC01-002**: Índices full-text obrigatórios
 - **RN-UC01-003**: Timeout 30 segundos
@@ -162,19 +162,19 @@ Exibir histórico completo e cronológico de todas as operações realizadas em 
 7. Sistema destaca campos modificados
 
 ### Fluxos Alternativos
-- **FA-02-01: Filtrar por tipo de operação**
-- **FA-02-02: Filtrar por período**
-- **FA-02-03: Comparar duas versões** (diff lado a lado)
+- **FA-UC02-001: Filtrar por tipo de operação**
+- **FA-UC02-002: Filtrar por período**
+- **FA-UC02-003: Comparar duas versões** (diff lado a lado)
 
 ### Fluxos de Exceção
-- **FE-02-01: Entidade não encontrada** - HTTP 404
-- **FE-02-02: Nenhum registro**
-- **FE-02-03: Erro ao carregar JSON**
+- **FE-UC02-001: Entidade não encontrada** - HTTP 404
+- **FE-UC02-002: Nenhum registro**
+- **FE-UC02-003: Erro ao carregar JSON**
 
 ### Regras de Negócio
-- **RN-AUD-002**: Snapshot completo before/after (DadosAnteriores_JSON, DadosNovos_JSON)
-- **RN-AUD-003**: Diff estruturado (JSON Patch RFC 6902)
-- **RN-AUD-009**: Timeline completa e cronológica
+- **RN-RF004-002**: Snapshot completo before/after (DadosAnteriores_JSON, DadosNovos_JSON)
+- **RN-RF004-003**: Diff estruturado (JSON Patch RFC 6902)
+- **RN-RF004-009**: Timeline completa e cronológica
 - **RN-UC02-001**: Ordenação Timestamp ASC
 - **RN-UC02-002**: Destaque visual para campos modificados
 - **RN-UC02-003**: JSON pretty-print
@@ -207,17 +207,17 @@ Gerar relatórios formatados para auditoria externa (LGPD, SOX, ISO 27001).
 9. Sistema exibe link download
 
 ### Fluxos Alternativos
-- **FA-03-01: Agendar exportação recorrente**
-- **FA-03-02: Incluir hash de integridade**
+- **FA-UC03-001: Agendar exportação recorrente**
+- **FA-UC03-002: Incluir hash de integridade**
 
 ### Fluxos de Exceção
-- **FE-03-01: Período excede 1 ano**
-- **FE-03-02: Volume muito grande (timeout)**
-- **FE-03-03: Erro ao gerar arquivo**
+- **FE-UC03-001: Período excede 1 ano**
+- **FE-UC03-002: Volume muito grande (timeout)**
+- **FE-UC03-003: Erro ao gerar arquivo**
 
 ### Regras de Negócio
-- **RN-AUD-004**: Retenção por categoria (LGPD/SOX: 7 anos)
-- **RN-AUD-008**: Relatórios de compliance
+- **RN-RF004-004**: Retenção por categoria (LGPD/SOX: 7 anos)
+- **RN-RF004-008**: Relatórios de compliance
 - **RN-UC03-001**: Auditoria de exportação obrigatória
 - **RN-UC03-002**: Hash SHA-256 do arquivo
 - **RN-UC03-003**: Formatos: PDF, Excel, JSON, CSV
@@ -251,16 +251,16 @@ Exibir dashboards visuais com métricas agregadas de auditoria por categoria.
 5. Sistema atualiza (cache 5 minutos)
 
 ### Fluxos Alternativos
-- **FA-04-01: Filtrar por período personalizado**
-- **FA-04-02: Drill-down em categoria**
-- **FA-04-03: Exportar gráfico**
+- **FA-UC04-001: Filtrar por período personalizado**
+- **FA-UC04-002: Drill-down em categoria**
+- **FA-UC04-003: Exportar gráfico**
 
 ### Fluxos de Exceção
-- **FE-04-01: Erro ao calcular métricas**
-- **FE-04-02: Cache expirado**
+- **FE-UC04-001: Erro ao calcular métricas**
+- **FE-UC04-002: Cache expirado**
 
 ### Regras de Negócio
-- **RN-AUD-004**: Retenção por categoria
+- **RN-RF004-004**: Retenção por categoria
 - **RN-UC04-001**: Cache 5 minutos
 - **RN-UC04-002**: Métricas pré-calculadas
 - **RN-UC04-003**: Isolamento por tenant
@@ -294,18 +294,18 @@ Detectar automaticamente padrões anômalos de comportamento e exibir alertas.
 5. Sistema permite investigação (redireciona UC01)
 
 ### Fluxos Alternativos
-- **FA-05-01: Marcar falso positivo**
-- **FA-05-02: Escalar para segurança**
-- **FA-05-03: Configurar thresholds**
+- **FA-UC05-001: Marcar falso positivo**
+- **FA-UC05-002: Escalar para segurança**
+- **FA-UC05-003: Configurar thresholds**
 
 ### Fluxos de Exceção
-- **FE-05-01: Nenhuma anomalia**
-- **FE-05-02: Erro ao executar detecção**
+- **FE-UC05-001: Nenhuma anomalia**
+- **FE-UC05-002: Erro ao executar detecção**
 
 ### Regras de Negócio
-- **RN-AUD-007**: Detecção automática (thresholds)
-- **RN-AUD-012**: Alertas em tempo real
-- **RN-AUD-013**: Thresholds configuráveis
+- **RN-RF004-007**: Detecção automática (thresholds)
+- **RN-RF004-012**: Alertas em tempo real
+- **RN-RF004-013**: Thresholds configuráveis
 - **RN-UC05-001**: Detecção a cada 10 min (Hangfire)
 - **RN-UC05-002**: Registra em SECURITY
 - **RN-UC05-003**: Severidade automática
@@ -336,16 +336,16 @@ Verificar a integridade criptográfica de registros de auditoria.
 7. Sistema exibe: ✅ Íntegro ou ❌ Corrompido
 
 ### Fluxos Alternativos
-- **FA-06-01: Exportar relatório de integridade**
-- **FA-06-02: Validação automática agendada**
+- **FA-UC06-001: Exportar relatório de integridade**
+- **FA-UC06-002: Validação automática agendada**
 
 ### Fluxos de Exceção
-- **FE-06-01: Registro corrompido** (alerta SECURITY)
-- **FE-06-02: Erro ao recalcular**
+- **FE-UC06-001: Registro corrompido** (alerta SECURITY)
+- **FE-UC06-002: Erro ao recalcular**
 
 ### Regras de Negócio
-- **RN-AUD-005**: Hash SHA-256 para integridade
-- **RN-AUD-006**: Validação periódica
+- **RN-RF004-005**: Hash SHA-256 para integridade
+- **RN-RF004-006**: Validação periódica
 - **RN-UC06-001**: Hash na criação (AuditingBehaviour)
 - **RN-UC06-002**: Individual ou lote
 - **RN-UC06-003**: Corrompido = alerta crítico
@@ -380,19 +380,19 @@ Exibir todos os detalhes de um registro específico de auditoria.
    - Painel 5: Retenção (RetentionDate, Arquivado, AzureBlobUri)
 
 ### Fluxos Alternativos
-- **FA-07-01: Copiar CorrelationId**
-- **FA-07-02: Rastrear CorrelationId** (filtro UC01)
-- **FA-07-03: Exportar JSON**
+- **FA-UC07-001: Copiar CorrelationId**
+- **FA-UC07-002: Rastrear CorrelationId** (filtro UC01)
+- **FA-UC07-003: Exportar JSON**
 
 ### Fluxos de Exceção
-- **FE-07-01: Registro não encontrado** - HTTP 404
-- **FE-07-02: Erro ao renderizar JSON**
+- **FE-UC07-001: Registro não encontrado** - HTTP 404
+- **FE-UC07-002: Erro ao renderizar JSON**
 
 ### Regras de Negócio
-- **RN-AUD-001**: Auditoria com todos metadados
-- **RN-AUD-002**: Snapshot before/after
-- **RN-AUD-010**: Multi-tenancy
-- **RN-AUD-011**: CorrelationId para rastreamento
+- **RN-RF004-001**: Auditoria com todos metadados
+- **RN-RF004-002**: Snapshot before/after
+- **RN-RF004-010**: Multi-tenancy
+- **RN-RF004-011**: CorrelationId para rastreamento
 - **RN-UC07-001**: JSON pretty-print
 - **RN-UC07-002**: Diff JSON Patch RFC 6902
 
@@ -424,17 +424,17 @@ Gerenciar políticas de retenção por categoria e exibir alertas de registros p
 6. Sistema valida e salva
 
 ### Fluxos Alternativos
-- **FA-08-01: Arquivar vencidos** (Azure Blob cold tier)
-- **FA-08-02: Restaurar arquivados**
-- **FA-08-03: Excluir vencidos** (apenas não-compliance)
+- **FA-UC08-001: Arquivar vencidos** (Azure Blob cold tier)
+- **FA-UC08-002: Restaurar arquivados**
+- **FA-UC08-003: Excluir vencidos** (apenas não-compliance)
 
 ### Fluxos de Exceção
-- **FE-08-01: Tentativa alterar compliance** (BLOQUEIO)
-- **FE-08-02: Tentativa excluir compliance** (BLOQUEIO)
-- **FE-08-03: Erro Azure Blob**
+- **FE-UC08-001: Tentativa alterar compliance** (BLOQUEIO)
+- **FE-UC08-002: Tentativa excluir compliance** (BLOQUEIO)
+- **FE-UC08-003: Erro Azure Blob**
 
 ### Regras de Negócio
-- **RN-AUD-015**: Alertas 30 dias antes vencimento
+- **RN-RF004-015**: Alertas 30 dias antes vencimento
 - **RN-UC08-001**: Compliance fixa (FINANCIAL/LGPD/SECURITY)
 - **RN-UC08-002**: Não-compliance ajustável (30d-10a)
 - **RN-UC08-003**: Arquivamento Azure cold
@@ -447,21 +447,21 @@ Gerenciar políticas de retenção por categoria e exibir alertas de registros p
 
 | Regra de Negócio | UCs Cobrindo | Status |
 |------------------|--------------|--------|
-| RN-AUD-001 — Auditoria Automática MediatR | UC00, UC07 | ✅ |
-| RN-AUD-002 — Snapshot Before/After | UC02, UC07 | ✅ |
-| RN-AUD-003 — Diff Estruturado (JSON Patch RFC 6902) | UC01, UC02, UC07 | ✅ |
-| RN-AUD-004 — Retenção por Categoria (SOX/LGPD) | UC00, UC03, UC04 | ✅ |
-| RN-AUD-005 — Hash SHA-256 para Integridade | UC06 | ✅ |
-| RN-AUD-006 — Validação de Integridade Periódica | UC06 | ✅ |
-| RN-AUD-007 — Detecção de Anomalias | UC05 | ✅ |
-| RN-AUD-008 — Relatórios de Compliance (LGPD/SOX/ISO) | UC03 | ✅ |
-| RN-AUD-009 — Timeline Cronológica Completa | UC02 | ✅ |
-| RN-AUD-010 — Multi-tenancy com Isolamento | UC00, UC01, UC07 | ✅ |
-| RN-AUD-011 — CorrelationId para Rastreamento | UC07 | ✅ |
-| RN-AUD-012 — Alertas de Anomalias em Tempo Real | UC05 | ✅ |
-| RN-AUD-013 — Configuração de Thresholds | UC05 | ✅ |
-| RN-AUD-014 — Full-text Search Otimizado | UC01 | ✅ |
-| RN-AUD-015 — Alertas de Retenção Expirando | UC08 | ✅ |
+| RN-RF004-001 — Auditoria Automática MediatR | UC00, UC07 | ✅ |
+| RN-RF004-002 — Snapshot Before/After | UC02, UC07 | ✅ |
+| RN-RF004-003 — Diff Estruturado (JSON Patch RFC 6902) | UC01, UC02, UC07 | ✅ |
+| RN-RF004-004 — Retenção por Categoria (SOX/LGPD) | UC00, UC03, UC04 | ✅ |
+| RN-RF004-005 — Hash SHA-256 para Integridade | UC06 | ✅ |
+| RN-RF004-006 — Validação de Integridade Periódica | UC06 | ✅ |
+| RN-RF004-007 — Detecção de Anomalias | UC05 | ✅ |
+| RN-RF004-008 — Relatórios de Compliance (LGPD/SOX/ISO) | UC03 | ✅ |
+| RN-RF004-009 — Timeline Cronológica Completa | UC02 | ✅ |
+| RN-RF004-010 — Multi-tenancy com Isolamento | UC00, UC01, UC07 | ✅ |
+| RN-RF004-011 — CorrelationId para Rastreamento | UC07 | ✅ |
+| RN-RF004-012 — Alertas de Anomalias em Tempo Real | UC05 | ✅ |
+| RN-RF004-013 — Configuração de Thresholds | UC05 | ✅ |
+| RN-RF004-014 — Full-text Search Otimizado | UC01 | ✅ |
+| RN-RF004-015 — Alertas de Retenção Expirando | UC08 | ✅ |
 
 **Cobertura Total: 15/15 Regras de Negócio (100%)**
 

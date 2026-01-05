@@ -1,0 +1,578 @@
+# =============================================
+# UC - Casos de Uso (Contrato Comportamental)
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+uc:
+  rf: "RF014"
+  versao: "2.0"
+  data: "2026-01-04"
+
+casos_de_uso:
+
+  - id: "UC00"
+    nome: "Visualizar Configurações Pessoais"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      rf_items:
+        - "RF014-CRUD-01"
+        - "RF014-SEC-01"
+        - "RF014-SEC-02"
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa menu Configurações ou Meu Perfil"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema valida token JWT"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Sistema carrega dados do usuário autenticado"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Sistema exibe dados pessoais (nome, email, CPF, telefone, data nascimento)"
+          required: true
+        - id: "FP-UC00-005"
+          title: "Sistema exibe empresa vinculada (somente leitura)"
+          required: true
+        - id: "FP-UC00-006"
+          title: "Sistema exibe preferências atuais (idioma, tema, timezone)"
+          required: true
+        - id: "FP-UC00-007"
+          title: "Sistema exibe informações de auditoria (created_at, updated_at)"
+          required: true
+        - id: "FA-UC00-001"
+          title: "Usuário navega entre abas (Dados Pessoais, Segurança, Preferências)"
+          required: false
+        - id: "FA-UC00-002"
+          title: "Usuário visualiza em tela pequena (< 1024px) → menu lateral vira drawer overlay"
+          required: false
+        - id: "FE-UC00-001"
+          title: "Token JWT inválido ou expirado → redirecionar para login"
+          required: true
+        - id: "FE-UC00-002"
+          title: "Usuário não encontrado no banco → retornar erro 404"
+          required: true
+        - id: "FE-UC00-003"
+          title: "Erro ao carregar dados → exibir mensagem genérica"
+          required: true
+
+    precondicoes:
+      - permissao: "self.view"
+
+    gatilho: "Usuario acessa menu Configurações"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_configuracoes"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_token_jwt"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_dados_usuario_autenticado"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibir_dados_pessoais"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_empresa_vinculada"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibir_preferencias_atuais"
+      - passo: 7
+        ator: "sistema"
+        acao: "exibir_informacoes_auditoria"
+
+    fluxos_alternativos:
+      - id: "FA-UC00-01"
+        condicao: "usuario_navega_entre_abas"
+        resultado: "exibir_aba_correspondente"
+      - id: "FA-UC00-02"
+        condicao: "tela_pequena"
+        resultado: "menu_lateral_vira_drawer_overlay"
+
+    fluxos_excecao:
+      - id: "FE-UC00-01"
+        condicao: "token_invalido_ou_expirado"
+        resultado: "redirecionar_para_login"
+      - id: "FE-UC00-02"
+        condicao: "usuario_nao_encontrado"
+        resultado: "retornar_404"
+      - id: "FE-UC00-03"
+        condicao: "erro_ao_carregar_dados"
+        resultado: "exibir_mensagem_generica"
+
+    regras_aplicadas:
+      - "RN-RF014-01"
+      - "RN-RF014-15"
+      - "RN-RF014-16"
+
+    resultado_final:
+      estado: "dados_exibidos"
+
+  - id: "UC01"
+    nome: "Atualizar Dados Pessoais"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RF014-CRUD-02"
+        - "RF014-VAL-01"
+        - "RF014-SEC-01"
+      uc_items:
+        - id: "FP-UC01-001"
+          title: "Usuário acessa seção Dados Pessoais"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema exibe formulário com telefone e data nascimento editáveis"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Usuário altera telefone e/ou data de nascimento"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Usuário clica em Salvar"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Sistema valida formato do telefone"
+          required: true
+        - id: "FP-UC01-006"
+          title: "Sistema valida data de nascimento (não pode ser futura)"
+          required: true
+        - id: "FP-UC01-007"
+          title: "Sistema persiste alterações no banco"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Sistema atualiza updated_at e updated_by automaticamente"
+          required: true
+        - id: "FP-UC01-009"
+          title: "Sistema emite evento usuario.dados_pessoais_atualizados"
+          required: true
+        - id: "FP-UC01-010"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FA-UC01-001"
+          title: "Usuário cancela edição"
+          required: false
+        - id: "FE-UC01-001"
+          title: "Telefone em formato inválido → exibir erro"
+          required: true
+        - id: "FE-UC01-002"
+          title: "Data de nascimento futura → exibir erro"
+          required: true
+        - id: "FE-UC01-003"
+          title: "Erro ao salvar no banco → exibir mensagem"
+          required: true
+
+    precondicoes:
+      - permissao: "self.update_profile"
+
+    gatilho: "Usuario acessa seção Dados Pessoais"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_secao_dados_pessoais"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_formulario_edicao"
+      - passo: 3
+        ator: "usuario"
+        acao: "alterar_telefone_ou_data_nascimento"
+      - passo: 4
+        ator: "usuario"
+        acao: "clicar_salvar"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_formato_telefone"
+      - passo: 6
+        ator: "sistema"
+        acao: "validar_data_nascimento"
+      - passo: 7
+        ator: "sistema"
+        acao: "persistir_alteracoes"
+      - passo: 8
+        ator: "sistema"
+        acao: "atualizar_campos_auditoria"
+      - passo: 9
+        ator: "sistema"
+        acao: "emitir_evento_dados_pessoais_atualizados"
+      - passo: 10
+        ator: "sistema"
+        acao: "exibir_mensagem_sucesso"
+
+    fluxos_alternativos:
+      - id: "FA-UC01-01"
+        condicao: "usuario_cancela_edicao"
+        resultado: "dados_nao_salvos"
+
+    fluxos_excecao:
+      - id: "FE-UC01-01"
+        condicao: "telefone_invalido"
+        resultado: "exibir_erro_formato_telefone"
+      - id: "FE-UC01-02"
+        condicao: "data_nascimento_futura"
+        resultado: "exibir_erro_data_futura"
+      - id: "FE-UC01-03"
+        condicao: "erro_ao_salvar"
+        resultado: "exibir_mensagem_erro_generico"
+
+    regras_aplicadas:
+      - "RN-RF014-01"
+      - "RN-RF014-02"
+
+    resultado_final:
+      estado: "dados_pessoais_atualizados"
+
+  - id: "UC02"
+    nome: "Alterar Senha"
+    ator_principal: "usuario_autenticado"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RF014-CRUD-03"
+        - "RF014-VAL-02"
+        - "RF014-VAL-03"
+        - "RF014-VAL-04"
+        - "RF014-VAL-05"
+        - "RF014-VAL-06"
+        - "RF014-VAL-07"
+        - "RF014-SEC-03"
+        - "RF014-SEC-04"
+        - "RF014-SEC-05"
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Usuário acessa seção Segurança ou Alterar Senha"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema exibe formulário com 3 campos: senha atual, nova senha, confirmar nova senha"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Usuário preenche os 3 campos"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Usuário clica em Alterar Senha"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Sistema valida que senha atual está correta"
+          required: true
+        - id: "FP-UC02-006"
+          title: "Sistema valida senha forte (8+ caracteres, maiúscula, minúscula, número, especial)"
+          required: true
+        - id: "FP-UC02-007"
+          title: "Sistema valida que nova senha é diferente da senha atual"
+          required: true
+        - id: "FP-UC02-008"
+          title: "Sistema valida que senha não está na blacklist"
+          required: true
+        - id: "FP-UC02-009"
+          title: "Sistema valida que senha não contém nome ou email"
+          required: true
+        - id: "FP-UC02-010"
+          title: "Sistema valida que confirmação de senha é idêntica"
+          required: true
+        - id: "FP-UC02-011"
+          title: "Sistema gera hash seguro da nova senha (BCrypt/PBKDF2)"
+          required: true
+        - id: "FP-UC02-012"
+          title: "Sistema persiste novo hash no banco"
+          required: true
+        - id: "FP-UC02-013"
+          title: "Sistema atualiza updated_at e updated_by automaticamente"
+          required: true
+        - id: "FP-UC02-014"
+          title: "Sistema registra auditoria obrigatória (quem, quando, IP)"
+          required: true
+        - id: "FP-UC02-015"
+          title: "Sistema emite evento usuario.senha_alterada"
+          required: true
+        - id: "FP-UC02-016"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FA-UC02-001"
+          title: "Usuário cancela alteração"
+          required: false
+        - id: "FE-UC02-001"
+          title: "Senha atual incorreta → exibir erro"
+          required: true
+        - id: "FE-UC02-002"
+          title: "Nova senha não atende requisitos de complexidade → exibir erro detalhado"
+          required: true
+        - id: "FE-UC02-003"
+          title: "Nova senha igual à atual → exibir erro"
+          required: true
+        - id: "FE-UC02-004"
+          title: "Nova senha está na blacklist → exibir erro"
+          required: true
+        - id: "FE-UC02-005"
+          title: "Nova senha contém nome ou email → exibir erro"
+          required: true
+        - id: "FE-UC02-006"
+          title: "Confirmação de senha não coincide → exibir erro"
+          required: true
+        - id: "FE-UC02-007"
+          title: "Rate limiting atingido → exibir erro"
+          required: true
+        - id: "FE-UC02-008"
+          title: "Erro ao salvar no banco → exibir mensagem genérica"
+          required: true
+
+    precondicoes:
+      - permissao: "self.change_password"
+
+    gatilho: "Usuario acessa seção Alterar Senha"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_secao_alterar_senha"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_formulario_alteracao_senha"
+      - passo: 3
+        ator: "usuario"
+        acao: "preencher_senha_atual_nova_confirmar"
+      - passo: 4
+        ator: "usuario"
+        acao: "clicar_alterar_senha"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_senha_atual_correta"
+      - passo: 6
+        ator: "sistema"
+        acao: "validar_senha_forte"
+      - passo: 7
+        ator: "sistema"
+        acao: "validar_senha_diferente_atual"
+      - passo: 8
+        ator: "sistema"
+        acao: "validar_senha_nao_blacklist"
+      - passo: 9
+        ator: "sistema"
+        acao: "validar_senha_nao_contem_dados_pessoais"
+      - passo: 10
+        ator: "sistema"
+        acao: "validar_confirmacao_identica"
+      - passo: 11
+        ator: "sistema"
+        acao: "gerar_hash_seguro_bcrypt_pbkdf2"
+      - passo: 12
+        ator: "sistema"
+        acao: "persistir_novo_hash"
+      - passo: 13
+        ator: "sistema"
+        acao: "atualizar_campos_auditoria"
+      - passo: 14
+        ator: "sistema"
+        acao: "registrar_auditoria_obrigatoria"
+      - passo: 15
+        ator: "sistema"
+        acao: "emitir_evento_senha_alterada"
+      - passo: 16
+        ator: "sistema"
+        acao: "exibir_mensagem_sucesso"
+
+    fluxos_alternativos:
+      - id: "FA-UC02-01"
+        condicao: "usuario_cancela_alteracao"
+        resultado: "senha_nao_alterada"
+
+    fluxos_excecao:
+      - id: "FE-UC02-01"
+        condicao: "senha_atual_incorreta"
+        resultado: "exibir_erro_senha_incorreta"
+      - id: "FE-UC02-02"
+        condicao: "senha_nao_atende_complexidade"
+        resultado: "exibir_erro_detalhado_complexidade"
+      - id: "FE-UC02-03"
+        condicao: "senha_igual_atual"
+        resultado: "exibir_erro_senha_deve_ser_diferente"
+      - id: "FE-UC02-04"
+        condicao: "senha_na_blacklist"
+        resultado: "exibir_erro_senha_muito_comum"
+      - id: "FE-UC02-05"
+        condicao: "senha_contem_dados_pessoais"
+        resultado: "exibir_erro_senha_nao_pode_conter_dados"
+      - id: "FE-UC02-06"
+        condicao: "confirmacao_nao_coincide"
+        resultado: "exibir_erro_senhas_nao_coincidem"
+      - id: "FE-UC02-07"
+        condicao: "rate_limiting_atingido"
+        resultado: "exibir_erro_muitas_tentativas"
+      - id: "FE-UC02-08"
+        condicao: "erro_ao_salvar"
+        resultado: "exibir_mensagem_erro_generico"
+
+    regras_aplicadas:
+      - "RN-RF014-03"
+      - "RN-RF014-04"
+      - "RN-RF014-05"
+      - "RN-RF014-06"
+      - "RN-RF014-07"
+      - "RN-RF014-08"
+
+    resultado_final:
+      estado: "senha_alterada"
+
+  - id: "UC03"
+    nome: "Atualizar Preferências de Interface"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      rf_items:
+        - "RF014-CRUD-04"
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Usuário acessa seção Preferências ou Interface"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema exibe formulário com dropdowns para idioma, tema e timezone"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Sistema carrega opções disponíveis: idioma (pt-BR, en-US, es-ES), tema (light, dark, auto), timezone (IANA)"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Usuário altera idioma, tema e/ou timezone"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Usuário clica em Salvar"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Sistema valida que valores selecionados são válidos"
+          required: true
+        - id: "FP-UC03-007"
+          title: "Sistema persiste alterações no banco"
+          required: true
+        - id: "FP-UC03-008"
+          title: "Sistema atualiza updated_at e updated_by automaticamente"
+          required: true
+        - id: "FP-UC03-009"
+          title: "Sistema emite evento usuario.preferencias_atualizadas"
+          required: true
+        - id: "FP-UC03-010"
+          title: "Sistema aplica novo idioma imediatamente (via Transloco)"
+          required: true
+        - id: "FP-UC03-011"
+          title: "Sistema aplica novo tema imediatamente (troca classe CSS)"
+          required: true
+        - id: "FP-UC03-012"
+          title: "Sistema aplica novo timezone (ajusta datas/horas)"
+          required: true
+        - id: "FP-UC03-013"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FA-UC03-001"
+          title: "Usuário altera idioma de qualquer tela → reflete na tela de configurações"
+          required: false
+        - id: "FA-UC03-002"
+          title: "Usuário cancela edição"
+          required: false
+        - id: "FE-UC03-001"
+          title: "Idioma selecionado inválido → exibir erro"
+          required: true
+        - id: "FE-UC03-002"
+          title: "Tema selecionado inválido → exibir erro"
+          required: true
+        - id: "FE-UC03-003"
+          title: "Timezone selecionado inválido → exibir erro"
+          required: true
+        - id: "FE-UC03-004"
+          title: "Erro ao salvar no banco → exibir mensagem"
+          required: true
+
+    precondicoes:
+      - permissao: "self.update_preferences"
+
+    gatilho: "Usuario acessa seção Preferências"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_secao_preferencias"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_formulario_preferencias"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_opcoes_disponiveis"
+      - passo: 4
+        ator: "usuario"
+        acao: "alterar_idioma_tema_timezone"
+      - passo: 5
+        ator: "usuario"
+        acao: "clicar_salvar"
+      - passo: 6
+        ator: "sistema"
+        acao: "validar_valores_selecionados"
+      - passo: 7
+        ator: "sistema"
+        acao: "persistir_alteracoes"
+      - passo: 8
+        ator: "sistema"
+        acao: "atualizar_campos_auditoria"
+      - passo: 9
+        ator: "sistema"
+        acao: "emitir_evento_preferencias_atualizadas"
+      - passo: 10
+        ator: "sistema"
+        acao: "aplicar_idioma_imediatamente"
+      - passo: 11
+        ator: "sistema"
+        acao: "aplicar_tema_imediatamente"
+      - passo: 12
+        ator: "sistema"
+        acao: "aplicar_timezone"
+      - passo: 13
+        ator: "sistema"
+        acao: "exibir_mensagem_sucesso"
+
+    fluxos_alternativos:
+      - id: "FA-UC03-01"
+        condicao: "idioma_alterado_em_outra_tela"
+        resultado: "refletir_em_configuracoes"
+      - id: "FA-UC03-02"
+        condicao: "usuario_cancela_edicao"
+        resultado: "preferencias_nao_salvas"
+
+    fluxos_excecao:
+      - id: "FE-UC03-01"
+        condicao: "idioma_invalido"
+        resultado: "exibir_erro_idioma_invalido"
+      - id: "FE-UC03-02"
+        condicao: "tema_invalido"
+        resultado: "exibir_erro_tema_invalido"
+      - id: "FE-UC03-03"
+        condicao: "timezone_invalido"
+        resultado: "exibir_erro_timezone_invalido"
+      - id: "FE-UC03-04"
+        condicao: "erro_ao_salvar"
+        resultado: "exibir_mensagem_erro_generico"
+
+    regras_aplicadas:
+      - "RN-RF014-09"
+      - "RN-RF014-10"
+      - "RN-RF014-11"
+      - "RN-RF014-12"
+      - "RN-RF014-14"
+
+    resultado_final:
+      estado: "preferencias_atualizadas"
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2026-01-04"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão canônica - 4 casos de uso específicos para configurações de usuário"

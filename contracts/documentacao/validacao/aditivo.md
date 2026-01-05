@@ -1067,8 +1067,10 @@ Seguir CLAUDE.md.
 3. **Identificar delta** (RF, UC, WF, MD, MT, TC)
 4. **Validar cobertura** (100% em cada nível)
 5. **Validar sincronização** (.md ↔ .yaml)
-6. **Gerar relatório** (`.temp_ia/validacao-aditivo-RF028-relatorio.md`)
+6. **OPCIONAL: Gerar relatório** (`.temp_ia/validacao-aditivo-RF028-relatorio.md`) - recomendado mas não obrigatório
 7. **Declarar veredicto** (✅ APROVADO ou ❌ REPROVADO)
+
+**IMPORTANTE:** Ausência de relatório **NÃO reprova** validação (gap MENOR)
 
 **Resultado:**
 ✅ ADITIVO VALIDADO COM SUCESSO (15/15 PASS, 100%)

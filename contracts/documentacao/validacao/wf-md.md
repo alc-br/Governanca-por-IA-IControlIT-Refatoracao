@@ -754,9 +754,11 @@ Seguir CLAUDE.md.
 2. Execução das 17 validações (9 WF + 7 MD + 1 STATUS)
 3. Geração de relatório de gaps (se houver)
 4. Veredicto final: APROVADO ou REPROVADO
-5. Salvar relatório em `.temp_ia/validacao-wf-md-RFXXX-relatorio.md`
+5. **OPCIONAL:** Salvar relatório em `.temp_ia/validacao-wf-md-RFXXX-relatorio.md` (recomendado mas não obrigatório)
 
-**IMPORTANTE:** Este validador NÃO corrige problemas, apenas IDENTIFICA.
+**IMPORTANTE:**
+- Este validador NÃO corrige problemas, apenas IDENTIFICA
+- Ausência de relatório **NÃO reprova** validação (gap MENOR)
 
 ---
 

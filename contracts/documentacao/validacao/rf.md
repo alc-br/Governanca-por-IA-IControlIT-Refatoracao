@@ -596,9 +596,11 @@ if exit_code != 0:
 
 ---
 
-## 5. Relatório Obrigatório
+## 5. Relatório Opcional (Recomendado)
 
-Gerar relatório em `.temp_ia/validacao-rf-RFXXX-relatorio.md`:
+**OPCIONAL:** Gerar relatório em `.temp_ia/validacao-rf-RFXXX-relatorio.md` para auditoria posterior.
+
+**IMPORTANTE:** Ausência de relatório **NÃO reprova** validação. Foco está em conformidade técnica.
 
 ```markdown
 # RELATÓRIO DE VALIDAÇÃO - RFXXX

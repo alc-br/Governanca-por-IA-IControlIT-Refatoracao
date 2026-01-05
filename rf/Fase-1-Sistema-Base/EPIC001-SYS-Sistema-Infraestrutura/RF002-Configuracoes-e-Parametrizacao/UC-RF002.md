@@ -93,37 +93,37 @@ Permitir que o usuário visualize configurações disponíveis respeitando hiera
    - Sistema, Email, Integração, Segurança, Notificação, Cache, Storage, Auditoria, Performance, Features
 
 ### Fluxos Alternativos
-- **FA-00-01: Buscar por termo**
+- **FA-UC00-001: Buscar por termo**
   - Usuário digita termo no campo de busca
   - Sistema filtra configurações por código, nome ou descrição (case-insensitive)
   - Sistema exibe resultados filtrados
 
-- **FA-00-02: Ordenar por coluna**
+- **FA-UC00-002: Ordenar por coluna**
   - Usuário clica no header de coluna (Código, Nome, Categoria, Tipo Dado, Valor)
   - Sistema reordena lista (ascendente/descendente)
   - Sistema exibe lista reordenada
 
-- **FA-00-03: Filtrar por categoria**
+- **FA-UC00-003: Filtrar por categoria**
   - Usuário seleciona categoria no dropdown
   - Sistema exibe apenas configurações da categoria selecionada
 
-- **FA-00-04: Filtrar por nível hierárquico**
+- **FA-UC00-004: Filtrar por nível hierárquico**
   - Usuário seleciona nível (Global, Conglomerado, Empresa, Departamento, Usuário)
   - Sistema exibe apenas configurações do nível selecionado
 
-- **FA-00-05: Visualizar apenas configurações sensíveis**
+- **FA-UC00-005: Visualizar apenas configurações sensíveis**
   - Usuário marca checkbox "Exibir apenas sensíveis"
   - Sistema filtra configurações com `Fl_Criptografado = 1`
 
 ### Fluxos de Exceção
-- **FE-00-01: Usuário sem permissão**
+- **FE-UC00-001: Usuário sem permissão**
   - Sistema retorna HTTP 403 Forbidden
   - Mensagem: "Você não possui permissão para visualizar configurações do sistema"
 
-- **FE-00-02: Nenhuma configuração disponível**
+- **FE-UC00-002: Nenhuma configuração disponível**
   - Sistema exibe estado vazio com botão "Criar Nova Configuração" (se usuário tiver permissão CREATE)
 
-- **FE-00-03: Erro ao carregar cache Redis**
+- **FE-UC00-003: Erro ao carregar cache Redis**
   - Sistema faz fallback para leitura direta do banco de dados
   - Exibe aviso: "Cache indisponível, performance degradada"
   - Registra erro no log
@@ -204,30 +204,30 @@ Permitir a criação de uma nova configuração válida com criptografia automá
     - Redireciona para listagem
 
 ### Fluxos Alternativos
-- **FA-01-01: Salvar e criar outra**
+- **FA-UC01-001: Salvar e criar outra**
   - Usuário clica em "Salvar e Criar Outra"
   - Sistema salva configuração atual
   - Sistema limpa formulário
   - Sistema mantém usuário na tela de criação
 
-- **FA-01-02: Cancelar criação**
+- **FA-UC01-002: Cancelar criação**
   - Usuário clica em "Cancelar"
   - Sistema exibe confirmação: "Descartar alterações?"
   - Se confirmado, redireciona para listagem
 
-- **FA-01-03: Criar configuração sensível**
+- **FA-UC01-003: Criar configuração sensível**
   - Usuário marca checkbox "Criptografado"
   - Sistema exibe aviso: "Valor será criptografado com Azure Key Vault. Não será possível visualizar em texto claro após salvar (exceto com permissão DECRYPT)"
   - Sistema desabilita preview do valor
 
-- **FA-01-04: Criar feature flag**
+- **FA-UC01-004: Criar feature flag**
   - Usuário marca checkbox "Habilitar Feature Flag"
   - Sistema exibe aba "Feature Flag"
   - Sistema valida estratégia de rollout selecionada
   - Sistema valida data de expiração (futuro obrigatório)
 
 ### Fluxos de Exceção
-- **FE-01-01: Erro de validação**
+- **FE-UC01-001: Erro de validação**
   - Sistema retorna HTTP 400 Bad Request
   - Mensagem específica por campo:
     - Código duplicado: "Configuração com código 'SMTP_Host' já existe para este tenant"
@@ -235,18 +235,18 @@ Permitir a criação de uma nova configuração válida com criptografia automá
     - Regex falhou: "E-mail inválido, formato esperado: exemplo@dominio.com"
     - Range violado: "Porta SMTP deve estar entre 1 e 65535"
 
-- **FE-01-02: Configuração duplicada**
+- **FE-UC01-002: Configuração duplicada**
   - Sistema retorna HTTP 409 Conflict
   - Mensagem: "Configuração com código 'SMTP_Host' já existe para este tenant. Deseja editar a existente?"
   - Botão "Editar Existente" redireciona para UC03
 
-- **FE-01-03: Azure Key Vault indisponível**
+- **FE-UC01-003: Azure Key Vault indisponível**
   - Sistema retorna HTTP 503 Service Unavailable
   - Mensagem: "Serviço de criptografia temporariamente indisponível. Tente novamente em alguns instantes."
   - Sistema registra erro no log
   - Sistema envia alerta para equipe DevOps
 
-- **FE-01-04: Erro inesperado**
+- **FE-UC01-004: Erro inesperado**
   - Sistema retorna HTTP 500 Internal Server Error
   - Mensagem genérica: "Erro ao criar configuração. Tente novamente ou contate o suporte."
   - Sistema registra stack trace completo no log
@@ -304,31 +304,31 @@ Permitir visualização detalhada de uma configuração incluindo histórico de 
 8. Sistema exibe dados
 
 ### Fluxos Alternativos
-- **FA-02-01: Revelar valor sensível** → Ver UC09
+- **FA-UC02-001: Revelar valor sensível** → Ver UC09
 
-- **FA-02-02: Comparar versões**
+- **FA-UC02-002: Comparar versões**
   - Usuário seleciona 2 versões na aba Histórico
   - Sistema exibe diff visual lado a lado:
     - Campos adicionados (verde)
     - Campos removidos (vermelho)
     - Campos alterados (amarelo com antes/depois)
 
-- **FA-02-03: Ver auditoria completa**
+- **FA-UC02-003: Ver auditoria completa**
   - Usuário clica em "Ver Auditoria Completa"
   - Sistema exibe timeline de eventos:
     - Criação, edições, rollbacks, acessos a valores sensíveis
     - Quem, quando, IP, user-agent, motivo, diff JSON
 
 ### Fluxos de Exceção
-- **FE-02-01: Configuração inexistente**
+- **FE-UC02-001: Configuração inexistente**
   - Sistema retorna HTTP 404 Not Found
   - Mensagem: "Configuração não encontrada ou foi excluída"
 
-- **FE-02-02: Configuração de outro tenant**
+- **FE-UC02-002: Configuração de outro tenant**
   - Sistema retorna HTTP 403 Forbidden
   - Mensagem: "Você não possui permissão para visualizar esta configuração"
 
-- **FE-02-03: Azure Key Vault indisponível (ao descriptografar)**
+- **FE-UC02-003: Azure Key Vault indisponível (ao descriptografar)**
   - Sistema retorna HTTP 503 Service Unavailable
   - Mensagem: "Serviço de descriptografia temporariamente indisponível"
 
@@ -398,22 +398,22 @@ Permitir alteração controlada de uma configuração com validação, versionam
     - Mensagem: "Configuração atualizada com sucesso. Nova versão: 1.1"
 
 ### Fluxos Alternativos
-- **FA-03-01: Cancelar edição**
+- **FA-UC03-001: Cancelar edição**
   - Usuário clica em "Cancelar"
   - Sistema exibe confirmação: "Descartar alterações?"
   - Se confirmado, retorna para UC02
 
-- **FA-03-02: Editar valor sensível**
+- **FA-UC03-002: Editar valor sensível**
   - Usuário tenta editar configuração com `Fl_Criptografado = 1`
   - Sistema exibe campo de entrada mascarado
   - Sistema exibe aviso: "Novo valor será criptografado automaticamente ao salvar"
   - Sistema NÃO exibe valor atual em texto claro (segurança)
 
-- **FA-03-03: Executar rollback**
+- **FA-UC03-003: Executar rollback**
   - Usuário clica em "Rollback" na aba Histórico
   - Redireciona para UC05 (Executar Rollback)
 
-- **FA-03-04: Dry-Run (Simulação de Impacto)**
+- **FA-UC03-004: Dry-Run (Simulação de Impacto)**
   - Sistema simula aplicação da mudança SEM persistir
   - Sistema retorna relatório de impacto:
     - Quantos usuários/empresas afetados
@@ -423,15 +423,15 @@ Permitir alteração controlada de uma configuração com validação, versionam
   - Usuário decide se confirma ou cancela alteração
 
 ### Fluxos de Exceção
-- **FE-03-01: Erro de validação**
+- **FE-UC03-001: Erro de validação**
   - Sistema retorna HTTP 400 Bad Request
   - Mensagem específica por campo violado
 
-- **FE-03-02: Configuração somente leitura**
+- **FE-UC03-002: Configuração somente leitura**
   - Sistema retorna HTTP 403 Forbidden
   - Mensagem: "Configuração protegida. Não pode ser editada. Contate Super Admin."
 
-- **FE-03-03: Conflito de edição concorrente**
+- **FE-UC03-003: Conflito de edição concorrente**
   - Usuário A e B editam mesma configuração simultaneamente
   - Usuário B salva primeiro
   - Quando A tenta salvar:
@@ -439,7 +439,7 @@ Permitir alteração controlada de uma configuração com validação, versionam
     - Sistema retorna HTTP 409 Conflict
     - Mensagem: "Configuração foi alterada por outro usuário. Recarregue e tente novamente."
 
-- **FE-03-04: Falha ao enviar notificação Slack/Teams**
+- **FE-UC03-004: Falha ao enviar notificação Slack/Teams**
   - Sistema registra erro no log
   - Sistema NÃO bloqueia salvamento da configuração
   - Sistema envia alerta interno para equipe DevOps
@@ -487,22 +487,22 @@ Permitir exclusão lógica (soft delete) de configurações com invalidação de
    - Mensagem: "Configuração excluída com sucesso"
 
 ### Fluxos Alternativos
-- **FA-04-01: Cancelar exclusão**
+- **FA-UC04-001: Cancelar exclusão**
   - Usuário clica em "Cancelar" na confirmação
   - Sistema retorna para tela anterior
 
-- **FA-04-02: Restaurar configuração excluída**
+- **FA-UC04-002: Restaurar configuração excluída**
   - Usuário acessa listagem de "Configurações Excluídas"
   - Usuário clica em "Restaurar"
   - Sistema marca `Fl_Excluido = 0`
   - Sistema registra auditoria
 
 ### Fluxos de Exceção
-- **FE-04-01: Configuração já excluída**
+- **FE-UC04-001: Configuração já excluída**
   - Sistema retorna HTTP 404 Not Found
   - Mensagem: "Configuração não encontrada ou já foi excluída"
 
-- **FE-04-02: Configuração somente leitura**
+- **FE-UC04-002: Configuração somente leitura**
   - Sistema retorna HTTP 403 Forbidden
   - Mensagem: "Configuração protegida. Não pode ser excluída."
 
@@ -559,7 +559,7 @@ Restaurar configuração para versão anterior em 1-click com auditoria completa
     - Mensagem: "Rollback executado com sucesso. Versão atual: 1.2 (restaurada da v1.0)"
 
 ### Fluxos de Exceção
-- **FE-05-01: Versão origem não encontrada**
+- **FE-UC05-001: Versão origem não encontrada**
   - Sistema retorna HTTP 404
   - Mensagem: "Versão selecionada não existe no histórico"
 

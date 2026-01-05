@@ -1,0 +1,1549 @@
+# =============================================
+# MD-RF012 — Modelo de Dados: Gestão de Usuários do Sistema
+# Versão: 2.0
+# Data: 2026-01-04
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+# =============================================
+# 1. METADADOS DO DOCUMENTO (OBRIGATÓRIO)
+# =============================================
+metadata:
+  versao: "2.0"
+  data: "2026-01-04"
+  autor: "Agência ALC - alc.dev.br"
+
+  rf_relacionado:
+    id: "RF012"
+    nome: "Gestão de Usuários do Sistema"
+
+  sistema_modulo: "Cadastros do Sistema"
+  banco_de_dados:
+    engine: "logico"        # Modelo lógico (independente de engine física)
+    schema: "logico"        # Abstração de schema
+  padroes:
+    multi_tenancy: true
+    auditoria: true
+    soft_delete: true
+
+# =============================================
+# 2. ENTIDADES (OBRIGATÓRIO)
+# =============================================
+entidades:
+  # =============================================
+  # 2.1 TABELA: usuario
+  # =============================================
+  - nome: "usuario"
+    descricao: "Usuário administrativo ou operacional do sistema IControlIT com credenciais de acesso"
+
+    campos:
+      # CHAVE PRIMÁRIA (OBRIGATÓRIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primária"
+        pk: true
+
+      # MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "empresa_id"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para empresa (multi-tenancy)"
+        fk:
+          tabela: "empresa"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC00, UC01, UC02, UC03, UC04, UC08"
+          wf: "WF-01"
+          regra_negocio: "RN-RF012-01"
+
+      # CAMPOS DE NEGÓCIO
+      - nome: "nome"
+        tipo: "VARCHAR(200)"
+        nulo: false
+        default: null
+        descricao: "Nome completo do usuário"
+        index: true
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-001"
+
+      - nome: "email"
+        tipo: "VARCHAR(200)"
+        nulo: false
+        default: null
+        descricao: "Email único no tenant"
+        unique_por_tenant: true
+        index: true
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-002"
+          regra_negocio: "RN-RF012-15"
+
+      - nome: "username"
+        tipo: "VARCHAR(100)"
+        nulo: false
+        default: null
+        descricao: "Username único no tenant (alfanumérico)"
+        unique_por_tenant: true
+        index: true
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-003"
+          regra_negocio: "RN-RF012-01"
+
+      - nome: "password_hash"
+        tipo: "VARCHAR(255)"
+        nulo: false
+        default: null
+        descricao: "Hash BCrypt da senha (work factor 12)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-004"
+          regra_negocio: "RN-RF012-02"
+
+      - nome: "estado"
+        tipo: "VARCHAR(30)"
+        nulo: false
+        default: "first_access"
+        descricao: "Estado do usuário (active, blocked, inactive, deactivated_permanent, deleted, first_access)"
+        index: true
+        mutavel: true
+        check:
+          definicao: "estado IN ('active','blocked','inactive','deactivated_permanent','deleted','first_access')"
+          descricao: "Estados permitidos conforme RF012"
+        origem:
+          rf: "RF012"
+          uc: "UC00, UC01, UC02, UC03, UC04"
+          wf: "WF-01, WF-03"
+          campo_wf: "CMP-WF01-010, CMP-WF03-004"
+          regra_negocio: "RN-RF012-17"
+
+      - nome: "fl_ativo"
+        tipo: "BIT"
+        nulo: false
+        default: 1
+        descricao: "Flag de ativo/inativo (0=soft deleted, 1=ativo)"
+        mutavel: true
+        index_parcial:
+          where: "fl_ativo = 1"
+          descricao: "Acelera listagens de usuários ativos"
+        origem:
+          rf: "RF012"
+          uc: "UC00, UC04"
+          wf: "WF-01"
+
+      - nome: "fl_bloqueado"
+        tipo: "BIT"
+        nulo: false
+        default: 0
+        descricao: "Flag de bloqueio (0=desbloqueado, 1=bloqueado)"
+        mutavel: true
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          wf: "WF-03"
+          regra_negocio: "RN-RF012-03"
+
+      - nome: "fl_desativado"
+        tipo: "INT"
+        nulo: false
+        default: 1
+        descricao: "Status de desativação (1=Ativo, 2=Inativo, 3=Desativado Permanentemente)"
+        mutavel: true
+        check:
+          definicao: "fl_desativado IN (1,2,3)"
+          descricao: "Níveis de desativação conforme RN-RF012-17"
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+          wf: "WF-03"
+          regra_negocio: "RN-RF012-17"
+
+      - nome: "tentativas_falhas"
+        tipo: "INT"
+        nulo: false
+        default: 0
+        descricao: "Contador de tentativas de login falhadas (reset após sucesso)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC02, UC03"
+          regra_negocio: "RN-RF012-03"
+
+      - nome: "dt_bloqueio"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data/hora do bloqueio automático ou manual"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+          regra_negocio: "RN-RF012-03"
+
+      - nome: "dt_alteracao_senha"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data/hora da última alteração de senha"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          regra_negocio: "RN-RF012-04"
+
+      - nome: "dt_expiracao_senha"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data/hora de expiração da senha (90 dias após última alteração)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          regra_negocio: "RN-RF012-04"
+
+      - nome: "fl_primeiro_acesso"
+        tipo: "BIT"
+        nulo: false
+        default: 1
+        descricao: "Flag de primeiro acesso (1=sim, 0=não) - força troca de senha"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01"
+          regra_negocio: "RN-RF012-14"
+
+      - nome: "fl_mfa_habilitado"
+        tipo: "BIT"
+        nulo: false
+        default: 1
+        descricao: "Flag de MFA habilitado (1=sim, 0=não)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-008"
+          regra_negocio: "RN-RF012-08"
+
+      - nome: "mfa_secret"
+        tipo: "VARCHAR(255)"
+        nulo: true
+        default: null
+        descricao: "Secret TOTP para MFA (Base32-encoded)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          regra_negocio: "RN-RF012-08"
+
+      - nome: "telefone_mfa"
+        tipo: "VARCHAR(20)"
+        nulo: true
+        default: null
+        descricao: "Telefone para backup MFA via SMS (opcional)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          regra_negocio: "RN-RF012-08"
+
+      - nome: "fl_usuario_ad"
+        tipo: "BIT"
+        nulo: false
+        default: 0
+        descricao: "Flag de usuário importado do Active Directory (1=sim, 0=não)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-009"
+          regra_negocio: "RN-RF012-09"
+
+      - nome: "ad_object_guid"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "GUID do objeto no Active Directory (se integrado)"
+        unique: true
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01"
+          regra_negocio: "RN-RF012-09"
+
+      - nome: "ad_sam_account_name"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "SamAccountName do Active Directory (se integrado)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01"
+          regra_negocio: "RN-RF012-09"
+
+      - nome: "detalhamento_conta"
+        tipo: "INT"
+        nulo: false
+        default: 1
+        descricao: "Nível de detalhamento de contas (1=Básico, 2=Intermediário, 3=Completo)"
+        mutavel: true
+        check:
+          definicao: "detalhamento_conta IN (1,2,3)"
+          descricao: "Níveis de detalhamento conforme RN-RF012-16"
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          regra_negocio: "RN-RF012-16"
+
+      - nome: "detalhamento_contato"
+        tipo: "INT"
+        nulo: false
+        default: 1
+        descricao: "Nível de detalhamento de contatos (1=Básico, 2=Intermediário, 3=Completo)"
+        mutavel: true
+        check:
+          definicao: "detalhamento_contato IN (1,2,3)"
+          descricao: "Níveis de detalhamento conforme RN-RF012-16"
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          regra_negocio: "RN-RF012-16"
+
+      - nome: "dt_ultimo_login"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data/hora do último login bem-sucedido"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC00, UC02"
+          wf: "WF-01"
+
+      - nome: "id_perfil"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "FK para perfil RBAC principal (permite múltiplos perfis via tabela associativa)"
+        fk:
+          tabela: "perfil"
+          coluna: "id"
+          on_delete: "SET NULL"
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03, UC08"
+          wf: "WF-02, WF-06"
+          campo_wf: "CMP-WF02-007, CMP-WF06-001"
+          regra_negocio: "RN-RF012-06"
+
+      - nome: "permissoes_customizadas"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: "JSON de permissões customizadas adicionais (apenas adicionam, não removem)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          regra_negocio: "RN-RF012-06"
+
+      # AUDITORIA (OBRIGATÓRIO - 5 campos)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criação"
+        audit: true
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC01"
+          wf: null
+          campo_wf: null
+          observacao: "Campo gerado automaticamente pelo sistema"
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que criou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          rf: "RF012"
+          uc: "UC01"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente com ID do usuário autenticado"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de atualização"
+        audit: true
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+          wf: null
+          campo_wf: null
+          observacao: "Campo gerado automaticamente pelo sistema"
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que atualizou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente com ID do usuário autenticado"
+
+      # SOFT DELETE (OBRIGATÓRIO)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Soft delete"
+        audit: true
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC04"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente ao excluir (soft delete)"
+
+    # ÍNDICES (OBRIGATÓRIO)
+    indices:
+      - nome: "pk_usuario"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primária"
+
+      - nome: "idx_usuario_empresa"
+        tipo: "BTREE"
+        colunas: ["empresa_id"]
+        descricao: "Performance multi-tenant"
+
+      - nome: "idx_usuario_email"
+        tipo: "BTREE"
+        colunas: ["email"]
+        descricao: "Performance em busca por email (WF-01)"
+
+      - nome: "idx_usuario_username"
+        tipo: "BTREE"
+        colunas: ["username"]
+        descricao: "Performance em busca por username (WF-01)"
+
+      - nome: "idx_usuario_nome"
+        tipo: "BTREE"
+        colunas: ["nome"]
+        descricao: "Performance em busca por nome (WF-01)"
+
+      - nome: "idx_usuario_estado"
+        tipo: "BTREE"
+        colunas: ["estado"]
+        descricao: "Performance em filtros por estado (WF-01)"
+
+      - nome: "idx_usuario_fl_ativo_true"
+        tipo: "BTREE"
+        colunas: ["fl_ativo"]
+        where: "fl_ativo = 1"
+        descricao: "Acelera consultas apenas de usuários ativos"
+
+      - nome: "idx_usuario_ad_object_guid"
+        tipo: "BTREE"
+        colunas: ["ad_object_guid"]
+        descricao: "Performance em sincronização AD"
+
+      - nome: "idx_usuario_dt_ultimo_login"
+        tipo: "BTREE"
+        colunas: ["dt_ultimo_login"]
+        descricao: "Performance em ordenação por último login (WF-01)"
+
+    # CONSTRAINTS (OBRIGATÓRIO)
+    constraints:
+      - nome: "fk_usuario_empresa"
+        tipo: "FOREIGN KEY"
+        definicao: "empresa_id REFERENCES empresa(id)"
+        on_delete: "CASCADE"
+        descricao: "Multi-tenancy"
+
+      - nome: "uq_usuario_empresa_email"
+        tipo: "UNIQUE"
+        definicao: "(empresa_id, email)"
+        descricao: "Email único por tenant (RN-RF012-15)"
+
+      - nome: "uq_usuario_empresa_username"
+        tipo: "UNIQUE"
+        definicao: "(empresa_id, username)"
+        descricao: "Username único por tenant (RN-RF012-01)"
+
+      - nome: "uq_usuario_ad_object_guid"
+        tipo: "UNIQUE"
+        definicao: "(ad_object_guid)"
+        descricao: "GUID AD único globalmente"
+        where: "ad_object_guid IS NOT NULL"
+
+      - nome: "fk_usuario_perfil"
+        tipo: "FOREIGN KEY"
+        definicao: "id_perfil REFERENCES perfil(id)"
+        on_delete: "SET NULL"
+        descricao: "Perfil RBAC principal"
+
+      - nome: "fk_usuario_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - criador"
+
+      - nome: "fk_usuario_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - editor"
+
+      - nome: "chk_usuario_estado"
+        tipo: "CHECK"
+        definicao: "estado IN ('active','blocked','inactive','deactivated_permanent','deleted','first_access')"
+        descricao: "Estados permitidos"
+
+      - nome: "chk_usuario_fl_desativado"
+        tipo: "CHECK"
+        definicao: "fl_desativado IN (1,2,3)"
+        descricao: "Níveis de desativação (RN-RF012-17)"
+
+      - nome: "chk_usuario_detalhamento_conta"
+        tipo: "CHECK"
+        definicao: "detalhamento_conta IN (1,2,3)"
+        descricao: "Níveis de detalhamento de conta (RN-RF012-16)"
+
+      - nome: "chk_usuario_detalhamento_contato"
+        tipo: "CHECK"
+        definicao: "detalhamento_contato IN (1,2,3)"
+        descricao: "Níveis de detalhamento de contato (RN-RF012-16)"
+
+  # =============================================
+  # 2.2 TABELA: usuario_sessao
+  # =============================================
+  - nome: "usuario_sessao"
+    descricao: "Sessões ativas do usuário (refresh tokens, dispositivo, geolocalização) - Máximo 5 sessões simultâneas"
+
+    campos:
+      # CHAVE PRIMÁRIA (OBRIGATÓRIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primária"
+        pk: true
+
+      # MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "empresa_id"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para empresa (multi-tenancy)"
+        fk:
+          tabela: "empresa"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+
+      # CAMPOS DE NEGÓCIO
+      - nome: "id_usuario"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para usuario"
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          regra_negocio: "RN-RF012-12"
+
+      - nome: "access_token"
+        tipo: "TEXT"
+        nulo: false
+        default: null
+        descricao: "JWT access token (válido 8 horas)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01"
+          regra_negocio: "RN-RF012-05"
+
+      - nome: "refresh_token"
+        tipo: "VARCHAR(255)"
+        nulo: false
+        default: null
+        descricao: "Refresh token SHA256 hash (válido 30 dias)"
+        unique: true
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01"
+          regra_negocio: "RN-RF012-05"
+
+      - nome: "dt_expiracao_access"
+        tipo: "DATETIME"
+        nulo: false
+        default: null
+        descricao: "Data/hora de expiração do access token (8 horas)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01"
+          regra_negocio: "RN-RF012-05"
+
+      - nome: "dt_expiracao_refresh"
+        tipo: "DATETIME"
+        nulo: false
+        default: null
+        descricao: "Data/hora de expiração do refresh token (30 dias)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC01"
+          regra_negocio: "RN-RF012-05"
+
+      - nome: "ip_address"
+        tipo: "VARCHAR(45)"
+        nulo: true
+        default: null
+        descricao: "Endereço IP do dispositivo (IPv4 ou IPv6)"
+        index: true
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC02"
+          regra_negocio: "RN-RF012-13"
+
+      - nome: "user_agent"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: "User-Agent do navegador/dispositivo"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          regra_negocio: "RN-RF012-13"
+
+      - nome: "dispositivo"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Identificação do dispositivo (ex: 'Chrome/Windows 10')"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+
+      - nome: "geolocalizacao_cidade"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Cidade identificada via IP"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          regra_negocio: "RN-RF012-10"
+
+      - nome: "geolocalizacao_pais"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "País identificado via IP"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          regra_negocio: "RN-RF012-10"
+
+      - nome: "fl_revogado"
+        tipo: "BIT"
+        nulo: false
+        default: 0
+        descricao: "Flag de sessão revogada (1=revogado, 0=ativo)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+
+      - nome: "dt_revogacao"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data/hora da revogação da sessão"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+
+      # AUDITORIA (OBRIGATÓRIO - 5 campos)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criação da sessão"
+        audit: true
+        mutavel: false
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que criou a sessão"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de atualização"
+        audit: true
+        mutavel: false
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que atualizou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+
+      # SOFT DELETE (NÃO APLICÁVEL - sessões são hard deleted)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Soft delete (não aplicável - sessões são removidas fisicamente)"
+        audit: true
+        mutavel: false
+
+    # ÍNDICES
+    indices:
+      - nome: "pk_usuario_sessao"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primária"
+
+      - nome: "idx_usuario_sessao_empresa"
+        tipo: "BTREE"
+        colunas: ["empresa_id"]
+        descricao: "Performance multi-tenant"
+
+      - nome: "idx_usuario_sessao_usuario"
+        tipo: "BTREE"
+        colunas: ["id_usuario"]
+        descricao: "Performance em consultas de sessões por usuário"
+
+      - nome: "idx_usuario_sessao_refresh_token"
+        tipo: "BTREE"
+        colunas: ["refresh_token"]
+        descricao: "Performance em validação de refresh token"
+
+      - nome: "idx_usuario_sessao_ip"
+        tipo: "BTREE"
+        colunas: ["ip_address"]
+        descricao: "Performance em detecção de login suspeito"
+
+    # CONSTRAINTS
+    constraints:
+      - nome: "fk_usuario_sessao_empresa"
+        tipo: "FOREIGN KEY"
+        definicao: "empresa_id REFERENCES empresa(id)"
+        on_delete: "CASCADE"
+        descricao: "Multi-tenancy"
+
+      - nome: "fk_usuario_sessao_usuario"
+        tipo: "FOREIGN KEY"
+        definicao: "id_usuario REFERENCES usuario(id)"
+        on_delete: "CASCADE"
+        descricao: "Sessão vinculada ao usuário"
+
+      - nome: "uq_usuario_sessao_refresh_token"
+        tipo: "UNIQUE"
+        definicao: "(refresh_token)"
+        descricao: "Refresh token único globalmente"
+
+      - nome: "fk_usuario_sessao_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - criador"
+
+      - nome: "fk_usuario_sessao_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - editor"
+
+  # =============================================
+  # 2.3 TABELA: usuario_historico_senha
+  # =============================================
+  - nome: "usuario_historico_senha"
+    descricao: "Histórico das últimas 12 senhas (BCrypt hash) para prevenir reutilização"
+
+    campos:
+      # CHAVE PRIMÁRIA (OBRIGATÓRIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primária"
+        pk: true
+
+      # MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "empresa_id"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para empresa (multi-tenancy)"
+        fk:
+          tabela: "empresa"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+
+      # CAMPOS DE NEGÓCIO
+      - nome: "id_usuario"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para usuario"
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC02, UC03"
+          regra_negocio: "RN-RF012-07"
+
+      - nome: "password_hash"
+        tipo: "VARCHAR(255)"
+        nulo: false
+        default: null
+        descricao: "Hash BCrypt da senha (trabalho factor 12)"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+          regra_negocio: "RN-RF012-07"
+
+      - nome: "dt_alteracao"
+        tipo: "DATETIME"
+        nulo: false
+        default: "GETDATE()"
+        descricao: "Data/hora da alteração de senha"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC01, UC03"
+
+      # AUDITORIA (SIMPLIFICADA - não possui created_by/updated_by)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criação do registro"
+        audit: true
+        mutavel: false
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que criou (sempre o próprio usuário)"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de atualização"
+        audit: true
+        mutavel: false
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que atualizou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+
+      # SOFT DELETE (NÃO APLICÁVEL - histórico não é deletado)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Soft delete (não aplicável - histórico preservado)"
+        audit: true
+        mutavel: false
+
+    # ÍNDICES
+    indices:
+      - nome: "pk_usuario_historico_senha"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primária"
+
+      - nome: "idx_usuario_historico_senha_empresa"
+        tipo: "BTREE"
+        colunas: ["empresa_id"]
+        descricao: "Performance multi-tenant"
+
+      - nome: "idx_usuario_historico_senha_usuario"
+        tipo: "BTREE"
+        colunas: ["id_usuario"]
+        descricao: "Performance em consultas de histórico por usuário"
+
+      - nome: "idx_usuario_historico_senha_dt_alteracao"
+        tipo: "BTREE"
+        colunas: ["dt_alteracao"]
+        descricao: "Performance em ordenação por data (últimas 12 senhas)"
+
+    # CONSTRAINTS
+    constraints:
+      - nome: "fk_usuario_historico_senha_empresa"
+        tipo: "FOREIGN KEY"
+        definicao: "empresa_id REFERENCES empresa(id)"
+        on_delete: "CASCADE"
+        descricao: "Multi-tenancy"
+
+      - nome: "fk_usuario_historico_senha_usuario"
+        tipo: "FOREIGN KEY"
+        definicao: "id_usuario REFERENCES usuario(id)"
+        on_delete: "CASCADE"
+        descricao: "Histórico vinculado ao usuário"
+
+      - nome: "fk_usuario_historico_senha_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - criador"
+
+      - nome: "fk_usuario_historico_senha_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - editor"
+
+  # =============================================
+  # 2.4 TABELA: usuario_historico_acesso
+  # =============================================
+  - nome: "usuario_historico_acesso"
+    descricao: "Auditoria de todos os acessos (sucesso/falha, IP, geolocalização) para detecção de login suspeito"
+
+    campos:
+      # CHAVE PRIMÁRIA (OBRIGATÓRIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primária"
+        pk: true
+
+      # MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "empresa_id"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para empresa (multi-tenancy)"
+        fk:
+          tabela: "empresa"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+
+      # CAMPOS DE NEGÓCIO
+      - nome: "id_usuario"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "FK para usuario (NULL se login falhou antes de identificar usuário)"
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          wf: "WF-04"
+          regra_negocio: "RN-RF012-13"
+
+      - nome: "username_tentativa"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Username utilizado na tentativa de login (mesmo se inválido)"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+
+      - nome: "fl_sucesso"
+        tipo: "BIT"
+        nulo: false
+        default: 0
+        descricao: "Flag de login bem-sucedido (1=sucesso, 0=falha)"
+        mutavel: false
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          regra_negocio: "RN-RF012-13"
+
+      - nome: "motivo_falha"
+        tipo: "VARCHAR(200)"
+        nulo: true
+        default: null
+        descricao: "Motivo da falha (ex: 'Senha inválida', 'Usuário bloqueado', 'Conta não encontrada')"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+
+      - nome: "ip_address"
+        tipo: "VARCHAR(45)"
+        nulo: true
+        default: null
+        descricao: "Endereço IP de origem (IPv4 ou IPv6)"
+        mutavel: false
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          wf: "WF-04"
+          regra_negocio: "RN-RF012-13"
+
+      - nome: "user_agent"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: "User-Agent do navegador/dispositivo"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          wf: "WF-04"
+          regra_negocio: "RN-RF012-13"
+
+      - nome: "geolocalizacao_cidade"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Cidade identificada via IP"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          wf: "WF-04"
+          regra_negocio: "RN-RF012-10"
+
+      - nome: "geolocalizacao_pais"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "País identificado via IP"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          wf: "WF-04"
+          regra_negocio: "RN-RF012-10"
+
+      - nome: "fl_login_suspeito"
+        tipo: "BIT"
+        nulo: false
+        default: 0
+        descricao: "Flag de login suspeito detectado (IP/país/horário anômalo)"
+        mutavel: false
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          regra_negocio: "RN-RF012-10"
+
+      - nome: "criterio_suspeita"
+        tipo: "VARCHAR(200)"
+        nulo: true
+        default: null
+        descricao: "Critério que acionou a suspeita (ex: 'País diferente', 'IP desconhecido', 'Horário atípico')"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          regra_negocio: "RN-RF012-10"
+
+      - nome: "fl_mfa_usado"
+        tipo: "BIT"
+        nulo: false
+        default: 0
+        descricao: "Flag indicando se MFA foi usado no login (1=sim, 0=não)"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          regra_negocio: "RN-RF012-08"
+
+      - nome: "dt_tentativa"
+        tipo: "DATETIME"
+        nulo: false
+        default: "GETDATE()"
+        descricao: "Data/hora da tentativa de acesso"
+        mutavel: false
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC02"
+          wf: "WF-04"
+
+      # AUDITORIA (SIMPLIFICADA - auditoria de auditoria)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criação do registro"
+        audit: true
+        mutavel: false
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que criou (normalmente NULL - registro automático)"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de atualização"
+        audit: true
+        mutavel: false
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que atualizou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+
+      # SOFT DELETE (NÃO APLICÁVEL - auditoria preservada)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Soft delete (não aplicável - auditoria preservada)"
+        audit: true
+        mutavel: false
+
+    # ÍNDICES
+    indices:
+      - nome: "pk_usuario_historico_acesso"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primária"
+
+      - nome: "idx_usuario_historico_acesso_empresa"
+        tipo: "BTREE"
+        colunas: ["empresa_id"]
+        descricao: "Performance multi-tenant"
+
+      - nome: "idx_usuario_historico_acesso_usuario"
+        tipo: "BTREE"
+        colunas: ["id_usuario"]
+        descricao: "Performance em consultas de histórico por usuário (WF-04)"
+
+      - nome: "idx_usuario_historico_acesso_dt_tentativa"
+        tipo: "BTREE"
+        colunas: ["dt_tentativa"]
+        descricao: "Performance em ordenação por data (últimos 50 acessos)"
+
+      - nome: "idx_usuario_historico_acesso_ip"
+        tipo: "BTREE"
+        colunas: ["ip_address"]
+        descricao: "Performance em detecção de login suspeito"
+
+      - nome: "idx_usuario_historico_acesso_fl_sucesso"
+        tipo: "BTREE"
+        colunas: ["fl_sucesso"]
+        descricao: "Performance em filtros por sucesso/falha"
+
+      - nome: "idx_usuario_historico_acesso_fl_login_suspeito"
+        tipo: "BTREE"
+        colunas: ["fl_login_suspeito"]
+        descricao: "Performance em consultas de logins suspeitos"
+
+    # CONSTRAINTS
+    constraints:
+      - nome: "fk_usuario_historico_acesso_empresa"
+        tipo: "FOREIGN KEY"
+        definicao: "empresa_id REFERENCES empresa(id)"
+        on_delete: "CASCADE"
+        descricao: "Multi-tenancy"
+
+      - nome: "fk_usuario_historico_acesso_usuario"
+        tipo: "FOREIGN KEY"
+        definicao: "id_usuario REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Histórico vinculado ao usuário"
+
+      - nome: "fk_usuario_historico_acesso_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - criador"
+
+      - nome: "fk_usuario_historico_acesso_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - editor"
+
+  # =============================================
+  # 2.5 TABELA: usuario_reset_senha
+  # =============================================
+  - nome: "usuario_reset_senha"
+    descricao: "Tokens de reset de senha via e-mail (válido 1 hora, uso único)"
+
+    campos:
+      # CHAVE PRIMÁRIA (OBRIGATÓRIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primária"
+        pk: true
+
+      # MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "empresa_id"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para empresa (multi-tenancy)"
+        fk:
+          tabela: "empresa"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+
+      # CAMPOS DE NEGÓCIO
+      - nome: "id_usuario"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para usuario"
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+          regra_negocio: "RN-RF012-11"
+
+      - nome: "token"
+        tipo: "VARCHAR(255)"
+        nulo: false
+        default: null
+        descricao: "Token único SHA256 hash (enviado por e-mail)"
+        unique: true
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+          regra_negocio: "RN-RF012-11"
+
+      - nome: "dt_expiracao"
+        tipo: "DATETIME"
+        nulo: false
+        default: null
+        descricao: "Data/hora de expiração do token (1 hora após criação)"
+        mutavel: false
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+          regra_negocio: "RN-RF012-11"
+
+      - nome: "fl_usado"
+        tipo: "BIT"
+        nulo: false
+        default: 0
+        descricao: "Flag de token já utilizado (1=usado, 0=disponível)"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+          regra_negocio: "RN-RF012-11"
+
+      - nome: "dt_utilizacao"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data/hora da utilização do token"
+        mutavel: true
+        origem:
+          rf: "RF012"
+          uc: "UC03"
+
+      # AUDITORIA (OBRIGATÓRIO - 5 campos)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criação do token"
+        audit: true
+        mutavel: false
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que solicitou o reset (normalmente NULL - solicitação externa)"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de atualização"
+        audit: true
+        mutavel: false
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que atualizou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+
+      # SOFT DELETE (NÃO APLICÁVEL - tokens expirados são limpos periodicamente)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Soft delete (não aplicável - tokens removidos fisicamente)"
+        audit: true
+        mutavel: false
+
+    # ÍNDICES
+    indices:
+      - nome: "pk_usuario_reset_senha"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primária"
+
+      - nome: "idx_usuario_reset_senha_empresa"
+        tipo: "BTREE"
+        colunas: ["empresa_id"]
+        descricao: "Performance multi-tenant"
+
+      - nome: "idx_usuario_reset_senha_usuario"
+        tipo: "BTREE"
+        colunas: ["id_usuario"]
+        descricao: "Performance em consultas de tokens por usuário"
+
+      - nome: "idx_usuario_reset_senha_token"
+        tipo: "BTREE"
+        colunas: ["token"]
+        descricao: "Performance em validação de token"
+
+      - nome: "idx_usuario_reset_senha_dt_expiracao"
+        tipo: "BTREE"
+        colunas: ["dt_expiracao"]
+        descricao: "Performance em limpeza de tokens expirados"
+
+    # CONSTRAINTS
+    constraints:
+      - nome: "fk_usuario_reset_senha_empresa"
+        tipo: "FOREIGN KEY"
+        definicao: "empresa_id REFERENCES empresa(id)"
+        on_delete: "CASCADE"
+        descricao: "Multi-tenancy"
+
+      - nome: "fk_usuario_reset_senha_usuario"
+        tipo: "FOREIGN KEY"
+        definicao: "id_usuario REFERENCES usuario(id)"
+        on_delete: "CASCADE"
+        descricao: "Token vinculado ao usuário"
+
+      - nome: "uq_usuario_reset_senha_token"
+        tipo: "UNIQUE"
+        definicao: "(token)"
+        descricao: "Token único globalmente (RN-RF012-11)"
+
+      - nome: "fk_usuario_reset_senha_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - criador"
+
+      - nome: "fk_usuario_reset_senha_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - editor"
+
+# =============================================
+# 3. RELACIONAMENTOS GLOBAIS (OPCIONAL)
+# =============================================
+relacionamentos_globais:
+  - origem: "empresa"
+    cardinalidade: "1:N"
+    destino: "usuario"
+    descricao: "Uma empresa possui muitos usuários (multi-tenancy)"
+
+  - origem: "usuario"
+    cardinalidade: "1:N"
+    destino: "usuario_sessao"
+    descricao: "Um usuário possui múltiplas sessões (máximo 5 simultâneas - RN-RF012-12)"
+
+  - origem: "usuario"
+    cardinalidade: "1:N"
+    destino: "usuario_historico_senha"
+    descricao: "Um usuário possui histórico de senhas (últimas 12 - RN-RF012-07)"
+
+  - origem: "usuario"
+    cardinalidade: "1:N"
+    destino: "usuario_historico_acesso"
+    descricao: "Um usuário possui histórico de acessos (auditoria completa - RN-RF012-13)"
+
+  - origem: "usuario"
+    cardinalidade: "1:N"
+    destino: "usuario_reset_senha"
+    descricao: "Um usuário pode ter tokens de reset de senha (RN-RF012-11)"
+
+  - origem: "perfil"
+    cardinalidade: "1:N"
+    destino: "usuario"
+    descricao: "Um perfil RBAC pode ser atribuído a muitos usuários (RN-RF012-06)"
+
+# =============================================
+# 4. OBSERVAÇÕES E DECISÕES (OBRIGATÓRIO)
+# =============================================
+observacoes:
+  - categoria: "Modelagem"
+    descricao: "Derivado do RF012.yaml, UC-RF012.yaml e WF-RF012.md. Modelo normalizado com 5 entidades principais: usuario (cadastro), usuario_sessao (autenticação), usuario_historico_senha (segurança), usuario_historico_acesso (auditoria), usuario_reset_senha (recuperação)."
+
+  - categoria: "Multi-Tenancy"
+    descricao: "TODAS as tabelas possuem empresa_id (GUID, FK CASCADE, INDEX). Isolamento total por tenant conforme RN-RF012-01. Email e Username são únicos por tenant via constraints UNIQUE (empresa_id, campo)."
+
+  - categoria: "Auditoria"
+    descricao: "TODAS as tabelas possuem 5 campos de auditoria obrigatórios: created_at, created_by, updated_at, updated_by, deleted_at. Tabelas de histórico (usuario_historico_senha, usuario_historico_acesso) têm auditoria simplificada (sem created_by/updated_by editáveis). RN-RF012-13 exige auditoria completa de acessos."
+
+  - categoria: "Soft Delete"
+    descricao: "Tabela 'usuario' possui soft delete obrigatório (deleted_at, fl_ativo=0). Tabelas de histórico e sessão NÃO usam soft delete (preservação perpétua ou hard delete). Estado 'deleted' é irreversível conforme RN-RF012-02."
+
+  - categoria: "Segurança"
+    descricao: "Senhas: BCrypt work factor 12 (RN-RF012-02). Histórico de 12 senhas previne reutilização (RN-RF012-07). MFA via TOTP obrigatório (RN-RF012-08). Tokens JWT: access=8h, refresh=30d (RN-RF012-05). Bloqueio automático após 5 tentativas (RN-RF012-03)."
+
+  - categoria: "Performance"
+    descricao: "Índices criados para queries principais do WF-01 (listagem com filtros): email, username, nome, estado, dt_ultimo_login. Índice parcial em fl_ativo=1 acelera listagens de usuários ativos. Índice composto em (empresa_id, email) e (empresa_id, username) para validação de unicidade por tenant."
+
+  - categoria: "Estados e Transições"
+    descricao: "6 estados definidos: active, blocked, inactive, deactivated_permanent, deleted, first_access. Transições válidas documentadas no RF012.yaml. Campo 'estado' possui CHECK constraint para garantir valores válidos. Campo 'fl_desativado' possui 3 níveis (1=Ativo, 2=Inativo, 3=Desativado Permanentemente - RN-RF012-17)."
+
+  - categoria: "Active Directory"
+    descricao: "Integração opcional via campos fl_usuario_ad, ad_object_guid (UNIQUE globalmente), ad_sam_account_name. RN-RF012-09 define autenticação LDAP e sincronização automática. Usuários AD não exigem MFA por padrão (conforme WF-02)."
+
+  - categoria: "Sessões"
+    descricao: "Máximo 5 sessões simultâneas por usuário (RN-RF012-12). 6ª sessão invalida a mais antiga. Sessão possui access_token (JWT 8h) e refresh_token (SHA256 30d). Geolocalização (cidade, país) para detecção de login suspeito (RN-RF012-10)."
+
+  - categoria: "Reset de Senha"
+    descricao: "Token SHA256 único, válido 1 hora, uso único (RN-RF012-11). Token enviado por e-mail. Após utilização, fl_usado=1 e dt_utilizacao preenchido. Tokens expirados são limpos periodicamente (job)."
+
+  - categoria: "Detalhamento de Contas e Contatos"
+    descricao: "Campos detalhamento_conta e detalhamento_contato possuem 3 níveis (1=Básico, 2=Intermediário, 3=Completo - RN-RF012-16). Definem o nível de visibilidade de dados que o usuário terá ao consultar contas e contatos no sistema."
+
+  - categoria: "Compatibilidade com Backend .NET"
+    descricao: "Tipos compatíveis com Entity Framework Core e SQL Server: GUID (uniqueidentifier), DATETIME (datetime2), BIT (bit), INT (int), VARCHAR/TEXT (nvarchar/nvarchar(max)). Constraints e índices mapeados via Fluent API."
+
+# =============================================
+# 5. HISTÓRICO DE ALTERAÇÕES (OBRIGATÓRIO)
+# =============================================
+historico:
+  - versao: "2.0"
+    data: "2026-01-04"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial do MD-RF012 derivada de RF012.yaml (v2.0), UC-RF012.yaml (v2.0) e WF-RF012.md (v2.0). Cobertura completa de 17 regras de negócio (RN-RF012-01 a RN-RF012-17). 5 entidades modeladas: usuario, usuario_sessao, usuario_historico_senha, usuario_historico_acesso, usuario_reset_senha. Multi-tenancy, auditoria e soft delete obrigatórios em todas as tabelas principais. Índices de performance para WF-01 (listagem com filtros). Constraints de unicidade por tenant (email, username). Campos de origem rastreados até RF, UC e WF específicos."

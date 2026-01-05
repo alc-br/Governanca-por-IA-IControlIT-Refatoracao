@@ -1,0 +1,617 @@
+# =============================================
+# Modelo de Dados (MD) — RF004: Sistema de Auditoria e Logs do Sistema
+# Versão: 2.0
+# Autor: Claude Sonnet 4.5 (Claude Code)
+# Data: 2026-01-04
+# =============================================
+
+# =============================================
+# 1. METADADOS DO DOCUMENTO (OBRIGATÓRIO)
+# =============================================
+metadata:
+  versao: "2.0"
+  data: "2026-01-04"
+  autor: "Claude Sonnet 4.5 (Claude Code)"
+
+  rf_relacionado:
+    id: "RF004"
+    nome: "Sistema de Auditoria e Logs do Sistema"
+
+  sistema_modulo: "Sistema Base - Infraestrutura de Auditoria e Compliance"
+  banco_de_dados:
+    engine: "logico"        # Modelo lógico (independente de engine física)
+    schema: "logico"        # Abstração de schema
+  padroes:
+    multi_tenancy: true
+    auditoria: false        # Tabela de auditoria NÃO audita a si mesma (loop infinito)
+    soft_delete: false      # Auditoria é append-only (imutável, sem soft delete)
+
+# =============================================
+# 2. ENTIDADES (OBRIGATÓRIO)
+# =============================================
+entidades:
+  - nome: "sistema_auditoria"
+    descricao: >
+      Entidade central do sistema de auditoria. Armazena registro imutável de todas as
+      operações críticas do sistema. Tabela append-only (somente INSERT/SELECT, nunca
+      UPDATE/DELETE). 50+ milhões de registros em produção. Arquivamento automático
+      após 1 ano em Azure Blob Cold Storage. Compliance obrigatório LGPD/SOX/ISO 27001.
+
+    # -----------------------------
+    # 2.1 CAMPOS (OBRIGATÓRIO)
+    # -----------------------------
+    campos:
+      # CHAVE PRIMÁRIA (OBRIGATÓRIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primária única do registro de auditoria"
+        pk: true
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: null
+          wf: null
+          campo_wf: null
+          observacao: "Gerado automaticamente pelo sistema"
+
+      # MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "cliente_id"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para clientes (multi-tenancy - isolamento por cliente)"
+        fk:
+          tabela: "cliente"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC00"
+          wf: "WF-01"
+          campo_wf: "CMP-WF01-009"
+          observacao: "Filtro WHERE cliente_id aplicado automaticamente em todas as queries"
+
+      # CAMPOS DE NEGÓCIO - INFORMAÇÕES GERAIS
+      - nome: "tipo"
+        tipo: "VARCHAR(30)"
+        nulo: false
+        default: null
+        descricao: >
+          Categoria de auditoria: CRUD, AUTH, EXPORT, ACCESS, CONFIG, LGPD, FINANCIAL,
+          SECURITY, ADMIN, PRINT. Define retenção (7 anos compliance, 1 ano outros).
+        index: true
+        mutavel: false
+        check:
+          definicao: "tipo IN ('CRUD','AUTH','EXPORT','ACCESS','CONFIG','LGPD','FINANCIAL','SECURITY','ADMIN','PRINT')"
+          descricao: "Categoria de auditoria permitida (10 tipos)"
+        origem:
+          rf: "RF004"
+          uc: "UC00"
+          wf: "WF-01"
+          campo_wf: "CMP-WF01-005"
+          observacao: "Badge colorido por categoria na UI (Tabela de Registros)"
+
+      - nome: "descricao"
+        tipo: "VARCHAR(500)"
+        nulo: false
+        default: null
+        descricao: >
+          Descrição legível da operação auditada (ex: 'Usuário criado', 'Fatura aprovada').
+          Campo indexado para busca full-text.
+        index: true
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC00"
+          wf: "WF-01"
+          campo_wf: "CMP-WF01-005"
+          observacao: "Resumida (max 80 caracteres) na listagem, completa nos detalhes"
+
+      - nome: "entidade"
+        tipo: "VARCHAR(100)"
+        nulo: false
+        default: null
+        descricao: >
+          Nome da entidade auditada (ex: 'Usuario', 'Pedido', 'Fatura'). Usado para
+          agrupamento e timeline.
+        index: true
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC00, UC02"
+          wf: "WF-01, WF-03"
+          campo_wf: "CMP-WF01-005, CMP-WF03-001"
+          observacao: "Filtro essencial para timeline de entidade (UC02)"
+
+      - nome: "entidade_id"
+        tipo: "GUID"
+        nulo: false
+        default: null
+        descricao: "ID da entidade auditada (referência genérica para timeline)"
+        index: true
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC02"
+          wf: "WF-03"
+          campo_wf: "CMP-WF03-001"
+          observacao: "Permite query: WHERE entidade='Usuario' AND entidade_id=@id"
+
+      # CAMPOS DE NEGÓCIO - CONTEXTO ENRIQUECIDO (RN-RF004-010)
+      - nome: "usuario_id"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "ID do usuário que executou a operação (NULL para operações de sistema)"
+        index: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          rf: "RF004"
+          uc: "UC00, UC01"
+          wf: "WF-01, WF-02"
+          campo_wf: "CMP-WF01-005, CMP-WF02-005"
+          observacao: "Filtro crítico para busca avançada (UC01) e anomalias (UC05)"
+
+      - nome: "usuario"
+        tipo: "VARCHAR(200)"
+        nulo: false
+        default: "'SYSTEM'"
+        descricao: >
+          Nome/email do usuário (denormalizado para performance). 'SYSTEM' para operações
+          automáticas, 'JOB:{nome}' para jobs.
+        index: true
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC00, UC01"
+          wf: "WF-01, WF-02"
+          campo_wf: "CMP-WF01-005, CMP-WF02-005"
+          observacao: "Nome + avatar exibido na tabela de listagem (WF-01)"
+
+      - nome: "ip"
+        tipo: "VARCHAR(45)"
+        nulo: true
+        default: null
+        descricao: "Endereço IP de origem do request (IPv4 ou IPv6)"
+        index: true
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC01, UC05"
+          wf: "WF-02, WF-06"
+          campo_wf: "CMP-WF02-006, CMP-WF08-002"
+          observacao: "Filtro para detecção de anomalias (UC05) e busca avançada (UC01)"
+
+      - nome: "user_agent"
+        tipo: "VARCHAR(500)"
+        nulo: true
+        default: null
+        descricao: "User-Agent do navegador/app (browser, versão, SO)"
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC07"
+          wf: "WF-08"
+          campo_wf: "CMP-WF08-002"
+          observacao: "Exibido no Painel 2: Contexto (WF-08)"
+
+      - nome: "correlation_id"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: >
+          Correlation ID para rastreamento end-to-end. Permite correlacionar auditoria
+          com logs técnicos (RF-003).
+        index: true
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC01, UC07"
+          wf: "WF-02, WF-08"
+          campo_wf: "CMP-WF02-007, CMP-WF08-002"
+          observacao: "Botão 'Copiar CorrelationId' e 'Rastrear CorrelationId' (WF-08)"
+
+      - nome: "request_id"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Request ID interno (rastreamento dentro do sistema)"
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC07"
+          wf: "WF-08"
+          campo_wf: "CMP-WF08-002"
+          observacao: "Rastreamento técnico interno"
+
+      - nome: "session_id"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Session ID do usuário (rastreamento de sessão)"
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC07"
+          wf: "WF-08"
+          campo_wf: "CMP-WF08-002"
+          observacao: "Permite rastrear todas as operações de uma sessão"
+
+      # CAMPOS DE NEGÓCIO - SNAPSHOTS E DIFF (RN-RF004-002, RN-RF004-003)
+      - nome: "dados_anteriores_json"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: >
+          Snapshot completo do estado ANTES da operação (JSON serializado).
+          NULL para CREATE, entidade completa para UPDATE/DELETE.
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC02, UC07"
+          wf: "WF-03, WF-08"
+          campo_wf: "CMP-WF03-005, CMP-WF08-003"
+          observacao: "JSON pretty-print no Painel 3: Snapshots (WF-08), busca full-text indexada"
+
+      - nome: "dados_novos_json"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: >
+          Snapshot completo do estado DEPOIS da operação (JSON serializado).
+          Entidade completa para CREATE/UPDATE, NULL para DELETE.
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC02, UC07"
+          wf: "WF-03, WF-08"
+          campo_wf: "CMP-WF03-005, CMP-WF08-003"
+          observacao: "JSON pretty-print no Painel 3: Snapshots (WF-08), busca full-text indexada"
+
+      - nome: "diff_json"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: >
+          Diff estruturado entre estado anterior e novo (JSON Patch RFC 6902).
+          Formato: [{"op":"replace","path":"/Nome","value":"João Silva"}].
+          Permite queries SQL eficientes para auditorias específicas.
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC02, UC07"
+          wf: "WF-03, WF-08"
+          campo_wf: "CMP-WF03-007, CMP-WF08-003"
+          observacao: "Visualização destacada de campos modificados (amarelo) no WF-03 e WF-08"
+
+      # CAMPOS DE NEGÓCIO - INTEGRIDADE E SEGURANÇA (RN-RF004-006)
+      - nome: "hash_sha256"
+        tipo: "VARCHAR(64)"
+        nulo: true
+        default: null
+        descricao: >
+          Hash SHA-256 calculado para registros críticos (FINANCIAL, SECURITY, LGPD, CONFIG).
+          Calculado sobre (Timestamp + UserId + Entidade + EntidadeId + DadosNovos_JSON).
+          Permite validação de integridade via UC06.
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC06, UC07"
+          wf: "WF-07, WF-08"
+          campo_wf: "CMP-WF07-007, CMP-WF08-004"
+          observacao: "Painel 4: Integridade (WF-08) com botão 'Validar Integridade'"
+
+      - nome: "justificativa"
+        tipo: "VARCHAR(500)"
+        nulo: true
+        default: null
+        descricao: >
+          Justificativa obrigatória para operações críticas (CONFIG category).
+          Mínimo 20 caracteres. Endpoint rejeita request sem justificativa (HTTP 400).
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "RN-RF004-013 - Auditoria de Configurações Críticas"
+
+      # CAMPOS DE NEGÓCIO - RETENÇÃO E ARQUIVAMENTO (RN-RF004-011, RN-RF004-015)
+      - nome: "retention_date"
+        tipo: "DATETIME"
+        nulo: false
+        default: null
+        descricao: >
+          Data de expiração da retenção (calculada automaticamente).
+          Compliance (FINANCIAL/LGPD/SECURITY): +7 anos.
+          Outros: +1 ano (CRUD/AUTH/EXPORT/CONFIG/ADMIN) ou +90 dias (PRINT/ACCESS).
+        index: true
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC08"
+          wf: "WF-09"
+          campo_wf: "CMP-WF09-004"
+          observacao: "Job semanal verifica registros expirando em 30 dias (alertas)"
+
+      - nome: "arquivado"
+        tipo: "BOOLEAN"
+        nulo: false
+        default: false
+        descricao: >
+          Flag indicando se registro foi arquivado em Azure Blob Storage (cold tier).
+          Job noturno arquiva registros > 1 ano. Mantém registro em banco com flag TRUE.
+        index: true
+        mutavel: false
+        index_parcial:
+          where: "arquivado = false"
+          descricao: "Acelera queries em registros ativos (não arquivados)"
+        origem:
+          rf: "RF004"
+          uc: "UC08"
+          wf: "WF-09"
+          campo_wf: "CMP-WF09-005"
+          observacao: "Painel 5: Retenção (WF-08) indica se está arquivado"
+
+      - nome: "azure_blob_uri"
+        tipo: "VARCHAR(500)"
+        nulo: true
+        default: null
+        descricao: >
+          URI do arquivo JSON compactado no Azure Blob Storage (cold tier).
+          Preenchido quando arquivado = TRUE. NULL se não arquivado.
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC08"
+          wf: "WF-09"
+          campo_wf: "CMP-WF09-006"
+          observacao: "Link para download de registros arquivados (WF-08, Painel 5)"
+
+      # TIMESTAMP (OBRIGATÓRIO - NÃO USA created_at PADRÃO)
+      - nome: "timestamp"
+        tipo: "DATETIME"
+        nulo: false
+        default: "GETDATE()"
+        descricao: >
+          Data/hora exata da operação auditada (não da criação do registro,
+          que pode ser posterior). Campo crítico para ordenação e timeline.
+        index: true
+        mutavel: false
+        origem:
+          rf: "RF004"
+          uc: "UC00, UC02"
+          wf: "WF-01, WF-03"
+          campo_wf: "CMP-WF01-005, CMP-WF03-004"
+          observacao: "Ordenação padrão DESC (mais recente primeiro) no WF-01"
+
+    # -----------------------------
+    # 2.2 ÍNDICES (OBRIGATÓRIO)
+    # -----------------------------
+    indices:
+      # ÍNDICE PRIMÁRIO (OBRIGATÓRIO)
+      - nome: "pk_sistema_auditoria"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primária única do registro de auditoria"
+
+      # ÍNDICE MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "idx_sistema_auditoria_cliente"
+        tipo: "BTREE"
+        colunas: ["cliente_id"]
+        descricao: "Performance em queries multi-tenant (filtro WHERE cliente_id)"
+
+      # ÍNDICES DE PERFORMANCE (QUERIES PRINCIPAIS - WF-01)
+      - nome: "idx_sistema_auditoria_timestamp"
+        tipo: "BTREE"
+        colunas: ["timestamp"]
+        descricao: "Performance em ordenação cronológica (padrão DESC no WF-01)"
+
+      - nome: "idx_sistema_auditoria_tipo"
+        tipo: "BTREE"
+        colunas: ["tipo"]
+        descricao: "Performance em filtros por categoria de auditoria (WF-01, WF-02)"
+
+      - nome: "idx_sistema_auditoria_usuario"
+        tipo: "BTREE"
+        colunas: ["usuario"]
+        descricao: "Performance em filtros por usuário (WF-02 - busca avançada)"
+
+      # ÍNDICES DE PERFORMANCE (TIMELINE - WF-03)
+      - nome: "idx_sistema_auditoria_entidade_id"
+        tipo: "BTREE"
+        colunas: ["entidade", "entidade_id", "timestamp"]
+        descricao: "Performance crítica em timeline de entidade (UC02, WF-03)"
+
+      # ÍNDICES DE PERFORMANCE (BUSCA AVANÇADA - WF-02)
+      - nome: "idx_sistema_auditoria_ip"
+        tipo: "BTREE"
+        colunas: ["ip"]
+        descricao: "Performance em filtros por IP (WF-02, detecção de anomalias WF-06)"
+
+      - nome: "idx_sistema_auditoria_correlation_id"
+        tipo: "BTREE"
+        colunas: ["correlation_id"]
+        descricao: "Performance em rastreamento de CorrelationId (WF-02, WF-08)"
+
+      # ÍNDICES DE PERFORMANCE (RETENÇÃO - WF-09)
+      - nome: "idx_sistema_auditoria_retention_date"
+        tipo: "BTREE"
+        colunas: ["retention_date"]
+        descricao: "Performance em job de alertas de retenção (30 dias antes de expirar)"
+
+      # ÍNDICE PARCIAL (REGISTROS NÃO ARQUIVADOS)
+      - nome: "idx_sistema_auditoria_nao_arquivados"
+        tipo: "BTREE"
+        colunas: ["arquivado"]
+        where: "arquivado = false"
+        descricao: "Acelera queries em registros ativos (não arquivados no Azure Blob)"
+
+      # ÍNDICE FULL-TEXT (BUSCA TEXTUAL - RN-RF004-014)
+      - nome: "idx_fulltext_sistema_auditoria_descricao_json"
+        tipo: "FULLTEXT"
+        colunas: ["descricao", "dados_anteriores_json", "dados_novos_json"]
+        descricao: >
+          Índice full-text para busca textual rápida em milhões de registros.
+          Queries suportadas: CPF mascarado, email, nome de usuário, IP, ID de entidade.
+
+    # -----------------------------
+    # 2.3 CONSTRAINTS (OBRIGATÓRIO)
+    # -----------------------------
+    constraints:
+      # FK MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "fk_sistema_auditoria_cliente"
+        tipo: "FOREIGN KEY"
+        definicao: "cliente_id REFERENCES cliente(id)"
+        on_delete: "CASCADE"
+        descricao: "Multi-tenancy - isolamento por cliente (CASCADE ao deletar cliente)"
+
+      # FK USUÁRIO (OPCIONAL - SET NULL)
+      - nome: "fk_sistema_auditoria_usuario"
+        tipo: "FOREIGN KEY"
+        definicao: "usuario_id REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Referência ao usuário que executou a operação (SET NULL se usuário deletado)"
+
+      # CHECK CONSTRAINT - CATEGORIA DE AUDITORIA (10 TIPOS)
+      - nome: "chk_sistema_auditoria_tipo"
+        tipo: "CHECK"
+        definicao: "tipo IN ('CRUD','AUTH','EXPORT','ACCESS','CONFIG','LGPD','FINANCIAL','SECURITY','ADMIN','PRINT')"
+        descricao: "Categoria de auditoria permitida (10 tipos pré-definidos)"
+
+      # TRIGGER - IMUTABILIDADE (RN-RF004-005)
+      - nome: "trg_sistema_auditoria_imutabilidade_update"
+        tipo: "TRIGGER"
+        definicao: "INSTEAD OF UPDATE - RAISE ERROR ('Registros de auditoria são imutáveis')"
+        descricao: "Bloqueia UPDATE na tabela (append-only, imutável após criação)"
+
+      - nome: "trg_sistema_auditoria_imutabilidade_delete"
+        tipo: "TRIGGER"
+        definicao: "INSTEAD OF DELETE - RAISE ERROR ('Registros de auditoria são imutáveis')"
+        descricao: "Bloqueia DELETE na tabela (apenas arquivamento permitido)"
+
+# =============================================
+# 3. RELACIONAMENTOS GLOBAIS (OPCIONAL)
+# =============================================
+relacionamentos_globais:
+  - origem: "cliente"
+    cardinalidade: "1:N"
+    destino: "sistema_auditoria"
+    descricao: "Um cliente possui muitos registros de auditoria (multi-tenancy)"
+
+  - origem: "usuario"
+    cardinalidade: "1:N"
+    destino: "sistema_auditoria"
+    descricao: "Um usuário pode ter muitos registros de auditoria (0:N - NULL permitido para operações de sistema)"
+
+# =============================================
+# 4. OBSERVAÇÕES E DECISÕES (OBRIGATÓRIO)
+# =============================================
+observacoes:
+  - categoria: "Modelagem"
+    descricao: >
+      Modelo derivado do RF004, UC-RF004 (9 UCs) e WF-RF004 (9 wireframes).
+      Tabela append-only (imutável): registros criados automaticamente pelo
+      AuditingBehaviour<TRequest, TResponse> (MediatR interceptor) e NUNCA
+      alterados ou deletados manualmente. Triggers bloqueiam UPDATE/DELETE.
+
+  - categoria: "Modelagem - Diferença com Padrão"
+    descricao: >
+      Esta tabela NÃO segue o padrão de auditoria comum (created_at, created_by,
+      updated_at, updated_by, deleted_at) porque ela PRÓPRIA É A AUDITORIA.
+      Usa campo 'timestamp' em vez de 'created_at' (momento da operação auditada,
+      não da criação do registro). NÃO tem soft delete (deleted_at) porque é
+      imutável - apenas arquivamento em Azure Blob Storage.
+
+  - categoria: "Modelagem - Multi-Tenancy"
+    descricao: >
+      Multi-tenancy implementado via cliente_id (FK para cliente). Filtro
+      WHERE cliente_id = @ClienteId aplicado automaticamente em todas as queries
+      (invisível ao usuário). Badge visual informativo no WF-01 mostra tenant atual.
+
+  - categoria: "Performance"
+    descricao: >
+      Sistema com 50+ milhões de registros em produção. Índices críticos em:
+      cliente_id (multi-tenancy), timestamp (ordenação), tipo (categoria),
+      entidade+entidade_id+timestamp (timeline), retention_date (alertas).
+      Índice full-text em descricao + JSONs para busca textual eficiente.
+
+  - categoria: "Performance - Índice Parcial"
+    descricao: >
+      Índice parcial em 'arquivado = false' acelera queries em registros ativos
+      (não arquivados). Registros > 1 ano são movidos para Azure Blob Storage
+      (cold tier) e flag arquivado = TRUE. Query típica: WHERE arquivado = false
+      beneficia-se do índice parcial.
+
+  - categoria: "Performance - Full-Text Search"
+    descricao: >
+      Índice full-text em (descricao, dados_anteriores_json, dados_novos_json)
+      permite busca rápida em milhões de registros. Queries suportadas: busca
+      por CPF mascarado, email, nome de usuário, IP, ID de entidade.
+      Endpoint: /api/auditoria/buscar?q={termo}&periodo={dias}&tipo={categoria}
+
+  - categoria: "Segurança - Imutabilidade"
+    descricao: >
+      Tabela append-only protegida por triggers INSTEAD OF UPDATE/DELETE.
+      Qualquer tentativa de alteração/exclusão gera RAISE ERROR.
+      Proteção contra adulteração de evidências forenses (compliance LGPD/SOX).
+
+  - categoria: "Segurança - Hash SHA-256"
+    descricao: >
+      Registros críticos (FINANCIAL, SECURITY, LGPD, CONFIG) têm hash SHA-256
+      calculado automaticamente no momento da criação. Permite validação de
+      integridade via UC06 (WF-07): recalcular hash e comparar com armazenado
+      detecta adulteração. Alerta crítico em SECURITY category se divergência.
+
+  - categoria: "Compliance - Retenção"
+    descricao: >
+      Retenção diferenciada por categoria (RN-RF004-004):
+      FINANCIAL/LGPD/SECURITY/EXPORT/ACCESS/CONFIG = 7 anos (compliance obrigatório).
+      CRUD/AUTH/ADMIN = 1 ano. PRINT = 90 dias.
+      Job diário arquiva registros > 1 ano em Azure Blob Cold Storage.
+      Job semanal alerta registros expirando em 30 dias.
+
+  - categoria: "Compliance - LGPD/SOX/ISO 27001"
+    descricao: >
+      Sistema crítico para compliance legal obrigatório:
+      LGPD Art. 37, 38, 46 (retenção 7 anos, registro de acesso a dados pessoais).
+      SOX Seção 404 (retenção 7 anos, auditoria de transações financeiras).
+      ISO 27001 (retenção 7 anos, auditoria de eventos de segurança).
+
+  - categoria: "Migração - Arquivamento Azure Blob"
+    descricao: >
+      Registros > 1 ano são arquivados automaticamente (Hangfire job noturno).
+      Processo: 1) Serializar registro em JSON compactado (gzip).
+      2) Upload para Azure Blob Storage (tier Cold).
+      3) Atualizar registro: arquivado = TRUE, azure_blob_uri = @uri.
+      Restauração via UC08 (WF-09): copiar Blob de volta ao banco,
+      arquivado = FALSE, azure_blob_uri = NULL.
+
+  - categoria: "Migração - Cuidados com Volume"
+    descricao: >
+      Sistema de alto volume (50M+ registros em produção). Todas as queries
+      DEVEM incluir filtro de período (timestamp BETWEEN @inicio AND @fim)
+      para evitar table scan. Paginação obrigatória (padrão 50, máx 200).
+      Timeout de 30s em busca avançada (UC01) para evitar queries lentas.
+
+# =============================================
+# 5. HISTÓRICO DE ALTERAÇÕES (OBRIGATÓRIO)
+# =============================================
+historico:
+  - versao: "2.0"
+    data: "2026-01-04"
+    autor: "Claude Sonnet 4.5 (Claude Code)"
+    descricao: >
+      Versão inicial do MD-RF004 derivado de RF004, UC-RF004 (9 UCs) e WF-RF004 (9 wireframes).
+      Tabela append-only com 21 campos (15 negócio + 6 infraestrutura).
+      10 índices (PK + multi-tenancy + performance + full-text).
+      6 constraints (PK + 2 FKs + CHECK + 2 triggers imutabilidade).
+      Compliance LGPD/SOX/ISO 27001 com retenção diferenciada por categoria.
+      Arquivamento automático Azure Blob Storage (cold tier > 1 ano).
