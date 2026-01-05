@@ -1,6 +1,6 @@
 ﻿# Deploy HOM sem Validação (EXCEPCIONAL)
 
-Deploy do **RF-XXX** para HOM sem validação completa conforme docs/contracts/deploy/CONTRATO-DEPLOY-HOM-SEM-VALIDACAO.md.
+Deploy do **RF-XXX** para HOM sem validação completa conforme contracts/deploy/CONTRATO-DEPLOY-HOM-SEM-VALIDACAO.md.
 
 **RF:** [Especificar RF, ex: RF-027]
 
@@ -10,7 +10,7 @@ Deploy do **RF-XXX** para HOM sem validação completa conforme docs/contracts/d
 
 **Contrato ativado:** CONTRATO-DEPLOY-HOM-SEM-VALIDACAO
 
-**Checklist:** docs/checklists/checklist-deploy-hom-sem-validacao.yaml
+**Checklist:** checklists/checklist-deploy-hom-sem-validacao.yaml
 
 **Uso restrito:**
 - Apresentações iniciais

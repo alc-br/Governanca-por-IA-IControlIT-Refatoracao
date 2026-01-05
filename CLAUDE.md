@@ -1,4 +1,4 @@
-# CLAUDE.md
+# D:\IC2\CLAUDE.md
 # Contrato de Governança de Documentação
 
 **Versão:** 4.0
@@ -8,7 +8,7 @@
 Este arquivo define **COMO** o Claude Code deve se comportar ao trabalhar com **documentação** neste repositório.
 Ele é um **contrato de governança**, não documentação técnica.
 
-O CLAUDE.md funciona como a **camada de governança superior** para documentação.
+O D:\IC2\CLAUDE.md funciona como a **camada de governança superior** para documentação.
 Contratos específicos complementam este arquivo e **NUNCA o substituem**.
 
 ---
@@ -28,11 +28,11 @@ Este projeto segue **EXCLUSIVAMENTE** os documentos abaixo na ordem hierárquica
 | Nível | Documento | Propósito |
 |-------|-----------|-----------|
 | **1** | `CLAUDE.md` (este arquivo) | Governança superior de documentação |
-| **2** | `docs/COMPLIANCE.md` | Regras de validação e conformidade de documentos |
-| **3** | `docs/CONVENTIONS.md` | Nomenclatura e padrões de documentação |
-| **4** | `docs/contracts/` | Contratos formais de documentação |
-| **5** | `docs/prompts/` | Prompts para ativar contratos |
-| **6** | `docs/checklists/` | Checklists de validação de documentação |
+| **2** | `COMPLIANCE.md` | Regras de validação e conformidade de documentos |
+| **3** | `CONVENTIONS.md` | Nomenclatura e padrões de documentação |
+| **4** | `contracts/` | Contratos formais de documentação |
+| **5** | `prompts/` | Prompts para ativar contratos |
+| **6** | `checklists/` | Checklists de validação de documentação |
 
 **Regra de Conflito:**
 ➡️ Em caso de conflito, a documentação de nível superior vence.
@@ -59,7 +59,7 @@ Este projeto opera em **MODO DE GOVERNANÇA RÍGIDA**.
 
 **Qualquer tentativa de execução fora do contrato invalida a tarefa.**
 
-➡️ **Ver detalhes completos em:** `docs/COMPLIANCE.md` (seção 17)
+➡️ **Ver detalhes completos em:** `COMPLIANCE.md` (seção 17)
 
 ---
 
@@ -74,13 +74,13 @@ Se uma solicitação:
 - Nenhuma ação parcial pode ser realizada
 - Nenhum "adiantamento" é permitido
 
-➡️ **Ver detalhes completos em:** `docs/COMPLIANCE.md` (seção 15)
+➡️ **Ver detalhes completos em:** `COMPLIANCE.md` (seção 15)
 
 ---
 
 ## 5. REGRA OBRIGATÓRIA — Arquivos Temporários da IA
 
-**PROIBIDO criar arquivos na raiz do projeto (`D:\IC2\docs\`) sem solicitação explícita do usuário.**
+**PROIBIDO criar arquivos na raiz do projeto (`D:\IC2_Governanca\`) sem solicitação explícita do usuário.**
 
 ### Regra
 
@@ -93,10 +93,10 @@ D:\IC2\.temp_ia\
 ### Exceções Permitidas (fora de `.temp_ia\`)
 
 - Relatórios de auditoria em `D:\IC2\relatorios\`
-- Documentação oficial de governança em `D:\IC2\docs\`
-- Documentação de contratos em `D:\IC2\docs\contracts\`
-- Documentação de prompts em `D:\IC2\docs\prompts\`
-- Documentação de checklists em `D:\IC2\docs\checklists\`
+- Documentação oficial de governança em `D:\IC2_Governanca\`
+- Documentação de contratos em `D:\IC2_Governanca\contracts\`
+- Documentação de prompts em `D:\IC2_Governanca\prompts\`
+- Documentação de checklists em `D:\IC2_Governanca\checklists\`
 
 ### Exemplos
 
@@ -109,13 +109,13 @@ D:\IC2\.temp_ia\validacao-temporaria.md
 
 **❌ INCORRETO:**
 ```
-D:\IC2\docs\RELATORIO-ANALISE-DOC.md          # ❌ NA RAIZ DE DOCS (proibido)
-D:\IC2\analise-gap-documentacao.md            # ❌ NA RAIZ (proibido)
+D:\IC2_Governanca\RELATORIO-ANALISE-DOC.md          # ❌ NA RAIZ (proibido)
+D:\IC2\analise-gap-documentacao.md                   # ❌ NA RAIZ (proibido)
 ```
 
 **VIOLAÇÃO:** Criar arquivos fora de `.temp_ia\` sem solicitação explícita é considerado **execução inválida**.
 
-➡️ **Ver detalhes completos em:** `docs/COMPLIANCE.md` (seção 16)
+➡️ **Ver detalhes completos em:** `COMPLIANCE.md` (seção 16)
 
 ---
 
@@ -124,13 +124,13 @@ D:\IC2\analise-gap-documentacao.md            # ❌ NA RAIZ (proibido)
 ```
 CLAUDE.md (este arquivo)
     ↓
-docs/COMPLIANCE.md (regras de validação de documentos)
+COMPLIANCE.md (regras de validação de documentos)
     ↓
-docs/contracts/ (contratos de documentação)
+contracts/ (contratos de documentação)
     ↓
-docs/prompts/ (prompts para ativar contratos)
+prompts/ (prompts para ativar contratos)
     ↓
-docs/checklists/ (checklists de validação)
+checklists/ (checklists de validação)
 ```
 
 ---
@@ -139,17 +139,17 @@ docs/checklists/ (checklists de validação)
 
 ### Estrutura de Contratos
 
-Os contratos estão organizados por categoria em `docs/contracts/`:
+Os contratos estão organizados por categoria em `contracts/`:
 
 ```
-docs/contracts/
+contracts/
 ├── documentacao/        ← Geração e validação de documentação
 ├── auditoria/           ← Auditoria de conformidade documental
 ├── fluxos/              ← Documentação de fluxos
 └── deprecated/          ← Contratos obsoletos (não usar)
 ```
 
-➡️ **Ver estrutura completa em:** `docs/contracts/README.md`
+➡️ **Ver estrutura completa em:** `contracts/README.md`
 
 ### Regras de Ativação
 
@@ -163,10 +163,10 @@ docs/contracts/
 
 | Prompt | Contrato Ativado | Caminho Completo |
 |--------|------------------|------------------|
-| "Conforme CONTRATO DE DOCUMENTAÇÃO ESSENCIAL" | Documentação Essencial | `docs/contracts/documentacao/CONTRATO-DE-ADEQUACAO-DE-DOCUMENTOS.md` |
-| "Conforme CONTRATO DE AUDITORIA" | Auditoria de Conformidade | `docs/contracts/auditoria/conformidade.md` |
+| "Conforme CONTRATO DE DOCUMENTAÇÃO ESSENCIAL" | Documentação Essencial | `contracts/documentacao/CONTRATO-DE-ADEQUACAO-DE-DOCUMENTOS.md` |
+| "Conforme CONTRATO DE AUDITORIA" | Auditoria de Conformidade | `contracts/auditoria/conformidade.md` |
 
-➡️ **Ver lista completa de contratos em:** `docs/contracts/README.md`
+➡️ **Ver lista completa de contratos em:** `contracts/README.md`
 
 ---
 
@@ -178,7 +178,7 @@ Sempre que o agente criar ou modificar qualquer um dos arquivos de documentaçã
 - `TC-RFXXX.yaml`
 - `CN-RFXXX.yaml`
 - `MD-RFXXX.yaml`
-- Arquivos `.md` em `docs/`
+- Arquivos `.md` em `D:\IC2_Governanca\`
 
 O agente **DEVE, OBRIGATORIAMENTE**:
 
@@ -195,7 +195,7 @@ O agente **DEVE, OBRIGATORIAMENTE**:
 - Criar seções fora do padrão estabelecido
 - Omitir seções obrigatórias
 
-➡️ **Ver detalhes completos em:** `docs/COMPLIANCE.md` (seção 3)
+➡️ **Ver detalhes completos em:** `COMPLIANCE.md` (seção 3)
 
 ---
 
@@ -205,11 +205,11 @@ O agente **DEVE, OBRIGATORIAMENTE**:
 
 | Categoria | Comando | Descrição |
 |-----------|---------|-----------|
-| **Validação** | `python docs/tools/docs/validator-rf-uc.py RFXXX` | Validar RF → UC |
-| **Validação** | `python docs/tools/docs/validator-coverage.py RFXXX` | Validar cobertura completa |
+| **Validação** | `python tools/docs/validator-rf-uc.py RFXXX` | Validar RF → UC |
+| **Validação** | `python tools/docs/validator-coverage.py RFXXX` | Validar cobertura completa |
 | **Auditoria** | `/audit-rf RFXXX` | Auditoria de conformidade documental |
 
-➡️ **Ver todos os comandos em:** `docs/COMMANDS.md`
+➡️ **Ver todos os comandos em:** `COMMANDS.md`
 
 ---
 
@@ -225,7 +225,7 @@ O agente **DEVE, OBRIGATORIAMENTE**:
 | **Seções Obrigatórias** | RF deve ter 5 seções | `COMPLIANCE.md` seção 10 |
 | **Referências Cruzadas** | RF → UC → TC → CN | `COMPLIANCE.md` seção 11 |
 
-➡️ **Ver todas as regras em:** `docs/COMPLIANCE.md`
+➡️ **Ver todas as regras em:** `COMPLIANCE.md`
 
 ---
 
@@ -274,9 +274,9 @@ Você **DEVE PARAR e ALERTAR** quando ocorrer:
 
 Antes de criar qualquer documento, você **DEVE**:
 
-1. Ler o template aplicável em `docs/templates/`
-2. Ler `docs/CONVENTIONS.md` (nomenclatura)
-3. Ler `docs/COMPLIANCE.md` (regras aplicáveis)
+1. Ler o template aplicável em `templates/`
+2. Ler `CONVENTIONS.md` (nomenclatura)
+3. Ler `COMPLIANCE.md` (regras aplicáveis)
 4. Confirmar entendimento das regras
 5. Identificar se há **contrato específico ativado**
 6. Somente então iniciar a criação
@@ -294,7 +294,7 @@ Você **NUNCA** deve:
 2. Modificar estrutura de governança sem autorização
 3. Inferir regras não documentadas
 4. "Melhorar" templates silenciosamente
-5. Alterar arquivos em `/docs` sem solicitação explícita
+5. Alterar arquivos em `D:\IC2_Governanca\` sem solicitação explícita
 6. Criar documentação sem validação
 7. Omitir seções obrigatórias
 8. Criar arquivos fora de `.temp_ia/` sem solicitação

@@ -392,8 +392,8 @@ execucao:
       erro_original: "Testes E2E não executavam devido a data-test attributes ausentes"
       causa_raiz: "Data-test attributes não foram implementados durante criação inicial do RF"
       arquivos_alterados:
-        - "frontend/icontrolit-app/src/app/modules/clientes/clientes-list/clientes-list.component.html"
-        - "frontend/icontrolit-app/src/app/modules/clientes/clientes-form/clientes-form.component.html"
+        - "D:\IC2\frontend\icontrolit-app/src/app/modules/clientes/clientes-list/clientes-list.component.html"
+        - "D:\IC2\frontend\icontrolit-app/src/app/modules/clientes/clientes-form/clientes-form.component.html"
       branch: "hotfix/correcao-sistemica-data-test-attributes"
       commit: "<hash do commit>"
       correcao_sistemica:

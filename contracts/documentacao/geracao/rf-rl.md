@@ -71,7 +71,7 @@ Este contrato é ativado quando a solicitação mencionar explicitamente:
 Exemplo:
 ```
 Conforme CONTRATO-GERACAO-RF-RL para RF060.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -160,10 +160,10 @@ D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
-- `backend/**`
-- `frontend/**`
-- `docs/contracts/**`
-- `docs/templates/**`
+- `D:\IC2\backend\**`
+- `D:\IC2\frontend\**`
+- `contracts/**`
+- `templates/**`
 - Qualquer arquivo que não seja os 5 listados acima
 
 ---
@@ -174,7 +174,7 @@ O contrato TRAVA se qualquer condição falhar:
 
 | Pré-requisito | Descrição | Bloqueante |
 |---------------|-----------|------------|
-| Pasta do RF | Pasta já criada em `docs/rf/[Fase]/[EPIC]/RFXXX/` | Sim |
+| Pasta do RF | Pasta já criada em `rf/[Fase]/[EPIC]/RFXXX/` | Sim |
 | Templates acessíveis | Templates em `D:\IC2\docs\templates\` disponíveis | Sim |
 | Legado acessível | Código legado em `D:\IC2\ic1_legado\` disponível | Sim |
 | Documentação funcional | `D:\IC2\docs\rf\documentacao-funcional.md` acessível (referência) | Não* |
@@ -759,7 +759,7 @@ metadados:
 
 ```bash
 # Validar que RF não contém legado e RL tem destinos definidos
-python D:\IC2\docs\tools\docs\validator-rl.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-rl.py RFXXX
 ```
 
 **Critérios de validação:**
@@ -1029,7 +1029,7 @@ End If
 O agente DEVE PARAR se:
 
 1. **Pasta do RF não existe**: RFXXX não encontrado na estrutura
-2. **Templates inacessíveis**: `docs/templates/` não disponível
+2. **Templates inacessíveis**: `templates/` não disponível
 3. **Legado inacessível**: `ic1_legado/` não disponível
 4. **Validador falhou**: `validator-rl.py` retornou exit code ≠ 0
 5. **Sincronização falhou**: MD e YAML não estão sincronizados
@@ -1226,7 +1226,7 @@ Após conclusão deste contrato, o próximo passo é:
 >
 > ```
 > Conforme CONTRATO DE DOCUMENTACAO-ESSENCIAL para RFXXX.
-> Seguir CLAUDE.md.
+> Seguir D:\IC2\CLAUDE.md.
 > ```
 
 Este contrato gerará os arquivos UC-RFXXX.md, MD-RFXXX.md, WF-RFXXX.md.
@@ -1237,16 +1237,16 @@ Este contrato gerará os arquivos UC-RFXXX.md, MD-RFXXX.md, WF-RFXXX.md.
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `/docs/contracts/CONTRATO-GERACAO-RF-RL.md` | Este contrato |
-| `/docs/contracts/CONTRATO-DOCUMENTACAO-ESSENCIAL.md` | Contrato para criar UC/MD/WF |
-| `/docs/contracts/CONTRATO-RF-PARA-RL.md` | Contrato de migração RF v1.0 → v2.0 |
-| `/docs/templates/RF.md` | Template do RF (contrato moderno) |
-| `/docs/templates/RF.yaml` | Template RF estruturado |
-| `/docs/templates/RL.md` | Template do RL (referência ao legado) |
-| `/docs/templates/RL.yaml` | Template RL estruturado |
-| `/docs/templates/STATUS.yaml` | Template STATUS estruturado |
-| `/docs/tools/docs/validator-rl.py` | Validador de separação RF/RL |
-| `/docs/rf/documentacao-funcional.md` | **Documentação funcional centralizada (atualizada ao final)** |
+| `contracts/CONTRATO-GERACAO-RF-RL.md` | Este contrato |
+| `contracts/CONTRATO-DOCUMENTACAO-ESSENCIAL.md` | Contrato para criar UC/MD/WF |
+| `contracts/CONTRATO-RF-PARA-RL.md` | Contrato de migração RF v1.0 → v2.0 |
+| `templates/RF.md` | Template do RF (contrato moderno) |
+| `templates/RF.yaml` | Template RF estruturado |
+| `templates/RL.md` | Template do RL (referência ao legado) |
+| `templates/RL.yaml` | Template RL estruturado |
+| `templates/STATUS.yaml` | Template STATUS estruturado |
+| `tools/docs/validator-rl.py` | Validador de separação RF/RL |
+| `/rf/documentacao-funcional.md` | **Documentação funcional centralizada (atualizada ao final)** |
 
 ---
 

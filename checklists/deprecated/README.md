@@ -94,7 +94,7 @@ Validar que o backend implementado respeita 100% o contrato definido através de
 
 **Exemplo:**
 ```bash
-code docs/checklists/auditoria-conformidade.md
+code checklists/auditoria-conformidade.md
 ```
 
 ---
@@ -117,7 +117,7 @@ code docs/checklists/auditoria-conformidade.md
 ```python
 import yaml
 
-with open('docs/checklists/auditoria-conformidade.yaml', 'r') as file:
+with open('checklists/auditoria-conformidade.yaml', 'r') as file:
     checklist = yaml.safe_load(file)
 
 for categoria in checklist['categorias']:
@@ -236,12 +236,12 @@ Para adicionar um novo checklist:
 
 1. **Criar versão Markdown:**
    ```bash
-   code docs/checklists/nome-do-checklist.md
+   code checklists/nome-do-checklist.md
    ```
 
 2. **Criar versão YAML:**
    ```bash
-   code docs/checklists/nome-do-checklist.yaml
+   code checklists/nome-do-checklist.yaml
    ```
 
 3. **Seguir estrutura padrão:**
@@ -313,8 +313,8 @@ def validate_sync(md_path, yaml_path):
         print("✅ Checklist sincronizado!")
 
 validate_sync(
-    'docs/checklists/auditoria-conformidade.md',
-    'docs/checklists/auditoria-conformidade.yaml'
+    'checklists/auditoria-conformidade.md',
+    'checklists/auditoria-conformidade.yaml'
 )
 ```
 

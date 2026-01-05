@@ -1,17 +1,17 @@
 ﻿# Sincronizar Todos RFs com Azure DevOps
 
-Sincronizar STATUS.yaml de **TODOS os RFs** com Azure DevOps conforme docs/contracts/devops/CONTRATO-DEVOPS-GOVERNANCA.md.
+Sincronizar STATUS.yaml de **TODOS os RFs** com Azure DevOps conforme contracts/devops/CONTRATO-DEVOPS-GOVERNANCA.md.
 
 ---
 
 **Contrato ativado:** CONTRATO-DEVOPS-GOVERNANCA
 
-**Checklist:** docs/checklists/checklist-devops.yaml
+**Checklist:** checklists/checklist-devops.yaml
 
-**Script:** `python docs/tools/devops-sync/core/sync-all-rfs.py`
+**Script:** `python tools/devops-sync/core/sync-all-rfs.py`
 
 **Objetivo:**
-- Varrer todos os RFs em `docs/rf/`
+- Varrer todos os RFs em `rf/`
 - Ler STATUS.yaml de cada RF
 - Determinar coluna correta do board para cada
 - Mover Work Items para colunas corretas

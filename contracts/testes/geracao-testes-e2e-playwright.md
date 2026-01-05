@@ -41,7 +41,7 @@ Este contrato é ativado quando a solicitação mencionar explicitamente:
 Exemplo:
 ```
 Conforme geracao-testes-e2e-playwright para RF060.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -128,7 +128,7 @@ Antes de QUALQUER teste E2E:
 | **Usuário Teste** | `usuario@teste.com` | `Test@123` | Testes de permissões limitadas |
 | **Sem Permissão** | `sempermissao@teste.com` | `Test@123` | Testes de autorização (403) |
 
-**Fonte de Verdade:** `backend/IControlIT.API/src/Infrastructure/Data/ApplicationDbContextInitialiser.cs`
+**Fonte de Verdade:** `D:\IC2\backend\IControlIT.API/src/Infrastructure/Data/ApplicationDbContextInitialiser.cs`
 
 **Exemplo em spec Playwright:**
 ```typescript
@@ -305,10 +305,10 @@ Ação sugerida:
 3. Tempo estimado: ~5 horas (vs 42 horas RF por RF)
 
 Prompt pronto em:
-docs/prompts/manutencao/correcao-sistemica-cross-rf.md
+prompts/manutencao/correcao-sistemica-cross-rf.md
 ```
 
-**Ver padrões completos em:** `docs/CONVENTIONS.md` (seção 5.6 - Data-test Attributes)
+**Ver padrões completos em:** `CONVENTIONS.md` (seção 5.6 - Data-test Attributes)
 
 ---
 
@@ -318,8 +318,8 @@ O contrato só é considerado CONCLUÍDO quando:
 
 ### 4.1 Arquivos Gerados
 
-- [ ] `frontend/e2e/data/MT-RFXXX.data.ts` criado
-- [ ] `frontend/e2e/helpers/rf-helpers.ts` criado ou atualizado
+- [ ] `D:\IC2\frontend\e2e/data/MT-RFXXX.data.ts` criado
+- [ ] `D:\IC2\frontend\e2e/helpers/rf-helpers.ts` criado ou atualizado
 - [ ] Specs Playwright criados (1 spec por TC-E2E)
 - [ ] Evidências geradas (screenshots, traces, logs)
 - [ ] Relatório consolidado criado

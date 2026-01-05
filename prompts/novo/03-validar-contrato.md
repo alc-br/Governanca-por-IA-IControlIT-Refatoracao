@@ -8,7 +8,7 @@ Validar backend do **RF-XXX** conforme CONTRATO-EXECUCAO-TESTER-BACKEND.
 
 **Contrato ativado:** CONTRATO-EXECUCAO-TESTER-BACKEND
 
-**Checklist:** docs/checklists/checklist-tester-backend.yaml
+**Checklist:** checklists/checklist-tester-backend.yaml
 
 **Agente responsável:** tester (qa-tester)
 

@@ -18,7 +18,7 @@ Tools são scripts executáveis que:
 ## Estrutura de Pastas
 
 ```
-docs/tools/
+tools/
 ├── docs/                    ← Validadores de documentação
 │   ├── validator-rf-uc.py
 │   ├── validator-rl.py
@@ -49,7 +49,7 @@ docs/tools/
 
 ## Categoria: Validadores de Documentação
 
-**Localização:** `docs/tools/docs/`
+**Localização:** `tools/docs/`
 
 ### validator-rf-uc.py
 
@@ -57,7 +57,7 @@ docs/tools/
 
 **Uso:**
 ```bash
-python docs/tools/docs/validator-rf-uc.py RFXXX
+python tools/docs/validator-rf-uc.py RFXXX
 ```
 
 **Valida:**
@@ -79,7 +79,7 @@ python docs/tools/docs/validator-rf-uc.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/docs/validator-rl.py RFXXX
+python tools/docs/validator-rl.py RFXXX
 ```
 
 **Valida:**
@@ -99,7 +99,7 @@ python docs/tools/docs/validator-rl.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/docs/validator-governance.py RFXXX
+python tools/docs/validator-governance.py RFXXX
 ```
 
 **Valida:**
@@ -122,7 +122,7 @@ python docs/tools/docs/validator-governance.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/docs/SCRIPT-AUDITORIA-CORRECAO-AUTO.py RFXXX
+python tools/docs/SCRIPT-AUDITORIA-CORRECAO-AUTO.py RFXXX
 ```
 
 **Funcionalidades:**
@@ -135,7 +135,7 @@ python docs/tools/docs/SCRIPT-AUDITORIA-CORRECAO-AUTO.py RFXXX
 
 ## Categoria: Sincronização com Azure DevOps
 
-**Localização:** `docs/tools/devops-sync/`
+**Localização:** `tools/devops-sync/`
 
 ### sync-rf.py
 
@@ -143,7 +143,7 @@ python docs/tools/docs/SCRIPT-AUDITORIA-CORRECAO-AUTO.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/devops-sync/sync-rf.py RFXXX
+python tools/devops-sync/sync-rf.py RFXXX
 ```
 
 **Ações:**
@@ -160,7 +160,7 @@ python docs/tools/devops-sync/sync-rf.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/devops-sync/sync-user-stories.py RFXXX
+python tools/devops-sync/sync-user-stories.py RFXXX
 ```
 
 **Ações:**
@@ -177,11 +177,11 @@ python docs/tools/devops-sync/sync-user-stories.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/devops-sync/sync-all-rfs.py
+python tools/devops-sync/sync-all-rfs.py
 ```
 
 **Ações:**
-- Varre todos os RFs em `docs/rf/`
+- Varre todos os RFs em `rf/`
 - Sincroniza cada RF individualmente
 - Gera relatório consolidado
 
@@ -189,7 +189,7 @@ python docs/tools/devops-sync/sync-all-rfs.py
 
 ## Categoria: Validação de Contratos
 
-**Localização:** `docs/tools/contract-validator/`
+**Localização:** `tools/contract-validator/`
 
 ### validate-transitions.py
 
@@ -197,7 +197,7 @@ python docs/tools/devops-sync/sync-all-rfs.py
 
 **Uso:**
 ```bash
-python docs/tools/contract-validator/validate-transitions.py RFXXX PROXIMO-CONTRATO
+python tools/contract-validator/validate-transitions.py RFXXX PROXIMO-CONTRATO
 ```
 
 **Valida:**
@@ -217,7 +217,7 @@ python docs/tools/contract-validator/validate-transitions.py RFXXX PROXIMO-CONTR
 
 **Uso:**
 ```bash
-python docs/tools/contract-validator/validate-contract-compliance.py RFXXX CONTRATO
+python tools/contract-validator/validate-contract-compliance.py RFXXX CONTRATO
 ```
 
 **Valida:**
@@ -229,7 +229,7 @@ python docs/tools/contract-validator/validate-contract-compliance.py RFXXX CONTR
 
 ## Categoria: Executores de Testes
 
-**Localização:** `docs/tools/test-runners/`
+**Localização:** `tools/test-runners/`
 
 ### run-backend-tests.py
 
@@ -237,7 +237,7 @@ python docs/tools/contract-validator/validate-contract-compliance.py RFXXX CONTR
 
 **Uso:**
 ```bash
-python docs/tools/test-runners/run-backend-tests.py RFXXX
+python tools/test-runners/run-backend-tests.py RFXXX
 ```
 
 **Executa:**
@@ -253,7 +253,7 @@ python docs/tools/test-runners/run-backend-tests.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/test-runners/run-e2e-tests.py RFXXX
+python tools/test-runners/run-e2e-tests.py RFXXX
 ```
 
 **Executa:**
@@ -269,7 +269,7 @@ python docs/tools/test-runners/run-e2e-tests.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/test-runners/run-all-tests.py RFXXX
+python tools/test-runners/run-all-tests.py RFXXX
 ```
 
 **Executa:**
@@ -282,7 +282,7 @@ python docs/tools/test-runners/run-all-tests.py RFXXX
 
 ## Categoria: Geradores de Relatórios
 
-**Localização:** `docs/tools/reports/`
+**Localização:** `tools/reports/`
 
 ### generate-coverage-report.py
 
@@ -290,7 +290,7 @@ python docs/tools/test-runners/run-all-tests.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/reports/generate-coverage-report.py RFXXX
+python tools/reports/generate-coverage-report.py RFXXX
 ```
 
 **Saída:** `relatorios/AAAA-MM-DD-RFXXX-Coverage.md`
@@ -303,7 +303,7 @@ python docs/tools/reports/generate-coverage-report.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/reports/generate-gap-report.py RFXXX
+python tools/reports/generate-gap-report.py RFXXX
 ```
 
 **Saída:** `relatorios/AAAA-MM-DD-RFXXX-Gaps.md`
@@ -316,7 +316,7 @@ python docs/tools/reports/generate-gap-report.py RFXXX
 
 **Uso:**
 ```bash
-python docs/tools/reports/generate-compliance-report.py RFXXX
+python tools/reports/generate-compliance-report.py RFXXX
 ```
 
 **Saída:** `relatorios/AAAA-MM-DD-RFXXX-Compliance.md`
@@ -355,7 +355,7 @@ python docs/tools/reports/generate-compliance-report.py RFXXX
 
 **Instalação:**
 ```bash
-pip install -r docs/tools/requirements.txt
+pip install -r tools/requirements.txt
 ```
 
 ---
@@ -380,8 +380,8 @@ Ao criar uma nova ferramenta:
 
 ---
 
-**Para mais detalhes sobre contratos, consulte:** `docs/contracts/README.md`
+**Para mais detalhes sobre contratos, consulte:** `contracts/README.md`
 
-**Para mais detalhes sobre checklists, consulte:** `docs/checklists/README.md`
+**Para mais detalhes sobre checklists, consulte:** `checklists/README.md`
 
-**Para mais detalhes sobre prompts, consulte:** `docs/prompts/README.md`
+**Para mais detalhes sobre prompts, consulte:** `prompts/README.md`

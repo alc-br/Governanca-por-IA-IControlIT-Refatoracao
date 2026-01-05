@@ -15,13 +15,13 @@ REGRA DE DETECÇÃO AUTOMÁTICA:
 
 IF execucao.frontend está VAZIO, NULL ou NÃO EXISTE:
   → FRONTEND NOVO (primeira vez)
-  → LER E EXECUTAR: docs/contracts/desenvolvimento/execucao/frontend-criacao.md
+  → LER E EXECUTAR: D:/IC2_Governanca/contracts/desenvolvimento/execucao/frontend-criacao.md
   → Criar frontend completo do zero
   → NÃO PERGUNTAR, EXECUTAR DIRETAMENTE
 
 ELSE IF execucao.frontend JÁ TEM DADOS (data, status, commit, etc.):
   → ADEQUAÇÃO (frontend já existe)
-  → LER E EXECUTAR: docs/contracts/desenvolvimento/execucao/frontend-adequacao.md
+  → LER E EXECUTAR: D:/IC2_Governanca/contracts/desenvolvimento/execucao/frontend-adequacao.md
   → Ajustar frontend existente
   → NÃO PERGUNTAR, EXECUTAR DIRETAMENTE
 
@@ -34,16 +34,16 @@ IMPORTANTE:
 
 EXEMPLO DE DECLARAÇÃO:
 "STATUS.yaml verificado: execucao.frontend está vazio → FRONTEND NOVO detectado.
-Executando docs/contracts/desenvolvimento/execucao/frontend-criacao.md automaticamente."
+Executando D:/IC2_Governanca/contracts/desenvolvimento/execucao/frontend-criacao.md automaticamente."
 
 OU
 
 "STATUS.yaml verificado: execucao.frontend tem dados → ADEQUAÇÃO detectada.
-Executando docs/contracts/desenvolvimento/execucao/frontend-adequacao.md automaticamente."
+Executando D:/IC2_Governanca/contracts/desenvolvimento/execucao/frontend-adequacao.md automaticamente."
 
 ---
 
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 PRE-REQUISITOS OBRIGATORIOS (BLOQUEANTES):
 Antes de QUALQUER acao, validar:

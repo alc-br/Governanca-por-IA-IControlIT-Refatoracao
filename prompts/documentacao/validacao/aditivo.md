@@ -6,8 +6,8 @@ Ele fica nesse endereço \docs\rf\Fase*\EPIC*\RF*
 
 ---
 
-Executar **VALIDADOR-ADITIVO** para o RF informado acima conforme docs/contracts/documentacao/validacao/aditivo.md.
-Seguir CLAUDE.md.
+Executar **VALIDADOR-ADITIVO** para o RF informado acima conforme D:/IC2_Governanca/contracts/documentacao/validacao/aditivo.md.
+Seguir D:\IC2\CLAUDE.md.
 
 ## ⚠️ MODO READ-ONLY
 
@@ -35,8 +35,8 @@ Este RF não passou por processo de ADITIVO.
 Isto NÃO é uma falha. Apenas significa que este validador não se aplica.
 
 Recomendações:
-- Para adicionar funcionalidade: Execute docs/prompts/documentacao/execucao/aditivo.md
-- Para validar sincronização: Execute docs/prompts/documentacao/validacao/rf.md
+- Para adicionar funcionalidade: Execute prompts/documentacao/execucao/aditivo.md
+- Para validar sincronização: Execute prompts/documentacao/validacao/rf.md
 ```
 
 ### CENÁRIO C: ADITIVO PARCIAL (Incompleto) ⚠️
@@ -50,7 +50,7 @@ Recomendações:
 Encontrados apenas X/10 arquivos _old.
 Faltam: [lista de arquivos]
 
-Recomendação: Complete o processo de ADITIVO executando docs/prompts/documentacao/execucao/aditivo.md
+Recomendação: Complete o processo de ADITIVO executando prompts/documentacao/execucao/aditivo.md
 
 Validações possíveis com arquivos disponíveis:
 - [lista de validações que podem ser executadas]
@@ -101,7 +101,7 @@ Validações possíveis com arquivos disponíveis:
 
 10. **VAL-10: Validador RF-UC passou (exit code 0)**
     ```bash
-    python docs/tools/docs/validator-rf-uc.py RFXXX
+    python tools/docs/validator-rf-uc.py RFXXX
     ```
 
 ### PARTE 3: COBERTURA TOTAL (5 validações)
@@ -233,7 +233,7 @@ else:
 
 ```bash
 cd D:\IC2
-python docs/tools/docs/validator-rf-uc.py RFXXX
+python tools/docs/validator-rf-uc.py RFXXX
 
 # Exit code 0 = APROVADO
 # Exit code != 0 = REPROVADO
@@ -346,8 +346,8 @@ else:
 
 **Se APROVADO:**
 - Commit e merge do aditivo
-- Executar backend-aditivo: `docs/contracts/desenvolvimento/execucao/backend-aditivo.md`
-- Executar frontend-aditivo: `docs/contracts/desenvolvimento/execucao/frontend-aditivo.md`
+- Executar backend-aditivo: `D:/IC2_Governanca/contracts/desenvolvimento/execucao/backend-aditivo.md`
+- Executar frontend-aditivo: `D:/IC2_Governanca/contracts/desenvolvimento/execucao/frontend-aditivo.md`
 
 **Se REPROVADO:**
 - Listar TODOS os gaps encontrados
@@ -435,6 +435,6 @@ Todas as validações aplicáveis passaram.
 
 ---
 
-**Contrato:** docs/contracts/documentacao/validacao/aditivo.md
+**Contrato:** D:/IC2_Governanca/contracts/documentacao/validacao/aditivo.md
 **Modo:** READ-ONLY
 **Aprovação:** 100% ou REPROVADO

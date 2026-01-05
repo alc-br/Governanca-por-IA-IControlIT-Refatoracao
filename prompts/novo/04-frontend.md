@@ -8,7 +8,7 @@ Implementar frontend completo do **RF-XXX** conforme CONTRATO-EXECUCAO-FRONTEND.
 
 **Contrato ativado:** CONTRATO-EXECUCAO-FRONTEND
 
-**Checklist:** docs/checklists/checklist-frontend.yaml
+**Checklist:** checklists/checklist-frontend.yaml
 
 **Agente responsável:** developer (full-stack-implementer)
 

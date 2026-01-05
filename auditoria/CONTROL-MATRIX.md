@@ -31,10 +31,10 @@ RF: RFXXX
 titulo: <titulo do RF>
 
 documentacao:
-  rf_documento: docs/rf/RFXXX/RFXXX.md
-  uc_documento: docs/rf/RFXXX/UC-RFXXX.md
-  md_documento: docs/rf/RFXXX/MD-RFXXX.md
-  wf_documento: docs/rf/RFXXX/WF-RFXXX.md
+  rf_documento: rf/RFXXX/RFXXX.md
+  uc_documento: rf/RFXXX/UC-RFXXX.md
+  md_documento: rf/RFXXX/MD-RFXXX.md
+  wf_documento: rf/RFXXX/WF-RFXXX.md
   status: aprovado | pendente
 
 desenvolvimento:
@@ -60,9 +60,9 @@ testes:
   decisao: APROVADO | REPROVADO
   taxa_aprovacao: 100% | <XX%>
   evidencias:
-    - docs/rf/RFXXX/evidencias/testes-backend.log
-    - docs/rf/RFXXX/evidencias/testes-e2e-screenshots/
-    - docs/rf/RFXXX/evidencias/testes-seguranca.log
+    - rf/RFXXX/evidencias/testes-backend.log
+    - rf/RFXXX/evidencias/testes-e2e-screenshots/
+    - rf/RFXXX/evidencias/testes-seguranca.log
 
 transicao_deploy:
   contrato: CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY
@@ -105,10 +105,10 @@ RF: RF001
 titulo: Parametros e Configuracoes do Sistema
 
 documentacao:
-  rf_documento: docs/rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/RF001.md
-  uc_documento: docs/rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/UC-RF001.md
-  md_documento: docs/rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/MD-RF001.md
-  wf_documento: docs/rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/WF-RF001.md
+  rf_documento: rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/RF001.md
+  uc_documento: rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/UC-RF001.md
+  md_documento: rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/MD-RF001.md
+  wf_documento: rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/WF-RF001.md
   status: aprovado
 
 desenvolvimento:
@@ -134,8 +134,8 @@ testes:
   decisao: APROVADO
   taxa_aprovacao: 100%
   evidencias:
-    - docs/rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/evidencias/testes-backend.log
-    - docs/rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/evidencias/testes-e2e-screenshots/
+    - rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/evidencias/testes-backend.log
+    - rf/Fase-1-Fundacao-e-Cadastros-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/evidencias/testes-e2e-screenshots/
 
 transicao_deploy:
   contrato: CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY
@@ -171,10 +171,10 @@ RF: RF015
 titulo: Gestao Locais Enderecos
 
 documentacao:
-  rf_documento: docs/rf/Fase-2-Servicos-Essenciais/EPIC003-GES-Gestao/RF015-Gestao-Locais-Enderecos/RF015.md
-  uc_documento: docs/rf/Fase-2-Servicos-Essenciais/EPIC003-GES-Gestao/RF015-Gestao-Locais-Enderecos/UC-RF015.md
-  md_documento: docs/rf/Fase-2-Servicos-Essenciais/EPIC003-GES-Gestao/RF015-Gestao-Locais-Enderecos/MD-RF015.md
-  wf_documento: docs/rf/Fase-2-Servicos-Essenciais/EPIC003-GES-Gestao/RF015-Gestao-Locais-Enderecos/WF-RF015.md
+  rf_documento: rf/Fase-2-Servicos-Essenciais/EPIC003-GES-Gestao/RF015-Gestao-Locais-Enderecos/RF015.md
+  uc_documento: rf/Fase-2-Servicos-Essenciais/EPIC003-GES-Gestao/RF015-Gestao-Locais-Enderecos/UC-RF015.md
+  md_documento: rf/Fase-2-Servicos-Essenciais/EPIC003-GES-Gestao/RF015-Gestao-Locais-Enderecos/MD-RF015.md
+  wf_documento: rf/Fase-2-Servicos-Essenciais/EPIC003-GES-Gestao/RF015-Gestao-Locais-Enderecos/WF-RF015.md
   status: aprovado
 
 desenvolvimento:
@@ -200,7 +200,7 @@ testes:
   decisao: APROVADO
   taxa_aprovacao: 100%
   evidencias:
-    - docs/rf/Fase-2-Servicos-Essenciais/EPIC003-GES-Gestao/RF015-Gestao-Locais-Enderecos/evidencias/
+    - rf/Fase-2-Servicos-Essenciais/EPIC003-GES-Gestao/RF015-Gestao-Locais-Enderecos/evidencias/
 
 transicao_deploy:
   contrato: CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY
@@ -311,10 +311,10 @@ def validate_rf_in_production(rf):
 
     # Validar documentação
     if all([
-        exists(f"docs/rf/{rf}/RF{rf}.md"),
-        exists(f"docs/rf/{rf}/UC-RF{rf}.md"),
-        exists(f"docs/rf/{rf}/MD-RF{rf}.md"),
-        exists(f"docs/rf/{rf}/WF-RF{rf}.md")
+        exists(f"rf/{rf}/RF{rf}.md"),
+        exists(f"rf/{rf}/UC-RF{rf}.md"),
+        exists(f"rf/{rf}/MD-RF{rf}.md"),
+        exists(f"rf/{rf}/WF-RF{rf}.md")
     ]):
         checks['documentacao_completa'] = True
 
@@ -335,7 +335,7 @@ def validate_rf_in_production(rf):
         checks['deploy_aprovado'] = True
 
     # Validar evidências
-    if exists(f"docs/rf/{rf}/evidencias/"):
+    if exists(f"rf/{rf}/evidencias/"):
         checks['evidencias_completas'] = True
 
     return all(checks.values()), checks

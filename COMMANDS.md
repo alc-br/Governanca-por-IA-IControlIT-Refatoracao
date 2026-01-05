@@ -233,19 +233,19 @@ git push origin --delete feature/RFXXX-backend
 
 ```bash
 # Validar cobertura RF → UC → TC
-python D:\IC2\docs\tools\docs\validator-rf-uc.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-rf-uc.py RFXXX
 
 # Validar separação RF / RL
-python D:\IC2\docs\tools\docs\validator-rl.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-rl.py RFXXX
 
 # Validar governança completa
-python D:\IC2\docs\tools\docs\validator-governance.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-governance.py RFXXX
 
 # Validar user stories
-python D:\IC2\docs\tools\docs\validator-user-stories.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-user-stories.py RFXXX
 
 # Validar STATUS.yaml
-python D:\IC2\docs\tools\docs\validator-status.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-status.py RFXXX
 ```
 
 ### Exit Codes Obrigatórios
@@ -262,19 +262,19 @@ Todos os validadores retornam exit codes:
 
 ```bash
 # Sincronizar RF com Azure DevOps
-python D:\IC2\docs\tools\devops-sync\sync-rf.py RFXXX
+python D:\IC2_Governanca\tools\devops-sync\sync-rf.py RFXXX
 
 # Sincronizar User Stories
-python D:\IC2\docs\tools\devops-sync\sync-user-stories.py RFXXX
+python D:\IC2_Governanca\tools\devops-sync\sync-user-stories.py RFXXX
 
 # Sincronizar STATUS.yaml → Board
-python D:\IC2\docs\tools\devops-sync\sync-status.py RFXXX
+python D:\IC2_Governanca\tools\devops-sync\sync-status.py RFXXX
 
 # Criar Feature no Azure DevOps
-python D:\IC2\docs\tools\devops-sync\create-feature.py RFXXX
+python D:\IC2_Governanca\tools\devops-sync\create-feature.py RFXXX
 
 # Mover work item de coluna
-python D:\IC2\docs\tools\devops-sync\move-workitem.py RFXXX "In Progress"
+python D:\IC2_Governanca\tools\devops-sync\move-workitem.py RFXXX "In Progress"
 ```
 
 ---
@@ -431,7 +431,7 @@ npm run test:coverage
 start coverage\index.html
 
 # Relatório de auditoria de conformidade
-python D:\IC2\docs\tools\docs\audit-rf.py RFXXX --output D:\IC2\relatorios\
+python D:\IC2_Governanca\tools\docs\audit-rf.py RFXXX --output D:\IC2\relatorios\
 ```
 
 ---
@@ -557,9 +557,9 @@ dotnet ef migrations remove --project src\Infrastructure --startup-project src\W
 - **CONVENTIONS.md** - Convenções de nomenclatura e código
 - **COMPLIANCE.md** - Regras de validação e conformidade
 - **DECISIONS.md** - Decisões arquiteturais tomadas
-- **docs/tools/README.md** - Documentação completa de ferramentas
+- **tools/README.md** - Documentação completa de ferramentas
 
 ---
 
 **Última Atualização:** 2026-01-01
-**Versão:** 2.0.0 - Redistribuição cirúrgica do CLAUDE.md
+**Versão:** 2.0.0 - Redistribuição cirúrgica do D:\IC2\CLAUDE.md

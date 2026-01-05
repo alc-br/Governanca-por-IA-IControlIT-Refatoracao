@@ -405,7 +405,7 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Migração de dados do legado
 - **Localização Backend:** `src/Application/BilhetesTipos/`
 - **Localização Frontend:** `src/app/modules/admin/bilhetes-tipos/`
-- **Testes E2E:** `frontend/icontrolit-app/e2e/rf058-bilhetes-tipos.spec.js`
+- **Testes E2E:** `D:\IC2\frontend\icontrolit-app/e2e/rf058-bilhetes-tipos.spec.js`
 - **Documentação:**
   - [RF058.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF058-Gestao-de-Tipos-Bilhetes/RF058.md)
   - [RL-RF058.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF058-Gestao-de-Tipos-Bilhetes/RL-RF058.yaml)
@@ -497,7 +497,7 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - [TC-RF027-E2E.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/TC-RF027-E2E.md)
 - **Localização Backend:** `src/Application/Aditivos/`
 - **Localização Frontend:** `src/app/modules/admin/aditivos/`
-- **Testes E2E:** `frontend/icontrolit-app/e2e/rf027-aditivos.spec.js`
+- **Testes E2E:** `D:\IC2\frontend\icontrolit-app/e2e/rf027-aditivos.spec.js`
 - **Documentação:**
   - [RF027.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/RF027.md)
   - [RL-RF027.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/RL-RF027.yaml)
@@ -525,7 +525,7 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Evidência E2E:** Registro mantido no sistema com nomenclatura `[EVIDENCIA E2E] RF028 - 2025-12-24 15:30`
 - **Localização Backend:** `src/Application/SlaOperacoes/`
 - **Localização Frontend:** `src/app/modules/admin/sla-operacoes/`
-- **Testes E2E:** `frontend/icontrolit-app/e2e/rf028-sla-operacoes.spec.js`
+- **Testes E2E:** `D:\IC2\frontend\icontrolit-app/e2e/rf028-sla-operacoes.spec.js`
 - **Documentação:**
   - [RF028.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF028-Gestao-de-SLA-Operacoes/RF028.md)
   - [RL-RF028.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF028-Gestao-de-SLA-Operacoes/RL-RF028.yaml)
@@ -827,7 +827,7 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Problema:** Backend antigo não atendia especificação (0% conformidade)
 - **Decisão:** Reescrita completa (regularização considerada impossível)
 - **Ação Necessária:** Reimplementação do zero conforme RF
-- **Documentação:** Relatórios de bloqueio em `docs/rf/.../RF054/`
+- **Documentação:** Relatórios de bloqueio em `rf/.../RF054/`
 - **Migração v2.0:** `679b7ec1` (30/12)
 
 ---
@@ -854,8 +854,8 @@ A governança do projeto foi **completamente reestruturada** em dezembro, estabe
 #### Contratos de Deploy (26/12)
 - **Commits:** `20e49d1f`, `bfe6314e`, `be753767`, `10a2a48e`
 - **Arquivos:**
-  - [CONTRATO-DEPLOY-AZURE.md](../../docs/contracts/CONTRATO-DEPLOY-AZURE.md)
-  - [CONTRATO-DEPLOY-HOM-SEM-VALIDACAO.md](../../docs/contracts/CONTRATO-DEPLOY-HOM-SEM-VALIDACAO.md)
+  - [CONTRATO-DEPLOY-AZURE.md](../..contracts/CONTRATO-DEPLOY-AZURE.md)
+  - [CONTRATO-DEPLOY-HOM-SEM-VALIDACAO.md](../..contracts/CONTRATO-DEPLOY-HOM-SEM-VALIDACAO.md)
 - **Entregas:**
   - Deploy governado para HOM/PRD
   - Bloqueio de deploy sem testes aprovados
@@ -865,8 +865,8 @@ A governança do projeto foi **completamente reestruturada** em dezembro, estabe
 #### Contratos de Documentação (24/12)
 - **Commits:** `155f34b6`, `0e2d9e33`, `7f5a3c24`, `9c8f9c57`
 - **Arquivos:**
-  - [CONTRATO-DOCUMENTACAO-ESSENCIAL.md](../../docs/contracts/CONTRATO-DOCUMENTACAO-ESSENCIAL.md)
-  - [CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES.md](../../docs/contracts/CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES.md)
+  - [CONTRATO-DOCUMENTACAO-ESSENCIAL.md](../..contracts/CONTRATO-DOCUMENTACAO-ESSENCIAL.md)
+  - [CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES.md](../..contracts/CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES.md)
 - **Entregas:**
   - Geração de RF, UC, MD, WF na ordem correta
   - Casos de teste em 4 arquivos separados (Backend, Frontend, Segurança, E2E)
@@ -893,7 +893,7 @@ A governança do projeto foi **completamente reestruturada** em dezembro, estabe
   - **FASE 4+5:** Criação de comandos de desenvolvimento
   - **FASES 6-10:** Documentação consolidada
   - **FASE 11 FINAL:** Prompt meta-template
-  - **FASE FINAL:** Mover tools/ para docs/tools/
+  - **FASE FINAL:** Mover tools/ para tools/
 - **Entregas:**
   - Manual completo do usuário com fluxos visuais
   - Relatório final da reorganização
@@ -989,7 +989,7 @@ A governança do projeto foi **completamente reestruturada** em dezembro, estabe
 
 **Lote 1: RF026-RF030 (Gestão Financeira)**
 - **Commit:** `f7bd395d`
-- **Relatório:** `docs/rf/.../relatorio-lote-1.md`
+- **Relatório:** `rf/.../relatorio-lote-1.md`
 - 5 RFs completos com seções obrigatórias:
   1. Visão Geral
   2. Regras de Negócio (mínimo 10 RNs)
@@ -999,7 +999,7 @@ A governança do projeto foi **completamente reestruturada** em dezembro, estabe
 
 **Lote 2: RF031-RF035**
 - **Commit:** `08d9d1f1`
-- **Relatório:** `docs/rf/.../relatorio-lote-2.md`
+- **Relatório:** `rf/.../relatorio-lote-2.md`
 
 **Lote 3: RF036-RF040**
 - **Commit:** `53dcf759`
@@ -1063,7 +1063,7 @@ mapeamento_legado:
 ### User Stories (27-28/12)
 
 - **Commits:** `d2482b27`, `02e1ac83`, `03d68380`, `d52131b9`, `3caf7209`
-- **Arquivo:** `docs/rf/user-stories.yaml`
+- **Arquivo:** `rf/user-stories.yaml`
 - **Padrão:** UC-mapping (vínculo com casos de uso)
 - **RFs com User Stories:**
   - RF002, RF003, RF004, RF005, RF007
@@ -1221,12 +1221,12 @@ mapeamento_legado:
   - RF-027: Aditivos Contratuais
   - RF-028: SLA Operações (com evidência cadastrada)
   - RF-058: Tipos de Bilhetes
-- **Localização:** `frontend/icontrolit-app/e2e/`
+- **Localização:** `D:\IC2\frontend\icontrolit-app/e2e/`
 - **Tecnologia:** Playwright (navegadores: Chromium, Firefox, WebKit)
 - **Padrão de Evidência:** Registros finais mantidos no sistema com nomenclatura `[EVIDENCIA E2E] RFXXX - YYYY-MM-DD HH:MM`
 
 #### Testes de Contrato Backend
-- **Contrato:** [CONTRATO-TESTER-BACKEND.md](../../docs/contracts/CONTRATO-TESTER-BACKEND.md)
+- **Contrato:** [CONTRATO-TESTER-BACKEND.md](../..contracts/CONTRATO-TESTER-BACKEND.md)
 - **Filosofia:** Priorizar violações (testes negativos) sobre fluxo feliz
 - **Tipos de Teste:**
   - Campo obrigatório ausente → HTTP 400

@@ -24,7 +24,7 @@ Ele apenas **AUTORIZA a mudança de estado** de um RF que passou por testes com 
 A **ÚNICA fonte da verdade** é o arquivo:
 
 ```
-docs/contracts/EXECUTION-MANIFEST.md
+contracts/EXECUTION-MANIFEST.md
 ```
 
 Este contrato NÃO pode ser ativado sem decisão formal registrada no manifesto.
@@ -204,7 +204,7 @@ Se após a transição for detectado um problema:
 Este contrato DEVE ser executado pelo script:
 
 ```bash
-python docs/tools/devops-sync/apply_tests_to_deploy_transition.py RFXXX
+python tools/devops-sync/apply_tests_to_deploy_transition.py RFXXX
 ```
 
 O script DEVE:

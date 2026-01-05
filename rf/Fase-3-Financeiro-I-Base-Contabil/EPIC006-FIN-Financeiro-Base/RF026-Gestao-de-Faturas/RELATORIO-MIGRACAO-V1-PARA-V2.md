@@ -263,7 +263,7 @@ Todos os 23 itens possuem:
 ### Execução
 ```bash
 cd D:\IC2
-python docs/tools/docs/validator-rl.py RF026
+python tools/docs/validator-rl.py RF026
 ```
 
 ### Resultado
@@ -451,7 +451,7 @@ O RF026 possui **backend skeleton (5% completo)**:
 - ⏭️ Criar user-stories.yaml (quebrar RF em User Stories para Azure DevOps)
 
 ### Sincronização DevOps
-- ⏭️ Executar `python docs/tools/devops-sync/sync-rf.py RF026` para atualizar Azure DevOps
+- ⏭️ Executar `python tools/devops-sync/sync-rf.py RF026` para atualizar Azure DevOps
 - ⏭️ Verificar que Work Item 555 reflete versao_governanca: "2.0"
 - ⏭️ Atualizar board column conforme progresso
 

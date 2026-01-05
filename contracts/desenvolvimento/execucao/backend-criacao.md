@@ -178,7 +178,7 @@ problemas:
 
 ## CONSULTA E REGISTRO DE DECISÕES TÉCNICAS (DECISIONS.md)
 
-O agente **DEVE** interagir com `docs/DECISIONS.md` durante a execução:
+O agente **DEVE** interagir com `DECISIONS.md` durante a execução:
 
 ### 1. CONSULTA OBRIGATÓRIA (Antes de Implementar)
 
@@ -253,7 +253,7 @@ Esta decisão deve ser registrada em docs/DECISIONS.md?
 
 ### 4. REGISTRO DE DECISÃO (Se Solicitado)
 
-Se usuário solicitar registro, o agente **DEVE** adicionar ao final de `docs/DECISIONS.md`:
+Se usuário solicitar registro, o agente **DEVE** adicionar ao final de `DECISIONS.md`:
 
 **Template ADR:**
 ```markdown
@@ -495,9 +495,9 @@ Inclui exclusivamente, quando aplicável:
 
 ## ZONAS PERMITIDAS
 
-- `backend/IControlIT.API/src/Application/**`
-- `backend/IControlIT.API/src/Web/**`
-- `backend/IControlIT.API/src/Infrastructure/**` (somente se necessário)
+- `D:\IC2\backend\IControlIT.API/src/Application/**`
+- `D:\IC2\backend\IControlIT.API/src/Web/**`
+- `D:\IC2\backend\IControlIT.API/src/Infrastructure/**` (somente se necessário)
 
 ---
 
@@ -733,7 +733,7 @@ Execuções fora dele são inválidas.**
 
 Apos conclusao deste contrato:
 
-➡️ **CONTRATO-VALIDACAO-BACKEND** (docs/contracts/desenvolvimento/validacao/backend.md)
+➡️ **CONTRATO-VALIDACAO-BACKEND** (contracts/desenvolvimento/validacao/backend.md)
 
 O validador vai:
 1. Verificar que TUDO no UC-RFXXX foi coberto 100%

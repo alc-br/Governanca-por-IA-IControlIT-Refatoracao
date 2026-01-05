@@ -5,7 +5,7 @@ O RF fica no endereço `\docs\rf\Fase*\EPIC*\RF*`
 ---
 
 Executar **CONTRATO-ADEQUACAO-COMPLETA-UC** para o RF informado acima.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 ## 🤖 MODO AUTÔNOMO (NÃO PERGUNTE, EXECUTE)
 

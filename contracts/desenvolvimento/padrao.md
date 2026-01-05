@@ -508,7 +508,7 @@ npm start
 ### Estrutura de Arquivos
 
 ```
-frontend/icontrolit-app/public/i18n/
+D:\IC2\frontend\icontrolit-app/public/i18n/
 ├── pt.json    (Português - PRIMARY)
 ├── en.json    (Inglês)
 └── es.json    (Espanhol)

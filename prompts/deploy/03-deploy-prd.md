@@ -1,6 +1,6 @@
 ﻿# Deploy para Produção (PRD)
 
-Deploy do **RF-XXX** para ambiente de Produção conforme docs/contracts/deploy/azure.md.
+Deploy do **RF-XXX** para ambiente de Produção conforme contracts/deploy/azure.md.
 
 **RF:** [Especificar RF, ex: RF-027]
 
@@ -8,7 +8,7 @@ Deploy do **RF-XXX** para ambiente de Produção conforme docs/contracts/deploy/
 
 **Contrato ativado:** CONTRATO-DEPLOY-AZURE
 
-**Checklist:** docs/checklists/checklist-deploy-prd.yaml
+**Checklist:** checklists/checklist-deploy-prd.yaml
 
 **Pré-requisitos OBRIGATÓRIOS:**
 - Tester-Backend aprovou (validacao.tester_backend_aprovado = True)

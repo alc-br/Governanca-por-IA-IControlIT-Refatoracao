@@ -1,17 +1,17 @@
 Para o RFXXX...
 
-Criar Requisito Funcional (RF) NOVO conforme docs/contracts/documentacao/execucao/rf-criacao.md.
+Criar Requisito Funcional (RF) NOVO conforme D:/IC2_Governanca/contracts/documentacao/execucao/rf-criacao.md.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 ---
 
 ## PRE-REQUISITOS BLOQUEANTES:
 
 1. RF DEVE ser NOVO (sem legado ASPX/WebServices/SQL)
-2. Pasta docs/rf/[Fase]/[EPIC]/RFXXX/ DEVE existir
+2. Pasta rf/[Fase]/[EPIC]/RFXXX/ DEVE existir
 3. Templates RF.md e RF.yaml DEVEM estar acessiveis
 4. STATUS.yaml NAO deve existir (RF novo)
 
@@ -64,7 +64,7 @@ Seguir CLAUDE.md.
 
 5. **Validar automaticamente:**
    ```bash
-   python docs/tools/docs/validator-docs.py RFXXX
+   python tools/docs/validator-docs.py RFXXX
    ```
    - Exit code 0 = APROVADO
    - Exit code != 0 = REPROVADO (corrigir e revalidar)
@@ -120,8 +120,8 @@ NAO EXISTE APROVACAO COM RESSALVAS.
 Apos RF criado e aprovado:
 
 ```
-Conforme docs/contracts/documentacao/execucao/uc-criacao.md para RFXXX.
-Seguir CLAUDE.md.
+Conforme D:/IC2_Governanca/contracts/documentacao/execucao/uc-criacao.md para RFXXX.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---

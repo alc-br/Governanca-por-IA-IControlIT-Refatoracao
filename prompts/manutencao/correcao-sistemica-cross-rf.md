@@ -2,7 +2,7 @@
 
 **Versão:** 1.0
 **Data:** 2026-01-05
-**Contrato Ativado:** `docs/contracts/manutencao/correcao-sistemica-cross-rf.md`
+**Contrato Ativado:** `D:/IC2_Governanca/contracts/manutencao/correcao-sistemica-cross-rf.md`
 
 ---
 

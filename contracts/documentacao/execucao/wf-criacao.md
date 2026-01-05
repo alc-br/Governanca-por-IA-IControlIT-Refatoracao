@@ -61,7 +61,7 @@ Este contrato é ativado quando a solicitação mencionar explicitamente:
 Exemplo:
 ```
 Conforme CONTRATO-GERACAO-DOCS-WF para RF060.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -122,10 +122,10 @@ D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
-- `backend/**`
-- `frontend/**`
-- `docs/contracts/**`
-- `docs/templates/**`
+- `D:\IC2\backend\**`
+- `D:\IC2\frontend\**`
+- `contracts/**`
+- `templates/**`
 - Qualquer arquivo que não seja os 2 listados acima
 
 ---
@@ -136,7 +136,7 @@ O contrato TRAVA se qualquer condição falhar:
 
 | Pré-requisito | Descrição | Bloqueante |
 |---------------|-----------|------------|
-| Pasta do RF | Pasta já criada em `docs/rf/[Fase]/[EPIC]/RFXXX/` | Sim |
+| Pasta do RF | Pasta já criada em `rf/[Fase]/[EPIC]/RFXXX/` | Sim |
 | UC-RFXXX.md | UC criado e completo | Sim |
 | UC-RFXXX.yaml | UC estruturado e sincronizado | Sim |
 | Template WF.md | Template WF.md disponível | Sim |
@@ -394,7 +394,7 @@ Após conclusão deste contrato, o próximo passo é:
 >
 > ```
 > Conforme CONTRATO-GERACAO-DOCS-MD para RFXXX.
-> Seguir CLAUDE.md.
+> Seguir D:\IC2\CLAUDE.md.
 > ```
 
 Este contrato gerará o arquivo MD-RFXXX.yaml (Modelo de Dados).
@@ -405,10 +405,10 @@ Este contrato gerará o arquivo MD-RFXXX.yaml (Modelo de Dados).
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `/docs/contracts/documentacao/execucao/wf-criacao.md` | Este contrato |
-| `/docs/checklists/documentacao/geracao/wf.yaml` | Checklist YAML |
-| `/docs/templates/WF.yaml` | Template do WF |
-| `/docs/templates/STATUS.yaml` | Template STATUS estruturado |
+| `contracts/documentacao/execucao/wf-criacao.md` | Este contrato |
+| `checklists/documentacao/geracao/wf.yaml` | Checklist YAML |
+| `templates/WF.yaml` | Template do WF |
+| `templates/STATUS.yaml` | Template STATUS estruturado |
 
 ---
 

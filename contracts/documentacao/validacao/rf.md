@@ -62,12 +62,12 @@ Este contrato valida **Requisito Funcional (RF)** criado, garantindo:
 
 Este contrato é ativado quando a solicitação mencionar explicitamente:
 
-> **"Conforme docs/contracts/documentacao/validacao/rf.md para RFXXX"**
+> **"Conforme contracts/documentacao/validacao/rf.md para RFXXX"**
 
 Exemplo:
 ```
-Conforme docs/contracts/documentacao/validacao/rf.md para RF070.
-Seguir CLAUDE.md.
+Conforme contracts/documentacao/validacao/rf.md para RF070.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -579,12 +579,12 @@ for campo in central_campos:
 Executar validador automático:
 
 ```bash
-python docs/tools/docs/validator-docs.py RFXXX
+python tools/docs/validator-docs.py RFXXX
 ```
 
 **Verificação:**
 ```python
-exit_code = executar("python docs/tools/docs/validator-docs.py {rf}")
+exit_code = executar("python tools/docs/validator-docs.py {rf}")
 
 if exit_code != 0:
     GAP("Validador automático reprovou (exit code != 0)")
@@ -652,12 +652,12 @@ Corrigir gap RF-3 e revalidar.
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `/docs/contracts/documentacao/validacao/rf.md` | Este contrato |
-| `/docs/prompts/documentacao/validacao/rf.md` | Prompt de ativação |
-| `/docs/checklists/documentacao/geracao/rf.yaml` | Checklist de validação |
-| `/docs/templates/RF.md` | Template RF Markdown |
-| `/docs/templates/RF.yaml` | Template RF YAML |
-| `/docs/tools/docs/validator-docs.py` | Validador automático |
+| `contracts/documentacao/validacao/rf.md` | Este contrato |
+| `prompts/documentacao/validacao/rf.md` | Prompt de ativação |
+| `checklists/documentacao/geracao/rf.yaml` | Checklist de validação |
+| `templates/RF.md` | Template RF Markdown |
+| `templates/RF.yaml` | Template RF YAML |
+| `tools/docs/validator-docs.py` | Validador automático |
 
 ---
 

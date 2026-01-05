@@ -91,7 +91,7 @@ Criar a seguinte estrutura:
 ```
 projeto/
 ├── docs/
-│   ├── CLAUDE.md
+│   ├── D:\IC2\CLAUDE.md
 │   ├── ARCHITECTURE.md
 │   ├── CONVENTIONS.md
 │   ├── COMPLIANCE.md
@@ -149,7 +149,7 @@ projeto/
 
 ## PASSO 3: Criar config.yaml para DevOps
 
-Baseado nas respostas da Seção 1, criar `docs/tools/devops-sync/config.yaml`:
+Baseado nas respostas da Seção 1, criar `tools/devops-sync/config.yaml`:
 
 ```yaml
 # Configuração DevOps
@@ -178,7 +178,7 @@ board_mapping:
 
 Criar arquitetura de adapters para suportar múltiplas ferramentas:
 
-**docs/tools/devops-sync/adapters/base.py:**
+**tools/devops-sync/adapters/base.py:**
 ```python
 from abc import ABC, abstractmethod
 
@@ -196,13 +196,13 @@ class DevOpsAdapter(ABC):
         pass
 ```
 
-**docs/tools/devops-sync/adapters/azure_devops.py:**
+**tools/devops-sync/adapters/azure_devops.py:**
 ```python
 # Implementação para Azure DevOps
 # (código completo conforme D:\IC2\tools\devops-sync\core\sync-rf.py)
 ```
 
-**docs/tools/devops-sync/adapters/jira.py:**
+**tools/devops-sync/adapters/jira.py:**
 ```python
 # Implementação para Jira
 # (adaptar lógica do Azure DevOps para API do Jira)
@@ -299,7 +299,7 @@ Cada prompt segue estrutura:
 
 **Contrato ativado:** CONTRATO-[NOME]
 
-**Checklist:** docs/checklists/checklist-[nome].yaml
+**Checklist:** checklists/checklist-[nome].yaml
 
 **Agente responsável:** [nome-agente] (se aplicável)
 
@@ -409,7 +409,7 @@ Comandos a criar:
 
 ## PASSO 10: Criar Documentação de Compliance
 
-Criar `docs/COMPLIANCE.md` com seções para cada certificação selecionada:
+Criar `COMPLIANCE.md` com seções para cada certificação selecionada:
 
 ```markdown
 # Certificações e Compliance - [Nome do Projeto]
@@ -432,12 +432,12 @@ Criar `docs/COMPLIANCE.md` com seções para cada certificação selecionada:
 
 ---
 
-## PASSO 11: Criar CLAUDE.md
+## PASSO 11: Criar D:\IC2\CLAUDE.md
 
 Criar arquivo principal de governança:
 
 ```markdown
-# CLAUDE.md
+# D:\IC2\CLAUDE.md
 # Contract for Claude Code (claude.ai/code)
 
 ## Idioma e Comunicação
@@ -448,7 +448,7 @@ Criar arquivo principal de governança:
 
 - `/docs/ARCHITECTURE.md`
 - `/docs/CONVENTIONS.md`
-- `/docs/contracts/*.md`
+- `contracts/*.md`
 
 ## Sistema de Contratos
 
@@ -524,7 +524,7 @@ Criar RF de teste (RF-001):
 
 ## Próximos Passos
 
-1. Criar primeiro RF usando `docs/prompts/novo/01-documentacao-essencial.md`
+1. Criar primeiro RF usando `prompts/novo/01-documentacao-essencial.md`
 2. Sincronizar com DevOps usando `/sync-devops`
 3. Validar fluxo completo com RF-001
 ```

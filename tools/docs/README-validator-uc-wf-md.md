@@ -80,12 +80,12 @@ O `validator-uc-wf-md.py` valida se os documentos de Casos de Uso (UC), Wirefram
 ### Validar um RF específico
 
 ```bash
-python docs/tools/docs/validator-uc-wf-md.py RFXXX
+python tools/docs/validator-uc-wf-md.py RFXXX
 ```
 
 **Exemplo:**
 ```bash
-python docs/tools/docs/validator-uc-wf-md.py RF001
+python tools/docs/validator-uc-wf-md.py RF001
 ```
 
 **Saída:**
@@ -116,12 +116,12 @@ STATUS FINAL:
 ### Validar todos os RFs de uma fase
 
 ```bash
-python docs/tools/docs/validator-uc-wf-md.py --fase N
+python tools/docs/validator-uc-wf-md.py --fase N
 ```
 
 **Exemplo:**
 ```bash
-python docs/tools/docs/validator-uc-wf-md.py --fase 1
+python tools/docs/validator-uc-wf-md.py --fase 1
 ```
 
 **Saída:**
@@ -131,7 +131,7 @@ python docs/tools/docs/validator-uc-wf-md.py --fase 1
 ### Validar todos os RFs do projeto
 
 ```bash
-python docs/tools/docs/validator-uc-wf-md.py --all
+python tools/docs/validator-uc-wf-md.py --all
 ```
 
 **Saída:**
@@ -217,14 +217,14 @@ Para RF único, além do relatório legível, também é gerado JSON estruturado
 
 ```yaml
 - name: Validar conformidade UC/WF/MD
-  run: python docs/tools/docs/validator-uc-wf-md.py RF001
+  run: python tools/docs/validator-uc-wf-md.py RF001
   continue-on-error: false
 ```
 
 ### Azure DevOps
 
 ```yaml
-- script: python docs/tools/docs/validator-uc-wf-md.py --fase 1
+- script: python tools/docs/validator-uc-wf-md.py --fase 1
   displayName: 'Validar UC/WF/MD Fase 1'
   failOnStderr: true
 ```
@@ -418,7 +418,7 @@ entidades:
 Após criar documentação de Casos de Uso:
 
 ```bash
-python docs/tools/docs/validator-uc-wf-md.py RF027
+python tools/docs/validator-uc-wf-md.py RF027
 ```
 
 ### 2. Validar antes de implementação
@@ -426,7 +426,7 @@ python docs/tools/docs/validator-uc-wf-md.py RF027
 Antes de iniciar implementação backend/frontend, garantir que UC/WF/MD estão completos:
 
 ```bash
-python docs/tools/docs/validator-uc-wf-md.py RF027
+python tools/docs/validator-uc-wf-md.py RF027
 # Exit code 0 → pode iniciar implementação
 # Exit code != 0 → corrigir documentação primeiro
 ```
@@ -436,7 +436,7 @@ python docs/tools/docs/validator-uc-wf-md.py RF027
 Ao finalizar documentação de uma fase:
 
 ```bash
-python docs/tools/docs/validator-uc-wf-md.py --fase 1
+python tools/docs/validator-uc-wf-md.py --fase 1
 # Gera relatório em relatorios/validacao-conformidade-uc-wf-md-fase1.md
 ```
 
@@ -445,7 +445,7 @@ python docs/tools/docs/validator-uc-wf-md.py --fase 1
 Validar todo o projeto:
 
 ```bash
-python docs/tools/docs/validator-uc-wf-md.py --all
+python tools/docs/validator-uc-wf-md.py --all
 # Gera relatório completo em relatorios/validacao-conformidade-uc-wf-md-completa.md
 ```
 

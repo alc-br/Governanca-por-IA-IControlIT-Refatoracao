@@ -1,6 +1,6 @@
-Validar frontend do RFXXX conforme CONTRATO DE VALIDACAO DE FRONTEND.
+Validar frontend do RFXXX conforme D:/IC2_Governanca/contracts/desenvolvimento/validacao/frontend.md.
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 

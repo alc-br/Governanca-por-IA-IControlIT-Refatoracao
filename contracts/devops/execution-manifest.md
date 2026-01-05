@@ -122,7 +122,7 @@ Faixa de IDs: 232 a 345
 
 ## EVIDENCIAS
 
-- Script utilizado: docs/tools/devops-sync/sync-all-rfs.py
+- Script utilizado: tools/devops-sync/sync-all-rfs.py
 - Tag de rastreio: sync-YYYY-MM-DD (data dinamica)
 - Tipo de Work Item: Feature (vinculado ao Epic pai)
 

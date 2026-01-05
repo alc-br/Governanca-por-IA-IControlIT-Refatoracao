@@ -639,7 +639,7 @@ Execute primeiro: CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY
 Para validar se o RF está no contrato correto antes de executar próximo passo:
 
 ```bash
-python d:/IC2/docs/tools/contract-validator/validate-transitions.py RFXXX PROXIMO-CONTRATO
+python d:/IC2tools/contract-validator/validate-transitions.py RFXXX PROXIMO-CONTRATO
 ```
 
 **Exemplo de uso:**

@@ -126,7 +126,7 @@ TODAS as funcionalidades DEVEM ser traduzidas para **3 idiomas obrigatórios:**
 
 **Estrutura de arquivos:**
 ```
-frontend/icontrolit-app/public/i18n/
+D:\IC2\frontend\icontrolit-app/public/i18n/
 ├── pt.json     ← Português (Brasil)
 ├── en.json     ← Inglês
 └── es.json     ← Espanhol
@@ -595,7 +595,7 @@ TODO backend DEVE seguir padrões de **Clean Architecture + CQRS + MediatR**.
 ### Estrutura obrigatória
 
 ```
-backend/IControlIT.API/src/
+D:\IC2\backend\IControlIT.API/src/
 ├── Domain/                    ← Entidades, Enums, Constants
 │   ├── Entities/
 │   ├── Enums/
@@ -940,7 +940,7 @@ Antes de considerar um RF concluído, verificar:
 - ✅ Referenciado em **prompts** e **anti-esquecimento**
 - ✅ Consultado durante **implementação**
 
-**CONTRATOS (docs/contracts/):**
+**CONTRATOS (contracts/):**
 - ✅ Governança **genérica e portável**
 - ✅ Aplicável a **qualquer projeto**
 - ✅ Define **processo** e **critérios de qualidade**

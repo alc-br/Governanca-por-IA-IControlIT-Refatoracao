@@ -180,11 +180,11 @@ Novas execuções (a partir de 2025-12-26) DEVEM seguir a estrutura acima.
 
 ## ARQUIVOS AFETADOS
 
-- docs/contracts/EXECUTION-MANIFEST.md (atualizado)
-- docs/contracts/CONTRATO-DEPLOY-AZURE.md (novo)
-- docs/contracts/CONTRATO-DEPLOY-HOM-SEM-VALIDACAO.md (novo)
-- docs/contracts/CONTRATO-DE-HOTFIX-EM-PRODUCAO.md (novo)
-- CLAUDE.md (atualizado com regras de deploy)
+- contracts/EXECUTION-MANIFEST.md (atualizado)
+- contracts/CONTRATO-DEPLOY-AZURE.md (novo)
+- contracts/CONTRATO-DEPLOY-HOM-SEM-VALIDACAO.md (novo)
+- contracts/CONTRATO-DE-HOTFIX-EM-PRODUCAO.md (novo)
+- D:\IC2\CLAUDE.md (atualizado com regras de deploy)
 
 ## EXECUCAO REALIZADA
 
@@ -297,11 +297,11 @@ Conforme CONTRATO DE DEPLOY - AZURE, Secao "BLOQUEIOS AUTOMATICOS":
 
 **Arquivos Verificados:**
 
-1. **frontend/icontrolit-app/src/app/core/auth/auth.types.ts**
+1. **D:\IC2\frontend\icontrolit-app/src/app/core/auth/auth.types.ts**
    - Linha 59: `enabledModules?: string[]` ✅ EXISTE
    - Conclusao: AuthUser.enabledModules EXISTE no codigo atual
 
-2. **frontend/icontrolit-app/src/app/modules/logs-monitoramento/logs-monitoramento.types.ts**
+2. **D:\IC2\frontend\icontrolit-app/src/app/modules/logs-monitoramento/logs-monitoramento.types.ts**
    - Linha 21: `pageTitle?: string` ✅ EXISTE
    - Linha 22: `pageUrl?: string` ✅ EXISTE
    - Linha 23: `action?: string` ✅ EXISTE
@@ -309,7 +309,7 @@ Conforme CONTRATO DE DEPLOY - AZURE, Secao "BLOQUEIOS AUTOMATICOS":
    - Linha 26: `changes?: any` ✅ EXISTE
    - Conclusao: Todas as propriedades de LogEntry EXISTEM no codigo atual
 
-3. **frontend/icontrolit-app/src/app/modules/admin/management/feature-flags/feature-flags.service.ts**
+3. **D:\IC2\frontend\icontrolit-app/src/app/modules/admin/management/feature-flags/feature-flags.service.ts**
    - Linha 226: `listarEmpresas(): Observable<Empresa[]>` (sem parametros)
    - Linha 106: `this.listarEmpresas()` (chamada sem argumentos)
    - Linha 298: `this.listarEmpresas()` (chamada sem argumentos)

@@ -61,7 +61,7 @@ Este contrato é ativado quando a solicitação mencionar explicitamente:
 Exemplo:
 ```
 Conforme CONTRATO-GERACAO-DOCS-MT para RF060.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -276,10 +276,10 @@ D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
-- `backend/**`
-- `frontend/**`
-- `docs/contracts/**`
-- `docs/templates/**`
+- `D:\IC2\backend\**`
+- `D:\IC2\frontend\**`
+- `contracts/**`
+- `templates/**`
 - Qualquer arquivo que não seja os 2 listados acima
 
 ---
@@ -290,10 +290,10 @@ O contrato TRAVA se qualquer condição falhar:
 
 | Pré-requisito | Descrição | Bloqueante |
 |---------------|-----------|------------|
-| Pasta do RF | Pasta já criada em `docs/rf/[Fase]/[EPIC]/RFXXX/` | Sim |
+| Pasta do RF | Pasta já criada em `rf/[Fase]/[EPIC]/RFXXX/` | Sim |
 | UC-RFXXX.md | UC criado e completo | Sim |
 | UC-RFXXX.yaml | UC estruturado e sincronizado | Sim |
-| Template MT.yaml | Template MT.yaml disponível em `docs/templates/` | Sim |
+| Template MT.yaml | Template MT.yaml disponível em `templates/` | Sim |
 | STATUS.yaml | Arquivo presente na pasta do RF | Sim |
 | UC Validado | STATUS.yaml com `documentacao.uc = true` | Sim |
 
@@ -579,7 +579,7 @@ Após conclusão deste contrato, o próximo passo é:
 >
 > ```
 > Conforme CONTRATO-GERACAO-DOCS-TC para RFXXX.
-> Seguir CLAUDE.md.
+> Seguir D:\IC2\CLAUDE.md.
 > ```
 
 Este contrato gerará o arquivo TC-RFXXX.yaml (Casos de Teste).
@@ -590,10 +590,10 @@ Este contrato gerará o arquivo TC-RFXXX.yaml (Casos de Teste).
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `/docs/contracts/documentacao/CONTRATO-GERACAO-DOCS-MT.md` | Este contrato |
-| `/docs/checklists/checklist-documentacao-mt.yaml` | Checklist YAML |
-| `/docs/templates/MT.yaml` | Template do MT |
-| `/docs/templates/STATUS.yaml` | Template STATUS estruturado |
+| `contracts/documentacao/CONTRATO-GERACAO-DOCS-MT.md` | Este contrato |
+| `checklists/checklist-documentacao-mt.yaml` | Checklist YAML |
+| `templates/MT.yaml` | Template do MT |
+| `templates/STATUS.yaml` | Template STATUS estruturado |
 
 ---
 

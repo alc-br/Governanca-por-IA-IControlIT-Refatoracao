@@ -8,7 +8,7 @@ Auditar e adequar backend legado do **RF-XXX** conforme CONTRATO-DE-REGULARIZACA
 
 **Contrato ativado:** CONTRATO-DE-REGULARIZACAO-DE-BACKEND
 
-**Checklist:** docs/checklists/checklist-regularizacao-backend.yaml
+**Checklist:** checklists/checklist-regularizacao-backend.yaml
 
 **Agente responsável:** backend-regularizer
 

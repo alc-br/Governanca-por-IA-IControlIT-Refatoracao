@@ -53,7 +53,7 @@ Este contrato é ativado quando a solicitação mencionar explicitamente:
 Exemplo:
 ```
 Conforme CONTRATO-VALIDACAO-MT-TC para RF006.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---

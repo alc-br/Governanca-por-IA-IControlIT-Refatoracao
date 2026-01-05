@@ -12,7 +12,7 @@ Implementa incrementalmente no frontend as mudanças especificadas no ADITIVO (R
 ## Ativação
 
 ```
-Conforme docs/contracts/desenvolvimento/execucao/frontend-aditivo.md para RFXXX.
+Conforme contracts/desenvolvimento/execucao/frontend-aditivo.md para RFXXX.
 ```
 
 ## Pré-Requisitos
@@ -84,4 +84,4 @@ Gerar `.temp_ia/frontend-aditivo-RFXXX-relatorio.md`:
 
 ---
 
-**Versão:** 1.0 | **Mantido por:** Time IControlIT | **Governado por:** CLAUDE.md
+**Versão:** 1.0 | **Mantido por:** Time IControlIT | **Governado por:** D:\IC2\CLAUDE.md

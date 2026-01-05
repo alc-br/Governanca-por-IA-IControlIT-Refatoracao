@@ -430,9 +430,9 @@ graph LR
 
 ## 🔗 REFERÊNCIAS
 
-- **Lista completa de prompts:** [docs/prompts/README.md](README.md)
-- **Contratos:** `docs/contracts/`
-- **Checklists:** `docs/checklists/`
+- **Lista completa de prompts:** [prompts/README.md](README.md)
+- **Contratos:** `contracts/`
+- **Checklists:** `checklists/`
 - **Governança:** [CLAUDE.md](../../CLAUDE.md)
 - **Comandos:** [docs/COMMANDS.md](../COMMANDS.md)
 - **Arquitetura:** [docs/ARCHITECTURE.md](../ARCHITECTURE.md)
@@ -448,4 +448,4 @@ graph LR
 ---
 
 **Mantido por:** Time de Arquitetura IControlIT
-**Governado por:** CLAUDE.md
+**Governado por:** D:\IC2\CLAUDE.md

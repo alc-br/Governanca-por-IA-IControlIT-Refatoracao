@@ -7,7 +7,7 @@ Ele fica nesse endereço \docs\rf\Fase*\EPIC*\RF*
 ---
 
 Executar **VALIDADOR-CONTRATO-ADEQUACAO-COMPLETA-RF** para o RF informado acima.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 ## ⚠️ MODO READ-ONLY
 
@@ -89,7 +89,7 @@ Você NÃO corrige problemas, apenas IDENTIFICA e REPORTA.
 ### PARTE 4: VALIDADOR AUTOMÁTICO (1 validação)
 
 15. **RF-15: validator-docs.py passou (exit code 0)**
-    - Executar: `python docs/tools/docs/validator-docs.py RFXXX`
+    - Executar: `python tools/docs/validator-docs.py RFXXX`
     - Exit code 0 = APROVADO
     - Exit code != 0 = REPROVADO
 
@@ -98,8 +98,8 @@ Você NÃO corrige problemas, apenas IDENTIFICA e REPORTA.
 - **RF.md** (validar 11 seções)
 - **RF.yaml** (validar estrutura e sincronização)
 - **STATUS.yaml** (verificar seção documentacao.rf)
-- **Template RF.md v2.0** (docs/templates/RF.md)
-- **Template RF.yaml v1.0** (docs/templates/RF.yaml)
+- **Template RF.md v2.0** (templates/RF.md)
+- **Template RF.yaml v1.0** (templates/RF.yaml)
 
 ## 🎯 CRITÉRIOS DE APROVAÇÃO
 
@@ -208,7 +208,7 @@ if rns_yaml_only:
 ```bash
 # Executar validador automático
 cd D:\IC2
-python docs/tools/docs/validator-docs.py RFXXX
+python tools/docs/validator-docs.py RFXXX
 
 # Exit code 0 = APROVADO
 # Exit code != 0 = REPROVADO
@@ -274,7 +274,7 @@ python docs/tools/docs/validator-docs.py RFXXX
 
 ---
 
-**Contrato:** docs/contracts/documentacao/validacao/rf.md
+**Contrato:** D:/IC2_Governanca/contracts/documentacao/validacao/rf.md
 **Template RF.md:** v2.0
 **Template RF.yaml:** v1.0
-**Validador:** docs/tools/docs/validator-docs.py
+**Validador:** tools/docs/validator-docs.py

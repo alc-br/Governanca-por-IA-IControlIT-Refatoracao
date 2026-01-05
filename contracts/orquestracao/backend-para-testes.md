@@ -25,7 +25,7 @@ Se QUALQUER item acima não existir → TRANSIÇÃO NEGADA.
 
 A única fonte válida para decisão é:
 
-docs/contracts/EXECUTION-MANIFEST.md
+contracts/EXECUTION-MANIFEST.md
 
 
 O STATUS.yaml NÃO é fonte de decisão.

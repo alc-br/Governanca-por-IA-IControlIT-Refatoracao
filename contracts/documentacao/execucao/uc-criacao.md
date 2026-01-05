@@ -82,7 +82,7 @@ Este contrato é ativado quando a solicitação mencionar explicitamente:
 Exemplo:
 ```
 Conforme CONTRATO-GERACAO-DOCS-UC para RF060.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -159,10 +159,10 @@ D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
-- `backend/**`
-- `frontend/**`
-- `docs/contracts/**`
-- `docs/templates/**`
+- `D:\IC2\backend\**`
+- `D:\IC2\frontend\**`
+- `contracts/**`
+- `templates/**`
 - Qualquer arquivo que não seja os 3 listados acima
 
 ---
@@ -173,7 +173,7 @@ O contrato TRAVA se qualquer condição falhar:
 
 | Pré-requisito | Descrição | Bloqueante |
 |---------------|-----------|------------|
-| Pasta do RF | Pasta já criada em `docs/rf/[Fase]/[EPIC]/RFXXX/` | Sim |
+| Pasta do RF | Pasta já criada em `rf/[Fase]/[EPIC]/RFXXX/` | Sim |
 | RFXXX.md | RF criado e aprovado | Sim |
 | RFXXX.yaml | RF estruturado e sincronizado | Sim |
 | Templates | Templates UC.md, UC.yaml disponíveis | Sim |
@@ -366,7 +366,7 @@ import re
 import yaml
 from pathlib import Path
 
-rf_base_path = Path('docs/rf/[FASE]/[EPIC]/RFXXX/')
+rf_base_path = Path('rf/[FASE]/[EPIC]/RFXXX/')
 md_file = rf_base_path / 'MD-RFXXX.md'
 uc_file = rf_base_path / 'UC-RFXXX.yaml'
 
@@ -640,9 +640,9 @@ Esta fase AUMENTA automaticamente a cobertura de UC ao detectar:
 #### 4.1 Executar Validador de Cobertura RF→UC (1ª Rodada)
 
 ```bash
-python D:\IC2\docs\tools\docs\validator-rf-uc.py \
-  --rf docs/rf/[Fase]/[EPIC]/RFXXX/RFXXX.yaml \
-  --uc docs/rf/[Fase]/[EPIC]/RFXXX/UC-RFXXX.yaml
+python D:\IC2_Governanca\tools\docs\validator-rf-uc.py \
+  --rf rf/[Fase]/[EPIC]/RFXXX/RFXXX.yaml \
+  --uc rf/[Fase]/[EPIC]/RFXXX/UC-RFXXX.yaml
 ```
 
 **IMPORTANTE:** O parâmetro `--tc` é **opcional** nesta fase, pois TC só será criado em contrato posterior.
@@ -795,7 +795,7 @@ Após conclusão deste contrato, o próximo passo é:
 >
 > ```
 > Conforme CONTRATO-GERACAO-DOCS-WF para RFXXX.
-> Seguir CLAUDE.md.
+> Seguir D:\IC2\CLAUDE.md.
 > ```
 
 Este contrato gerará o arquivo WF-RFXXX.md (Wireframes).
@@ -806,11 +806,11 @@ Este contrato gerará o arquivo WF-RFXXX.md (Wireframes).
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `/docs/contracts/documentacao/execucao/uc-criacao.md` | Este contrato |
-| `/docs/checklists/documentacao/geracao/uc.yaml` | Checklist YAML |
-| `/docs/templates/UC.yaml` | Template UC estruturado |
-| `/docs/templates/STATUS.yaml` | Template STATUS estruturado |
-| `/docs/tools/docs/validator-rf-uc.py` | Validador de cobertura RF→UC |
+| `contracts/documentacao/execucao/uc-criacao.md` | Este contrato |
+| `checklists/documentacao/geracao/uc.yaml` | Checklist YAML |
+| `templates/UC.yaml` | Template UC estruturado |
+| `templates/STATUS.yaml` | Template STATUS estruturado |
+| `tools/docs/validator-rf-uc.py` | Validador de cobertura RF→UC |
 
 ---
 

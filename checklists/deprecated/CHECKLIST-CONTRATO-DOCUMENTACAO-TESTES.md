@@ -127,22 +127,22 @@ Antes de iniciar, TODOS devem ser True:
 ### Leitura
 
 ```
-docs/rf/**/RF*.md
-docs/rf/**/UC-RF*.md
-docs/rf/**/MD-RF*.md
-docs/rf/**/WF-RF*.md
-docs/rf/**/STATUS.yaml
-docs/templates/TEMPLATE-TC.md
+rf/**/RF*.md
+rf/**/UC-RF*.md
+rf/**/MD-RF*.md
+rf/**/WF-RF*.md
+rf/**/STATUS.yaml
+templates/TEMPLATE-TC.md
 ```
 
 ### Escrita (4 arquivos)
 
 ```
-docs/rf/**/TC-RFXXX-BACKEND.md
-docs/rf/**/TC-RFXXX-FRONTEND.md
-docs/rf/**/TC-RFXXX-SEGURANCA.md
-docs/rf/**/TC-RFXXX-E2E.md
-docs/rf/**/STATUS.yaml (apenas documentacao_testes)
+rf/**/TC-RFXXX-BACKEND.md
+rf/**/TC-RFXXX-FRONTEND.md
+rf/**/TC-RFXXX-SEGURANCA.md
+rf/**/TC-RFXXX-E2E.md
+rf/**/STATUS.yaml (apenas documentacao_testes)
 ```
 
 ---
@@ -156,10 +156,10 @@ frontend/**
 *.test.ts
 *Tests.cs
 azure-pipelines.yml
-docs/rf/**/RF*.md (somente leitura)
-docs/rf/**/UC-*.md (somente leitura)
-docs/rf/**/MD-*.md (somente leitura)
-docs/rf/**/WF-*.md (somente leitura)
+rf/**/RF*.md (somente leitura)
+rf/**/UC-*.md (somente leitura)
+rf/**/MD-*.md (somente leitura)
+rf/**/WF-*.md (somente leitura)
 ```
 
 ---

@@ -80,7 +80,7 @@ Este contrato é ativado quando a solicitação mencionar explicitamente:
 Exemplo:
 ```
 Conforme CONTRATO-GERACAO-DOCS-MT-TC para RF006.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -513,12 +513,12 @@ Após criar e validar MT-RF[XXX].yaml e TC-RF[XXX].yaml, o agente DEVE gerar:
 
 **Arquivo 1: `azure-test-cases-RF[XXX].csv`**
 - Formato: CSV compatível com Azure Test Plans
-- Localização: `docs/rf/[FASE]/[EPIC]/[RFXXX]/azure-test-cases-RF[XXX].csv`
+- Localização: `rf/[FASE]/[EPIC]/[RFXXX]/azure-test-cases-RF[XXX].csv`
 - Propósito: Importação direta no Azure DevOps Test Plans
 
 **Arquivo 2: `azure-test-suites-RF[XXX].json`**
 - Formato: JSON compatível com Azure DevOps API
-- Localização: `docs/rf/[FASE]/[EPIC]/[RFXXX]/azure-test-suites-RF[XXX].json`
+- Localização: `rf/[FASE]/[EPIC]/[RFXXX]/azure-test-suites-RF[XXX].json`
 - Propósito: Criação automática de Test Suites via API
 
 ### 12.2 Estrutura do CSV (azure-test-cases-RF[XXX].csv)

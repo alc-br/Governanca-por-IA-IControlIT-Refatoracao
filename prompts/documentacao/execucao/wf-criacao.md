@@ -1,10 +1,10 @@
 Para o RFXXX...
 
-Crie os documentos de Wireframes (WF) conforme docs/contracts/documentacao/execucao/wf-criacao.md.
+Crie os documentos de Wireframes (WF) conforme D:/IC2_Governanca/contracts/documentacao/execucao/wf-criacao.md.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 
@@ -13,7 +13,7 @@ PRÉ-REQUISITOS BLOQUEANTES:
 - STATUS.yaml DEVE ter documentacao.uc = true
 
 IMPORTANTE:
-1. Leia o template em docs/templates/:
+1. Leia o template em templates/:
    - WF.yaml
 
 2. Analise o UC-RFXXX.yaml para extrair tudo o que for necessário para os Wireframes.
@@ -46,9 +46,9 @@ Após criar WF-RFXXX.yaml:
 PROXIMOS PASSOS:
 Após a conclusão bem-sucedida deste contrato, o próximo passo é:
 
-> Conforme docs/contracts/documentacao/execucao/md-criacao.md para RFXXX.
-> Seguir CLAUDE.md.
+> Conforme D:/IC2_Governanca/contracts/documentacao/execucao/md-criacao.md para RFXXX.
+> Seguir D:\IC2\CLAUDE.md.
 
 IMPORTANTE:
 
-Se o WF já estiver criado, valide se ele está dentro dos padrões do template docs/templates/WF.yaml. Se não estiver, ajuste-o para que entre nos padrões. Se ele está no padrão, pare e peça para que avance para o próximo passo que é "Gerar o MD de acordo com o contrato de geração de MD."
+Se o WF já estiver criado, valide se ele está dentro dos padrões do template templates/WF.yaml. Se não estiver, ajuste-o para que entre nos padrões. Se ele está no padrão, pare e peça para que avance para o próximo passo que é "Gerar o MD de acordo com o contrato de geração de MD."

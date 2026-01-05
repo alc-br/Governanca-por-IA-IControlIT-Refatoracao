@@ -10,7 +10,7 @@ Este checklist valida o cumprimento integral do **Contrato de DevOps / Governan�
 ## 1. Governança Inicial
 
 - [ ] O contrato de DevOps foi explicitamente citado no prompt
-- [ ] O agente confirmou leitura de CLAUDE.md
+- [ ] O agente confirmou leitura de D:\IC2\CLAUDE.md
 - [ ] devops/execution-manifest.md foi atualizado antes da execução
 
 ---

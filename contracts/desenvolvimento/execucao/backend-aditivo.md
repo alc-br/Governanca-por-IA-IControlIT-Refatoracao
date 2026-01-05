@@ -26,8 +26,8 @@ Este contrato **implementa incrementalmente no backend** as mudanças especifica
 ## 1. Ativação
 
 ```
-Conforme docs/contracts/desenvolvimento/execucao/backend-aditivo.md para RFXXX.
-Seguir CLAUDE.md.
+Conforme contracts/desenvolvimento/execucao/backend-aditivo.md para RFXXX.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -268,4 +268,4 @@ Criar `.temp_ia/backend-aditivo-RFXXX-relatorio.md` com:
 ---
 
 **Mantido por:** Time de Arquitetura IControlIT
-**Governado por:** CLAUDE.md
+**Governado por:** D:\IC2\CLAUDE.md

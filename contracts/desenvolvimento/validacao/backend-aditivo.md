@@ -13,7 +13,7 @@ Valida que o backend foi atualizado corretamente conforme ADITIVO de documentaç
 ## Ativação
 
 ```
-Conforme docs/contracts/desenvolvimento/validacao/backend-aditivo.md para RFXXX.
+Conforme contracts/desenvolvimento/validacao/backend-aditivo.md para RFXXX.
 ```
 
 ## Validações (10 obrigatórias)
@@ -85,4 +85,4 @@ resultado_tests = executar_dotnet_test()
 
 ---
 
-**Versão:** 1.0 | **Mantido por:** Time IControlIT | **Governado por:** CLAUDE.md
+**Versão:** 1.0 | **Mantido por:** Time IControlIT | **Governado por:** D:\IC2\CLAUDE.md

@@ -4,7 +4,7 @@ Crie os documentos de Modelo de Dados (MD) conforme docs\contracts\documentacao\
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 
@@ -16,7 +16,7 @@ PRÉ-REQUISITOS BLOQUEANTES:
 - STATUS.yaml DEVE ter documentacao.wf = true
 
 IMPORTANTE:
-1. Leia o template em docs/templates/:
+1. Leia o template em templates/:
    - MD.yaml
 
 2. Analise RFXXX.yaml, UC-RFXXX.yaml e WF-RFXXX.yaml para extrair tudo o que for necessário para o Modelo de Dados:
@@ -59,4 +59,4 @@ Após a conclusão bem-sucedida deste contrato, a documentação funcional compl
 O próximo passo é criar os casos de teste:
 
 > Conforme CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES para RFXXX.
-> Seguir CLAUDE.md.
+> Seguir D:\IC2\CLAUDE.md.

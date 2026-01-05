@@ -257,7 +257,7 @@ Se o backend atual cobre 70% dos UCs, este contrato DEVE implementar os 30% rest
 
 Apos conclusao deste contrato:
 
-➡️ **CONTRATO-VALIDACAO-BACKEND** (docs/contracts/desenvolvimento/validacao/backend.md)
+➡️ **CONTRATO-VALIDACAO-BACKEND** (contracts/desenvolvimento/validacao/backend.md)
 
 O validador vai:
 1. Verificar que TUDO no UC-RFXXX foi coberto 100%

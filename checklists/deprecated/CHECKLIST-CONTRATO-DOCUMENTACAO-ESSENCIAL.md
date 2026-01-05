@@ -22,10 +22,10 @@
 
 Antes de iniciar, TODOS devem ser True:
 
-- [ ] **Pasta do RF existe** - em docs/rf/[Fase]/[EPIC]/
+- [ ] **Pasta do RF existe** - em rf/[Fase]/[EPIC]/
 - [ ] **Legado acessivel** - D:/IC2/ic1_legado/
 - [ ] **Modelo fisico acessivel** - D:\DocumentosIC2\modelo-fisico-bd.sql
-- [ ] **Templates disponiveis** - docs/templates/TEMPLATE-*.md
+- [ ] **Templates disponiveis** - templates/TEMPLATE-*.md
 
 **PARAR se qualquer item for False.**
 
@@ -157,22 +157,22 @@ Antes de iniciar, TODOS devem ser True:
 D:/IC2/ic1_legado/**
 D:\DocumentosIC2\modelo-fisico-bd.sql
 D:\DocumentosIC2\inteligencia-artificial\prompts\arquitetura.md
-docs/templates/TEMPLATE-RF.md
-docs/templates/TEMPLATE-UC.md
-docs/templates/TEMPLATE-MD.md
-docs/templates/TEMPLATE-WF.md
-docs/rf/**/STATUS.yaml
+templates/TEMPLATE-RF.md
+templates/TEMPLATE-UC.md
+templates/TEMPLATE-MD.md
+templates/TEMPLATE-WF.md
+rf/**/STATUS.yaml
 ```
 
 ### Escrita (5 arquivos + STATUS)
 
 ```
-docs/rf/**/RFXXX.md
-docs/rf/**/UC-RFXXX.md
-docs/rf/**/MD-RFXXX.md
-docs/rf/**/WF-RFXXX.md
-docs/rf/**/user-stories.yaml
-docs/rf/**/STATUS.yaml (apenas secao documentacao)
+rf/**/RFXXX.md
+rf/**/UC-RFXXX.md
+rf/**/MD-RFXXX.md
+rf/**/WF-RFXXX.md
+rf/**/user-stories.yaml
+rf/**/STATUS.yaml (apenas secao documentacao)
 ```
 
 ---
@@ -186,7 +186,7 @@ frontend/**
 *.test.ts
 *Tests.cs
 azure-pipelines.yml
-docs/rf/**/TC-*.md (outro contrato)
+rf/**/TC-*.md (outro contrato)
 ```
 
 ---
@@ -197,5 +197,5 @@ Apos conclusao: **CONTRATO DE DOCUMENTACAO-GOVERNADA-TESTES**
 
 ```
 Conforme CONTRATO DE DOCUMENTACAO-GOVERNADA-TESTES para RFXXX.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```

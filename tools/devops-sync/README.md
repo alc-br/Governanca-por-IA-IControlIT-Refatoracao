@@ -176,7 +176,7 @@ python tools/devops-sync/core/sync-all-rfs.py
 ```
 
 **O que faz**:
-- Varre todos os RFs em `docs/rf/`
+- Varre todos os RFs em `rf/`
 - Lê STATUS.yaml de cada RF
 - Determina coluna correta do board para cada
 - Move Work Items para colunas corretas
@@ -294,7 +294,7 @@ python tools/devops-sync/setup/update-sprint-dates.py by-id <iteration_id>
 - [Azure DevOps REST API](https://learn.microsoft.com/en-us/rest/api/azure/devops/)
 - [Work Items API](https://learn.microsoft.com/en-us/rest/api/azure/devops/wit/)
 - [CLAUDE.md - Gestão de User Stories](../../CLAUDE.md#regra-obrigatória--gestão-de-user-stories-user-storiesyaml)
-- [CONTRATO-DEVOPS-GOVERNANCA](../../docs/contracts/CONTRATO-DEVOPS-GOVERNANCA.md)
+- [CONTRATO-DEVOPS-GOVERNANCA](../..contracts/CONTRATO-DEVOPS-GOVERNANCA.md)
 
 ---
 

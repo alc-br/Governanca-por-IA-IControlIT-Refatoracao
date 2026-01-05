@@ -8,7 +8,7 @@ Implementar backend completo do **RF-XXX** conforme CONTRATO-EXECUCAO-BACKEND.
 
 **Contrato ativado:** CONTRATO-EXECUCAO-BACKEND
 
-**Checklist:** docs/checklists/checklist-backend.yaml
+**Checklist:** checklists/checklist-backend.yaml
 
 **Agente responsável:** developer (full-stack-implementer)
 

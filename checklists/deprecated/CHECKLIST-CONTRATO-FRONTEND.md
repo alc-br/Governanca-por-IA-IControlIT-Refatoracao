@@ -10,7 +10,7 @@ Este checklist valida o cumprimento integral do **Contrato de Execução – Fro
 ## 1. Governança Inicial
 
 - [ ] O contrato de execução frontend foi explicitamente citado no prompt
-- [ ] O agente confirmou leitura de ARCHITECTURE.md, CONVENTIONS.md e CLAUDE.md
+- [ ] O agente confirmou leitura de ARCHITECTURE.md, CONVENTIONS.md e D:\IC2\CLAUDE.md
 - [ ] Nenhum arquivo em /docs foi alterado
 
 ---

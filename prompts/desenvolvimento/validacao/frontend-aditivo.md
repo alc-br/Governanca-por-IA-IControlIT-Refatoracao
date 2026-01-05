@@ -6,8 +6,8 @@ Ele fica nesse endereço \docs\rf\Fase*\EPIC*\RF*
 
 ---
 
-Executar **VALIDADOR FRONTEND ADITIVO** para o RF informado acima conforme docs/contracts/desenvolvimento/validacao/frontend-aditivo.md.
-Seguir CLAUDE.md.
+Executar **VALIDADOR FRONTEND ADITIVO** para o RF informado acima conforme D:/IC2_Governanca/contracts/desenvolvimento/validacao/frontend-aditivo.md.
+Seguir D:\IC2\CLAUDE.md.
 
 ## ⚠️ MODO READ-ONLY
 
@@ -277,6 +277,6 @@ Nenhum gap identificado.
 
 ---
 
-**Contrato:** docs/contracts/desenvolvimento/validacao/frontend-aditivo.md
+**Contrato:** D:/IC2_Governanca/contracts/desenvolvimento/validacao/frontend-aditivo.md
 **Modo:** READ-ONLY
 **Aprovação:** 10/10 PASS ou REPROVADO

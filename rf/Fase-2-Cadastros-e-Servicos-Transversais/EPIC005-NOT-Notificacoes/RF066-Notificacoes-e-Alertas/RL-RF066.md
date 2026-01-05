@@ -796,4 +796,4 @@ Tabela consolidada de destino de todos os itens legados extraídos do RF066 v1.0
 - Sobre comportamento esperado → Consultar **RF066.md v2.0**
 - Sobre código legado → Consultar **este documento (RL-RF066.md)**
 - Sobre modelo de dados → Consultar **RF066.yaml**
-- Sobre implementação atual → Consultar código em `backend/IControlIT.API/src/`
+- Sobre implementação atual → Consultar código em `D:\IC2\backend\IControlIT.API/src/`

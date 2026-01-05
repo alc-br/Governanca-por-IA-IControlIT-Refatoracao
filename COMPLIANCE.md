@@ -36,7 +36,7 @@ Todo RF DEVE ter separação estrita entre:
 4. Criar RFXXX.md limpo (apenas contrato)
 5. Criar RL-RFXXX.md com memória legado
 6. Estruturar RFXXX.yaml + RL-RFXXX.yaml
-7. Executar validador: `python docs/tools/docs/validator-rl.py RFXXX`
+7. Executar validador: `python tools/docs/validator-rl.py RFXXX`
 8. Corrigir gaps até 100%
 9. Atualizar STATUS.yaml
 
@@ -45,13 +45,13 @@ Todo RF DEVE ter separação estrita entre:
 Antes de marcar RF como completo, DEVE executar:
 ```bash
 # Validar separação RF/RL
-python D:\IC2\docs\tools\docs\validator-rl.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-rl.py RFXXX
 
 # Validar cobertura RF → UC
-python D:\IC2\docs\tools\docs\validator-rf-uc.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-rf-uc.py RFXXX
 
 # Validar governança completa
-python D:\IC2\docs\tools\docs\validator-governance.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-governance.py RFXXX
 ```
 
 ### Critério de Aceite
@@ -149,9 +149,9 @@ O agente DEVE, OBRIGATORIAMENTE:
 1. Executar o validador de cobertura RF → UC → TC:
 ```bash
 python tools/docs/validator-rf-uc.py \
-  --rf docs/rf/[FASE]/[EPIC]/RFXXX/RFXXX.yaml \
-  --uc docs/rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml \
-  --tc docs/rf/[FASE]/[EPIC]/RFXXX/TC-RFXXX.yaml
+  --rf rf/[FASE]/[EPIC]/RFXXX/RFXXX.yaml \
+  --uc rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml \
+  --tc rf/[FASE]/[EPIC]/RFXXX/TC-RFXXX.yaml
 ```
 
 2. Interpretar o EXIT CODE retornado:
@@ -373,7 +373,7 @@ Antes de executar QUALQUER ação que envolva:
 O agente DEVE obrigatoriamente:
 
 1. Atualizar o arquivo:
-   `docs/contracts/EXECUTION-MANIFEST.md`
+   `contracts/EXECUTION-MANIFEST.md`
 
 2. Declarar:
    - O contrato ativo
@@ -507,8 +507,8 @@ Os seguintes diretórios e arquivos são considerados **ÂNCORAS IMUTÁVEIS**
 da governança do projeto:
 
 - `CLAUDE.md`
-- `/docs/contracts/*`
-- `/docs/tools/*`
+- `contracts/*`
+- `tools/*`
 
 ### Regras
 
@@ -576,8 +576,8 @@ considerado violação grave de governança.
 - **A.12.4.3 - Logs do Administrador:** RF-004 (Logs de auditoria)
 
 **Artefatos:**
-- `/docs/auditoria/ACCESS-CONTROL.md`
-- `/docs/auditoria/AUDIT-TRAIL.md`
+- `auditoria/ACCESS-CONTROL.md`
+- `auditoria/AUDIT-TRAIL.md`
 - RF-004 (Auditoria)
 
 ### SOC 2 (Service Organization Control)
@@ -619,7 +619,7 @@ public class MinhaEntidade
 ```
 
 **Artefatos:**
-- `/docs/ARCHITECTURE.md` ADR-004
+- `ARCHITECTURE.md` ADR-004
 - RF-080 (Termos LGPD)
 
 ### SOX (Sarbanes-Oxley)
@@ -641,7 +641,7 @@ public class MinhaEntidade
 
 | Certificação | Evidência | Localização |
 |--------------|-----------|-------------|
-| ISO 27001 | Matriz de controles | `/docs/auditoria/ACCESS-CONTROL.md` |
+| ISO 27001 | Matriz de controles | `auditoria/ACCESS-CONTROL.md` |
 | SOC 2 | Trilha de auditoria | RF-004 logs |
 | LGPD | Soft delete implementado | `ADR-004` + código fonte |
 | SOX | Retenção 7 anos | RF-004 configuração |
@@ -732,10 +732,10 @@ Qualquer tentativa de execução fora do contrato invalida a tarefa.
 - **CONVENTIONS.md** - Convenções de nomenclatura e código
 - **COMMANDS.md** - Comandos de desenvolvimento, validação e deploy
 - **DECISIONS.md** - Decisões arquiteturais tomadas
-- **docs/contracts/** - Contratos formais de execução
-- **docs/tools/README.md** - Ferramentas de validação e sincronização
+- **contracts/** - Contratos formais de execução
+- **tools/README.md** - Ferramentas de validação e sincronização
 
 ---
 
 **Última Atualização:** 2026-01-01
-**Versão:** 2.0.0 - Redistribuição cirúrgica do CLAUDE.md
+**Versão:** 2.0.0 - Redistribuição cirúrgica do D:\IC2\CLAUDE.md

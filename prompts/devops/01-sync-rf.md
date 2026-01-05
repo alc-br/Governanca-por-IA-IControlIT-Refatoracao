@@ -1,6 +1,6 @@
 ﻿# Sincronizar RF com Azure DevOps
 
-Sincronizar STATUS.yaml do **RF-XXX** com Azure DevOps conforme docs/contracts/devops/CONTRATO-DEVOPS-GOVERNANCA.md.
+Sincronizar STATUS.yaml do **RF-XXX** com Azure DevOps conforme contracts/devops/CONTRATO-DEVOPS-GOVERNANCA.md.
 
 **RF:** [Especificar RF, ex: RF-027]
 
@@ -8,9 +8,9 @@ Sincronizar STATUS.yaml do **RF-XXX** com Azure DevOps conforme docs/contracts/d
 
 **Contrato ativado:** CONTRATO-DEVOPS-GOVERNANCA
 
-**Checklist:** docs/checklists/checklist-devops.yaml
+**Checklist:** checklists/checklist-devops.yaml
 
-**Script:** `python docs/tools/devops-sync/core/sync-rf.py RF-XXX`
+**Script:** `python tools/devops-sync/core/sync-rf.py RF-XXX`
 
 **Objetivo:**
 - Ler STATUS.yaml do RF

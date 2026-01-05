@@ -367,9 +367,9 @@ keywords = ["api", "azure", "brasil", "graph", "externo", "integra"]
 
 **Método:**
 ```bash
-python docs/tools/docs/validator-rf-uc.py \
-  --rf docs/rf/.../RFXXX.yaml \
-  --uc docs/rf/.../UC-RFXXX.yaml
+python tools/docs/validator-rf-uc.py \
+  --rf rf/.../RFXXX.yaml \
+  --uc rf/.../UC-RFXXX.yaml
 
 echo $?  # DEVE ser 0
 ```
@@ -633,7 +633,7 @@ Ação: Reexecutar CONTRATO-ADEQUACAO-COMPLETA-UC novamente
 **Prompt de ativação:**
 ```
 Executar VALIDADOR-CONTRATO-ADEQUACAO-COMPLETA-UC para RFXXX.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 **Comportamento esperado:**

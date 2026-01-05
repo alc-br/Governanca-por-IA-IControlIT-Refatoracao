@@ -1,6 +1,6 @@
 ﻿# Auditar Conformidade Completa (Backend + Frontend)
 
-Auditar conformidade completa do **RF-XXX** conforme docs/contracts/auditoria/conformidade.md.
+Auditar conformidade completa do **RF-XXX** conforme D:/IC2_Governanca/contracts/auditoria/conformidade.md.
 
 **RF:** [Especificar RF, ex: RF-027]
 
@@ -8,7 +8,7 @@ Auditar conformidade completa do **RF-XXX** conforme docs/contracts/auditoria/co
 
 **Contrato ativado:** CONTRATO-AUDITORIA-CONFORMIDADE
 
-**Checklist:** docs/checklists/checklist-auditoria-conformidade.yaml
+**Checklist:** checklists/checklist-auditoria-conformidade.yaml
 
 **Agente responsável:** auditor (conformance-auditor)
 

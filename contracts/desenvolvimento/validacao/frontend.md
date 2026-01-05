@@ -331,7 +331,7 @@ TODO LIST - Validacao Frontend RFXXX
   +-- [pending] git branch -d feature/RFXXX-frontend
 
 [pending] Sincronizar DevOps (SE aprovado 100%)
-  +-- [pending] python docs/tools/devops-sync/sync-rf.py RFXXX
+  +-- [pending] python tools/devops-sync/sync-rf.py RFXXX
 
 [pending] Verificar resultado final
   +-- [pending] Board atualizado com status de validacao frontend
@@ -447,8 +447,8 @@ Error: TS2304: Cannot find name 'Categoria'
 \```
 
 **Arquivos afetados:**
-- `frontend/icontrolit-app/src/app/modules/categorias/list/list.component.ts:12`
-- `frontend/icontrolit-app/src/app/core/models/categoria.model.ts:5`
+- `D:\IC2\frontend\icontrolit-app/src/app/modules/categorias/list/list.component.ts:12`
+- `D:\IC2\frontend\icontrolit-app/src/app/core/models/categoria.model.ts:5`
 
 **Impacto:** Impossivel validar RFXXX em ambiente quebrado
 

@@ -24,7 +24,7 @@ Rollback é uma operação de emergência que:
 A **ÚNICA fonte da verdade** é o arquivo:
 
 ```
-docs/contracts/EXECUTION-MANIFEST.md
+contracts/EXECUTION-MANIFEST.md
 ```
 
 Rollback DEVE ter:
@@ -222,7 +222,7 @@ def execute_deploy():
         # Chamar script de rollback
         subprocess.run([
             "python",
-            "docs/tools/devops-sync/apply_rollback.py",
+            "tools/devops-sync/apply_rollback.py",
             rf,
             "--automatic",
             "--reason", "Smoke tests failed"
@@ -345,10 +345,10 @@ Este contrato DEVE ser executado pelo script:
 
 ```bash
 # Rollback automático (chamado pelo script de deploy)
-python docs/tools/devops-sync/apply_rollback.py RFXXX --automatic --reason "Smoke tests failed"
+python tools/devops-sync/apply_rollback.py RFXXX --automatic --reason "Smoke tests failed"
 
 # Rollback manual
-python docs/tools/devops-sync/apply_rollback.py RFXXX --manual --reason "Business decision" --authorized-by "Release Manager"
+python tools/devops-sync/apply_rollback.py RFXXX --manual --reason "Business decision" --authorized-by "Release Manager"
 ```
 
 O script DEVE:

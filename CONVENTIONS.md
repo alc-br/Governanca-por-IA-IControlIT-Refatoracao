@@ -39,7 +39,7 @@
 #### 🔴 OBRIGATÓRIO: Estrutura de Solução
 
 ```
-backend/IControlIT.API/
+D:\IC2\backend\IControlIT.API/
 ├── src/
 │   ├── Domain/
 │   ├── Application/
@@ -124,7 +124,7 @@ Web/
 #### 🔴 OBRIGATÓRIO: Estrutura do Projeto
 
 ```
-frontend/icontrolit-app/src/app/
+D:\IC2\frontend\icontrolit-app/src/app/
 ├── core/
 ├── shared/
 ├── modules/

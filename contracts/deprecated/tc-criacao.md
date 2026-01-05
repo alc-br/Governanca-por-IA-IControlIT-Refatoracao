@@ -61,7 +61,7 @@ Este contrato é ativado quando a solicitação mencionar explicitamente:
 Exemplo:
 ```
 Conforme CONTRATO-GERACAO-DOCS-TC para RF060.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -269,10 +269,10 @@ D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
-- `backend/**`
-- `frontend/**`
-- `docs/contracts/**`
-- `docs/templates/**`
+- `D:\IC2\backend\**`
+- `D:\IC2\frontend\**`
+- `contracts/**`
+- `templates/**`
 - Qualquer arquivo que não seja os 2 listados acima
 
 ---
@@ -283,11 +283,11 @@ O contrato TRAVA se qualquer condição falhar:
 
 | Pré-requisito | Descrição | Bloqueante |
 |---------------|-----------|------------|
-| Pasta do RF | Pasta já criada em `docs/rf/[Fase]/[EPIC]/RFXXX/` | Sim |
+| Pasta do RF | Pasta já criada em `rf/[Fase]/[EPIC]/RFXXX/` | Sim |
 | UC-RFXXX.md | UC criado e completo | Sim |
 | UC-RFXXX.yaml | UC estruturado e sincronizado | Sim |
 | MT-RFXXX.yaml | Massa de Teste criada | Sim |
-| Template TC.yaml | Template TC.yaml disponível em `docs/templates/` | Sim |
+| Template TC.yaml | Template TC.yaml disponível em `templates/` | Sim |
 | STATUS.yaml | Arquivo presente na pasta do RF | Sim |
 | UC Validado | STATUS.yaml com `documentacao.uc = true` | Sim |
 | MT Criado | STATUS.yaml com `documentacao.mt = true` | Sim |
@@ -536,7 +536,7 @@ O próximo passo é:
 >
 > ```
 > Conforme CONTRATO-EXECUCAO-BACKEND para RFXXX.
-> Seguir CLAUDE.md.
+> Seguir D:\IC2\CLAUDE.md.
 > ```
 
 ---
@@ -545,10 +545,10 @@ O próximo passo é:
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `/docs/contracts/documentacao/CONTRATO-GERACAO-DOCS-TC.md` | Este contrato |
-| `/docs/checklists/checklist-documentacao-tc.yaml` | Checklist YAML |
-| `/docs/templates/TC.yaml` | Template do TC |
-| `/docs/templates/STATUS.yaml` | Template STATUS estruturado |
+| `contracts/documentacao/CONTRATO-GERACAO-DOCS-TC.md` | Este contrato |
+| `checklists/checklist-documentacao-tc.yaml` | Checklist YAML |
+| `templates/TC.yaml` | Template do TC |
+| `templates/STATUS.yaml` | Template STATUS estruturado |
 
 ---
 

@@ -226,7 +226,7 @@ TODO LIST - Tester-Backend RFXXX
   +-- [pending] git branch -d feature/RFXXX-backend
 
 [pending] Sincronizar DevOps (SE aprovado 100%)
-  +-- [pending] python docs/tools/devops-sync/sync-rf.py RFXXX
+  +-- [pending] python tools/devops-sync/sync-rf.py RFXXX
 
 [pending] Verificar resultado final
   +-- [pending] Board atualizado com status de validação de contrato
@@ -341,8 +341,8 @@ Error CS0103: The name 'CategoriaId' does not exist in the current context
 \```
 
 **Arquivos afetados:**
-- `backend/IControlIT.API/src/Application/Modulos/Commands/CreateModuloCommand.cs:15`
-- `backend/IControlIT.API/src/Application/Modulos/Handlers/CreateModuloHandler.cs:48`
+- `D:\IC2\backend\IControlIT.API/src/Application/Modulos/Commands/CreateModuloCommand.cs:15`
+- `D:\IC2\backend\IControlIT.API/src/Application/Modulos/Handlers/CreateModuloHandler.cs:48`
 
 **Impacto:** Impossível validar RFXXX em ambiente quebrado
 

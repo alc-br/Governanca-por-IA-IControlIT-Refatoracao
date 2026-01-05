@@ -246,7 +246,7 @@ WORKFLOW OBRIGATÓRIO
 ================================================================
 
 1. Executar validador (primeira vez):
-   python D:\IC2\docs\tools\docs\validator-docs.py RFXXX
+   python D:\IC2_Governanca\tools\docs\validator-docs.py RFXXX
 
 2. Abrir auditoria.json:
    D:\IC2\relatorios\rfxxx\auditoria.json
@@ -269,7 +269,7 @@ WORKFLOW OBRIGATÓRIO
    - Adicionar apenas o que está faltando
 
 6. Re-executar validador:
-   python D:\IC2\docs\tools\docs\validator-docs.py RFXXX
+   python D:\IC2_Governanca\tools\docs\validator-docs.py RFXXX
 
 7. Repetir passos 2-6 até:
    conforme = true
@@ -351,13 +351,13 @@ Para validar rastreabilidade, use:
 
 ```bash
 # Cobertura RF → UC → TC
-python D:\IC2\docs\tools\docs\validator-rf-uc.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-rf-uc.py RFXXX
 
 # Separação RF / RL
-python D:\IC2\docs\tools\docs\validator-rl.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-rl.py RFXXX
 
 # Governança completa
-python D:\IC2\docs\tools\docs\validator-governance.py RFXXX
+python D:\IC2_Governanca\tools\docs\validator-governance.py RFXXX
 ```
 
 Ordem de execução obrigatória:

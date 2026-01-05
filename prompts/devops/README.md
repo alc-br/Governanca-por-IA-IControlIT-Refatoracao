@@ -29,6 +29,6 @@ Use esta sequência de prompts para sincronizar STATUS.yaml e user-stories.yaml 
 ## Importante
 
 - Sincronização é automática via scripts Python
-- Scripts leem `docs/tools/devops-sync/config.yaml`
+- Scripts leem `tools/devops-sync/config.yaml`
 - Suporta múltiplas ferramentas (Azure DevOps, Jira, GitHub, GitLab)
 - Usa Adapter Pattern para abstração

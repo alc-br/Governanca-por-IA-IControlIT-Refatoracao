@@ -164,7 +164,7 @@ Sempre que possível:
 
 Antes de qualquer ação, o agente DEVE atualizar:
 
-docs/contracts/DEVOPS-EXECUTION-MANIFEST.md
+contracts/DEVOPS-EXECUTION-MANIFEST.md
 
 
 Declarando:

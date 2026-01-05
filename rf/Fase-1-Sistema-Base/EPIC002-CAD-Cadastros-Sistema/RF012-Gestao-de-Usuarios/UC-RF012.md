@@ -1765,10 +1765,10 @@ GET /api/usuarios?nome='; DROP TABLE Usuarios; --
 - `AuditLogService` ✅ Implementado
 
 ### Frontend
-- `UsersListComponent` ✅ Implementado ([users.component.ts](../../../frontend/icontrolit-app/src/app/modules/admin/management/users/users.component.ts))
-- `UsersService` ✅ Implementado ([users.service.ts](../../../frontend/icontrolit-app/src/app/modules/admin/management/users/users.service.ts))
-- `PermissionService` ✅ Implementado ([permission.service.ts](../../../frontend/icontrolit-app/src/app/core/auth/permission.service.ts))
-- `*hasPermission` directive ✅ Implementado ([has-permission.directive.ts](../../../frontend/icontrolit-app/src/app/core/auth/has-permission.directive.ts))
+- `UsersListComponent` ✅ Implementado ([users.component.ts](../../../D:\IC2\frontend\icontrolit-app/src/app/modules/admin/management/users/users.component.ts))
+- `UsersService` ✅ Implementado ([users.service.ts](../../../D:\IC2\frontend\icontrolit-app/src/app/modules/admin/management/users/users.service.ts))
+- `PermissionService` ✅ Implementado ([permission.service.ts](../../../D:\IC2\frontend\icontrolit-app/src/app/core/auth/permission.service.ts))
+- `*hasPermission` directive ✅ Implementado ([has-permission.directive.ts](../../../D:\IC2\frontend\icontrolit-app/src/app/core/auth/has-permission.directive.ts))
 
 ---
 

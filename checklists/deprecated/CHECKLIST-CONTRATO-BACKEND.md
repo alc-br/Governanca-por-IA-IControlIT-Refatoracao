@@ -7,7 +7,7 @@ Checklist de validação do **Contrato de Execução – Backend**.
 ## 1. Governança Inicial
 
 - [ ] Contrato backend citado explicitamente
-- [ ] ARCHITECTURE.md, CONVENTIONS.md e CLAUDE.md respeitados
+- [ ] ARCHITECTURE.md, CONVENTIONS.md e D:\IC2\CLAUDE.md respeitados
 - [ ] Nenhuma alteração em /docs
 
 ---

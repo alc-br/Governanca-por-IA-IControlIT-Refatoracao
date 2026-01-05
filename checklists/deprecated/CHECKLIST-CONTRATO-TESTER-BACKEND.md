@@ -11,7 +11,7 @@ Este checklist garante que o backend seja **PERFEITO** em relação ao contrato.
 - [ ] Contrato Tester-Backend citado explicitamente
 - [ ] CONTRATO-PADRAO-DESENVOLVIMENTO.md lido
 - [ ] CONTRATO-EXECUCAO-BACKEND.md lido
-- [ ] ARCHITECTURE.md, CONVENTIONS.md e CLAUDE.md respeitados
+- [ ] ARCHITECTURE.md, CONVENTIONS.md e D:\IC2\CLAUDE.md respeitados
 - [ ] Backend já implementado e mergeado em `dev`
 
 ---

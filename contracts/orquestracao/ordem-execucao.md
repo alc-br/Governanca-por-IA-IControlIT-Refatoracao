@@ -16,7 +16,7 @@ Este documento define a **ordem correta de execução** de todos os contratos de
 
 ### 1. CONTRATO-DOCUMENTACAO-ESSENCIAL
 
-**Arquivo:** `/docs/contracts/CONTRATO-DOCUMENTACAO-ESSENCIAL.md`
+**Arquivo:** `contracts/CONTRATO-DOCUMENTACAO-ESSENCIAL.md`
 
 **Quando executar:**
 - Quando existe apenas ideia ou descrição do RF
@@ -45,7 +45,7 @@ Conforme CONTRATO DE DOCUMENTACAO-ESSENCIAL para RFXXX
 
 ### 2. CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES
 
-**Arquivo:** `/docs/contracts/CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES.md`
+**Arquivo:** `contracts/CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES.md`
 
 **Quando executar:**
 - Após RF, UC, MD e WF estarem completos e aprovados
@@ -76,7 +76,7 @@ Conforme CONTRATO DE DOCUMENTACAO-GOVERNADA-TESTES para RFXXX
 
 ### 3. CONTRATO-EXECUCAO-BACKEND
 
-**Arquivo:** `/docs/contracts/CONTRATO-EXECUCAO-BACKEND.md`
+**Arquivo:** `contracts/CONTRATO-EXECUCAO-BACKEND.md`
 
 **Quando executar:**
 - Backend não existe ainda
@@ -108,7 +108,7 @@ Conforme CONTRATO DE EXECUCAO – BACKEND para RFXXX
 
 ### 4. CONTRATO-REGULARIZACAO-BACKEND
 
-**Arquivo:** `/docs/contracts/CONTRATO-REGULARIZACAO-BACKEND.md`
+**Arquivo:** `contracts/CONTRATO-REGULARIZACAO-BACKEND.md`
 
 **Quando executar:**
 - Backend existe mas foi criado antes da governança
@@ -138,7 +138,7 @@ Conforme CONTRATO DE REGULARIZACAO DE BACKEND para RFXXX
 
 ### 5. CONTRATO-EXECUCAO-TESTER-BACKEND
 
-**Arquivo:** `/docs/contracts/CONTRATO-EXECUCAO-TESTER-BACKEND.md`
+**Arquivo:** `contracts/CONTRATO-EXECUCAO-TESTER-BACKEND.md`
 
 **Quando executar:**
 - Backend implementado (#3) ou regularizado (#4)
@@ -170,7 +170,7 @@ Conforme CONTRATO DE EXECUCAO – TESTER-BACKEND para RFXXX
 
 ### 6. CONTRATO-TRANSICAO-BACKEND-PARA-TESTES
 
-**Arquivo:** `/docs/contracts/CONTRATO-TRANSICAO-BACKEND-PARA-TESTES.md`
+**Arquivo:** `contracts/CONTRATO-TRANSICAO-BACKEND-PARA-TESTES.md`
 
 **Quando executar:**
 - Backend foi APROVADO pelo Tester-Backend
@@ -204,7 +204,7 @@ Conforme CONTRATO DE TRANSICAO-BACKEND-PARA-TESTES para RFXXX
 
 ### 7. CONTRATO-EXECUCAO-FRONTEND
 
-**Arquivo:** `/docs/contracts/CONTRATO-EXECUCAO-FRONTEND.md`
+**Arquivo:** `contracts/CONTRATO-EXECUCAO-FRONTEND.md`
 
 **Quando executar:**
 - Backend foi aprovado e mergeado em `dev`
@@ -237,7 +237,7 @@ Conforme CONTRATO DE EXECUCAO – FRONTEND para RFXXX
 
 ### 8. CONTRATO-EXECUCAO-TESTES
 
-**Arquivo:** `/docs/contracts/CONTRATO-EXECUCAO-TESTES.md`
+**Arquivo:** `contracts/CONTRATO-EXECUCAO-TESTES.md`
 
 **Quando executar:**
 - Backend aprovado
@@ -274,7 +274,7 @@ Conforme CONTRATO DE EXECUCAO DE TESTES para RFXXX
 
 ### 9. CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY
 
-**Arquivo:** `/docs/contracts/CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY.md`
+**Arquivo:** `contracts/CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY.md`
 
 **Quando executar:**
 - Testes foram APROVADOS (taxa = 100%)
@@ -305,7 +305,7 @@ Conforme CONTRATO DE TRANSICAO-TESTES-PARA-DEPLOY para RFXXX
 
 ### 10. CONTRATO-EXECUCAO-DEPLOY
 
-**Arquivo:** `/docs/contracts/CONTRATO-EXECUCAO-DEPLOY.md`
+**Arquivo:** `contracts/CONTRATO-EXECUCAO-DEPLOY.md`
 
 **Quando executar:**
 - Aprovação formal para deploy recebida
@@ -338,7 +338,7 @@ Conforme CONTRATO DE EXECUCAO-DEPLOY para RFXXX em [HOM|PRD]
 
 ### 11. CONTRATO-ROLLBACK
 
-**Arquivo:** `/docs/contracts/CONTRATO-ROLLBACK.md`
+**Arquivo:** `contracts/CONTRATO-ROLLBACK.md`
 
 **Quando executar:**
 - Smoke tests falharam (automático)
@@ -378,7 +378,7 @@ Autorizado por: [nome]
 
 ### 12. CONTRATO-DEBUG-CONTROLADO
 
-**Arquivo:** `/docs/contracts/CONTRATO-DEBUG-CONTROLADO.md`
+**Arquivo:** `contracts/CONTRATO-DEBUG-CONTROLADO.md`
 
 **Quando executar:**
 - Bug identificado mas causa desconhecida
@@ -405,7 +405,7 @@ Conforme CONTRATO DE DEBUG para investigar [descrição do erro] em RFXXX
 
 ### 13. CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA
 
-**Arquivo:** `/docs/contracts/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md`
+**Arquivo:** `contracts/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md`
 
 **Quando executar:**
 - Causa raiz identificada (#12)
@@ -432,7 +432,7 @@ Conforme CONTRATO DE MANUTENCAO para corrigir [descrição] em RFXXX
 
 ### 14. CONTRATO-MANUTENCAO-BACKEND
 
-**Arquivo:** `/docs/contracts/CONTRATO-DE-MANUTENCAO-BACKEND.md`
+**Arquivo:** `contracts/CONTRATO-DE-MANUTENCAO-BACKEND.md`
 
 **Quando executar:**
 - Manutenção específica de backend necessária
@@ -456,7 +456,7 @@ Conforme CONTRATO DE MANUTENCAO DE BACKEND para RFXXX
 
 ### 15. CONTRATO-AUDITORIA-CONFORMIDADE
 
-**Arquivo:** `/docs/contracts/CONTRATO-AUDITORIA-CONFORMIDADE.md`
+**Arquivo:** `contracts/CONTRATO-AUDITORIA-CONFORMIDADE.md`
 
 **Quando executar:**
 - Antes de marcar RF como concluído
@@ -483,7 +483,7 @@ Conforme CONTRATO DE AUDITORIA para auditar RFXXX
 
 ### 16. CONTRATO-DEVOPS-GOVERNANCA
 
-**Arquivo:** `/docs/contracts/CONTRATO-DEVOPS-GOVERNANCA.md`
+**Arquivo:** `contracts/CONTRATO-DEVOPS-GOVERNANCA.md`
 
 **Quando executar:**
 - Sincronização com Azure DevOps necessária
@@ -589,7 +589,7 @@ Conforme CONTRATO DE DEVOPS GOVERNANCA para sincronizar RFXXX
 Antes de executar qualquer contrato, validar transição:
 
 ```bash
-python d:/IC2/docs/tools/contract-validator/validate-transitions.py RFXXX PROXIMO-CONTRATO
+python d:/IC2tools/contract-validator/validate-transitions.py RFXXX PROXIMO-CONTRATO
 ```
 
 Exemplo:

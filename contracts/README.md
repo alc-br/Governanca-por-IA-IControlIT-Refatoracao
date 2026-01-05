@@ -15,8 +15,8 @@ Os contratos **NÃO são prompts**. Eles definem:
 O comportamento do agente é governado por:
 1. **`CLAUDE.md`** - Camada superior (regras gerais do projeto)
 2. **Contratos específicos** - Este diretório (regras por tipo de tarefa)
-3. **Checklists** - Validação estruturada (`docs/checklists/`)
-4. **Prompts** - Ativadores simplificados (`docs/prompts/`)
+3. **Checklists** - Validação estruturada (`checklists/`)
+4. **Prompts** - Ativadores simplificados (`prompts/`)
 
 ---
 
@@ -34,7 +34,7 @@ O comportamento do agente é governado por:
 Este diretório está organizado por categoria:
 
 ```
-docs/contracts/
+contracts/
 ├── desenvolvimento/      ← Criação e manutenção de código
 │   ├── execucao/
 │   ├── validacao/
@@ -68,27 +68,27 @@ docs/contracts/
 
 ```
 Conforme <CAMINHO_COMPLETO_DO_CONTRATO> para <RF/TAREFA>.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 **Exemplos corretos:**
 
 ```
 # Adequar frontend
-Conforme docs/contracts/desenvolvimento/execucao/frontend-adequacao.md para RF046.
-Seguir CLAUDE.md.
+Conforme contracts/desenvolvimento/execucao/frontend-adequacao.md para RF046.
+Seguir D:\IC2\CLAUDE.md.
 
 # Validar frontend
-Conforme docs/contracts/desenvolvimento/validacao/frontend.md para RF046.
-Seguir CLAUDE.md.
+Conforme contracts/desenvolvimento/validacao/frontend.md para RF046.
+Seguir D:\IC2\CLAUDE.md.
 
 # Gerar documentação UC
-Conforme docs/contracts/documentacao/geracao/uc.md para RF046.
-Seguir CLAUDE.md.
+Conforme contracts/documentacao/geracao/uc.md para RF046.
+Seguir D:\IC2\CLAUDE.md.
 
 # Auditar conformidade
-Conforme docs/contracts/auditoria/conformidade.md para RF046.
-Seguir CLAUDE.md.
+Conforme contracts/auditoria/conformidade.md para RF046.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 **Se nenhum contrato for citado:**
@@ -190,12 +190,12 @@ CONTRATO-EXECUCAO-TESTER-BACKEND.md
 
 Checklist:
 ```
-/docs/checklists/CHECKLIST-CONTRATO-TESTER-BACKEND.md
+checklists/CHECKLIST-CONTRATO-TESTER-BACKEND.md
 ```
 
 Prompt:
 ```
-/docs/prompts/TESTER-BACKEND.md
+prompts/TESTER-BACKEND.md
 ```
 
 Finalidade:

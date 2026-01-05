@@ -83,8 +83,8 @@ Antes de ativar este contrato, VERIFICAR:
 
 - [ ] `RFXXX.yaml` existe e está validado
 - [ ] Python 3.10+ instalado
-- [ ] Script `docs/tools/docs/validator-rf-uc.py` disponível
-- [ ] Templates oficiais disponíveis: `docs/templates/UC.yaml`, `docs/templates/UC.md`
+- [ ] Script `tools/docs/validator-rf-uc.py` disponível
+- [ ] Templates oficiais disponíveis: `templates/UC.yaml`, `templates/UC.md`
 
 **⚠️ IMPORTANTE:** `UC-RFXXX.yaml` e `UC-RFXXX.md` **NÃO** são pré-requisitos bloqueantes.
 
@@ -104,22 +104,22 @@ Antes de ativar este contrato, VERIFICAR:
 ### INCLUÍDO (Zona de Atuação)
 
 ✅ **Leitura permitida:**
-- `docs/rf/**/RFXXX.yaml` (fonte da verdade)
-- `docs/rf/**/UC-RFXXX.yaml` (arquivo a ser corrigido)
-- `docs/rf/**/UC-RFXXX.md` (arquivo a ser corrigido)
-- `docs/templates/UC.yaml` (template oficial)
-- `docs/templates/UC.md` (template oficial)
+- `rf/**/RFXXX.yaml` (fonte da verdade)
+- `rf/**/UC-RFXXX.yaml` (arquivo a ser corrigido)
+- `rf/**/UC-RFXXX.md` (arquivo a ser corrigido)
+- `templates/UC.yaml` (template oficial)
+- `templates/UC.md` (template oficial)
 - Código legado `ic1_legado/IControlIT/**/*` (referência comportamental)
 
 ✅ **Escrita permitida:**
-- `docs/rf/**/UC-RFXXX.yaml` (correção completa)
-- `docs/rf/**/UC-RFXXX.md` (correção completa)
-- `docs/rf/**/STATUS.yaml` (atualização após validação)
+- `rf/**/UC-RFXXX.yaml` (correção completa)
+- `rf/**/UC-RFXXX.md` (correção completa)
+- `rf/**/STATUS.yaml` (atualização após validação)
 - `.temp_ia/adequacao-uc-RFXXX-diagnostico.md` (diagnóstico inicial) - **OPCIONAL**
 - `.temp_ia/adequacao-uc-RFXXX-relatorio.md` (relatório final de execução) - **OPCIONAL**
 
 ✅ **Execução permitida:**
-- `python docs/tools/docs/validator-rf-uc.py` (validação)
+- `python tools/docs/validator-rf-uc.py` (validação)
 - Scripts Python de migração/diagnóstico
 
 ### EXCLUÍDO (Zona Proibida)
@@ -455,7 +455,7 @@ Antes de QUALQUER ação, criar todo list EXATA:
 
 ```bash
 # Verificar se UC.yaml existe
-if [ -f "docs/rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml" ]; then
+if [ -f "rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml" ]; then
     echo "✅ UC.yaml existe - ADEQUAÇÃO"
     MODO="ADEQUACAO"
 else
@@ -464,7 +464,7 @@ else
 fi
 
 # Verificar se UC.md existe
-if [ -f "docs/rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md" ]; then
+if [ -f "rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md" ]; then
     echo "✅ UC.md existe"
 else
     echo "⚠️ UC.md NÃO existe - CRIAÇÃO DO ZERO"
@@ -476,15 +476,15 @@ fi
 ```bash
 # Backup UC.yaml (se existir)
 if [ "$MODO" = "ADEQUACAO" ]; then
-    cp docs/rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml \
-       docs/rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml.backup-$(date +%Y%m%d-%H%M%S)
+    cp rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml \
+       rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml.backup-$(date +%Y%m%d-%H%M%S)
     echo "✅ Backup criado: UC.yaml.backup"
 fi
 
 # Backup UC.md (se existir)
-if [ -f "docs/rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md" ]; then
-    cp docs/rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md \
-       docs/rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md.backup-$(date +%Y%m%d-%H%M%S)
+if [ -f "rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md" ]; then
+    cp rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md \
+       rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md.backup-$(date +%Y%m%d-%H%M%S)
     echo "✅ Backup criado: UC.md.backup"
 fi
 ```
@@ -503,7 +503,7 @@ if [ "$MODO" = "CRIACAO" ]; then
     echo "      - Entidades órfãs (MD-RFXXX.md)"
     echo "      - Jobs background (keywords)"
     echo "      - Integrações externas (keywords)"
-    echo "   4. Copiar template oficial (docs/templates/UC.yaml)"
+    echo "   4. Copiar template oficial (templates/UC.yaml)"
     echo "   5. Criar UC.yaml do zero com cobertura 100%"
     echo "   6. Criar UC.md narrativo correspondente"
     echo "   7. Validar com validator-rf-uc.py"
@@ -579,9 +579,9 @@ import re
 import yaml
 from pathlib import Path
 
-rf_file = Path('docs/rf/.../RFXXX.yaml')
-uc_file = Path('docs/rf/.../UC-RFXXX.yaml')
-md_file = Path('docs/rf/.../MD-RFXXX.md')
+rf_file = Path('rf/.../RFXXX.yaml')
+uc_file = Path('rf/.../UC-RFXXX.yaml')
+md_file = Path('rf/.../MD-RFXXX.md')
 
 # Ler RF
 with open(rf_file) as f:
@@ -601,7 +601,7 @@ gaps = rns_rf - rns_uc
 non_standard = [rn for rn in rns_uc if not rn.startswith('RN-RF')]
 
 # ✨ NOVO: Detectar nomenclatura de fluxos incorreta (VALIDAÇÃO 3.5 - BLOQUEANTE)
-uc_md_file = Path('docs/rf/.../UC-RFXXX.md')
+uc_md_file = Path('rf/.../UC-RFXXX.md')
 if uc_md_file.exists():
     with open(uc_md_file) as f:
         uc_md_content = f.read()
@@ -917,7 +917,7 @@ def migrate_flow_nomenclature(uc_md_file):
     print(f"✅ Nomenclatura de fluxos migrada em {uc_md_file.name}")
 
 # Executar para o UC do RF
-uc_md_path = Path('docs/rf/.../UC-RFXXX.md')
+uc_md_path = Path('rf/.../UC-RFXXX.md')
 migrate_flow_nomenclature(uc_md_path)
 ```
 
@@ -1057,7 +1057,7 @@ def clean_catalog_codes(uc_file, rf_file):
 
 **Problema:** UC.yaml pode estar desatualizado em relação ao template v2.0.
 
-**Ação:** Comparar estrutura do UC-RFXXX.yaml com `docs/templates/UC.yaml` e adequar.
+**Ação:** Comparar estrutura do UC-RFXXX.yaml com `templates/UC.yaml` e adequar.
 
 **Verificações obrigatórias:**
 
@@ -1142,7 +1142,7 @@ def clean_catalog_codes(uc_file, rf_file):
 
 **Problema:** UC.md pode estar desatualizado em relação ao template v2.0.
 
-**Ação:** Comparar estrutura do UC-RFXXX.md com `docs/templates/UC.md` e adequar.
+**Ação:** Comparar estrutura do UC-RFXXX.md com `templates/UC.md` e adequar.
 
 **Seções obrigatórias:**
 
@@ -1375,9 +1375,9 @@ regras_negocio:
 
 **Validação:** Após criar todos os UCs, executar:
 ```bash
-python docs/tools/docs/validator-rf-uc.py \
-  --rf docs/rf/.../RFXXX.yaml \
-  --uc docs/rf/.../UC-RFXXX.yaml
+python tools/docs/validator-rf-uc.py \
+  --rf rf/.../RFXXX.yaml \
+  --uc rf/.../UC-RFXXX.yaml
 ```
 
 Deve retornar: `✅ Cobertura: 15/15 (100%)`
@@ -1956,9 +1956,9 @@ Deve retornar: `✅ Cobertura: 15/15 (100%)`
 Executar validador e corrigir até exit code 0:
 
 ```bash
-python docs/tools/docs/validator-rf-uc.py \
-  --rf docs/rf/.../RFXXX.yaml \
-  --uc docs/rf/.../UC-RFXXX.yaml
+python tools/docs/validator-rf-uc.py \
+  --rf rf/.../RFXXX.yaml \
+  --uc rf/.../UC-RFXXX.yaml
 
 # Exit code DEVE ser 0
 echo $?  # Deve imprimir: 0
@@ -2065,7 +2065,7 @@ import yaml
 from pathlib import Path
 from datetime import datetime
 
-status_file = Path('docs/rf/.../STATUS.yaml')
+status_file = Path('rf/.../STATUS.yaml')
 
 # Ler STATUS.yaml atual
 with open(status_file) as f:
@@ -2188,9 +2188,9 @@ Criar `.temp_ia/adequacao-uc-RFXXX-relatorio.md`:
 ## VALIDAÇÃO FINAL
 
 ```bash
-$ python docs/tools/docs/validator-rf-uc.py \
-    --rf docs/rf/.../RFXXX.yaml \
-    --uc docs/rf/.../UC-RFXXX.yaml
+$ python tools/docs/validator-rf-uc.py \
+    --rf rf/.../RFXXX.yaml \
+    --uc rf/.../UC-RFXXX.yaml
 
 ✅ Nomenclatura: 15/15 RNs no padrão RN-RFXXX-NNN
 ✅ Cobertura: 15/15 RNs (100%)
@@ -2446,7 +2446,7 @@ Ação: Corrigir gaps antes de aprovar (NÃO é falha técnica)
 **Prompt:**
 ```
 Executar CONTRATO-ADEQUACAO-COMPLETA-UC para RF024.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 **Comportamento:**
@@ -2462,7 +2462,7 @@ Seguir CLAUDE.md.
 **Prompt:**
 ```
 Executar CONTRATO-ADEQUACAO-COMPLETA-UC para RF001-RF066.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 Modo: batch
 ```
 
@@ -2516,7 +2516,7 @@ Modo: batch
 
 ```
 Executar CONTRATO-ADEQUACAO-COMPLETA-UC para RF024.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ### Saída Esperada:

@@ -76,7 +76,7 @@ python -m venv .venv
 .venv\Scripts\activate
 
 # Instalar dependências
-pip install -r docs/tools/docs/requirements.txt
+pip install -r tools/docs/requirements.txt
 ```
 
 ### Verificar Instalação
@@ -86,7 +86,7 @@ pip install -r docs/tools/docs/requirements.txt
 .venv\Scripts\python.exe docs\tools\docs\validator-docs.py --help
 
 # Linux/Mac (com venv)
-.venv/bin/python docs/tools/docs/validator-docs.py --help
+.venv/bin/python tools/docs/validator-docs.py --help
 ```
 
 ## Uso
@@ -110,7 +110,7 @@ docs\tools\docs\run-validator.bat --fase 2
 ### Validar um RF específico
 
 ```bash
-python docs/tools/docs/validator-docs.py RF001
+python tools/docs/validator-docs.py RF001
 ```
 
 **Saída:**
@@ -120,7 +120,7 @@ python docs/tools/docs/validator-docs.py RF001
 ### Validar uma Fase completa
 
 ```bash
-python docs/tools/docs/validator-docs.py --fase 2
+python tools/docs/validator-docs.py --fase 2
 ```
 
 **Saída:**
@@ -130,7 +130,7 @@ python docs/tools/docs/validator-docs.py --fase 2
 ### Validar TODOS os RFs
 
 ```bash
-python docs/tools/docs/validator-docs.py --all
+python tools/docs/validator-docs.py --all
 ```
 
 **Saída:**
@@ -140,7 +140,7 @@ python docs/tools/docs/validator-docs.py --all
 ### Personalizar saída
 
 ```bash
-python docs/tools/docs/validator-docs.py --all \
+python tools/docs/validator-docs.py --all \
   --output relatorios/2025-12-31-validacao-completa.json \
   --markdown relatorios/2025-12-31-validacao-completa.md
 ```
@@ -313,7 +313,7 @@ O validador é **auto-adaptável**:
 # .github/workflows/validate-docs.yml
 - name: Validar documentação
   run: |
-    python docs/tools/docs/validator-docs.py --all --output validation.json
+    python tools/docs/validator-docs.py --all --output validation.json
     # Falha se houver gaps críticos
     python -c "
     import json, sys
@@ -336,7 +336,7 @@ RF_CHANGED=$(git diff --cached --name-only | grep -oP 'RF\d+' | head -1)
 
 if [ ! -z "$RF_CHANGED" ]; then
     echo "Validando $RF_CHANGED..."
-    python docs/tools/docs/validator-docs.py $RF_CHANGED
+    python tools/docs/validator-docs.py $RF_CHANGED
 fi
 ```
 
@@ -345,7 +345,7 @@ fi
 ```bash
 # Validar todos os RFs
 cd D:\IC2
-python docs/tools/docs/validator-docs.py --all \
+python tools/docs/validator-docs.py --all \
   --output relatorios/2025-12-31-validacao-COMPLETA.json \
   --markdown relatorios/2025-12-31-validacao-COMPLETA.md
 
@@ -369,7 +369,7 @@ python docs/tools/docs/validator-docs.py --all \
 
 **Solução:** Verificar se as pastas seguem o padrão:
 ```
-docs/rf/Fase-X-*/EPIC*/RF*-*/
+rf/Fase-X-*/EPIC*/RF*-*/
 ```
 
 ### "UnicodeEncodeError" no Windows
@@ -404,7 +404,7 @@ Em caso de dúvidas ou problemas:
 1. Ver exemplos de uso neste README
 2. Analisar JSON de saída para detalhes
 3. Verificar logs de execução
-4. Consultar templates oficiais em `docs/templates/`
+4. Consultar templates oficiais em `templates/`
 
 ---
 

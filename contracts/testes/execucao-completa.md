@@ -36,12 +36,12 @@ Este contrato **EXECUTA TODOS OS TESTES** de um RF automaticamente, incluindo:
 
 Este contrato é ativado quando a solicitação mencionar explicitamente:
 
-> **"Conforme docs/contracts/testes/execucao-completa.md para RFXXX"**
+> **"Conforme contracts/testes/execucao-completa.md para RFXXX"**
 
 Exemplo:
 ```
-Conforme docs/contracts/testes/execucao-completa.md para RF006.
-Seguir CLAUDE.md.
+Conforme contracts/testes/execucao-completa.md para RF006.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -57,7 +57,7 @@ Exemplo de solicitação simplificada:
 
 **O agente DEVE:**
 
-1. **LER o prompt correspondente** (`docs/prompts/testes/execucao-completa.md`)
+1. **LER o prompt correspondente** (`prompts/testes/execucao-completa.md`)
 2. **GERAR o prompt correto formatado** conforme template do prompt
 3. **EXIBIR o prompt gerado para o usuário** (para validação)
 4. **EXECUTAR imediatamente** (não esperar confirmação)
@@ -67,10 +67,10 @@ Exemplo de solicitação simplificada:
 Quando o usuário solicitar execução de testes para um RF, o agente deve gerar:
 
 ```markdown
-Executar testes automatizados do [RFXXX] conforme docs/contracts/testes/execucao-completa.md.
+Executar testes automatizados do [RFXXX] conforme contracts/testes/execucao-completa.md.
 
 Modo governança rígida. Não negociar escopo. Não extrapolar.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 Preste MUITA atenção ao checklist obrigatório, pois é essencial que você o siga.
 
@@ -114,7 +114,7 @@ RESPONSABILIDADE DO AGENTE:
 5. Executar testes backend (dotnet test)
 6. Executar testes frontend (npm run test)
 7. VERIFICAR SE SPECS PLAYWRIGHT EXISTEM:
-   - Se NÃO: executar geração automática (docs/prompts/testes/geracao-e2e-playwright.md)
+   - Se NÃO: executar geração automática (prompts/testes/geracao-e2e-playwright.md)
    - Se SIM: validar cobertura completa de TC-E2E
 8. Executar testes E2E (npm run e2e)
 9. Executar testes de segurança
@@ -136,7 +136,7 @@ NÃO EXISTE APROVAÇÃO COM RESSALVAS.
 ### Regras de Geração
 
 1. **Substituir `[RFXXX]` pelo RF correto** (ex: RF006)
-2. **Copiar o template do prompt** (`docs/prompts/testes/execucao-completa.md`)
+2. **Copiar o template do prompt** (`prompts/testes/execucao-completa.md`)
 3. **Exibir prompt completo** antes de executar
 4. **Não esperar confirmação** (executar imediatamente)
 
@@ -149,7 +149,7 @@ Para o RF006 execute o docs\prompts\testes\execucao-completa.md
 
 **O que o agente FAZ:**
 
-1. ✅ Lê `docs/prompts/testes/execucao-completa.md`
+1. ✅ Lê `prompts/testes/execucao-completa.md`
 2. ✅ Gera prompt substituindo `RFXXX` → `RF006`
 3. ✅ Exibe: "Prompt gerado para RF006 (executando imediatamente):"
 4. ✅ Exibe prompt completo formatado
@@ -242,10 +242,10 @@ RESPONSABILIDADE: INFRAESTRUTURA (não é erro de código)
 # - documentacao.tc = true
 
 # Verificar arquivos
-# - backend/IControlIT.API/IControlIT.API.sln existe
-# - frontend/icontrolit-app/package.json existe
-# - docs/rf/.../MT-RFXXX.yaml existe
-# - docs/rf/.../TC-RFXXX.yaml existe
+# - D:\IC2\backend\IControlIT.API/IControlIT.API.sln existe
+# - D:\IC2\frontend\icontrolit-app/package.json existe
+# - rf/.../MT-RFXXX.yaml existe
+# - rf/.../TC-RFXXX.yaml existe
 ```
 
 **Se qualquer validação FALHAR:** BLOQUEIO TOTAL
@@ -349,13 +349,13 @@ Start-Process -NoNewWindow -FilePath "npm" -ArgumentList "start"
 
 1. Verificar se Program.cs tem Task.Run() em InitialiseDatabaseAsync
 2. Se NÃO tiver, backend vai travar. Corrigir conforme:
-   - Linha 216-232 de backend/IControlIT.API/src/Web/Program.cs
+   - Linha 216-232 de D:\IC2\backend\IControlIT.API/src/Web/Program.cs
    - DEVE usar Task.Run() para executar seeds em BACKGROUND
    - Nunca usar await direto (bloqueia startup)
 
 3. Se backend continuar travado após 30s:
    - Matar processo: `Stop-Process -Name "IControlIT.API.Web" -Force`
-   - Limpar artifacts: `Remove-Item backend/IControlIT.API/artifacts -Recurse -Force`
+   - Limpar artifacts: `Remove-Item D:\IC2\backend\IControlIT.API/artifacts -Recurse -Force`
    - Rebuild: `dotnet build --no-incremental`
    - Reiniciar: `dotnet run`
 
@@ -422,10 +422,10 @@ npm run test
 
 ```bash
 # 1. Verificar pasta de specs do RF
-ls frontend/icontrolit-app/e2e/specs/RFXXX/
+ls D:\IC2\frontend\icontrolit-app/e2e/specs/RFXXX/
 
 # 2. Verificar arquivo de dados MT
-ls frontend/icontrolit-app/e2e/data/MT-RFXXX.data.ts
+ls D:\IC2\frontend\icontrolit-app/e2e/data/MT-RFXXX.data.ts
 
 # 3. Ler TC-RFXXX.yaml e contar TC-E2E
 # Exemplo: TC-RF006-E2E-001, TC-RF006-E2E-002, etc.
@@ -449,7 +449,7 @@ test_cases:
 
 **Deve existir:**
 ```
-frontend/icontrolit-app/e2e/specs/RF006/
+D:\IC2\frontend\icontrolit-app/e2e/specs/RF006/
 ├── TC-RF006-E2E-001.spec.ts
 ├── TC-RF006-E2E-002.spec.ts
 └── TC-RF006-E2E-003.spec.ts
@@ -463,15 +463,15 @@ frontend/icontrolit-app/e2e/specs/RF006/
 
 1. **Ativar contrato de geração de specs:**
    ```
-   Conforme docs/contracts/testes/geracao-testes-e2e-playwright.md para RFXXX.
-   Seguir CLAUDE.md.
+   Conforme contracts/testes/geracao-testes-e2e-playwright.md para RFXXX.
+   Seguir D:\IC2\CLAUDE.md.
    ```
 
 2. **O contrato de geração irá:**
    - Ler TC-RFXXX.yaml e MT-RFXXX.yaml
-   - Gerar `frontend/e2e/data/MT-RFXXX.data.ts`
-   - Gerar `frontend/e2e/helpers/rf-helpers.ts`
-   - Gerar `frontend/e2e/specs/RFXXX/*.spec.ts` (1 spec por TC-E2E)
+   - Gerar `D:\IC2\frontend\e2e/data/MT-RFXXX.data.ts`
+   - Gerar `D:\IC2\frontend\e2e/helpers/rf-helpers.ts`
+   - Gerar `D:\IC2\frontend\e2e/specs/RFXXX/*.spec.ts` (1 spec por TC-E2E)
    - Validar cobertura 100% de TC-E2E
 
 3. **SOMENTE prosseguir** se geração aprovada 100%
@@ -649,7 +649,7 @@ O prompt de correção **DEVE** conter:
 ```markdown
 # PROMPT PARA CORREÇÃO DE FALHAS RFXXX
 
-Conforme docs/contracts/desenvolvimento/execucao/manutencao/manutencao-controlada.md,
+Conforme contracts/desenvolvimento/execucao/manutencao/manutencao-controlada.md,
 corrija os seguintes erros CRÍTICOS identificados na Execução [N] de testes do RFXXX:
 
 ## CONTEXTO DA EXECUÇÃO
@@ -736,7 +736,7 @@ corrija os seguintes erros CRÍTICOS identificados na Execução [N] de testes d
 3. **FOCO:** [Áreas específicas a corrigir]
 
 Modo governança rígida. Não negociar escopo. Não extrapolar.
-Seguir CLAUDE.md e docs/contracts/desenvolvimento/execucao/manutencao/manutencao-controlada.md.
+Seguir D:\IC2\CLAUDE.md e contracts/desenvolvimento/execucao/manutencao/manutencao-controlada.md.
 ```
 
 #### Regras para Geração do Prompt
@@ -942,10 +942,10 @@ Para cada teste REPROVADO, criar:
 - Resposta esperada: { ... }
 
 ## PRÓXIMO PASSO
-Corrigir via docs/contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md:
+Corrigir via contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md:
 
 \```
-Conforme docs/contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md,
+Conforme contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md,
 corrija o seguinte erro no [backend/frontend] de RFXXX:
 
 ERRO IDENTIFICADO:

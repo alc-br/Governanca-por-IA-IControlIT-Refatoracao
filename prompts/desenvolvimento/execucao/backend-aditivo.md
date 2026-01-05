@@ -6,15 +6,15 @@ Ele fica nesse endereço \docs\rf\Fase*\EPIC*\RF*
 
 ---
 
-Executar **BACKEND ADITIVO** para o RF informado acima conforme docs/contracts/desenvolvimento/execucao/backend-aditivo.md.
-Seguir CLAUDE.md.
+Executar **BACKEND ADITIVO** para o RF informado acima conforme D:/IC2_Governanca/contracts/desenvolvimento/execucao/backend-aditivo.md.
+Seguir D:\IC2\CLAUDE.md.
 
 ## 📋 PRÉ-REQUISITOS OBRIGATÓRIOS
 
 Antes de executar este prompt, você **DEVE** ter:
 
-1. ✅ Executado aditivo de documentação: `docs/prompts/documentacao/execucao/aditivo.md`
-2. ✅ Validado aditivo de documentação: `docs/prompts/documentacao/validacao/aditivo.md` (APROVADO)
+1. ✅ Executado aditivo de documentação: `prompts/documentacao/execucao/aditivo.md`
+2. ✅ Validado aditivo de documentação: `prompts/documentacao/validacao/aditivo.md` (APROVADO)
 3. ✅ Relatório de delta existe: `.temp_ia/aditivo-RFXXX-delta-report.md`
 4. ✅ Arquivos `_old` existem (10 arquivos)
 5. ✅ Branch correto: `feature/RFXXX-aditivo-*`
@@ -310,7 +310,7 @@ Build, testes e migrations passaram sem erros.
 ## 🔄 PRÓXIMOS PASSOS
 
 **Após aprovação deste prompt:**
-1. Executar validação backend: `docs/contracts/desenvolvimento/validacao/backend-aditivo.md`
+1. Executar validação backend: `D:/IC2_Governanca/contracts/desenvolvimento/validacao/backend-aditivo.md`
 2. Se aprovado: Executar frontend-aditivo
 3. Se aprovado: Commit e merge
 
@@ -336,6 +336,6 @@ Build, testes e migrations passaram sem erros.
 
 ---
 
-**Contrato:** docs/contracts/desenvolvimento/execucao/backend-aditivo.md
+**Contrato:** D:/IC2_Governanca/contracts/desenvolvimento/execucao/backend-aditivo.md
 **Modo:** Governança rígida
 **Aprovação:** Build PASS + Testes PASS + Relatório completo

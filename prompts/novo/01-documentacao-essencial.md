@@ -10,6 +10,6 @@ Criar documentação completa do **RF-XXX** conforme CONTRATO-DOCUMENTACAO-ESSEN
 
 **Contrato ativado:** CONTRATO-DOCUMENTACAO-ESSENCIAL
 
-**Checklist:** docs/checklists/checklist-documentacao-essencial.yaml
+**Checklist:** checklists/checklist-documentacao-essencial.yaml
 
 **Agente responsável:** architect (icontrolit-architect)

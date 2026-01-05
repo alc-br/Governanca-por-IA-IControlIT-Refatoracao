@@ -80,13 +80,13 @@ Este contrato **adiciona novas funcionalidades a um RF existente** de forma incr
 
 Este contrato é ativado quando a solicitação mencionar explicitamente:
 
-> **"Conforme docs/contracts/documentacao/execucao/aditivo.md para RFXXX"**
+> **"Conforme contracts/documentacao/execucao/aditivo.md para RFXXX"**
 
 Exemplo:
 ```
-Conforme docs/contracts/documentacao/execucao/aditivo.md para RF028.
+Conforme contracts/documentacao/execucao/aditivo.md para RF028.
 Adicionar funcionalidade de "Exportação em PDF".
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -382,7 +382,7 @@ Ao final da execução, o validador VAL-0 verificará:
 ---
 
 **Mantido por:** Agente de Execução ADITIVO
-**Governado por:** CLAUDE.md
+**Governado por:** D:\IC2\CLAUDE.md
 ```
 
 #### 0.3. Checkpoint PASSO 0
@@ -529,7 +529,7 @@ fi
    - Adicionar UCs em `UC-RFXXX.md` e `UC-RFXXX.yaml`
 
 4. **Validar cobertura**:
-   - Executar: `python docs/tools/docs/validator-rf-uc.py RFXXX`
+   - Executar: `python tools/docs/validator-rf-uc.py RFXXX`
    - Exit code DEVE ser 0 (100% de cobertura)
 
 **Checkpoint:**
@@ -888,7 +888,7 @@ Versões `_old` criadas para rastreabilidade.
 ---
 
 **Próximos passos:**
-1. Executar validação completa: `docs/prompts/documentacao/validacao/aditivo.md`
+1. Executar validação completa: `prompts/documentacao/validacao/aditivo.md`
 2. Se aprovado: Commit e merge
 3. Executar backend-aditivo para implementar código
 4. Executar frontend-aditivo para implementar UI
@@ -938,9 +938,9 @@ documentacao:
 
 **Solicitação:**
 ```
-Conforme docs/contracts/documentacao/execucao/aditivo.md para RF028.
+Conforme contracts/documentacao/execucao/aditivo.md para RF028.
 Adicionar funcionalidade de "Exportação em PDF".
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 **Execução:**
@@ -983,4 +983,4 @@ Seguir CLAUDE.md.
 ---
 
 **Mantido por:** Time de Arquitetura IControlIT
-**Governado por:** CLAUDE.md
+**Governado por:** D:\IC2\CLAUDE.md

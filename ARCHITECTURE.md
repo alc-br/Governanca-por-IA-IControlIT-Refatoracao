@@ -273,7 +273,7 @@ O **IControlIT** é uma plataforma corporativa de gestão de ativos de TI e Tele
 ### 4.2 Estrutura de Diretórios - Backend
 
 ```
-backend/IControlIT.API/src/
+D:\IC2\backend\IControlIT.API/src/
 │
 ├── Domain/                          # Núcleo do domínio (zero dependências)
 │   ├── Entities/                    # Entidades de negócio
@@ -315,7 +315,7 @@ backend/IControlIT.API/src/
 ### 4.3 Estrutura de Diretórios - Frontend
 
 ```
-frontend/icontrolit-app/src/app/
+D:\IC2\frontend\icontrolit-app/src/app/
 │
 ├── core/                            # Serviços singleton (providedIn: 'root')
 │   ├── auth/                        # AuthService, AuthGuard, AuthInterceptor

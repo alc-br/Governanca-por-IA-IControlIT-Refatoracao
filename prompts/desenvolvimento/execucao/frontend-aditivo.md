@@ -6,17 +6,17 @@ Ele fica nesse endereço \docs\rf\Fase*\EPIC*\RF*
 
 ---
 
-Executar **FRONTEND ADITIVO** para o RF informado acima conforme docs/contracts/desenvolvimento/execucao/frontend-aditivo.md.
-Seguir CLAUDE.md.
+Executar **FRONTEND ADITIVO** para o RF informado acima conforme D:/IC2_Governanca/contracts/desenvolvimento/execucao/frontend-aditivo.md.
+Seguir D:\IC2\CLAUDE.md.
 
 ## 📋 PRÉ-REQUISITOS OBRIGATÓRIOS
 
 Antes de executar este prompt, você **DEVE** ter:
 
-1. ✅ Executado aditivo de documentação: `docs/prompts/documentacao/execucao/aditivo.md`
-2. ✅ Validado aditivo de documentação: `docs/prompts/documentacao/validacao/aditivo.md` (APROVADO)
-3. ✅ Executado backend aditivo: `docs/prompts/desenvolvimento/execucao/backend-aditivo.md`
-4. ✅ Validado backend aditivo: `docs/contracts/desenvolvimento/validacao/backend-aditivo.md` (APROVADO)
+1. ✅ Executado aditivo de documentação: `prompts/documentacao/execucao/aditivo.md`
+2. ✅ Validado aditivo de documentação: `prompts/documentacao/validacao/aditivo.md` (APROVADO)
+3. ✅ Executado backend aditivo: `prompts/desenvolvimento/execucao/backend-aditivo.md`
+4. ✅ Validado backend aditivo: `D:/IC2_Governanca/contracts/desenvolvimento/validacao/backend-aditivo.md` (APROVADO)
 5. ✅ Endpoints backend disponíveis
 6. ✅ Branch correto: `feature/RFXXX-aditivo-*`
 
@@ -397,12 +397,12 @@ Build, testes e funcionamento manual passaram sem erros.
 ## 🔄 PRÓXIMOS PASSOS
 
 **Após aprovação deste prompt:**
-1. Executar validação frontend: `docs/contracts/desenvolvimento/validacao/frontend-aditivo.md`
+1. Executar validação frontend: `D:/IC2_Governanca/contracts/desenvolvimento/validacao/frontend-aditivo.md`
 2. Se aprovado: Commit e merge
 3. Executar testes E2E completos
 
 ---
 
-**Contrato:** docs/contracts/desenvolvimento/execucao/frontend-aditivo.md
+**Contrato:** D:/IC2_Governanca/contracts/desenvolvimento/execucao/frontend-aditivo.md
 **Modo:** Governança rígida
 **Aprovação:** Build PASS + Testes PASS + Relatório completo

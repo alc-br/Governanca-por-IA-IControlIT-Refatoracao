@@ -102,20 +102,20 @@ Use para adicionar novas funcionalidades a um RF existente de forma incremental 
 
 | Prompt | Contrato | Checklist | Agente |
 |--------|----------|-----------|--------|
-| documentacao/execucao/rf-criacao.md | docs/contracts/documentacao/execucao/rf-criacao.md | docs/checklists/documentacao/geracao/rf.yaml | architect |
-| documentacao/execucao/uc-criacao.md | docs/contracts/documentacao/execucao/uc-criacao.md | docs/checklists/documentacao/geracao/uc.yaml | architect |
-| documentacao/execucao/wf-criacao.md | docs/contracts/documentacao/execucao/wf-criacao.md | docs/checklists/documentacao/geracao/wf.yaml | architect |
-| documentacao/execucao/md-criacao.md | docs/contracts/documentacao/execucao/md-criacao.md | docs/checklists/documentacao/geracao/md.yaml | architect |
-| documentacao/execucao/mt-tc-criacao.md | docs/contracts/documentacao/execucao/mt-tc-criacao.md | - | architect |
-| **documentacao/execucao/aditivo.md** | **docs/contracts/documentacao/execucao/aditivo.md** | **docs/checklists/documentacao/geracao/aditivo.yaml** | **architect** |
-| documentacao/validacao/rf.md | docs/contracts/documentacao/validacao/rf.md | - | validator |
-| documentacao/validacao/uc.md | docs/contracts/documentacao/validacao/uc.md | - | validator |
-| documentacao/validacao/wf-md.md | docs/contracts/documentacao/validacao/wf-md.md | - | validator |
-| **documentacao/validacao/aditivo.md** | **docs/contracts/documentacao/validacao/aditivo.md** | - | **validator** |
-| **desenvolvimento/execucao/backend-aditivo.md** | **docs/contracts/desenvolvimento/execucao/backend-aditivo.md** | - | **developer** |
-| **desenvolvimento/execucao/frontend-aditivo.md** | **docs/contracts/desenvolvimento/execucao/frontend-aditivo.md** | - | **developer** |
-| **desenvolvimento/validacao/backend-aditivo.md** | **docs/contracts/desenvolvimento/validacao/backend-aditivo.md** | - | **validator** |
-| **desenvolvimento/validacao/frontend-aditivo.md** | **docs/contracts/desenvolvimento/validacao/frontend-aditivo.md** | - | **validator** |
+| documentacao/execucao/rf-criacao.md | D:/IC2_Governanca/contracts/documentacao/execucao/rf-criacao.md | checklists/documentacao/geracao/rf.yaml | architect |
+| documentacao/execucao/uc-criacao.md | D:/IC2_Governanca/contracts/documentacao/execucao/uc-criacao.md | checklists/documentacao/geracao/uc.yaml | architect |
+| documentacao/execucao/wf-criacao.md | D:/IC2_Governanca/contracts/documentacao/execucao/wf-criacao.md | checklists/documentacao/geracao/wf.yaml | architect |
+| documentacao/execucao/md-criacao.md | D:/IC2_Governanca/contracts/documentacao/execucao/md-criacao.md | checklists/documentacao/geracao/md.yaml | architect |
+| documentacao/execucao/mt-tc-criacao.md | contracts/documentacao/execucao/mt-tc-criacao.md | - | architect |
+| **documentacao/execucao/aditivo.md** | **D:/IC2_Governanca/contracts/documentacao/execucao/aditivo.md** | **checklists/documentacao/geracao/aditivo.yaml** | **architect** |
+| documentacao/validacao/rf.md | D:/IC2_Governanca/contracts/documentacao/validacao/rf.md | - | validator |
+| documentacao/validacao/uc.md | D:/IC2_Governanca/contracts/documentacao/validacao/uc.md | - | validator |
+| documentacao/validacao/wf-md.md | contracts/documentacao/validacao/wf-md.md | - | validator |
+| **documentacao/validacao/aditivo.md** | **D:/IC2_Governanca/contracts/documentacao/validacao/aditivo.md** | - | **validator** |
+| **desenvolvimento/execucao/backend-aditivo.md** | **D:/IC2_Governanca/contracts/desenvolvimento/execucao/backend-aditivo.md** | - | **developer** |
+| **desenvolvimento/execucao/frontend-aditivo.md** | **D:/IC2_Governanca/contracts/desenvolvimento/execucao/frontend-aditivo.md** | - | **developer** |
+| **desenvolvimento/validacao/backend-aditivo.md** | **D:/IC2_Governanca/contracts/desenvolvimento/validacao/backend-aditivo.md** | - | **validator** |
+| **desenvolvimento/validacao/frontend-aditivo.md** | **D:/IC2_Governanca/contracts/desenvolvimento/validacao/frontend-aditivo.md** | - | **validator** |
 | novo/01-documentacao-essencial.md | CONTRATO-DOCUMENTACAO-ESSENCIAL | checklist-documentacao-essencial.yaml | architect |
 | novo/02-backend.md | CONTRATO-EXECUCAO-BACKEND | checklist-backend.yaml | developer |
 | novo/03-validar-contrato.md | CONTRATO-EXECUCAO-TESTER-BACKEND | checklist-tester-backend.yaml | tester |
@@ -170,8 +170,8 @@ Use para adicionar novas funcionalidades a um RF existente de forma incremental 
 
 ---
 
-**Para mais detalhes sobre contratos, consulte:** `docs/contracts/README.md`
+**Para mais detalhes sobre contratos, consulte:** `contracts/README.md`
 
-**Para mais detalhes sobre checklists, consulte:** `docs/checklists/README.md`
+**Para mais detalhes sobre checklists, consulte:** `checklists/README.md`
 
 **Para mais detalhes sobre agentes, consulte:** `.claude/agents/README.md`

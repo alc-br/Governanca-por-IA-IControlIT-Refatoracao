@@ -1,6 +1,6 @@
 ﻿# Sincronizar User Stories com Azure DevOps
 
-Sincronizar user-stories.yaml do **RF-XXX** com Azure DevOps conforme docs/contracts/devops/CONTRATO-DEVOPS-GOVERNANCA.md.
+Sincronizar user-stories.yaml do **RF-XXX** com Azure DevOps conforme contracts/devops/CONTRATO-DEVOPS-GOVERNANCA.md.
 
 **RF:** [Especificar RF, ex: RF-027]
 
@@ -8,9 +8,9 @@ Sincronizar user-stories.yaml do **RF-XXX** com Azure DevOps conforme docs/contr
 
 **Contrato ativado:** CONTRATO-DEVOPS-GOVERNANCA
 
-**Checklist:** docs/checklists/checklist-devops.yaml
+**Checklist:** checklists/checklist-devops.yaml
 
-**Script:** `python docs/tools/devops-sync/core/sync-user-stories.py RF-XXX`
+**Script:** `python tools/devops-sync/core/sync-user-stories.py RF-XXX`
 
 **Objetivo:**
 - Ler user-stories.yaml do RF

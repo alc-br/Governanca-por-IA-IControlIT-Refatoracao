@@ -1,7 +1,7 @@
-Executar geracao e execucao de testes E2E Playwright do RFXXX conforme docs/contracts/testes/geracao-testes-e2e-playwright.md.
+Executar geracao e execucao de testes E2E Playwright do RFXXX conforme D:/IC2_Governanca/contracts/testes/geracao-testes-e2e-playwright.md.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 

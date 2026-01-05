@@ -6,8 +6,8 @@ Ele fica nesse endereço \docs\rf\Fase*\EPIC*\RF*
 
 ---
 
-Executar **VALIDADOR BACKEND ADITIVO** para o RF informado acima conforme docs/contracts/desenvolvimento/validacao/backend-aditivo.md.
-Seguir CLAUDE.md.
+Executar **VALIDADOR BACKEND ADITIVO** para o RF informado acima conforme D:/IC2_Governanca/contracts/desenvolvimento/validacao/backend-aditivo.md.
+Seguir D:\IC2\CLAUDE.md.
 
 ## ⚠️ MODO READ-ONLY
 
@@ -193,7 +193,7 @@ dotnet test
 ## 🔄 PRÓXIMOS PASSOS
 
 **Se APROVADO:**
-- Executar frontend-aditivo: `docs/prompts/desenvolvimento/execucao/frontend-aditivo.md`
+- Executar frontend-aditivo: `prompts/desenvolvimento/execucao/frontend-aditivo.md`
 
 **Se REPROVADO:**
 - Listar TODOS os gaps encontrados
@@ -263,6 +263,6 @@ Nenhum gap identificado.
 
 ---
 
-**Contrato:** docs/contracts/desenvolvimento/validacao/backend-aditivo.md
+**Contrato:** D:/IC2_Governanca/contracts/desenvolvimento/validacao/backend-aditivo.md
 **Modo:** READ-ONLY
 **Aprovação:** 10/10 PASS ou REPROVADO

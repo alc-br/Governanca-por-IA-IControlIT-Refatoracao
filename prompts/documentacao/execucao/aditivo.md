@@ -6,8 +6,8 @@ Ele fica nesse endereço \docs\rf\Fase*\EPIC*\RF*
 
 ---
 
-Executar **ADITIVO** para o RF informado acima conforme docs/contracts/documentacao/execucao/aditivo.md.
-Seguir CLAUDE.md.
+Executar **ADITIVO** para o RF informado acima conforme D:/IC2_Governanca/contracts/documentacao/execucao/aditivo.md.
+Seguir D:\IC2\CLAUDE.md.
 
 ## 📋 FUNCIONALIDADE A ADICIONAR
 
@@ -60,7 +60,7 @@ exportem a lista de clientes em formato PDF com logo da empresa e filtros aplica
 - Criar novos UCs cobrindo 100% da nova funcionalidade
 - Garantir que TODAS as novas RNs estejam cobertas
 - Sincronizar UC-RFXXX.md ↔ UC-RFXXX.yaml
-- Validar: `python docs/tools/docs/validator-rf-uc.py RFXXX` (exit code 0)
+- Validar: `python tools/docs/validator-rf-uc.py RFXXX` (exit code 0)
 
 **Checkpoint:** ✅ UCs criados cobrindo 100% do delta RF
 
@@ -223,10 +223,10 @@ exportem a lista de clientes em formato PDF com logo da empresa e filtros aplica
 ## 🔄 PRÓXIMOS PASSOS
 
 **Após aprovação deste prompt:**
-1. Executar validação: `docs/prompts/documentacao/validacao/aditivo.md`
+1. Executar validação: `prompts/documentacao/validacao/aditivo.md`
 2. Se aprovado: Commit e merge
-3. Executar backend-aditivo: `docs/contracts/desenvolvimento/execucao/backend-aditivo.md`
-4. Executar frontend-aditivo: `docs/contracts/desenvolvimento/execucao/frontend-aditivo.md`
+3. Executar backend-aditivo: `D:/IC2_Governanca/contracts/desenvolvimento/execucao/backend-aditivo.md`
+4. Executar frontend-aditivo: `D:/IC2_Governanca/contracts/desenvolvimento/execucao/frontend-aditivo.md`
 
 ---
 
@@ -242,8 +242,8 @@ exportem a lista de clientes em formato PDF com logo da empresa e filtros aplica
 
 ---
 
-Conforme docs/contracts/documentacao/execucao/aditivo.md para RF028.
-Seguir CLAUDE.md.
+Conforme D:/IC2_Governanca/contracts/documentacao/execucao/aditivo.md para RF028.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 **Resultado esperado:**
@@ -258,6 +258,6 @@ Seguir CLAUDE.md.
 
 ---
 
-**Contrato:** docs/contracts/documentacao/execucao/aditivo.md
+**Contrato:** D:/IC2_Governanca/contracts/documentacao/execucao/aditivo.md
 **Modo:** Governança rígida
 **Aprovação:** 100% ou REPROVADO

@@ -15,13 +15,13 @@ REGRA DE DETECÇÃO AUTOMÁTICA:
 
 IF execucao.backend está VAZIO, NULL ou NÃO EXISTE:
   → BACKEND NOVO (primeira vez)
-  → LER E EXECUTAR: docs/contracts/desenvolvimento/execucao/backend-criacao.md
+  → LER E EXECUTAR: D:/IC2_Governanca/contracts/desenvolvimento/execucao/backend-criacao.md
   → Criar backend completo do zero
   → NÃO PERGUNTAR, EXECUTAR DIRETAMENTE
 
 ELSE IF execucao.backend JÁ TEM DADOS (data, status, commit, etc.):
   → ADEQUAÇÃO (backend já existe)
-  → LER E EXECUTAR: docs/contracts/desenvolvimento/execucao/backend-adequacao.md
+  → LER E EXECUTAR: D:/IC2_Governanca/contracts/desenvolvimento/execucao/backend-adequacao.md
   → Ajustar backend existente
   → NÃO PERGUNTAR, EXECUTAR DIRETAMENTE
 
@@ -34,17 +34,17 @@ IMPORTANTE:
 
 EXEMPLO DE DECLARAÇÃO:
 "STATUS.yaml verificado: execucao.backend está vazio → BACKEND NOVO detectado.
-Executando docs/contracts/desenvolvimento/execucao/backend-criacao.md automaticamente."
+Executando D:/IC2_Governanca/contracts/desenvolvimento/execucao/backend-criacao.md automaticamente."
 
 OU
 
 "STATUS.yaml verificado: execucao.backend tem dados → ADEQUAÇÃO detectada.
-Executando docs/contracts/desenvolvimento/execucao/backend-adequacao.md automaticamente."
+Executando D:/IC2_Governanca/contracts/desenvolvimento/execucao/backend-adequacao.md automaticamente."
 
 ---
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 

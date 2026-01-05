@@ -388,20 +388,20 @@ Após correção de TODOS os gaps críticos e importantes, validar:
 ### Leitura
 
 **Documentação:**
-- `docs/rf/**/*.md` (RF, UC, MD, WF, TC)
-- `docs/ARCHITECTURE.md`
-- `docs/CONVENTIONS.md`
+- `rf/**/*.md` (RF, UC, MD, WF, TC)
+- `ARCHITECTURE.md`
+- `CONVENTIONS.md`
 
 **Backend:**
-- `backend/IControlIT.API/src/Domain/Entities/*.cs`
-- `backend/IControlIT.API/src/Application/**/*.cs`
-- `backend/IControlIT.API/src/Infrastructure/**/*.cs`
-- `backend/IControlIT.API/src/Web/**/*.cs`
+- `D:\IC2\backend\IControlIT.API/src/Domain/Entities/*.cs`
+- `D:\IC2\backend\IControlIT.API/src/Application/**/*.cs`
+- `D:\IC2\backend\IControlIT.API/src/Infrastructure/**/*.cs`
+- `D:\IC2\backend\IControlIT.API/src/Web/**/*.cs`
 
 **Frontend:**
-- `frontend/icontrolit-app/src/app/**/*.ts`
-- `frontend/icontrolit-app/src/app/**/*.html`
-- `frontend/icontrolit-app/src/assets/i18n/*.json`
+- `D:\IC2\frontend\icontrolit-app/src/app/**/*.ts`
+- `D:\IC2\frontend\icontrolit-app/src/app/**/*.html`
+- `D:\IC2\frontend\icontrolit-app/src/assets/i18n/*.json`
 
 ### Escrita (ÚNICA ZONA PERMITIDA)
 

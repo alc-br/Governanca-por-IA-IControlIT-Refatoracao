@@ -90,7 +90,7 @@ Conforme CONTRATO-DOCUMENTACAO-ESSENCIAL para RF-XXX
 4. Faz commit e merge para `dev`
 
 **Como validar:**
-- Arquivos criados em `docs/rf/Fase-X/EPIC-XXX/RF-XXX/`
+- Arquivos criados em `rf/Fase-X/EPIC-XXX/RF-XXX/`
 - STATUS.yaml com `documentacao: { rf: True, uc: True, md: True, wf: True, user_stories: True }`
 
 **Tempo estimado:** 30-60 minutos
@@ -118,7 +118,7 @@ Conforme CONTRATO DE EXECUÇÃO – BACKEND para RF-XXX
 
 **Como validar:**
 - Backend compilando: `cd backend && dotnet build` (0 erros)
-- Seeds criados em `backend/Web/Data/Seeds/`
+- Seeds criados em `D:\IC2\backend\Web/Data/Seeds/`
 - STATUS.yaml com `desenvolvimento.backend.status: "done"`
 
 **Tempo estimado:** 2-4 horas
@@ -216,7 +216,7 @@ Conforme CONTRATO DE EXECUÇÃO DE TESTES para RF-XXX
 **Você responde:** RF-XXX
 
 **O que a IA faz:**
-- Executa `python docs/tools/devops-sync/core/sync-rf.py RF-XXX`
+- Executa `python tools/devops-sync/core/sync-rf.py RF-XXX`
 - Move work item para coluna correta no board
 - Cria user stories (se houver user-stories.yaml)
 
@@ -967,7 +967,7 @@ Ordem correta:
 
 Se ainda não mover:
 ```
-python docs/tools/devops-sync/validation/check-work-item.py
+python tools/devops-sync/validation/check-work-item.py
 ```
 
 ---
@@ -991,9 +991,9 @@ python docs/tools/devops-sync/validation/check-work-item.py
 - [COMPLIANCE.md](COMPLIANCE.md) - Certificações (ISO, SOC, LGPD)
 
 **Scripts úteis:**
-- `docs/tools/devops-sync/core/` - Scripts de sincronização
-- `docs/tools/status-validator/` - Validação de STATUS.yaml
-- `docs/tools/contract-validator/` - Validação de contratos
+- `tools/devops-sync/core/` - Scripts de sincronização
+- `tools/status-validator/` - Validação de STATUS.yaml
+- `tools/contract-validator/` - Validação de contratos
 
 ---
 

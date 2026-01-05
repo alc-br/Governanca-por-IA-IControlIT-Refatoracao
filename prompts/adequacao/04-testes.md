@@ -8,7 +8,7 @@ Executar todas as baterias de teste do **RF-XXX** conforme CONTRATO-EXECUCAO-TES
 
 **Contrato ativado:** CONTRATO-EXECUCAO-TESTES
 
-**Checklist:** docs/checklists/checklist-testes.yaml
+**Checklist:** checklists/checklist-testes.yaml
 
 **Agente responsável:** tester (qa-tester)
 

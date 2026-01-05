@@ -1,6 +1,6 @@
 ﻿# Auditar Backend vs Especificação
 
-Auditar conformidade do backend do **RF-XXX** conforme docs/contracts/auditoria/conformidade.md.
+Auditar conformidade do backend do **RF-XXX** conforme D:/IC2_Governanca/contracts/auditoria/conformidade.md.
 
 **RF:** [Especificar RF, ex: RF-027]
 
@@ -8,7 +8,7 @@ Auditar conformidade do backend do **RF-XXX** conforme docs/contracts/auditoria/
 
 **Contrato ativado:** CONTRATO-AUDITORIA-CONFORMIDADE
 
-**Checklist:** docs/checklists/checklist-auditoria-conformidade.yaml
+**Checklist:** checklists/checklist-auditoria-conformidade.yaml
 
 **Agente responsável:** auditor (conformance-auditor)
 

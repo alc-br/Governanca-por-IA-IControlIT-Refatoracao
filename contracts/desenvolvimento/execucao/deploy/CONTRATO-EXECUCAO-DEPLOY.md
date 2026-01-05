@@ -26,7 +26,7 @@ Deploy é uma operação crítica que:
 A **ÚNICA fonte da verdade** é o arquivo:
 
 ```
-docs/contracts/EXECUTION-MANIFEST.md
+contracts/EXECUTION-MANIFEST.md
 ```
 
 Este contrato NÃO pode ser executado sem:
@@ -311,7 +311,7 @@ Este deploy é auditável e DEVE ser rastreável:
 Este contrato DEVE ser executado pelo script:
 
 ```bash
-python docs/tools/devops-sync/execute_deploy.py RFXXX HOM|PRD
+python tools/devops-sync/execute_deploy.py RFXXX HOM|PRD
 ```
 
 O script DEVE:

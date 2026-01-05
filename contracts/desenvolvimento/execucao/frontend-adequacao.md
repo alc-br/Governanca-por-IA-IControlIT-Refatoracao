@@ -475,10 +475,10 @@ O projeto usa **Fuse Admin Template** que fornece:
 
 ## ZONAS PERMITIDAS
 
-- `frontend/icontrolit-app/src/app/modules/**` (componentes do RF)
-- `frontend/icontrolit-app/src/app/core/services/**` (se necessario)
-- `frontend/icontrolit-app/src/app/core/models/**` (se necessario)
-- `frontend/icontrolit-app/src/assets/i18n/**` (traducoes)
+- `D:\IC2\frontend\icontrolit-app/src/app/modules/**` (componentes do RF)
+- `D:\IC2\frontend\icontrolit-app/src/app/core/services/**` (se necessario)
+- `D:\IC2\frontend\icontrolit-app/src/app/core/models/**` (se necessario)
+- `D:\IC2\frontend\icontrolit-app/src/assets/i18n/**` (traducoes)
 
 ---
 
@@ -880,7 +880,7 @@ Execucoes fora dele sao invalidas.**
 
 Apos conclusao deste contrato:
 
-➡️ **CONTRATO-VALIDACAO-FRONTEND** (docs/contracts/desenvolvimento/validacao/frontend.md)
+➡️ **CONTRATO-VALIDACAO-FRONTEND** (contracts/desenvolvimento/validacao/frontend.md)
 
 O validador vai:
 1. Verificar que TUDO no UC-RFXXX foi coberto 100%

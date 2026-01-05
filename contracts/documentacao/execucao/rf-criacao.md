@@ -54,12 +54,12 @@ Este contrato gera **documentação completa de Requisito Funcional (RF)** NOVO 
 
 Este contrato é ativado quando a solicitação mencionar explicitamente:
 
-> **"Conforme docs/contracts/documentacao/execucao/rf-criacao.md para RFXXX"**
+> **"Conforme contracts/documentacao/execucao/rf-criacao.md para RFXXX"**
 
 Exemplo:
 ```
-Conforme docs/contracts/documentacao/execucao/rf-criacao.md para RF070.
-Seguir CLAUDE.md.
+Conforme contracts/documentacao/execucao/rf-criacao.md para RF070.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 **IMPORTANTE:** Este contrato é para RFs **NOVOS** (sem legado).
@@ -154,7 +154,7 @@ Além disso, atualizar:
 
 **Execução:**
 ```bash
-python docs/tools/docs/validator-docs.py RFXXX
+python tools/docs/validator-docs.py RFXXX
 ```
 
 **Exit Code:**
@@ -169,8 +169,8 @@ Antes de iniciar, o agente DEVE validar:
 
 | Pré-requisito | Descrição | Bloqueante |
 |---------------|-----------|------------|
-| Pasta do RF existe | `docs/rf/[Fase]/[EPIC]/RFXXX/` criada | Sim |
-| Templates acessíveis | `docs/templates/RF.md` e `RF.yaml` disponíveis | Sim |
+| Pasta do RF existe | `rf/[Fase]/[EPIC]/RFXXX/` criada | Sim |
+| Templates acessíveis | `templates/RF.md` e `RF.yaml` disponíveis | Sim |
 | Nenhum legado identificado | SEM ASPX, WebServices, SQL legado | Sim |
 | STATUS.yaml NÃO existe | Novo RF (não é adequação) | Sim |
 
@@ -190,14 +190,14 @@ Antes de iniciar, o agente DEVE validar:
 
 ```python
 # 1. Verificar pasta do RF
-pasta_rf = f"docs/rf/{fase}/{epic}/{rf}/"
+pasta_rf = f"rf/{fase}/{epic}/{rf}/"
 if not exists(pasta_rf):
     ERRO("Pasta do RF não existe")
 
 # 2. Verificar templates
-if not exists("docs/templates/RF.md"):
+if not exists("templates/RF.md"):
     ERRO("Template RF.md não encontrado")
-if not exists("docs/templates/RF.yaml"):
+if not exists("templates/RF.yaml"):
     ERRO("Template RF.yaml não encontrado")
 
 # 3. Verificar que NÃO há legado
@@ -239,7 +239,7 @@ endpoints = definir_endpoints(requisitos, tipo_rf)
 
 ```python
 # 1. Ler template RF.md
-template_md = ler_arquivo("docs/templates/RF.md")
+template_md = ler_arquivo("templates/RF.md")
 
 # 2. Preencher Seção 1: Objetivo
 secao_1 = gerar_objetivo(requisitos)
@@ -285,7 +285,7 @@ salvar_arquivo(f"{pasta_rf}/RF{rf}.md", rf_md)
 
 ```python
 # 1. Ler template RF.yaml
-template_yaml = ler_arquivo("docs/templates/RF.yaml")
+template_yaml = ler_arquivo("templates/RF.yaml")
 
 # 2. Preencher campos obrigatórios
 rf_yaml = {
@@ -320,7 +320,7 @@ salvar_yaml(f"{pasta_rf}/RF{rf}.yaml", rf_yaml)
 
 ```python
 # 1. Ler template STATUS.yaml
-template_status = ler_arquivo("docs/templates/STATUS.yaml")
+template_status = ler_arquivo("templates/STATUS.yaml")
 
 # 2. Preencher campos iniciais
 status_yaml = {
@@ -367,7 +367,7 @@ salvar_yaml(f"{pasta_rf}/STATUS.yaml", status_yaml)
 
 ```python
 # 1. Executar validador
-exit_code = executar("python docs/tools/docs/validator-docs.py {rf}")
+exit_code = executar("python tools/docs/validator-docs.py {rf}")
 
 # 2. Interpretar resultado
 if exit_code == 0:
@@ -383,7 +383,7 @@ else:
 
 ```python
 # 1. Verificar se existe
-doc_funcional = f"docs/rf/documentacao-funcional.md"
+doc_funcional = f"rf/documentacao-funcional.md"
 if exists(doc_funcional):
     # 2. Adicionar seção do RF
     adicionar_secao_rf(doc_funcional, rf, nome_rf, fase, epic)
@@ -396,7 +396,7 @@ if exists(doc_funcional):
 ### 7.1 Arquivos Gerados
 
 ```
-docs/rf/[Fase]/[EPIC]/RFXXX/
+rf/[Fase]/[EPIC]/RFXXX/
 ├── RFXXX.md                    ← RF completo (11 seções)
 ├── RFXXX.yaml                  ← Estrutura canônica
 └── STATUS.yaml                 ← Governança
@@ -466,7 +466,7 @@ D:\IC2\docs\checklists\documentacao\geracao\rf.yaml
 ### 9.3 Validação Automática (Bloqueante)
 
 ```bash
-python docs/tools/docs/validator-docs.py RFXXX
+python tools/docs/validator-docs.py RFXXX
 ```
 
 **Exit Code 0** = APROVADO
@@ -516,7 +516,7 @@ O agente DEVE PARAR se:
 
 | Bloqueio | Condição |
 |----------|----------|
-| Pasta não existe | `docs/rf/[Fase]/[EPIC]/RFXXX/` não criada |
+| Pasta não existe | `rf/[Fase]/[EPIC]/RFXXX/` não criada |
 | Templates não acessíveis | `RF.md` ou `RF.yaml` não disponíveis |
 | Legado identificado | RF tem ASPX, WebServices, SQL legado |
 | STATUS.yaml já existe | RF já foi criado (usar adequação) |
@@ -530,12 +530,12 @@ O agente DEVE PARAR se:
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `/docs/contracts/documentacao/execucao/rf-criacao.md` | Este contrato |
-| `/docs/prompts/documentacao/execucao/rf-criacao.md` | Prompt de ativação |
-| `/docs/checklists/documentacao/geracao/rf.yaml` | Checklist de validação |
-| `/docs/templates/RF.md` | Template RF Markdown |
-| `/docs/templates/RF.yaml` | Template RF YAML |
-| `/docs/tools/docs/validator-docs.py` | Validador automático |
+| `contracts/documentacao/execucao/rf-criacao.md` | Este contrato |
+| `prompts/documentacao/execucao/rf-criacao.md` | Prompt de ativação |
+| `checklists/documentacao/geracao/rf.yaml` | Checklist de validação |
+| `templates/RF.md` | Template RF Markdown |
+| `templates/RF.yaml` | Template RF YAML |
+| `tools/docs/validator-docs.py` | Validador automático |
 
 ---
 
@@ -544,8 +544,8 @@ O agente DEVE PARAR se:
 Após RF criado e aprovado:
 
 ```
-Conforme docs/contracts/documentacao/execucao/uc-criacao.md para RFXXX.
-Seguir CLAUDE.md.
+Conforme contracts/documentacao/execucao/uc-criacao.md para RFXXX.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 Criar **Casos de Uso (UC)** derivados do RF.

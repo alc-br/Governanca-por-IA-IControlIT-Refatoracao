@@ -46,7 +46,7 @@ Se forem encontradas não-conformidades:
 ```python
 import os
 
-wf_path = f"docs/rf/Fase-X/EPICX/RFXXX/WF-RFXXX.md"
+wf_path = f"rf/Fase-X/EPICX/RFXXX/WF-RFXXX.md"
 exists = os.path.exists(wf_path)
 ```
 
@@ -426,7 +426,7 @@ Nenhuma ação corretiva necessária. RFXXX pode prosseguir para criação de MD
 **Prompt de ativação:**
 ```
 Executar VALIDADOR-WF para RFXXX.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 **Comportamento esperado:**

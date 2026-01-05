@@ -187,7 +187,7 @@ Migração COMPLETA do RF032 de v1.0 (RF+RL misturados) para v2.0 (separação e
 3. **Destinos definidos**: ✅ 100% itens RL com campo `destino`
 4. **Sincronização RF**: ✅ RF.md ↔ RF.yaml 100% sincronizados
 5. **Sincronização RL**: ✅ RL.md ↔ RL.yaml 100% sincronizados
-6. **Templates oficiais**: ✅ Seguidos conforme `docs/templates/`
+6. **Templates oficiais**: ✅ Seguidos conforme `templates/`
 7. **Encoding UTF-8**: ✅ Todos arquivos em UTF-8 com acentos corretos
 8. **Backup seguro**: ✅ RF032.md.backup-20251230 criado antes da migração
 
@@ -207,7 +207,7 @@ Migração COMPLETA do RF032 de v1.0 (RF+RL misturados) para v2.0 (separação e
 
 ---
 
-## 5. CONFORMIDADE COM CLAUDE.md
+## 5. CONFORMIDADE COM D:\IC2\CLAUDE.md
 
 ### ✅ REGRA OBRIGATÓRIA — SEPARAÇÃO RF / RL
 
@@ -273,7 +273,7 @@ Migração COMPLETA do RF032 de v1.0 (RF+RL misturados) para v2.0 (separação e
 - RF.md ↔ RF.yaml sincronizados (100%)
 - RL.md ↔ RL.yaml sincronizados (100%)
 
-✅ A separação RF/RL está **CONFORME CLAUDE.md** e **REGRA OBRIGATÓRIA**
+✅ A separação RF/RL está **CONFORME D:\IC2\CLAUDE.md** e **REGRA OBRIGATÓRIA**
 
 ✅ O RF032 está **PRONTO** para próximos contratos:
 - CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES

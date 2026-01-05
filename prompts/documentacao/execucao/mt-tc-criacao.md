@@ -1,7 +1,7 @@
 Executar criacao de Massa de Teste (MT) e Casos de Teste (TC) do RFXXX conforme docs\contracts\documentacao\execucao\mt-tc-criacao.md.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 

@@ -23,7 +23,7 @@ Testes aprovam **CONTRATOS EM EXECUÇÃO**.
 A **ÚNICA fonte da verdade** é o arquivo:
 
 ```
-docs/contracts/EXECUTION-MANIFEST.md
+contracts/EXECUTION-MANIFEST.md
 ```
 
 Este contrato NÃO pode ser executado sem:
@@ -64,8 +64,8 @@ governanca:
 
 DEVEM existir os arquivos:
 
-- `docs/rf/[FASE]/[EPIC]/RFXXX/MT-RFXXX.yaml` (Massa de Teste)
-- `docs/rf/[FASE]/[EPIC]/RFXXX/TC-RFXXX.yaml` (Casos de Teste)
+- `rf/[FASE]/[EPIC]/RFXXX/MT-RFXXX.yaml` (Massa de Teste)
+- `rf/[FASE]/[EPIC]/RFXXX/TC-RFXXX.yaml` (Casos de Teste)
 - STATUS.yaml com `documentacao.mt = true`
 - STATUS.yaml com `documentacao.tc = true`
 
@@ -256,7 +256,7 @@ curl -f http://localhost:4200 && echo "✅ Frontend OK" || echo "❌ Frontend FA
 
 **Como Obter Credenciais Corretas:**
 
-1. **Ler arquivo de seeds:** `backend/IControlIT.API/src/Infrastructure/Data/ApplicationDbContextSeed.cs`
+1. **Ler arquivo de seeds:** `D:\IC2\backend\IControlIT.API/src/Infrastructure/Data/ApplicationDbContextSeed.cs`
 2. **Verificar STATUS.yaml:** Campo `testes.credenciais_padrao` (se existir)
 3. **Ler MT (Massa de Teste):** Campo `contexto.autenticacao` em cada MT
 
@@ -302,7 +302,7 @@ await page.fill('[data-test="password"]', 'Test@123');
 **Problema 4: Timeout ao aguardar backend/frontend**
 - **Causa:** Aplicação travou na inicialização
 - **Solução:**
-  1. Verificar logs: `backend/IControlIT.API/logs/` ou `frontend/logs/`
+  1. Verificar logs: `D:\IC2\backend\IControlIT.API/logs/` ou `D:\IC2\frontend\logs/`
   2. Matar processos background
   3. REPROVAR com "STARTUP_TIMEOUT"
 
@@ -435,7 +435,7 @@ done
 
 **Se timeout (60 segundos):**
 - ❌ REPROVAR (backend não inicializou)
-- ❌ Verificar logs: `backend/IControlIT.API/logs/`
+- ❌ Verificar logs: `D:\IC2\backend\IControlIT.API/logs/`
 - ❌ Gerar relatório de falha
 
 #### 2.4 Iniciar Frontend (Background - OBRIGATÓRIO)
@@ -457,7 +457,7 @@ done
 
 **Se timeout (120 segundos):**
 - ❌ REPROVAR (frontend não inicializou)
-- ❌ Verificar logs: `frontend/logs/`
+- ❌ Verificar logs: `D:\IC2\frontend\logs/`
 - ❌ Gerar relatório de falha
 
 #### 2.5 Validação de Ambiente (ANTES de testes)

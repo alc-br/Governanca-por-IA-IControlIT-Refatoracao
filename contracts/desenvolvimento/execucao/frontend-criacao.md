@@ -236,7 +236,7 @@ execucao:
       validacao: aprovada
 ```
 
-**Ver padrões completos em:** `docs/CONVENTIONS.md` (seção 5.6 - Data-test Attributes)
+**Ver padrões completos em:** `CONVENTIONS.md` (seção 5.6 - Data-test Attributes)
 
 ---
 
@@ -326,7 +326,7 @@ problemas:
 
 ## CONSULTA E REGISTRO DE DECISÕES TÉCNICAS (DECISIONS.md)
 
-O agente **DEVE** interagir com `docs/DECISIONS.md` durante a execução:
+O agente **DEVE** interagir com `DECISIONS.md` durante a execução:
 
 ### 1. CONSULTA OBRIGATÓRIA (Antes de Implementar)
 
@@ -401,7 +401,7 @@ Esta decisão deve ser registrada em docs/DECISIONS.md?
 
 ### 4. REGISTRO DE DECISÃO (Se Solicitado)
 
-Se usuário solicitar registro, o agente **DEVE** adicionar ao final de `docs/DECISIONS.md`:
+Se usuário solicitar registro, o agente **DEVE** adicionar ao final de `DECISIONS.md`:
 
 **Template ADR:**
 ```markdown
@@ -654,9 +654,9 @@ Qualquer warning de tradução ausente:
 
 ## ZONAS PERMITIDAS
 
-- `frontend/icontrolit-app/src/app/modules/**`
-- `frontend/icontrolit-app/src/app/core/services/**` (somente se necessário)
-- `frontend/icontrolit-app/src/app/core/models/**` (somente se necessário)
+- `D:\IC2\frontend\icontrolit-app/src/app/modules/**`
+- `D:\IC2\frontend\icontrolit-app/src/app/core/services/**` (somente se necessário)
+- `D:\IC2\frontend\icontrolit-app/src/app/core/models/**` (somente se necessário)
 
 ---
 
@@ -995,7 +995,7 @@ Execuções fora dele são inválidas.**
 
 Apos conclusao deste contrato:
 
-➡️ **CONTRATO-VALIDACAO-FRONTEND** (docs/contracts/desenvolvimento/validacao/frontend.md)
+➡️ **CONTRATO-VALIDACAO-FRONTEND** (contracts/desenvolvimento/validacao/frontend.md)
 
 O validador vai:
 1. Verificar que TUDO no UC-RFXXX foi coberto 100%

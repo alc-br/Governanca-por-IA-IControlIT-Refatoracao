@@ -40,7 +40,7 @@ Este documento mapeia componentes do sistema legado (`D:\IC2\ic1_legado\`) para 
 
 ## Script de Validação
 
-Script: `docs/tools/validate-legacy-mapping.py`
+Script: `tools/validate-legacy-mapping.py`
 
 Valida se referências ao legado foram documentadas corretamente.
 

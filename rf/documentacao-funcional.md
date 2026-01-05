@@ -1080,17 +1080,17 @@ Este é um **RF CRÍTICO DE FUNDAÇÃO** pois permite:
 
 **Arquivos de Tradução (Frontend Angular):**
 
-- `frontend/src/assets/i18n/pt-BR.json` - Traduções português (padrão)
-- `frontend/src/assets/i18n/en-US.json` - Traduções inglês
-- `frontend/src/assets/i18n/es-ES.json` - Traduções espanhol
-- `frontend/src/assets/i18n/fr-FR.json` - Traduções francês
+- `D:\IC2\frontend\src/assets/i18n/pt-BR.json` - Traduções português (padrão)
+- `D:\IC2\frontend\src/assets/i18n/en-US.json` - Traduções inglês
+- `D:\IC2\frontend\src/assets/i18n/es-ES.json` - Traduções espanhol
+- `D:\IC2\frontend\src/assets/i18n/fr-FR.json` - Traduções francês
 
 **Arquivos de Tradução (Backend .NET):**
 
-- `backend/Resources/pt-BR.resx` - Recursos português
-- `backend/Resources/en-US.resx` - Recursos inglês
-- `backend/Resources/es-ES.resx` - Recursos espanhol
-- `backend/Resources/fr-FR.resx` - Recursos francês
+- `D:\IC2\backend\Resources/pt-BR.resx` - Recursos português
+- `D:\IC2\backend\Resources/en-US.resx` - Recursos inglês
+- `D:\IC2\backend\Resources/es-ES.resx` - Recursos espanhol
+- `D:\IC2\backend\Resources/fr-FR.resx` - Recursos francês
 
 ---
 

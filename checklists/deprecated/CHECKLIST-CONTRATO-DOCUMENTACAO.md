@@ -10,7 +10,7 @@ Este checklist valida o cumprimento integral do **Contrato de Documentação Gov
 ## 1. Governança Inicial
 
 - [ ] O contrato de documentação foi explicitamente citado no prompt
-- [ ] O agente confirmou leitura de CLAUDE.md
+- [ ] O agente confirmou leitura de D:\IC2\CLAUDE.md
 - [ ] Nenhum arquivo de código foi alterado
 
 ---

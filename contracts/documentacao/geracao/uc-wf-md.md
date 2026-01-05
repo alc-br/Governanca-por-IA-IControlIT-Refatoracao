@@ -63,7 +63,7 @@ Este contrato é ativado quando a solicitação mencionar explicitamente:
 Exemplo:
 ```
 Conforme CONTRATO-GERACAO-UC-WF-MD para RF060.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -144,10 +144,10 @@ D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
-- `backend/**`
-- `frontend/**`
-- `docs/contracts/**`
-- `docs/templates/**`
+- `D:\IC2\backend\**`
+- `D:\IC2\frontend\**`
+- `contracts/**`
+- `templates/**`
 - Qualquer arquivo que não seja os 5 listados acima
 
 ---
@@ -158,7 +158,7 @@ O contrato TRAVA se qualquer condição falhar:
 
 | Pré-requisito | Descrição | Bloqueante |
 |---------------|-----------|------------|
-| Pasta do RF | Pasta já criada em `docs/rf/[Fase]/[EPIC]/RFXXX/` | Sim |
+| Pasta do RF | Pasta já criada em `rf/[Fase]/[EPIC]/RFXXX/` | Sim |
 | RFXXX.md | RF criado e aprovado | Sim |
 | RFXXX.yaml | RF estruturado e sincronizado | Sim |
 | Templates | Templates UC.md, UC.yaml, WF.md, MD.yaml disponíveis | Sim |
@@ -337,9 +337,9 @@ historico:
 #### 4.1 Executar Validador de Cobertura RF→UC
 
 ```bash
-python D:\IC2\docs\tools\docs\validator-rf-uc.py \
-  --rf docs/rf/[Fase]/[EPIC]/RFXXX/RFXXX.yaml \
-  --uc docs/rf/[Fase]/[EPIC]/RFXXX/UC-RFXXX.yaml
+python D:\IC2_Governanca\tools\docs\validator-rf-uc.py \
+  --rf rf/[Fase]/[EPIC]/RFXXX/RFXXX.yaml \
+  --uc rf/[Fase]/[EPIC]/RFXXX/UC-RFXXX.yaml
 ```
 
 **IMPORTANTE:** O parâmetro `--tc` é **opcional** nesta fase, pois TC só será criado no próximo contrato (CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES). O validador deve funcionar sem TC.
@@ -684,7 +684,7 @@ Após conclusão deste contrato, o próximo passo é:
 >
 > ```
 > Conforme CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES para RFXXX.
-> Seguir CLAUDE.md.
+> Seguir D:\IC2\CLAUDE.md.
 > ```
 
 Este contrato gerará os arquivos TC-RFXXX-*.md para testes.
@@ -695,14 +695,14 @@ Este contrato gerará os arquivos TC-RFXXX-*.md para testes.
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `/docs/contracts/CONTRATO-GERACAO-UC-WF-MD.md` | Este contrato |
-| `/docs/checklists/checklist-geracao-uc-wf-md.yaml` | Checklist YAML |
-| `/docs/templates/UC.md` | Template do UC |
-| `/docs/templates/UC.yaml` | Template UC estruturado |
-| `/docs/templates/WF.md` | Template do WF |
-| `/docs/templates/MD.yaml` | Template do MD |
-| `/docs/templates/STATUS.yaml` | Template STATUS estruturado |
-| `/docs/tools/docs/validator-rf-uc.py` | Validador de cobertura RF→UC |
+| `contracts/CONTRATO-GERACAO-UC-WF-MD.md` | Este contrato |
+| `checklists/checklist-geracao-uc-wf-md.yaml` | Checklist YAML |
+| `templates/UC.md` | Template do UC |
+| `templates/UC.yaml` | Template UC estruturado |
+| `templates/WF.md` | Template do WF |
+| `templates/MD.yaml` | Template do MD |
+| `templates/STATUS.yaml` | Template STATUS estruturado |
+| `tools/docs/validator-rf-uc.py` | Validador de cobertura RF→UC |
 
 ---
 

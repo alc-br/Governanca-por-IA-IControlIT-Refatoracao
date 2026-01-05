@@ -746,7 +746,7 @@ Nenhuma ação corretiva necessária. RFXXX pode prosseguir para criação de TC
 **Prompt de ativação:**
 ```
 Executar VALIDADOR-WF-MD para RFXXX.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 **Comportamento esperado:**

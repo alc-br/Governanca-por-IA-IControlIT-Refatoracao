@@ -84,7 +84,7 @@ python tools/devops-sync/setup/create-missing-status.py
 
 - Variável de ambiente `AZURE_DEVOPS_PAT` configurada
 - Permissões de administrador no projeto Azure DevOps
-- Estrutura de pastas de RFs criada em `docs/rf/`
+- Estrutura de pastas de RFs criada em `rf/`
 
 ## Atenção
 

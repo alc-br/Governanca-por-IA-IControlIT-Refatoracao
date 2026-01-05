@@ -1,6 +1,6 @@
 ﻿# Manutenção Técnica Backend
 
-Manutenção técnica de backend do **RF-XXX** conforme docs/contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-BACKEND.md.
+Manutenção técnica de backend do **RF-XXX** conforme contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-BACKEND.md.
 
 **RF/Componente:** [Especificar, ex: RF-027]
 
@@ -10,7 +10,7 @@ Manutenção técnica de backend do **RF-XXX** conforme docs/contracts/desenvolv
 
 **Contrato ativado:** CONTRATO-DE-MANUTENCAO-BACKEND
 
-**Checklist:** docs/checklists/checklist-manutencao-backend.yaml
+**Checklist:** checklists/checklist-manutencao-backend.yaml
 
 **Agente responsável:** developer (full-stack-implementer)
 

@@ -1,17 +1,17 @@
 Para o RF003
 
-Crie os documentos de Casos de Uso (UC) conforme docs/contracts/documentacao/execucao/CONTRATO-GERACAO-DOCS-UC.md.
+Crie os documentos de Casos de Uso (UC) conforme contracts/documentacao/execucao/CONTRATO-GERACAO-DOCS-UC.md.
 
 Se já houver um documento de UC criado, você precisa validar se está dentro dos padrões do template e se foi levantado todos os cenários para cobrir todo o requisito funcional.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 
 IMPORTANTE:
-1. Leia os templates em docs/templates/:
+1. Leia os templates em templates/:
    - UC.md
    - UC.yaml
 

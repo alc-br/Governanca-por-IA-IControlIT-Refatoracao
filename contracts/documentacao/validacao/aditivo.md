@@ -66,12 +66,12 @@ Este contrato **valida que um ADITIVO foi aplicado corretamente** a um RF existe
 
 Este contrato é ativado quando a solicitação mencionar explicitamente:
 
-> **"Conforme docs/contracts/documentacao/validacao/aditivo.md para RFXXX"**
+> **"Conforme contracts/documentacao/validacao/aditivo.md para RFXXX"**
 
 Exemplo:
 ```
-Conforme docs/contracts/documentacao/validacao/aditivo.md para RF028.
-Seguir CLAUDE.md.
+Conforme contracts/documentacao/validacao/aditivo.md para RF028.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ---
@@ -140,13 +140,13 @@ Não é possível executar as 15 validações deste contrato.
 ## RECOMENDAÇÕES
 
 **Se você quer adicionar uma funcionalidade a este RF:**
-1. Execute: `docs/prompts/documentacao/execucao/aditivo.md`
+1. Execute: `prompts/documentacao/execucao/aditivo.md`
 2. Depois execute este validador novamente
 
 **Se você quer apenas validar sincronização dos documentos:**
-1. Execute: `docs/prompts/documentacao/validacao/rf.md`
-2. Execute: `docs/prompts/documentacao/validacao/uc.md`
-3. Execute: `docs/prompts/documentacao/validacao/wf-md.md`
+1. Execute: `prompts/documentacao/validacao/rf.md`
+2. Execute: `prompts/documentacao/validacao/uc.md`
+3. Execute: `prompts/documentacao/validacao/wf-md.md`
 
 ---
 
@@ -197,7 +197,7 @@ Faltam Y arquivos _old.
 ## RECOMENDAÇÕES
 
 1. Complete o processo de ADITIVO:
-   - Execute: `docs/prompts/documentacao/execucao/aditivo.md`
+   - Execute: `prompts/documentacao/execucao/aditivo.md`
    - Certifique-se de criar TODOS os 10 backups `_old`
 
 2. Depois execute este validador novamente
@@ -680,13 +680,13 @@ else:
 #### VAL-10: Validador RF-UC Passou (Exit Code 0)
 
 **Critério:**
-- ✅ PASS: `python docs/tools/docs/validator-rf-uc.py RFXXX` retorna exit code 0
+- ✅ PASS: `python tools/docs/validator-rf-uc.py RFXXX` retorna exit code 0
 - ❌ FAIL: Exit code != 0
 
 **Como verificar:**
 ```bash
 cd D:\IC2
-python docs/tools/docs/validator-rf-uc.py RFXXX
+python tools/docs/validator-rf-uc.py RFXXX
 echo $?  # Deve ser 0
 ```
 
@@ -1056,8 +1056,8 @@ Sincronização 100% em todos os níveis.
 
 **Solicitação:**
 ```
-Conforme docs/contracts/documentacao/validacao/aditivo.md para RF028.
-Seguir CLAUDE.md.
+Conforme contracts/documentacao/validacao/aditivo.md para RF028.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 **Execução:**
@@ -1086,4 +1086,4 @@ Seguir CLAUDE.md.
 ---
 
 **Mantido por:** Time de Arquitetura IControlIT
-**Governado por:** CLAUDE.md
+**Governado por:** D:\IC2\CLAUDE.md

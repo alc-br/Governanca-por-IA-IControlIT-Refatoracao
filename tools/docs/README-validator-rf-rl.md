@@ -79,12 +79,12 @@ O `validator-rf-rl.py` valida se os documentos gerados de Requisitos Funcionais 
 ### Validar um RF específico
 
 ```bash
-python docs/tools/docs/validator-rf-rl.py RFXXX
+python tools/docs/validator-rf-rl.py RFXXX
 ```
 
 **Exemplo:**
 ```bash
-python docs/tools/docs/validator-rf-rl.py RF001
+python tools/docs/validator-rf-rl.py RF001
 ```
 
 **Saída:**
@@ -115,12 +115,12 @@ STATUS FINAL:
 ### Validar todos os RFs de uma fase
 
 ```bash
-python docs/tools/docs/validator-rf-rl.py --fase N
+python tools/docs/validator-rf-rl.py --fase N
 ```
 
 **Exemplo:**
 ```bash
-python docs/tools/docs/validator-rf-rl.py --fase 1
+python tools/docs/validator-rf-rl.py --fase 1
 ```
 
 **Saída:**
@@ -130,7 +130,7 @@ python docs/tools/docs/validator-rf-rl.py --fase 1
 ### Validar todos os RFs do projeto
 
 ```bash
-python docs/tools/docs/validator-rf-rl.py --all
+python tools/docs/validator-rf-rl.py --all
 ```
 
 **Saída:**
@@ -216,14 +216,14 @@ Para RF único, além do relatório legível, também é gerado JSON estruturado
 
 ```yaml
 - name: Validar conformidade RF/RL
-  run: python docs/tools/docs/validator-rf-rl.py RF001
+  run: python tools/docs/validator-rf-rl.py RF001
   continue-on-error: false
 ```
 
 ### Azure DevOps
 
 ```yaml
-- script: python docs/tools/docs/validator-rf-rl.py --fase 1
+- script: python tools/docs/validator-rf-rl.py --fase 1
   displayName: 'Validar Fase 1'
   failOnStderr: true
 ```

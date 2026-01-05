@@ -1,6 +1,6 @@
 ﻿# Investigar Erro (Debug Controlado)
 
-Investigar erro no **RF-XXX** ou **componente específico** conforme docs/contracts/auditoria/CONTRATO-DEBUG-CONTROLADO.md.
+Investigar erro no **RF-XXX** ou **componente específico** conforme contracts/auditoria/CONTRATO-DEBUG-CONTROLADO.md.
 
 **RF/Componente:** [Especificar, ex: RF-027 ou Backend de Autenticação]
 
@@ -10,7 +10,7 @@ Investigar erro no **RF-XXX** ou **componente específico** conforme docs/contra
 
 **Contrato ativado:** CONTRATO-DEBUG-CONTROLADO
 
-**Checklist:** docs/checklists/checklist-debug.yaml
+**Checklist:** checklists/checklist-debug.yaml
 
 **Agente responsável:** debugger (debug-investigator)
 

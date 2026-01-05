@@ -1,6 +1,6 @@
 ﻿# Deploy para Homologação (HOM)
 
-Deploy do **RF-XXX** para ambiente de Homologação conforme docs/contracts/deploy/azure.md.
+Deploy do **RF-XXX** para ambiente de Homologação conforme contracts/deploy/azure.md.
 
 **RF:** [Especificar RF, ex: RF-027]
 
@@ -8,7 +8,7 @@ Deploy do **RF-XXX** para ambiente de Homologação conforme docs/contracts/depl
 
 **Contrato ativado:** CONTRATO-DEPLOY-AZURE
 
-**Checklist:** docs/checklists/checklist-deploy-prd.yaml
+**Checklist:** checklists/checklist-deploy-prd.yaml
 
 **Pré-requisitos:**
 - Tester-Backend aprovou (validacao.tester_backend_aprovado = True)

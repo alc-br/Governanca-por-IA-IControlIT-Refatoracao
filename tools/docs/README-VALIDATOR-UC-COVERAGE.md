@@ -17,13 +17,13 @@ Validar automaticamente se os Casos de Uso (UC) cobrem **100%** das funcionalida
 
 ```bash
 # Validar RF específico
-python docs/tools/docs/validator-rf-uc-coverage.py --rf RF001
+python tools/docs/validator-rf-uc-coverage.py --rf RF001
 
 # Validar todos os RFs
-python docs/tools/docs/validator-rf-uc-coverage.py --all
+python tools/docs/validator-rf-uc-coverage.py --all
 
 # Validar com saída JSON customizada
-python docs/tools/docs/validator-rf-uc-coverage.py --rf RF001 --output meu-relatorio.json
+python tools/docs/validator-rf-uc-coverage.py --rf RF001 --output meu-relatorio.json
 ```
 
 ---
@@ -199,7 +199,7 @@ graph TD
 ```markdown
 #### 4.1 Executar Validador de Cobertura RF→UC (1ª Rodada)
 
-python docs/tools/docs/validator-rf-uc-coverage.py --rf RFXXX
+python tools/docs/validator-rf-uc-coverage.py --rf RFXXX
 
 #### 4.2 Processo de Correção Obrigatória
 
@@ -329,7 +329,7 @@ ucs_minimos_logs = {'UC00', 'UC01', 'UC02', 'UC03', 'UC04', 'UC05', 'UC06', 'UC0
 **Solução:**
 ```bash
 # Listar RFs disponíveis
-ls docs/rf/**/RF*
+ls rf/**/RF*
 
 # Executar com RF ID correto
 python validator-rf-uc-coverage.py --rf RF001

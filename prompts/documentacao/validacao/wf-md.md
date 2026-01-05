@@ -1,10 +1,10 @@
 Para o RFXXX...
 
-Executar validação completa de WF-RFXXX.yaml e MD-RFXXX.yaml conforme docs/contracts/documentacao/validacao/wf-md.md.
+Executar validação completa de WF-RFXXX.yaml e MD-RFXXX.yaml conforme contracts/documentacao/validacao/wf-md.md.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 PRÉ-REQUISITOS BLOQUEANTES:
 - WF-RFXXX.yaml DEVE existir

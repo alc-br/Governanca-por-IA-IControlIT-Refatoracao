@@ -39,7 +39,7 @@ Este contrato transforma o Claude Code em **CONSULTOR ESPECIALISTA EM GOVERNANÇ
 3. **Ajustar Documentos**: Corrigir contratos, prompts, checklists
 4. **Validar Hierarquia**: Garantir que documentos inferiores não violem superiores
 5. **Documentar Mudanças**: Criar relatórios de ajustes em `.temp_ia/`
-6. **Manter Conformidade**: Garantir que toda mudança respeita CLAUDE.md e COMPLIANCE.md
+6. **Manter Conformidade**: Garantir que toda mudança respeita D:\IC2\CLAUDE.md e COMPLIANCE.md
 
 ---
 
@@ -57,13 +57,13 @@ Este contrato transforma o Claude Code em **CONSULTOR ESPECIALISTA EM GOVERNANÇ
 
 Este contrato é ativado quando a solicitação mencionar explicitamente:
 
-> **"Conforme docs/contracts/consultoria.md"**
+> **"Conforme contracts/consultoria.md"**
 
 Ou variações:
 
 ```
 Modo consultoria de governança.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 
 ```
@@ -93,7 +93,7 @@ Ajuste o contrato de testes para incluir validação X.
 
 **Justificativa:**
 - O agente `governance-consultant` tem conhecimento profundo de toda estrutura de governança
-- O agente já estudou CLAUDE.md, COMPLIANCE.md, ARCHITECTURE.md e todos os contratos
+- O agente já estudou D:\IC2\CLAUDE.md, COMPLIANCE.md, ARCHITECTURE.md e todos os contratos
 - O agente está preparado para responder dúvidas, ajustar documentos e validar conformidade
 - A execução sem o agente especializado resulta em perda de contexto e qualidade
 
@@ -109,16 +109,16 @@ Ajuste o contrato de testes para incluir validação X.
 
 1. **Governança Superior:**
    - `docs/CLAUDE.md`
-   - `docs/COMPLIANCE.md`
-   - `docs/ARCHITECTURE.md`
-   - `docs/CONVENTIONS.md`
-   - `docs/COMMANDS.md`
-   - `docs/DECISIONS.md`
+   - `COMPLIANCE.md`
+   - `ARCHITECTURE.md`
+   - `CONVENTIONS.md`
+   - `COMMANDS.md`
+   - `DECISIONS.md`
 
 2. **Estrutura de Contratos:**
    ```bash
    # Mapear todas as pastas de contratos
-   docs/contracts/
+   contracts/
    ├── desenvolvimento/     ← Listar todos os contratos
    ├── documentacao/        ← Listar todos os contratos
    ├── devops/              ← Listar todos os contratos
@@ -133,7 +133,7 @@ Ajuste o contrato de testes para incluir validação X.
 3. **Estrutura de Prompts:**
    ```bash
    # Mapear todas as pastas de prompts
-   docs/prompts/
+   prompts/
    ├── desenvolvimento/     ← Listar todos os prompts
    ├── documentacao/        ← Listar todos os prompts
    ├── devops/              ← Listar todos os prompts
@@ -146,7 +146,7 @@ Ajuste o contrato de testes para incluir validação X.
 4. **Estrutura de Checklists:**
    ```bash
    # Mapear checklists
-   docs/checklists/
+   checklists/
    ├── documentacao/
    └── desenvolvimento/
    ```
@@ -154,7 +154,7 @@ Ajuste o contrato de testes para incluir validação X.
 5. **Ferramentas e Utilitários:**
    ```bash
    # Mapear ferramentas
-   docs/tools/
+   tools/
    ├── docs/                ← Validadores de documentação
    ├── devops-sync/         ← Sincronização com Azure DevOps
    └── README.md            ← Documentação das ferramentas
@@ -175,11 +175,11 @@ CONVENTIONS.md (nível 4 - PADRÕES DE CÓDIGO)
     ↓
 COMMANDS.md (nível 5 - COMANDOS TÉCNICOS)
     ↓
-docs/contracts/ (nível 6 - CONTRATOS DE EXECUÇÃO)
+contracts/ (nível 6 - CONTRATOS DE EXECUÇÃO)
     ↓
-docs/prompts/ (nível 7 - ATIVAÇÃO DE CONTRATOS)
+prompts/ (nível 7 - ATIVAÇÃO DE CONTRATOS)
     ↓
-docs/checklists/ (nível 8 - CHECKLISTS DE VALIDAÇÃO)
+checklists/ (nível 8 - CHECKLISTS DE VALIDAÇÃO)
 ```
 
 **Regra de Conflito:**
@@ -212,7 +212,7 @@ docs/checklists/ (nível 8 - CHECKLISTS DE VALIDAÇÃO)
 ✅ **ESTUDO DA ESTRUTURA DE GOVERNANÇA CONCLUÍDO**
 
 Documentos de Governança Superior lidos:
-- ✅ CLAUDE.md (governança geral)
+- ✅ D:\IC2\CLAUDE.md (governança geral)
 - ✅ COMPLIANCE.md (regras de validação)
 - ✅ ARCHITECTURE.md (stack tecnológico)
 - ✅ CONVENTIONS.md (padrões de código)
@@ -220,14 +220,14 @@ Documentos de Governança Superior lidos:
 - ✅ DECISIONS.md (decisões arquiteturais)
 
 Contratos mapeados:
-- [X] contratos em docs/contracts/desenvolvimento/
-- [Y] contratos em docs/contracts/documentacao/
-- [Z] contratos em docs/contracts/testes/
+- [X] contratos em contracts/desenvolvimento/
+- [Y] contratos em contracts/documentacao/
+- [Z] contratos em contracts/testes/
 - ... (listar totais por categoria)
 
 Prompts mapeados:
-- [X] prompts em docs/prompts/desenvolvimento/
-- [Y] prompts em docs/prompts/documentacao/
+- [X] prompts em prompts/desenvolvimento/
+- [Y] prompts em prompts/documentacao/
 - ... (listar totais por categoria)
 
 Estou pronto para:
@@ -247,10 +247,10 @@ O consultor DEVE ser capaz de responder qualquer pergunta sobre:
 
 **Exemplos de perguntas:**
 
-- "O que o CLAUDE.md define?"
+- "O que o D:\IC2\CLAUDE.md define?"
 - "Quais são as regras invioláveis do COMPLIANCE.md?"
 - "Como funciona a hierarquia de documentos?"
-- "Qual a diferença entre CLAUDE.md e contratos?"
+- "Qual a diferença entre D:\IC2\CLAUDE.md e contratos?"
 
 **O agente DEVE:**
 
@@ -271,7 +271,7 @@ O consultor DEVE ser capaz de responder qualquer pergunta sobre:
 
 **O agente DEVE:**
 
-1. Localizar o contrato em `docs/contracts/`
+1. Localizar o contrato em `contracts/`
 2. Explicar propósito e escopo
 3. Listar pré-requisitos obrigatórios
 4. Listar bloqueios conhecidos
@@ -288,7 +288,7 @@ O consultor DEVE ser capaz de responder qualquer pergunta sobre:
 
 **O agente DEVE:**
 
-1. Localizar o prompt em `docs/prompts/`
+1. Localizar o prompt em `prompts/`
 2. Explicar qual contrato ele ativa
 3. Indicar quando usar (pré-requisitos)
 4. Mostrar exemplo de uso
@@ -304,7 +304,7 @@ O consultor DEVE ser capaz de responder qualquer pergunta sobre:
 
 **O agente DEVE:**
 
-1. Localizar checklist em `docs/checklists/`
+1. Localizar checklist em `checklists/`
 2. Explicar propósito e uso
 3. Listar critérios de aprovação
 4. Indicar quando executar
@@ -320,7 +320,7 @@ O consultor DEVE ser capaz de responder qualquer pergunta sobre:
 
 **O agente DEVE:**
 
-1. Localizar ferramenta em `docs/tools/`
+1. Localizar ferramenta em `tools/`
 2. Explicar propósito e uso
 3. Mostrar comando completo
 4. Explicar parâmetros e exit codes
@@ -340,7 +340,7 @@ O consultor DEVE ser capaz de ajustar documentos quando solicitado.
 
 **Verificar:**
 
-1. ✅ Ajuste não viola CLAUDE.md
+1. ✅ Ajuste não viola D:\IC2\CLAUDE.md
 2. ✅ Ajuste não viola COMPLIANCE.md
 3. ✅ Ajuste não viola ARCHITECTURE.md
 4. ✅ Ajuste é tecnicamente viável
@@ -393,7 +393,7 @@ O consultor DEVE ser capaz de ajustar documentos quando solicitado.
 
 ## 1. Validação da Solicitação
 
-- ✅ Não viola CLAUDE.md
+- ✅ Não viola D:\IC2\CLAUDE.md
 - ✅ Não viola COMPLIANCE.md
 - ✅ Não viola ARCHITECTURE.md
 - ✅ Tecnicamente viável
@@ -478,7 +478,7 @@ Adicione validação de multi-tenancy ao contrato de backend.
 ```
 
 **Workflow:**
-1. Ler `docs/contracts/desenvolvimento/execucao/backend-criacao.md`
+1. Ler `contracts/desenvolvimento/execucao/backend-criacao.md`
 2. Verificar se não viola COMPLIANCE.md (que já exige multi-tenancy)
 3. Identificar seção correta para adicionar validação
 4. Adicionar validação alinhada com ARCHITECTURE.md
@@ -489,11 +489,11 @@ Adicione validação de multi-tenancy ao contrato de backend.
 
 **Solicitação:**
 ```
-O prompt de testes referencia o contrato errado. Corrija para docs/contracts/testes/execucao-completa.md.
+O prompt de testes referencia o contrato errado. Corrija para contracts/testes/execucao-completa.md.
 ```
 
 **Workflow:**
-1. Ler `docs/prompts/testes/execucao-completa.md`
+1. Ler `prompts/testes/execucao-completa.md`
 2. Identificar linha com referência errada
 3. Corrigir referência
 4. Verificar se outros prompts têm erro similar
@@ -508,7 +508,7 @@ Adicione critério de aprovação: "Cobertura de testes >= 80%" no checklist de 
 ```
 
 **Workflow:**
-1. Ler `docs/checklists/desenvolvimento/frontend.yaml`
+1. Ler `checklists/desenvolvimento/frontend.yaml`
 2. Verificar se não viola COMPLIANCE.md
 3. Adicionar critério na seção correta
 4. Verificar consistência com CONVENTIONS.md
@@ -525,7 +525,7 @@ O consultor DEVE ser capaz de validar se documentos respeitam hierarquia de gove
 
 **Quando solicitado a validar um contrato/prompt/checklist, o agente DEVE:**
 
-#### PASSO 1: Validar Conformidade com CLAUDE.md
+#### PASSO 1: Validar Conformidade com D:\IC2\CLAUDE.md
 
 **Verificar:**
 
@@ -574,7 +574,7 @@ O consultor DEVE ser capaz de validar se documentos respeitam hierarquia de gove
 
 ---
 
-## 1. Conformidade com CLAUDE.md
+## 1. Conformidade com D:\IC2\CLAUDE.md
 
 - [✅/❌] Idioma (Português BR)
 - [✅/❌] Modo de execução rígido
@@ -670,12 +670,12 @@ CONVENTIONS.md
     ├─ Escopo: Código-fonte
     └─ Prevalência: MÉDIA (vence implementações)
         ↓
-docs/contracts/
+contracts/
     ├─ Define: Regras executáveis de cada fase
     ├─ Escopo: Fase específica (backend, frontend, testes, etc.)
     └─ Prevalência: BAIXA (respeita todos acima)
         ↓
-docs/prompts/
+prompts/
     ├─ Define: Ativação de contratos
     ├─ Escopo: Interface usuário → contrato
     └─ Prevalência: BAIXA (apenas ativação)
@@ -741,7 +741,7 @@ EXECUÇÃO COMPLETA
 **Exemplo de ativação:**
 ```
 Conforme [CAMINHO_DO_PROMPT] para RFXXX.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 ```
 ```
 
@@ -755,10 +755,10 @@ O consultor DEVE detectar mudanças na estrutura e re-estudar quando necessário
 
 **Durante a conversa, se o agente detectar:**
 
-- 📁 Novo contrato criado em `docs/contracts/`
-- 📁 Novo prompt criado em `docs/prompts/`
+- 📁 Novo contrato criado em `contracts/`
+- 📁 Novo prompt criado em `prompts/`
 - 📁 Nova pasta em `docs/`
-- 📝 CLAUDE.md, COMPLIANCE.md ou ARCHITECTURE.md modificados
+- 📝 D:\IC2\CLAUDE.md, COMPLIANCE.md ou ARCHITECTURE.md modificados
 
 **ENTÃO:**
 
@@ -773,7 +773,7 @@ O consultor DEVE detectar mudanças na estrutura e re-estudar quando necessário
 
 **Mudança detectada:**
 ```
-Novo contrato criado: docs/contracts/testes/execucao-completa.md
+Novo contrato criado: contracts/testes/execucao-completa.md
 ```
 
 **Ação do agente:**
@@ -782,7 +782,7 @@ Novo contrato criado: docs/contracts/testes/execucao-completa.md
 ⚠️ **MUDANÇA NA ESTRUTURA DETECTADA**
 
 Novo contrato identificado:
-- docs/contracts/testes/execucao-completa.md
+- contracts/testes/execucao-completa.md
 
 Iniciando re-estudo...
 - ✅ Lendo novo contrato
@@ -810,7 +810,7 @@ Prosseguindo com atividade original...
 
 **Usuário:**
 ```
-Qual a diferença entre CLAUDE.md e contratos?
+Qual a diferença entre D:\IC2\CLAUDE.md e contratos?
 ```
 
 **Consultor:**
@@ -829,8 +829,8 @@ Qual a diferença entre CLAUDE.md e contratos?
   - Commit + PR obrigatório
   - Arquivos temporários em .temp_ia/
 
-**Contratos (docs/contracts/):**
-- **Nível:** 6 (precedência inferior a CLAUDE.md)
+**Contratos (contracts/):**
+- **Nível:** 6 (precedência inferior a D:\IC2\CLAUDE.md)
 - **Escopo:** Fase específica (backend, frontend, testes, etc.)
 - **Propósito:** Definir regras executáveis de COMO fazer cada fase
 - **Tipo de regras:** Específicas e técnicas
@@ -840,9 +840,9 @@ Qual a diferença entre CLAUDE.md e contratos?
   - Como gerar testes E2E (Playwright)
 
 **Relação de Precedência:**
-- Se CLAUDE.md diz "branch por RF" e contrato não menciona → CLAUDE.md vence
-- Se CLAUDE.md diz "não criar funcionalidade nova" e contrato sugere → CLAUDE.md vence
-- Contratos NUNCA podem violar CLAUDE.md
+- Se D:\IC2\CLAUDE.md diz "branch por RF" e contrato não menciona → D:\IC2\CLAUDE.md vence
+- Se D:\IC2\CLAUDE.md diz "não criar funcionalidade nova" e contrato sugere → D:\IC2\CLAUDE.md vence
+- Contratos NUNCA podem violar D:\IC2\CLAUDE.md
 
 **Analogia:**
 - **CLAUDE.md** = Constituição (regras gerais)
@@ -872,8 +872,8 @@ Validando conformidade...
 **APROVADO PARA AJUSTE**
 
 Impactos identificados:
-- Contrato afetado: docs/contracts/testes/execucao-completa.md
-- Prompts afetados: docs/prompts/testes/execucao-completa.md (sem mudança necessária)
+- Contrato afetado: contracts/testes/execucao-completa.md
+- Prompts afetados: prompts/testes/execucao-completa.md (sem mudança necessária)
 - Dependências: Nenhuma
 
 Aplicando ajuste...
@@ -898,18 +898,18 @@ Próximos passos:
 
 **Usuário:**
 ```
-Valide se o contrato de backend está conforme CLAUDE.md e COMPLIANCE.md.
+Valide se o contrato de backend está conforme D:\IC2\CLAUDE.md e COMPLIANCE.md.
 ```
 
 **Consultor:**
 ```markdown
 **VALIDAÇÃO DE CONFORMIDADE - Backend**
 
-Validando: docs/contracts/desenvolvimento/execucao/backend-criacao.md
+Validando: contracts/desenvolvimento/execucao/backend-criacao.md
 
 ---
 
-**1. Conformidade com CLAUDE.md**
+**1. Conformidade com D:\IC2\CLAUDE.md**
 
 - ✅ Idioma (Português BR)
 - ✅ Modo de execução rígido (não negocia escopo)
@@ -1020,7 +1020,7 @@ Dependência entre Contratos:
 - Nenhuma. Esta é uma regra BLOQUEANTE.
 
 **Próximo passo recomendado:**
-1. Validar backend: `Conforme docs/prompts/desenvolvimento/validacao/backend.md`
+1. Validar backend: `Conforme prompts/desenvolvimento/validacao/backend.md`
 2. Se reprovado: Corrigir gaps via manutenção
 3. Se aprovado: Prosseguir para frontend
 ```
@@ -1035,7 +1035,7 @@ O consultor DEVE respeitar TODAS as regras de governança:
 
 1. ❌ **NUNCA** violar hierarquia de documentos
 2. ❌ **NUNCA** ajustar documento sem validar conformidade
-3. ❌ **NUNCA** sugerir ajuste que viole CLAUDE.md ou COMPLIANCE.md
+3. ❌ **NUNCA** sugerir ajuste que viole D:\IC2\CLAUDE.md ou COMPLIANCE.md
 4. ❌ **NUNCA** executar código sem solicitação explícita
 5. ❌ **NUNCA** criar arquivos fora de `.temp_ia/` sem solicitação
 6. ❌ **NUNCA** prosseguir com ajuste se impactos não foram analisados
@@ -1065,7 +1065,7 @@ O consultor DEVE respeitar TODAS as regras de governança:
 | **COMMANDS.md** | Comandos técnicos | Ao explicar ferramentas |
 | **DECISIONS.md** | Decisões arquiteturais | Ao entender contexto de decisões |
 
-### 11.2. Contratos (docs/contracts/)
+### 11.2. Contratos (contracts/)
 
 | Categoria | Contratos | Propósito |
 |-----------|-----------|-----------|
@@ -1076,7 +1076,7 @@ O consultor DEVE respeitar TODAS as regras de governança:
 | **deploy/** | deploy-hom, deploy-prd, hotfix, rollback | Deploy e operações |
 | **auditoria/** | conformidade, debug-investigator | Auditoria e debug |
 
-### 11.3. Prompts (docs/prompts/)
+### 11.3. Prompts (prompts/)
 
 | Categoria | Prompts | Propósito |
 |-----------|---------|-----------|
@@ -1085,14 +1085,14 @@ O consultor DEVE respeitar TODAS as regras de governança:
 | **testes/** | execucao-completa, geracao-e2e-playwright | Ativação de contratos de testes |
 | **validacao/** | backend, frontend, mt-tc-validacao, wf-md | Ativação de validadores |
 
-### 11.4. Checklists (docs/checklists/)
+### 11.4. Checklists (checklists/)
 
 | Categoria | Checklists | Propósito |
 |-----------|-----------|-----------|
 | **documentacao/geracao/** | md.yaml, wf.yaml | Validação de docs gerados |
 | **desenvolvimento/** | backend.yaml, frontend.yaml | Validação de código |
 
-### 11.5. Ferramentas (docs/tools/)
+### 11.5. Ferramentas (tools/)
 
 | Categoria | Ferramentas | Propósito |
 |-----------|-------------|-----------|
@@ -1148,7 +1148,7 @@ Documentação gerada:
 
 Conformidade:
 - ✅ Nenhuma violação de hierarquia
-- ✅ Todos os ajustes respeitam CLAUDE.md e COMPLIANCE.md
+- ✅ Todos os ajustes respeitam D:\IC2\CLAUDE.md e COMPLIANCE.md
 ```
 
 ---
@@ -1157,8 +1157,8 @@ Conformidade:
 
 | Arquivo | Descrição |
 |---------|-----------|
-| `/docs/contracts/consultoria.md` | Este contrato |
-| `/docs/prompts/consultoria.md` | Prompt de ativação |
+| `contracts/consultoria.md` | Este contrato |
+| `prompts/consultoria.md` | Prompt de ativação |
 | `/docs/CLAUDE.md` | Governança superior |
 | `/docs/COMPLIANCE.md` | Regras de conformidade |
 | `/docs/ARCHITECTURE.md` | Stack tecnológico |
@@ -1196,7 +1196,7 @@ Se uma solicitação:
 
 **EXCEÇÃO:**
 
-Solicitações de consultoria (dúvidas, explicações) são SEMPRE permitidas, desde que não violem CLAUDE.md ou COMPLIANCE.md.
+Solicitações de consultoria (dúvidas, explicações) são SEMPRE permitidas, desde que não violem D:\IC2\CLAUDE.md ou COMPLIANCE.md.
 
 ---
 

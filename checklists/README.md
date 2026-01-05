@@ -108,13 +108,13 @@ criteria:
     description: "RF-XXX.md criado com 5 seções obrigatórias"
     severity: "CRITICAL"
     validation_type: "file_exists"
-    file_path: "docs/rf/Fase-X/EPIC-YYY/RF-ZZZ/RF-ZZZ.md"
+    file_path: "rf/Fase-X/EPIC-YYY/RF-ZZZ/RF-ZZZ.md"
 
   - id: "DOC-002"
     description: "UC-RF-XXX.md criado com 5 casos de uso"
     severity: "CRITICAL"
     validation_type: "file_exists"
-    file_path: "docs/rf/Fase-X/EPIC-YYY/RF-ZZZ/UC-RF-ZZZ.md"
+    file_path: "rf/Fase-X/EPIC-YYY/RF-ZZZ/UC-RF-ZZZ.md"
 
 compliance_gates:
   - gate: "DOCUMENTATION_COMPLETE"
@@ -142,6 +142,6 @@ Checklists em formato .md foram movidos para `deprecated/` e não devem mais ser
 
 ---
 
-**Para mais detalhes sobre contratos, consulte:** `docs/contracts/README.md`
+**Para mais detalhes sobre contratos, consulte:** `contracts/README.md`
 
-**Para mais detalhes sobre prompts, consulte:** `docs/prompts/README.md`
+**Para mais detalhes sobre prompts, consulte:** `prompts/README.md`

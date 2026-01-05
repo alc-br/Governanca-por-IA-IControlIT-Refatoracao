@@ -52,7 +52,7 @@ Requisito (RF)
 - 4 arquivos de casos de teste
 
 **Evidências:**
-- Arquivos em `docs/rf/RFXXX/`
+- Arquivos em `rf/RFXXX/`
 - STATUS.yaml com `documentacao: all True`
 
 ---
@@ -335,7 +335,7 @@ Para QUALQUER mudança em produção, é possível rastrear:
 
 ### Único Ponto de Verdade
 
-O arquivo `docs/contracts/EXECUTION-MANIFEST.md` é a **ÚNICA fonte da verdade** para:
+O arquivo `contracts/EXECUTION-MANIFEST.md` é a **ÚNICA fonte da verdade** para:
 
 - Todas as execuções
 - Todas as decisões
@@ -428,7 +428,7 @@ Para auditoria externa, fornecer:
 2. **STATUS.yaml de todos os RFs em produção**
    - Demonstra estado atual validado
 
-3. **Contratos ativos** (`docs/contracts/`)
+3. **Contratos ativos** (`contracts/`)
    - Demonstra governança formal
 
 4. **Logs de deploy** (se disponíveis)

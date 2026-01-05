@@ -1,7 +1,7 @@
-Executar testes automatizados do RFXXX conforme docs/contracts/testes/execucao-completa.md.
+Executar testes automatizados do RFXXX conforme D:/IC2_Governanca/contracts/testes/execucao-completa.md.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
-Seguir CLAUDE.md.
+Seguir D:\IC2\CLAUDE.md.
 
 Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 
@@ -95,13 +95,13 @@ WORKFLOW DE EXECUCAO (ORDEM OBRIGATORIA):
 
    1. Verificar se Program.cs tem Task.Run() em InitialiseDatabaseAsync
    2. Se NAO tiver, backend vai travar. Corrigir conforme:
-      - Linha 216-232 de backend/IControlIT.API/src/Web/Program.cs
+      - Linha 216-232 de D:\IC2\backend\IControlIT.API/src/Web/Program.cs
       - DEVE usar Task.Run() para executar seeds em BACKGROUND
       - Nunca usar await direto (bloqueia startup)
 
    3. Se backend continuar travado apos 30s:
       - Matar processo: Stop-Process -Name "IControlIT.API.Web" -Force
-      - Limpar artifacts: Remove-Item backend/IControlIT.API/artifacts -Recurse -Force
+      - Limpar artifacts: Remove-Item D:\IC2\backend\IControlIT.API/artifacts -Recurse -Force
       - Rebuild: dotnet build --no-incremental
       - Reiniciar: dotnet run
 
@@ -147,7 +147,7 @@ WORKFLOW DE EXECUCAO (ORDEM OBRIGATORIA):
    - Verificar se specs cobrem TODOS os TC-E2E-NNN do TC-RFXXX.yaml
 
    **4.2 SE SPECS NAO EXISTEM OU INCOMPLETOS:**
-   - Executar geracao automatica via docs/prompts/testes/geracao-e2e-playwright.md:
+   - Executar geracao automatica via prompts/testes/geracao-e2e-playwright.md:
      * Ler TC-RFXXX.yaml e MT-RFXXX.yaml
      * Gerar frontend/e2e/data/MT-RFXXX.data.ts
      * Gerar frontend/e2e/helpers/rf-helpers.ts
@@ -271,10 +271,10 @@ Para cada teste REPROVADO, criar:
 - Resposta esperada: { ... }
 
 ## PROXIMO PASSO
-Corrigir via docs/contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md:
+Corrigir via contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md:
 
 \```
-Conforme docs/contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md,
+Conforme contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md,
 corrija o seguinte erro no [backend/frontend] de RFXXX:
 
 ERRO IDENTIFICADO:
@@ -307,7 +307,7 @@ RESPONSABILIDADE DO AGENTE:
 5. Executar testes backend (dotnet test)
 6. Executar testes frontend (npm run test)
 7. VERIFICAR SE SPECS PLAYWRIGHT EXISTEM:
-   - Se NAO: executar geracao automatica (docs/prompts/testes/geracao-e2e-playwright.md)
+   - Se NAO: executar geracao automatica (prompts/testes/geracao-e2e-playwright.md)
    - Se SIM: validar cobertura completa de TC-E2E
 8. Executar testes E2E (npm run e2e)
 9. Executar testes de seguranca
