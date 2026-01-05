@@ -169,6 +169,7 @@ O contrato TRAVA se qualquer condição falhar:
 
 | Pré-requisito | Descrição | Bloqueante |
 |---------------|-----------|------------|
+| **Docker rodando** | `docker ps` deve responder (TestContainers dependency) | **Sim** |
 | Backend aprovado | `STATUS.yaml`: `execucao.backend = done` | Sim |
 | Frontend aprovado | `STATUS.yaml`: `execucao.frontend = done` | Sim |
 | MT-RFXXX.yaml | Massa de teste criada e validada | Sim |
@@ -177,6 +178,39 @@ O contrato TRAVA se qualquer condição falhar:
 | Build frontend | `npm run build` deve passar | Sim |
 
 **PARAR se qualquer item falhar.**
+
+### 3.1. Validação de Docker (INFRAESTRUTURA)
+
+**ANTES de QUALQUER teste backend, o agente DEVE validar Docker:**
+
+```bash
+# Verificar se Docker está rodando
+docker ps
+```
+
+**SE comando falhar:**
+- ❌ **BLOQUEAR execução de testes backend**
+- ❌ **NÃO tentar iniciar Docker automaticamente** (requer privilégios de sistema)
+- ✅ **REPORTAR ao usuário:**
+
+```
+BLOQUEIO: Docker não está rodando
+
+ERRO IDENTIFICADO:
+- 23 testes funcionais FALHARÃO (TestContainers dependency)
+- Docker Desktop DEVE estar ativo ANTES de executar testes
+
+AÇÃO NECESSÁRIA:
+1. Iniciar Docker Desktop manualmente
+2. Aguardar Docker estar pronto (ícone verde no sistema)
+3. Validar: docker ps
+4. Retornar execução de testes
+
+RESPONSABILIDADE: INFRAESTRUTURA (não é erro de código)
+```
+
+**SE comando SUCEDER:**
+- ✅ Prosseguir com testes normalmente
 
 ---
 
@@ -529,6 +563,12 @@ Para cada teste FALHADO:
 - Endpoint /health não responde (TIMEOUT/ERROR/BACKEND_DOWN)
 - Backend não confirma "Application started" nos logs
 - Seeds travando inicialização (InitialiseDatabaseAsync bloqueante)
+- **AutoMapper configuration inválida:**
+  - Teste `ShouldHaveValidConfiguration` falhando
+  - Unmapped members detectados
+  - Arquivo responsável: `*MappingProfile.cs`
+  - **Correção via CONTRATO DE MANUTENÇÃO CONTROLADA**
+  - **NÃO criar data-test para isto** (não é UI)
 
 **FRONTEND é responsável quando:**
 - Elemento não renderizado (data-test ausente)
@@ -542,6 +582,41 @@ Para cada teste FALHADO:
 - Contrato de API quebrado (campo ausente)
 - DTO incompatível
 - Mapeamento incorreto
+
+**INFRAESTRUTURA é responsável quando:**
+- Docker não está rodando (TestContainers dependency)
+- Processo travado bloqueando DLLs (PID bloqueante)
+- Variáveis de ambiente ausentes
+- Banco de dados não acessível
+- **NÃO gerar prompt de correção para infraestrutura**
+- **Reportar ao usuário para ação manual**
+
+#### 🚨 REGRA ESPECIAL: Erros de Infraestrutura
+
+**Quando erro for de INFRAESTRUTURA, o agente DEVE:**
+
+1. ❌ **NÃO gerar prompt de correção** (agente não pode corrigir infraestrutura)
+2. ✅ **Reportar claramente ao usuário:**
+   ```
+   BLOQUEIO: Infraestrutura (não é erro de código)
+
+   ERRO IDENTIFICADO:
+   - [Descrição do erro de infraestrutura]
+
+   AÇÃO NECESSÁRIA (USUÁRIO):
+   1. [Passo 1 manual]
+   2. [Passo 2 manual]
+   3. Retornar execução de testes
+
+   RESPONSABILIDADE: INFRAESTRUTURA
+   ```
+3. ✅ **Atualizar STATUS.yaml com bloqueio:**
+   ```yaml
+   testes_ti:
+     resultado_final: "BLOQUEADO"
+     motivo_bloqueio: "Infraestrutura - Docker não está rodando"
+     requer_acao_manual: true
+   ```
 
 ---
 
