@@ -81,6 +81,31 @@ VALIDACAO DE PRE-REQUISITOS:
    - REPROVAR com mensagem clara
    - NAO prosseguir com frontend
 
+VALIDACAO DATA-TEST ATTRIBUTES (BLOQUEANTE):
+Antes de considerar frontend concluido, o agente DEVE validar:
+
+1. TODOS elementos interativos TEM data-test attributes
+2. Nomenclatura segue padrao: data-test="<contexto>-<elemento>-<acao>"
+3. Executar validacao:
+   ```bash
+   grep -r "data-test=" frontend/src/app/modules/RFXXX/
+   ```
+4. Se resultado vazio ou insuficiente → BLOQUEAR conclusao do frontend
+5. Elementos que DEVEM ter data-test:
+   - Botoes (salvar, cancelar, excluir, etc.)
+   - Campos de formulario (input, select, textarea)
+   - Links de navegacao
+   - Grids/tabelas (headers, rows, acoes)
+   - Modals/dialogs
+6. Elementos que NAO precisam de data-test:
+   - Texto estatico
+   - Icones decorativos
+   - Divs estruturais
+
+Ver padrao completo em: docs/CONVENTIONS.md (secao 5.6 - Data-test Attributes)
+
+RAZAO: Testes E2E dependem de data-test. Sem eles, 100% dos testes FALHAM.
+
 Antes de qualquer coisa, analise se tudo está implementado no backend e caso falte algo me avise imediatamente.
 
 Preste MUITA atenção ao checklist obrigatório, pois é essencial que voce o siga.

@@ -229,10 +229,16 @@ TODO LIST - Manutencao/Correcao
   +-- [pending] Confirmar que está em dev antes de prosseguir
 
 [pending] Validar alinhamento RF ↔ Correção (BLOQUEANTE)
-  |-- [pending] Ler RFXXX.md (requisitos funcionais)
-  |-- [pending] Ler UC-RFXXX.md (casos de uso)
+  |-- [pending] Ler RFXXX.yaml (requisitos funcionais)
+  |-- [pending] Ler UC-RFXXX.yaml (casos de uso autorizados)
+  |-- [pending] Ler WF-RFXXX.md (fluxos de trabalho autorizados)
+  |-- [pending] Ler MD-RFXXX.yaml (modelo de dados autorizado)
   |-- [pending] Ler TC-RFXXX.yaml (casos de teste, se aplicável)
   |-- [pending] Validar que erro é DESVIO da especificação (não funcionalidade nova)
+  |-- [pending] Validar que correção NÃO adiciona campos não documentados no MD
+  |-- [pending] Validar que correção NÃO implementa fluxos não documentados no WF
+  |-- [pending] Validar que correção NÃO cria validações não especificadas no UC
+  |-- [pending] SE correção sair do escopo UC/WF/MD-RFXXX → PARAR e REPORTAR
   |-- [pending] SE RF NÃO especifica comportamento → PARAR e REPORTAR
   +-- [pending] Identificar gaps documentação ↔ código (reportar ao usuário)
 
@@ -436,15 +442,21 @@ O agente PODE atuar **somente se for estritamente necessário** para corrigir o 
 - Criar novas funcionalidades
 - Alterar regras de negócio
 - Refatorar código não relacionado ao erro
-- “Aproveitar” para melhorias técnicas
+- "Aproveitar" para melhorias técnicas
 - Introduzir novos padrões ou abstrações
 - Alterar arquitetura
 - Alterar contratos de RF
 - Alterar arquivos em `/docs`
 - Reorganizar pastas ou módulos
-- Ajustar código “preventivamente”
+- Ajustar código "preventivamente"
+- **Adicionar campos não documentados no MD-RFXXX.yaml**
+- **Implementar fluxos não documentados no WF-RFXXX.md**
+- **Criar validações não especificadas no UC-RFXXX.yaml**
+- **Sair do escopo definido no RF/UC/WF/MD correspondente**
 
 Manutenção NÃO é evolução.
+
+**Ver detalhes completos em:** Seção "GOVERNANÇA DE DOCUMENTAÇÃO (OBRIGATÓRIA)" → "⚠️ REGRA CRÍTICA: LIMITAÇÃO ABSOLUTA DE ESCOPO"
 
 ---
 
@@ -488,6 +500,97 @@ Caso o erro envolva ausência ou inconsistência de dados:
 **Manutenção corrige código, NÃO cria funcionalidade.**
 
 Para garantir isso, o agente DEVE validar que a correção está **ALINHADA** com a documentação existente.
+
+---
+
+### ⚠️ REGRA CRÍTICA: LIMITAÇÃO ABSOLUTA DE ESCOPO
+
+**TODA correção aplicada neste contrato DEVE respeitar RIGOROSAMENTE o escopo do RF correspondente:**
+
+- ✅ **UC-RFXXX.yaml:** Define os casos de uso autorizados
+- ✅ **WF-RFXXX.md:** Define os fluxos de trabalho autorizados
+- ✅ **MD-RFXXX.yaml:** Define o modelo de dados autorizado
+- ✅ **RFXXX.yaml:** Define os requisitos funcionais autorizados
+
+**PROIBIÇÕES ABSOLUTAS:**
+
+- ❌ **NÃO** corrigir código fora do escopo do UC/WF/MD-RFXXX
+- ❌ **NÃO** adicionar campos não documentados no MD-RFXXX.yaml
+- ❌ **NÃO** implementar fluxos não documentados no WF-RFXXX.md
+- ❌ **NÃO** criar validações não especificadas no UC-RFXXX.yaml
+- ❌ **NÃO** "aproveitar" para implementar funcionalidades pendentes
+- ❌ **NÃO** corrigir "problemas percebidos" não relacionados ao erro reportado
+
+**EXEMPLOS DE VIOLAÇÃO:**
+
+**BLOQUEIO #1 - Adicionar Campo Não Documentado:**
+```
+ERRO REPORTADO: "Botão salvar não funciona na tela de Clientes"
+
+MD-RF006.yaml: Define 10 campos (nome, CNPJ, endereço...)
+Código atual: Implementa 10 campos
+
+CORREÇÃO PROPOSTA: "Vou adicionar campo 'email' pois percebi que falta"
+
+VEREDICTO: ❌ BLOQUEIO TOTAL
+RAZÃO: MD-RF006.yaml NÃO especifica campo 'email'
+AÇÃO: SOMENTE corrigir o botão salvar, NÃO adicionar campo email
+```
+
+**BLOQUEIO #2 - Implementar Validação Não Especificada:**
+```
+ERRO REPORTADO: "Tela de Contratos com erro 500 ao salvar"
+
+UC-RF023.yaml: Define validações obrigatórias (data início < data fim, valor > 0)
+Código atual: NÃO valida CNPJ do fornecedor
+
+CORREÇÃO PROPOSTA: "Vou adicionar validação de CNPJ para evitar erros futuros"
+
+VEREDICTO: ❌ BLOQUEIO TOTAL
+RAZÃO: UC-RF023.yaml NÃO especifica validação de CNPJ
+AÇÃO: SOMENTE corrigir erro 500, NÃO adicionar validação de CNPJ
+```
+
+**BLOQUEIO #3 - Implementar Fluxo Não Documentado:**
+```
+ERRO REPORTADO: "Tela de Faturas não carrega dados"
+
+WF-RF026.md: Define fluxo de listagem e visualização de faturas
+WF-RF026.md: NÃO menciona exportação para Excel
+
+CORREÇÃO PROPOSTA: "Vou implementar exportação Excel já que estou mexendo aqui"
+
+VEREDICTO: ❌ BLOQUEIO TOTAL
+RAZÃO: WF-RF026.md NÃO especifica exportação
+AÇÃO: SOMENTE corrigir carregamento de dados, NÃO implementar exportação
+```
+
+**CORREÇÃO VÁLIDA - Dentro do Escopo:**
+```
+ERRO REPORTADO: "Validação de data início < data fim não funciona"
+
+UC-RF023.yaml linha 150: Especifica "Sistema valida que dtInicio < dtFim"
+Código atual: Implementa validação INCORRETAMENTE (dtInicio <= dtFim)
+
+CORREÇÃO PROPOSTA: "Vou corrigir validação para dtInicio < dtFim (excluindo igualdade)"
+
+VEREDICTO: ✅ APROVADO
+RAZÃO: UC-RF023.yaml ESPECIFICA essa validação
+AÇÃO: Corrigir operador <= para < conforme especificação
+```
+
+**AÇÃO OBRIGATÓRIA EM CASO DE VIOLAÇÃO:**
+
+Se correção exigir sair do escopo UC/WF/MD-RFXXX:
+
+1. **PARAR** imediatamente
+2. **REPORTAR** violação de escopo ao usuário
+3. **DECLARAR** o que está fora do escopo e por quê
+4. **SUGERIR** criação de aditivo ao RF (atividade separada)
+5. **AGUARDAR** decisão do usuário
+
+**Manutenção RESTAURA comportamento especificado.**
+**Manutenção NÃO implementa comportamento não especificado.**
 
 ---
 
@@ -680,6 +783,10 @@ A correção **SÓ é considerada válida** quando:
 - Testes existentes continuam passando
 - **STATUS.yaml foi atualizado com entrada de manutenção**
 - **Validação RF ↔ Correção foi executada e aprovada**
+- **Correção NÃO adicionou campos não documentados no MD-RFXXX.yaml**
+- **Correção NÃO implementou fluxos não documentados no WF-RFXXX.md**
+- **Correção NÃO criou validações não especificadas no UC-RFXXX.yaml**
+- **Correção permaneceu RIGOROSAMENTE dentro do escopo do RF**
 - Se aplicável:
   - Um teste automatizado é ajustado ou criado para evitar regressão
 

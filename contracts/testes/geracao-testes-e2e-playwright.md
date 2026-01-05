@@ -151,6 +151,167 @@ test('TC-E2E-001: Login e acesso ao módulo', async ({ page }) => {
 
 ---
 
+## 3.2 DEPENDÊNCIA CRÍTICA - Data-test Attributes (BLOQUEANTE)
+
+**Testes E2E Playwright DEPENDEM ABSOLUTAMENTE de data-test attributes nos componentes Angular.**
+
+### Validação Pré-teste (BLOQUEANTE)
+
+Antes de gerar specs Playwright, o agente DEVE validar que componentes têm data-test:
+
+```bash
+# Verificar presença de data-test no módulo do RF
+grep -r "data-test=" frontend/src/app/modules/RFXXX/
+
+# Se resultado vazio ou insuficiente → BLOQUEAR geração de testes
+```
+
+**Elementos que DEVEM ter data-test:**
+- Botões (salvar, cancelar, excluir, etc.)
+- Campos de formulário (input, select, textarea)
+- Links de navegação
+- Grids/tabelas (headers, rows)
+- Modals/dialogs
+
+### BLOQUEIO: Frontend sem data-test
+
+Se componente NÃO tiver data-test attributes:
+
+1. **PARAR** geração de testes imediatamente
+2. **REPORTAR** elementos faltantes ao usuário
+3. **DECLARAR** que testes E2E não podem ser gerados
+4. **SUGERIR** ativação de correção sistêmica cross-RF para data-test
+5. **AGUARDAR** correção do frontend
+
+**Mensagem de Bloqueio:**
+```
+❌ BLOQUEIO: Componentes do RFXXX sem data-test attributes
+
+Elementos faltantes:
+- Botão "Salvar" (sem data-test)
+- Campo "Nome" (sem data-test)
+- Grid "Clientes" (sem data-test)
+
+AÇÃO NECESSÁRIA:
+1. Corrigir frontend para adicionar data-test attributes
+2. Seguir padrão: data-test="<contexto>-<elemento>-<acao>"
+3. Ver: docs/CONVENTIONS.md (seção 5.6 - Data-test Attributes)
+
+TESTES E2E NÃO PODEM SER GERADOS sem data-test attributes.
+```
+
+### Seletores Obrigatórios (SEMPRE usar data-test)
+
+**TODOS os seletores Playwright DEVEM usar data-test:**
+
+```typescript
+// ✅ CORRETO - SEMPRE usar data-test
+await page.click('[data-test="btn-save"]');
+await page.fill('[data-test="input-name"]', 'João Silva');
+await page.selectOption('[data-test="select-status"]', 'Ativo');
+await page.locator('[data-test="grid-clients"]').waitFor();
+
+// ❌ INCORRETO - NUNCA usar (instáveis, podem quebrar)
+await page.click('.btn-primary'); // ❌ classe CSS pode mudar
+await page.click('#saveButton');  // ❌ ID pode mudar
+await page.click('button:has-text("Salvar")'); // ❌ texto pode ser traduzido (i18n)
+await page.locator('div.container > button'); // ❌ hierarquia pode mudar
+```
+
+**Razão:**
+- **Classes CSS** mudam em refatorações de estilo
+- **IDs** podem mudar em refatorações de código
+- **Texto** muda com i18n (pt-BR, en-US, es-ES)
+- **Hierarquia** muda em refatorações de estrutura
+- **data-test** é estável e explicitamente para testes
+
+### Validação de Seletores (Automática)
+
+Ao gerar specs, o agente DEVE validar:
+
+```typescript
+// Para CADA seletor gerado, validar que usa data-test
+const seletoresInvalidos = specs
+  .filter(spec => !spec.includes('[data-test="'))
+  .length;
+
+if (seletoresInvalidos > 0) {
+  throw new Error('Specs contêm seletores sem data-test. Geração BLOQUEADA.');
+}
+```
+
+### Exemplo Completo - RF006 (Gestão de Clientes)
+
+**TC-RF006-E2E-001.yaml: Criar novo cliente**
+
+**Frontend (CORRETO - COM data-test):**
+```html
+<form>
+  <input data-test="input-name" formControlName="nome" />
+  <input data-test="input-cnpj" formControlName="cnpj" />
+  <button data-test="btn-save">Salvar</button>
+  <button data-test="btn-cancel">Cancelar</button>
+</form>
+```
+
+**Spec Playwright Gerado (CORRETO):**
+```typescript
+test('TC-RF006-E2E-001: Criar novo cliente', async ({ page }) => {
+  // Navegar
+  await page.goto('http://localhost:4200/clients');
+
+  // Preencher formulário (usando data-test)
+  await page.fill('[data-test="input-name"]', 'Empresa Teste LTDA');
+  await page.fill('[data-test="input-cnpj"]', '12.345.678/0001-90');
+
+  // Salvar (usando data-test)
+  await page.click('[data-test="btn-save"]');
+
+  // Validar sucesso
+  await expect(page.locator('[data-test="toast-success"]')).toBeVisible();
+});
+```
+
+**Frontend (INCORRETO - SEM data-test):**
+```html
+<form>
+  <input formControlName="nome" />
+  <input formControlName="cnpj" />
+  <button>Salvar</button>
+  <button>Cancelar</button>
+</form>
+```
+
+**Resultado:**
+```
+❌ BLOQUEIO: Testes E2E não podem ser gerados
+Razão: Componentes sem data-test attributes
+Status: AGUARDANDO correção do frontend
+```
+
+### Integração com Correção Sistêmica Cross-RF
+
+Se MÚLTIPLOS RFs não têm data-test:
+
+**Sugerir ao usuário:**
+```
+📋 RECOMENDAÇÃO: Correção Sistêmica Cross-RF
+
+Identificados 42 RFs sem data-test attributes.
+
+Ação sugerida:
+1. Ativar: CONTRATO DE CORREÇÃO SISTÊMICA CROSS-RF
+2. Corrigir data-test em todos os 42 RFs simultaneamente
+3. Tempo estimado: ~5 horas (vs 42 horas RF por RF)
+
+Prompt pronto em:
+docs/prompts/manutencao/correcao-sistemica-cross-rf.md
+```
+
+**Ver padrões completos em:** `docs/CONVENTIONS.md` (seção 5.6 - Data-test Attributes)
+
+---
+
 ## 4. CRITÉRIO DE PRONTO
 
 O contrato só é considerado CONCLUÍDO quando:

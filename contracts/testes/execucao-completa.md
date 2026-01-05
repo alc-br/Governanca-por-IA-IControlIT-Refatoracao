@@ -99,7 +99,29 @@ O contrato TRAVA se qualquer condição falhar:
 
 **Se qualquer validação FALHAR:** BLOQUEIO TOTAL
 
-#### PASSO 1.2: Validar Builds
+#### PASSO 1.2: Matar Processos Travados (AUTOMÁTICO)
+
+**ANTES de validar builds, o agente DEVE AUTOMATICAMENTE matar processos travados:**
+
+```bash
+# Usar run.py para matar processos (RECOMENDADO)
+python run.py --kill-only
+```
+
+**OU (se --kill-only não disponível, usar PowerShell/Bash):**
+
+```powershell
+# Windows
+powershell.exe -ExecutionPolicy Bypass -Command "Get-Process | Where-Object { $_.ProcessName -like '*IControlIT*' -or $_.ProcessName -like '*node*' } | Stop-Process -Force"
+```
+
+**IMPORTANTE:**
+- Esta etapa é **OBRIGATÓRIA** antes de builds
+- Processos travados (PID bloqueando DLLs) são **NORMAIS** em desenvolvimento
+- **NÃO gerar prompt de correção** para processos travados
+- Apenas matar automaticamente e prosseguir
+
+#### PASSO 1.3: Validar Builds
 
 ```bash
 # Backend
@@ -111,7 +133,7 @@ cd frontend/icontrolit-app
 npm run build
 ```
 
-**Se QUALQUER build FALHAR:** BLOQUEIO TOTAL (PARAR, REPORTAR, BLOQUEAR)
+**Se QUALQUER build FALHAR (APÓS matar processos):** BLOQUEIO TOTAL (PARAR, REPORTAR, BLOQUEAR)
 
 ---
 
@@ -408,7 +430,27 @@ Para cada teste FALHADO:
 
 ### FASE 7.4: GERAR PROMPT DE CORREÇÃO AUTOMÁTICO (SE REPROVADO)
 
-**SE taxa de aprovação < 100%, o agente DEVE gerar automaticamente um prompt de correção.**
+**SE taxa de aprovação < 100%, o agente DEVE OBRIGATORIAMENTE gerar um prompt de correção completo e descritivo.**
+
+#### ⚠️ REGRA OBRIGATÓRIA: Prompt Completo e Descritivo
+
+O prompt de correção **DEVE** conter:
+
+1. ✅ **Contexto da execução** (RF, data, execução N, taxa de aprovação)
+2. ✅ **Descrição específica do erro** (mensagem exata, código de erro)
+3. ✅ **Evidências completas** (logs, processos travados, arquivos bloqueados)
+4. ✅ **Comandos já tentados** (e seus resultados - SUCESSO/FALHOU + motivo)
+5. ✅ **Fase e passo onde erro ocorreu** (ex: FASE 2 → PASSO 2.1)
+6. ✅ **Responsabilidade atribuída** (BACKEND/FRONTEND/INTEGRAÇÃO + justificativa técnica)
+7. ✅ **Arquivos prováveis** (onde erro provavelmente está)
+8. ✅ **Solução esperada** (passos claros e específicos, não genéricos)
+
+**PROIBIDO:**
+- ❌ Prompt vago ("Corrija isso usando...")
+- ❌ Placeholders não substituídos ([YYYY-MM-DD], [N], [Lista...])
+- ❌ Falta de evidências técnicas
+- ❌ Soluções genéricas ("corrigir o erro")
+- ❌ Omitir comandos tentados
 
 #### Template de Prompt de Correção
 
@@ -457,14 +499,20 @@ corrija os seguintes erros CRÍTICOS identificados na Execução [N] de testes d
 #### Arquivos Prováveis
 [Lista de arquivos que provavelmente contêm o erro]
 
+#### Comandos Tentados
+[Lista completa de comandos executados durante troubleshooting]
+1. `[comando 1]` → [✅ SUCESSO / ❌ FALHOU] ([motivo])
+2. `[comando 2]` → [✅ SUCESSO / ❌ FALHOU] ([motivo])
+
 #### Contexto Técnico
+- **Fase do erro:** [FASE X] → [PASSO X.X]
 - **[Informação relevante 1]**
 - **[Informação relevante 2]**
 - **Problema:** [Descrição técnica do problema]
 
 #### Solução Esperada
-1. [Passo 1 da correção esperada]
-2. [Passo 2 da correção esperada]
+1. [Passo 1 da correção esperada - ESPECÍFICO, não genérico]
+2. [Passo 2 da correção esperada - ESPECÍFICO, não genérico]
 3. [...]
 
 ---
@@ -544,6 +592,50 @@ Seguir CLAUDE.md e docs/contracts/desenvolvimento/execucao/manutencao/manutencao
    - Criar arquivo: `.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md`
    - Formato Markdown completo
    - Pronto para copiar e colar em nova conversa
+
+7. **Comandos Tentados (NOVO - OBRIGATÓRIO):**
+   - Listar TODOS os comandos executados durante troubleshooting
+   - Incluir resultado de cada comando (✅ SUCESSO / ❌ FALHOU + motivo)
+   - Exemplo:
+     ```
+     #### Comandos Tentados
+     1. `taskkill /F /PID 20924` → ❌ FALHOU (argumento inválido /PID não reconhecido)
+     2. `Get-Process | Where-Object...` → ❌ FALHOU (bash não reconhece PowerShell cmdlets)
+     3. `python run.py &` → ✅ SUCESSO (backend reiniciou)
+     ```
+
+8. **Contexto de Fase/Passo (NOVO - OBRIGATÓRIO):**
+   - Informar exatamente onde o erro ocorreu
+   - Formato: "Fase do erro: FASE X (Nome) → PASSO X.X (Descrição)"
+   - Exemplo: "Fase do erro: FASE 1 (PRÉ-REQUISITOS) → PASSO 1.2 (Validar Builds)"
+
+---
+
+#### 📋 Validação de Prompt Gerado (OBRIGATÓRIO)
+
+**Após salvar `.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md`, o agente DEVE:**
+
+1. ✅ Verificar que arquivo foi criado
+2. ✅ Verificar que arquivo tem > 100 linhas (prompt completo, não vago)
+3. ✅ Verificar que NÃO contém placeholders não substituídos:
+   - Buscar por `[YYYY-MM-DD]`, `[N]`, `[Lista...]`, `[RFXXX]`
+   - Se encontrar qualquer placeholder → **BLOQUEIO TOTAL**
+4. ✅ Verificar que seções obrigatórias estão presentes:
+   - "## CONTEXTO DA EXECUÇÃO"
+   - "## ERROS IDENTIFICADOS"
+   - "### ERRO [N] - [CATEGORIA]"
+   - "#### Descrição do Erro"
+   - "#### Evidências"
+   - "#### Comandos Tentados" (NOVO)
+   - "#### Contexto Técnico" (com "Fase do erro:")
+   - "#### Responsabilidade"
+   - "#### Solução Esperada"
+5. ✅ Exibir prompt completo na tela ANTES de salvar arquivo
+
+**SE qualquer validação FALHAR:**
+- ❌ **BLOQUEIO TOTAL**
+- Exibir mensagem: "Prompt de correção incompleto ou vago. Refazer FASE 7.4 com captura completa de contexto."
+- **NÃO prosseguir para FASE 8**
 
 ---
 
@@ -715,7 +807,12 @@ O contrato só é considerado CONCLUÍDO quando:
 - [ ] Falhas identificadas com responsável atribuído
 - [ ] Evidências geradas (screenshots, logs, traces)
 - [ ] Relatório consolidado criado
-- [ ] **SE REPROVADO: Prompt de correção gerado (.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md)**
+- [ ] **SE REPROVADO: Prompt de correção gerado e validado:**
+  - [ ] Arquivo `.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md` criado
+  - [ ] Prompt tem > 100 linhas (completo, não vago)
+  - [ ] ZERO placeholders não substituídos ([YYYY-MM-DD], [N], etc.)
+  - [ ] Todas as seções obrigatórias presentes (incluindo "Comandos Tentados")
+  - [ ] Prompt exibido na tela para validação do usuário
 - [ ] STATUS.yaml atualizado (incluindo testes.azure_devops)
 - [ ] azure-test-cases-RF[XXX].csv atualizado (State conforme resultado)
 - [ ] Decisão registrada (APROVADO/REPROVADO)

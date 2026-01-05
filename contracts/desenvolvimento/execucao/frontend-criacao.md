@@ -96,6 +96,150 @@ Se criar branch de `dev` quando `dev` tem conflitos:
 
 ---
 
+## REGRA OBRIGATÓRIA - Data-test Attributes (Infraestrutura de Testes E2E)
+
+**TODOS os componentes Angular criados neste contrato DEVEM incluir data-test attributes em elementos interativos.**
+
+### Obrigatoriedade
+
+Data-test attributes são **INFRAESTRUTURA DE TESTES**, não funcionalidade opcional.
+
+**Propósito:**
+- Testes E2E Playwright (seletores estáveis)
+- Testes de integração
+- Automação de QA
+- Garantir que 100% dos testes E2E executem
+
+### Elementos que DEVEM ter data-test
+
+- ✅ **Botões** (salvar, cancelar, excluir, adicionar, etc.)
+- ✅ **Campos de formulário** (input, select, textarea, checkbox, radio)
+- ✅ **Links de navegação** (routerLink, href)
+- ✅ **Grids/tabelas** (cabeçalhos, linhas, células clicáveis)
+- ✅ **Modals/dialogs** (container e botões)
+- ✅ **Menus/dropdowns** (p-menu, p-dropdown, etc.)
+
+### Elementos que NÃO precisam de data-test
+
+- ❌ **Textos estáticos** (labels, parágrafos de ajuda)
+- ❌ **Ícones decorativos** (sem ação)
+- ❌ **Divs/spans estruturais** (layout)
+
+### Padrão de Nomenclatura
+
+**Formato:** `data-test="<contexto>-<elemento>-<acao>"`
+
+**Exemplos:**
+```html
+<!-- Botões -->
+<button data-test="btn-save">Salvar</button>
+<button data-test="btn-cancel">Cancelar</button>
+
+<!-- Campos -->
+<input data-test="input-name" type="text" />
+<select data-test="select-status"></select>
+
+<!-- Links -->
+<a data-test="link-dashboard" routerLink="/dashboard">Dashboard</a>
+
+<!-- Grid -->
+<p-table data-test="grid-clients">
+  <ng-template pTemplate="header">
+    <tr>
+      <th data-test="header-name">Nome</th>
+    </tr>
+  </ng-template>
+</p-table>
+```
+
+### Validação Obrigatória (BLOQUEANTE)
+
+Antes de considerar frontend CONCLUÍDO, o agente DEVE validar:
+
+1. **Todos elementos especificados no WF-RFXXX.md têm data-test**
+   ```bash
+   # Verificar presença de data-test no módulo
+   grep -r "data-test=" frontend/src/app/modules/RFXXX/
+   ```
+
+2. **Nomenclatura segue padrão CONVENTIONS.md**
+   - Formato: `<contexto>-<elemento>-<acao>`
+   - Sem espaços, hífens como separadores
+
+3. **Data-test está documentado no WF-RFXXX.md**
+   - Seção "Elementos de Interface" deve listar data-test attributes
+
+4. **Elementos NÃO especificados no WF foram PULADOS**
+   - Correto: Se WF não menciona botão "Exportar", NÃO adicionar data-test nele
+   - Incorreto: Adicionar data-test em elementos não documentados
+
+### BLOQUEIO: Frontend sem data-test
+
+Se componente NÃO tiver data-test attributes:
+1. **PARAR** execução
+2. **REPORTAR** elementos faltantes
+3. **NÃO** marcar frontend como concluído
+4. **AGUARDAR** correção
+
+**Razão:** Testes E2E dependem de data-test. Sem eles, 100% dos testes FALHAM.
+
+### Exemplo Completo - RF006 (Gestão de Clientes)
+
+**WF-RF006.md especifica:**
+- Botão "Salvar Cliente"
+- Botão "Cancelar"
+- Campo "Nome do Cliente"
+- Campo "CNPJ"
+- Grid de Clientes
+
+**Implementação CORRETA:**
+```html
+<!-- Formulário -->
+<form>
+  <input data-test="input-name" formControlName="nome" />
+  <input data-test="input-cnpj" formControlName="cnpj" />
+
+  <button data-test="btn-save">Salvar Cliente</button>
+  <button data-test="btn-cancel">Cancelar</button>
+</form>
+
+<!-- Grid -->
+<p-table data-test="grid-clients">
+  <!-- ... -->
+</p-table>
+```
+
+**Implementação INCORRETA:**
+```html
+<!-- ❌ SEM data-test attributes -->
+<form>
+  <input formControlName="nome" />
+  <input formControlName="cnpj" />
+
+  <button>Salvar Cliente</button>
+  <button>Cancelar</button>
+</form>
+```
+
+### Integração com STATUS.yaml
+
+Após adicionar data-test attributes, atualizar STATUS.yaml:
+
+```yaml
+execucao:
+  frontend:
+    data_test_attributes:
+      aplicado: true
+      elementos_cobertos: 15
+      elementos_especificados_wf: 15
+      cobertura_percentual: 100
+      validacao: aprovada
+```
+
+**Ver padrões completos em:** `docs/CONVENTIONS.md` (seção 5.6 - Data-test Attributes)
+
+---
+
 ## CONSULTA OBRIGATÓRIA À BASE DE CONHECIMENTO
 
 Antes de criar a TODO LIST e iniciar qualquer implementação, o agente **DEVE**:

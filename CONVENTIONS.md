@@ -777,6 +777,187 @@ Exemplos:
 | Tempo atual (IDateTimeProvider) | Entidades |
 | Usuário atual (ICurrentUserService) | Value Objects |
 
+### 5.6 Data-test Attributes (Infraestrutura de Testes E2E)
+
+#### 🔴 OBRIGATÓRIO: Atributos data-test em Componentes Angular
+
+**TODOS os componentes Angular DEVEM incluir data-test attributes em elementos interativos.**
+
+Data-test attributes são **INFRAESTRUTURA DE TESTES**, não funcionalidade opcional. São necessários para:
+- Testes E2E Playwright
+- Testes de integração
+- Automação de QA
+
+#### 🔴 OBRIGATÓRIO: Formato do Atributo
+
+```
+data-test="<contexto>-<elemento>-<acao>"
+```
+
+**Estrutura:**
+- `<contexto>`: Módulo ou tela (ex: `client`, `contract`, `invoice`)
+- `<elemento>`: Tipo do elemento (ex: `btn`, `input`, `select`, `grid`, `link`)
+- `<acao>`: Ação ou identificador (ex: `save`, `cancel`, `name`, `email`)
+
+#### 🔴 OBRIGATÓRIO: Elementos que DEVEM ter data-test
+
+| Tipo de Elemento | Obrigatoriedade | Exemplo |
+|------------------|-----------------|---------|
+| Botões (ações) | **SIM** | `data-test="btn-save"` |
+| Campos de formulário | **SIM** | `data-test="input-name"` |
+| Selects/Dropdowns | **SIM** | `data-test="select-status"` |
+| Links de navegação | **SIM** | `data-test="link-dashboard"` |
+| Grids/Tabelas | **SIM** | `data-test="grid-clients"` |
+| Modals/Dialogs | **SIM** | `data-test="modal-confirm-delete"` |
+| Checkboxes/Radios | **SIM** | `data-test="checkbox-active"` |
+| Textos estáticos | **NÃO** | - |
+| Ícones decorativos | **NÃO** | - |
+| Divs/spans estruturais | **NÃO** | - |
+
+#### 🔴 OBRIGATÓRIO: Exemplos por Categoria
+
+**Botões:**
+```html
+<button data-test="btn-save">Salvar</button>
+<button data-test="btn-cancel">Cancelar</button>
+<button data-test="btn-delete">Excluir</button>
+<button data-test="btn-add-item">Adicionar Item</button>
+<button data-test="btn-export">Exportar</button>
+```
+
+**Campos de Formulário:**
+```html
+<!-- Inputs de texto -->
+<input data-test="input-name" type="text" />
+<input data-test="input-email" type="email" />
+<input data-test="input-phone" type="tel" />
+
+<!-- Selects -->
+<select data-test="select-status">
+  <option>Ativo</option>
+  <option>Inativo</option>
+</select>
+
+<!-- Textareas -->
+<textarea data-test="textarea-notes"></textarea>
+
+<!-- Checkboxes -->
+<input data-test="checkbox-active" type="checkbox" />
+
+<!-- Radios -->
+<input data-test="radio-tipo-fisica" type="radio" name="tipo" />
+<input data-test="radio-tipo-juridica" type="radio" name="tipo" />
+```
+
+**Links de Navegação:**
+```html
+<a data-test="link-dashboard" routerLink="/dashboard">Dashboard</a>
+<a data-test="link-clients" routerLink="/clients">Clientes</a>
+<a data-test="link-contracts" routerLink="/contracts">Contratos</a>
+```
+
+**Grids/Tabelas:**
+```html
+<table data-test="grid-clients">
+  <thead>
+    <tr>
+      <th data-test="header-name">Nome</th>
+      <th data-test="header-email">Email</th>
+      <th data-test="header-status">Status</th>
+      <th data-test="header-actions">Ações</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr data-test="row-client-1">
+      <td data-test="cell-name">João Silva</td>
+      <td data-test="cell-email">joao@example.com</td>
+      <td data-test="cell-status">Ativo</td>
+      <td>
+        <button data-test="btn-edit-1">Editar</button>
+        <button data-test="btn-delete-1">Excluir</button>
+      </td>
+    </tr>
+  </tbody>
+</table>
+```
+
+**Modals/Dialogs:**
+```html
+<div data-test="modal-confirm-delete">
+  <h3>Confirmar Exclusão</h3>
+  <p>Tem certeza que deseja excluir este item?</p>
+  <button data-test="btn-confirm-delete">Confirmar</button>
+  <button data-test="btn-cancel-delete">Cancelar</button>
+</div>
+```
+
+#### 🔴 OBRIGATÓRIO: Validação de Data-test
+
+Antes de considerar frontend concluído, validar:
+- [ ] Todos elementos especificados no **WF-RFXXX.md** têm data-test attributes
+- [ ] Nomenclatura segue padrão `<contexto>-<elemento>-<acao>`
+- [ ] Data-test está documentado no **WF-RFXXX.md** (seção "Elementos de Interface")
+- [ ] Seletores Playwright usam data-test (não classes CSS ou IDs)
+
+#### 🟡 RECOMENDADO: Prefixos por Contexto
+
+Para evitar colisões, usar prefixo de contexto:
+
+```html
+<!-- Módulo de Clientes -->
+<button data-test="client-btn-save">Salvar</button>
+<input data-test="client-input-name" />
+
+<!-- Módulo de Contratos -->
+<button data-test="contract-btn-save">Salvar</button>
+<input data-test="contract-input-number" />
+```
+
+#### ❌ INCORRETO: O que NÃO fazer
+
+```html
+<!-- ❌ NÃO usar classes CSS como seletores -->
+<button class="btn-primary">Salvar</button>
+
+<!-- ❌ NÃO usar IDs como seletores -->
+<button id="saveButton">Salvar</button>
+
+<!-- ❌ NÃO usar texto como seletor (pode ser traduzido) -->
+<button>Salvar</button>
+
+<!-- ❌ NÃO usar hierarquia de elementos -->
+<div class="actions">
+  <button>Salvar</button>
+</div>
+```
+
+#### ✅ CORRETO: Usar data-test
+
+```html
+<!-- ✅ SEMPRE usar data-test -->
+<button data-test="btn-save">Salvar</button>
+<input data-test="input-name" type="text" />
+<select data-test="select-status"></select>
+```
+
+#### 🔴 OBRIGATÓRIO: Integração com Testes E2E
+
+**Seletores Playwright DEVEM usar data-test:**
+
+```typescript
+// ✅ CORRETO
+await page.click('[data-test="btn-save"]');
+await page.fill('[data-test="input-name"]', 'João');
+await page.selectOption('[data-test="select-status"]', 'Ativo');
+
+// ❌ INCORRETO (NÃO usar)
+await page.click('.btn-primary'); // classe CSS pode mudar
+await page.click('#saveButton');  // ID pode mudar
+await page.click('button:has-text("Salvar")'); // texto pode ser traduzido
+```
+
+**Razão:** Data-test attributes são estáveis e não mudam com refatorações de CSS ou i18n.
+
 ---
 
 ## 6. Convenções de Commits e Versionamento
