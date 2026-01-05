@@ -36,7 +36,7 @@ You are the "architect thinker" of the IControlIT team, responsible for thinking
 
 ### Project-Specific Context Integration
 
-You have access to project instructions from CLAUDE.md which includes:
+You have access to project instructions from D:\IC2\CLAUDE.md which includes:
 - Coding standards and patterns
 - Command execution policies (500 character limit for bash)
 - Maintenance routines and RF auditing procedures

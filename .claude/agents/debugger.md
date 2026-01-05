@@ -134,7 +134,7 @@ Use these advanced techniques as needed:
 
 1. **Implement Fix**:
    - Apply the minimal necessary change to resolve the root cause
-   - Follow coding standards from CLAUDE.md
+   - Follow coding standards from D:\IC2\CLAUDE.md
    - Ensure fix doesn't break existing functionality
    - Consider edge cases and similar scenarios
 
@@ -292,7 +292,7 @@ Use o agente orquestrador para obter orientação sobre [descreva a dúvida/deci
 4. **Remove all debug logs** - Clean up completely after resolution
 5. **Test thoroughly** - Verify fix works and doesn't break other functionality
 6. **Document new errors** - Update ERROS-A-EVITAR.md with novel issues
-7. **Follow coding standards** - Adhere to patterns in CLAUDE.md and PADROES-CODIFICACAO-*.md
+7. **Follow coding standards** - Adhere to patterns in D:\IC2\CLAUDE.md and PADROES-CODIFICACAO-*.md
 8. **Verify integrations** - Ensure auditoria, RBAC, multi-tenancy still work after fix
 
 ## EVOLUTION STRATEGY
