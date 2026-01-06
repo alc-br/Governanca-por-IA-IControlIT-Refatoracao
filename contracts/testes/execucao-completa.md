@@ -179,7 +179,7 @@ O contrato TRAVA se qualquer condição falhar:
 
 **PARAR se qualquer item falhar.**
 
-### 3.1. Validação de Docker (INFRAESTRUTURA)
+### 3.1. Validação de Docker (INFRAESTRUTURA) - BLOQUEANTE
 
 **ANTES de QUALQUER teste backend, o agente DEVE validar Docker:**
 
@@ -189,28 +189,31 @@ docker ps
 ```
 
 **SE comando falhar:**
-- ❌ **BLOQUEAR execução de testes backend**
+- ❌ **BLOQUEAR execução de testes funcionais backend**
 - ❌ **NÃO tentar iniciar Docker automaticamente** (requer privilégios de sistema)
-- ✅ **REPORTAR ao usuário:**
+- ❌ **NÃO gerar prompt de correção** (não é erro de código)
+- ✅ **REPORTAR ao usuário E CONTINUAR com testes unitários:**
 
 ```
-BLOQUEIO: Docker não está rodando
+⚠️ BLOQUEIO PARCIAL: Docker não está rodando
 
-ERRO IDENTIFICADO:
-- 23 testes funcionais FALHARÃO (TestContainers dependency)
-- Docker Desktop DEVE estar ativo ANTES de executar testes
+IMPACTO:
+- ❌ Testes funcionais backend BLOQUEADOS (23 testes - TestContainers dependency)
+- ✅ Testes unitários backend PROSSEGUIRÃO normalmente
+- ✅ Testes frontend PROSSEGUIRÃO normalmente
 
-AÇÃO NECESSÁRIA:
+AÇÃO NECESSÁRIA (USUÁRIO - ANTES DE RE-EXECUTAR):
 1. Iniciar Docker Desktop manualmente
 2. Aguardar Docker estar pronto (ícone verde no sistema)
 3. Validar: docker ps
-4. Retornar execução de testes
+4. Re-executar testes: prompts/testes/execucao-completa.md
 
 RESPONSABILIDADE: INFRAESTRUTURA (não é erro de código)
+TIPO: BLOQUEIO DE AMBIENTE (não gera prompt de correção)
 ```
 
 **SE comando SUCEDER:**
-- ✅ Prosseguir com testes normalmente
+- ✅ Prosseguir com TODOS os testes normalmente
 
 ---
 
@@ -583,99 +586,240 @@ Para cada teste FALHADO:
 - Gerar relatório de falha
 - **Criar prompt de correção automático (OBRIGATÓRIO)**
 
-#### PASSO 7.3: Atribuir Responsabilidade
+#### PASSO 7.3: Atribuir Responsabilidade E CLASSIFICAR
 
-**BACKEND é responsável quando:**
+**🚨 REGRA CRÍTICA: Classificar ANTES de atribuir responsabilidade**
+
+```
+1. Identificar erro
+2. Classificar: CÓDIGO ou INFRAESTRUTURA?
+3. SE CÓDIGO → Atribuir camada (BACKEND/FRONTEND/INTEGRAÇÃO)
+4. SE INFRAESTRUTURA → Marcar como BLOQUEIO (não gerar prompt)
+```
+
+---
+
+### CLASSIFICAÇÃO: BLOQUEIO DE INFRAESTRUTURA (Ação do Usuário)
+
+**❌ NÃO gerar prompt de correção**
+**✅ Reportar ao usuário e instruir ação manual**
+
+| Erro | Responsável | Ação do Usuário |
+|------|-------------|-----------------|
+| Docker não rodando | USUÁRIO | Iniciar Docker Desktop → validar `docker ps` |
+| Processo travado (PID) | USUÁRIO | Matar processo: `python run.py --kill-only` |
+| Banco não acessível | USUÁRIO | Validar connection string, iniciar SQL Server |
+| Variáveis ambiente ausentes | USUÁRIO | Configurar `.env` ou `appsettings.json` |
+| Porta ocupada | USUÁRIO | Liberar porta ou alterar configuração |
+
+**Marcação no relatório:**
+```
+RESPONSABILIDADE: INFRAESTRUTURA
+TIPO: BLOQUEIO DE AMBIENTE
+GERAR PROMPT: NÃO
+AÇÃO: Usuário deve [ação específica]
+```
+
+---
+
+### CLASSIFICAÇÃO: ERRO DE CÓDIGO (Correção via Prompt)
+
+**✅ GERAR prompt de correção**
+**✅ Atribuir camada responsável**
+
+#### BACKEND é responsável quando:
 - HTTP 500 (erro interno do servidor)
 - HTTP 400 com mensagem incorreta
 - Validação aceita payload inválido
 - Violação não rejeitada
 - Multi-tenancy quebrado (retorna dados de outro tenant)
 - Auditoria não gravada
-- Endpoint /health não responde (TIMEOUT/ERROR/BACKEND_DOWN)
-- Backend não confirma "Application started" nos logs
-- Seeds travando inicialização (InitialiseDatabaseAsync bloqueante)
+- **Testes unitários falhando** (Domain, Application)
 - **AutoMapper configuration inválida:**
   - Teste `ShouldHaveValidConfiguration` falhando
   - Unmapped members detectados
   - Arquivo responsável: `*MappingProfile.cs`
-  - **Correção via CONTRATO DE MANUTENÇÃO CONTROLADA**
-  - **NÃO criar data-test para isto** (não é UI)
+  - **Correção via CONTRATO DE MANUTENÇÃO CONTROLADA/COMPLETA**
 
-**FRONTEND é responsável quando:**
+**Marcação no relatório:**
+```
+RESPONSABILIDADE: BACKEND ❌
+TIPO: ERRO DE CÓDIGO
+GERAR PROMPT: SIM
+CONTRATO: manutencao-controlada.md (ou manutencao-completa.md se > 3 arquivos)
+```
+
+#### FRONTEND é responsável quando:
+- **Compilação TypeScript falhou** (erros TS)
+- **Testes unitários falhando** (Jest)
 - Elemento não renderizado (data-test ausente)
 - Estado Loading não visível
 - Estado Vazio não visível
 - Estado Erro não visível
 - i18n quebrado (chave não traduzida)
 - Validação de formulário ausente
+- **Mock objects desatualizados**
+- **Signals do Angular mal configurados**
 
-**INTEGRAÇÃO é responsável quando:**
+**Marcação no relatório:**
+```
+RESPONSABILIDADE: FRONTEND ❌
+TIPO: ERRO DE CÓDIGO
+GERAR PROMPT: SIM
+CONTRATO: manutencao-controlada.md (ou manutencao-completa.md se > 3 arquivos)
+```
+
+#### INTEGRAÇÃO é responsável quando:
 - Contrato de API quebrado (campo ausente)
 - DTO incompatível
 - Mapeamento incorreto
 
-**INFRAESTRUTURA é responsável quando:**
-- Docker não está rodando (TestContainers dependency)
-- Processo travado bloqueando DLLs (PID bloqueante)
-- Variáveis de ambiente ausentes
-- Banco de dados não acessível
-- **NÃO gerar prompt de correção para infraestrutura**
-- **Reportar ao usuário para ação manual**
+**Marcação no relatório:**
+```
+RESPONSABILIDADE: INTEGRAÇÃO ❌
+TIPO: ERRO DE CÓDIGO
+GERAR PROMPT: SIM
+CONTRATO: manutencao-completa.md (cross-layer)
+```
 
-#### 🚨 REGRA ESPECIAL: Erros de Infraestrutura
+#### 🚨 REGRA ESPECIAL: Erros de Infraestrutura vs Erros de Código
 
-**Quando erro for de INFRAESTRUTURA, o agente DEVE:**
+**Quando houver APENAS bloqueios de infraestrutura (0 erros de código):**
 
-1. ❌ **NÃO gerar prompt de correção** (agente não pode corrigir infraestrutura)
+1. ❌ **NÃO gerar prompt de correção** (não há código para corrigir)
 2. ✅ **Reportar claramente ao usuário:**
    ```
-   BLOQUEIO: Infraestrutura (não é erro de código)
+   ⚠️ BLOQUEIO DE INFRAESTRUTURA (não é erro de código)
 
-   ERRO IDENTIFICADO:
-   - [Descrição do erro de infraestrutura]
+   BLOQUEIOS IDENTIFICADOS:
+   - Docker não está rodando (23 testes funcionais backend)
+   - [outros bloqueios...]
 
    AÇÃO NECESSÁRIA (USUÁRIO):
-   1. [Passo 1 manual]
-   2. [Passo 2 manual]
-   3. Retornar execução de testes
+   1. Iniciar Docker Desktop
+   2. Validar: docker ps
+   3. Re-executar: prompts/testes/execucao-completa.md
 
-   RESPONSABILIDADE: INFRAESTRUTURA
+   RESPONSABILIDADE: USUÁRIO (infraestrutura)
+   NÃO HÁ ERROS DE CÓDIGO PARA CORRIGIR.
    ```
-3. ✅ **Atualizar STATUS.yaml com bloqueio:**
+3. ✅ **Atualizar STATUS.yaml:**
    ```yaml
    testes_ti:
-     resultado_final: "BLOQUEADO"
-     motivo_bloqueio: "Infraestrutura - Docker não está rodando"
+     resultado_final: "BLOQUEADO_INFRAESTRUTURA"
+     motivo_bloqueio: "Docker não disponível"
      requer_acao_manual: true
+     erros_codigo: 0
+     bloqueios_infraestrutura: 1
+   ```
+
+---
+
+**Quando houver MIX (bloqueios de infraestrutura + erros de código):**
+
+1. ✅ **GERAR prompt de correção APENAS para erros de código**
+2. ✅ **Separar claramente bloqueios vs erros no prompt:**
+   ```
+   📋 PROMPT DE CORREÇÃO + BLOQUEIOS
+
+   ERROS DE CÓDIGO (COPIAR PROMPT):
+   - ERRO #1: Frontend Unit Tests (11 erros TypeScript)
+   → Arquivo: .temp_ia/PROMPT-CORRECAO-RF006-2026-01-06.md
+
+   BLOQUEIOS DE INFRAESTRUTURA (AÇÃO USUÁRIO):
+   - Docker não disponível (23 testes funcionais backend)
+   → Ação: Iniciar Docker Desktop
+
+   ORDEM DE RESOLUÇÃO:
+   1. Corrigir ERROS DE CÓDIGO (copiar prompt acima)
+   2. Resolver BLOQUEIOS (ações manuais)
+   3. Re-executar testes completos
+   ```
+3. ✅ **Atualizar STATUS.yaml:**
+   ```yaml
+   testes_ti:
+     resultado_final: "REPROVADO_MISTO"
+     erros_codigo: 11
+     bloqueios_infraestrutura: 23
+     requer_correcao_codigo: true
+     requer_acao_usuario: true
    ```
 
 ---
 
 ### FASE 7.4: GERAR PROMPT DE CORREÇÃO AUTOMÁTICO (SE REPROVADO)
 
-**SE taxa de aprovação < 100%, o agente DEVE OBRIGATORIAMENTE:**
+#### 🚨 REGRA CRÍTICA: Diferenciar Bloqueios de Infraestrutura vs Erros de Código
 
-1. ✅ **Gerar prompt de correção completo e descritivo**
-2. ✅ **Salvar em `.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md`**
-3. ✅ **Exibir prompt completo na tela**
-4. ✅ **Informar ao usuário:**
+**ANTES de gerar prompt de correção, o agente DEVE classificar cada erro:**
+
+| Tipo | Responsabilidade | Gerar Prompt? | Ação |
+|------|------------------|---------------|------|
+| **Erro de Código** | BACKEND/FRONTEND/INTEGRAÇÃO | ✅ **SIM** | Gerar prompt de correção |
+| **Bloqueio de Infraestrutura** | USUÁRIO | ❌ **NÃO** | Reportar e instruir usuário |
+
+**Exemplos de Bloqueio de Infraestrutura (NÃO gerar prompt):**
+- Docker não está rodando
+- Banco de dados não acessível
+- Variáveis de ambiente ausentes
+- Processos travados (PID bloqueando DLLs)
+
+**Exemplos de Erro de Código (GERAR prompt):**
+- Compilação TypeScript falhou (frontend)
+- Testes unitários falhando (backend/frontend)
+- AutoMapper configuration inválida (backend)
+- Data-test attributes ausentes (frontend)
+
+---
+
+**SE taxa de aprovação < 100% E houver ERROS DE CÓDIGO:**
+
+1. ✅ **Filtrar apenas erros de código** (excluir bloqueios de infraestrutura)
+2. ✅ **Gerar prompt de correção completo e descritivo**
+3. ✅ **Salvar em `.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md`**
+4. ✅ **Exibir prompt completo na tela**
+5. ✅ **Informar ao usuário:**
    ```
    📋 PROMPT DE CORREÇÃO GERADO
 
-   Arquivo: .temp_ia/PROMPT-CORRECAO-RFXXX-2026-01-05-EXECUCAO-1.md
+   Arquivo: .temp_ia/PROMPT-CORRECAO-RFXXX-2026-01-06-EXECUCAO-1.md
 
-   Para corrigir os erros identificados, COPIE o conteúdo do arquivo acima
+   ERROS DE CÓDIGO IDENTIFICADOS:
+   - ERRO #1: Frontend Unit Tests (11 erros TypeScript)
+   - (lista apenas erros que exigem correção de código)
+
+   BLOQUEIOS DE INFRAESTRUTURA (AÇÃO DO USUÁRIO):
+   - Docker não está rodando (iniciar Docker Desktop)
+
+   Para corrigir os ERROS DE CÓDIGO, COPIE o conteúdo do arquivo acima
    e COLE em uma NOVA CONVERSA com o Claude Code.
 
-   O prompt já está pronto para uso e contém:
-   - Contexto completo da execução
-   - Erros identificados com responsabilidade atribuída
-   - Evidências técnicas completas
-   - Solução esperada detalhada
+   Para resolver BLOQUEIOS DE INFRAESTRUTURA, execute as ações indicadas
+   e RE-EXECUTE os testes.
    ```
-5. ❌ **NUNCA tentar corrigir código** durante execução de testes
-6. ❌ **NUNCA fazer commits** de correções
+6. ❌ **NUNCA tentar corrigir código** durante execução de testes
+7. ❌ **NUNCA fazer commits** de correções
+
+---
+
+**SE taxa de aprovação < 100% APENAS por bloqueios de infraestrutura:**
+
+1. ❌ **NÃO gerar prompt de correção** (não há código para corrigir)
+2. ✅ **Reportar bloqueios ao usuário:**
+   ```
+   ⚠️ EXECUÇÃO BLOQUEADA POR INFRAESTRUTURA
+
+   BLOQUEIOS IDENTIFICADOS:
+   - Docker não está rodando (23 testes funcionais backend)
+
+   AÇÃO NECESSÁRIA (USUÁRIO):
+   1. Iniciar Docker Desktop
+   2. Validar: docker ps
+   3. Re-executar: prompts/testes/execucao-completa.md
+
+   NÃO HÁ ERROS DE CÓDIGO PARA CORRIGIR.
+   Após resolver bloqueios, testes devem passar.
+   ```
 
 #### ⚠️ REGRA OBRIGATÓRIA: Prompt Completo e Descritivo
 
@@ -699,18 +843,34 @@ O prompt de correção **DEVE** conter:
 
 #### Template de Prompt de Correção
 
+**IMPORTANTE:** Este template é usado APENAS quando houver **ERROS DE CÓDIGO** (não bloqueios de infraestrutura).
+
 ```markdown
-Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\manutencao-controlada.md para corrigir os seguintes erros CRÍTICOS identificados na Execução [N] de testes do RFXXX:
+Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\[TIPO].md para corrigir os seguintes erros CRÍTICOS identificados na Execução [N] de testes do RFXXX:
+
+[TIPO] = manutencao-controlada.md (se <= 3 arquivos) OU manutencao-completa.md (se > 3 arquivos)
 
 ## CONTEXTO DA EXECUÇÃO
 
 - **RF:** RFXXX - [Título do RF]
 - **Data:** [YYYY-MM-DD]
 - **Execução:** [N]ª tentativa
-- **Taxa de Aprovação:** [XX%] ([Y]/[Z] testes)
+- **Taxa de Aprovação:** [XX%] ([Y]/[Z] testes CÓDIGO | [W] testes BLOQUEADOS por infraestrutura)
 - **Resultado:** REPROVADO (critério: 100%)
 - **Relatório:** .temp_ia/RELATORIO-TESTES-RFXXX-[DATA]-EXECUCAO-[N].md
 - **STATUS.yaml:** Atualizado com execução [N]
+
+## BLOQUEIOS DE INFRAESTRUTURA (AÇÃO DO USUÁRIO - NÃO CORRIGIR)
+
+[SE houver bloqueios de infraestrutura, listar aqui:]
+
+- ⚠️ **Docker não disponível:** 23 testes funcionais backend bloqueados
+  - Ação: Iniciar Docker Desktop
+  - Validar: `docker ps`
+  - Re-executar testes após resolver
+
+[SE não houver bloqueios, escrever:]
+- ✅ Nenhum bloqueio de infraestrutura identificado
 
 ## ERROS IDENTIFICADOS
 
