@@ -188,32 +188,60 @@ O contrato TRAVA se qualquer condição falhar:
 docker ps
 ```
 
-**SE comando falhar:**
+#### ℹ️ CONTEXTO: Testcontainers
+
+**Por que Docker é necessário:**
+- Testes funcionais backend usam **Testcontainers** (biblioteca .NET)
+- Testcontainers cria containers SQL Server efêmeros para testes
+- Containers são criados/destruídos automaticamente durante execução
+- Arquivo responsável: `tests/Application.FunctionalTests/SqlTestcontainersTestDatabase.cs`
+
+**Alternativa (SE Docker não disponível):**
+- Existe `SqlTestDatabase.cs` que usa SQL Server local
+- Requer alterar `TestDatabaseFactory.cs` (linha 9)
+- **NÃO é responsabilidade do agente** (decisão arquitetural)
+- **NÃO sugerir esta alternativa** ao usuário
+
+---
+
+**SE comando `docker ps` falhar:**
 - ❌ **BLOQUEAR execução de testes funcionais backend**
 - ❌ **NÃO tentar iniciar Docker automaticamente** (requer privilégios de sistema)
 - ❌ **NÃO gerar prompt de correção** (não é erro de código)
+- ❌ **NÃO sugerir usar SQL Server local** (decisão arquitetural)
 - ✅ **REPORTAR ao usuário E CONTINUAR com testes unitários:**
 
 ```
 ⚠️ BLOQUEIO PARCIAL: Docker não está rodando
 
 IMPACTO:
-- ❌ Testes funcionais backend BLOQUEADOS (23 testes - TestContainers dependency)
-- ✅ Testes unitários backend PROSSEGUIRÃO normalmente
+- ❌ Testes funcionais backend BLOQUEADOS (23 testes - Testcontainers dependency)
+- ✅ Testes unitários backend PROSSEGUIRÃO normalmente (5 testes Domain.UnitTests)
+- ✅ Testes unitários backend PROSSEGUIRÃO normalmente (26 testes Application.UnitTests)
 - ✅ Testes frontend PROSSEGUIRÃO normalmente
+
+CONTEXTO TÉCNICO:
+- Testcontainers cria containers SQL Server efêmeros
+- Biblioteca: Testcontainers.MsSql (via NuGet)
+- Container: mcr.microsoft.com/mssql/server:2022-latest (baixado automaticamente)
+- Arquivo: tests/Application.FunctionalTests/SqlTestcontainersTestDatabase.cs
 
 AÇÃO NECESSÁRIA (USUÁRIO - ANTES DE RE-EXECUTAR):
 1. Iniciar Docker Desktop manualmente
-2. Aguardar Docker estar pronto (ícone verde no sistema)
-3. Validar: docker ps
+2. Aguardar Docker estar pronto (ícone verde na bandeja do sistema)
+3. Validar: docker ps (deve retornar cabeçalhos sem erro)
 4. Re-executar testes: prompts/testes/execucao-completa.md
+
+OBSERVAÇÃO: Primeira execução pode ser lenta (download da imagem SQL Server ~1.5GB)
 
 RESPONSABILIDADE: INFRAESTRUTURA (não é erro de código)
 TIPO: BLOQUEIO DE AMBIENTE (não gera prompt de correção)
 ```
 
-**SE comando SUCEDER:**
+**SE comando `docker ps` SUCEDER:**
 - ✅ Prosseguir com TODOS os testes normalmente
+- ✅ Testcontainers criará containers SQL Server automaticamente
+- ✅ Containers serão destruídos ao final dos testes
 
 ---
 
@@ -417,15 +445,47 @@ cd backend/IControlIT.API
 dotnet test --verbosity normal
 ```
 
+#### ℹ️ CONTEXTO: Comportamento Esperado dos Testes Funcionais
+
+**COM Docker rodando:**
+```
+✅ Domain.UnitTests: 5/5 testes passam (fast)
+✅ Application.UnitTests: 26/26 testes passam (fast)
+✅ Application.FunctionalTests: 23/23 testes passam (slow - Testcontainers)
+   - Testcontainers baixa imagem SQL Server (primeira vez: ~1.5GB)
+   - Testcontainers cria container efêmero
+   - Testes executam contra SQL Server real
+   - Container é destruído automaticamente
+   - Tempo estimado: 30-60s (primeira execução), 10-20s (subsequentes)
+
+Total: 54/54 testes
+```
+
+**SEM Docker rodando:**
+```
+✅ Domain.UnitTests: 5/5 testes passam (fast)
+✅ Application.UnitTests: 26/26 testes passam (fast)
+❌ Application.FunctionalTests: 0/23 testes executados (SKIP - Docker não disponível)
+   - Testcontainers tenta conectar ao Docker
+   - Falha: "Docker not found" ou similar
+   - 23 testes PULADOS (não é falha de código)
+
+Total: 31/54 testes (23 bloqueados por infraestrutura)
+```
+
+**IMPORTANTE:**
+- Testes funcionais pulados NÃO são erro de código
+- Docker ausente = BLOQUEIO DE INFRAESTRUTURA
+- Taxa de aprovação será < 100%, mas NÃO gera prompt de correção
+- Resultado: `BLOQUEADO_INFRAESTRUTURA` (não `REPROVADO`)
+
 #### PASSO 3.2: Registrar Resultados
 
-- ✅ Testes unitários passaram
-- ✅ Testes de integração passaram
-- ✅ Testes de contrato passaram
-- ✅ Testes de violação passaram
-- ✅ Backend rejeita payloads inválidos
+- ✅ Testes unitários passaram (Domain: 5, Application: 26)
+- ✅ Testes funcionais passaram (Application.FunctionalTests: 23) **OU** ⚠️ Bloqueados (Docker ausente)
+- ✅ Backend rejeita payloads inválidos (se funcionais executaram)
 
-**Resultado:** PASS/FAIL
+**Resultado:** PASS/FAIL/BLOCKED
 
 ---
 
