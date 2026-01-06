@@ -7,13 +7,13 @@ Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 
 ORDEM DE EXECUCAO (BLOQUEANTE):
 1. PRIMEIRO: Executar CONTRATO-GERACAO-DOCS-MT
-   - Criar docs\rf\[FASE]\[EPIC]\[RFXXX]\MT-RF[XXX].yaml (Massa de Teste)
+   - Criar D:\IC2\rf\[FASE]\[EPIC]\[RFXXX]\MT-RF[XXX].yaml (Massa de Teste)
    - Validar via checklist-documentacao-mt.yaml
    - Atualizar STATUS.yaml
    - SOMENTE prosseguir se aprovado 100%
 
 2. SEGUNDO: Executar CONTRATO-GERACAO-DOCS-TC
-   - Criar docs\rf\[FASE]\[EPIC]\[RFXXX]\TC-RF[XXX].yaml (Casos de Teste)
+   - Criar D:\IC2\rf\[FASE]\[EPIC]\[RFXXX]\TC-RF[XXX].yaml (Casos de Teste)
    - Validar via checklist-documentacao-tc.yaml
    - Atualizar STATUS.yaml
    - SOMENTE prosseguir se aprovado 100%

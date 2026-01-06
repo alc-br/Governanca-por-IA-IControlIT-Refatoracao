@@ -52,7 +52,7 @@ Seguir D:\IC2\CLAUDE.md.
 
 Exemplo de solicitação simplificada:
 ```
-"Para o RF006 docs\rf\...\RF006-Gestao-de-Clientes execute o docs\prompts\testes\execucao-completa.md"
+"Para o RF006 D:\IC2\rf\...\RF006-Gestao-de-Clientes execute o docs\prompts\testes\execucao-completa.md"
 ```
 
 **O agente DEVE:**

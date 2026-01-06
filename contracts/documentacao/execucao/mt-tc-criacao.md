@@ -214,7 +214,7 @@ Antes de QUALQUER ação, o agente DEVE validar:
 ## 5. ESTRUTURA DE ARQUIVOS (OBRIGATÓRIA)
 
 ```
-D:\IC2\docs\rf\[FASE]\[EPIC]\[RFXXX]\
+ D:\IC2\rf\[FASE]\[EPIC]\[RFXXX]\
 ├── RF[XXX].yaml
 ├── UC-RF[XXX].md
 ├── UC-RF[XXX].yaml
@@ -226,7 +226,7 @@ D:\IC2\docs\rf\[FASE]\[EPIC]\[RFXXX]\
 
 **Exemplo para RF006:**
 ```
-D:\IC2\docs\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF006-Gestao-de-Clientes\
+ D:\IC2\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF006-Gestao-de-Clientes\
 ├── MT-RF006.yaml                 ⚠️ CRIAR AQUI
 ├── TC-RF006.yaml                 ⚠️ CRIAR AQUI
 └── STATUS.yaml                   ⚠️ ATUALIZAR

@@ -188,7 +188,7 @@ O sistema permite aos administradores gerenciar parâmetros de configuração ce
 - **Limites de Uso**: Definidos por plano contratado (Básico, Pro, Enterprise)
 
 **Evidências adicionais (opcional):**
-- Documento RF001.md completo: `D:\IC2\docs\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF001-Parametros-e-Configuracoes-do-Sistema\RF001.md`
+- Documento RF001.md completo: ` D:\IC2\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF001-Parametros-e-Configuracoes-do-Sistema\RF001.md`
 - 15 Regras de Negócio documentadas (RN-CFG-001-01 até RN-CFG-001-15)
 - Modelo de dados completo em `MD-RF001.md`
 - Casos de uso em `UC-RF001.md`
@@ -355,7 +355,7 @@ O sistema centraliza TODAS as configurações infraestruturais e de integração
 - **Estratégias de Rollout**: Percentual aleatório, lista de usuários específicos, perfis (gerentes), empresas piloto
 
 **Evidências adicionais (opcional):**
-- Documento RF002.md completo: `D:\IC2\docs\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF002-Configuracoes-e-Parametrizacao\RF002.md`
+- Documento RF002.md completo: ` D:\IC2\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF002-Configuracoes-e-Parametrizacao\RF002.md`
 - 15 Regras de Negócio documentadas (RN-SIS-001 até RN-SIS-015)
 - Diferenciação clara entre RF-001 (parâmetros operacionais) e RF-002 (configurações infraestruturais)
 - Exemplo de web.config legado com senhas em texto claro (violação de segurança)
@@ -569,7 +569,7 @@ O sistema implementa infraestrutura completa de observabilidade para garantir SL
 - **Mascaramento**: CPF obrigatório Brasil, SSN obrigatório USA, GDPR compliance Europa
 
 **Evidências adicionais (opcional):**
-- Documento RF003.md completo: `D:\IC2\docs\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF003-Logs-Monitoramento-Observabilidade\RF003.md`
+- Documento RF003.md completo: ` D:\IC2\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF003-Logs-Monitoramento-Observabilidade\RF003.md`
 - 12 Regras de Negócio documentadas (RN-LOG-001 até RN-LOG-012)
 - Configuração Serilog completa em appsettings.json
 - Código de Health Checks em Program.cs
@@ -791,7 +791,7 @@ O sistema implementa auditoria completa de todas as operações críticas para c
 - **Timeline de Entidade**: Básico=últimos 90 dias, Enterprise=histórico completo ilimitado
 
 **Evidências adicionais (opcional):**
-- Documento RF004.md completo: `D:\IC2\docs\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF004-Auditoria-Logs-Sistema\RF004.md`
+- Documento RF004.md completo: ` D:\IC2\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF004-Auditoria-Logs-Sistema\RF004.md`
 - 15 Regras de Negócio documentadas (RN-AUD-001 até RN-AUD-015)
 - Diferenciação clara RF-003 (logs técnicos) vs RF-004 (auditoria negócio)
 - Tabela legada Auditoria com problemas críticos documentados

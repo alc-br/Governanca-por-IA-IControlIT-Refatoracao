@@ -146,16 +146,16 @@ casos_de_uso:
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | `D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 
 ### 4.2 Permissões de Escrita
 
 O agente PODE escrever **APENAS** em:
 ```
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\UC-RFXXX.md
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\UC-RFXXX.yaml
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\UC-RFXXX.md
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\UC-RFXXX.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
@@ -191,13 +191,13 @@ O contrato TRAVA se qualquer condição falhar:
 Antes de criar qualquer documento, o agente DEVE:
 
 #### 1.1 Ler RFXXX.md Completamente
-- Localização: `D:\IC2\docs\rf\[Fase]\[EPIC]\RFXXX\RFXXX.md`
+- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\RFXXX.md`
 - Entender TODAS as funcionalidades descritas
 - Identificar TODAS as regras de negócio (RN-RFXXX-NNN)
 - Mapear endpoints, permissões e integrações
 
 #### 1.2 Ler RFXXX.yaml Completamente
-- Localização: `D:\IC2\docs\rf\[Fase]\[EPIC]\RFXXX\RFXXX.yaml`
+- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\RFXXX.yaml`
 - Extrair catálogo de funcionalidades (`rf_items`)
 - Mapear regras de negócio estruturadas
 - Identificar entidades principais

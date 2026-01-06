@@ -144,7 +144,7 @@ Em **RL-RFXXX.yaml** (para cada item):
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | `D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 | **LEGACY_PATH** | `D:\IC2\ic1_legado\IControlIT\` |
 
@@ -152,11 +152,11 @@ Em **RL-RFXXX.yaml** (para cada item):
 
 O agente PODE escrever **APENAS** em:
 ```
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\RFXXX.md
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\RFXXX.yaml
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.md
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.yaml
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\RFXXX.md
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\RFXXX.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.md
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
@@ -177,7 +177,7 @@ O contrato TRAVA se qualquer condição falhar:
 | Pasta do RF | Pasta já criada em `rf/[Fase]/[EPIC]/RFXXX/` | Sim |
 | Templates acessíveis | Templates em `D:\IC2\docs\templates\` disponíveis | Sim |
 | Legado acessível | Código legado em `D:\IC2\ic1_legado\` disponível | Sim |
-| Documentação funcional | `D:\IC2\docs\rf\documentacao-funcional.md` acessível (referência) | Não* |
+| Documentação funcional | ` D:\IC2\rf\documentacao-funcional.md` acessível (referência) | Não* |
 
 **PARAR se qualquer item falhar.**
 
@@ -783,7 +783,7 @@ python D:\IC2_Governanca\tools\docs\validator-rl.py RFXXX
 
 Antes de iniciar a análise do legado, o agente DEVE:
 
-1. **Ler** o arquivo `D:\IC2\docs\rf\documentacao-funcional.md`
+1. **Ler** o arquivo ` D:\IC2\rf\documentacao-funcional.md`
 2. **Verificar** se o RFXXX já está documentado nele
 3. **Usar** como referência inicial (se existir)
 
@@ -1043,7 +1043,7 @@ O agente DEVE PARAR se:
 
 Após criar os 4 arquivos (RF.md, RF.yaml, RL.md, RL.yaml) e validar com `validator-rl.py`, o agente DEVE:
 
-1. **Abrir** o arquivo `D:\IC2\docs\rf\documentacao-funcional.md`
+1. **Abrir** o arquivo ` D:\IC2\rf\documentacao-funcional.md`
 2. **Localizar** a seção do RFXXX (se já existir)
 3. **Atualizar** ou **criar** a seção com as seguintes informações:
 
@@ -1104,7 +1104,7 @@ Após criar os 4 arquivos (RF.md, RF.yaml, RL.md, RL.yaml) e validar com `valida
 - ✅ Se seção RFXXX já existe → **SUBSTITUIR** completamente (sobrescrever)
 - ✅ Se seção RFXXX NÃO existe → **ADICIONAR** ao final do arquivo
 - ✅ Manter ordem numérica dos RFs (RF001, RF002, RF003...)
-- ✅ Links devem ser relativos a partir de `D:\IC2\docs\rf\`
+- ✅ Links devem ser relativos a partir de ` D:\IC2\rf\`
 
 **Critério de completude:**
 - ✅ Seção RFXXX criada/atualizada no documentacao-funcional.md
@@ -1277,7 +1277,7 @@ ENTÃO:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ FASE 0: Consulta documentacao-funcional.md (OPCIONAL)          │
-│ ├─ Ler D:\IC2\docs\rf\documentacao-funcional.md                │
+│ ├─ Ler  D:\IC2\rf\documentacao-funcional.md                │
 │ ├─ Verificar se RFXXX já está documentado                      │
 │ ├─ Usar como referência inicial (se existir)                   │
 │ └─ SE NÃO EXISTIR → Fazer análise completa do legado           │
@@ -1356,7 +1356,7 @@ ENTÃO:
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ FASE 9: Atualizar documentacao-funcional.md (OBRIGATÓRIO)      │
-│ ├─ Abrir D:\IC2\docs\rf\documentacao-funcional.md              │
+│ ├─ Abrir  D:\IC2\rf\documentacao-funcional.md              │
 │ ├─ Criar/Atualizar seção RFXXX                                 │
 │ ├─ Incluir resumo, funcionalidades, RNs críticas               │
 │ ├─ Incluir estatísticas (legado mapeado)                       │

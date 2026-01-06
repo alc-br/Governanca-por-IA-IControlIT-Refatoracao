@@ -134,7 +134,7 @@ def load_all_status_files():
 
 def extract_fase_nome_from_path(file_path, fase_code):
     """Extrai nome completo da Fase do caminho"""
-    # Exemplo: D:\IC2\docs\rf\Fase-1-Fundacao-e-Cadastros-Base\...
+    # Exemplo:  D:\IC2\rf\Fase-1-Fundacao-e-Cadastros-Base\...
     parts = file_path.replace('\\', '/').split('/')
 
     for part in parts:

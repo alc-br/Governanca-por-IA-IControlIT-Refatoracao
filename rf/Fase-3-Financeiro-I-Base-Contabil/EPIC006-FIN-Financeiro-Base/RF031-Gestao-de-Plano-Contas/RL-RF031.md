@@ -505,7 +505,7 @@ AND YEAR(Lancamento.Dt_Lancamento) = @Ano
 
 **Finalidade:** Converter estrutura plano contas legado (3 níveis separados) para hierarquia recursiva (PaiId).
 
-**Localização:** `D:\IC2\docs\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF031-Gestao-de-Plano-Contas\Apoio\SQL\legacy_plano_conta_to_recursive.sql`
+**Localização:** ` D:\IC2\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF031-Gestao-de-Plano-Contas\Apoio\SQL\legacy_plano_conta_to_recursive.sql`
 
 **Complexidade:** Alta (CTE recursiva + múltiplos INSERTs)
 
@@ -517,7 +517,7 @@ AND YEAR(Lancamento.Dt_Lancamento) = @Ano
 
 **Finalidade:** Migrar rateios manuais legados para nova estrutura multi-dimensional.
 
-**Localização:** `D:\IC2\docs\rf\...\Apoio\SQL\migrate_rateio_to_dimensions.sql`
+**Localização:** ` D:\IC2\rf\...\Apoio\SQL\migrate_rateio_to_dimensions.sql`
 
 **Complexidade:** Média
 

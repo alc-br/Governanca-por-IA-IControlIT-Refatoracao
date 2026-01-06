@@ -351,7 +351,7 @@ governanca:
 
 ### Localização dos Arquivos
 ```
-D:\IC2\docs\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF026-Gestao-de-Faturas\
+ D:\IC2\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF026-Gestao-de-Faturas\
 ├── RF026.md                                  # v2.0 (moderno, SEM legado)
 ├── RF026.md.backup-20251230                  # v1.0 (backup original)
 ├── RF026.yaml                                # estruturado, sincronizado com RF026.md

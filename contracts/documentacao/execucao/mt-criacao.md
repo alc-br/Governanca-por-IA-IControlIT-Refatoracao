@@ -264,15 +264,15 @@ MT-RF060-001:
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | `D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 
 ### 4.2 Permissões de Escrita
 
 O agente PODE escrever **APENAS** em:
 ```
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\MT-RFXXX.yaml
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\MT-RFXXX.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
@@ -308,13 +308,13 @@ O contrato TRAVA se qualquer condição falhar:
 Antes de criar qualquer massa de teste, o agente DEVE:
 
 #### 1.1 Ler UC-RFXXX.md Completamente
-- Localização: `D:\IC2\docs\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.md`
+- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.md`
 - Entender TODOS os casos de uso
 - Identificar TODOS os fluxos (FP, FA, FE)
 - Mapear regras de negócio validáveis
 
 #### 1.2 Ler UC-RFXXX.yaml Completamente
-- Localização: `D:\IC2\docs\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.yaml`
+- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.yaml`
 - Extrair cenários de teste necessários
 - Mapear validações de campos
 - Identificar permissões e multi-tenancy

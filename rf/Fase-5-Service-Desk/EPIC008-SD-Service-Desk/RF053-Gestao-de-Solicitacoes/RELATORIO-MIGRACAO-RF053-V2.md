@@ -314,11 +314,11 @@ python D:\IC2\docs\tools\docs\validator-governance.py RF053
 ✅ **MIGRAÇÃO RF053 v1.0 → v2.0 CONCLUÍDA COM 100% DE SUCESSO**
 
 **Arquivos entregues:**
-- ✅ D:\IC2\docs\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF053-Gestao-de-Solicitacoes\RF053.md (v2.0)
-- ✅ D:\IC2\docs\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF053-Gestao-de-Solicitacoes\RF053.yaml (v2.0)
-- ✅ D:\IC2\docs\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF053-Gestao-de-Solicitacoes\RL-RF053.md (v1.0)
-- ✅ D:\IC2\docs\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF053-Gestao-de-Solicitacoes\RL-RF053.yaml (v1.0)
-- ✅ D:\IC2\docs\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF053-Gestao-de-Solicitacoes\RF053.md.backup-20251230
+- ✅  D:\IC2\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF053-Gestao-de-Solicitacoes\RF053.md (v2.0)
+- ✅  D:\IC2\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF053-Gestao-de-Solicitacoes\RF053.yaml (v2.0)
+- ✅  D:\IC2\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF053-Gestao-de-Solicitacoes\RL-RF053.md (v1.0)
+- ✅  D:\IC2\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF053-Gestao-de-Solicitacoes\RL-RF053.yaml (v1.0)
+- ✅  D:\IC2\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF053-Gestao-de-Solicitacoes\RF053.md.backup-20251230
 
 **Qualidade:**
 - 0% de código legado em RF053.md

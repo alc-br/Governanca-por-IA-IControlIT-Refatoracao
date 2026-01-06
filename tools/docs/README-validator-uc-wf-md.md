@@ -346,7 +346,7 @@ casos_de_uso:
 Criar arquivo `WF-RF001.md` na pasta do RF baseado no template `WF.md`:
 
 ```bash
-cp D:\IC2\docs\templates\WF.md D:\IC2\docs\rf\...\RF001\WF-RF001.md
+cp D:\IC2\docs\templates\WF.md  D:\IC2\rf\...\RF001\WF-RF001.md
 # Editar WF-RF001.md com conteúdo específico do RF001
 ```
 
@@ -404,7 +404,7 @@ entidades:
   - UC.yaml
   - WF.md
   - MD.yaml
-- Documentos gerados: `D:\IC2\docs\rf\Fase-X\EPIC-XXX\RFXXX\`
+- Documentos gerados: ` D:\IC2\rf\Fase-X\EPIC-XXX\RFXXX\`
   - UC-RFXXX.md
   - UC-RFXXX.yaml
   - WF-RFXXX.md

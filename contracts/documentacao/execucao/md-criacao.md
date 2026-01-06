@@ -103,15 +103,15 @@ Além disso, atualizar:
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | `D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 
 ### 4.2 Permissões de Escrita
 
 O agente PODE escrever **APENAS** em:
 ```
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\MD-RFXXX.yaml
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\MD-RFXXX.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
@@ -149,19 +149,19 @@ O contrato TRAVA se qualquer condição falhar:
 Antes de criar o modelo de dados, o agente DEVE:
 
 #### 1.1 Ler RFXXX.yaml Completamente
-- Localização: `D:\IC2\docs\rf\[Fase]\[EPIC]\RFXXX\RFXXX.yaml`
+- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\RFXXX.yaml`
 - Identificar TODAS as entidades principais
 - Mapear relacionamentos (1:N, N:N)
 - Entender regras de negócio que afetam o modelo
 
 #### 1.2 Ler UC-RFXXX.yaml Completamente
-- Localização: `D:\IC2\docs\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.yaml`
+- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.yaml`
 - Identificar operações CRUD necessárias
 - Mapear campos validados nos UCs
 - Entender unicidades e constraints
 
 #### 1.3 Ler WF-RFXXX.yaml Completamente
-- Localização: `D:\IC2\docs\rf\[Fase]\[EPIC]\RFXXX\WF-RFXXX.yaml`
+- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\WF-RFXXX.yaml`
 - Identificar campos visíveis na UI
 - Mapear filtros e ordenações (índices necessários)
 - Entender campos de busca

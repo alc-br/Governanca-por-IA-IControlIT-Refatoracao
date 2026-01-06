@@ -28,7 +28,7 @@ Migração completa e bem-sucedida do RF024 da versão 1.0 (RF + legado misturad
 
 ### 2.1 RF024.md (Contrato Funcional Moderno)
 
-**Local:** `d:\IC2\docs\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RF024.md`
+**Local:** ` D:\IC2\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RF024.md`
 
 **Versão:** 2.0
 **Linhas:** 469
@@ -59,7 +59,7 @@ Migração completa e bem-sucedida do RF024 da versão 1.0 (RF + legado misturad
 
 ### 2.2 RF024.yaml (Estruturado Sincronizado)
 
-**Local:** `d:\IC2\docs\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RF024.yaml`
+**Local:** ` D:\IC2\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RF024.yaml`
 
 **Versão:** 2.0
 **Linhas:** 680
@@ -86,7 +86,7 @@ Migração completa e bem-sucedida do RF024 da versão 1.0 (RF + legado misturad
 
 ### 2.3 RL-RF024.md (Referência ao Legado - Memória Técnica)
 
-**Local:** `d:\IC2\docs\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RL-RF024.md`
+**Local:** ` D:\IC2\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RL-RF024.md`
 
 **Versão:** 1.0
 **Linhas:** 493
@@ -115,7 +115,7 @@ Migração completa e bem-sucedida do RF024 da versão 1.0 (RF + legado misturad
 
 ### 2.4 RL-RF024.yaml (Estruturado com 100% Destinos)
 
-**Local:** `d:\IC2\docs\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RL-RF024.yaml`
+**Local:** ` D:\IC2\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RL-RF024.yaml`
 
 **Versão:** 2.0
 **Linhas:** 420
@@ -137,7 +137,7 @@ Migração completa e bem-sucedida do RF024 da versão 1.0 (RF + legado misturad
 
 ### 2.5 STATUS.yaml (Atualizado v2.0)
 
-**Local:** `d:\IC2\docs\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\STATUS.yaml`
+**Local:** ` D:\IC2\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\STATUS.yaml`
 
 **Atualização:**
 ```yaml
@@ -374,8 +374,8 @@ python D:\IC2\docs\tools\devops-sync\sync-rf.py RF024
 - RF024 está PRONTO para próximos contratos (BACKEND, FRONTEND, TESTES)
 
 **Documentação disponível em:**
-- RF: `d:\IC2\docs\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RF024.md`
-- RL: `d:\IC2\docs\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RL-RF024.md`
+- RF: ` D:\IC2\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RF024.md`
+- RL: ` D:\IC2\rf\Fase-3-Financeiro-I-Base-Contabil\EPIC006-FIN-Financeiro-Base\RF024-Gestao-Departamentos\RL-RF024.md`
 
 ---
 

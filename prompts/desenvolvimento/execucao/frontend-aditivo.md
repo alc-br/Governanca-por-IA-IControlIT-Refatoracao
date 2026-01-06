@@ -1,6 +1,6 @@
 # Frontend Aditivo RFXXX - Implementar Delta no Frontend
 
-Ele fica nesse endereço \docs\rf\Fase*\EPIC*\RF*
+Ele fica nesse endereço D:\IC2\rf\Fase*\EPIC*\RF*
 
 **Instruções:** Altere RFXXX acima para o RF desejado (ex: RF001, RF025, RF028).
 

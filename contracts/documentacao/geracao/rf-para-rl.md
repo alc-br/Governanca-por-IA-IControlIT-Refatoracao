@@ -54,7 +54,7 @@ Adequar documentação de RFs existentes (v1.0) para o padrão de **Governança 
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | `D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 | **LEGACY_PATH** | `D:\IC2\ic1_legado\IControlIT\` |
 
@@ -62,11 +62,11 @@ Adequar documentação de RFs existentes (v1.0) para o padrão de **Governança 
 
 O agente PODE escrever **APENAS** em:
 ```
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\RFXXX.md
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\RFXXX.yaml
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.md
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.yaml
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\RFXXX.md
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\RFXXX.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.md
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:

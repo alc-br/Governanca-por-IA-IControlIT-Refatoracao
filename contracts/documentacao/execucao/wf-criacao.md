@@ -110,15 +110,15 @@ Estados obrigatórios:
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | `D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 
 ### 4.2 Permissões de Escrita
 
 O agente PODE escrever **APENAS** em:
 ```
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\WF-RFXXX.md
-D:\IC2\docs\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\WF-RFXXX.md
+ D:\IC2\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
@@ -154,13 +154,13 @@ O contrato TRAVA se qualquer condição falhar:
 Antes de criar qualquer wireframe, o agente DEVE:
 
 #### 1.1 Ler UC-RFXXX.md Completamente
-- Localização: `D:\IC2\docs\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.md`
+- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.md`
 - Entender TODOS os casos de uso
 - Identificar TODAS as telas necessárias
 - Mapear fluxos principais, alternativos e de exceção
 
 #### 1.2 Ler UC-RFXXX.yaml Completamente
-- Localização: `D:\IC2\docs\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.yaml`
+- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.yaml`
 - Extrair ações permitidas por UC
 - Mapear estados esperados
 - Identificar gatilhos e resultados finais

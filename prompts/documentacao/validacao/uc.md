@@ -1,6 +1,6 @@
 # Validação de UC do RFXXX - Validação de Adequação UC
 
-Ele fica nesse endereço \docs\rf\Fase*\EPIC*\RF*
+Ele fica nesse endereço D:\IC2\rf\Fase*\EPIC*\RF*
 
 ---
 

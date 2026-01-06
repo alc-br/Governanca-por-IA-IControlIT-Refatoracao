@@ -54,7 +54,7 @@ Migração bem-sucedida do RF-028 (Gestão de SLA - Operações) de v1.0 para v2
 ### 2.2 Estrutura Final do Diretório
 
 ```
-D:\IC2\docs\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF028-Gestao-de-SLA-Operacoes\
+ D:\IC2\rf\Fase-5-Service-Desk\EPIC008-SD-Service-Desk\RF028-Gestao-de-SLA-Operacoes\
 ├── RF028.md                          # ← v2.0 (LIMPO, sem legado)
 ├── RF028.yaml                        # ← v2.0 (estruturado)
 ├── RL-RF028.md                       # ← v2.0 (memória legado)
