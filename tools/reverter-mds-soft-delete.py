@@ -86,7 +86,7 @@ def processar_md(filepath):
         )
         substituicoes_arquivo += count
 
-        # 7. Índices compostos: (ConglomeradoId, Ativo) -> (ClienteId, FlExcluido)
+        # 7. Índices compostos: (FornecedorId, Ativo) -> (ClienteId, FlExcluido)
         conteudo_novo, count = re.subn(
             r'\(ClienteId,\s*Ativo\)',
             r'(ClienteId, FlExcluido)',

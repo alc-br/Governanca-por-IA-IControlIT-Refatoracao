@@ -42,7 +42,7 @@ Os UCs aqui definidos servem como **contrato comportamental**, sendo a **fonte p
 
 ## 3. PADRÕES GERAIS APLICÁVEIS A TODOS OS UCs
 
-- Todos os acessos respeitam **isolamento por tenant** (ConglomeradoId)
+- Todos os acessos respeitam **isolamento por tenant** (FornecedorId)
 - Todas as ações exigem **permissão explícita** conforme RBAC
 - Erros não devem vazar informações sensíveis
 - Auditoria deve registrar **quem**, **quando** e **qual ação**
@@ -69,7 +69,7 @@ Permitir que auditores e gestores visualizem itens auditados com filtros avança
 ### Fluxo Principal
 - **FP-UC00-001:** Usuário acessa "Auditoria → Itens de Auditoria"
 - **FP-UC00-002:** Sistema valida permissão AUD.ITENS.VIEW
-- **FP-UC00-003:** Sistema carrega itens do tenant (Global Query Filter por ConglomeradoId)
+- **FP-UC00-003:** Sistema carrega itens do tenant (Global Query Filter por FornecedorId)
 - **FP-UC00-004:** Sistema aplica paginação (20 itens/página) e ordenação padrão (data DESC)
 - **FP-UC00-005:** Sistema exibe grid com colunas: Lote, Bilhete, Ativo, Operadora, ValorCobrado, ValorCorreto, Glosa, Divergência%, Status
 - **FP-UC00-006:** Sistema exibe totalizadores no rodapé: Total Glosa, Total Itens
@@ -95,7 +95,7 @@ Permitir que auditores e gestores visualizem itens auditados com filtros avança
 - **FE-UC00-003:** Filtro de lote inválido → HTTP 400 "Lote deve estar no formato AAAAMM"
 
 ### Regras de Negócio
-- **RN-UC00-001:** Somente registros do tenant (ConglomeradoId = usuário logado)
+- **RN-UC00-001:** Somente registros do tenant (FornecedorId = usuário logado)
 - **RN-UC00-002:** Registros soft-deleted (FlExcluido=true) não aparecem
 - **RN-UC00-003:** Paginação padrão: 20 registros/página
 - **RN-UC00-004:** Divergência calculada como: ((ValorCobrado - ValorCorreto) / ValorCorreto) * 100
@@ -164,7 +164,7 @@ Permitir criação de novo item de auditoria com validações automáticas de c�
   - Divergência 5-10% → Alta
   - Divergência 1-5% → Média
   - Divergência <1% → Baixa
-- **FP-UC01-008:** Sistema cria registro com ConglomeradoId = usuário logado
+- **FP-UC01-008:** Sistema cria registro com FornecedorId = usuário logado
 - **FP-UC01-009:** Sistema dispara Domain Event: `AuditoriaItemCreated`
 - **FP-UC01-010:** Handler sincroniza Resumo: incrementa TotalGlosa, QtdItens
 - **FP-UC01-011:** Sistema registra auditoria (UsuarioCriacao, DataCriacao)
@@ -192,7 +192,7 @@ Permitir criação de novo item de auditoria com validações automáticas de c�
 
 ### Regras de Negócio
 - **RN-UC01-001:** Campos obrigatórios: Resumo, Bilhete, Ativo, Contrato, Operadora, Tipo, Lote, Quantidade, Unidade, ValorCobrado, ValorCorreto
-- **RN-UC01-002:** ConglomeradoId preenchido automaticamente com tenant do usuário
+- **RN-UC01-002:** FornecedorId preenchido automaticamente com tenant do usuário
 - **RN-UC01-003:** UsuarioCriacao e DataCriacao preenchidos automaticamente
 - **RN-UC01-004:** Campo ValorCobradoAMais é somente leitura (calculado automaticamente)
 - **RN-UC01-005:** Campo PercentualDivergencia é somente leitura (calculado automaticamente)
@@ -201,7 +201,7 @@ Permitir criação de novo item de auditoria com validações automáticas de c�
 
 ### Critérios de Aceite
 - **CA-UC01-001:** Todos os campos obrigatórios DEVEM ser validados antes de persistir
-- **CA-UC01-002:** ConglomeradoId DEVE ser preenchido automaticamente com tenant do usuário autenticado
+- **CA-UC01-002:** FornecedorId DEVE ser preenchido automaticamente com tenant do usuário autenticado
 - **CA-UC01-003:** UsuarioCriacao DEVE ser preenchido automaticamente com ID do usuário autenticado
 - **CA-UC01-004:** DataCriacao DEVE ser preenchido automaticamente com timestamp UTC
 - **CA-UC01-005:** ValorCobradoAMais DEVE ser calculado como (ValorCobrado - ValorCorreto) com precisão de 8 decimais
@@ -227,7 +227,7 @@ Permitir visualização detalhada de um item auditado com histórico completo, r
 ### Fluxo Principal
 - **FP-UC02-001:** Usuário seleciona item na lista (clica em linha ou botão "Visualizar")
 - **FP-UC02-002:** Sistema valida permissão AUD.ITENS.VIEW
-- **FP-UC02-003:** Sistema valida tenant (item.ConglomeradoId == usuário logado)
+- **FP-UC02-003:** Sistema valida tenant (item.FornecedorId == usuário logado)
 - **FP-UC02-004:** Sistema carrega item com relacionamentos:
   - Resumo de Auditoria
   - Bilhete
@@ -329,7 +329,7 @@ Permitir alteração controlada de item auditado com recálculo automático de g
 
 ### Regras de Negócio
 - **RN-UC03-001:** UsuarioAlteracao e DataAlteracao preenchidos automaticamente
-- **RN-UC03-002:** Campos não editáveis: ConglomeradoId, Resumo, Bilhete, Ativo, Contrato, Operadora, Tipo, Lote, DataCriacao, UsuarioCriacao
+- **RN-UC03-002:** Campos não editáveis: FornecedorId, Resumo, Bilhete, Ativo, Contrato, Operadora, Tipo, Lote, DataCriacao, UsuarioCriacao
 - **RN-UC03-003:** Recálculo de glosa automático ao alterar ValorCobrado ou ValorCorreto
 - **RN-UC03-004:** Sincronização com Resumo via Domain Event (assíncrono)
 

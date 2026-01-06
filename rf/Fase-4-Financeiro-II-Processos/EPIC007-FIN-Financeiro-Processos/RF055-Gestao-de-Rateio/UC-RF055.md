@@ -35,7 +35,7 @@ Permitir ao usuário visualizar e filtrar as regras de rateio cadastradas no sis
 
 ### Pós-condições
 - Lista de rateios exibida conforme filtros aplicados
-- Isolamento multi-tenant garantido (apenas rateios do Id_Conglomerado do usuário)
+- Isolamento multi-tenant garantido (apenas rateios do Id_Fornecedor do usuário)
 
 ### Fluxo Principal
 
@@ -43,7 +43,7 @@ Permitir ao usuário visualizar e filtrar as regras de rateio cadastradas no sis
 
 **FP-UC00-002**: Sistema valida permissão `rateio.view_any`
 
-**FP-UC00-003**: Sistema carrega rateios do Id_Conglomerado do usuário logado
+**FP-UC00-003**: Sistema carrega rateios do Id_Fornecedor do usuário logado
 
 **FP-UC00-004**: Sistema aplica paginação (20 registros por página) e ordenação padrão (data de criação DESC)
 
@@ -87,7 +87,7 @@ Permitir ao usuário visualizar e filtrar as regras de rateio cadastradas no sis
 
 ### Regras de Negócio
 
-**RN-UC-00-001**: Apenas rateios do Id_Conglomerado do usuário podem ser exibidos (multi-tenant)
+**RN-UC-00-001**: Apenas rateios do Id_Fornecedor do usuário podem ser exibidos (multi-tenant)
 
 **RN-UC-00-002**: Paginação padrão: 20 registros por página
 
@@ -177,7 +177,7 @@ Permitir ao usuário criar uma nova regra de rateio de custos com validação de
 - Sistema exibe mensagem: "A soma dos percentuais deve ser exatamente 100%. Atual: {valor}%"
 - Sistema impede salvamento
 
-**FE-UC01-003**: Nome da regra duplicado (mesmo Id_Conglomerado)
+**FE-UC01-003**: Nome da regra duplicado (mesmo Id_Fornecedor)
 - Sistema exibe mensagem: "Já existe uma regra com este nome."
 - Sistema impede salvamento
 
@@ -206,7 +206,7 @@ Permitir ao usuário criar uma nova regra de rateio de custos com validação de
 
 **RN-UC-01-007**: Regras criadas ficam automaticamente com Status "Ativo"
 
-**RN-UC-01-008**: Multi-tenant: Regra só pode referenciar destinos do mesmo Id_Conglomerado
+**RN-UC-01-008**: Multi-tenant: Regra só pode referenciar destinos do mesmo Id_Fornecedor
 
 ### Critérios de Aceite
 
@@ -247,7 +247,7 @@ Exibir informações detalhadas de uma regra de rateio, incluindo histórico de 
 
 **FP-UC02-002**: Sistema valida permissão `rateio.view`
 
-**FP-UC02-003**: Sistema valida que o rateio pertence ao Id_Conglomerado do usuário
+**FP-UC02-003**: Sistema valida que o rateio pertence ao Id_Fornecedor do usuário
 
 **FP-UC02-004**: Sistema exibe tela de detalhes com 3 seções:
 
@@ -300,7 +300,7 @@ Exibir informações detalhadas de uma regra de rateio, incluindo histórico de 
 
 ### Regras de Negócio
 
-**RN-UC-02-001**: Apenas rateios do Id_Conglomerado do usuário podem ser visualizados
+**RN-UC-02-001**: Apenas rateios do Id_Fornecedor do usuário podem ser visualizados
 
 **RN-UC-02-002**: Histórico de execuções exibe últimas 12 execuções (1 ano)
 
@@ -809,7 +809,7 @@ Exibir visão consolidada de rateios aplicados, com análises de tendências, co
 
 **FP-UC07-002**: Sistema valida permissão `rateio.view_dashboard`
 
-**FP-UC07-003**: Sistema carrega dados do Id_Conglomerado do usuário
+**FP-UC07-003**: Sistema carrega dados do Id_Fornecedor do usuário
 
 **FP-UC07-004**: Sistema exibe dashboard com 4 seções:
 
@@ -864,7 +864,7 @@ Exibir visão consolidada de rateios aplicados, com análises de tendências, co
 
 ### Regras de Negócio
 
-**RN-UC-07-001**: Dashboard exibe apenas dados do Id_Conglomerado do usuário (multi-tenant)
+**RN-UC-07-001**: Dashboard exibe apenas dados do Id_Fornecedor do usuário (multi-tenant)
 
 **RN-UC-07-002**: Alertas de variação > 10% são exibidos em vermelho (prioridade alta)
 

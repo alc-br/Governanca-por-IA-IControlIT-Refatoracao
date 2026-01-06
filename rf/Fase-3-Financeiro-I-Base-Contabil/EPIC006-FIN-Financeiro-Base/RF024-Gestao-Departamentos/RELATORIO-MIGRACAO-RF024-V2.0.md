@@ -278,7 +278,7 @@ Gaps Encontrados: 2
 | IControlIT_Cliente02 | SQL-LEGADO-01 | CONSOLIDADO |
 | IControlIT_Cliente03 | SQL-LEGADO-02 | CONSOLIDADO |
 
-**Estratégia:** 3 bancos SQL Server → 1 banco único (SQLite dev / SQL Server moderno prod) com multi-tenancy (Id_Conglomerado)
+**Estratégia:** 3 bancos SQL Server → 1 banco único (SQLite dev / SQL Server moderno prod) com multi-tenancy (Id_Fornecedor)
 
 ---
 

@@ -172,15 +172,15 @@ Todos os webservices ASMX foram substituídos por API REST com:
 
 | Tabela | Finalidade | Problemas Identificados | Destino |
 |-------|------------|-------------------------|---------|
-| `Usuario` | Cadastro principal de usuários/consumidores | Sem campos de auditoria (`Created`, `CreatedBy`), sem multi-tenancy (`ConglomeradoId`), sem soft delete consistente | SUBSTITUÍDO |
-| `Usuario_Linha` | Associação usuário-linha móvel | Sem validação de unicidade (permitia múltiplas alocações da mesma linha), sem campo `ConglomeradoId` | SUBSTITUÍDO |
+| `Usuario` | Cadastro principal de usuários/consumidores | Sem campos de auditoria (`Created`, `CreatedBy`), sem multi-tenancy (`FornecedorId`), sem soft delete consistente | SUBSTITUÍDO |
+| `Usuario_Linha` | Associação usuário-linha móvel | Sem validação de unicidade (permitia múltiplas alocações da mesma linha), sem campo `FornecedorId` | SUBSTITUÍDO |
 | `Usuario_Aparelho` | Associação usuário-aparelho | Histórico em tabela separada (complexidade desnecessária), sem soft delete | SUBSTITUÍDO |
 | `Usuario_Custo_Mensal` | Custos mensais pré-calculados | Retenção de apenas 12 meses (insuficiente para LGPD - 7 anos), sem criptografia | SUBSTITUÍDO |
 | `Usuario_Movimentacao` | Histórico de movimentações | Apenas departamento (cargo sem histórico), sem campo `Justificativa` | SUBSTITUÍDO |
 | `Usuario_Perfil` | Perfis de uso (Executivo, Colaborador, etc.) | Tabela de domínio hard-coded (sem flexibilidade), sem vínculo com políticas | SUBSTITUÍDO |
 
 **Problemas Comuns:**
-- Ausência de `ConglomeradoId` (multi-tenancy)
+- Ausência de `FornecedorId` (multi-tenancy)
 - Ausência de campos de auditoria (`CreatedBy`, `Created`, `LastModifiedBy`, `LastModified`)
 - Soft delete inconsistente (algumas tabelas com `Ativo` bit, outras sem)
 - Nomes inconsistentes (algumas `Usuario_X`, outras `UsuarioX`)
@@ -314,7 +314,7 @@ Todos os webservices ASMX foram substituídos por API REST com:
 
 | Item | Legado | RF Moderno | Observação |
 |-----|--------|------------|------------|
-| Multi-tenancy | Bancos separados por cliente | Row-Level Security unificado (`ConglomeradoId`) | Redução de custos de infraestrutura |
+| Multi-tenancy | Bancos separados por cliente | Row-Level Security unificado (`FornecedorId`) | Redução de custos de infraestrutura |
 | Auditoria | Parcial (algumas operações) | Completa (todas as operações via RF003) | Conformidade e rastreabilidade |
 | Soft Delete | Inconsistente (campo `Ativo` em algumas tabelas) | Padronizado (`Deleted`, `DeletedBy`, `DeletedAt`) | Recuperação de dados, LGPD |
 | Validações | Duplicadas (frontend JS + stored procedures) | Camada única (FluentValidation no backend) | Manutenibilidade |
@@ -337,7 +337,7 @@ Todos os webservices ASMX foram substituídos por API REST com:
 
 **Motivo:** Reduzir custos de infraestrutura (múltiplos SQL Servers) e facilitar manutenção (1 schema único vs N schemas).
 
-**Impacto:** Alto (requer migração de dados de múltiplos bancos SQL Server para banco unificado com campo `ConglomeradoId`).
+**Impacto:** Alto (requer migração de dados de múltiplos bancos SQL Server para banco unificado com campo `FornecedorId`).
 
 ---
 
@@ -380,7 +380,7 @@ Todos os webservices ASMX foram substituídos por API REST com:
 | Perda de dados durante migração multi-database → unificado | Alto | Média | Backup completo antes de migração, script de validação pós-migração, rollback plan |
 | Quebra de integrações com sistemas externos (RH, ERP) | Alto | Alta | Mapeamento detalhado de integrações legado, testes de integração antes de go-live |
 | Curva de aprendizado de workflows automatizados | Médio | Alta | Treinamento para gestores/RH, documentação detalhada, suporte dedicado pós-go-live |
-| Performance de queries em tabela unificada (todos os clientes) | Alto | Média | Índices otimizados, particionamento, Query Filters EF Core com `ConglomeradoId` |
+| Performance de queries em tabela unificada (todos os clientes) | Alto | Média | Índices otimizados, particionamento, Query Filters EF Core com `FornecedorId` |
 | Resistência de usuários acostumados com telas legado | Médio | Alta | Change management, demonstrações de benefícios (dashboard 360°, workflows), período de convivência |
 
 ---

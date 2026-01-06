@@ -17,7 +17,7 @@ Descreve o cenário geral do sistema legado.
 - **Arquitetura:** Monolítica WebForms
 - **Linguagem / Stack:** VB.NET + ASP.NET Web Forms + SQL Server
 - **Banco de Dados:** SQL Server (tabelas `Cargo`, `Rl_Cargo_Competencia`)
-- **Multi-tenant:** Não (campo `Id_Conglomerado` ausente)
+- **Multi-tenant:** Não (campo `Id_Fornecedor` ausente)
 - **Auditoria:** Parcial (apenas criação e última atualização)
 - **Configurações:** Web.config, stored procedures no banco
 
@@ -121,7 +121,7 @@ Descreve o cenário geral do sistema legado.
 
 | Tabela | Finalidade | Problemas Identificados |
 |-------|------------|-------------------------|
-| `Cargo` | Armazenamento principal | Falta campo `Id_Conglomerado` (multi-tenancy), constraint de unicidade fraca |
+| `Cargo` | Armazenamento principal | Falta campo `Id_Fornecedor` (multi-tenancy), constraint de unicidade fraca |
 | `Rl_Cargo_Competencia` | Competências por cargo | Permite duplicação, sem FK constraint adequada |
 | `Cargo_FaixaSalarial` | Histórico de salários | Tabela não existe (dados em `Cargo.Vl_Salario_Piso` e `Cargo.Vl_Salario_Teto`) |
 
@@ -235,7 +235,7 @@ Explique decisões tomadas durante a refatoração.
 
 ### 1. Código Duplicado (Bug Crítico)
 
-**Descrição:** Sistema permite salvar cargo com código duplicado no mesmo conglomerado.
+**Descrição:** Sistema permite salvar cargo com código duplicado no mesmo Fornecedor.
 
 **Causa:** Constraint UNIQUE ausente, validação de código apenas no frontend (pode ser contornada).
 
@@ -283,9 +283,9 @@ Explique decisões tomadas durante a refatoração.
 
 ### 5. Sem Multi-Tenancy (Segurança Crítica)
 
-**Descrição:** Sistema não possui isolamento de dados por cliente/conglomerado.
+**Descrição:** Sistema não possui isolamento de dados por cliente/Fornecedor.
 
-**Causa:** Tabela sem campo `Id_Conglomerado`.
+**Causa:** Tabela sem campo `Id_Fornecedor`.
 
 **Impacto:** Risco de acesso cruzado (Cliente A vê dados do Cliente B).
 

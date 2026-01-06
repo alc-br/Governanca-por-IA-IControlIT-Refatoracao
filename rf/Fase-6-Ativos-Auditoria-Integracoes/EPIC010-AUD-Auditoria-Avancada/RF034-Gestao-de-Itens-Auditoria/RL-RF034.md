@@ -21,7 +21,7 @@
 ### 1.2 Arquitetura Geral
 
 O sistema legado operava em modelo **multi-database**:
-- Cada cliente (conglomerado) possuía um banco SQL Server dedicado
+- Cada cliente (Fornecedor) possuía um banco SQL Server dedicado
 - Schema idêntico replicado em N bancos
 - Sem consolidação centralizada
 - Conexões via connection strings dinâmicas no web.config
@@ -51,7 +51,7 @@ O sistema legado operava em modelo **multi-database**:
 - Solução moderna: Shadow Properties (UsuarioCriacao, DataCriacao, UsuarioAlteracao, DataAlteracao)
 
 **PROB-005: Sem Row-Level Security**
-- Campo Id_Conglomerado sem filtro automático
+- Campo Id_Fornecedor sem filtro automático
 - Risco de vazamento cross-tenant se query esquecer WHERE
 - Solução moderna: Global Query Filter no DbContext
 
@@ -162,9 +162,9 @@ O sistema legado operava em modelo **multi-database**:
 
 **Métodos Públicos**:
 
-1. **ObterItensAuditoria(lote As String, conglomeradoId As Integer) As DataSet**
+1. **ObterItensAuditoria(lote As String, FornecedorId As Integer) As DataSet**
    - Retorna DataSet com itens filtrados por lote
-   - Parâmetros: lote (AAAAMM), conglomeradoId
+   - Parâmetros: lote (AAAAMM), FornecedorId
    - Retorno: DataSet não tipado
 
 2. **SalvarItemAuditoria(item As ItemAuditoriaDto) As Boolean**
@@ -208,7 +208,7 @@ O sistema legado operava em modelo **multi-database**:
 
 **Parâmetros de Entrada**:
 - `@Id_Fatura INT`
-- `@Id_Conglomerado INT`
+- `@Id_Fornecedor INT`
 - `@Lote VARCHAR(6)`
 
 **Parâmetros de Saída**:
@@ -269,7 +269,7 @@ SET @Glosa = @ValorCobrado - @ValorCorreto
 **Parâmetros**:
 - `@DataInicio DATE`
 - `@DataFim DATE`
-- `@Id_Conglomerado INT`
+- `@Id_Fornecedor INT`
 
 **Lógica Principal**:
 1. Agrupa itens por operadora usando GROUP BY
@@ -296,7 +296,7 @@ SET @Glosa = @ValorCobrado - @ValorCorreto
 
 **Parâmetros**:
 - `@Id_Auditoria_Resumo INT`
-- `@Id_Conglomerado INT`
+- `@Id_Fornecedor INT`
 
 **Lógica**:
 1. SELECT com múltiplos JOINs (7 tabelas)
@@ -329,7 +329,7 @@ CREATE TABLE [dbo].[Auditoria_Item](
     [Id_Bilhete_Tipo] [int] NOT NULL,
     [Id_Ativo] [int] NOT NULL,
     [Id_Contrato] [int] NOT NULL,
-    [Id_Conglomerado] [int] NOT NULL,
+    [Id_Fornecedor] [int] NOT NULL,
     [Unidade] [int] NOT NULL,
     [DT_Lote] [varchar](6) NOT NULL,
     [QTD_Consumo] [float] NOT NULL,
@@ -349,7 +349,7 @@ CREATE TABLE [dbo].[Auditoria_Item](
 - ❌ **Campos NULL**: `Valor_Cobrado`, `Valor_Contrato`, `Valor_Correto` permitem NULL (deveriam ser obrigatórios)
 - ❌ **Sem soft delete**: Não possui campo `FlExcluido`
 - ❌ **Sem auditoria**: Não possui `DataCriacao`, `UsuarioCriacao`, `DataAlteracao`, `UsuarioAlteracao`
-- ❌ **Id_Conglomerado**: Sem Row-Level Security (sem índice otimizado para multi-tenancy)
+- ❌ **Id_Fornecedor**: Sem Row-Level Security (sem índice otimizado para multi-tenancy)
 - ❌ **Sem índices**: Apenas PK clusterizada, sem índices para queries analíticas
 
 **DESTINO**: **SUBSTITUÍDO**
@@ -381,7 +381,7 @@ CREATE TABLE [dbo].[Auditoria_Item](
 ```sql
 CREATE TABLE [dbo].[Auditoria_Resumo](
     [Id_Auditoria_Resumo] [int] IDENTITY(1,1) NOT NULL,
-    [Id_Conglomerado] [int] NOT NULL,
+    [Id_Fornecedor] [int] NOT NULL,
     [DT_Lote] [varchar](6) NOT NULL,
     [Total_Valor_Cobrado] [numeric](13, 8) NULL,
     [Total_Valor_Correto] [numeric](13, 8) NULL,
@@ -393,7 +393,7 @@ CREATE TABLE [dbo].[Auditoria_Resumo](
 ```
 
 **Problemas Identificados**:
-- ❌ **FK sem constraint**: `Id_Conglomerado` sem FK para tabela Conglomerado
+- ❌ **FK sem constraint**: `Id_Fornecedor` sem FK para tabela Fornecedor
 - ❌ **Campos NULL**: Totalizadores permitem NULL (deveriam ter default 0)
 - ❌ **Sem soft delete**: Não possui `FlExcluido`
 - ❌ **Auditoria parcial**: Possui `Data_Criacao`, mas falta `UsuarioCriacao`, `DataAlteracao`, `UsuarioAlteracao`
@@ -521,7 +521,7 @@ CREATE TABLE [dbo].[Auditoria_Resumo](
 |---------|--------|---------|---------|
 | **Exclusão** | Física (DELETE) | Lógica (FlExcluido) | Preserva histórico |
 | **Cálculo de Glosa** | Manual ou editável | Automático (read-only) | Elimina inconsistências |
-| **Multi-Tenancy** | Manual (WHERE Id_Conglomerado) | Automático (Global Query Filter) | Elimina vazamento de dados |
+| **Multi-Tenancy** | Manual (WHERE Id_Fornecedor) | Automático (Global Query Filter) | Elimina vazamento de dados |
 | **Auditoria** | Sem rastreamento | Shadow Properties automático | Conformidade LGPD |
 | **Validações** | Manuais inline | FluentValidation centralizado | Consistência e testabilidade |
 | **Sincronização Resumo** | Job batch (sp_RecalcularResumo) | Domain Events em tempo real | Consistência imediata |

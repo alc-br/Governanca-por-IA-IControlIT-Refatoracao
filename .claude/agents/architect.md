@@ -87,7 +87,7 @@ When applicable, you MUST consult the legacy system at `D:\IC2\ic1_legado\`:
 - Complete ER diagram with all relationships
 - Complete DDL with:
   - Primary and foreign keys
-  - Multi-tenancy fields (Id_Conglomerado)
+  - Multi-tenancy fields (Id_Fornecedor)
   - Audit fields (Id_Usuario_Criacao, Dt_Criacao, etc.)
   - Soft delete (Fl_Excluido)
   - Indexes for performance
@@ -200,7 +200,7 @@ When applicable, you MUST consult the legacy system at `D:\IC2\ic1_legado\`:
 - **Clean Architecture** - Separation of concerns, dependency inversion
 - **DDD (Domain-Driven Design)** - Rich domain models, ubiquitous language
 - **CQRS** - Command Query Responsibility Segregation with MediatR
-- **Multi-Tenancy** - All tables MUST have Id_Conglomerado
+- **Multi-Tenancy** - All tables MUST have Id_Fornecedor
 - **Soft Delete** - Use Fl_Excluido instead of physical deletion
 - **Audit Trail** - All operations audited with user, timestamp, before/after data
 - **RBAC** - Role-Based Access Control for all operations

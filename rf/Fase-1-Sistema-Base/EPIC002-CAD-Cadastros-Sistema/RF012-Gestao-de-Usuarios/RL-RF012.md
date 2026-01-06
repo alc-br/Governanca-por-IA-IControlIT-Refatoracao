@@ -17,7 +17,7 @@
 - **Arquitetura:** Monolítica ASP.NET Web Forms
 - **Linguagem:** VB.NET (code-behind) + ASPX (markup)
 - **Banco de Dados:** SQL Server
-- **Multi-tenant:** Sim (campo `Id_Conglomerado` em tabela Usuario)
+- **Multi-tenant:** Sim (campo `Id_Fornecedor` em tabela Usuario)
 - **Auditoria:** Parcial (apenas `Dt_Ultimo_Acesso`, sem logs detalhados de alterações)
 - **Configurações:** Web.config + stored procedures no banco
 - **Autenticação:** Session cookies ASP.NET + MD5 para senhas
@@ -50,7 +50,7 @@
 
 | Campo | Tipo | Obrigatório | Observações |
 |-------|------|-------------|-------------|
-| Login | TextBox (`txtDescricao`) | ✅ Sim | MaxLength=50, único por conglomerado |
+| Login | TextBox (`txtDescricao`) | ✅ Sim | MaxLength=50, único por Fornecedor |
 | Senha | Botão "Reiniciar Senha" | N/A | Gera senha temporária com confirmação JS |
 | Idioma | DropDownList (`cboIdioma`) | ✅ Sim | Lista de idiomas do sistema |
 | Grupo | DropDownList (`cboUsuarioGrupo`) | ✅ Sim | Agrupamento lógico de usuários |
@@ -96,11 +96,11 @@
 **Parâmetros:**
 - `pLogin` (String): Login do usuário
 - `pSenha` (String): Senha em plaintext (⚠️ não usa HTTPS obrigatório)
-- `pId_Conglomerado` (GUID): Identificador do conglomerado (multi-tenant)
+- `pId_Fornecedor` (GUID): Identificador do Fornecedor (multi-tenant)
 
 **Comportamento:**
 1. Calcula hash MD5 da senha fornecida
-2. Executa query SQL dinâmica (⚠️ SQL Injection) buscando usuário com login/senha/conglomerado
+2. Executa query SQL dinâmica (⚠️ SQL Injection) buscando usuário com login/senha/Fornecedor
 3. Se encontrado:
    - Atualiza `Dt_Ultimo_Acesso = GETDATE()`
    - Zera `Tentativas_Falhas`
@@ -160,10 +160,10 @@
 | Campo | Tipo | Nullable | Descrição | Problema |
 |-------|------|----------|-----------|----------|
 | `Id_Usuario` | UNIQUEIDENTIFIER | NOT NULL | PK, identificador único | ✅ OK |
-| `Id_Conglomerado` | UNIQUEIDENTIFIER | NOT NULL | FK multi-tenant | ✅ OK |
+| `Id_Fornecedor` | UNIQUEIDENTIFIER | NOT NULL | FK multi-tenant | ✅ OK |
 | `Nm_Usuario` | NVARCHAR(120) | NOT NULL | Nome completo | ✅ OK |
-| `Email` | NVARCHAR(100) | NOT NULL | E-mail (único por conglomerado) | ✅ OK |
-| `Login` | NVARCHAR(50) | NOT NULL | Login (único por conglomerado) | ✅ OK |
+| `Email` | NVARCHAR(100) | NOT NULL | E-mail (único por Fornecedor) | ✅ OK |
+| `Login` | NVARCHAR(50) | NOT NULL | Login (único por Fornecedor) | ✅ OK |
 | `Password_Hash` | NVARCHAR(255) | NOT NULL | Hash MD5 da senha | ⚠️ MD5 inseguro |
 | `Id_Perfil` | UNIQUEIDENTIFIER | NOT NULL | FK perfil RBAC | ✅ OK |
 | `Fl_Ativo` | INT | NOT NULL | 1=Ativo, 2=Inativo | ⚠️ Valores confusos (esperado 0/1) |

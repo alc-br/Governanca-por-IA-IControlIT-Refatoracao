@@ -46,7 +46,7 @@ Os UCs aqui definidos servem como **contrato comportamental**, sendo a **fonte p
 
 ## 3. PADRÕES GERAIS APLICÁVEIS A TODOS OS UCs
 
-- Todos os acessos respeitam **isolamento por tenant** (Id_Conglomerado)
+- Todos os acessos respeitam **isolamento por tenant** (Id_Fornecedor)
 - Todas as ações exigem **permissão explícita** (RBAC)
 - Erros não devem vazar informações sensíveis
 - Auditoria deve registrar **quem**, **quando** e **qual ação**
@@ -91,7 +91,7 @@ Permitir que o usuário visualize ativos disponíveis do seu próprio tenant com
 - **FE-UC00-003:** Erro ao carregar dados → exibe mensagem e permite retry
 
 ### Regras de Negócio
-- **RN-UC00-001:** Somente ativos do tenant do usuário logado (Id_Conglomerado)
+- **RN-UC00-001:** Somente ativos do tenant do usuário logado (Id_Fornecedor)
 - **RN-UC00-002:** Ativos soft-deleted (Fl_Ativo=FALSE) não aparecem
 - **RN-UC00-003:** Paginação padrão 20 registros
 - **RN-UC00-004:** Filtros são acumuláveis e refletem na URL
@@ -131,7 +131,7 @@ Permitir criação de novo ativo com geração automática de QR Code e número 
 - **FP-UC01-008:** Sistema gera Número de Patrimônio automaticamente (PAT-{TipoAbrev}-{Ano}-{Sequencial})
 - **FP-UC01-009:** Sistema gera QR Code 300x300px apontando para URL do ativo
 - **FP-UC01-010:** Sistema armazena QR_Code_Base64 e QR_Code_URL
-- **FP-UC01-011:** Sistema cria registro com Id_Conglomerado do usuário logado
+- **FP-UC01-011:** Sistema cria registro com Id_Fornecedor do usuário logado
 - **FP-UC01-012:** Sistema registra auditoria (Created, CreatedBy)
 - **FP-UC01-013:** Sistema exibe mensagem de sucesso com Número de Patrimônio gerado
 
@@ -153,7 +153,7 @@ Permitir criação de novo ativo com geração automática de QR Code e número 
 - **RN-UC01-002:** QR Code gerado automaticamente (RN-RF025-002)
 - **RN-UC01-003:** Campos obrigatórios variam por tipo (RN-RF025-008)
 - **RN-UC01-004:** IMEI validado para smartphones (RN-RF025-011)
-- **RN-UC01-005:** Id_Conglomerado preenchido automaticamente
+- **RN-UC01-005:** Id_Fornecedor preenchido automaticamente
 - **RN-UC01-006:** Status inicial sempre "Disponivel"
 - **RN-UC01-007:** Created/CreatedBy preenchidos automaticamente
 
@@ -162,7 +162,7 @@ Permitir criação de novo ativo com geração automática de QR Code e número 
 - **CA-UC01-002:** QR Code DEVE ser gerado automaticamente ao criar ativo
 - **CA-UC01-003:** Campos obrigatórios DEVEM variar por tipo de ativo
 - **CA-UC01-004:** IMEI DEVE ser validado (formato, Luhn, Anatel) se tipo = Smartphone
-- **CA-UC01-005:** Id_Conglomerado DEVE ser preenchido automaticamente
+- **CA-UC01-005:** Id_Fornecedor DEVE ser preenchido automaticamente
 - **CA-UC01-006:** Auditoria DEVE registrar Created e CreatedBy
 
 ---

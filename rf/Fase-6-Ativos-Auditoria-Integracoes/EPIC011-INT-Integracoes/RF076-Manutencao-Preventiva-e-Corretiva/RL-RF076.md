@@ -79,7 +79,7 @@ CREATE TABLE [dbo].[OrdemManutencao](
 ```
 
 **Problemas Identificados:**
-- Sem campo `Id_Conglomerado` (não multi-tenant)
+- Sem campo `Id_Fornecedor` (não multi-tenant)
 - Sem soft delete (`Fl_Excluido`)
 - Sem campos de auditoria completos (falta `Id_Usuario_Alteracao`, `Dt_Alteracao`)
 - Status textual sem enum (permite valores inconsistentes)
@@ -90,7 +90,7 @@ CREATE TABLE [dbo].[OrdemManutencao](
 **Destino:** `substituido`
 
 **Justificativa:** Será criada nova tabela `OrdemServico` com:
-- Multi-tenancy (`Id_Conglomerado`)
+- Multi-tenancy (`Id_Fornecedor`)
 - Auditoria completa
 - Soft delete
 - Status enum estruturado
@@ -112,7 +112,7 @@ CREATE TABLE [dbo].[OrdemManutencao](
 | `Dt_Fechamento` | `DataFechamento` | Mantido |
 | `Nu_Horas` | `HorasExecutadas` | Renomeado |
 | `Vl_Total` | `CustoTotal` | Calculado (não armazenado) |
-| - | `Id_Conglomerado` | NOVO (multi-tenancy) |
+| - | `Id_Fornecedor` | NOVO (multi-tenancy) |
 | - | `Fl_Excluido` | NOVO (soft delete) |
 | - | `IdResponsavel` | NOVO (FK Usuario) |
 | - | `IdTecnico` | NOVO (FK Usuario) |
@@ -205,7 +205,7 @@ CREATE TABLE [dbo].[PlanoManutencao](
 | `Fl_Ativo` | `Ativo` | Mantido |
 | `Dt_Proxima` | `DataProximaManutencao` | Mantido |
 | - | `Checklist` (JSON ou tabela separada) | NOVO |
-| - | `Id_Conglomerado` | NOVO (multi-tenancy) |
+| - | `Id_Fornecedor` | NOVO (multi-tenancy) |
 | - | `Id_Usuario_Criacao` | NOVO (auditoria) |
 | - | `Dt_Criacao` | NOVO (auditoria) |
 | - | `Fl_Excluido` | NOVO (soft delete) |

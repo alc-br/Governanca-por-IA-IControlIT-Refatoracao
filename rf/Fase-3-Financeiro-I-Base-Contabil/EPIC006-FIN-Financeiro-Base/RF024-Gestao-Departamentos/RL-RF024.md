@@ -68,7 +68,7 @@ O sistema legado de gestão de departamentos foi implementado em **ASP.NET Web F
 
 #### Comportamentos Implícitos (Code-Behind VB.NET)
 
-1. **Validação Código Único Ausente**: Não valida duplicidade `Codigo_Departamento` por conglomerado - permite cadastros duplicados
+1. **Validação Código Único Ausente**: Não valida duplicidade `Codigo_Departamento` por Fornecedor - permite cadastros duplicados
 2. **Líder Sem Validação FK**: Aceita GUID inválido em `Id_Usuario_Lider` - campo texto livre sem verificação `IF EXISTS (SELECT 1 FROM Usuario WHERE Id = @IdLider)`
 3. **Listagem Flat Alfabética**: Query `SELECT * FROM Departamento ORDER BY Nome` - sem hierarquia visual (Diretoria > Gerência)
 4. **Sem Organograma**: Botão "Visualizar Organograma" desabilitado com tooltip "Funcionalidade não disponível"
@@ -121,7 +121,7 @@ O sistema legado de gestão de departamentos foi implementado em **ASP.NET Web F
 ```vb
 <WebMethod()> Public Function CadastrarDepartamento(ByVal nome As String, ByVal sigla As String) As Guid
     ' ❌ PROBLEMA: Flat structure - sem suporte Id_Departamento_Pai
-    ' ❌ PROBLEMA: Sem validação código único por conglomerado
+    ' ❌ PROBLEMA: Sem validação código único por Fornecedor
     ' ❌ PROBLEMA: Sem campo Id_Usuario_Lider validado (FK Usuario)
     Dim idDepartamento As Guid = Guid.NewGuid()
     Dim sql As String = "INSERT INTO Departamento (Id_Departamento, Nome, Sigla, Status) VALUES (@Id, @Nome, @Sigla, 'Ativo')"
@@ -133,7 +133,7 @@ End Function
 **Regras Implícitas Extraídas:**
 1. Código departamento gerado automaticamente como GUID - não usa formato alfanumérico [TIPO]-[NOME]
 2. Status padrão "Ativo" hard-coded
-3. Sem validação unicidade Nome por conglomerado
+3. Sem validação unicidade Nome por Fornecedor
 4. Sem criação automática grupo Active Directory
 
 **DESTINO**: SUBSTITUÍDO - Sistema moderno usa `CreateDepartamentoCommand` com FluentValidation, formato código [TIPO]-[NOME], FK líder validada, hierarquia recursiva
@@ -308,9 +308,9 @@ Procedure retorna lista flat de departamentos filtrados por status. Campos retor
 8. ❌ **Campo `Status` enum string**: Sem constraint CHECK - aceita valores inválidos ('ativo', 'ATIVO', 'Active')
 9. ❌ **Sem soft delete**: Sem flag `Fl_Ativo` booleano - exclusão física (DELETE) causa FK violations
 10. ❌ **Sem campos auditoria**: Falta `Id_Usuario_Criacao`, `Dt_Criacao`, `Id_Usuario_Atualizacao`, `Dt_Atualizacao` padronizados
-11. ❌ **Sem multi-tenancy**: Falta `Id_Conglomerado` - banco por cliente (migração complexa)
+11. ❌ **Sem multi-tenancy**: Falta `Id_Fornecedor` - banco por cliente (migração complexa)
 
-**DESTINO**: SUBSTITUÍDO - Tabela `Departamento` redesenhada com campos hierarquia (IdDepartamentoPai, NivelHierarquia, CaminhoHierarquico), Azure AD (AzureADObjectId), multi-tenancy (IdConglomerado), soft delete (FlAtivo), auditoria (Created, CreatedBy, LastModified, LastModifiedBy)
+**DESTINO**: SUBSTITUÍDO - Tabela `Departamento` redesenhada com campos hierarquia (IdDepartamentoPai, NivelHierarquia, CaminhoHierarquico), Azure AD (AzureADObjectId), multi-tenancy (IdFornecedor), soft delete (FlAtivo), auditoria (Created, CreatedBy, LastModified, LastModifiedBy)
 
 ---
 
@@ -385,9 +385,9 @@ SELECT * FROM CTE_Hierarquia
 
 **Localização:** `Departamento.aspx.vb` - Event handler `btnSalvar_Click` - Linha 78
 
-**Descrição:** Sistema legado NÃO valida se código departamento já existe para o conglomerado. Permite cadastrar múltiplos departamentos com mesmo código "DIR-TI" causando ambiguidade em relatórios e inconsistência referencial.
+**Descrição:** Sistema legado NÃO valida se código departamento já existe para o Fornecedor. Permite cadastrar múltiplos departamentos com mesmo código "DIR-TI" causando ambiguidade em relatórios e inconsistência referencial.
 
-**DESTINO**: ASSUMIDO - Regra migrada para `RN-RF024-001` com validação FluentValidation + constraint UNIQUE (Codigo_Departamento, Id_Conglomerado)
+**DESTINO**: ASSUMIDO - Regra migrada para `RN-RF024-001` com validação FluentValidation + constraint UNIQUE (Codigo_Departamento, Id_Fornecedor)
 
 ---
 
@@ -496,7 +496,7 @@ SELECT * FROM CTE_Hierarquia
 | **Versionamento Estrutura** | INEXISTENTE (sobrescreve sem histórico) | Tabela `Departamento_Historico` append-only | **NOVO RECURSO** - Auditoria completa mudanças organizacionais |
 | **Código Departamento** | GUID auto-gerado | Formato alfanumérico [TIPO]-[NOME] | **MUDANÇA FORMATO** - Migração precisa gerar códigos retroativos |
 | **Líder FK Validada** | GUID texto livre sem validação | FK Usuario com FluentValidation | **CORREÇÃO BUG** - Impede líderes inválidos |
-| **Multi-Tenancy** | 1 banco por cliente | Id_Conglomerado em tabela única | **BREAKING CHANGE** - Migração consolida múltiplos bancos |
+| **Multi-Tenancy** | 1 banco por cliente | Id_Fornecedor em tabela única | **BREAKING CHANGE** - Migração consolida múltiplos bancos |
 | **Soft Delete** | DELETE físico (FK violations) | Fl_Ativo flag (soft delete) | **MUDANÇA PADRÃO** - Preserva histórico |
 | **Auditoria** | Campos Created/Updated básicos | EF Core SaveChangesInterceptor + JSON snapshot | **MELHORIA** - Rastreabilidade completa |
 | **Paginação** | INEXISTENTE (retorna TODAS linhas) | Skip().Take() + PaginatedListDto | **NOVA FUNCIONALIDADE** - Performance > 1000 registros |

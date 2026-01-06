@@ -77,7 +77,7 @@ CREATE TABLE [dbo].[Solicitacao_SLA](
 - ❌ Sem diferenciação entre tempo de resposta vs tempo de resolução
 - ❌ Sem suporte a calendários (horário útil hardcoded)
 - ❌ Sem campos de auditoria (Created, CreatedBy, Modified, ModifiedBy)
-- ❌ Sem multi-tenancy (Id_Conglomerado)
+- ❌ Sem multi-tenancy (Id_Fornecedor)
 - ❌ Sem soft delete (Fl_Excluido)
 
 ### 2.2 Tabela Secundária: Contrato_SLA_Operacao

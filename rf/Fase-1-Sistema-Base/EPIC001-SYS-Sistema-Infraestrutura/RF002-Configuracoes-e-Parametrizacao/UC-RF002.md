@@ -85,7 +85,7 @@ Permitir que o usuário visualize configurações disponíveis respeitando hiera
 2. Sistema valida permissão `SYS.CONFIGURACOES.READ`
 3. Sistema carrega configurações respeitando hierarquia multi-tenant:
    - Se configuração existe em nível Usuário → exibe valor do Usuário
-   - Senão, busca em Departamento → Empresa → Conglomerado → Global
+   - Senão, busca em Departamento → Empresa → Fornecedor → Global
 4. Sistema mascara valores sensíveis (`Fl_Criptografado = 1`) como `********`
 5. Sistema aplica paginação padrão (50 registros)
 6. Sistema aplica ordenação padrão (por categoria e nome)
@@ -108,7 +108,7 @@ Permitir que o usuário visualize configurações disponíveis respeitando hiera
   - Sistema exibe apenas configurações da categoria selecionada
 
 - **FA-UC00-004: Filtrar por nível hierárquico**
-  - Usuário seleciona nível (Global, Conglomerado, Empresa, Departamento, Usuário)
+  - Usuário seleciona nível (Global, Fornecedor, Empresa, Departamento, Usuário)
   - Sistema exibe apenas configurações do nível selecionado
 
 - **FA-UC00-005: Visualizar apenas configurações sensíveis**
@@ -129,11 +129,11 @@ Permitir que o usuário visualize configurações disponíveis respeitando hiera
   - Registra erro no log
 
 ### Regras de Negócio
-- **RN-UC00-001**: Somente configurações do tenant do usuário (isolamento por `Id_Conglomerado` e `Id_Empresa`)
+- **RN-UC00-001**: Somente configurações do tenant do usuário (isolamento por `Id_Fornecedor` e `Id_Empresa`)
 - **RN-UC00-002**: Configurações soft-deleted (`Fl_Excluido = 1`) não aparecem
 - **RN-UC00-003**: Paginação padrão 50 registros (configurável)
 - **RN-UC00-004**: Valores sensíveis mascarados como `********` (exceto com permissão `DECRYPT`)
-- **RN-UC00-005**: Hierarquia multi-tenant: Usuário → Departamento → Empresa → Conglomerado → Global
+- **RN-UC00-005**: Hierarquia multi-tenant: Usuário → Departamento → Empresa → Fornecedor → Global
 
 ---
 
@@ -161,7 +161,7 @@ Permitir a criação de uma nova configuração válida com criptografia automá
    - **Aba Valor**: Tipo Dado, Valor, Valor Padrão
    - **Aba Validação**: Validação Regex, Valores Permitidos, Min/Max
    - **Aba Segurança**: Criptografado (checkbox), Somente Leitura (checkbox), Crítica (checkbox)
-   - **Aba Multi-Tenancy**: Nível (Global/Conglomerado/Empresa/Departamento/Usuário)
+   - **Aba Multi-Tenancy**: Nível (Global/Fornecedor/Empresa/Departamento/Usuário)
    - **Aba Feature Flag** (opcional): Habilitar Feature Flag, Estratégia Rollout, Data Expiração
 4. Usuário preenche campos obrigatórios:
    - Código (ex: `SMTP_Host`)
@@ -172,7 +172,7 @@ Permitir a criação de uma nova configuração válida com criptografia automá
 5. Usuário marca checkbox "Criptografado" se valor sensível (senha, API key, token)
 6. Usuário clica em "Salvar"
 7. Sistema valida dados:
-   - Código único por tenant (`WHERE Nm_Codigo = ? AND Id_Conglomerado = ? AND Fl_Excluido = 0`)
+   - Código único por tenant (`WHERE Nm_Codigo = ? AND Id_Fornecedor = ? AND Fl_Excluido = 0`)
    - Tipo de dado válido (String, Integer, Decimal, Boolean, JSON, Enum, DateTime)
    - Valor compatível com tipo escolhido
    - Validação customizada (regex, ranges, valores permitidos)
@@ -181,7 +181,7 @@ Permitir a criação de uma nova configuração válida com criptografia automá
    - Criptografa valor com AES-256-GCM
    - Armazena valor criptografado no banco
 9. Sistema persiste configuração com campos automáticos:
-   - `Id_Conglomerado` (do usuário logado)
+   - `Id_Fornecedor` (do usuário logado)
    - `Id_Empresa` (se nível Empresa/Departamento/Usuário)
    - `Dt_Criacao` (timestamp atual)
    - `Id_Usuario_Criacao` (usuário logado)
@@ -254,7 +254,7 @@ Permitir a criação de uma nova configuração válida com criptografia automá
 
 ### Regras de Negócio
 - **RN-UC01-001**: Campos obrigatórios: Código, Nome, Categoria, Tipo Dado, Valor
-- **RN-UC01-002**: `Id_Conglomerado` e `Id_Empresa` automáticos (multi-tenancy)
+- **RN-UC01-002**: `Id_Fornecedor` e `Id_Empresa` automáticos (multi-tenancy)
 - **RN-UC01-003**: `Dt_Criacao`, `Id_Usuario_Criacao` automáticos
 - **RN-UC01-004**: Código único por tenant (case-insensitive)
 - **RN-UC01-005**: Validação de tipo antes de persistir (RN-RF002-03)
@@ -297,7 +297,7 @@ Permitir visualização detalhada de uma configuração incluindo histórico de 
    - **Aba Valor**: Tipo Dado, Valor (mascarado se sensível), Valor Padrão
    - **Aba Validação**: Validação Regex, Valores Permitidos, Min/Max
    - **Aba Segurança**: Criptografado, Somente Leitura, Crítica
-   - **Aba Multi-Tenancy**: Nível, Conglomerado, Empresa, Departamento, Usuário
+   - **Aba Multi-Tenancy**: Nível, Fornecedor, Empresa, Departamento, Usuário
    - **Aba Feature Flag** (se aplicável): Estratégia Rollout, Data Expiração, Status
    - **Aba Histórico**: Lista de versões com diff visual (JSON comparado)
    - **Aba Auditoria**: Log completo de acessos e modificações

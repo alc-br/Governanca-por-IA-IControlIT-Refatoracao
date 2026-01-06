@@ -101,26 +101,26 @@ Cada RF possui um arquivo STATUS.yaml que registra:
 **Contexto:**
 O sistema IControlIT 2.0 possui uma hierarquia multi-tenant complexa com 4 níveis:
 - Cliente (tenant raiz - quem paga pelo sistema)
-- Conglomerado (agrupamento lógico de empresas dentro do Cliente)
-- Empresa (empresa individual dentro do Conglomerado)
+- Fornecedor (agrupamento lógico de empresas dentro do Cliente)
+- Empresa (empresa individual dentro do Fornecedor)
 - Filial (filial da empresa)
 
-Os Modelos de Dados (MDs) foram inicialmente gerados assumindo `Conglomerado` como
+Os Modelos de Dados (MDs) foram inicialmente gerados assumindo `Fornecedor` como
 entidade raiz de multi-tenancy, mas a implementação do backend já estava usando
 `Cliente` como raiz.
 
 Auditoria de conformidade (2025-12-25) identificou divergência sistemática entre
-MDs (usam ConglomeradoId) e código backend (usa ClienteId/EmpresaId) em 100%
+MDs (usam FornecedorId) e código backend (usa ClienteId/EmpresaId) em 100%
 dos 49 RFs da Fase 2.
 
 **Decisao:**
-- **Cliente é a entidade raiz de multi-tenancy** (não Conglomerado)
+- **Cliente é a entidade raiz de multi-tenancy** (não Fornecedor)
 - Todas as entidades devem ter FK `ClienteId` como campo obrigatório de isolamento multi-tenant
 - Entidades podem ter FK adicional `EmpresaId` quando precisam de escopo por empresa específica
 - TODOS os Modelos de Dados (MD-RFXXX.md) serão atualizados para refletir esta hierarquia
 
 **Alternativas Consideradas:**
-- **Alternativa 1 (Rejeitada):** Usar `Conglomerado` como raiz
+- **Alternativa 1 (Rejeitada):** Usar `Fornecedor` como raiz
   - Motivo: Não reflete modelo de negócio real (Cliente é quem paga)
   - Motivo: Exigiria refatoração massiva de ~250 entidades já implementadas
   - Motivo: Risco alto de regressões e quebra de dados existentes
@@ -133,7 +133,7 @@ dos 49 RFs da Fase 2.
 - **Positivas:**
   - Documentação sincronizada com código implementado
   - Hierarquia multi-tenant alinhada com modelo de negócio
-  - Maior flexibilidade de isolamento (Cliente > Conglomerado > Empresa > Filial)
+  - Maior flexibilidade de isolamento (Cliente > Fornecedor > Empresa > Filial)
   - Zero risco técnico (código já está correto)
 
 - **Negativas:**
@@ -141,7 +141,7 @@ dos 49 RFs da Fase 2.
   - Necessidade de documentar hierarquia completa em ARCHITECTURE.md
 
 **Impacto:**
-- 49 arquivos MD-RFXXX.md precisam ser atualizados (substituir `ConglomeradoId` por `ClienteId`)
+- 49 arquivos MD-RFXXX.md precisam ser atualizados (substituir `FornecedorId` por `ClienteId`)
 - Seção de multi-tenancy será adicionada em `/docs/ARCHITECTURE.md`
 - Seeds e migrations já estão corretos (usam ClienteId)
 

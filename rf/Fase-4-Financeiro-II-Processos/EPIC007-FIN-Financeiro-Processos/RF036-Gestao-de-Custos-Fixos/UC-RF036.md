@@ -43,8 +43,8 @@ Todos os casos de uso seguem os seguintes padrões obrigatórios:
 
 ### 3.1 Multi-Tenancy
 
-- Todas as operações **filtram automaticamente** por `ConglomeradoId` do usuário autenticado.
-- Tentativa de acesso a custo fixo de outro conglomerado → **HTTP 404**.
+- Todas as operações **filtram automaticamente** por `FornecedorId` do usuário autenticado.
+- Tentativa de acesso a custo fixo de outro Fornecedor → **HTTP 404**.
 - **RN-RF036-13** aplicada em TODOS os UCs.
 
 ### 3.2 Auditoria
@@ -95,7 +95,7 @@ Permitir ao usuário listar todos os custos fixos cadastrados com filtros, orden
 #### Pós-condições
 
 - Lista de custos fixos exibida conforme filtros aplicados.
-- Apenas custos do conglomerado do usuário são retornados.
+- Apenas custos do Fornecedor do usuário são retornados.
 
 #### Fluxo Principal
 
@@ -123,11 +123,11 @@ Permitir ao usuário listar todos os custos fixos cadastrados com filtros, orden
 
 #### Regras de Negócio Aplicadas
 
-- **RN-RF036-13**: Isolamento multi-tenant por ConglomeradoId.
+- **RN-RF036-13**: Isolamento multi-tenant por FornecedorId.
 
 #### Critérios de Aceite
 
-- ✅ Apenas custos do conglomerado do usuário são exibidos.
+- ✅ Apenas custos do Fornecedor do usuário são exibidos.
 - ✅ Filtros funcionam corretamente.
 - ✅ Paginação retorna registros conforme limite especificado.
 - ✅ Ordenação funciona em todas as colunas.
@@ -172,9 +172,9 @@ Permitir ao usuário cadastrar um novo custo fixo mensal com informações obrig
    - Valor Orçado > 0 (**RN-RF036-01**).
    - Data Início ≤ hoje (**RN-RF036-01**).
    - Data Fim > Data Início (se informada) (**RN-RF036-08**).
-   - Fornecedor e Contrato pertencem ao mesmo ConglomeradoId (se informados) (**RN-RF036-09**).
+   - Fornecedor e Contrato pertencem ao mesmo FornecedorId (se informados) (**RN-RF036-09**).
 5. Sistema cria custo fixo com:
-   - ConglomeradoId do usuário autenticado (**RN-RF036-13**).
+   - FornecedorId do usuário autenticado (**RN-RF036-13**).
    - Status informado (padrão: Ativo) (**RN-RF036-10**).
    - UsuarioCriacaoId = usuário autenticado.
    - DataCriacao = agora.
@@ -203,21 +203,21 @@ Permitir ao usuário cadastrar um novo custo fixo mensal com informações obrig
 **FE-UC01-05: Data Fim < Data Início**
 - Passo 4: Sistema retorna **HTTP 400** com mensagem: "Data Fim deve ser posterior à Data Início".
 
-**FE-UC01-06: Fornecedor de outro conglomerado**
-- Passo 4: Sistema retorna **HTTP 400** com mensagem: "Fornecedor não pertence ao seu conglomerado".
+**FE-UC01-06: Fornecedor de outro Fornecedor**
+- Passo 4: Sistema retorna **HTTP 400** com mensagem: "Fornecedor não pertence ao seu Fornecedor".
 
 #### Regras de Negócio Aplicadas
 
 - **RN-RF036-01**: Campos obrigatórios (Descricao, TipoCustoFixoId, ValorOrcadoMensal, DataInicio, Status).
 - **RN-RF036-08**: Data Fim opcional mas validada (> Data Início).
-- **RN-RF036-09**: Vinculação a fornecedor e contrato (validação de ConglomeradoId).
+- **RN-RF036-09**: Vinculação a fornecedor e contrato (validação de FornecedorId).
 - **RN-RF036-10**: Status do custo fixo (enum válido).
 - **RN-RF036-13**: Isolamento multi-tenant.
 
 #### Critérios de Aceite
 
 - ✅ Custo fixo criado com sucesso se todas validações passarem.
-- ✅ ConglomeradoId do usuário autenticado é atribuído automaticamente.
+- ✅ FornecedorId do usuário autenticado é atribuído automaticamente.
 - ✅ Validações retornam HTTP 400 com mensagens específicas.
 - ✅ Auditoria registrada corretamente (UsuarioCriacaoId, DataCriacao).
 
@@ -233,7 +233,7 @@ Permitir ao usuário visualizar detalhes completos de um custo fixo específico,
 
 - Usuário autenticado.
 - Usuário possui permissão `GES.CUSTOS_FIXOS.VIEW`.
-- Custo fixo existe e pertence ao ConglomeradoId do usuário.
+- Custo fixo existe e pertence ao FornecedorId do usuário.
 
 #### Pós-condições
 
@@ -245,7 +245,7 @@ Permitir ao usuário visualizar detalhes completos de um custo fixo específico,
 
 1. Usuário clica em custo fixo na listagem.
 2. Sistema valida:
-   - Custo fixo pertence ao ConglomeradoId do usuário (**RN-RF036-13**).
+   - Custo fixo pertence ao FornecedorId do usuário (**RN-RF036-13**).
 3. Sistema exibe:
    - **Dados principais**: Descrição, Tipo, Valor Orçado, Data Início, Data Fim, Fornecedor, Contrato, Status, Observações.
    - **Histórico de lançamentos**: Últimos 12 meses com Mês Referência, Valor Provisionado, Valor Realizado, Variação %, Status, Justificativa (se houver).
@@ -260,7 +260,7 @@ Nenhum.
 
 #### Fluxos de Exceção
 
-**FE-UC02-01: Custo fixo não encontrado ou de outro conglomerado**
+**FE-UC02-01: Custo fixo não encontrado ou de outro Fornecedor**
 - Passo 2: Sistema retorna **HTTP 404** com mensagem "Custo fixo não encontrado".
 
 #### Regras de Negócio Aplicadas
@@ -272,7 +272,7 @@ Nenhum.
 - ✅ Detalhes completos exibidos corretamente.
 - ✅ Histórico de lançamentos carregado.
 - ✅ Gráfico de evolução renderizado.
-- ✅ Tentativa de acesso a custo de outro conglomerado retorna HTTP 404.
+- ✅ Tentativa de acesso a custo de outro Fornecedor retorna HTTP 404.
 
 ---
 
@@ -286,7 +286,7 @@ Permitir ao usuário alterar informações de um custo fixo existente.
 
 - Usuário autenticado.
 - Usuário possui permissão `GES.CUSTOS_FIXOS.UPDATE`.
-- Custo fixo existe e pertence ao ConglomeradoId do usuário.
+- Custo fixo existe e pertence ao FornecedorId do usuário.
 
 #### Pós-condições
 
@@ -307,7 +307,7 @@ Permitir ao usuário alterar informações de um custo fixo existente.
    - Valor Orçado > 0 (**RN-RF036-01**).
    - Data Início ≤ hoje (**RN-RF036-01**).
    - Data Fim > Data Início (se informada) (**RN-RF036-08**).
-   - Fornecedor e Contrato pertencem ao mesmo ConglomeradoId (se informados) (**RN-RF036-09**).
+   - Fornecedor e Contrato pertencem ao mesmo FornecedorId (se informados) (**RN-RF036-09**).
 5. Sistema atualiza custo fixo com:
    - UsuarioAlteracaoId = usuário autenticado.
    - DataAlteracao = agora.
@@ -327,7 +327,7 @@ Permitir ao usuário alterar informações de um custo fixo existente.
 **FE-UC03-02: Validações diversas (mesmas de UC01)**
 - Passo 4: Sistema retorna **HTTP 400** conforme violação.
 
-**FE-UC03-03: Custo fixo não encontrado ou de outro conglomerado**
+**FE-UC03-03: Custo fixo não encontrado ou de outro Fornecedor**
 - Passo 1: Sistema retorna **HTTP 404**.
 
 #### Regras de Negócio Aplicadas
@@ -356,7 +356,7 @@ Permitir ao usuário inativar um custo fixo, interrompendo provisionamento autom
 
 - Usuário autenticado.
 - Usuário possui permissão `GES.CUSTOS_FIXOS.UPDATE`.
-- Custo fixo existe, pertence ao ConglomeradoId do usuário e tem status "Ativo".
+- Custo fixo existe, pertence ao FornecedorId do usuário e tem status "Ativo".
 
 #### Pós-condições
 
@@ -384,7 +384,7 @@ Permitir ao usuário inativar um custo fixo, interrompendo provisionamento autom
 
 #### Fluxos de Exceção
 
-**FE-UC04-01: Custo fixo não encontrado ou de outro conglomerado**
+**FE-UC04-01: Custo fixo não encontrado ou de outro Fornecedor**
 - Passo 1: Sistema retorna **HTTP 404**.
 
 **FE-UC04-02: Custo fixo já está inativo**
@@ -432,7 +432,7 @@ Executar job automático mensal que cria lançamentos de custos fixos ativos par
    - Status = **Ativo** (**RN-RF036-10**).
    - DataInicio ≤ data atual (**RN-RF036-02**).
    - (DataFim IS NULL OU DataFim ≥ data atual) (**RN-RF036-02**).
-   - ConglomeradoId = todos os conglomerados (processamento global).
+   - FornecedorId = todos os Fornecedores (processamento global).
 3. Para cada custo fixo elegível:
    - Sistema verifica se já existe lançamento para o mês corrente:
      - Se SIM → pula (evita duplicatas - idempotência).
@@ -446,7 +446,7 @@ Executar job automático mensal que cria lançamentos de custos fixos ativos par
      - ValorProvisionado = calculado acima.
      - Status = **Provisionado**.
      - FlProvisionamentoAutomatico = **true**.
-     - ConglomeradoId = mesmo do custo fixo (**RN-RF036-13**).
+     - FornecedorId = mesmo do custo fixo (**RN-RF036-13**).
      - UsuarioCriacaoId = ID do sistema (job).
      - DataCriacao = agora.
 4. Sistema envia notificação ao responsável de cada custo fixo: "Lançamento de [Descrição] provisionado para [Mês/Ano] no valor de R$ [Valor]".
@@ -494,7 +494,7 @@ Permitir ao usuário informar o valor efetivamente realizado de um lançamento p
 
 - Usuário autenticado.
 - Usuário possui permissão `GES.CUSTOS_FIXOS.UPDATE`.
-- Lançamento existe, pertence ao ConglomeradoId do usuário e tem Status = **Provisionado**.
+- Lançamento existe, pertence ao FornecedorId do usuário e tem Status = **Provisionado**.
 
 #### Pós-condições
 
@@ -559,7 +559,7 @@ Permitir ao usuário informar o valor efetivamente realizado de um lançamento p
 **FE-UC06-03: Lançamento já possui Status = Pago**
 - Passo 1: Sistema retorna **HTTP 400** com mensagem: "Lançamentos com status Pago não podem ser editados" (**RN-RF036-12**).
 
-**FE-UC06-04: Lançamento não encontrado ou de outro conglomerado**
+**FE-UC06-04: Lançamento não encontrado ou de outro Fornecedor**
 - Passo 1: Sistema retorna **HTTP 404**.
 
 #### Regras de Negócio Aplicadas
@@ -593,7 +593,7 @@ Permitir a um gestor aprovar ou reprovar lançamentos que ultrapassaram variaç�
 
 - Usuário autenticado.
 - Usuário possui permissão `GES.CUSTOS_FIXOS.APROVAR`.
-- Lançamento existe, pertence ao ConglomeradoId do usuário e tem Status = **Aguardando Aprovação**.
+- Lançamento existe, pertence ao FornecedorId do usuário e tem Status = **Aguardando Aprovação**.
 
 #### Pós-condições
 
@@ -678,7 +678,7 @@ Permitir ao usuário configurar distribuição percentual de um custo fixo entre
 
 - Usuário autenticado.
 - Usuário possui permissão `GES.CUSTOS_FIXOS.UPDATE`.
-- Custo fixo existe e pertence ao ConglomeradoId do usuário.
+- Custo fixo existe e pertence ao FornecedorId do usuário.
 
 #### Pós-condições
 
@@ -693,19 +693,19 @@ Permitir ao usuário configurar distribuição percentual de um custo fixo entre
    - Colunas: Centro de Custo, Percentual (%).
    - Botões: **Adicionar Linha** | **Remover Linha**.
 3. Usuário adiciona linhas:
-   - Seleciona Centro de Custo (dropdown - apenas do mesmo ConglomeradoId).
+   - Seleciona Centro de Custo (dropdown - apenas do mesmo FornecedorId).
    - Informa Percentual (decimal, 0 < x ≤ 100).
 4. Usuário clica em "Salvar".
 5. Sistema valida:
    - Ao menos 1 item de rateio (**RN-RF036-06**).
    - Cada item tem Percentual > 0 e ≤ 100 (**RN-RF036-06**).
    - Soma dos percentuais = 100% (**RN-RF036-06**).
-   - Cada Centro de Custo pertence ao mesmo ConglomeradoId (**RN-RF036-06**).
+   - Cada Centro de Custo pertence ao mesmo FornecedorId (**RN-RF036-06**).
 6. Sistema salva itens de rateio com:
    - CustoFixoId.
    - CentroCustoId.
    - Percentual.
-   - ConglomeradoId = mesmo do custo fixo.
+   - FornecedorId = mesmo do custo fixo.
    - UsuarioCriacaoId = usuário autenticado.
    - DataCriacao = agora.
 7. Sistema exibe mensagem de sucesso: "Rateio configurado com sucesso".
@@ -728,8 +728,8 @@ Permitir ao usuário configurar distribuição percentual de um custo fixo entre
 **FE-UC08-02: Percentual ≤ 0 ou > 100**
 - Passo 5: Sistema retorna **HTTP 400** com mensagem: "Percentual deve ser maior que 0 e no máximo 100".
 
-**FE-UC08-03: Centro de Custo de outro conglomerado**
-- Passo 5: Sistema retorna **HTTP 400** com mensagem: "Centro de Custo não pertence ao seu conglomerado".
+**FE-UC08-03: Centro de Custo de outro Fornecedor**
+- Passo 5: Sistema retorna **HTTP 400** com mensagem: "Centro de Custo não pertence ao seu Fornecedor".
 
 #### Regras de Negócio Aplicadas
 
@@ -740,7 +740,7 @@ Permitir ao usuário configurar distribuição percentual de um custo fixo entre
 
 - ✅ Rateio configurado com sucesso se soma = 100%.
 - ✅ Validação bloqueia soma ≠ 100%.
-- ✅ Apenas centros de custo do mesmo ConglomeradoId são permitidos.
+- ✅ Apenas centros de custo do mesmo FornecedorId são permitidos.
 - ✅ Rateio é opcional (pode ser removido completamente).
 
 ---
@@ -755,7 +755,7 @@ Exibir visão consolidada dos custos fixos com KPIs, gráficos e análises compa
 
 - Usuário autenticado.
 - Usuário possui permissão `GES.CUSTOS_FIXOS.VIEW`.
-- Existem custos fixos e lançamentos no ConglomeradoId do usuário.
+- Existem custos fixos e lançamentos no FornecedorId do usuário.
 
 #### Pós-condições
 
@@ -797,11 +797,11 @@ Nenhum.
 
 #### Regras de Negócio Aplicadas
 
-- **RN-RF036-13**: Isolamento multi-tenant (apenas dados do ConglomeradoId do usuário).
+- **RN-RF036-13**: Isolamento multi-tenant (apenas dados do FornecedorId do usuário).
 
 #### Critérios de Aceite
 
-- ✅ Dashboard carrega dados apenas do conglomerado do usuário.
+- ✅ Dashboard carrega dados apenas do Fornecedor do usuário.
 - ✅ KPIs calculados corretamente.
 - ✅ Gráficos renderizados com dados dos últimos 12 meses.
 - ✅ Análise YoY compara mês atual com mesmo mês do ano anterior.
@@ -819,7 +819,7 @@ Projetar valores futuros de custos fixos para os próximos 3, 6 ou 12 meses, con
 
 - Usuário autenticado.
 - Usuário possui permissão `GES.CUSTOS_FIXOS.VIEW`.
-- Existem custos fixos ativos no ConglomeradoId do usuário.
+- Existem custos fixos ativos no FornecedorId do usuário.
 
 #### Pós-condições
 

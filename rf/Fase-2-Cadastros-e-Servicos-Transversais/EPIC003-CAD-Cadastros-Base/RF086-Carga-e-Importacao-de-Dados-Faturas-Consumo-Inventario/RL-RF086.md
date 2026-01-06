@@ -55,7 +55,7 @@ O sistema legado de Carga e Importação de Dados foi desenvolvido em **VB.NET +
 ```sql
 CREATE TABLE [dbo].[FaturaOperadora](
     [Id_Fatura] [int] IDENTITY(1,1) NOT NULL,
-    [Id_Conglomerado] [int] NOT NULL,
+    [Id_Fornecedor] [int] NOT NULL,
     [Cd_Operadora] [varchar](10) NOT NULL, -- V=Vivo, C=Claro, T=TIM, O=Oi
     [Nm_Arquivo] [varchar](255) NOT NULL,
     [Nr_Fatura] [varchar](50) NOT NULL,
@@ -67,8 +67,8 @@ CREATE TABLE [dbo].[FaturaOperadora](
     [Dt_Processamento] [datetime] NULL,
     [Dt_Excluido] [datetime] NULL,
     CONSTRAINT [PK_FaturaOperadora] PRIMARY KEY CLUSTERED ([Id_Fatura] ASC),
-    CONSTRAINT [FK_FaturaOperadora_Conglomerado] FOREIGN KEY ([Id_Conglomerado])
-        REFERENCES [dbo].[Conglomerado]([Id_Conglomerado])
+    CONSTRAINT [FK_FaturaOperadora_Fornecedor] FOREIGN KEY ([Id_Fornecedor])
+        REFERENCES [dbo].[Fornecedor]([Id_Fornecedor])
 )
 ```
 
@@ -169,7 +169,7 @@ CREATE TABLE [dbo].[GlosaFaturaOperadora](
 **Responsabilidade**: Iniciar processamento de fatura de operadora (síncrono, bloqueante).
 
 **Parâmetros**:
-- `@Id_Conglomerado INT`
+- `@Id_Fornecedor INT`
 - `@Cd_Operadora VARCHAR(10)`
 - `@Nm_Arquivo VARCHAR(255)`
 - `@Conteudo_Arquivo VARBINARY(MAX)`
@@ -265,7 +265,7 @@ CREATE TABLE [dbo].[GlosaFaturaOperadora](
 **Responsabilidade**: Listar histórico de importações com filtros.
 
 **Parâmetros**:
-- `@Id_Conglomerado INT`
+- `@Id_Fornecedor INT`
 - `@Cd_Operadora VARCHAR(10)` (opcional)
 - `@Dt_Inicio DATETIME` (opcional)
 - `@Dt_Fim DATETIME` (opcional)

@@ -39,7 +39,7 @@ Os UCs aqui definidos servem como **contrato comportamental**, sendo a **fonte p
 
 ## 3. PADRÕES GERAIS APLICÁVEIS A TODOS OS UCs
 
-- Todos os acessos respeitam **isolamento por tenant** (Id_Conglomerado)
+- Todos os acessos respeitam **isolamento por tenant** (Id_Fornecedor)
 - Todas as ações exigem **permissão explícita** (RBAC)
 - Erros não devem vazar informações sensíveis
 - Auditoria deve registrar **quem**, **quando** e **qual ação**
@@ -67,7 +67,7 @@ Permitir que o usuário visualize todos os troncos telefônicos do seu tenant co
 ### Fluxo Principal
 - **FP-UC00-001:** Usuário acessa a funcionalidade "Troncos"
 - **FP-UC00-002:** Sistema valida permissão `GES.TRONCOS.VISUALIZAR`
-- **FP-UC00-003:** Sistema carrega troncos do tenant (Id_Conglomerado)
+- **FP-UC00-003:** Sistema carrega troncos do tenant (Id_Fornecedor)
 - **FP-UC00-004:** Sistema exibe listagem com: Identificação, Tipo (SIP/E1/Analógico), Operadora, Capacidade (canais), Utilização (%), Status, Localização (Filial)
 - **FP-UC00-005:** Sistema aplica paginação padrão (20 registros por página)
 - **FP-UC00-006:** Sistema exibe indicador visual de utilização (verde <70%, amarelo 70-90%, vermelho >90%)
@@ -147,7 +147,7 @@ Permitir a criação de um novo tronco telefônico com todas as configurações 
 - **FP-UC01-005:** Usuário clica em "Salvar"
 - **FP-UC01-006:** Sistema valida dados (RN-UC-01-001 a RN-UC-01-007)
 - **FP-UC01-007:** Sistema cria registro com:
-  - Id_Conglomerado (automático, tenant do usuário)
+  - Id_Fornecedor (automático, tenant do usuário)
   - CriadoPor (automático, usuário autenticado)
   - DataCriacao (automático, timestamp UTC)
   - Status (automático, "disponivel")
@@ -178,8 +178,8 @@ Permitir a criação de um novo tronco telefônico com todas as configurações 
 
 ### Regras de Negócio
 - **RN-UC-01-001:** Campos obrigatórios: Identificação, Tipo, Operadora, Capacidade_Canais, Localização, Dt_Ativacao
-- **RN-UC-01-002:** Identificação deve ser única por tenant (Id_Conglomerado)
-- **RN-UC-01-003:** Id_Conglomerado preenchido automaticamente com tenant do usuário
+- **RN-UC-01-002:** Identificação deve ser única por tenant (Id_Fornecedor)
+- **RN-UC-01-003:** Id_Fornecedor preenchido automaticamente com tenant do usuário
 - **RN-UC-01-004:** CriadoPor preenchido automaticamente com ID do usuário autenticado
 - **RN-UC-01-005:** DataCriacao preenchida automaticamente com timestamp UTC
 - **RN-UC-01-006:** Status inicial sempre "disponivel"
@@ -191,7 +191,7 @@ Permitir a criação de um novo tronco telefônico com todas as configurações 
 
 ### Critérios de Aceite
 - **CA-UC01-001:** Todos os campos obrigatórios DEVEM ser validados antes de persistir
-- **CA-UC01-002:** Id_Conglomerado DEVE ser preenchido automaticamente com o tenant do usuário autenticado
+- **CA-UC01-002:** Id_Fornecedor DEVE ser preenchido automaticamente com o tenant do usuário autenticado
 - **CA-UC01-003:** CriadoPor DEVE ser preenchido automaticamente com o ID do usuário autenticado
 - **CA-UC01-004:** DataCriacao DEVE ser preenchida automaticamente com timestamp UTC atual
 - **CA-UC01-005:** Sistema DEVE retornar erro claro se validação falhar

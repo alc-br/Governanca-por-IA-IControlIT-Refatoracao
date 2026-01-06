@@ -83,7 +83,7 @@ Permitir ao usuário **localizar, filtrar e acessar configurações** respeitand
 | CMP-WF01-001 | Botão "Nova Configuração" | Button | Ação primária para criar nova configuração (exibido se usuário tiver permissão CREATE) |
 | CMP-WF01-002 | Campo de Busca Global | Input | Busca por código, nome ou descrição (case-insensitive) |
 | CMP-WF01-003 | Filtro de Categoria | Dropdown | Filtrar por: Sistema, Email, Integração, Segurança, Notificação, Cache, Storage, Auditoria, Performance, Features |
-| CMP-WF01-004 | Filtro de Nível Hierárquico | Dropdown | Filtrar por: Global, Conglomerado, Empresa, Departamento, Usuário |
+| CMP-WF01-004 | Filtro de Nível Hierárquico | Dropdown | Filtrar por: Global, Fornecedor, Empresa, Departamento, Usuário |
 | CMP-WF01-005 | Checkbox "Apenas Sensíveis" | Checkbox | Filtrar configurações com `Fl_Criptografado = 1` |
 | CMP-WF01-006 | Tabela de Configurações | DataTable | Grid hierarquizado por categoria com colunas: Código, Nome, Categoria, Tipo Dado, Valor (mascarado se sensível), Nível, Ações |
 | CMP-WF01-007 | Botão Ver Detalhes | IconButton | Ação para visualizar configuração (cada linha) |
@@ -172,7 +172,7 @@ Permitir ao usuário **localizar, filtrar e acessar configurações** respeitand
 #### Regras de Negócio Visuais
 - Apenas configurações do tenant atual (RN-UC00-001)
 - Configurações soft-deleted (`Fl_Excluido = 1`) não aparecem (RN-UC00-002)
-- Hierarquia multi-tenant: Usuário → Departamento → Empresa → Conglomerado → Global (RN-UC00-005)
+- Hierarquia multi-tenant: Usuário → Departamento → Empresa → Fornecedor → Global (RN-UC00-005)
 - Valores sensíveis mascarados como `********` (RN-UC00-004)
 - Paginação padrão 50 registros (RN-UC00-003)
 
@@ -207,8 +207,8 @@ Permitir **criação segura e validada** de uma nova configuração com criptogr
 | CMP-WF02-014 | Checkbox Somente Leitura | Checkbox | Se marcado, configuração não pode ser editada posteriormente |
 | CMP-WF02-015 | Checkbox Crítica | Checkbox | Se marcado, mudanças exigem dry-run e geram notificações Slack/Teams |
 | **Aba Multi-Tenancy** | | | |
-| CMP-WF02-016 | Dropdown Nível | Dropdown | Obrigatório: Global, Conglomerado, Empresa, Departamento, Usuário |
-| CMP-WF02-017 | Dropdown Conglomerado | Dropdown | Se nível != Global (auto-preenchido do usuário) |
+| CMP-WF02-016 | Dropdown Nível | Dropdown | Obrigatório: Global, Fornecedor, Empresa, Departamento, Usuário |
+| CMP-WF02-017 | Dropdown Fornecedor | Dropdown | Se nível != Global (auto-preenchido do usuário) |
 | CMP-WF02-018 | Dropdown Empresa | Dropdown | Se nível = Empresa/Departamento/Usuário |
 | CMP-WF02-019 | Dropdown Departamento | Dropdown | Se nível = Departamento/Usuário |
 | CMP-WF02-020 | Dropdown Usuário | Dropdown | Se nível = Usuário |
@@ -316,7 +316,7 @@ Permitir **criação segura e validada** de uma nova configuração com criptogr
 - Código único por tenant (validação backend, mensagem frontend) (RN-UC01-004)
 - Criptografia automática se `Fl_Criptografado = 1` (RN-UC01-006)
 - Validação de tipo antes de persistir (RN-UC01-005)
-- Campos automáticos não exibidos: `Id_Conglomerado`, `Id_Empresa`, `Dt_Criacao`, `Id_Usuario_Criacao` (RN-UC01-002, RN-UC01-003)
+- Campos automáticos não exibidos: `Id_Fornecedor`, `Id_Empresa`, `Dt_Criacao`, `Id_Usuario_Criacao` (RN-UC01-002, RN-UC01-003)
 
 ---
 
@@ -350,7 +350,7 @@ Permitir **consulta completa e segura** do registro com histórico de versões, 
 | CMP-WF03-015 | Badge Crítica | Badge | "Crítica" se `Fl_Critica = 1` |
 | **Aba Multi-Tenancy** (Leitura) | | | |
 | CMP-WF03-016 | Exibição Nível | Badge | Nível hierárquico (Global, Empresa, etc.) |
-| CMP-WF03-017 | Exibição Tenant Info | ReadOnly | Conglomerado, Empresa, Departamento, Usuário |
+| CMP-WF03-017 | Exibição Tenant Info | ReadOnly | Fornecedor, Empresa, Departamento, Usuário |
 | **Aba Histórico** | | | |
 | CMP-WF03-018 | Timeline de Versões | Timeline | Lista de versões com timestamp, usuário, ação |
 | CMP-WF03-019 | Botão Comparar Versões | Button | Selecionar 2 versões e comparar |

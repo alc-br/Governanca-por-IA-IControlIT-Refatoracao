@@ -135,7 +135,7 @@ CREATE TABLE [dbo].[RoamingInternacional](
 **Finalidade Esperada:** Armazenar solicitações de roaming internacional.
 
 **Problemas Identificados (se existisse):**
-- Sem multi-tenancy (faltaria Id_Conglomerado)
+- Sem multi-tenancy (faltaria Id_Fornecedor)
 - Sem soft delete (faltaria Fl_Excluido)
 - Status como VARCHAR (deveria ser enum ou FK para tabela de status)
 - Sem campos de auditoria completa (falta dados antes/depois)

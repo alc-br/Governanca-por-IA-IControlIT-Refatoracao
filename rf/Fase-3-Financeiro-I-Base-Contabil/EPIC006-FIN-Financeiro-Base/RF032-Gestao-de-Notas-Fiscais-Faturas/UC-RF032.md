@@ -35,7 +35,7 @@ Os UCs aqui definidos servem como **contrato comportamental**, sendo a **fonte p
 
 ## 3. PADRÕES GERAIS APLICÁVEIS A TODOS OS UCs
 
-- Todos os acessos respeitam **isolamento por tenant (ConglomeradoId)**
+- Todos os acessos respeitam **isolamento por tenant (FornecedorId)**
 - Todas as ações exigem **permissão explícita (RBAC)**
 - Erros não devem vazar informações sensíveis
 - Auditoria deve registrar **quem**, **quando** e **qual ação**
@@ -60,7 +60,7 @@ Permitir que o usuário visualize todas as notas fiscais do seu tenant com filtr
 ### Fluxo Principal
 - **FP-UC00-001:** Usuário acessa funcionalidade Notas Fiscais
 - **FP-UC00-002:** Sistema valida permissão
-- **FP-UC00-003:** Sistema carrega notas do tenant (ConglomeradoId)
+- **FP-UC00-003:** Sistema carrega notas do tenant (FornecedorId)
 - **FP-UC00-004:** Sistema aplica paginação (50 registros/página)
 - **FP-UC00-005:** Sistema exibe lista
 
@@ -111,7 +111,7 @@ Permitir importação de NF-e via XML, DANFE PDF (OCR) ou lote CSV.
 - **FP-UC01-005:** Sistema extrai metadados (emitente, destinatário, itens, impostos)
 - **FP-UC01-006:** Sistema valida chave de acesso (44 dígitos, unicidade)
 - **FP-UC01-007:** Sistema salva XML/DANFE em Azure Blob Storage
-- **FP-UC01-008:** Sistema cria registro NotaFiscal com ConglomeradoId automático
+- **FP-UC01-008:** Sistema cria registro NotaFiscal com FornecedorId automático
 - **FP-UC01-009:** Sistema agenda validação de assinatura (UC03)
 - **FP-UC01-010:** Sistema registra auditoria
 - **FP-UC01-011:** Sistema confirma sucesso
@@ -137,7 +137,7 @@ Permitir importação de NF-e via XML, DANFE PDF (OCR) ou lote CSV.
 - RN-NFE-032-10: Auditoria completa (7 anos)
 
 ### Critérios de Aceite
-- **CA-UC01-001:** ConglomeradoId DEVE ser preenchido automaticamente
+- **CA-UC01-001:** FornecedorId DEVE ser preenchido automaticamente
 - **CA-UC01-002:** Chave de acesso DEVE ser única por tenant
 - **CA-UC01-003:** XML e DANFE DEVEM ser salvos em Azure Blob Storage
 - **CA-UC01-004:** Sistema DEVE agendar validação de assinatura
@@ -162,7 +162,7 @@ Permitir visualização completa de uma nota fiscal com todos metadados, imposto
 ### Fluxo Principal
 - **FP-UC02-001:** Usuário seleciona nota na listagem
 - **FP-UC02-002:** Sistema valida permissão
-- **FP-UC02-003:** Sistema valida tenant (ConglomeradoId)
+- **FP-UC02-003:** Sistema valida tenant (FornecedorId)
 - **FP-UC02-004:** Sistema carrega dados completos (cabeçalho, itens, impostos)
 - **FP-UC02-005:** Sistema carrega divergências (se houver)
 - **FP-UC02-006:** Sistema carrega histórico de aprovações

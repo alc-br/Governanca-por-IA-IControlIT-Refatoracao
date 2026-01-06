@@ -275,7 +275,7 @@ Criando UC15-UC19 para Sistema_Limite_Uso...
 ```yaml
 regras_negocio:
   - id: "RN-RF012-01"
-    descricao: "Login único por conglomerado (multi-tenancy)"
+    descricao: "Login único por Fornecedor (multi-tenancy)"
     tipo: "funcionalidade"
     obrigatorio: true
 
@@ -294,7 +294,7 @@ regras_negocio:
 catalog:
   funcionalidades:
     - id: "RN-RF012-01"
-      title: "Login único por conglomerado"
+      title: "Login único por Fornecedor"
       required: true
 ```
 
@@ -315,7 +315,7 @@ Se `regras_negocio` existe no RF.yaml, o validador **IGNORA** `catalog` completa
 catalog:
   funcionalidades:
     - id: "RN-RF012-01"
-      title: "Login único por conglomerado"
+      title: "Login único por Fornecedor"
       required: true
       origem: "regras_negocio"  # ← WORKAROUND DESNECESSÁRIO
 ```

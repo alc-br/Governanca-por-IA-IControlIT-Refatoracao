@@ -17,7 +17,7 @@ O sistema legado IControlIT v1 NÃO possui um módulo estruturado de gestão de 
 - **Arquitetura:** Monolítica WebForms
 - **Linguagem / Stack:** VB.NET, ASP.NET Web Forms, ADO.NET
 - **Banco de Dados:** SQL Server (tabelas sem controle de status estruturado)
-- **Multi-tenant:** Parcial (Id_Conglomerado em algumas tabelas)
+- **Multi-tenant:** Parcial (Id_Fornecedor em algumas tabelas)
 - **Auditoria:** Inexistente para mudanças de status
 - **Configurações:** Web.config (sem parametrização de status)
 
@@ -114,7 +114,7 @@ Após análise do arquivo `ic1_legado/BancoDados/Interno/K2A.sql` (corrompido, m
 ```sql
 CREATE TABLE Consumidor (
     Id_Consumidor INT PRIMARY KEY,
-    Id_Conglomerado INT, -- Multi-tenancy parcial
+    Id_Fornecedor INT, -- Multi-tenancy parcial
     Nm_Consumidor VARCHAR(100),
     Fl_Ativo BIT DEFAULT 1, -- Flag de ativo/inativo (sem workflow)
     Fl_Bloqueado BIT DEFAULT 0, -- Flag de bloqueio (sem integração)
@@ -177,7 +177,7 @@ Liste regras que não estavam documentadas formalmente mas foram identificadas n
 | Reativação Pós-Regularização | Manual via telefone | Automática com integração RF026 (Faturamento) | Eficiência e experiência do usuário |
 | Dashboard de Status | Inexistente | Dashboard em tempo real via SignalR com indicadores visuais | Visibilidade operacional |
 | Auditoria | Parcial (campos raramente preenchidos) | Completa via AuditInterceptor (7 anos) | Conformidade regulatória |
-| Multi-Tenancy | Parcial (Id_Conglomerado) | Completo com Query Filter automático (Id_Fornecedor) | Isolamento garantido |
+| Multi-Tenancy | Parcial (Id_Fornecedor) | Completo com Query Filter automático (Id_Fornecedor) | Isolamento garantido |
 | Permissões RBAC | Genéricas (editar consumidor) | Granulares (VIEW, CHANGE, APPROVE, ADMIN) | Segregação de funções |
 
 ---

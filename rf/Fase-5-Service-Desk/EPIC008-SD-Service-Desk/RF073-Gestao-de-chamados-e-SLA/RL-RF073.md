@@ -267,7 +267,7 @@
 **Caminho:** `D:\IC2\ic1_legado\Database\Procedures\pa_Solicitacao_Incluir.sql`
 
 **Parâmetros:**
-- `@Cd_Conglomerado INT`
+- `@Cd_Fornecedor INT`
 - `@Cd_Usuario INT`
 - `@Cd_Prioridade INT`
 - `@Ds_Solicitacao VARCHAR(MAX)`
@@ -319,7 +319,7 @@
 **Caminho:** `D:\IC2\ic1_legado\Database\Procedures\pa_Solicitacao_Lista.sql`
 
 **Parâmetros:**
-- `@Cd_Conglomerado INT`
+- `@Cd_Fornecedor INT`
 - `@Filtro_Status VARCHAR(20)` (NULL = todos)
 - `@Filtro_Prioridade INT` (NULL = todos)
 - `@PageNumber INT`
@@ -327,7 +327,7 @@
 
 **Lógica:**
 1. Query principal com múltiplos JOINs (Usuario, Categoria, SLA)
-2. Filtra por `@Cd_Conglomerado` (multi-tenancy)
+2. Filtra por `@Cd_Fornecedor` (multi-tenancy)
 3. Aplica filtros opcionais
 4. Ordena por Dt_Criacao DESC
 5. Aplica OFFSET/FETCH para paginação
@@ -349,7 +349,7 @@
 **Finalidade:** Armazenar dados principais do chamado.
 
 **Problemas Identificados:**
-- ❌ **Campo `Cd_Conglomerado` sem FK**: Permite inserir conglomerado inexistente
+- ❌ **Campo `Cd_Fornecedor` sem FK**: Permite inserir Fornecedor inexistente
 - ❌ **Campo `St_Solicitacao` VARCHAR sem constraint**: Permite valores inválidos ("Pendente", "Aberto" não documentados)
 - ❌ **Sem auditoria nativa**: Campos Created/Modified ausentes (apenas Dt_Criacao_SYS)
 - ❌ **Soft delete manual**: `Fl_Excluido` sem índice (queries lentas com WHERE Fl_Excluido=0)
@@ -360,7 +360,7 @@
 ```
 Solicitacao (legado) → Ticket (moderno)
 - Id_Solicitacao → Id (GUID)
-- Cd_Conglomerado → ClienteId (FK com constraint)
+- Cd_Fornecedor → ClienteId (FK com constraint)
 - Cd_Usuario → SolicitanteId (FK)
 - Cd_Usuario_Atribuido → TecnicoAtribuidoId (FK)
 - Ds_Solicitacao → Descricao (nvarchar(max))
@@ -450,7 +450,7 @@ Solicitacao_Fila_Atendimento → QueueAtendimento + QueueTecnico (tabela junctio
 ### RL-RN-001: Número de chamado sequencial por cliente
 
 **Fonte:** `pa_Solicitacao_Incluir.sql` - Linha 45
-**Descrição:** Número do chamado é gerado como `SELECT MAX(Id_Solicitacao) + 1 WHERE Cd_Conglomerado = @Cd_Conglomerado`. Formato exibido: `CHD-YYYY-NNN` (ex: CHD-2025-001).
+**Descrição:** Número do chamado é gerado como `SELECT MAX(Id_Solicitacao) + 1 WHERE Cd_Fornecedor = @Cd_Fornecedor`. Formato exibido: `CHD-YYYY-NNN` (ex: CHD-2025-001).
 
 **Destino:** **ASSUMIDO** - Manter numeração sequencial mas usar SEQUENCE do SQL Server (thread-safe) em vez de MAX+1.
 
@@ -459,7 +459,7 @@ Solicitacao_Fila_Atendimento → QueueAtendimento + QueueTecnico (tabela junctio
 ### RL-RN-002: Prioridade fixa por cliente específico
 
 **Fonte:** `Chamado.aspx.vb` - Linha 123 (hardcoded)
-**Descrição:** Cliente "Empresa XYZ" (Cd_Conglomerado=5) sempre recebe prioridade P1, independente de impacto/urgência.
+**Descrição:** Cliente "Empresa XYZ" (Cd_Fornecedor=5) sempre recebe prioridade P1, independente de impacto/urgência.
 
 **Destino:** **DESCARTADO** - Regra de exceção não documentada, será substituída por matriz Impacto x Urgência universal.
 
@@ -531,7 +531,7 @@ Solicitacao_Fila_Atendimento → QueueAtendimento + QueueTecnico (tabela junctio
 ### RL-RN-010: Integração ServiceNow só para cliente "Banco ABC"
 
 **Fonte:** Web.config `<appSettings key="ServiceNow_ClienteId" value="12"/>`
-**Descrição:** Sincronização com ServiceNow habilitada apenas para cliente específico (Cd_Conglomerado=12).
+**Descrição:** Sincronização com ServiceNow habilitada apenas para cliente específico (Cd_Fornecedor=12).
 
 **Destino:** **ASSUMIDO** - Integração será configurável via Feature Flag (`SERVICEDESK_SERVICENOW_SYNC`) ativada por cliente.
 

@@ -21,7 +21,7 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 - Encerramento com avaliação de satisfação e reabertura controlada
 
 **Padrões Aplicados:**
-- Multi-tenancy obrigatório (isolamento por `ConglomeradoId`)
+- Multi-tenancy obrigatório (isolamento por `FornecedorId`)
 - RBAC granular (permissões diferenciadas por perfil)
 - Soft delete (nunca exclusão física)
 - Auditoria completa (7 anos de retenção - LGPD)
@@ -43,13 +43,13 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 
 ## 3. PADRÕES GERAIS APLICÁVEIS A TODOS OS UCs
 
-### 3.1 Multi-Tenancy (Isolamento de Conglomerado)
+### 3.1 Multi-Tenancy (Isolamento de Fornecedor)
 
-**Regra:** Todos os UCs DEVEM filtrar dados por `ConglomeradoId` do usuário autenticado.
+**Regra:** Todos os UCs DEVEM filtrar dados por `FornecedorId` do usuário autenticado.
 
 **Implementação:**
-- Queries: `WHERE ConglomeradoId = @UsuarioConglomeradoId AND Fl_Ativo = 1`
-- Tentativa de acesso a chamado de outro conglomerado → HTTP 403
+- Queries: `WHERE FornecedorId = @UsuarioFornecedorId AND Fl_Ativo = 1`
+- Tentativa de acesso a chamado de outro Fornecedor → HTTP 403
 
 ### 3.2 Controle de Acesso (RBAC)
 
@@ -149,11 +149,11 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 **Sistema:**
 1. Valida filtros
 2. Monta query com cláusulas WHERE:
-   - `ConglomeradoId = @UsuarioConglomeradoId`
+   - `FornecedorId = @UsuarioFornecedorId`
    - `Fl_Ativo = 1`
    - Filtros adicionais (status, prioridade, fila, período, solicitante, atendente)
 3. Se perfil = "Usuário" → adiciona `SolicitanteId = @UsuarioId`
-4. Se perfil = "Suporte Nível 1+" → retorna todos do conglomerado
+4. Se perfil = "Suporte Nível 1+" → retorna todos do Fornecedor
 5. Retorna lista paginada
 
 **Cobertura:**
@@ -250,9 +250,9 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 2. Renderiza formulário com campos:
    - Título* (máx 200 caracteres)
    - Descrição* (máx 2000 caracteres)
-   - Tipo de Solicitação* (dropdown - carrega ativos do conglomerado)
+   - Tipo de Solicitação* (dropdown - carrega ativos do Fornecedor)
    - Prioridade* (Alta, Média, Baixa)
-   - Fila de Atendimento* (dropdown - carrega filas ativas do conglomerado)
+   - Fila de Atendimento* (dropdown - carrega filas ativas do Fornecedor)
    - Ativo (opcional - autocomplete)
    - Unidade Consumidor (opcional - autocomplete)
    - Anexos (opcional - múltiplos arquivos)
@@ -274,8 +274,8 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
    - Prioridade obrigatória
    - Fila de Atendimento obrigatória
 2. Campos opcionais:
-   - Ativo (se informado, valida existência e conglomerado)
-   - Unidade Consumidor (se informado, valida existência e conglomerado)
+   - Ativo (se informado, valida existência e Fornecedor)
+   - Unidade Consumidor (se informado, valida existência e Fornecedor)
    - Anexos (valida extensões e tamanho)
 
 **Cobertura:**
@@ -301,12 +301,12 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
      - Exclusão de datas de parada cadastradas
      - Determina `DataVencimento`
 3. Cria registro em `Chamado`:
-   - `Numero` = auto-incremento por conglomerado
+   - `Numero` = auto-incremento por Fornecedor
    - `Status` = `Aberto`
    - `SolicitanteId` = usuário logado
    - `DataAbertura` = `DateTime.Now`
    - `DataVencimento` = calculado
-   - `ConglomeradoId` = conglomerado do usuário
+   - `FornecedorId` = Fornecedor do usuário
    - `FilaAtendimentoId` = informado
    - `AtivoId` = opcional
    - `ConsumidorUnidadeId` = opcional
@@ -369,7 +369,7 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 
 #### FE-UC01-003 — Fila Inválida ou Inativa
 
-**Condição:** Fila não existe, está inativa ou pertence a outro conglomerado
+**Condição:** Fila não existe, está inativa ou pertence a outro Fornecedor
 
 **Sistema:**
 1. Retorna HTTP 400
@@ -401,7 +401,7 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 **Pré-condições:**
 - Usuário autenticado
 - Possui permissão `GES.CHAMADOS.VIEW`
-- Chamado pertence ao conglomerado do usuário
+- Chamado pertence ao Fornecedor do usuário
 
 **Pós-condições:**
 - Detalhes completos do chamado exibidos
@@ -416,7 +416,7 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 **Sistema:**
 1. Verifica permissão `GES.CHAMADOS.VIEW`
 2. Carrega chamado:
-   - `WHERE Id = @ChamadoId AND ConglomeradoId = @UsuarioConglomeradoId AND Fl_Ativo = 1`
+   - `WHERE Id = @ChamadoId AND FornecedorId = @UsuarioFornecedorId AND Fl_Ativo = 1`
 3. Se perfil = "Usuário":
    - Verifica `SolicitanteId = @UsuarioId` OU `AtendenteResponsavelId = @UsuarioId`
    - Se não → HTTP 403
@@ -499,7 +499,7 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 
 #### FE-UC02-001 — Chamado Não Encontrado
 
-**Condição:** Chamado não existe ou pertence a outro conglomerado
+**Condição:** Chamado não existe ou pertence a outro Fornecedor
 
 **Sistema:**
 1. Retorna HTTP 404
@@ -542,7 +542,7 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 **Pré-condições:**
 - Usuário autenticado
 - Possui permissão `GES.CHAMADOS.UPDATE`
-- Chamado pertence ao conglomerado do usuário
+- Chamado pertence ao Fornecedor do usuário
 
 **Pós-condições:**
 - Chamado atualizado
@@ -592,7 +592,7 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 1. Verifica permissão `GES.CHAMADOS.ASSIGN`
 2. Valida técnico:
    - Existe e está ativo
-   - Pertence ao mesmo conglomerado
+   - Pertence ao mesmo Fornecedor
    - Possui permissão `GES.CHAMADOS.UPDATE`
 3. Atualiza `AtendenteResponsavelId`
 4. Altera status para `EmAtendimento` (se estava `Aberto`)
@@ -683,7 +683,7 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 
 #### FE-UC03-002 — Técnico Inválido para Atribuição
 
-**Condição:** Técnico não existe, está inativo ou pertence a outro conglomerado
+**Condição:** Técnico não existe, está inativo ou pertence a outro Fornecedor
 
 **Sistema:**
 1. Retorna HTTP 400
@@ -715,7 +715,7 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
 **Pré-condições:**
 - Usuário autenticado
 - Possui permissão `GES.CHAMADOS.CLOSE`
-- Chamado pertence ao conglomerado do usuário
+- Chamado pertence ao Fornecedor do usuário
 - Status atual = `Resolvido`
 
 **Pós-condições:**
@@ -737,7 +737,7 @@ Este documento especifica os **5 Casos de Uso Canônicos** do **RF033 — Gestã
    - `SolucaoId` deve ser informado
    - Solução deve existir e estar ativa
    - Se não → HTTP 400 com mensagem i18n: `chamados.validacoes.solucao_obrigatoria`
-4. Valida se solução pertence ao mesmo conglomerado
+4. Valida se solução pertence ao mesmo Fornecedor
 5. Atualiza chamado:
    - `Status = Encerrado`
    - `DataEncerramento = DateTime.Now`

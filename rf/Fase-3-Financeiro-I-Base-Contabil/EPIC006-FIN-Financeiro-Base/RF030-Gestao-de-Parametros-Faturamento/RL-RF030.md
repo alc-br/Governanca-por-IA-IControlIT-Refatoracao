@@ -39,7 +39,7 @@
 
 **Versão 3 (2023)**: Melhorias incrementais
 
-- Multi-tenancy via campo `Id_Conglomerado`
+- Multi-tenancy via campo `Id_Fornecedor`
 - Hash para detectar mudanças
 - Flags para controle (`Fl_Critico`, `Fl_Testado_Sandbox`)
 - Ainda sem workflow de aprovação ou sandbox real
@@ -127,7 +127,7 @@ CREATE TABLE Layout_Importacao (
     Tipo_Arquivo VARCHAR(20), -- 'CSV', 'Excel', 'XML'
     Configuracao_JSON NVARCHAR(MAX), -- Mapeamento de colunas (SEM validação de sintaxe)
     Id_Fornecedor INT,
-    Id_Conglomerado INT NOT NULL DEFAULT 1,
+    Id_Fornecedor INT NOT NULL DEFAULT 1,
     Numero_Versao VARCHAR(20) DEFAULT '1.0',
     Hash_Configuracao VARCHAR(64), -- SHA256
     Fl_Critico BIT DEFAULT 0,
@@ -193,7 +193,7 @@ CREATE TABLE Regra_Auditoria_Faturamento (
     Mensagem_Violacao NVARCHAR(500),
     Categoria VARCHAR(50),
     Fl_Ativa BIT DEFAULT 1,
-    Id_Conglomerado INT NOT NULL,
+    Id_Fornecedor INT NOT NULL,
     Id_Usuario_Criacao INT,
     Data_Criacao DATETIME DEFAULT GETDATE()
 )
@@ -234,7 +234,7 @@ CREATE TABLE Parametro_Faturamento (
     Data_Vigencia_Fim DATE,
     Fl_Critico BIT DEFAULT 0,
     Justificativa_Mudanca NVARCHAR(1000),
-    Id_Conglomerado INT NOT NULL,
+    Id_Fornecedor INT NOT NULL,
     Id_Usuario_Criacao INT,
     Data_Criacao DATETIME DEFAULT GETDATE()
 )
@@ -297,7 +297,7 @@ CREATE TABLE Importacao_Log (
     Erros_JSON NVARCHAR(MAX), -- JSON sem estrutura definida
     Tempo_Processamento_Ms INT,
     Id_Usuario INT,
-    Id_Conglomerado INT NOT NULL,
+    Id_Fornecedor INT NOT NULL,
     Fl_Excluido BIT DEFAULT 0,
     Data_Exclusao DATETIME,
     CONSTRAINT FK_Importacao_Log_Layout FOREIGN KEY (Id_Layout) REFERENCES Layout_Importacao(Id_Layout)

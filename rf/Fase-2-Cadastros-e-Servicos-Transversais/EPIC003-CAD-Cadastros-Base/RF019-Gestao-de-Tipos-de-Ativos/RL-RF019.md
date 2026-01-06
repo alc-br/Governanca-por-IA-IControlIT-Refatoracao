@@ -15,7 +15,7 @@
 ### Arquitetura Geral
 - **Stack Tecnológica**: ASP.NET Web Forms 4.0 + VB.NET + SQL Server 2012
 - **Arquitetura**: Monolítica com acoplamento tight entre UI (ASPX), lógica de negócio (Code-Behind VB.NET) e acesso a dados (ADO.NET + Stored Procedures)
-- **Multi-tenant**: Parcial (Id_Conglomerado existe mas sem Row-Level Security)
+- **Multi-tenant**: Parcial (Id_Fornecedor existe mas sem Row-Level Security)
 - **Auditoria**: Inexistente (sem tabela de auditoria, sem rastreamento de alterações)
 - **Autenticação**: Session-based com cookies ASP.NET
 
@@ -70,8 +70,8 @@
 
 | Método | Parâmetros | Retorno | Descrição |
 |--------|-----------|---------|-----------|
-| `ListarTiposAtivo` | token (String), idConglomerado (Guid) | List<AtivoTipoInfo> | Lista todos os tipos ativos |
-| `CriarTipoAtivo` | token, idConglomerado, cdTipo, nmTipo, dsTipo, categoria, flDepreciavel, taxaDepreciacao, vidaUtil, etc. | OperacaoResult | Cria novo tipo |
+| `ListarTiposAtivo` | token (String), idFornecedor (Guid) | List<AtivoTipoInfo> | Lista todos os tipos ativos |
+| `CriarTipoAtivo` | token, idFornecedor, cdTipo, nmTipo, dsTipo, categoria, flDepreciavel, taxaDepreciacao, vidaUtil, etc. | OperacaoResult | Cria novo tipo |
 | `AtualizarTipoAtivo` | token, idTipo, nmTipo, dsTipo, taxaDepreciacao, vidaUtil | OperacaoResult | Atualiza tipo existente |
 | `ExcluirTipoAtivo` | token, idTipo | OperacaoResult | Exclui tipo (DELETE físico) |
 
@@ -79,7 +79,7 @@
 
 1. **Validação de Permissão**: Método `ValidarToken` verifica se usuário tem permissão "cadastros:ativos:tipos:create" (hard-coded no código VB.NET)
 
-2. **Verificação de Duplicidade**: Query SQL direta verifica se `Cd_Tipo` já existe no conglomerado antes de criar
+2. **Verificação de Duplicidade**: Query SQL direta verifica se `Cd_Tipo` já existe no Fornecedor antes de criar
 
 3. **Cálculo de Hierarquia** (não implementado no legado): Código comentado mostra tentativa não concluída de implementar hierarquia pai-filho com campos `Nivel_Hierarquia` e `Caminho_Hierarquia`
 
@@ -98,12 +98,12 @@
 ### sp_AtivoTipo_Listar
 
 - **Caminho:** `ic1_legado/Database/Procedures/sp_AtivoTipo_Listar.sql`
-- **Parâmetros Entrada:** `@IdConglomerado UNIQUEIDENTIFIER`
+- **Parâmetros Entrada:** `@IdFornecedor UNIQUEIDENTIFIER`
 - **Parâmetros Saída:** Nenhum
-- **Descrição:** Lista todos os tipos de ativos ativos de um conglomerado, ordenados por nome
+- **Descrição:** Lista todos os tipos de ativos ativos de um Fornecedor, ordenados por nome
 
 **Lógica (em linguagem natural):**
-- Buscar registros da tabela TB_ATIVO_TIPO onde Id_Conglomerado = @IdConglomerado e Fl_Ativo = 1
+- Buscar registros da tabela TB_ATIVO_TIPO onde Id_Fornecedor = @IdFornecedor e Fl_Ativo = 1
 - Ordenar por Nm_Tipo ASC
 - Retornar colunas: Id_Ativo_Tipo, Cd_Tipo, Nm_Tipo, Ds_Tipo, Categoria_Principal, Taxa_Depreciacao_Anual, Vida_Util_Anos
 
@@ -116,7 +116,7 @@
 ### sp_AtivoTipo_Insert
 
 - **Caminho:** `ic1_legado/Database/Procedures/sp_AtivoTipo_Insert.sql`
-- **Parâmetros Entrada:** `@IdConglomerado, @CdTipo, @NmTipo, @DsTipo, @Categoria, @FlDepreciavel, @TaxaDepreciacao, @VidaUtil, @IdUsuario`
+- **Parâmetros Entrada:** `@IdFornecedor, @CdTipo, @NmTipo, @DsTipo, @Categoria, @FlDepreciavel, @TaxaDepreciacao, @VidaUtil, @IdUsuario`
 - **Parâmetros Saída:** `@IdTipo UNIQUEIDENTIFIER OUTPUT`
 
 **Lógica (em linguagem natural):**
@@ -172,7 +172,7 @@
 
 1. **Falta Foreign Key para Id_Tipo_Pai**: Campo existe mas sem constraint FK (permite valores inválidos)
 2. **Sem campos de auditoria**: Falta Id_Usuario_Criacao, Dt_Criacao, Id_Usuario_Atualizacao, Dt_Ult_Atualizacao
-3. **Sem índice em Id_Conglomerado**: Queries lentas ao filtrar por conglomerado
+3. **Sem índice em Id_Fornecedor**: Queries lentas ao filtrar por Fornecedor
 4. **Fl_Ativo como INT**: Deveria ser BIT (0/1), mas usa INT (0, 1, 2, etc.) - valores inconsistentes no banco
 5. **Sem CHECK constraints**: Taxa_Depreciacao_Anual permite valores negativos e > 100
 6. **Colunas NULL sem DEFAULT**: Campos opcionais sem valor padrão definido

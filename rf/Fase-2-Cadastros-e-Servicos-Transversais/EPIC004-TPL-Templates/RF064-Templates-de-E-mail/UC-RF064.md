@@ -55,7 +55,7 @@ Este documento é a **especificação comportamental canônica** do RF064 e deve
 | 401 Unauthorized | Token ausente/inválido | Bearer Token expirado ou ausente |
 | 403 Forbidden | Sem permissão | Usuário sem permissão `TPL.EMAIL.*` correspondente |
 | 404 Not Found | Recurso não encontrado | Template ID inexistente |
-| 409 Conflict | Conflito de dados | Nome duplicado no conglomerado |
+| 409 Conflict | Conflito de dados | Nome duplicado no Fornecedor |
 | 500 Internal Server Error | Erro inesperado | Falha na compilação MJML, erro de banco |
 
 ### 3.4 Auditoria
@@ -95,7 +95,7 @@ Exibir lista paginada e filtrável de templates de e-mail, permitindo busca por 
 ### Pós-condições
 
 - Lista de templates retornada com paginação
-- Apenas templates do conglomerado do usuário + templates globais
+- Apenas templates do Fornecedor do usuário + templates globais
 - Templates inativos (`Ativo = false`) não exibidos por padrão
 
 ### Gatilho
@@ -278,7 +278,7 @@ Exibir detalhes completos de um template: código MJML, HTML compilado, JSON Sch
 - Usuário autenticado
 - Usuário possui permissão `TPL.EMAIL.VIEW`
 - Template existe no banco
-- Usuário tem acesso ao template (mesmo conglomerado ou global)
+- Usuário tem acesso ao template (mesmo Fornecedor ou global)
 
 ### Pós-condições
 
@@ -329,7 +329,7 @@ Permitir edição de template existente, criando nova versão automaticamente co
 
 - Usuário autenticado
 - Usuário possui permissão `TPL.EMAIL.UPDATE`
-- Template existe e pertence ao conglomerado do usuário
+- Template existe e pertence ao Fornecedor do usuário
 
 ### Pós-condições
 

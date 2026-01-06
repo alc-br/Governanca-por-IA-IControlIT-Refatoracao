@@ -74,7 +74,7 @@ Os UCs aqui definidos servem como **contrato comportamental**, sendo a **fonte p
 
 ## 3. PADRÕES GERAIS APLICÁVEIS A TODOS OS UCs
 
-- Todos os acessos respeitam **isolamento por tenant** (Id_Conglomerado)
+- Todos os acessos respeitam **isolamento por tenant** (Id_Fornecedor)
 - Todas as ações exigem **permissão explícita** conforme matriz RBAC
 - Erros não devem vazar informações sensíveis (stack traces, senhas, tokens)
 - Auditoria deve registrar **quem** (Id_Usuario), **quando** (timestamp), **de onde** (IP, User-Agent) e **qual ação** (CREATE, UPDATE, DELETE, ACCESS)
@@ -100,7 +100,7 @@ Permitir que o usuário visualize parâmetros do sistema disponíveis do seu pr�
 ### Fluxo Principal
 - **FP-UC00-001:** Usuário acessa a funcionalidade "Parâmetros do Sistema" pelo menu
 - **FP-UC00-002:** Sistema valida permissão `SYS.PARAMETROS.VIEW_ANY`
-- **FP-UC00-003:** Sistema carrega registros do tenant (filtra por Id_Conglomerado do usuário autenticado)
+- **FP-UC00-003:** Sistema carrega registros do tenant (filtra por Id_Fornecedor do usuário autenticado)
 - **FP-UC00-004:** Sistema aplica paginação padrão (20 registros por página) e ordenação padrão (Cd_Parametro ASC)
 - **FP-UC00-005:** Sistema máscaras valores sensíveis (Fl_Sensivel = 1) se usuário não tiver permissão `SYS.PARAMETROS.VIEW_SENSITIVE`
 - **FP-UC00-006:** Sistema exibe a lista com colunas: Cd_Parametro, Nm_Parametro, Categoria, Tipo_Dado, Fl_Sistema, Fl_Sensivel, Ações
@@ -119,12 +119,12 @@ Permitir que o usuário visualize parâmetros do sistema disponíveis do seu pr�
 - **FE-UC00-003:** Erro ao carregar registros → Sistema exibe mensagem "Erro ao carregar parâmetros. Tente novamente." e registra erro em log
 
 ### Regras de Negócio
-- **RN-SYS-001-14:** Isolamento multi-tenant - Somente registros do tenant do usuário autenticado (Id_Conglomerado)
+- **RN-SYS-001-14:** Isolamento multi-tenant - Somente registros do tenant do usuário autenticado (Id_Fornecedor)
 - **RN-SYS-001-04:** Valores sensíveis mascarados (`*****`) para usuários sem permissão `SYS.PARAMETROS.VIEW_SENSITIVE`
 - Registros soft-deleted (Fl_Excluido = 1) não aparecem na listagem
 
 ### Critérios de Aceite
-- **CA-UC00-001:** A lista DEVE exibir apenas registros do tenant do usuário autenticado (Id_Conglomerado)
+- **CA-UC00-001:** A lista DEVE exibir apenas registros do tenant do usuário autenticado (Id_Fornecedor)
 - **CA-UC00-002:** Registros excluídos (Fl_Excluido = 1) NÃO devem aparecer na listagem
 - **CA-UC00-003:** Paginação DEVE ser aplicada com limite padrão de 20 registros por página
 - **CA-UC00-004:** Sistema DEVE permitir ordenação por qualquer coluna visível (Cd_Parametro, Nm_Parametro, Categoria, Tipo_Dado)
@@ -163,7 +163,7 @@ Permitir a criação de um novo parâmetro do sistema com validação tipada, cr
 - **FP-UC01-011:** Sistema valida valor dentro de min/max se especificado (RN-SYS-001-02)
 - **FP-UC01-012:** Sistema valida valor dentro de Opcoes_Validas se especificado (RN-SYS-001-05)
 - **FP-UC01-013:** Sistema criptografa valor se Fl_Sensivel = 1 (RN-SYS-001-04)
-- **FP-UC01-014:** Sistema preenche automaticamente: Id_Conglomerado (do usuário autenticado), Id_Usuario_Criacao, Dt_Criacao, Fl_Excluido = 0
+- **FP-UC01-014:** Sistema preenche automaticamente: Id_Fornecedor (do usuário autenticado), Id_Usuario_Criacao, Dt_Criacao, Fl_Excluido = 0
 - **FP-UC01-015:** Sistema persiste registro no banco de dados
 - **FP-UC01-016:** Sistema registra auditoria em Sistema_Parametro_Historico (tipo CREATE, valor anterior = NULL, valor novo = JSON completo)
 - **FP-UC01-017:** Sistema invalida cache de configurações
@@ -176,7 +176,7 @@ Permitir a criação de um novo parâmetro do sistema com validação tipada, cr
 
 ### Fluxos de Exceção
 - **FE-UC01-001:** Erro de validação de campos obrigatórios → Sistema retorna HTTP 400 com lista de erros: `"Campo '{campo}' é obrigatório"`
-- **FE-UC01-002:** Código de parâmetro duplicado → Sistema retorna HTTP 409 com mensagem: `"Já existe um parâmetro com o código '{Cd_Parametro}' neste conglomerado"`
+- **FE-UC01-002:** Código de parâmetro duplicado → Sistema retorna HTTP 409 com mensagem: `"Já existe um parâmetro com o código '{Cd_Parametro}' neste Fornecedor"`
 - **FE-UC01-003:** Valor inválido conforme tipo de dado → Sistema retorna HTTP 400 com mensagem específica: `"Valor inválido para tipo {Tipo_Dado}. Esperado: {formato}"`
 - **FE-UC01-004:** Valor fora de min/max → Sistema retorna HTTP 400 com mensagem: `"Valor deve estar entre {Valor_Minimo} e {Valor_Maximo}"`
 - **FE-UC01-005:** Valor fora de Opcoes_Validas → Sistema retorna HTTP 400 com mensagem: `"Valor '{valor}' inválido. Opções válidas: {Opcoes_Validas}"`
@@ -191,11 +191,11 @@ Permitir a criação de um novo parâmetro do sistema com validação tipada, cr
 - **RN-SYS-001-05:** Validação de opções válidas (se Opcoes_Validas especificado)
 - **RN-SYS-001-06:** Valores obrigatórios (se Fl_Obrigatorio = 1, usar Valor_Padrao se especificado)
 - **RN-SYS-001-07:** Histórico completo de alterações
-- **RN-SYS-001-14:** Isolamento multi-tenant (Id_Conglomerado automático)
+- **RN-SYS-001-14:** Isolamento multi-tenant (Id_Fornecedor automático)
 
 ### Critérios de Aceite
 - **CA-UC01-001:** Todos os campos obrigatórios (Cd_Parametro, Nm_Parametro, Ds_Parametro, Categoria, Tipo_Dado) DEVEM ser validados antes de persistir
-- **CA-UC01-002:** Id_Conglomerado DEVE ser preenchido automaticamente com o tenant do usuário autenticado
+- **CA-UC01-002:** Id_Fornecedor DEVE ser preenchido automaticamente com o tenant do usuário autenticado
 - **CA-UC01-003:** Id_Usuario_Criacao DEVE ser preenchido automaticamente com o ID do usuário autenticado
 - **CA-UC01-004:** Dt_Criacao DEVE ser preenchido automaticamente com timestamp atual (UTC)
 - **CA-UC01-005:** Sistema DEVE retornar erro claro (HTTP 400/409) se validação falhar, sem expor stack traces
@@ -223,7 +223,7 @@ Permitir visualização detalhada de um parâmetro do sistema, incluindo metadad
 ### Fluxo Principal
 - **FP-UC02-001:** Usuário seleciona parâmetro na listagem ou acessa URL direta
 - **FP-UC02-002:** Sistema valida permissão `SYS.PARAMETROS.VIEW`
-- **FP-UC02-003:** Sistema valida que parâmetro pertence ao tenant do usuário autenticado (Id_Conglomerado)
+- **FP-UC02-003:** Sistema valida que parâmetro pertence ao tenant do usuário autenticado (Id_Fornecedor)
 - **FP-UC02-004:** Sistema carrega dados completos do parâmetro
 - **FP-UC02-005:** Sistema verifica se parâmetro é sensível (Fl_Sensivel = 1)
 - **FP-UC02-006:** Se parâmetro sensível E usuário NÃO tem permissão `SYS.PARAMETROS.VIEW_SENSITIVE` → Máscaras valor (`*****`)
@@ -246,7 +246,7 @@ Permitir visualização detalhada de um parâmetro do sistema, incluindo metadad
 - **RN-SYS-001-14:** Isolamento multi-tenant (usuário só visualiza parâmetros do próprio tenant)
 
 ### Critérios de Aceite
-- **CA-UC02-001:** Usuário SÓ pode visualizar parâmetros do próprio tenant (Id_Conglomerado)
+- **CA-UC02-001:** Usuário SÓ pode visualizar parâmetros do próprio tenant (Id_Fornecedor)
 - **CA-UC02-002:** Informações de auditoria DEVEM ser exibidas (Id_Usuario_Criacao, Dt_Criacao, Id_Usuario_Atualizacao, Dt_Atualizacao)
 - **CA-UC02-003:** Tentativa de acessar parâmetro de outro tenant DEVE retornar HTTP 404
 - **CA-UC02-004:** Tentativa de acessar parâmetro inexistente DEVE retornar HTTP 404
@@ -276,10 +276,10 @@ Permitir alteração controlada de parâmetros do sistema, com validação, crip
 ### Fluxo Principal
 - **FP-UC03-001:** Usuário clica em "Editar" na tela de visualização ou listagem
 - **FP-UC03-002:** Sistema valida permissão `SYS.PARAMETROS.UPDATE`
-- **FP-UC03-003:** Sistema valida que parâmetro pertence ao tenant do usuário autenticado (Id_Conglomerado)
+- **FP-UC03-003:** Sistema valida que parâmetro pertence ao tenant do usuário autenticado (Id_Fornecedor)
 - **FP-UC03-004:** Sistema verifica se parâmetro é de sistema (Fl_Sistema)
 - **FP-UC03-005:** Se Fl_Sistema = 1 → Sistema permite editar apenas valor (campos metadados bloqueados)
-- **FP-UC03-006:** Se Fl_Sistema = 0 → Sistema permite editar todos os campos exceto Cd_Parametro e Id_Conglomerado
+- **FP-UC03-006:** Se Fl_Sistema = 0 → Sistema permite editar todos os campos exceto Cd_Parametro e Id_Fornecedor
 - **FP-UC03-007:** Sistema carrega dados atuais no formulário
 - **FP-UC03-008:** Usuário altera dados (valor, descrição, validações, flags)
 - **FP-UC03-009:** Usuário clica em "Salvar"
@@ -352,7 +352,7 @@ Permitir exclusão lógica (soft delete) de parâmetros do sistema, com proteç�
 ### Fluxo Principal
 - **FP-UC04-001:** Usuário clica em "Excluir" na tela de visualização ou listagem
 - **FP-UC04-002:** Sistema valida permissão `SYS.PARAMETROS.DELETE`
-- **FP-UC04-003:** Sistema valida que parâmetro pertence ao tenant do usuário autenticado (Id_Conglomerado)
+- **FP-UC04-003:** Sistema valida que parâmetro pertence ao tenant do usuário autenticado (Id_Fornecedor)
 - **FP-UC04-004:** Sistema verifica se parâmetro é de sistema (Fl_Sistema)
 - **FP-UC04-005:** Se Fl_Sistema = 1 → Sistema retorna HTTP 403 (parâmetros de sistema não podem ser excluídos)
 - **FP-UC04-006:** Sistema exibe modal de confirmação: "Tem certeza que deseja excluir o parâmetro '{Cd_Parametro}'? Esta ação não pode ser desfeita."

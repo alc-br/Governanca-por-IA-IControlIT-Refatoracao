@@ -234,7 +234,7 @@ CREATE TABLE [dbo].[Nota_Fiscal](
 **Problemas Identificados:**
 - **Sem chave de acesso única**: Permite duplicatas da mesma NF
 - **Sem campos de auditoria completos**: Falta Id_Usuario_Criacao, Dt_Criacao UTC
-- **Sem multi-tenancy**: Id_Conglomerado ausente
+- **Sem multi-tenancy**: Id_Fornecedor ausente
 - **XML em campo TEXT**: Performance ruim em queries grandes
 - **Sem validação de CNPJ**: Aceita valores inválidos
 - **Sem índices**: Listagem lenta (> 5 segundos para 10.000 registros)
@@ -252,7 +252,7 @@ CREATE TABLE [dbo].[Nota_Fiscal](
 | Valor_Total | NotaFiscal.ValorTotal | DECIMAL(15,2) → DECIMAL(18,4) |
 | XML_Arquivo | NotaFiscal.UriXmlBlob | TEXT → URL (Azure Blob) |
 | — | NotaFiscal.ChaveAcesso | Campo novo (44 dígitos, unique) |
-| — | NotaFiscal.ConglomeradoId | Campo novo (multi-tenancy) |
+| — | NotaFiscal.FornecedorId | Campo novo (multi-tenancy) |
 
 **Destino**: SUBSTITUÍDO por tabela `NotaFiscal` moderna com índices e auditoria
 

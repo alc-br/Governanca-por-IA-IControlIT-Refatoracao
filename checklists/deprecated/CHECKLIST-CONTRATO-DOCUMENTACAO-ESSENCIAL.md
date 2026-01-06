@@ -90,7 +90,7 @@ Antes de iniciar, TODOS devem ser True:
   - [ ] Diagrama ER (Mermaid)
   - [ ] DDL completo (CREATE TABLE)
   - [ ] Campos de auditoria (Created, CreatedBy, LastModified, LastModifiedBy)
-  - [ ] Multi-tenancy (ClienteId, EmpresaId ou ConglomeradoId)
+  - [ ] Multi-tenancy (ClienteId, EmpresaId ou FornecedorId)
   - [ ] Constraints (PK, FK, UNIQUE, CHECK)
   - [ ] Indices sugeridos
   - [ ] Dados iniciais (Seed)

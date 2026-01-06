@@ -138,7 +138,7 @@ O sistema legado **NÃO ARMAZENAVA** configurações em banco de dados.
 | Senhas em texto claro | 🔴 CRÍTICO | Vazamento de credenciais em backups, logs, repositório Git | ❌ LGPD Art. 46, ❌ PCI-DSS Req. 8.2.1, ❌ SOX Seção 404 |
 | Sem versionamento | 🔴 CRÍTICO | Impossível recuperar configuração anterior após erro | ❌ SOX Seção 404 (controle de mudanças) |
 | Sem auditoria | 🔴 CRÍTICO | Desconhecido quem alterou, quando e por quê | ❌ SOX Seção 302/404 |
-| Sem multi-tenancy | 🟡 ALTO | Uma única configuração para todos os conglomerados | ❌ Requisito de negócio |
+| Sem multi-tenancy | 🟡 ALTO | Uma única configuração para todos os Fornecedores | ❌ Requisito de negócio |
 | Sem validação | 🟡 ALTO | Aceita valores inválidos (ex: porta 999999), quebra em runtime | ❌ Best practice |
 | Downtime obrigatório | 🟡 MÉDIO | IIS restart necessário a cada mudança (30s-2min) | ❌ SLA 99.9% |
 | Sem cache | 🟢 BAIXO | Performance ruim (lê XML a cada request) | ❌ Best practice |
@@ -166,7 +166,7 @@ As seguintes regras **NÃO estavam documentadas** formalmente, mas foram identif
 | Item | Legado (web.config) | RF-002 Moderno | Observação |
 |------|---------------------|----------------|------------|
 | **Armazenamento** | Arquivo XML estático | Banco de dados + Cache Redis | Migração: script extração XML → insert SQL |
-| **Multi-Tenancy** | ❌ Não existe | ✅ Hierarquia Global → Conglomerado → Empresa | BREAKING CHANGE: cada tenant precisa configuração própria |
+| **Multi-Tenancy** | ❌ Não existe | ✅ Hierarquia Global → Fornecedor → Empresa | BREAKING CHANGE: cada tenant precisa configuração própria |
 | **Criptografia** | ❌ Texto claro | ✅ AES-256-GCM via Azure Key Vault | Migração: re-encriptar senhas existentes |
 | **Versionamento** | ❌ Não existe | ✅ Histórico completo com diff JSON | Nova feature (sem equivalente legado) |
 | **Validação** | ❌ Não existe | ✅ Validação tipo + regex + ranges | BREAKING CHANGE: valores inválidos rejeitados |

@@ -42,7 +42,7 @@ Exibir listagem paginada de layouts de importação configurados com filtros por
 ### Pré-condições
 - Usuário logado no sistema
 - Usuário com permissão `PARAMETROS_FAT.LISTAR_LAYOUTS`
-- Multi-tenancy: Usuário vinculado a conglomerado
+- Multi-tenancy: Usuário vinculado a Fornecedor
 
 ### Fluxo Principal
 

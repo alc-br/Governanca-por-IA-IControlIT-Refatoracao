@@ -24,7 +24,7 @@ Este caso de uso permite que gestores de Service Desk visualizem lista paginada 
 - Usuário autenticado com perfil Atendente, Supervisor, Gerente ou Administrador
 - Permissão: `servicedesk:sla:read`
 - Feature flag `SERVICE_DESK_SLA_CONFIGURACAO` habilitada
-- Multi-tenancy ativo (Id_Conglomerado válido)
+- Multi-tenancy ativo (Id_Fornecedor válido)
 
 ### 4. Fluxo Principal
 
@@ -33,7 +33,7 @@ Este caso de uso permite que gestores de Service Desk visualizem lista paginada 
 | 1 | Acessa menu Service Desk → Configuração de SLA | - |
 | 2 | - | Frontend valida permissão RBAC: `servicedesk:sla:read` → Se negado: HTTP 403, redireciona para /403 |
 | 3 | - | Frontend executa GET `/api/sla?pageNumber=1&pageSize=20&orderBy=DataCriacao DESC` |
-| 4 | - | Backend aplica filtro multi-tenancy automático: `WHERE Id_Conglomerado = @idConglomerado AND Fl_Excluido = false` via query filter EF Core |
+| 4 | - | Backend aplica filtro multi-tenancy automático: `WHERE Id_Fornecedor = @idFornecedor AND Fl_Excluido = false` via query filter EF Core |
 | 5 | - | Backend executa query paginada: `SELECT * FROM SLA_Chamado WHERE ... ORDER BY DataCriacao DESC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY` |
 | 6 | - | Backend calcula total de registros: `SELECT COUNT(*) FROM SLA_Chamado WHERE ...` (para exibir "Página 1 de 50") |
 | 7 | - | Backend retorna HTTP 200 com body: `{ data: [...], totalCount: 1000, pageNumber: 1, pageSize: 20, totalPages: 50 }` |
@@ -105,7 +105,7 @@ Este caso de uso permite que gestores de Service Desk visualizem lista paginada 
 ### 8. Regras de Negócio Aplicáveis
 
 - **RN-SLA-069-08**: Versionamento de SLA (lista exibe apenas versão ativa, histórico acessado via botão "Ver Histórico")
-- **Multi-Tenancy**: Filtro global `Id_Conglomerado` aplicado automaticamente em TODAS queries
+- **Multi-Tenancy**: Filtro global `Id_Fornecedor` aplicado automaticamente em TODAS queries
 
 ---
 
@@ -271,7 +271,7 @@ Este caso de uso permite que gestores editem SLA existente alterando tempos de r
 | 1 | Na lista de SLAs (UC01), clica em ação "Editar" de um SLA específico (ex: ID = 42) | - |
 | 2 | - | Frontend valida permissão RBAC: `servicedesk:sla:update` → Se negado: HTTP 403 |
 | 3 | - | Frontend executa GET `/api/sla/42` para buscar dados atuais |
-| 4 | - | Backend query: `SELECT * FROM SLA_Chamado WHERE Id_SLA = 42 AND Id_Conglomerado = @idConglomerado` |
+| 4 | - | Backend query: `SELECT * FROM SLA_Chamado WHERE Id_SLA = 42 AND Id_Fornecedor = @idFornecedor` |
 | 5 | - | Backend retorna HTTP 200 com SLA completo: `{ idSLA: 42, nmSLA: "SLA Crítico - Infraestrutura", prioridade: "Crítica", tempoRespostaMinutos: 15, tempoResolucaoMinutos: 240, ... }` |
 | 6 | Frontend pré-preenche formulário de edição com valores atuais | - |
 | 7 | Usuário altera Tempo Resolução de 240 min (4h) para 180 min (3h) | - |
@@ -394,30 +394,30 @@ Este caso de uso permite que gestores visualizem dashboard de compliance SLA em 
 | 1 | Acessa menu Service Desk → Compliance SLA | - |
 | 2 | - | Frontend valida permissão RBAC: `servicedesk:sla:report:view` → Se negado: HTTP 403 |
 | 3 | - | Frontend estabelece conexão SignalR: `_hubConnection.start()` com URL `/hubs/servicedesk-sla` |
-| 4 | - | SignalR Hub autentica via JWT, adiciona conexão ao grupo do tenant: `Groups.AddToGroupAsync(connectionId, idConglomerado)` |
+| 4 | - | SignalR Hub autentica via JWT, adiciona conexão ao grupo do tenant: `Groups.AddToGroupAsync(connectionId, idFornecedor)` |
 | 5 | - | Frontend executa GET `/api/sla/compliance?periodo=ultimos30dias` |
-| 6 | - | Backend tenta buscar do Redis cache: `_cache.GetStringAsync("sla_compliance_{idConglomerado}_30d")` |
+| 6 | - | Backend tenta buscar do Redis cache: `_cache.GetStringAsync("sla_compliance_{idFornecedor}_30d")` |
 | 7 | - | Se cache miss: Backend executa queries agregadas complexas (3 queries principais em paralelo) |
-| 8 | - | Query 1 - Compliance Resposta: `SELECT (COUNT(CASE WHEN Fl_Resposta_Violada = false THEN 1 END) * 100.0 / COUNT(*)) FROM Chamado WHERE Dt_Abertura >= DATEADD(DAY, -30, GETUTCDATE()) AND Id_Conglomerado = @idConglomerado` → 96.5% |
+| 8 | - | Query 1 - Compliance Resposta: `SELECT (COUNT(CASE WHEN Fl_Resposta_Violada = false THEN 1 END) * 100.0 / COUNT(*)) FROM Chamado WHERE Dt_Abertura >= DATEADD(DAY, -30, GETUTCDATE()) AND Id_Fornecedor = @idFornecedor` → 96.5% |
 | 9 | - | Query 2 - Compliance Resolução: `SELECT (COUNT(CASE WHEN Fl_Resolucao_Violada = false THEN 1 END) * 100.0 / COUNT(*)) FROM Chamado WHERE Status IN ('Resolvido', 'Fechado') AND Dt_Abertura >= DATEADD(DAY, -30, GETUTCDATE())` → 92.3% |
 | 10 | - | Query 3 - Violações por Prioridade: `SELECT Prioridade, COUNT(*) as TotalViolacoes FROM Chamado WHERE Fl_Resolucao_Violada = true AND Dt_Abertura >= DATEADD(DAY, -30, GETUTCDATE()) GROUP BY Prioridade` → `[{ Crítica: 5 }, { Alta: 12 }, { Média: 8 }]` |
 | 11 | - | Backend calcula métricas adicionais: Total Chamados (1250), Chamados com Escalação (320), Tempo Médio Resolução (450 min) |
-| 12 | - | Backend armazena no Redis cache: `_cache.SetStringAsync("sla_compliance_{idConglomerado}_30d", JSON, TimeSpan.FromMinutes(5))` → cache por 5 minutos |
+| 12 | - | Backend armazena no Redis cache: `_cache.SetStringAsync("sla_compliance_{idFornecedor}_30d", JSON, TimeSpan.FromMinutes(5))` → cache por 5 minutos |
 | 13 | - | Retorna HTTP 200 com body completo: `{ complianceResposta: 96.5, complianceResolucao: 92.3, totalChamados: 1250, violacoes: { critica: 5, alta: 12, media: 8 }, ... }` |
 | 14 | Frontend renderiza 4 KPI cards no topo: [Compliance Resposta: 96.5% 🟢] [Compliance Resolução: 92.3% 🟢] [Total Violações: 25 🟡] [Escalações Disparadas: 320] | - |
 | 15 | Frontend renderiza gráfico de barras (ApexCharts): "Violações por Prioridade" com barras coloridas (Crítica=vermelho, Alta=laranja, Média=amarelo) | - |
 | 16 | Frontend renderiza gráfico de linha: "Tendência Compliance Últimos 30 Dias" com 2 linhas (Resposta, Resolução) | - |
 | 17 | - | **Atualização em Tempo Real**: Hangfire job detecta nova violação de SLA em chamado ID = 9876 |
 | 18 | - | Job registra violação: `UPDATE Chamado SET Fl_Resolucao_Violada = true WHERE Id_Chamado = 9876` |
-| 19 | - | Job invalida cache Redis: `_cache.RemoveAsync("sla_compliance_{idConglomerado}_30d")` |
-| 20 | - | Job dispara SignalR: `_hubContext.Clients.Group(idConglomerado).SendAsync("SLAViolacaoDetectada", { chamadoId: 9876, prioridade: "Crítica", dtViolacao: "2025-12-29T14:45:00Z" })` |
+| 19 | - | Job invalida cache Redis: `_cache.RemoveAsync("sla_compliance_{idFornecedor}_30d")` |
+| 20 | - | Job dispara SignalR: `_hubContext.Clients.Group(idFornecedor).SendAsync("SLAViolacaoDetectada", { chamadoId: 9876, prioridade: "Crítica", dtViolacao: "2025-12-29T14:45:00Z" })` |
 | 21 | Frontend escuta evento SignalR: `_hubConnection.on("SLAViolacaoDetectada", (data) => { ... })` | - |
 | 22 | Frontend atualiza KPI "Total Violações" de 25 para 26, incrementa barra "Crítica" de 5 para 6 no gráfico | - |
 | 23 | Frontend exibe notificação toast vermelha: "🚨 Nova violação SLA detectada - Chamado #9876 (Prioridade Crítica)" com link para o chamado | - |
 | 24 | - | **Alerta Automático**: Backend detecta que Compliance Resolução caiu para 89.8% (abaixo do threshold 90%) |
-| 25 | - | Backend cria registro de alerta: `INSERT INTO Alerta_Compliance (Id_Conglomerado, TipoAlerta = 'ComplianceAbaixoThreshold', Severidade = 'Alta', Descricao = 'Compliance de resolução caiu para 89.8% (meta: 90%)', Dt_Criacao)` |
+| 25 | - | Backend cria registro de alerta: `INSERT INTO Alerta_Compliance (Id_Fornecedor, TipoAlerta = 'ComplianceAbaixoThreshold', Severidade = 'Alta', Descricao = 'Compliance de resolução caiu para 89.8% (meta: 90%)', Dt_Criacao)` |
 | 26 | - | Backend envia e-mail para Gerente Service Desk: "ALERTA: Compliance SLA abaixo da meta por 2 semanas consecutivas" |
-| 27 | - | Backend dispara SignalR: `_hubContext.Clients.Group(idConglomerado).SendAsync("AlertaComplianceCriado", { alerta })` |
+| 27 | - | Backend dispara SignalR: `_hubContext.Clients.Group(idFornecedor).SendAsync("AlertaComplianceCriado", { alerta })` |
 | 28 | Frontend exibe banner vermelho no topo do dashboard: "⚠️ Compliance de resolução abaixo da meta (89.8% < 90%). Ação necessária." | - |
 
 ### 5. Fluxos Alternativos
@@ -512,7 +512,7 @@ Este caso de uso permite que administradores criem/editem calendários de opera�
 | 1 | Acessa menu Service Desk → Calendários de Operação | - |
 | 2 | - | Frontend valida permissão RBAC: `servicedesk:sla:calendar:manage` → Se negado: HTTP 403 |
 | 3 | - | Frontend executa GET `/api/sla/calendario` |
-| 4 | - | Backend query: `SELECT * FROM Calendario WHERE Id_Conglomerado = @idConglomerado AND Fl_Excluido = false` |
+| 4 | - | Backend query: `SELECT * FROM Calendario WHERE Id_Fornecedor = @idFornecedor AND Fl_Excluido = false` |
 | 5 | - | Retorna HTTP 200 com array de calendários: `[{ idCalendario: 1, nmCalendario: "Comercial 8-18h", horarioInicio: "08:00", horarioFim: "18:00", diasUteis: [1,2,3,4,5], fl24x7: false }, ...]` |
 | 6 | Frontend renderiza lista com 3 calendários existentes: "Comercial 8-18h", "24x7 Plantão", "Fins de Semana" | - |
 | 7 | Clica em "+ Novo Calendário" | - |
@@ -521,7 +521,7 @@ Este caso de uso permite que administradores criem/editem calendários de opera�
 | 10 | Clica em "Salvar Calendário" | - |
 | 11 | - | Frontend executa POST `/api/sla/calendario` com body: `{ nmCalendario, horarioInicio, horarioFim, diasUteis: [1,2,3,4,5], fl24x7: false, flAtivo: true }` |
 | 12 | - | Backend valida: Nome required, Horário Fim > Horário Início, Se fl24x7 = false então diasUteis deve ter pelo menos 1 dia |
-| 13 | - | Backend persiste: `INSERT INTO Calendario (Nm_Calendario, Horario_Inicio, Horario_Fim, Dias_Uteis_JSON, Fl_24x7, Fl_Ativo, Id_Conglomerado, Dt_Criacao)` |
+| 13 | - | Backend persiste: `INSERT INTO Calendario (Nm_Calendario, Horario_Inicio, Horario_Fim, Dias_Uteis_JSON, Fl_24x7, Fl_Ativo, Id_Fornecedor, Dt_Criacao)` |
 | 14 | - | Retorna HTTP 201: `{ idCalendario: 4, nmCalendario: "Comercial SP 9-18h", ... }` |
 | 15 | Frontend exibe mensagem de sucesso e adiciona calendário à lista | - |
 | 16 | Usuário clica em ação "Gerenciar Feriados" do calendário criado | - |
@@ -534,7 +534,7 @@ Este caso de uso permite que administradores criem/editem calendários de opera�
 | 23 | - | Backend invoca BrasilAPI: `GET https://brasilapi.com.br/api/feriados/v1/2025` |
 | 24 | - | BrasilAPI retorna JSON com 10 feriados nacionais: `[{ date: "2025-01-01", name: "Ano Novo", type: "national" }, { date: "2025-04-21", name: "Tiradentes", type: "national" }, ...]` |
 | 25 | - | Backend itera sobre feriados retornados, para cada um: verifica se já existe no banco (`SELECT COUNT(*) FROM Feriado WHERE Dt_Feriado = @date AND Id_Calendario = 4`) |
-| 26 | - | Se NÃO existe: `INSERT INTO Feriado (Id_Calendario, Dt_Feriado, Nm_Feriado, Tipo, Fl_Recorrente, Id_Conglomerado)` |
+| 26 | - | Se NÃO existe: `INSERT INTO Feriado (Id_Calendario, Dt_Feriado, Nm_Feriado, Tipo, Fl_Recorrente, Id_Fornecedor)` |
 | 27 | - | Backend registra log: `Nivel = "Info", Mensagem = "Importados 10 feriados nacionais para calendário 4"` |
 | 28 | - | Backend registra auditoria: Operacao = "SLA_IMPORT_HOLIDAYS", Dados = "Ano: 2025, Quantidade: 10" |
 | 29 | - | Retorna HTTP 201: `{ feriadosImportados: 10, message: "10 feriados nacionais importados com sucesso" }` |

@@ -84,7 +84,7 @@ Este documento registra **exclusivamente** as referências ao sistema legado (AS
 ```sql
 CREATE TABLE tb_AuditoriaBatch (
     ID_AuditoriaBatch INT PRIMARY KEY IDENTITY(1,1),
-    ID_Conglomerado INT NOT NULL,
+    ID_Fornecedor INT NOT NULL,
     NM_Batch NVARCHAR(200) NOT NULL,
     DS_Batch NVARCHAR(MAX),
     DT_Inicio DATETIME,
@@ -104,14 +104,14 @@ CREATE TABLE tb_AuditoriaBatch (
 
 **Problemas Identificados**:
 - `ST_Lote` como string livre (permitia valores inconsistentes como "Processand0" com typo)
-- Sem foreign keys para `ID_Conglomerado` e `ID_Auditor` (dados órfãos)
+- Sem foreign keys para `ID_Fornecedor` e `ID_Auditor` (dados órfãos)
 - `PC_Progresso` calculado manualmente de forma incorreta (não refletia progresso real)
 - `ID_JobHangfire` nunca utilizado (coluna morta)
 - Sem campos de auditoria (`UpdatedBy`, `UpdatedAt`, `IsDeleted`)
 
 **Campos Mapeados**:
 - `ID_AuditoriaBatch` → `AuditBatch.Id` (Guid)
-- `ID_Conglomerado` → `AuditBatch.CompanyId` (Guid)
+- `ID_Fornecedor` → `AuditBatch.CompanyId` (Guid)
 - `NM_Batch` → `AuditBatch.Name`
 - `DS_Batch` → `AuditBatch.Description`
 - `DT_Inicio` → `AuditBatch.StartedAt`
@@ -193,15 +193,15 @@ CREATE TABLE tb_AuditoriaBatchInvoices (
 **Assinatura**:
 ```sql
 CREATE PROCEDURE pa_AuditoriaBatch_Create
-    @ID_Conglomerado INT,
+    @ID_Fornecedor INT,
     @NM_Batch NVARCHAR(200),
     @DS_Batch NVARCHAR(MAX),
     @ID_Auditor INT = NULL,
     @ID_UsuarioCriacao INT
 AS
 BEGIN
-    INSERT INTO tb_AuditoriaBatch (ID_Conglomerado, NM_Batch, DS_Batch, ST_Lote, ID_Auditor, DT_Criacao, ID_UsuarioCriacao)
-    VALUES (@ID_Conglomerado, @NM_Batch, @DS_Batch, 'Criado', @ID_Auditor, GETDATE(), @ID_UsuarioCriacao)
+    INSERT INTO tb_AuditoriaBatch (ID_Fornecedor, NM_Batch, DS_Batch, ST_Lote, ID_Auditor, DT_Criacao, ID_UsuarioCriacao)
+    VALUES (@ID_Fornecedor, @NM_Batch, @DS_Batch, 'Criado', @ID_Auditor, GETDATE(), @ID_UsuarioCriacao)
 
     SELECT SCOPE_IDENTITY() AS ID_AuditoriaBatch
 END
@@ -488,7 +488,7 @@ END
 **Assinatura**:
 ```vb
 <WebMethod()>
-Public Function CreateBatch(ByVal ID_Conglomerado As Integer, ByVal NM_Batch As String, ByVal DS_Batch As String, ByVal ID_Auditor As Integer?) As Integer
+Public Function CreateBatch(ByVal ID_Fornecedor As Integer, ByVal NM_Batch As String, ByVal DS_Batch As String, ByVal ID_Auditor As Integer?) As Integer
     ' Chama pa_AuditoriaBatch_Create
     ' Retorna ID do lote criado
 End Function

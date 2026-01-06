@@ -37,7 +37,7 @@ Exibir listagem paginada de aditivos contratuais com filtros avançados (contrat
 ### Pré-condições
 - Usuário logado no sistema
 - Usuário com permissão `ADITIVOS.LISTAR`
-- Multi-tenancy: Usuário vinculado a conglomerado
+- Multi-tenancy: Usuário vinculado a Fornecedor
 
 ### Fluxo Principal
 

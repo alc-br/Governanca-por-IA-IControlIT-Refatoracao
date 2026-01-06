@@ -52,7 +52,7 @@
 **Moderno**: Sistema completo de Feature Flags com:
 - Rollout gradual (por % usuários, lista específica, período)
 - Ativação/desativação em runtime (sem restart)
-- Multi-tenant (flags globais ou específicas por conglomerado)
+- Multi-tenant (flags globais ou específicas por Fornecedor)
 
 **Destino**: NOVA FUNCIONALIDADE (não há equivalente legado)
 
@@ -108,7 +108,7 @@
 
 | Aspecto | Legado | Moderno |
 |---------|--------|---------|
-| **Multi-Tenant** | ❌ Não suportado | ✅ Configuração por conglomerado |
+| **Multi-Tenant** | ❌ Não suportado | ✅ Configuração por Fornecedor |
 | **Tipos de Dados** | ❌ Apenas strings | ✅ String, Integer, Decimal, Boolean, Date, JSON |
 | **Validação** | ❌ Sem validação | ✅ Regex, min/max, opções válidas, tipo |
 | **Criptografia** | ❌ Senhas em texto plano | ✅ AES-256 para dados sensíveis |
@@ -200,7 +200,7 @@
 
 INSERT INTO Sistema_Parametro (
     Id,
-    Id_Conglomerado,
+    Id_Fornecedor,
     Cd_Parametro,
     Nm_Parametro,
     Ds_Parametro,
@@ -215,7 +215,7 @@ INSERT INTO Sistema_Parametro (
 )
 SELECT
     NEWID() AS Id,
-    1 AS Id_Conglomerado, -- Conglomerado padrão (ajustar conforme necessário)
+    1 AS Id_Fornecedor, -- Fornecedor padrão (ajustar conforme necessário)
     Cd_Parametro,
     Nm_Parametro,
     ISNULL(Ds_Parametro, '') AS Ds_Parametro,
@@ -243,7 +243,7 @@ WHERE Fl_Sensivel = 1
 -- Migração de tbl_Config_Email → Sistema_Configuracao_Email
 INSERT INTO Sistema_Configuracao_Email (
     Id,
-    Id_Conglomerado,
+    Id_Fornecedor,
     Provedor,
     Servidor_Smtp,
     Porta_Smtp,
@@ -258,7 +258,7 @@ INSERT INTO Sistema_Configuracao_Email (
 )
 SELECT
     NEWID() AS Id,
-    1 AS Id_Conglomerado,
+    1 AS Id_Fornecedor,
     'SMTP' AS Provedor, -- Legado só tinha SMTP
     Servidor_Smtp,
     Porta_Smtp,
@@ -288,7 +288,7 @@ WHERE Fl_Excluido = 0;
 - [ ] Auditoria funcionando (histórico registra todas as alterações)
 - [ ] Cache funcionando (verificar Redis)
 - [ ] Feature flags criadas para funcionalidades críticas
-- [ ] Limites de uso configurados para todos os conglomerados
+- [ ] Limites de uso configurados para todos os Fornecedores
 - [ ] Alertas de limite de uso sendo enviados corretamente
 - [ ] Backup do banco legado realizado antes de deletar dados
 

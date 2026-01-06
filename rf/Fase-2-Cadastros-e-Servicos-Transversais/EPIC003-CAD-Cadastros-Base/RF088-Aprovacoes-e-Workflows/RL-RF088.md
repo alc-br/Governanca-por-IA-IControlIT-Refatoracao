@@ -167,7 +167,7 @@
 ```sql
 CREATE TABLE [dbo].[tblAprovacoes](
     [IdAprovacao] [int] IDENTITY(1,1) NOT NULL,
-    [IdConglomerado] [int] NOT NULL,
+    [IdFornecedor] [int] NOT NULL,
     [IdDocumento] [int] NOT NULL,
     [TipoDocumento] [varchar](50) NOT NULL,
     [IdAprovadorPrincipal] [int] NOT NULL,
@@ -386,7 +386,7 @@ Estas regras NÃO estavam documentadas formalmente, mas foram descobertas no có
   - **Localização**: Job SQL Server `JobDelegacaoExpiracao`
   - **DESTINO**: SUBSTITUÍDO por background service .NET com execução a cada hora
 
-- **RL-RN-004**: Aprovador pode aprovar qualquer documento, mesmo de outro conglomerado (falha multi-tenant)
+- **RL-RN-004**: Aprovador pode aprovar qualquer documento, mesmo de outro Fornecedor (falha multi-tenant)
   - **Localização**: `WSAprovacoes.asmx.vb` - Método `Aprovar()` - Linha 89
   - **DESTINO**: CORRIGIDO - Validação de EmpresaId obrigatória (RN-RF088-006)
 

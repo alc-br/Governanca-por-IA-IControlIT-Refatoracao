@@ -239,7 +239,7 @@ ORDER BY M.Descricao
 
 1. **Falta de Unique Constraint em Nome:** Permite fabricantes duplicados
 2. **Sem Auditoria:** Não há campos `Created`, `CreatedBy`, `Modified`, `ModifiedBy`
-3. **Sem Multi-Tenancy:** Não há campo `Id_Conglomerado` ou `EmpresaId`
+3. **Sem Multi-Tenancy:** Não há campo `Id_Fornecedor` ou `EmpresaId`
 4. **Sem Soft Delete:** Não há campo `Fl_Excluido` ou `IsDeleted`
 5. **Logo como Path:** Path de arquivo, não BLOB ou URL externa
 6. **Campos VARCHAR Fixos:** Sem suporte a Unicode (NVARCHAR)

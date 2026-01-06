@@ -17,7 +17,7 @@
 - **Arquitetura:** Monolítica ASP.NET Web Forms
 - **Linguagem / Stack:** VB.NET + ASP.NET Web Forms + ADO.NET
 - **Banco de Dados:** SQL Server 2012+
-- **Multi-tenant:** Sim (campo Id_Conglomerado)
+- **Multi-tenant:** Sim (campo Id_Fornecedor)
 - **Auditoria:** Parcial (apenas criação e alteração de regras, sem histórico de processamento)
 - **Configurações:** Web.config + tabelas de configuração
 
@@ -211,7 +211,7 @@ O sistema legado não tinha lógica de rateio no banco de dados. Apenas consulta
 | **Dashboard** | Não existe | Gráficos executivos | Visibilidade em tempo real (RN-RF055-15) |
 | **Reprocessamento** | Impossível | Suportado com regra histórica | Correção de erros retroativos (RN-RF055-19) |
 | **Cancelamento** | Impossível após lançar | Até antes de exportar | Correção antes de impactar contabilidade (RN-RF055-20) |
-| **Multi-tenant** | Sim (Id_Conglomerado) | Sim (EmpresaId) | Mantido (RN-RF055-16) |
+| **Multi-tenant** | Sim (Id_Fornecedor) | Sim (EmpresaId) | Mantido (RN-RF055-16) |
 | **Auditoria** | Parcial (apenas regras) | Completa (todas operações) | Compliance e rastreabilidade (RN-RF055-17) |
 
 ---
@@ -319,7 +319,7 @@ O sistema legado não tinha lógica de rateio no banco de dados. Apenas consulta
 
 ### 11.1 O Que Funcionava Bem
 
-- ✅ Multi-tenancy com Id_Conglomerado (mantido)
+- ✅ Multi-tenancy com Id_Fornecedor (mantido)
 - ✅ Estrutura de centros de custo (reutilizada)
 - ✅ Views de custos consolidados (usadas como fonte)
 

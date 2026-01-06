@@ -21,7 +21,7 @@ O sistema legado IControlIT implementava uma gestão simplificada de arquivos se
 - **Linguagem:** VB.NET (code-behind .aspx.vb)
 - **Banco de Dados:** SQL Server (tabela `Arquivo` com campos básicos)
 - **Armazenamento:** FileSystem local (D:\Arquivos\)
-- **Multi-tenant:** Parcial (Id_Conglomerado existia, mas sem row-level security)
+- **Multi-tenant:** Parcial (Id_Fornecedor existia, mas sem row-level security)
 - **Auditoria:** Inexistente (sem log de uploads, downloads, exclusões)
 - **Versionamento:** Inexistente (sobrescrever arquivo perdia versão anterior)
 - **Scan Antivírus:** Inexistente (risco de malware)
@@ -44,7 +44,7 @@ O sistema legado IControlIT implementava uma gestão simplificada de arquivos se
 ```sql
 CREATE TABLE Arquivo (
     Id_Arquivo INT PRIMARY KEY IDENTITY,
-    Id_Conglomerado INT NOT NULL, -- Multi-tenancy básico
+    Id_Fornecedor INT NOT NULL, -- Multi-tenancy básico
     Nm_Arquivo VARCHAR(255) NOT NULL,
     Caminho VARCHAR(500) NOT NULL, -- Caminho físico no FileSystem
     Tamanho INT, -- Bytes
@@ -164,13 +164,13 @@ Dim sql As String = "INSERT INTO Arquivo (Nm_Arquivo, Caminho, Tamanho) VALUES (
 ```sql
 CREATE TABLE Arquivo (
     Id_Arquivo INT PRIMARY KEY IDENTITY,
-    Id_Conglomerado INT NOT NULL,
+    Id_Fornecedor INT NOT NULL,
     Nm_Arquivo VARCHAR(255) NOT NULL,
     Caminho VARCHAR(500) NOT NULL, -- Ex: D:\Arquivos\contrato_001.pdf
     Tamanho INT, -- Bytes
     Dt_Upload DATETIME DEFAULT GETDATE(),
     Id_Usuario_Upload INT,
-    CONSTRAINT FK_Arquivo_Conglomerado FOREIGN KEY (Id_Conglomerado) REFERENCES Conglomerado(Id_Conglomerado)
+    CONSTRAINT FK_Arquivo_Fornecedor FOREIGN KEY (Id_Fornecedor) REFERENCES Fornecedor(Id_Fornecedor)
 )
 ```
 

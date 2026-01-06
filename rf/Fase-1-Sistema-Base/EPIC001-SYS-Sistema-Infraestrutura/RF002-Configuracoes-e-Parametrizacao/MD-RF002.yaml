@@ -51,7 +51,7 @@ entidades:
       - nome: "cliente_id"
         tipo: "GUID"
         nulo: false
-        descricao: "FK para clientes (multi-tenancy - isolamento por cliente/conglomerado)"
+        descricao: "FK para clientes (multi-tenancy - isolamento por cliente/Fornecedor)"
         fk:
           tabela: "cliente"
           coluna: "id"
@@ -64,13 +64,13 @@ entidades:
           campo_wf: "CMP-WF02-017"
 
       # CAMPOS DE HIERARQUIA MULTI-TENANT (RN-RF002-01)
-      - nome: "id_conglomerado"
+      - nome: "id_Fornecedor"
         tipo: "GUID"
         nulo: true
         default: null
-        descricao: "FK para conglomerados (nível Global ou Conglomerado)"
+        descricao: "FK para Fornecedores (nível Global ou Fornecedor)"
         fk:
-          tabela: "conglomerado"
+          tabela: "Fornecedor"
           coluna: "id"
           on_delete: "CASCADE"
         index: true
@@ -79,7 +79,7 @@ entidades:
           uc: "UC01"
           wf: "WF-02"
           campo_wf: "CMP-WF02-017"
-          observacao: "Hierarquia multi-tenant: Usuário → Departamento → Empresa → Conglomerado → Global"
+          observacao: "Hierarquia multi-tenant: Usuário → Departamento → Empresa → Fornecedor → Global"
 
       - nome: "id_empresa"
         tipo: "GUID"
@@ -479,7 +479,7 @@ entidades:
       # ÍNDICES DE HIERARQUIA MULTI-TENANT
       - nome: "idx_sistema_configuracao_geral_hierarquia"
         tipo: "BTREE"
-        colunas: ["id_conglomerado", "id_empresa", "id_departamento", "id_usuario"]
+        colunas: ["id_Fornecedor", "id_empresa", "id_departamento", "id_usuario"]
         descricao: "Performance em consultas de precedência hierárquica (RN-RF002-01)"
 
       # ÍNDICES DE BUSCA E FILTRO (conforme WF-01)
@@ -548,11 +548,11 @@ entidades:
         descricao: "Multi-tenancy (isolamento por cliente)"
 
       # FK HIERARQUIA MULTI-TENANT
-      - nome: "fk_sistema_configuracao_geral_conglomerado"
+      - nome: "fk_sistema_configuracao_geral_Fornecedor"
         tipo: "FOREIGN KEY"
-        definicao: "id_conglomerado REFERENCES conglomerado(id)"
+        definicao: "id_Fornecedor REFERENCES Fornecedor(id)"
         on_delete: "CASCADE"
-        descricao: "Hierarquia multi-tenant (nível Conglomerado)"
+        descricao: "Hierarquia multi-tenant (nível Fornecedor)"
 
       - nome: "fk_sistema_configuracao_geral_empresa"
         tipo: "FOREIGN KEY"
@@ -875,10 +875,10 @@ relacionamentos_globais:
     destino: "sistema_configuracao_geral"
     descricao: "Um cliente possui muitas configurações (multi-tenancy)"
 
-  - origem: "conglomerado"
+  - origem: "Fornecedor"
     cardinalidade: "1:N"
     destino: "sistema_configuracao_geral"
-    descricao: "Um conglomerado pode ter configurações específicas (hierarquia multi-tenant)"
+    descricao: "Um Fornecedor pode ter configurações específicas (hierarquia multi-tenant)"
 
   - origem: "empresa"
     cardinalidade: "1:N"
@@ -913,7 +913,7 @@ observacoes:
     descricao: "Modelo de dados derivado do RF002, UC-RF002 (UC00-UC09) e WF-RF002 (WF-01 a WF-10). Entidade principal sistema_configuracao_geral armazena configurações com suporte completo a hierarquia multi-tenant (5 níveis), tipos de dados variados (7 tipos), criptografia Azure Key Vault, validações customizadas, feature flags com rollout progressivo e proteção de configurações críticas. Entidade sistema_configuracao_versao implementa versionamento imutável com diff JSON completo para rollback 1-click."
 
   - categoria: "Hierarquia Multi-Tenant"
-    descricao: "Implementação completa da RN-RF002-01 com precedência: Usuário → Departamento → Empresa → Conglomerado → Global. Campos id_conglomerado, id_empresa, id_departamento e id_usuario permitem configurações em qualquer nível da hierarquia. Constraint UNIQUE (cliente_id, nm_codigo) garante unicidade de código por tenant. Índice composto de hierarquia otimiza consultas de precedência."
+    descricao: "Implementação completa da RN-RF002-01 com precedência: Usuário → Departamento → Empresa → Fornecedor → Global. Campos id_Fornecedor, id_empresa, id_departamento e id_usuario permitem configurações em qualquer nível da hierarquia. Constraint UNIQUE (cliente_id, nm_codigo) garante unicidade de código por tenant. Índice composto de hierarquia otimiza consultas de precedência."
 
   - categoria: "Segurança e Criptografia"
     descricao: "RN-RF002-02 implementada via fl_criptografado. Valores sensíveis (fl_criptografado = 1) são criptografados com Azure Key Vault AES-256-GCM antes de persistir no campo ds_valor. RN-RF002-09 garante mascaramento automático de valores sensíveis na UI (********) exceto para usuários com permissão DECRYPT. RN-RF002-13 implementada via fl_somente_leitura bloqueando edição/exclusão de configurações críticas."
@@ -955,4 +955,4 @@ historico:
   - versao: "2.0"
     data: "2026-01-04"
     autor: "Agência ALC - alc.dev.br"
-    descricao: "Versão inicial do modelo de dados RF002 derivado de RF002.yaml (15 RNs + 24 FUNCs), UC-RF002.yaml (10 UCs) e WF-RF002.md (10 wireframes). Entidades: sistema_configuracao_geral (configuração principal com 28 campos + auditoria completa + soft delete), sistema_configuracao_versao (versionamento imutável com diff JSON). Multi-tenancy obrigatório (cliente_id), hierarquia 5 níveis (id_conglomerado, id_empresa, id_departamento, id_usuario), criptografia Azure Key Vault (fl_criptografado), feature flags com 4 estratégias de rollout, validação customizada (regex/ranges/enum), versionamento completo com rollback 1-click, auditoria SOX completa."
+    descricao: "Versão inicial do modelo de dados RF002 derivado de RF002.yaml (15 RNs + 24 FUNCs), UC-RF002.yaml (10 UCs) e WF-RF002.md (10 wireframes). Entidades: sistema_configuracao_geral (configuração principal com 28 campos + auditoria completa + soft delete), sistema_configuracao_versao (versionamento imutável com diff JSON). Multi-tenancy obrigatório (cliente_id), hierarquia 5 níveis (id_Fornecedor, id_empresa, id_departamento, id_usuario), criptografia Azure Key Vault (fl_criptografado), feature flags com 4 estratégias de rollout, validação customizada (regex/ranges/enum), versionamento completo com rollback 1-click, auditoria SOX completa."

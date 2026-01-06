@@ -17,7 +17,7 @@ Descreve o cenário geral do sistema legado de inventário.
 - **Arquitetura:** Monolítica WebForms
 - **Linguagem / Stack:** VB.NET + ASP.NET Web Forms + SQL Server + stored procedures
 - **Banco de Dados:** SQL Server (tabelas `Estoque_Inventario`, `Estoque_Inventario_Item`)
-- **Multi-tenant:** Parcial (campo `Id_Conglomerado` ausente em tabelas de inventário)
+- **Multi-tenant:** Parcial (campo `Id_Fornecedor` ausente em tabelas de inventário)
 - **Auditoria:** Inexistente (sem campos Created, CreatedBy, LastModified)
 - **Classificação ABC:** Inexistente (manual em planilhas Excel, não automatizado)
 - **Contagem:** 100% manual via planilhas Excel, sem app mobile
@@ -149,7 +149,7 @@ Descreve o cenário geral do sistema legado de inventário.
 | `Vl_Divergencias` | DECIMAL(18,2) | Valor total das divergências | ✅ Mantido |
 
 **Problemas Identificados:**
-- ❌ **Falta multi-tenancy:** Sem campo `ClienteId` (todos os conglomerados compartilham mesma tabela)
+- ❌ **Falta multi-tenancy:** Sem campo `ClienteId` (todos os Fornecedores compartilham mesma tabela)
 - ❌ **Falta auditoria:** Sem `Created`, `CreatedBy`, `LastModified`, `LastModifiedBy`
 - ❌ **Falta soft delete:** Sem `Fl_Excluido` (deleção física)
 - ❌ **Falta classificação ABC:** Sem campo para tipo de inventário cíclico

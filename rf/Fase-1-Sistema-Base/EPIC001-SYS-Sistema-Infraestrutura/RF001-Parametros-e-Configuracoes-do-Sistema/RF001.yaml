@@ -18,7 +18,7 @@ descricao:
   objetivo: |
     Implementar o Sistema de Parâmetros e Configurações Centralizadas do IControlIT, responsável por gerenciar todas as configurações do sistema de forma flexível, segura e auditável, permitindo que administradores personalizem comportamentos do sistema sem necessidade de alteração de código.
   problema_resolvido: |
-    Eliminar necessidade de alteração de código para ajustar comportamentos do sistema. Permitir configuração flexível por conglomerado (multi-tenant). Armazenar dados sensíveis de forma segura (criptografia AES-256). Auditar todas as alterações em configurações.
+    Eliminar necessidade de alteração de código para ajustar comportamentos do sistema. Permitir configuração flexível por Fornecedor (multi-tenant). Armazenar dados sensíveis de forma segura (criptografia AES-256). Auditar todas as alterações em configurações.
   publico_afetado: |
     Administradores de Sistema, Administradores de TI, Gerentes de Operações, Auditores, Super Administradores.
 
@@ -27,12 +27,12 @@ escopo:
     - Criar, atualizar, listar e excluir parâmetros de sistema
     - Gerenciar feature flags com rollout gradual
     - Configurar provedores de e-mail (SMTP, SendGrid, AWS SES)
-    - Definir e monitorar limites de uso por conglomerado
+    - Definir e monitorar limites de uso por Fornecedor
     - Validar valores conforme tipo de dado (String, Integer, Decimal, Boolean, Date, JSON)
     - Criptografar dados sensíveis (senhas, API keys, tokens)
     - Registrar histórico completo de alterações (auditoria)
     - Controle de acesso baseado em permissões (RBAC)
-    - Isolamento multi-tenant (parâmetros por conglomerado ou globais)
+    - Isolamento multi-tenant (parâmetros por Fornecedor ou globais)
     - Configuração dinâmica em runtime (cache invalidation)
     - Categorização de parâmetros (Sistema, Segurança, Integração, Notificação, Relatório)
     - Proteção de parâmetros críticos (não editáveis via UI)
@@ -53,7 +53,7 @@ entidades:
         tipo: string
         obrigatorio: true
         unicidade: true
-        descricao: Código único do parâmetro por conglomerado
+        descricao: Código único do parâmetro por Fornecedor
       - nome: Nm_Parametro
         tipo: string
         obrigatorio: true
@@ -192,10 +192,10 @@ entidades:
       - nome: Fl_Principal
         tipo: boolean
         obrigatorio: true
-        descricao: Indica se é configuração principal do conglomerado
+        descricao: Indica se é configuração principal do Fornecedor
 
   - nome: Sistema_Limite_Uso
-    descricao: Restrição quantitativa por conglomerado (usuários, ativos, storage, API calls)
+    descricao: Restrição quantitativa por Fornecedor (usuários, ativos, storage, API calls)
     multi_tenant: true
     soft_delete: true
     auditoria: true
@@ -205,7 +205,7 @@ entidades:
         valores: [MAX_USUARIOS, MAX_ATIVOS, MAX_STORAGE_MB, MAX_API_CALLS_DIA]
         obrigatorio: true
         unicidade: true
-        descricao: Tipo de limite (único por conglomerado)
+        descricao: Tipo de limite (único por Fornecedor)
       - nome: Limite
         tipo: integer
         obrigatorio: true
@@ -225,7 +225,7 @@ entidades:
 
 regras_negocio:
   - id: RN-SYS-001-01
-    descricao: O código do parâmetro (Cd_Parametro) deve ser único por conglomerado
+    descricao: O código do parâmetro (Cd_Parametro) deve ser único por Fornecedor
     tipo: unicidade
     campos_afetados: [Cd_Parametro]
     obrigatorio: true
@@ -274,9 +274,9 @@ regras_negocio:
     criterio_aceite: Histórico registra usuário, data/hora, IP, User-Agent, diff JSON (UPDATE), retenção 7 anos
 
   - id: RN-SYS-001-08
-    descricao: Feature flags podem ser globais (Id_Conglomerado = NULL) ou específicas por conglomerado; flag específica tem prioridade
+    descricao: Feature flags podem ser globais (Id_Fornecedor = NULL) ou específicas por Fornecedor; flag específica tem prioridade
     tipo: logica
-    campos_afetados: [Id_Conglomerado]
+    campos_afetados: [Id_Fornecedor]
     obrigatorio: true
     criterio_aceite: Verificar flag específica primeiro; se não existir, verificar flag global
 
@@ -288,11 +288,11 @@ regras_negocio:
     criterio_aceite: Hash(Id_Usuario) % 100 < Percentual_Rollout → feature ativa; mesmo usuário sempre mesmo resultado
 
   - id: RN-SYS-001-10
-    descricao: Apenas uma configuração de e-mail pode ser principal (Fl_Principal = 1) por conglomerado
+    descricao: Apenas uma configuração de e-mail pode ser principal (Fl_Principal = 1) por Fornecedor
     tipo: unicidade
     campos_afetados: [Fl_Principal]
     obrigatorio: true
-    criterio_aceite: Ao marcar como principal, desmarcar automaticamente outras do conglomerado
+    criterio_aceite: Ao marcar como principal, desmarcar automaticamente outras do Fornecedor
 
   - id: RN-SYS-001-11
     descricao: Configurações SMTP devem ter servidor, porta (1-65535) e credenciais válidas
@@ -302,11 +302,11 @@ regras_negocio:
     criterio_aceite: Campos obrigatórios preenchidos; senha criptografada; opcionalmente testar conexão SMTP
 
   - id: RN-SYS-001-12
-    descricao: Cada Tipo_Limite deve ser único por conglomerado; atualizar Uso_Atual quando operações afetadas ocorrerem
+    descricao: Cada Tipo_Limite deve ser único por Fornecedor; atualizar Uso_Atual quando operações afetadas ocorrerem
     tipo: unicidade
     campos_afetados: [Tipo_Limite, Uso_Atual]
     obrigatorio: true
-    criterio_aceite: Constraint UNIQUE (Id_Conglomerado, Tipo_Limite); bloquear operação quando Uso_Atual >= Limite
+    criterio_aceite: Constraint UNIQUE (Id_Fornecedor, Tipo_Limite); bloquear operação quando Uso_Atual >= Limite
 
   - id: RN-SYS-001-13
     descricao: Enviar alertas quando Uso_Atual/Limite >= Percentual_Alerta; evitar duplicação com flag Fl_Alerta_Enviado
@@ -316,11 +316,11 @@ regras_negocio:
     criterio_aceite: Job Hangfire verifica a cada 1h; enviar e-mail para admins; resetar flag com hysteresis (Percentual_Alerta - 10%)
 
   - id: RN-SYS-001-14
-    descricao: Isolamento multi-tenant; usuário só acessa dados do próprio conglomerado; Super Admin bypassa filtro
+    descricao: Isolamento multi-tenant; usuário só acessa dados do próprio Fornecedor; Super Admin bypassa filtro
     tipo: seguranca
-    campos_afetados: [Id_Conglomerado]
+    campos_afetados: [Id_Fornecedor]
     obrigatorio: true
-    criterio_aceite: Filtrar sempre por Id_Conglomerado do usuário autenticado; cross-tenant → HTTP 403
+    criterio_aceite: Filtrar sempre por Id_Fornecedor do usuário autenticado; cross-tenant → HTTP 403
 
   - id: RN-SYS-001-15
     descricao: Parâmetros tipo JSON devem ter JSON válido; aceitar apenas objetos {} ou arrays []
@@ -403,7 +403,7 @@ permissoes:
 integracoes:
   internas:
     - Autenticacao (verificar permissões RBAC)
-    - Multi-Tenancy (isolamento por Id_Conglomerado)
+    - Multi-Tenancy (isolamento por Id_Fornecedor)
     - Auditoria (registrar em Sistema_Parametro_Historico, Sistema_Feature_Flag_Historico, etc)
     - Cache (invalidar ao alterar parâmetro)
     - Hangfire (job para verificar limites de uso a cada 1h)

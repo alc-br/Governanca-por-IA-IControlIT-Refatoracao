@@ -75,7 +75,7 @@ Sistema legado VB.NET/ASP.NET Web Forms utilizado para gestão rudimentar de ati
    - Cascata: Ao mudar, atualiza campo Modelo e Dados Complementares
    - **DESTINO:** ASSUMIDO - Enum Tipo_Ativo mantido (Notebook, Desktop, Smartphone, etc.)
 
-3. **Fornecedor** (cboConglomerado) - DropDownList obrigatório, TabIndex=4
+3. **Fornecedor** (cboFornecedor) - DropDownList obrigatório, TabIndex=4
    - Operadora/fornecedor do ativo
    - **DESTINO:** ASSUMIDO - Mantido como Id_Marca/Id_Modelo (normalização)
 
@@ -266,13 +266,13 @@ Sistema legado tinha apenas 3 tabelas básicas:
 - ❌ Sem campos GPS (Latitude, Longitude)
 - ❌ Sem QR Code (QR_Code_URL, QR_Code_Base64)
 - ❌ Sem campos de depreciação (Metodo_Depreciacao, Valor_Atual_Depreciado, Dt_Ultima_Depreciacao)
-- ❌ Sem multi-tenancy (Id_Conglomerado ausente)
+- ❌ Sem multi-tenancy (Id_Fornecedor ausente)
 - ❌ Sem auditoria (Created, CreatedBy, LastModified, LastModifiedBy ausentes)
 - ❌ DELETE físico permitido (sem Fl_Ativo)
 
 **DESTINO:** SUBSTITUÍDO
 - Tabela redesenhada com 30+ campos novos (QR Code, GPS, Garantia, Depreciação, Características Técnicas)
-- Multi-tenancy obrigatório (Id_Conglomerado)
+- Multi-tenancy obrigatório (Id_Fornecedor)
 - Auditoria completa (Created, CreatedBy, LastModified, LastModifiedBy)
 - Soft delete (Fl_Ativo)
 - FK normalizadas (Id_Marca, Id_Modelo, Id_Usuario_Responsavel)
@@ -288,7 +288,7 @@ Sistema legado tinha apenas 3 tabelas básicas:
 **Problemas:** Estrutura básica OK, mas sem multi-tenancy
 
 **DESTINO:** ASSUMIDO
-- Mantida com adição de Id_Conglomerado (multi-tenancy)
+- Mantida com adição de Id_Fornecedor (multi-tenancy)
 - Adição de auditoria (Created, CreatedBy)
 - Soft delete (Fl_Ativo)
 
@@ -304,7 +304,7 @@ Sistema legado tinha apenas 3 tabelas básicas:
 **Problemas:** Estrutura básica OK, mas sem multi-tenancy
 
 **DESTINO:** ASSUMIDO
-- Mantida com adição de Id_Conglomerado (multi-tenancy)
+- Mantida com adição de Id_Fornecedor (multi-tenancy)
 - Adição de auditoria (Created, CreatedBy)
 - Soft delete (Fl_Ativo)
 
@@ -418,7 +418,7 @@ Regras NÃO documentadas encontradas no código VB.NET:
 | **Inventário** | Manual 2 semanas papel | App mobile MAUI scan QR Code GPS | NOVA | Redução 80% tempo (RN-RF025-009 + RN-RF025-015) |
 | **Localização** | Texto livre sem estrutura | Hierarquia Edificio→Andar→Sala + GPS | SUBSTITUÍDO | Mapas interativos e relatórios geográficos |
 | **Baixa Patrimonial** | Qualquer usuário, sem aprovação | Workflow 2 níveis Gestor+Controller | NOVA | Compliance (RN-RF025-010) |
-| **Multi-Tenancy** | 1 banco por cliente (físico) | Id_Conglomerado em todas tabelas (lógico) | NOVA | Escalabilidade SaaS (RN-RF025-012) |
+| **Multi-Tenancy** | 1 banco por cliente (físico) | Id_Fornecedor em todas tabelas (lógico) | NOVA | Escalabilidade SaaS (RN-RF025-012) |
 | **Soft Delete** | DELETE físico | Fl_Ativo (exclusão lógica) | NOVA | Preservação histórico 7 anos (RN-RF025-013) |
 | **Integração ERP** | Export CSV manual mensal | Webhook outbound + API REST inbound | NOVA | Sincronização tempo real (RN-RF025-014) |
 | **Autenticação** | Windows Auth (NTLM) | JWT Bearer stateless | SUBSTITUÍDO | Compatibilidade mobile/B2B |
@@ -466,7 +466,7 @@ Regras NÃO documentadas encontradas no código VB.NET:
 - Foto evidencia estado físico do ativo
 - Sincronização online/offline
 
-### Decisão 5: Multi-Tenancy Lógico (Id_Conglomerado)
+### Decisão 5: Multi-Tenancy Lógico (Id_Fornecedor)
 
 **Motivo:** Legado usava 1 banco SQL Server por cliente (multi-tenant físico). Manutenção custosa (backups, migrations, monitoramento).
 

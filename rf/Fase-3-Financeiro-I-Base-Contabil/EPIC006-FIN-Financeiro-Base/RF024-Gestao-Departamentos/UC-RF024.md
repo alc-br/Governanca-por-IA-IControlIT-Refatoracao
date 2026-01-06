@@ -41,7 +41,7 @@ Os UCs aqui definidos servem como **contrato comportamental**, sendo a **fonte p
 
 ## 3. PADRÕES GERAIS APLICÁVEIS A TODOS OS UCs
 
-- Todos os acessos respeitam **isolamento por tenant** (Id_Conglomerado)
+- Todos os acessos respeitam **isolamento por tenant** (Id_Fornecedor)
 - Todas as ações exigem **permissão explícita** (RBAC)
 - Erros não devem vazar informações sensíveis
 - Auditoria deve registrar **quem**, **quando** e **qual ação**
@@ -85,7 +85,7 @@ Permitir que o usuário visualize departamentos disponíveis do seu próprio ten
 - **FE-UC00-003:** Erro de conexão com banco → HTTP 500, mensagem "Erro ao carregar departamentos, tente novamente"
 
 ### Regras de Negócio
-- **RN-UC-00-001**: Somente departamentos do tenant do usuário autenticado (Id_Conglomerado)
+- **RN-UC-00-001**: Somente departamentos do tenant do usuário autenticado (Id_Fornecedor)
 - **RN-UC-00-002**: Registros soft-deleted NÃO aparecem na listagem (Deleted_At IS NULL)
 - **RN-UC-00-003**: Paginação padrão de 20 registros (configurável até 100)
 - **RN-UC-00-004**: Ordenação padrão por Nome_Departamento ASC
@@ -128,7 +128,7 @@ Permitir a criação de um novo departamento com hierarquia recursiva, líder de
   - Líder (FK Usuario - obrigatório exceto tipo Equipe)
 - **FP-UC01-005:** Usuário clica em "Salvar"
 - **FP-UC01-006:** Sistema valida dados (FluentValidation):
-  - Código único por conglomerado
+  - Código único por Fornecedor
   - Código formato alfanumérico regex: `^[A-Z]{3,5}-[A-Z0-9]{2,20}$`
   - Nome obrigatório (3-200 caracteres)
   - Líder existe e está ativo
@@ -136,7 +136,7 @@ Permitir a criação de um novo departamento com hierarquia recursiva, líder de
 - **FP-UC01-007:** Sistema valida referências circulares na hierarquia (algoritmo HashSet)
 - **FP-UC01-008:** Sistema calcula Nivel_Hierarquia e Caminho_Hierarquico (trigger ou aplicação)
 - **FP-UC01-009:** Sistema cria registro com campos automáticos:
-  - Id_Conglomerado (tenant do usuário autenticado)
+  - Id_Fornecedor (tenant do usuário autenticado)
   - Created_By (Id do usuário autenticado)
   - Created_At (timestamp atual)
   - Qtd_Colaboradores = 0
@@ -158,12 +158,12 @@ Permitir a criação de um novo departamento com hierarquia recursiva, líder de
 - **FE-UC01-006:** Departamento Pai de outro tenant → HTTP 403, mensagem "Departamento pai não pertence ao seu tenant"
 
 ### Regras de Negócio
-- **RN-UC-01-001**: Código departamento único por conglomerado (**RN-RF024-001**)
+- **RN-UC-01-001**: Código departamento único por Fornecedor (**RN-RF024-001**)
 - **RN-UC-01-002**: Código formato alfanumérico regex: `^[A-Z]{3,5}-[A-Z0-9]{2,20}$` (**RN-RF024-001**)
 - **RN-UC-01-003**: Hierarquia recursiva ilimitada via self-referencing FK (**RN-RF024-002**)
 - **RN-UC-01-004**: Validação de referências circulares obrigatória (**RN-RF024-003**)
 - **RN-UC-01-005**: Líder obrigatório para tipos Diretoria/Gerencia/Coordenacao (**RN-RF024-004**)
-- **RN-UC-01-006**: Id_Conglomerado automático (tenant do usuário autenticado)
+- **RN-UC-01-006**: Id_Fornecedor automático (tenant do usuário autenticado)
 - **RN-UC-01-007**: Created_By automático (ID do usuário autenticado)
 - **RN-UC-01-008**: Created_At automático (timestamp atual)
 - **RN-UC-01-009**: Nivel_Hierarquia calculado automaticamente (1 = raiz, 2 = filho, etc.)
@@ -173,7 +173,7 @@ Permitir a criação de um novo departamento com hierarquia recursiva, líder de
 
 ### Critérios de Aceite
 - **CA-UC01-001:** Todos os campos obrigatórios DEVEM ser validados antes de persistir
-- **CA-UC01-002:** Id_Conglomerado DEVE ser preenchido automaticamente com o tenant do usuário autenticado
+- **CA-UC01-002:** Id_Fornecedor DEVE ser preenchido automaticamente com o tenant do usuário autenticado
 - **CA-UC01-003:** Created_By DEVE ser preenchido automaticamente com o ID do usuário autenticado
 - **CA-UC01-004:** Created_At DEVE ser preenchido automaticamente com timestamp atual
 - **CA-UC01-005:** Sistema DEVE retornar erro claro se validação falhar
@@ -227,7 +227,7 @@ Permitir visualização detalhada de um departamento com informações de hierar
 - **FE-UC02-003:** Departamento soft-deleted → HTTP 404, mensagem "Departamento não encontrado"
 
 ### Regras de Negócio
-- **RN-UC-02-001**: Isolamento por tenant obrigatório (Id_Conglomerado)
+- **RN-UC-02-001**: Isolamento por tenant obrigatório (Id_Fornecedor)
 - **RN-UC-02-002**: Informações de auditoria devem ser exibidas (Created_By, Created_At, LastModified_By, LastModified_At)
 - **RN-UC-02-003**: Caminho hierárquico exibido como breadcrumb clicável (ex: Diretoria TI > Gerência Dev > Coordenação Backend)
 - **RN-UC-02-004**: Colaboradores soft-deleted não aparecem na lista (Deleted_At IS NULL)

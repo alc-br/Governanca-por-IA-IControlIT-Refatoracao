@@ -80,7 +80,7 @@ Use esta ordem para confirmar qualquer RF:
 ## RF-001 – Parâmetros e Configurações do Sistema
 
 **Descrição (comportamento atual):**
-O sistema permite aos administradores gerenciar parâmetros de configuração centralizados que controlam o comportamento da aplicação. No legado, parâmetros eram armazenados em Web.config e tbl_Parametros, sem validação de tipo, criptografia ou multi-tenancy. O sistema moderno implementa parâmetros tipados (String, Integer, Decimal, Boolean, Date, JSON) com validação, criptografia para dados sensíveis, feature flags para rollout gradual de funcionalidades, e configurações específicas por conglomerado (multi-tenant).
+O sistema permite aos administradores gerenciar parâmetros de configuração centralizados que controlam o comportamento da aplicação. No legado, parâmetros eram armazenados em Web.config e tbl_Parametros, sem validação de tipo, criptografia ou multi-tenancy. O sistema moderno implementa parâmetros tipados (String, Integer, Decimal, Boolean, Date, JSON) com validação, criptografia para dados sensíveis, feature flags para rollout gradual de funcionalidades, e configurações específicas por Fornecedor (multi-tenant).
 
 **What (o que faz):**
 - Cadastro, edição e exclusão de parâmetros do sistema
@@ -88,7 +88,7 @@ O sistema permite aos administradores gerenciar parâmetros de configuração ce
 - Criptografia automática de parâmetros sensíveis (senhas, API keys)
 - Gerenciamento de feature flags para ativar/desativar funcionalidades de forma controlada
 - Configuração de servidor SMTP e provedores de e-mail (SendGrid, AWS SES)
-- Controle de limites de uso por conglomerado (máximo de usuários, ativos, armazenamento, chamadas API)
+- Controle de limites de uso por Fornecedor (máximo de usuários, ativos, armazenamento, chamadas API)
 - Histórico completo de alterações com auditoria (usuário, IP, data/hora, motivo)
 - Categorização de parâmetros (Sistema, Segurança, Integração, Notificação, Relatório)
 
@@ -116,7 +116,7 @@ O sistema permite aos administradores gerenciar parâmetros de configuração ce
   - `/admin/configuracoes/parametros` (lista e gerencia parâmetros)
   - `/admin/configuracoes/feature-flags` (controla feature flags)
   - `/admin/configuracoes/email` (configurações de servidor SMTP)
-  - `/admin/configuracoes/limites` (limites de uso por conglomerado)
+  - `/admin/configuracoes/limites` (limites de uso por Fornecedor)
 - **API (Backend .NET) - Endpoints Implementados**:
   - `GET /api/parametros/categorias` (ListarCategorias - lista categorias de parâmetros)
   - `GET /api/parametros` (ListarParametros - lista paginada com filtros por categoria, tipo, ativo)
@@ -129,7 +129,7 @@ O sistema permite aos administradores gerenciar parâmetros de configuração ce
 
 **Why (por que existe):**
 - **Flexibilidade**: Permitir alteração de comportamento sem deploy ou alteração de código
-- **Multi-tenancy**: Configurações específicas por conglomerado (cliente) no modelo SaaS
+- **Multi-tenancy**: Configurações específicas por Fornecedor (cliente) no modelo SaaS
 - **Segurança**: Criptografia de dados sensíveis (senhas, API keys, tokens)
 - **Feature Flags**: Rollout gradual de funcionalidades (% usuários, lista específica, período)
 - **Auditoria**: Rastreamento completo de quem alterou o quê e quando
@@ -178,13 +178,13 @@ O sistema permite aos administradores gerenciar parâmetros de configuração ce
 - **Hangfire**: Jobs para verificar limites de uso e enviar alertas
 
 **Variações por cliente (se houver):**
-- **Multi-tenant**: Cada conglomerado pode ter valores diferentes para mesmos parâmetros
+- **Multi-tenant**: Cada Fornecedor pode ter valores diferentes para mesmos parâmetros
 - Exemplos:
   - Cliente A: Timeout sessão = 30 minutos
   - Cliente B: Timeout sessão = 60 minutos
   - Cliente C: Feature "Export PDF" habilitada
   - Cliente D: Feature "Export PDF" desabilitada
-- **Configurações de E-mail**: Cada conglomerado tem seu próprio servidor SMTP ou provedor
+- **Configurações de E-mail**: Cada Fornecedor tem seu próprio servidor SMTP ou provedor
 - **Limites de Uso**: Definidos por plano contratado (Básico, Pro, Enterprise)
 
 **Evidências adicionais (opcional):**
@@ -205,7 +205,7 @@ O sistema permite aos administradores gerenciar parâmetros de configuração ce
 
 **Mudanças críticas do legado para moderno:**
 1. **Armazenamento**: Web.config hardcoded → Banco de dados centralizado
-2. **Multi-Tenant**: Não suportado → Configuração por conglomerado
+2. **Multi-Tenant**: Não suportado → Configuração por Fornecedor
 3. **Tipos de Dados**: Apenas strings → String, Integer, Decimal, Boolean, Date, JSON
 4. **Validação**: Sem validação → Regex, min/max, opções válidas
 5. **Criptografia**: Senhas em texto plano → AES-256 para dados sensíveis
@@ -217,7 +217,7 @@ O sistema permite aos administradores gerenciar parâmetros de configuração ce
 
 **Funcionalidades novas (não existem no legado):**
 - Feature Flags (ativação gradual de funcionalidades)
-- Limites de Uso por Conglomerado (controle SaaS)
+- Limites de Uso por Fornecedor (controle SaaS)
 - Rollout percentual de features
 - Teste de envio de e-mail via interface
 - Cache distribuído (Redis)
@@ -300,7 +300,7 @@ O sistema centraliza TODAS as configurações infraestruturais e de integração
 - **Separação de Responsabilidades**: Isolar configs infraestruturais (RF-002) de parâmetros operacionais (RF-001)
 - **Zero Downtime**: Alterar configurações sem restart do servidor (cache hot-reload via Redis Pub/Sub)
 - **Segurança**: Criptografar automaticamente senhas, API keys, tokens com Azure Key Vault
-- **Multi-tenancy**: Cada conglomerado tem configurações específicas (SMTP próprio, limites personalizados)
+- **Multi-tenancy**: Cada Fornecedor tem configurações específicas (SMTP próprio, limites personalizados)
 - **Compliance**: Auditoria SOX completa com histórico imutável, diff, IP, motivo, ticket de mudança
 - **Redução de Risco**: Feature flags progressivos reduzem impacto de bugs em produção (canary releases)
 - **Disaster Recovery**: Export/import facilita restauração rápida de configurações
@@ -344,7 +344,7 @@ O sistema centraliza TODAS as configurações infraestruturais e de integração
 - **ERPs (SAP, TOTVS)**: Configuração de URLs e API keys para integração
 
 **Variações por cliente (se houver):**
-- **Configuração Multi-Tenant Hierárquica**: Global → Conglomerado → Empresa → Departamento → Usuário
+- **Configuração Multi-Tenant Hierárquica**: Global → Fornecedor → Empresa → Departamento → Usuário
 - Exemplos:
   - Cliente A: SMTP próprio (smtp.empresaa.com.br)
   - Cliente B: Azure Blob próprio (contaa.blob.core.windows.net)
@@ -384,7 +384,7 @@ O sistema centraliza TODAS as configurações infraestruturais e de integração
 1. **Armazenamento**: web.config estático → Banco de dados centralizado
 2. **Restart**: Requer restart IIS → Zero downtime (cache hot-reload)
 3. **Segurança**: Senhas em texto claro → Criptografia AES-256-GCM com Azure Key Vault
-4. **Multi-Tenant**: Não suportado → Hierarquia Global → Conglomerado → Empresa → Usuário
+4. **Multi-Tenant**: Não suportado → Hierarquia Global → Fornecedor → Empresa → Usuário
 5. **Versionamento**: Sem controle → Histórico imutável com diff visual
 6. **Validação**: Sem validação → Regex, ranges, enums, dry run
 7. **Feature Flags**: Não existe → Rollout progressivo (canary releases)
@@ -561,11 +561,11 @@ O sistema implementa infraestrutura completa de observabilidade para garantir SL
 - **Kubernetes**: Consome endpoints /health para liveness/readiness probes
 
 **Variações por cliente (se houver):**
-- **Nível de Log por Ambiente**: DEV=Debug, HOM=Info, PRD=Warning (configurável por conglomerado)
+- **Nível de Log por Ambiente**: DEV=Debug, HOM=Info, PRD=Warning (configurável por Fornecedor)
 - **Retenção de Logs**: Básico=90 dias, Pro=1 ano, Enterprise=7 anos
 - **Agregador**: Dev/Hom=Seq (auto-hosted), Produção=Elasticsearch (Azure Managed)
 - **Alertas**: Cliente básico=Email, Cliente enterprise=PagerDuty/Opsgenie integrado
-- **Sampling Rate**: Configurável por conglomerado (padrão 10%, pode ser ajustado para 100% temporariamente)
+- **Sampling Rate**: Configurável por Fornecedor (padrão 10%, pode ser ajustado para 100% temporariamente)
 - **Mascaramento**: CPF obrigatório Brasil, SSN obrigatório USA, GDPR compliance Europa
 
 **Evidências adicionais (opcional):**

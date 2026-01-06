@@ -245,7 +245,7 @@ CREATE TABLE [dbo].[Solicitacao_SLA](
 - **Falta de chave estrangeira** para validar `Id_Tipo_Solicitacao` (referência implícita sem FK)
 - **Falta de campo de prioridade**: SLA é único por tipo, não distingue alta/média/baixa prioridade
 - **Sem auditoria**: não registra quem criou, quando criou, quem modificou
-- **Sem multi-tenancy**: não tem `Id_Conglomerado` ou `Id_Fornecedor` (cada cliente tem database separado)
+- **Sem multi-tenancy**: não tem `Id_Fornecedor` ou `Id_Fornecedor` (cada cliente tem database separado)
 - **Prazo apenas em horas**: não permite configurar prazo misto (ex: 2 dias + 4 horas)
 - **Email hard-coded**: apenas 1 email de supervisor, não suporta múltiplos destinatários ou níveis de escalação
 

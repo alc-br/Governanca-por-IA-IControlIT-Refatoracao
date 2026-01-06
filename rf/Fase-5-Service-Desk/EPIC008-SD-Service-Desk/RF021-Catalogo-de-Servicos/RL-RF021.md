@@ -282,7 +282,7 @@ CREATE TABLE [dbo].[Chamado] (
 2. **Campos Sem Validação**: `Categoria`, `Prioridade`, `Status` são texto livre (inconsistência de dados)
 3. **Sem Auditoria**: Não tem campos `Id_Usuario_Criacao`, `Dt_Criacao`, `Id_Usuario_Alteracao`, `Dt_Alteracao`
 4. **Sem Soft Delete**: Registros deletados são removidos fisicamente (perda de histórico)
-5. **Sem Multi-Tenancy**: Não tem campo `Id_Conglomerado` ou `Id_Empresa` (bancos separados por cliente)
+5. **Sem Multi-Tenancy**: Não tem campo `Id_Fornecedor` ou `Id_Empresa` (bancos separados por cliente)
 6. **Sem SLA**: Não tem campo `Data_Vencimento_SLA` ou `SLA_Atendimento_Horas`
 7. **Sem Workflow**: Não tem campos `Id_Aprovador`, `Status_Aprovacao`, `Nivel_Aprovacao`
 8. **Sem Rastreamento de Serviço**: Não diferencia solicitações de serviços de outros chamados

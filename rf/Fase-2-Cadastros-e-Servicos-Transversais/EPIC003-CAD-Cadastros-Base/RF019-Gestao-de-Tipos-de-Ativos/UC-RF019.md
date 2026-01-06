@@ -35,7 +35,7 @@ Os UCs aqui definidos servem como **contrato comportamental**, sendo a **fonte p
 
 ## 3. PADRÕES GERAIS APLICÁVEIS A TODOS OS UCs
 
-- Todos os acessos respeitam **isolamento por tenant** (Id_Conglomerado)
+- Todos os acessos respeitam **isolamento por tenant** (Id_Fornecedor)
 - Todas as ações exigem **permissão explícita** (RBAC policy-based)
 - Erros não devem vazar informações sensíveis
 - Auditoria deve registrar **quem**, **quando** e **qual ação**
@@ -61,7 +61,7 @@ Permitir que o usuário visualize tipos de ativos disponíveis do seu próprio t
 ### Fluxo Principal
 - **FP-UC00-001:** Usuário acessa o menu "Cadastros > Tipos de Ativos"
 - **FP-UC00-002:** Sistema valida permissão `CAD.ATIVOS.TIPOS.READ_ANY`
-- **FP-UC00-003:** Sistema carrega tipos do tenant do usuário autenticado (WHERE Id_Conglomerado = @TenantId AND Fl_Ativo = 1)
+- **FP-UC00-003:** Sistema carrega tipos do tenant do usuário autenticado (WHERE Id_Fornecedor = @TenantId AND Fl_Ativo = 1)
 - **FP-UC00-004:** Sistema aplica paginação padrão (20 registros por página)
 - **FP-UC00-005:** Sistema ordena por Ordem_Exibicao ASC, Nm_Tipo ASC
 - **FP-UC00-006:** Sistema calcula quantidade de ativos vinculados a cada tipo
@@ -126,7 +126,7 @@ Permitir a criação de um novo tipo de ativo com código único, categoria, hie
 - **FP-UC01-002:** Sistema valida permissão `CAD.ATIVOS.TIPOS.CREATE`
 - **FP-UC01-003:** Sistema exibe formulário com campos obrigatórios e opcionais
 - **FP-UC01-004:** Usuário preenche campos:
-  - Código (obrigatório, máx 20 caracteres, único no conglomerado)
+  - Código (obrigatório, máx 20 caracteres, único no Fornecedor)
   - Nome (obrigatório, máx 200 caracteres)
   - Descrição (opcional, máx 1000 caracteres)
   - Categoria Principal (dropdown: Hardware, Software, LinhaMovel, LinhaFixa, Servico, Licenca, Acessorio, Outro)
@@ -140,14 +140,14 @@ Permitir a criação de um novo tipo de ativo com código único, categoria, hie
   - Cor (color picker hex)
 - **FP-UC01-005:** Usuário clica em "Salvar"
 - **FP-UC01-006:** Sistema valida dados:
-  - Código único no conglomerado ✓ (RN-RF019-001)
+  - Código único no Fornecedor ✓ (RN-RF019-001)
   - Categoria válida ✓ (RN-RF019-003)
   - Se categoria = Hardware, obrigatório Taxa e Vida Útil ✓ (RN-RF019-004)
   - Taxa entre 0-100% ✓ (RN-RF019-007)
   - Se tem tipo pai, calcular nível hierárquico ≤ 5 ✓ (RN-RF019-002)
   - Validar que não cria loop na hierarquia ✓ (RN-RF019-013)
 - **FP-UC01-007:** Sistema calcula campos automáticos:
-  - Id_Conglomerado: tenant do usuário autenticado
+  - Id_Fornecedor: tenant do usuário autenticado
   - Nivel_Hierarquia: se tipo pai (nível do pai + 1), senão (1)
   - Caminho_Hierarquia: concatenação de nomes "/Pai/Filho"
   - Fl_Ativo: 1 (ativo por padrão)
@@ -216,8 +216,8 @@ Permitir a criação de um novo tipo de ativo com código único, categoria, hie
   - Retorna ao passo FP-UC01-004
 
 ### Regras de Negócio
-- **RN-UC-01-001:** Código obrigatório, único no conglomerado, máx 20 caracteres
-- **RN-UC-01-002:** Id_Conglomerado preenchido automaticamente com tenant do usuário autenticado
+- **RN-UC-01-001:** Código obrigatório, único no Fornecedor, máx 20 caracteres
+- **RN-UC-01-002:** Id_Fornecedor preenchido automaticamente com tenant do usuário autenticado
 - **RN-UC-01-003:** Campos de auditoria (Dt_Criacao, Id_Usuario_Criacao) preenchidos automaticamente
 - **RN-UC-01-004:** Fl_Ativo = 1 por padrão (tipo ativo)
 - **RN-UC-01-005:** Fl_Sistema = 0 por padrão (não é tipo de sistema)
@@ -225,7 +225,7 @@ Permitir a criação de um novo tipo de ativo com código único, categoria, hie
 
 ### Critérios de Aceite
 - **CA-UC01-001:** Todos os campos obrigatórios DEVEM ser validados antes de persistir
-- **CA-UC01-002:** Id_Conglomerado DEVE ser preenchido automaticamente com o tenant do usuário autenticado
+- **CA-UC01-002:** Id_Fornecedor DEVE ser preenchido automaticamente com o tenant do usuário autenticado
 - **CA-UC01-003:** Dt_Criacao e Id_Usuario_Criacao DEVEM ser preenchidos automaticamente
 - **CA-UC01-004:** Sistema DEVE retornar erro HTTP 400 se código duplicado (RN-RF019-001)
 - **CA-UC01-005:** Sistema DEVE retornar erro HTTP 400 se Hardware sem depreciação (RN-RF019-004)
@@ -290,7 +290,7 @@ Permitir visualização detalhada de um tipo de ativo específico, incluindo hie
   - Sistema loga tentativa de acesso cross-tenant para auditoria de segurança
 
 ### Regras de Negócio
-- **RN-UC-02-001:** Isolamento por tenant (WHERE Id_Conglomerado = @TenantId)
+- **RN-UC-02-001:** Isolamento por tenant (WHERE Id_Fornecedor = @TenantId)
 - **RN-UC-02-002:** Informações de auditoria DEVEM ser exibidas
 - **RN-UC-02-003:** Quantidade de ativos calculada em tempo real via COUNT
 
@@ -383,7 +383,7 @@ Permitir alteração controlada de um tipo de ativo existente, preservando integ
 
 ### Regras de Negócio
 - **RN-UC-03-001:** Dt_Ult_Atualizacao e Id_Usuario_Atualizacao preenchidos automaticamente
-- **RN-UC-03-002:** Campos imutáveis: Cd_Tipo, Categoria_Principal, Id_Conglomerado
+- **RN-UC-03-002:** Campos imutáveis: Cd_Tipo, Categoria_Principal, Id_Fornecedor
 - **RN-UC-03-003:** Tipos de sistema (Fl_Sistema = 1) NÃO são editáveis (RN-RF019-008)
 - **RN-UC-03-004:** Se tipo pai mudou, recalcular hierarquia de descendentes (RN-RF019-009)
 - **RN-UC-03-005:** Auditoria DEVE registrar estado anterior e novo estado (Dados_Antes/Dados_Depois)

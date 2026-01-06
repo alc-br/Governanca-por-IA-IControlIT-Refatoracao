@@ -616,7 +616,7 @@ CREATE TABLE EnderecoEntrega (
 - Múltiplos endereços padrão possíveis (violação de business rule)
 
 **Regra Modernizada (RF043):**
-- Apenas 1 endereço padrão por ClienteId (conglomerado/fornecedor)
+- Apenas 1 endereço padrão por ClienteId (Fornecedor/fornecedor)
 - Ao marcar novo padrão, desmarcar anterior automaticamente (transação ACID)
 - Validação FluentValidation: se FlEnderecoPadrao=1 e FlExcluido=1, retornar erro 400 "Endereço padrão não pode ser excluído. Defina outro como padrão primeiro"
 

@@ -19,7 +19,7 @@
 - **Arquitetura**: Monolítica WebForms + VB.NET
 - **Linguagem / Stack**: VB.NET, ASP.NET Web Forms, SQL Server
 - **Banco de Dados**: SQL Server 2016+ (database `IControlIT`)
-- **Multi-tenant**: Sim (campo `Id_Conglomerado` em todas as tabelas)
+- **Multi-tenant**: Sim (campo `Id_Fornecedor` em todas as tabelas)
 - **Auditoria**: Parcial (campos `Dt_Atualizacao` e `Id_Usuario_Atualizacao`, sem histórico imutável)
 - **Configurações**: Web.config para connection strings e APIs externas
 - **Validação de CEP**: Manual, sem integração com APIs externas
@@ -85,7 +85,7 @@
 | txtNomeLocal | TextBox | Sim | Nome do local |
 | ddlTipo | DropDownList | Sim | Valores: Edificio, Andar, Sala |
 | ddlLocalPai | DropDownList | Não | Permite selecionar qualquer local (sem validação de hierarquia) |
-| ddlEndereco | DropDownList | Sim | Lista todos os endereços do conglomerado |
+| ddlEndereco | DropDownList | Sim | Lista todos os endereços do Fornecedor |
 | txtDescricao | TextBox | Não | Texto livre |
 
 #### Comportamentos Implícitos
@@ -160,7 +160,7 @@
 |------|-------|------------------|-------------|
 | `CadastrarEndereco` | `WSLocal.asmx.vb` | Criar novo endereço | Validação manual de CEP, sem ViaCEP |
 | `AtualizarEndereco` | `WSLocal.asmx.vb` | Atualizar endereço | Permite alterar endereço principal sem desmarcar anterior |
-| `ListarEnderecos` | `WSLocal.asmx.vb` | Listar todos endereços do conglomerado | Query sem paginação, retorna até 10.000 registros |
+| `ListarEnderecos` | `WSLocal.asmx.vb` | Listar todos endereços do Fornecedor | Query sem paginação, retorna até 10.000 registros |
 | `BuscarEnderecoPorCEP` | `WSLocal.asmx.vb` | Buscar endereço por CEP | Consulta tabela local de CEPs (desatualizada) |
 | `CadastrarLocal` | `WSLocal.asmx.vb` | Criar local/andar/sala | Sem validação de hierarquia |
 | `ListarLocalHierarquia` | `WSLocal.asmx.vb` | Obter árvore de locais | Query recursiva manual (lenta) |
@@ -184,7 +184,7 @@
 ```sql
 CREATE TABLE [dbo].[Endereco](
     [Id_Endereco] [int] IDENTITY(1,1) NOT NULL,
-    [Id_Conglomerado] [int] NOT NULL,
+    [Id_Fornecedor] [int] NOT NULL,
     [Nm_Tipo] [varchar](50) NOT NULL,  -- 'Empresa', 'Filial', 'Fornecedor', 'Consumidor'
     [Id_Referencia] [int] NOT NULL,     -- FK genérica (problema: sem FK real)
     [Nm_Logradouro] [varchar](255) NOT NULL,
@@ -208,15 +208,15 @@ CREATE TABLE [dbo].[Endereco](
 **Problemas**:
 - Campo `Nm_Tipo` + `Id_Referencia` cria FK "polimórfica" (anti-pattern)
 - Falta constraint CHECK para validar `Sg_Estado` em lista de UFs
-- Falta constraint UNIQUE para garantir 1 principal por conglomerado
-- Falta índice em `(Id_Conglomerado, Fl_Excluido, Fl_Principal)`
+- Falta constraint UNIQUE para garantir 1 principal por Fornecedor
+- Falta índice em `(Id_Fornecedor, Fl_Excluido, Fl_Principal)`
 
 ### DDL Legado (Local)
 
 ```sql
 CREATE TABLE [dbo].[Local](
     [Id_Local] [int] IDENTITY(1,1) NOT NULL,
-    [Id_Conglomerado] [int] NOT NULL,
+    [Id_Fornecedor] [int] NOT NULL,
     [Id_Endereco] [int] NOT NULL,
     [Nm_Local] [varchar](200) NOT NULL,
     [Nm_Tipo] [varchar](50) NOT NULL,  -- 'Edificio', 'Andar', 'Sala', 'Rack', 'Posicao'
@@ -246,7 +246,7 @@ CREATE TABLE [dbo].[Local](
 ```sql
 CREATE TABLE [dbo].[Rack](
     [Id_Rack] [int] IDENTITY(1,1) NOT NULL,
-    [Id_Conglomerado] [int] NOT NULL,
+    [Id_Fornecedor] [int] NOT NULL,
     [Id_Local] [int] NOT NULL,
     [Nm_Rack] [varchar](100) NOT NULL,
     [Nr_Altura_Us] [int] NOT NULL,           -- 1-48
@@ -318,7 +318,7 @@ CREATE TABLE [dbo].[Local_Historico_Movimentacao](
 
 | Procedure | Descrição | Migração Moderna |
 |--|--|--|
-| `pa_Endereco_ListarPorConglomerado` | Lista endereços do conglomerado | SUBSTITUÍDO: LINQ query `context.Enderecos.Where(e => e.Id_Conglomerado == id && !e.Fl_Excluido)` |
+| `pa_Endereco_ListarPorFornecedor` | Lista endereços do Fornecedor | SUBSTITUÍDO: LINQ query `context.Enderecos.Where(e => e.Id_Fornecedor == id && !e.Fl_Excluido)` |
 | `pa_Endereco_BuscarPorCEP` | Busca endereço por CEP em tabela local | SUBSTITUÍDO: Integração com ViaCEP API |
 | `pa_Local_ObterHierarquia` | Obtém árvore de locais via recursão manual | SUBSTITUÍDO: CTE recursiva ou query LINQ com `Include` |
 | `pa_Rack_ObterOcupacao` | Calcula Us ocupadas em rack | SUBSTITUÍDO: LINQ aggregate query `rackPosicoes.Count(p => p.Fl_Ocupada)` |
@@ -459,7 +459,7 @@ Lista de regras que não estavam documentadas formalmente:
 | **Histórico Movimentações** | Editável (UPDATE/DELETE) | Imutável (append-only) | Gap: Auditoria aprimorada |
 | **Circuit Breaker** | Inexistente | Implementado (timeout 5s) | Gap: Feature completamente nova |
 | **Soft Delete** | Hard delete (DELETE direto) | Soft delete (Fl_Excluido) | Gap: Preservação de dados |
-| **Multi-tenant** | Sim (Id_Conglomerado) | Sim (mantido) | Assumido do legado |
+| **Multi-tenant** | Sim (Id_Fornecedor) | Sim (mantido) | Assumido do legado |
 | **Auditoria** | Parcial (Dt_Atualizacao) | Completa (quem, quando, o quê) | Gap: Auditoria aprimorada |
 | **Performance** | Queries N+1, sem índices | Queries otimizadas, índices compostos | Gap: Otimização nova |
 | **Interface** | WebForms (postback) | Angular SPA (interativa) | Gap: Tecnologia completamente nova |
@@ -533,7 +533,7 @@ Lista de regras que não estavam documentadas formalmente:
 | Tela `Local.aspx` | UC02 (Visualizar Detalhes de Local) |
 | Tela `Rack.aspx` | UC01 (Criar Rack) |
 | Tela `MapaLocais.aspx` | Feature opcional (fora do escopo v2.0) |
-| SP `pa_Endereco_ListarPorConglomerado` | UC00 (Listar Endereços) |
+| SP `pa_Endereco_ListarPorFornecedor` | UC00 (Listar Endereços) |
 | SP `pa_Local_ObterHierarquia` | UC02 (Visualizar Hierarquia) |
 | SP `pa_Movimentacao_Registrar` | Funcionalidade de movimentações |
 | WebService `WSLocal.asmx` | Endpoints RESTful `/api/locais/*` |

@@ -17,7 +17,7 @@
 - **Arquitetura:** Monolítica WebForms com lógica distribuída entre ASPX, Code-Behind VB.NET e Stored Procedures SQL
 - **Linguagem / Stack:** ASP.NET Web Forms + VB.NET + SQL Server 2019+
 - **Banco de Dados:** SQL Server com banco dedicado "Auditoria" (multi-database legacy)
-- **Multi-tenant:** Parcial - Campo `Id_Conglomerado` sem Row-Level Security automática
+- **Multi-tenant:** Parcial - Campo `Id_Fornecedor` sem Row-Level Security automática
 - **Auditoria:** Parcial - Log básico de alterações sem Event Sourcing
 - **Configurações:** Web.config + Tabelas de configuração
 
@@ -35,7 +35,7 @@
 
 6. **Relatórios Estáticos em Crystal Reports:** Geração síncrona bloqueando interface, sem suporte a exportação assíncrona ou streaming
 
-7. **Multi-tenancy Frágil:** Filtro manual `Id_Conglomerado` em cada query, sujeito a vazamento de dados por esquecimento ou erro humano
+7. **Multi-tenancy Frágil:** Filtro manual `Id_Fornecedor` em cada query, sujeito a vazamento de dados por esquecimento ou erro humano
 
 8. **Navegação Desconectada:** Drill-down entre telas abre múltiplas janelas ASPX sem preservação de contexto, exigindo re-digitação de filtros
 
@@ -66,7 +66,7 @@
 #### Comportamentos Implícitos
 
 - **Validação de Período:** Code-behind VB.NET valida que `DataFim >= DataInicio` mas APENAS no client-side (JavaScript), sem validação server-side
-- **Filtro Automático por Conglomerado:** Linha oculta no code-behind aplica `WHERE Id_Conglomerado = Session("IdConglomerado")` - potencial risco de vazamento se Session expirar
+- **Filtro Automático por Fornecedor:** Linha oculta no code-behind aplica `WHERE Id_Fornecedor = Session("IdFornecedor")` - potencial risco de vazamento se Session expirar
 - **Paginação Ineficiente:** GridView carrega TODOS os registros do banco e faz paginação em memória (performance ruim > 10k registros)
 - **Totalizadores no Rodapé:** Calculados em loop no code-behind VB.NET após binding do GridView (re-processamento desnecessário)
 - **Exportação Excel Síncrona:** Botão "Exportar" gera arquivo Excel bloqueando thread principal, causando timeout > 30s em bases grandes
@@ -157,10 +157,10 @@
 
 | Método | Parâmetros | Retorno | Responsabilidade |
 |--------|-----------|---------|------------------|
-| `GetResumosPeriodo` | `IdConglomerado As Integer, DataInicio As Date, DataFim As Date` | `DataSet` com resumos | Retorna resumos filtrados por período |
+| `GetResumosPeriodo` | `IdFornecedor As Integer, DataInicio As Date, DataFim As Date` | `DataSet` com resumos | Retorna resumos filtrados por período |
 | `GetResumoDetalhes` | `IdResumo As Integer` | `DataRow` com detalhe | Retorna detalhes de um resumo específico |
-| `CalcularIndicadores` | `IdConglomerado As Integer, Periodo As String` | `DataSet` com KPIs | Calcula indicadores (ROI, % glosa, ticket médio) |
-| `GetAlertas` | `IdConglomerado As Integer, Severidade As String` | `DataSet` com alertas | Lista alertas por severidade |
+| `CalcularIndicadores` | `IdFornecedor As Integer, Periodo As String` | `DataSet` com KPIs | Calcula indicadores (ROI, % glosa, ticket médio) |
+| `GetAlertas` | `IdFornecedor As Integer, Severidade As String` | `DataSet` com alertas | Lista alertas por severidade |
 | `ExportarPDF` | `IdResumo As Integer` | `Byte()` (PDF binário) | Gera PDF usando Crystal Reports |
 | `ExportarExcel` | `IdResumo As Integer` | `Byte()` (XLSX binário) | Gera Excel usando VBA instável |
 
@@ -184,7 +184,7 @@
 
 **Parâmetros:**
 - `@DataConsolidacao DATE` - Data dos itens a consolidar
-- `@IdConglomerado INT` - Filtro por conglomerado
+- `@IdFornecedor INT` - Filtro por Fornecedor
 
 **Lógica Principal (em linguagem natural):**
 
@@ -209,7 +209,7 @@
 **Caminho:** `Database.[dbo].[pa_CalcularIndicadores]`
 
 **Parâmetros:**
-- `@IdConglomerado INT`
+- `@IdFornecedor INT`
 - `@Periodo VARCHAR(7)` - Formato: "YYYY-MM"
 
 **Lógica Principal:**
@@ -316,7 +316,7 @@
 2. **Campo redundante:** `Nm_Operadora` duplicado (deveria referenciar tabela `Operadora`)
 3. **Sem auditoria de campos:** Sem Created/Modified/By (não rastreia quem/quando alterou)
 4. **Tipo numeric(13,2):** Precisão fixa pode causar overflow em valores > R$ 99.999.999.999,99
-5. **Sem índices de consulta:** Apenas Clustered PK, sem NonClustered em `Id_Conglomerado`, `Dt_Resumo`, `Id_Operadora`
+5. **Sem índices de consulta:** Apenas Clustered PK, sem NonClustered em `Id_Fornecedor`, `Dt_Resumo`, `Id_Operadora`
 6. **Sem particionamento:** Tabela única sem partition por período (performance ruim > 10M registros)
 7. **Campo `Vl_Ticket_Medio` computado:** Calculado mas armazenado (redundância - deveria ser computed column)
 
@@ -363,7 +363,7 @@ DECLARE @InvestimentoAuditoria NUMERIC(13,2) = 50000.00
 SET @ROI = (SUM(Vl_Total_Economia) / @InvestimentoAuditoria) * 100
 ```
 
-Regra natural: "O investimento em auditoria deve ser configurável por conglomerado e período, não fixo em código."
+Regra natural: "O investimento em auditoria deve ser configurável por Fornecedor e período, não fixo em código."
 
 **DESTINO:** ASSUMIDO - Regra documentada em RN-RF035-004 com configuração dinâmica em tabela `ConfiguracaoAuditoria`
 
@@ -405,10 +405,10 @@ Regra natural: "Cada operadora pode ter limite de glosa diferente. Ultrapassar o
 -- Legado
 DELETE FROM Auditoria_Resumo
 WHERE Dt_Resumo = @DataConsolidacao
-  AND Id_Conglomerado = @IdConglomerado
+  AND Id_Fornecedor = @IdFornecedor
 ```
 
-Regra natural: "Apenas uma consolidação por (período, conglomerado, operadora, lote) deve existir. Reprocessamento deve substituir consolidação anterior."
+Regra natural: "Apenas uma consolidação por (período, Fornecedor, operadora, lote) deve existir. Reprocessamento deve substituir consolidação anterior."
 
 **DESTINO:** SUBSTITUÍDO - Lógica implementada com `UPSERT` (UPDATE se existe, INSERT se não) em vez de DELETE/INSERT
 
@@ -461,7 +461,7 @@ Regra natural: "Data final deve ser maior ou igual à data inicial."
 | **Alertas** | Tabela + verificação manual | Domain Events + SignalR | Moderno: notificação real-time, severidade estruturada |
 | **Exportação PDF** | Crystal Reports + COM | iText 8+ server-side | Moderno: sem licença paga, streaming, i18n |
 | **Exportação Excel** | VBA instável | EPPlus 6+ | Moderno: múltiplas abas, gráficos incorporados |
-| **Multi-tenancy** | Filtro manual `Id_Conglomerado` | Row-Level Security automático | Moderno: RLS SQL Server + CONTEXT_INFO |
+| **Multi-tenancy** | Filtro manual `Id_Fornecedor` | Row-Level Security automático | Moderno: RLS SQL Server + CONTEXT_INFO |
 | **Auditoria** | Log básico sem campos | Event Sourcing completo | Moderno: quem/quando/o quê/por quê |
 | **Performance** | Índices básicos | Índices estratégicos + particionamento | Moderno: otimizado para > 10M registros |
 

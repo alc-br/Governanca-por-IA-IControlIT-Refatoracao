@@ -35,7 +35,7 @@ Os UCs aqui definidos servem como **contrato comportamental**, sendo a **fonte p
 
 ## 3. PADRÕES GERAIS APLICÁVEIS A TODOS OS UCs
 
-- Todos os acessos respeitam **isolamento por tenant (conglomerado)**
+- Todos os acessos respeitam **isolamento por tenant (Fornecedor)**
 - Todas as ações exigem **permissão explícita**
 - Erros não devem vazar informações sensíveis
 - Auditoria deve registrar **quem**, **quando** e **qual ação**
@@ -50,7 +50,7 @@ Os UCs aqui definidos servem como **contrato comportamental**, sendo a **fonte p
 ## UC00 — Listar Hierarquia Corporativa
 
 ### Objetivo
-Permitir que o usuário visualize todos os níveis hierárquicos (Centro de Custo, Departamento, Setor, Seção) disponíveis do seu próprio conglomerado.
+Permitir que o usuário visualize todos os níveis hierárquicos (Centro de Custo, Departamento, Setor, Seção) disponíveis do seu próprio Fornecedor.
 
 ### Pré-condições
 - Usuário autenticado
@@ -63,7 +63,7 @@ Permitir que o usuário visualize todos os níveis hierárquicos (Centro de Cust
 ### Fluxo Principal
 - **FP-UC00-001:** Usuário acessa a funcionalidade de hierarquia corporativa
 - **FP-UC00-002:** Sistema valida permissão `hierarquia.view_any`
-- **FP-UC00-003:** Sistema carrega registros do conglomerado do usuário autenticado
+- **FP-UC00-003:** Sistema carrega registros do Fornecedor do usuário autenticado
 - **FP-UC00-004:** Sistema aplica paginação (padrão: 20 registros) e ordenação (padrão: por código)
 - **FP-UC00-005:** Sistema exibe a lista com colunas: Código, Nome, Tipo (CC/Depto/Setor/Seção), Nível Pai, Gestor, Budget Mensal, Status
 
@@ -90,7 +90,7 @@ Permitir que o usuário visualize todos os níveis hierárquicos (Centro de Cust
   - Sistema retorna HTTP 403 (Forbidden)
   - Sistema exibe mensagem: "Acesso negado. Você não possui permissão para visualizar a hierarquia corporativa."
 - **FE-UC00-002:** Nenhum registro encontrado
-  - Não existem níveis hierárquicos cadastrados no conglomerado
+  - Não existem níveis hierárquicos cadastrados no Fornecedor
   - Sistema exibe estado vazio com mensagem: "Nenhum nível hierárquico cadastrado"
   - Sistema exibe botão "Criar Primeiro Nível" (se usuário tiver permissão `hierarquia.create`)
 - **FE-UC00-003:** Erro de conexão
@@ -99,13 +99,13 @@ Permitir que o usuário visualize todos os níveis hierárquicos (Centro de Cust
   - Sistema disponibiliza botão "Tentar novamente"
 
 ### Regras de Negócio
-- **RN-UC-00-001:** Somente registros do conglomerado do usuário autenticado devem ser exibidos (RN-RF017-09)
+- **RN-UC-00-001:** Somente registros do Fornecedor do usuário autenticado devem ser exibidos (RN-RF017-09)
 - **RN-UC-00-002:** Registros com soft delete (deleted_at não nulo) NÃO devem aparecer por padrão
 - **RN-UC-00-003:** Paginação padrão: 20 registros por página
 - **RN-UC-00-004:** Ordenação padrão: por código (ascendente)
 
 ### Critérios de Aceite
-- **CA-UC00-001:** A lista DEVE exibir apenas registros do conglomerado do usuário autenticado
+- **CA-UC00-001:** A lista DEVE exibir apenas registros do Fornecedor do usuário autenticado
 - **CA-UC00-002:** Registros excluídos (soft delete) NÃO devem aparecer na listagem padrão
 - **CA-UC00-003:** Paginação DEVE ser aplicada com limite padrão de 20 registros
 - **CA-UC00-004:** Sistema DEVE permitir ordenação por qualquer coluna visível
@@ -143,7 +143,7 @@ Permitir a criação de um novo nível hierárquico (Centro de Custo, Departamen
 - **FP-UC01-005:** Usuário clica em "Salvar"
 - **FP-UC01-006:** Sistema valida dados (RN-RF017-01 a RN-RF017-07)
 - **FP-UC01-007:** Sistema cria registro com campos automáticos:
-  - `conglomerado_id` = ID do conglomerado do usuário autenticado
+  - `Fornecedor_id` = ID do Fornecedor do usuário autenticado
   - `created_by` = ID do usuário autenticado
   - `created_at` = timestamp atual
   - `status` = "active"
@@ -164,9 +164,9 @@ Permitir a criação de um novo nível hierárquico (Centro de Custo, Departamen
 
 ### Fluxos de Exceção
 - **FE-UC01-001:** Código duplicado
-  - Sistema detecta código já existente no conglomerado (RN-RF017-01)
+  - Sistema detecta código já existente no Fornecedor (RN-RF017-01)
   - Sistema retorna HTTP 400 (Bad Request)
-  - Sistema exibe mensagem: "Código {codigo} já existe para este conglomerado"
+  - Sistema exibe mensagem: "Código {codigo} já existe para este Fornecedor"
 - **FE-UC01-002:** Código inválido (não UPPER_SNAKE_CASE)
   - Sistema detecta código fora do padrão (RN-RF017-07)
   - Sistema retorna HTTP 400
@@ -193,18 +193,18 @@ Permitir a criação de um novo nível hierárquico (Centro de Custo, Departamen
   - Sistema exibe mensagem: "Filial {id} não existe ou está inativa"
 
 ### Regras de Negócio
-- **RN-UC-01-001:** Código DEVE ser único por conglomerado (case-insensitive) (RN-RF017-01)
+- **RN-UC-01-001:** Código DEVE ser único por Fornecedor (case-insensitive) (RN-RF017-01)
 - **RN-UC-01-002:** Código DEVE seguir padrão UPPER_SNAKE_CASE (RN-RF017-07)
 - **RN-UC-01-003:** Nome é obrigatório e DEVE ter até 120 caracteres (RN-RF017-11)
 - **RN-UC-01-004:** Hierarquia DEVE ser respeitada: Filial → CC → Depto → Setor → Seção (RN-RF017-02)
-- **RN-UC-01-005:** `conglomerado_id` preenchido automaticamente (RN-RF017-09)
+- **RN-UC-01-005:** `Fornecedor_id` preenchido automaticamente (RN-RF017-09)
 - **RN-UC-01-006:** `created_by` e `created_at` preenchidos automaticamente
 - **RN-UC-01-007:** Budget mensal, se informado, DEVE ser > 0 (RN-RF017-05)
 - **RN-UC-01-008:** Gestor, se informado, DEVE ser consumidor ativo (RN-RF017-04)
 
 ### Critérios de Aceite
 - **CA-UC01-001:** Todos os campos obrigatórios DEVEM ser validados antes de persistir
-- **CA-UC01-002:** `conglomerado_id` DEVE ser preenchido automaticamente com o conglomerado do usuário autenticado
+- **CA-UC01-002:** `Fornecedor_id` DEVE ser preenchido automaticamente com o Fornecedor do usuário autenticado
 - **CA-UC01-003:** `created_by` DEVE ser preenchido automaticamente com o ID do usuário autenticado
 - **CA-UC01-004:** `created_at` DEVE ser preenchido automaticamente com timestamp atual
 - **CA-UC01-005:** Sistema DEVE retornar erro claro se validação falhar (HTTP 400 + mensagem)
@@ -222,7 +222,7 @@ Permitir visualização detalhada de um nível hierárquico específico (Centro 
 ### Pré-condições
 - Usuário autenticado
 - Permissão `hierarquia.view`
-- Registro existe e pertence ao conglomerado do usuário
+- Registro existe e pertence ao Fornecedor do usuário
 
 ### Pós-condições
 - Dados exibidos corretamente
@@ -231,7 +231,7 @@ Permitir visualização detalhada de um nível hierárquico específico (Centro 
 ### Fluxo Principal
 - **FP-UC02-001:** Usuário seleciona registro na listagem ou acessa via URL direta
 - **FP-UC02-002:** Sistema valida permissão `hierarquia.view`
-- **FP-UC02-003:** Sistema valida que registro pertence ao conglomerado do usuário (RN-RF017-09)
+- **FP-UC02-003:** Sistema valida que registro pertence ao Fornecedor do usuário (RN-RF017-09)
 - **FP-UC02-004:** Sistema carrega dados completos do registro
 - **FP-UC02-005:** Sistema exibe tela de visualização com:
   - Dados principais (Código, Nome, Tipo, Status)
@@ -258,8 +258,8 @@ Permitir visualização detalhada de um nível hierárquico específico (Centro 
   - ID informado não existe
   - Sistema retorna HTTP 404 (Not Found)
   - Sistema exibe mensagem: "Registro não encontrado"
-- **FE-UC02-002:** Registro de outro conglomerado
-  - Registro existe mas pertence a outro conglomerado
+- **FE-UC02-002:** Registro de outro Fornecedor
+  - Registro existe mas pertence a outro Fornecedor
   - Sistema retorna HTTP 404 (por segurança, não revelar existência)
   - Sistema exibe mensagem: "Registro não encontrado"
 - **FE-UC02-003:** Usuário sem permissão
@@ -268,14 +268,14 @@ Permitir visualização detalhada de um nível hierárquico específico (Centro 
   - Sistema exibe mensagem: "Acesso negado"
 
 ### Regras de Negócio
-- **RN-UC-02-001:** Usuário SÓ pode visualizar registros do próprio conglomerado (RN-RF017-09)
+- **RN-UC-02-001:** Usuário SÓ pode visualizar registros do próprio Fornecedor (RN-RF017-09)
 - **RN-UC-02-002:** Informações de auditoria DEVEM ser exibidas (created_by, created_at, updated_by, updated_at)
 - **RN-UC-02-003:** Se registro tiver níveis filhos, exibir lista resumida
 
 ### Critérios de Aceite
-- **CA-UC02-001:** Usuário SÓ pode visualizar registros do próprio conglomerado
+- **CA-UC02-001:** Usuário SÓ pode visualizar registros do próprio Fornecedor
 - **CA-UC02-002:** Informações de auditoria DEVEM ser exibidas (created_by, created_at, updated_by, updated_at)
-- **CA-UC02-003:** Tentativa de acessar registro de outro conglomerado DEVE retornar HTTP 404
+- **CA-UC02-003:** Tentativa de acessar registro de outro Fornecedor DEVE retornar HTTP 404
 - **CA-UC02-004:** Tentativa de acessar registro inexistente DEVE retornar HTTP 404
 - **CA-UC02-005:** Dados exibidos DEVEM corresponder exatamente ao estado atual no banco
 - **CA-UC02-006:** Se budget configurado, exibir percentual de consumo atual
@@ -290,7 +290,7 @@ Permitir alteração controlada de um nível hierárquico existente, respeitando
 ### Pré-condições
 - Usuário autenticado
 - Permissão `hierarquia.update`
-- Registro existe, está ativo e pertence ao conglomerado do usuário
+- Registro existe, está ativo e pertence ao Fornecedor do usuário
 
 ### Pós-condições
 - Registro atualizado no banco de dados
@@ -300,7 +300,7 @@ Permitir alteração controlada de um nível hierárquico existente, respeitando
 ### Fluxo Principal
 - **FP-UC03-001:** Usuário solicita edição de nível hierárquico
 - **FP-UC03-002:** Sistema valida permissão `hierarquia.update`
-- **FP-UC03-003:** Sistema valida que registro pertence ao conglomerado do usuário
+- **FP-UC03-003:** Sistema valida que registro pertence ao Fornecedor do usuário
 - **FP-UC03-004:** Sistema carrega dados atuais do registro
 - **FP-UC03-005:** Sistema exibe formulário preenchido com dados atuais
 - **FP-UC03-006:** Usuário altera campos permitidos:
@@ -326,9 +326,9 @@ Permitir alteração controlada de um nível hierárquico existente, respeitando
 
 ### Fluxos de Exceção
 - **FE-UC03-001:** Código duplicado
-  - Código alterado já existe para outro registro no conglomerado
+  - Código alterado já existe para outro registro no Fornecedor
   - Sistema retorna HTTP 400
-  - Sistema exibe mensagem: "Código {codigo} já existe para este conglomerado"
+  - Sistema exibe mensagem: "Código {codigo} já existe para este Fornecedor"
 - **FE-UC03-002:** Tentativa de alterar código com histórico financeiro
   - Registro possui movimentações financeiras (RN-RF017-08)
   - Sistema retorna HTTP 400
@@ -365,7 +365,7 @@ Permitir alteração controlada de um nível hierárquico existente, respeitando
 - **CA-UC03-002:** `updated_at` DEVE ser preenchido automaticamente com timestamp atual
 - **CA-UC03-003:** Apenas campos alterados DEVEM ser validados
 - **CA-UC03-004:** Sistema DEVE detectar conflitos de edição concorrente (retornar HTTP 409)
-- **CA-UC03-005:** Tentativa de editar registro de outro conglomerado DEVE retornar HTTP 404
+- **CA-UC03-005:** Tentativa de editar registro de outro Fornecedor DEVE retornar HTTP 404
 - **CA-UC03-006:** Auditoria DEVE registrar estado anterior e novo estado (RN-RF017-10)
 - **CA-UC03-007:** Tentativa de alterar código com histórico financeiro DEVE retornar HTTP 400
 - **CA-UC03-008:** Campo Código DEVE aparecer readonly se houver histórico financeiro
@@ -380,7 +380,7 @@ Permitir inativação lógica (soft delete) de níveis hierárquicos, com opçã
 ### Pré-condições
 - Usuário autenticado
 - Permissão `hierarquia.delete`
-- Registro existe, está ativo e pertence ao conglomerado do usuário
+- Registro existe, está ativo e pertence ao Fornecedor do usuário
 - Se não usar cascata: nível NÃO pode ter filhos ativos (RN-RF017-03)
 
 ### Pós-condições
@@ -392,7 +392,7 @@ Permitir inativação lógica (soft delete) de níveis hierárquicos, com opçã
 ### Fluxo Principal
 - **FP-UC04-001:** Usuário solicita inativação de nível hierárquico
 - **FP-UC04-002:** Sistema valida permissão `hierarquia.delete`
-- **FP-UC04-003:** Sistema valida que registro pertence ao conglomerado do usuário
+- **FP-UC04-003:** Sistema valida que registro pertence ao Fornecedor do usuário
 - **FP-UC04-004:** Sistema verifica se existem níveis filhos ativos
 - **FP-UC04-005:** Se existem filhos ativos, sistema exibe confirmação:
   - "Este nível possui {quantidade} {tipo_filho}(s) ativo(s). Deseja inativar em cascata?"
@@ -433,8 +433,8 @@ Permitir inativação lógica (soft delete) de níveis hierárquicos, com opçã
   - Registro já possui `deleted_at` preenchido
   - Sistema retorna HTTP 400
   - Sistema exibe mensagem: "Registro já está inativo"
-- **FE-UC04-003:** Registro não pertence ao conglomerado
-  - Registro pertence a outro conglomerado
+- **FE-UC04-003:** Registro não pertence ao Fornecedor
+  - Registro pertence a outro Fornecedor
   - Sistema retorna HTTP 404
   - Sistema exibe mensagem: "Registro não encontrado"
 - **FE-UC04-004:** Usuário sem permissão

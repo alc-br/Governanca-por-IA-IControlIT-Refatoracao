@@ -112,7 +112,7 @@ CREATE TABLE [dbo].[ContasPagar](
 - ❌ Sem campo de "Recorrência" ou "Tipo" (fixo vs variável)
 - ❌ Sem campo de "Valor Orçado" vs "Valor Realizado"
 - ❌ Sem campo de "Mês de Referência" para provisionamento
-- ❌ Sem multi-tenancy (campo `Id_Conglomerado`)
+- ❌ Sem multi-tenancy (campo `Id_Fornecedor`)
 - ❌ Sem auditoria (campos `Dt_Criacao`, `Id_Usuario_Criacao`, etc)
 - ❌ Sem exclusão lógica (`Fl_Excluido`)
 - ❌ Sem flag de "Provisionamento Automático"
@@ -239,7 +239,7 @@ Baseado em análise de padrões do sistema legado:
 | Aprovação Gerencial | ❌ Não | ✅ Sim | Para variações >30% |
 | Alertas de Vencimento | ❌ Não | ✅ Sim | 7, 3, 1 dia antes |
 | Auditoria Completa | ❌ Não | ✅ Sim | Campos de auditoria obrigatórios |
-| Multi-Tenancy | ❌ Não | ✅ Sim | ConglomeradoId obrigatório |
+| Multi-Tenancy | ❌ Não | ✅ Sim | FornecedorId obrigatório |
 | Exclusão Lógica | ❌ Não | ✅ Sim | FlExcluido = true |
 | Histórico de Alterações | ❌ Não | ✅ Sim | Tabela de histórico + auditoria |
 | RBAC Granular | ❌ Não | ✅ Sim | 7 permissões específicas |

@@ -201,7 +201,7 @@ Permitir ao usuário **localizar, filtrar e acessar parâmetros do sistema** do 
 ### 4.6 Contratos de Comportamento
 
 #### Isolamento Multi-Tenant
-- Apenas parâmetros do tenant atual (Id_Conglomerado) são exibidos
+- Apenas parâmetros do tenant atual (Id_Fornecedor) são exibidos
 - Registros soft-deleted (Fl_Excluido = 1) não aparecem
 
 #### Proteção de Parâmetros de Sistema
@@ -310,7 +310,7 @@ Permitir **criação segura e validada** de novo parâmetro do sistema com valid
 - Campos inválidos destacados em vermelho
 - Mensagens de erro específicas abaixo de cada campo:
   - "Campo obrigatório"
-  - "Código já existe neste conglomerado"
+  - "Código já existe neste Fornecedor"
   - "Valor inválido para tipo Integer"
   - "JSON inválido"
 - Alert geral no topo: "Corrija os erros abaixo antes de salvar"
@@ -440,7 +440,7 @@ Permitir **consulta completa e segura** de parâmetro do sistema, incluindo meta
 ### 6.6 Contratos de Comportamento
 
 #### Isolamento Multi-Tenant
-- Usuário só visualiza parâmetros do próprio tenant (Id_Conglomerado)
+- Usuário só visualiza parâmetros do próprio tenant (Id_Fornecedor)
 - Tentativa de acessar parâmetro de outro tenant retorna HTTP 404
 
 #### Máscara de Valores Sensíveis
@@ -716,14 +716,14 @@ As telas de **Sistema_Feature_Flag** (WF-06 a WF-10) seguem a **mesma estrutura*
   - `Data_Fim` (opcional, datetime picker)
   - `Percentual_Ativacao` (0-100%, slider)
   - `Usuarios_Alvo` (JSON array, textarea)
-  - `Conglomerados_Alvo` (JSON array, textarea)
+  - `Fornecedores_Alvo` (JSON array, textarea)
 
 #### WF-08: Visualizar Feature Flag (UC07)
 - Card adicional: **Status e Agendamento**
   - Status atual (On/Off com badge)
   - Data início/fim
   - Percentual de ativação
-  - Usuários/Conglomerados alvo
+  - Usuários/Fornecedores alvo
 
 #### WF-09: Editar Feature Flag (UC08)
 - Permite editar status (On/Off) em tempo real
@@ -924,7 +924,7 @@ Interface para **testar conexão e envio de email SMTP** usando configuração d
 #### Erro
 - "Acesso negado. Você não tem permissão para {ação}"
 - "Parâmetro não encontrado"
-- "Código '{Cd_Parametro}' já existe neste conglomerado"
+- "Código '{Cd_Parametro}' já existe neste Fornecedor"
 - "Valor inválido para tipo {Tipo_Dado}"
 - "Erro ao carregar dados. Tente novamente."
 

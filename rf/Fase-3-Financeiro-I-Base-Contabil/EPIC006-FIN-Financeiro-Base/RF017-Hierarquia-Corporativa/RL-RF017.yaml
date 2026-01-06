@@ -60,7 +60,7 @@ referencias:
       Campos: Id_Departamento, Id_Centro_Custo, Cd_Departamento, Nm_Departamento, Id_Gerente, Fl_Ativo.
       Problemas identificados:
       - Não valida inativação com setores ativos
-      - Código duplicado entre conglomerados (validação não considera multi-tenancy)
+      - Código duplicado entre Fornecedores (validação não considera multi-tenancy)
       - Sem auditoria de alterações completa
 
     destino: "assumido"
@@ -185,7 +185,7 @@ referencias:
 
     destino: "substituido"
     justificativa: |
-      Substituído por constraint composta UNIQUE (Id_Conglomerado, Codigo)
+      Substituído por constraint composta UNIQUE (Id_Fornecedor, Codigo)
       + validação em FluentValidation.
 
     rf_item_relacionado: "RN-RF017-01"
@@ -383,7 +383,7 @@ tabelas:
   - nome: "Centro_Custo"
     finalidade: "Armazenar centros de custo (primeira camada hierárquica)"
     problemas:
-      - "Sem campo Id_Conglomerado (problema crítico de multi-tenancy)"
+      - "Sem campo Id_Fornecedor (problema crítico de multi-tenancy)"
       - "Constraint UNIQUE global (não considera multi-tenancy)"
       - "Sem auditoria completa (faltam campos Dt_Alteracao, Id_Usuario_Alteracao, Dt_Exclusao)"
       - "Permite Vr_Budget_Mensal negativo/zero (sem CHECK constraint)"
@@ -420,7 +420,7 @@ regras_implicitas:
       Código Único (Implementação Incorreta):
       Sistema valida código único em nível de banco (UNIQUE constraint) mas não considera
       multi-tenancy porque cada cliente tem banco separado. Na migração para banco único
-      com Id_Conglomerado, a constraint deve ser UNIQUE (Id_Conglomerado, Codigo).
+      com Id_Fornecedor, a constraint deve ser UNIQUE (Id_Fornecedor, Codigo).
     fonte: "Centro_Custo.aspx.vb, linha 245"
 
   - id: "RL-RN-002"
@@ -470,17 +470,17 @@ gap_analysis:
   - item: "Multi-tenancy"
     existe_legado: false
     existe_moderno: true
-    notas: "Legado: 18 bancos separados. Moderno: 1 banco com Id_Conglomerado + Row-Level Security"
+    notas: "Legado: 18 bancos separados. Moderno: 1 banco com Id_Fornecedor + Row-Level Security"
 
   - item: "Auditoria completa com dados anteriores em JSON"
     existe_legado: false
     existe_moderno: true
     notas: "Legado: Tabelas de histórico sem dados anteriores. Moderno: Auditoria completa"
 
-  - item: "Validação de código único por conglomerado"
+  - item: "Validação de código único por Fornecedor"
     existe_legado: false
     existe_moderno: true
-    notas: "Legado: UNIQUE global. Moderno: UNIQUE (Id_Conglomerado, Codigo)"
+    notas: "Legado: UNIQUE global. Moderno: UNIQUE (Id_Fornecedor, Codigo)"
 
   - item: "Validação de budget > 0"
     existe_legado: false
@@ -587,7 +587,7 @@ riscos_migracao:
       - Validação de contagem de registros
       - Testes em ambiente de homologação
 
-  - risco: "Conflito de códigos duplicados entre conglomerados"
+  - risco: "Conflito de códigos duplicados entre Fornecedores"
     impacto: "alto"
     probabilidade: "media"
     mitigacao: |
@@ -605,8 +605,8 @@ riscos_migracao:
     impacto: "medio"
     probabilidade: "baixa"
     mitigacao: |
-      - Implementar índices compostos (Id_Conglomerado, Codigo)
-      - Particionamento de tabelas por conglomerado
+      - Implementar índices compostos (Id_Fornecedor, Codigo)
+      - Particionamento de tabelas por Fornecedor
 
   - risco: "Usuários estranharem mudança de códigos para UPPER_SNAKE_CASE"
     impacto: "baixo"
@@ -669,14 +669,14 @@ rastreabilidade:
 # BASES DE DADOS LEGADAS MAPEADAS
 # =============================================
 bases_dados_legadas:
-  total_conglomerados: 18
+  total_Fornecedores: 18
   estimativa_registros:
     centros_custo: 250
     departamentos: 700
     setores: 1400
     secoes: 2100
 
-  conglomerados:
+  Fornecedores:
     - cnpj: "12.345.678/0001-90"
       razao_social: "Empresa A"
       banco: "DB_IControlIT_EmpresaA"
@@ -708,7 +708,7 @@ estrategia_migracao:
   decisao_arquitetural: "CRIAR_DO_ZERO" # CRIAR_DO_ZERO | MIGRAR_INCREMENTAL | REPLICAR_ESTRUTURA
   justificativa: |
     Criar estrutura moderna desde o início porque:
-    - Multi-tenancy requer mudanças estruturais profundas (Id_Conglomerado)
+    - Multi-tenancy requer mudanças estruturais profundas (Id_Fornecedor)
     - Auditoria completa exige novos campos e triggers
     - REST API não é compatível com SOAP
     - Melhor garantir qualidade desde o início
@@ -717,9 +717,9 @@ estrategia_migracao:
     - fase: 1
       nome: "Preparação"
       atividades:
-        - "Criar banco unificado com Id_Conglomerado em todas as tabelas"
+        - "Criar banco unificado com Id_Fornecedor em todas as tabelas"
         - "Criar script de migração que lê cada banco separado"
-        - "Atribuir Id_Conglomerado único (1, 2, 3...)"
+        - "Atribuir Id_Fornecedor único (1, 2, 3...)"
         - "Inserir dados no banco unificado preservando IDs originais"
 
     - fase: 2
@@ -727,8 +727,8 @@ estrategia_migracao:
       atividades:
         - "Comparar contagem de registros (legado vs unificado)"
         - "Validar integridade referencial (FKs)"
-        - "Validar códigos únicos por conglomerado"
-        - "Identificar códigos duplicados entre conglomerados"
+        - "Validar códigos únicos por Fornecedor"
+        - "Identificar códigos duplicados entre Fornecedores"
 
     - fase: 3
       nome: "Ajustes"

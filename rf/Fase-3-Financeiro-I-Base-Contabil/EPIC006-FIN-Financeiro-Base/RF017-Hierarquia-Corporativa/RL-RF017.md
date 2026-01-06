@@ -23,7 +23,7 @@
 
 ### Características Principais
 
-- Sistema legado opera com **18 bancos SQL Server separados** (um por cliente/conglomerado)
+- Sistema legado opera com **18 bancos SQL Server separados** (um por cliente/Fornecedor)
 - Cada banco possui estrutura idêntica mas dados isolados
 - Não há Row-Level Security, o isolamento é feito por banco de dados físico
 - Telas ASPX com code-behind VB.NET
@@ -83,7 +83,7 @@
 #### Comportamentos Implícitos
 
 - **Não valida inativação com setores ativos:** Sistema permite inativar departamento mesmo com setores ativos (problema identificado)
-- **Código duplicado entre conglomerados:** Validação de código único não considera multi-tenancy (problema no legado)
+- **Código duplicado entre Fornecedores:** Validação de código único não considera multi-tenancy (problema no legado)
 - **Sem auditoria de alterações:** Não registra dados anteriores quando atualiza (problema identificado)
 
 ---
@@ -166,8 +166,8 @@
 |--------|------|-------------|-------------|
 | Id_Centro_Custo | INT | PK, IDENTITY(1,1) | Chave primária |
 | Id_Filial | INT | FK → Filial(Id_Filial), NOT NULL | Vinculação obrigatória |
-| Id_Conglomerado | INT | NOT NULL | **NÃO EXISTE** (problema multi-tenancy) |
-| Cd_Centro_Custo | VARCHAR(50) | NOT NULL, UNIQUE | Código único (mas não por conglomerado) |
+| Id_Fornecedor | INT | NOT NULL | **NÃO EXISTE** (problema multi-tenancy) |
+| Cd_Centro_Custo | VARCHAR(50) | NOT NULL, UNIQUE | Código único (mas não por Fornecedor) |
 | Nm_Centro_Custo | VARCHAR(120) | NOT NULL | Nome |
 | Id_Gestor | INT | FK → Consumidor(Id_Consumidor), NULL | Gestor opcional |
 | Vr_Budget_Mensal | DECIMAL(18,2) | NULL | Budget opcional |
@@ -176,7 +176,7 @@
 | Id_Usuario_Criacao | INT | NULL | Usuário que criou |
 
 **Problemas Identificados:**
-- **Sem campo Id_Conglomerado:** Problema grave de multi-tenancy (cada banco é um conglomerado, mas não há coluna para isso)
+- **Sem campo Id_Fornecedor:** Problema grave de multi-tenancy (cada banco é um Fornecedor, mas não há coluna para isso)
 - **Sem auditoria completa:** Faltam campos Dt_Alteracao, Id_Usuario_Alteracao, Dt_Exclusao, Id_Usuario_Exclusao
 - **Sem tabela de histórico com dados anteriores em JSON:** Existe tabela Centro_Custo_Historico mas não salva dados anteriores
 
@@ -262,7 +262,7 @@ CREATE TABLE Centro_Custo_Historico (
 
 ### RL-RN-001: Código Único (Implementação Incorreta)
 
-**Descrição:** Sistema legado valida código único em nível de banco de dados (UNIQUE constraint), mas não considera multi-tenancy porque cada cliente tem banco separado. Na migração para banco único com Id_Conglomerado, a constraint deve ser UNIQUE (Id_Conglomerado, Codigo).
+**Descrição:** Sistema legado valida código único em nível de banco de dados (UNIQUE constraint), mas não considera multi-tenancy porque cada cliente tem banco separado. Na migração para banco único com Id_Fornecedor, a constraint deve ser UNIQUE (Id_Fornecedor, Codigo).
 
 **Fonte:** `Centro_Custo.aspx.vb`, linha 245 (validação no code-behind antes de insert)
 
@@ -348,9 +348,9 @@ End If
 
 | Item | Legado | RF Moderno | Observação |
 |------|--------|------------|------------|
-| **Multi-tenancy** | 18 bancos separados | 1 banco com Id_Conglomerado + Row-Level Security | Mudança arquitetural crítica |
+| **Multi-tenancy** | 18 bancos separados | 1 banco com Id_Fornecedor + Row-Level Security | Mudança arquitetural crítica |
 | **Auditoria** | Tabelas de histórico sem dados anteriores | Auditoria completa com dados anteriores em JSON | Melhoria de compliance |
-| **Validação de código único** | UNIQUE global | UNIQUE (Id_Conglomerado, Codigo) | Correção de problema |
+| **Validação de código único** | UNIQUE global | UNIQUE (Id_Fornecedor, Codigo) | Correção de problema |
 | **Validação de budget** | Não valida | Budget > 0 se informado | Correção de problema |
 | **Validação de código formato** | Não valida | UPPER_SNAKE_CASE obrigatório | Padronização |
 | **Validação de inativação** | Permite inativar com filhos ativos | Proíbe (exceto cascata opcional) | Correção de problema crítico |
@@ -377,9 +377,9 @@ End If
 **Impacto:** **Alto**
 
 **Estratégia de Migração:**
-- Adicionar coluna Id_Conglomerado em todas as tabelas
+- Adicionar coluna Id_Fornecedor em todas as tabelas
 - Criar views compatíveis com legado (para não quebrar queries antigas)
-- Migrar dados de cada banco separado para o banco unificado com Id_Conglomerado correto
+- Migrar dados de cada banco separado para o banco unificado com Id_Fornecedor correto
 - Implementar Row-Level Security para isolar automaticamente
 
 ---
@@ -443,9 +443,9 @@ End If
 | Risco | Impacto | Probabilidade | Mitigação |
 |-------|---------|---------------|-----------|
 | Perda de dados durante migração de 18 bancos para 1 | Crítico | Baixa | Backup completo antes da migração + validação de contagem de registros + testes em ambiente de homologação |
-| Conflito de códigos duplicados entre conglomerados | Alto | Média | Script de pré-validação que identifica códigos duplicados e gera relatório para ajuste manual antes da migração |
+| Conflito de códigos duplicados entre Fornecedores | Alto | Média | Script de pré-validação que identifica códigos duplicados e gera relatório para ajuste manual antes da migração |
 | Quebra de integrações SOAP existentes | Alto | Média | Manter WebServices SOAP legados como facade temporário que chama REST API internamente |
-| Performance degradada em queries cross-tenant | Médio | Baixa | Implementar índices compostos (Id_Conglomerado, Codigo) e particionamento de tabelas por conglomerado |
+| Performance degradada em queries cross-tenant | Médio | Baixa | Implementar índices compostos (Id_Fornecedor, Codigo) e particionamento de tabelas por Fornecedor |
 | Usuários estranharem mudança de códigos para UPPER_SNAKE_CASE | Baixo | Alta | Comunicação prévia + treinamento + manter códigos legados como alias temporário |
 | Resistência à validação de inativação com filhos ativos | Médio | Média | Oferecer opção de inativação em cascata opcional para facilitar casos legítimos |
 
@@ -463,10 +463,10 @@ End If
 | WS_Departamento.* | Endpoints REST modernos | SUBSTITUÍDO |
 | WS_Setor.* | Endpoints REST modernos | SUBSTITUÍDO |
 | WS_Secao.* | Endpoints REST modernos | SUBSTITUÍDO |
-| Tabela Centro_Custo | Entidade CentroCusto | ASSUMIDO (com Id_Conglomerado) |
-| Tabela Departamento | Entidade Departamento | ASSUMIDO (com Id_Conglomerado) |
-| Tabela Setor | Entidade Setor | ASSUMIDO (com Id_Conglomerado) |
-| Tabela Secao | Entidade Secao | ASSUMIDO (com Id_Conglomerado) |
+| Tabela Centro_Custo | Entidade CentroCusto | ASSUMIDO (com Id_Fornecedor) |
+| Tabela Departamento | Entidade Departamento | ASSUMIDO (com Id_Fornecedor) |
+| Tabela Setor | Entidade Setor | ASSUMIDO (com Id_Fornecedor) |
+| Tabela Secao | Entidade Secao | ASSUMIDO (com Id_Fornecedor) |
 | Tabelas *_Historico | Auditoria completa com JSON | SUBSTITUÍDO |
 | Modal de lixeira (ASPX) | Filtro status=inactive no frontend moderno | ASSUMIDO (com UX moderna) |
 | Validação de código único | RN-RF017-01 | ASSUMIDO (com multi-tenancy) |
@@ -481,7 +481,7 @@ End If
 
 ## 10. BASES DE DADOS LEGADAS MAPEADAS
 
-### Conglomerados Identificados (18 Bancos Separados)
+### Fornecedores Identificados (18 Bancos Separados)
 
 | CNPJ | Razão Social | Banco SQL Server | Qtd Centros Custo | Qtd Departamentos | Qtd Setores | Qtd Seções |
 |------|--------------|------------------|-------------------|-------------------|-------------|------------|
@@ -491,7 +491,7 @@ End If
 | ... | ... | ... | ... | ... | ... | ... |
 
 **Total Estimado:**
-- 18 conglomerados (bancos separados)
+- 18 Fornecedores (bancos separados)
 - ~250 centros de custo
 - ~700 departamentos
 - ~1.400 setores
@@ -503,18 +503,18 @@ End If
 
 ### Fase 1: Preparação
 
-1. Criar banco unificado com Id_Conglomerado em todas as tabelas
+1. Criar banco unificado com Id_Fornecedor em todas as tabelas
 2. Criar script de migração que:
    - Lê cada banco separado
-   - Atribui Id_Conglomerado único (sequencial: 1, 2, 3...)
+   - Atribui Id_Fornecedor único (sequencial: 1, 2, 3...)
    - Insere dados no banco unificado preservando IDs originais
 
 ### Fase 2: Validação
 
 1. Comparar contagem de registros (legado vs unificado)
 2. Validar integridade referencial (FKs)
-3. Validar códigos únicos por conglomerado
-4. Identificar códigos duplicados entre conglomerados (reportar para ajuste)
+3. Validar códigos únicos por Fornecedor
+4. Identificar códigos duplicados entre Fornecedores (reportar para ajuste)
 
 ### Fase 3: Ajustes
 
@@ -525,7 +525,7 @@ End If
 
 ### Fase 4: Homologação
 
-1. Testar acesso multi-tenant (cada conglomerado vê apenas seus dados)
+1. Testar acesso multi-tenant (cada Fornecedor vê apenas seus dados)
 2. Testar APIs REST
 3. Testar auditoria completa
 4. Testar validações novas (inativação com filhos, etc)

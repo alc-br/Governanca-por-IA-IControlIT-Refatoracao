@@ -208,7 +208,7 @@ A ausência de WebServices para custos indica que:
 | **Dashboard de TCO** | ❌ Inexistente | ✅ Gráficos interativos (evolução, breakdown) | Gap médio - visualização executiva |
 | **Exportação de Relatórios TCO** | ❌ Inexistente | ✅ Excel/PDF com breakdown completo | Gap médio - relatórios gerenciais |
 | **Auditoria de Custos** | ❌ Inexistente | ✅ Auditoria completa (7 anos LGPD) | Gap crítico - compliance legal |
-| **Multi-tenancy** | ⚠️ Controle manual | ✅ Automático (ConglomeradoId) | Melhoria - segurança e isolamento |
+| **Multi-tenancy** | ⚠️ Controle manual | ✅ Automático (FornecedorId) | Melhoria - segurança e isolamento |
 | **Permissões Granulares** | ⚠️ Perfil genérico | ✅ RBAC com 7 permissões específicas | Melhoria - controle de acesso fino |
 
 ### Conclusão do Gap Analysis

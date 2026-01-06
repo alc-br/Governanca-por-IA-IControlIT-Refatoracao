@@ -17,7 +17,7 @@
 - **Linguagem:** VB.NET (code-behind) + SQL Server
 - **Framework:** .NET Framework 4.x
 - **Banco de Dados:** SQL Server (multi-database por cliente)
-- **Multi-tenant:** Parcial (via Id_Conglomerado, mas bancos separados)
+- **Multi-tenant:** Parcial (via Id_Fornecedor, mas bancos separados)
 - **Auditoria:** Parcial (algumas tabelas de histórico, inconsistente)
 - **Configurações:** Web.config + tabelas de configuração
 
@@ -97,7 +97,7 @@
 
 | Método | Parâmetros | Retorno | Responsabilidade | Observações |
 |--------|-----------|---------|------------------|-------------|
-| `ListarFornecedores` | idConglomerado (int), tipoFornecedor (string) | List<Fornecedor> | Listar fornecedores por tipo | Sem paginação, retorna tudo |
+| `ListarFornecedores` | idFornecedor (int), tipoFornecedor (string) | List<Fornecedor> | Listar fornecedores por tipo | Sem paginação, retorna tudo |
 | `BuscarFornecedor` | idFornecedor (int) | Fornecedor | Buscar por ID | Sem validação multi-tenant |
 | `InserirFornecedor` | objFornecedor (Fornecedor) | int (ID inserido) | Criar fornecedor | Validação parcial, sem CNPJ único |
 | `AtualizarFornecedor` | objFornecedor (Fornecedor) | bool | Atualizar fornecedor | Sem auditoria de campos alterados |
@@ -147,14 +147,14 @@
 ```sql
 CREATE TABLE Fornecedor (
     Id_Fornecedor INT PRIMARY KEY IDENTITY,
-    Id_Conglomerado INT,  -- Multi-tenancy parcial
+    Id_Fornecedor INT,  -- Multi-tenancy parcial
     Descricao VARCHAR(50),  -- Razão Social
     CNPJ VARCHAR(20),
     Contato VARCHAR(50),
     Observacao VARCHAR(200),
     FL_Ativo BIT DEFAULT 1
     -- ❌ Sem Created, CreatedBy, LastModified, LastModifiedBy
-    -- ❌ Sem validação FK para Id_Conglomerado
+    -- ❌ Sem validação FK para Id_Fornecedor
 )
 ```
 
@@ -292,7 +292,7 @@ Regras descobertas no código VB.NET que NÃO estavam documentadas:
 | **Validação CNPJ único** | ❌ Não existia | ✅ RN-RF022-001 | Previne duplicatas |
 | **Soft Delete** | ❌ Exclusão física | ✅ Inativação lógica | Preserva histórico |
 | **Auditoria** | ⚠️ Parcial | ✅ Completa (RN-RF022-015) | Compliance fiscal |
-| **Multi-tenancy** | ⚠️ Parcial (Id_Conglomerado) | ✅ Rigoroso (TenantId + RLS) | Isolamento garantido |
+| **Multi-tenancy** | ⚠️ Parcial (Id_Fornecedor) | ✅ Rigoroso (TenantId + RLS) | Isolamento garantido |
 | **Avaliação Fornecedor** | ❌ Não existia | ✅ Rating 1-5 estrelas | Nova funcionalidade |
 | **Gestão de Documentos** | ❌ Não existia | ✅ Upload de documentos obrigatórios | Nova funcionalidade |
 | **Múltiplos Contatos** | ⚠️ Sim, mas sem tipo | ✅ Tipos (Comercial, Técnico, etc) | Organização aprimorada |
@@ -396,7 +396,7 @@ Regras descobertas no código VB.NET que NÃO estavam documentadas:
 ### Novos Campos (Sem Equivalente Legado)
 
 ⚠️ **Preencher com defaults na migração:**
-- Fornecedor.TenantId → Mapear via Id_Conglomerado
+- Fornecedor.TenantId → Mapear via Id_Fornecedor
 - Fornecedor.Tipo → Default "OUTROS" (revisar manualmente depois)
 - Fornecedor.NotaGeral → NULL (sem avaliações históricas)
 - Fornecedor.Created → Data da migração

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Script para atualizar MDs da Fase 2 conforme ADR-003 e ADR-004
-- ADR-003: ConglomeradoId → ClienteId/EmpresaId
+- ADR-003: FornecedorId → ClienteId/EmpresaId
 - ADR-004: FlExcluido → Ativo
 
 Data: 2025-12-25
@@ -35,42 +35,42 @@ def processar_md(filepath):
         conteudo_novo = conteudo_original
         substituicoes_arquivo = 0
 
-        # ADR-003: ConglomeradoId → ClienteId (ou EmpresaId conforme contexto)
+        # ADR-003: FornecedorId → ClienteId (ou EmpresaId conforme contexto)
         # Regra: Manter EmpresaId se já existe, senão usar ClienteId
 
         # 1. Tabelas de definição (seção de campos)
-        # Padrão: | ConglomeradoId | UNIQUEIDENTIFIER | ...
+        # Padrão: | FornecedorId | UNIQUEIDENTIFIER | ...
         if 'EmpresaId' not in conteudo_novo:
             # Se não tem EmpresaId, usar ClienteId
             conteudo_novo, count = re.subn(
-                r'(\|\s*)ConglomeradoId(\s*\|)',
+                r'(\|\s*)FornecedorId(\s*\|)',
                 r'\1ClienteId\2',
                 conteudo_novo
             )
             substituicoes_arquivo += count
 
         # 2. DDL (CREATE TABLE)
-        # Padrão: ConglomeradoId UNIQUEIDENTIFIER
+        # Padrão: FornecedorId UNIQUEIDENTIFIER
         if 'EmpresaId' not in conteudo_novo:
             conteudo_novo, count = re.subn(
-                r'\bConglomeradoId\s+(UNIQUEIDENTIFIER|UUID|GUID)',
+                r'\bFornecedorId\s+(UNIQUEIDENTIFIER|UUID|GUID)',
                 r'ClienteId \1',
                 conteudo_novo
             )
             substituicoes_arquivo += count
 
         # 3. Foreign Keys
-        # Padrão: FOREIGN KEY (ConglomeradoId) REFERENCES Conglomerado(Id)
+        # Padrão: FOREIGN KEY (FornecedorId) REFERENCES Fornecedor(Id)
         if 'EmpresaId' not in conteudo_novo:
             conteudo_novo, count = re.subn(
-                r'FOREIGN KEY \(ConglomeradoId\) REFERENCES Conglomerado\(Id\)',
+                r'FOREIGN KEY \(FornecedorId\) REFERENCES Fornecedor\(Id\)',
                 r'FOREIGN KEY (ClienteId) REFERENCES Cliente(Id)',
                 conteudo_novo
             )
             substituicoes_arquivo += count
 
             conteudo_novo, count = re.subn(
-                r'FK para Conglomerado',
+                r'FK para Fornecedor',
                 r'FK para Cliente (multi-tenancy raiz)',
                 conteudo_novo
             )
@@ -79,7 +79,7 @@ def processar_md(filepath):
         # 4. Comentários e descrições
         if 'EmpresaId' not in conteudo_novo:
             conteudo_novo, count = re.subn(
-                r'Conglomerado \(multi-tenancy\)',
+                r'Fornecedor \(multi-tenancy\)',
                 r'Cliente (multi-tenancy raiz)',
                 conteudo_novo
             )
@@ -153,7 +153,7 @@ def processar_md(filepath):
 def main():
     print("=" * 80)
     print("ATUALIZACAO DE MDs DA FASE 2")
-    print("ADR-003: ConglomeradoId -> ClienteId/EmpresaId")
+    print("ADR-003: FornecedorId -> ClienteId/EmpresaId")
     print("ADR-004: FlExcluido -> Ativo")
     print("=" * 80)
     print()
@@ -180,7 +180,7 @@ def main():
     with open(log_file, 'w', encoding='utf-8') as f:
         f.write("LOG DE ATUALIZAÇÃO DE MDs - FASE 2\n")
         f.write(f"Data: 2025-12-25\n")
-        f.write(f"ADR-003: ConglomeradoId → ClienteId/EmpresaId\n")
+        f.write(f"ADR-003: FornecedorId → ClienteId/EmpresaId\n")
         f.write(f"ADR-004: FlExcluido → Ativo\n")
         f.write("=" * 80 + "\n\n")
         f.write("\n".join(log_lines))

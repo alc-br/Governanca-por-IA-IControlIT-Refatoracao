@@ -238,7 +238,7 @@ CREATE TABLE Plano_Conta (
 - ❌ Campos separados em vez de hierarquia recursiva (difícil navegação)
 - ❌ Sem FK para pai (impossível query recursiva CTE)
 - ❌ Sem validação sintética/analítica no código (permitia lançamentos em sintéticas)
-- ❌ Sem multi-tenancy (`Id_Conglomerado`)
+- ❌ Sem multi-tenancy (`Id_Fornecedor`)
 - ❌ Sem auditoria
 
 **Destino no RF Moderno:** **SUBSTITUÍDO** - Nova tabela `PlanoContaContabil` com hierarquia recursiva (`PlanoContaContabil_PaiId`), até 7 níveis, multi-tenancy, auditoria completa (RN-RF031-01, RN-RF031-15).

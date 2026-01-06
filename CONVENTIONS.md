@@ -1376,7 +1376,7 @@ public class MinhaEntidade : BaseAuditableGuidEntity
 | Nível | Campo | Tipo | Obrigatório | Propósito | Query Filter |
 |-------|-------|------|-------------|-----------|--------------|
 | 1. Cliente | `ClienteId` | `Guid` | ✅ SIM | **Isolamento multi-tenant** | ✅ SIM |
-| 2. Conglomerado | `ConglomeradoId` | `Guid?` | ❌ NÃO | Agrupamento lógico | ❌ NÃO |
+| 2. Fornecedor | `FornecedorId` | `Guid?` | ❌ NÃO | Agrupamento lógico | ❌ NÃO |
 | 3. Empresa | `EmpresaId` | `Guid?` | ❌ NÃO | Organização fiscal (CNPJ) | ❌ NÃO |
 | 4. Filial | `FilialId` | `Guid?` | ❌ NÃO | Localização física | ❌ NÃO |
 

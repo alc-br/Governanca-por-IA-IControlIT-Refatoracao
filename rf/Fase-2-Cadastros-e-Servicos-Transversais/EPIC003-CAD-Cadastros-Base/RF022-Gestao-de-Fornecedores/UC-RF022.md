@@ -144,7 +144,7 @@ Permitir a criação de um novo fornecedor com validações completas de dados o
 - **FE-UC01-001:** Campo obrigatório ausente → HTTP 400 + mensagem específica (ex: "Nome do fornecedor é obrigatório") (RN-RF022-005)
 - **FE-UC01-002:** CNPJ inválido (dígitos verificadores) → HTTP 400 + "CNPJ inválido" (RN-RF022-002)
 - **FE-UC01-003:** CPF inválido (dígitos verificadores) → HTTP 400 + "CPF inválido" (RN-RF022-003)
-- **FE-UC01-004:** CNPJ duplicado no tenant → HTTP 409 + "CNPJ já cadastrado neste conglomerado" (RN-RF022-001)
+- **FE-UC01-004:** CNPJ duplicado no tenant → HTTP 409 + "CNPJ já cadastrado neste Fornecedor" (RN-RF022-001)
 - **FE-UC01-005:** E-mail inválido → HTTP 400 + "E-mail inválido" (RN-RF022-008)
 - **FE-UC01-006:** Tipo de fornecedor fora da lista → HTTP 400 + "Tipo de fornecedor inválido" (RN-RF022-004)
 - **FE-UC01-007:** Limite de crédito negativo → HTTP 400 + "Limite de crédito deve ser maior ou igual a zero" (RN-RF022-016)
@@ -270,7 +270,7 @@ Permitir alteração controlada de dados de um fornecedor existente com validaç
 
 ### Fluxos de Exceção
 - **FE-UC03-001:** Campo obrigatório removido → HTTP 400 + mensagem específica
-- **FE-UC03-002:** CNPJ duplicado (se alterado) → HTTP 409 + "CNPJ já cadastrado neste conglomerado" (RN-RF022-001)
+- **FE-UC03-002:** CNPJ duplicado (se alterado) → HTTP 409 + "CNPJ já cadastrado neste Fornecedor" (RN-RF022-001)
 - **FE-UC03-003:** E-mail inválido (se alterado) → HTTP 400 + "E-mail inválido" (RN-RF022-008)
 - **FE-UC03-004:** Transição de status inválida → HTTP 400 + "Transição de status inválida" (ex: INATIVO → EM_HOMOLOGACAO não permitido)
 - **FE-UC03-005:** Fornecedor de outro tenant → HTTP 404 (RN-RF022-014)

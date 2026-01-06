@@ -17,7 +17,7 @@
 - **Arquitetura:** Monolítica Web Forms
 - **Linguagem / Stack:** ASP.NET Web Forms + VB.NET
 - **Banco de Dados:** SQL Server
-- **Multi-tenant:** ❌ Não implementado (sem campo `Id_Conglomerado`)
+- **Multi-tenant:** ❌ Não implementado (sem campo `Id_Fornecedor`)
 - **Auditoria:** ❌ Inexistente (sem campos de criação/alteração)
 - **Configurações:** Web.config
 - **Controle de SLA:** Manual via campo texto `Excedente_SLA` (varchar(8000))
@@ -326,7 +326,7 @@ Rl_Solicitacao_Ativo (Vinculação N:N com Ativos)
 
 **Destino no RF Moderno:** ✅ **ASSUMIDO** com melhorias (RN-RF033-09)
 
-**Observações:** Mesma lógica mantida, porém com validação de existência e pertencimento ao conglomerado.
+**Observações:** Mesma lógica mantida, porém com validação de existência e pertencimento ao Fornecedor.
 
 ---
 
@@ -428,15 +428,15 @@ Rl_Solicitacao_Ativo (Vinculação N:N com Ativos)
 
 ### RL-RN-015: Sem Isolamento Multi-Tenant
 
-**Fonte:** Ausência de campo `Id_Conglomerado`
+**Fonte:** Ausência de campo `Id_Fornecedor`
 
-**Descrição:** Todos os dados eram compartilhados sem isolamento por conglomerado.
+**Descrição:** Todos os dados eram compartilhados sem isolamento por Fornecedor.
 
 **Destino no RF Moderno:** ✅ **NOVA FUNCIONALIDADE CRÍTICA** (RN-RF033-16)
 
 **Justificativa:** **OBRIGATÓRIO** para conformidade LGPD e segurança.
 
-**Impacto:** **CRÍTICO** - Requer adição de `ConglomeradoId` em TODAS as entidades e Row-Level Security.
+**Impacto:** **CRÍTICO** - Requer adição de `FornecedorId` em TODAS as entidades e Row-Level Security.
 
 ---
 
@@ -488,11 +488,11 @@ Rl_Solicitacao_Ativo (Vinculação N:N com Ativos)
 
 ### Decisão 3: Implementar Multi-Tenancy Obrigatório
 
-**Motivo:** Conformidade LGPD e isolamento de dados por conglomerado.
+**Motivo:** Conformidade LGPD e isolamento de dados por Fornecedor.
 
-**Solução Moderna:** Campo `ConglomeradoId` em todas as entidades + Row-Level Security.
+**Solução Moderna:** Campo `FornecedorId` em todas as entidades + Row-Level Security.
 
-**Impacto:** **CRÍTICO** - Requer migração de TODOS os dados históricos associando a conglomerado padrão.
+**Impacto:** **CRÍTICO** - Requer migração de TODOS os dados históricos associando a Fornecedor padrão.
 
 ---
 
