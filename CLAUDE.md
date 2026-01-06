@@ -13,6 +13,18 @@ Contratos específicos complementam este arquivo e **NUNCA o substituem**.
 
 ---
 
+**ATENÇÃO:**
+
+Aqui D:\IC2_Governanca\ é onde fica nossa estrutura de governança por contratos e os documentos do sistema. Se você estiver rodando a partir dessa pasta raiz nunca altere o branch.
+
+Aqui D:\IC2\ é onde fica nossa estrutura de código. Quando estivermos falando em código, deve-se pesquisar nessa estrutura. 
+
+Se você estiver rodando a partir da raiz D:\IC2_Governanca\ nunca altere nada em D:\IC2\.
+
+Se você estiver rodando a partir da raiz D:\IC2\ nunca altere nada em D:\IC2_Governanca\.
+
+---
+
 ## 1. Idioma e Comunicação
 
 - **SEMPRE responda em Português do Brasil**
