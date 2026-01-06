@@ -4,7 +4,7 @@ Ele fica nesse endereço D:\IC2\rf\Fase*\EPIC*\RF*
 
 ---
 
-Executar **docs\contracts\documentacao\validacao\md.md** para o RF informado acima.
+Executar **D:\IC2_Governanca\contracts\documentacao\validacao\md.md** para o RF informado acima.
 Seguir D:\IC2\CLAUDE.md.
 
 ## ⚠️ MODO READ-ONLY

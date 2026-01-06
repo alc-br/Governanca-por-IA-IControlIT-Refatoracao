@@ -445,7 +445,7 @@ Após concluir esta configuração:
 Em caso de dúvidas ou problemas:
 
 1. Consulte documentação adicional:
-   - `D:\IC2\docs\contracts\CONTRATO-BASE-DE-ENTIDADE.md`
+   - `D:\IC2\D:\IC2_Governanca\contracts\CONTRATO-BASE-DE-ENTIDADE.md`
    - `D:\IC2\docs\workflows\FLUXO-TRANSICAO-SKELETON.md`
    - `D:\IC2\tools\devops-sync\PATCH-SKELETON-SUPPORT.md`
 

@@ -1463,7 +1463,7 @@ dev → CONTRATO-TESTER-BACKEND → validação 100% → aprovação → merge d
 
 - **Código Fonte:** `D:\IC2`
 - **Documentação de RFs:** `D:\IC2\docs\rf`
-- **Contratos:** `D:\IC2\docs\contracts`
+- **Contratos:** `D:\IC2\D:\IC2_Governanca\contracts`
 - **Ferramentas DevOps:** `D:\IC2\tools\devops-sync`
 - **Azure DevOps:** [URL do projeto]
 

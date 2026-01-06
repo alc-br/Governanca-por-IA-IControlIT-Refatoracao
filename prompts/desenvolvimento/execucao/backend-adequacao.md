@@ -1,4 +1,4 @@
-Regularizar backend do RFXXX conforme o contrato \docs\contracts\desenvolvimento\execucao\backend-adequacao.md.
+Regularizar backend do RFXXX conforme o contrato \D:\IC2_Governanca\contracts\desenvolvimento\execucao\backend-adequacao.md.
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 Seguir D:\IC2\CLAUDE.md.
 

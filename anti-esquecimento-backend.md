@@ -1,9 +1,9 @@
 # ESQUECIMENTOS OU ERROS COMUNS DE VALIDAÇÃO DE CONTRATO BACKEND
 
 > ⚠️ **IMPORTANTE**: Este é apenas um documento de **LEMBRETE** do que pode ocorrer e de como não errar. **NÃO é uma diretriz** nem substitui os contratos oficiais. Consulte sempre:
-- \docs\contracts\desenvolvimento\execucao\backend-criacao.md
-- \docs\contracts\desenvolvimento\execucao\backend-adequacao.md
-- \docs\contracts\desenvolvimento\validacao\backend.md
+- \D:\IC2_Governanca\contracts\desenvolvimento\execucao\backend-criacao.md
+- \D:\IC2_Governanca\contracts\desenvolvimento\execucao\backend-adequacao.md
+- \D:\IC2_Governanca\contracts\desenvolvimento\validacao\backend.md
 
 ---
 

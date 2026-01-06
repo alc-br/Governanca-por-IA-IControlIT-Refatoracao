@@ -1,6 +1,6 @@
 Para o RFXXX...
 
-Crie os documentos de Modelo de Dados (MD) conforme docs\contracts\documentacao\execucao\md-criacao.md.
+Crie os documentos de Modelo de Dados (MD) conforme D:\IC2_Governanca\contracts\documentacao\execucao\md-criacao.md.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 

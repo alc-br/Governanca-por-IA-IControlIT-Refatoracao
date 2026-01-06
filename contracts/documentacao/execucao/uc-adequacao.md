@@ -522,7 +522,7 @@ if [ "$MODO" = "CRIACAO" ]; then
     echo "🤖 EXECUTANDO CONTRATO-GERACAO-DOCS-UC..."
 
     # O agente DEVE ler e executar:
-    # D:\IC2\docs\contracts\documentacao\CONTRATO-GERACAO-DOCS-UC.md
+    # D:\IC2\D:\IC2_Governanca\contracts\documentacao\CONTRATO-GERACAO-DOCS-UC.md
     # para o RFXXX especificado
 
     # Após execução do CONTRATO-GERACAO-DOCS-UC:

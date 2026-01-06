@@ -1,4 +1,4 @@
-Executar validacao de Massa de Teste (MT) e Casos de Teste (TC) do RFXXX conforme docs\contracts\documentacao\validacao\mt-tc.md.
+Executar validacao de Massa de Teste (MT) e Casos de Teste (TC) do RFXXX conforme D:\IC2_Governanca\contracts\documentacao\validacao\mt-tc.md.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 Seguir D:\IC2\CLAUDE.md.

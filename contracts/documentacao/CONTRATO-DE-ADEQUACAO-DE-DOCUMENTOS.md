@@ -217,23 +217,23 @@ Quando um documento NÃO existir, o agente DEVE:
 Contratos de criação disponíveis:
 
 - UC
-  - \docs\contracts\documentacao\CONTRATO-GERACAO-DOCS-UC.md
+  - \D:\IC2_Governanca\contracts\documentacao\CONTRATO-GERACAO-DOCS-UC.md
   - \docs\checklists\checklist-documentacao-uc.yaml
 
 - WF
-  - \docs\contracts\documentacao\CONTRATO-GERACAO-DOCS-WF.md
+  - \D:\IC2_Governanca\contracts\documentacao\CONTRATO-GERACAO-DOCS-WF.md
   - \docs\checklists\checklist-documentacao-wf.yaml
 
 - MD
-  - \docs\contracts\documentacao\CONTRATO-GERACAO-DOCS-MD.md
+  - \D:\IC2_Governanca\contracts\documentacao\CONTRATO-GERACAO-DOCS-MD.md
   - \docs\checklists\checklist-documentacao-md.yaml
 
 - MT
-  - \docs\contracts\documentacao\CONTRATO-GERACAO-DOCS-MT.md
+  - \D:\IC2_Governanca\contracts\documentacao\CONTRATO-GERACAO-DOCS-MT.md
   - \docs\checklists\checklist-documentacao-mt.yaml
 
 - TC
-  - \docs\contracts\documentacao\CONTRATO-GERACAO-DOCS-TC.md
+  - \D:\IC2_Governanca\contracts\documentacao\CONTRATO-GERACAO-DOCS-TC.md
   - \docs\checklists\checklist-documentacao-tc.yaml
 
 Proibições:

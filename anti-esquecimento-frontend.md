@@ -1,9 +1,9 @@
 # ESQUECIMENTOS OU ERROS COMUNS DE VALIDAÇÃO DE CONTRATO FRONTEND
 
 > ⚠️ **IMPORTANTE**: Este é apenas um documento de **LEMBRETE** do que pode ocorrer e de como não errar. **NÃO é uma diretriz** nem substitui os contratos oficiais. Consulte sempre:
-- \docs\contracts\desenvolvimento\execucao\frontend-criacao.md
-- \docs\contracts\desenvolvimento\execucao\frontend-adequacao.md
-- \docs\contracts\desenvolvimento\validacao\frontend.md
+- \D:\IC2_Governanca\contracts\desenvolvimento\execucao\frontend-criacao.md
+- \D:\IC2_Governanca\contracts\desenvolvimento\execucao\frontend-adequacao.md
+- \D:\IC2_Governanca\contracts\desenvolvimento\validacao\frontend.md
 
 ---
 
