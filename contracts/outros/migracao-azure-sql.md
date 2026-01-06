@@ -72,8 +72,42 @@ git branch --show-current
 
 ## 4. WORKFLOW (7 FASES - 7 COMMITS)
 
+### 🚨 VALIDAÇÃO OBRIGATÓRIA ANTES DE QUALQUER FASE
+
+**ANTES de executar QUALQUER fase (0 a 7), o agente DEVE SEMPRE validar:**
+
+```bash
+git branch --show-current
+# Esperado: migration/azure-sql-complete
+```
+
+**Se NÃO estiver no branch correto:**
+```
+❌ BLOQUEIO TOTAL - Branch incorreto
+
+ERRO: Contrato DEVE ser executado APENAS no branch: migration/azure-sql-complete
+Branch atual: [branch_atual]
+
+AÇÃO:
+1. git checkout dev && git pull
+2. git checkout -b migration/azure-sql-complete
+3. git push -u origin migration/azure-sql-complete
+4. Re-execute contrato
+
+NUNCA executar em dev, main ou qualquer outro branch.
+```
+
+---
+
 ### FASE 0: VALIDAR AUTENTICAÇÃO AZURE
 
+**Passo 0.1: Validar Branch (OBRIGATÓRIO)**
+```bash
+git branch --show-current
+# Esperado: migration/azure-sql-complete
+```
+
+**Passo 0.2: Validar Autenticação Azure**
 ```bash
 az account show
 ```
@@ -94,14 +128,34 @@ O agente NÃO pode executar az login (requer navegador).
 
 ### FASE 1: PREPARAÇÃO
 
-1. Validar branch `migration/azure-sql-complete`
-2. Backup SQLite: `.temp_ia/backup-sqlite/IControlIT-*.db`
-3. Validar migrations (ZERO tipos SQLite)
-4. **Commit:** `chore(infra): preparar ambiente para migração Azure SQL`
+**Passo 1.1: Validar Branch (OBRIGATÓRIO - NOVAMENTE)**
+```bash
+git branch --show-current
+# Esperado: migration/azure-sql-complete
+```
+
+**Passo 1.2: Validar RF006 e Migrations**
+1. Verificar commit 5fc9cf91 em dev
+2. Validar migrations (ZERO tipos SQLite)
+
+**Passo 1.3: Backup SQLite**
+1. Criar `.temp_ia/backup-sqlite/IControlIT-*.db`
+
+**Passo 1.4: Commit**
+```bash
+git commit -m "chore(infra): preparar ambiente para migração Azure SQL"
+```
 
 ---
 
 ### FASE 2: CRIAR INFRAESTRUTURA AZURE SQL DEV
+
+**Passo 2.0: Validar Branch (OBRIGATÓRIO)**
+```bash
+git branch --show-current
+# Esperado: migration/azure-sql-complete
+```
+**Se falhar:** BLOQUEIO TOTAL
 
 #### 2.1. Obter Padrão de Resource Groups Existentes
 
@@ -179,6 +233,13 @@ az sql db show \
 
 ### FASE 3: ATUALIZAR CÓDIGO
 
+**Passo 3.0: Validar Branch (OBRIGATÓRIO)**
+```bash
+git branch --show-current
+# Esperado: migration/azure-sql-complete
+```
+**Se falhar:** BLOQUEIO TOTAL
+
 #### 3.1. appsettings.Development.json
 
 **ANTES:**
@@ -215,6 +276,14 @@ echo "*.db-wal" >> D:\IC2\.gitignore
 
 ### FASE 4: APLICAR MIGRATIONS
 
+**Passo 4.0: Validar Branch (OBRIGATÓRIO)**
+```bash
+git branch --show-current
+# Esperado: migration/azure-sql-complete
+```
+**Se falhar:** BLOQUEIO TOTAL
+
+**Passo 4.1: Aplicar Migrations**
 ```bash
 cd D:\IC2\backend\IControlIT.API
 dotnet ef database update --connection "[CONNECTION_STRING_DEV]"
@@ -230,6 +299,15 @@ dotnet ef migrations list --connection "[CONNECTION_STRING_DEV]"
 
 ### FASE 5: MIGRAR DADOS (OPCIONAL)
 
+**Passo 5.0: Validar Branch (OBRIGATÓRIO)**
+```bash
+git branch --show-current
+# Esperado: migration/azure-sql-complete
+```
+**Se falhar:** BLOQUEIO TOTAL
+
+**Passo 5.1: Verificar Dados**
+
 Verificar se SQLite tem dados:
 - Se < 100KB: Pular (apenas schema)
 - Se > 100KB: Executar migração manual ou repovoar via seeds
@@ -240,6 +318,14 @@ Verificar se SQLite tem dados:
 
 ### FASE 6: VALIDAÇÃO COMPLETA
 
+**Passo 6.0: Validar Branch (OBRIGATÓRIO)**
+```bash
+git branch --show-current
+# Esperado: migration/azure-sql-complete
+```
+**Se falhar:** BLOQUEIO TOTAL
+
+**Passo 6.1: Executar Validações**
 ```bash
 # Build
 dotnet build --no-incremental
@@ -259,6 +345,13 @@ curl https://localhost:5001/health  # 200 OK
 ---
 
 ### FASE 7: DOCUMENTAÇÃO
+
+**Passo 7.0: Validar Branch (OBRIGATÓRIO)**
+```bash
+git branch --show-current
+# Esperado: migration/azure-sql-complete
+```
+**Se falhar:** BLOQUEIO TOTAL
 
 #### 7.1. Atualizar DECISIONS.md
 
