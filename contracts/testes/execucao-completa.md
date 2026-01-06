@@ -230,9 +230,41 @@ RESPONSABILIDADE: INFRAESTRUTURA (não é erro de código)
 
 ## 5. FLUXO DE EXECUÇÃO (ORDEM OBRIGATÓRIA)
 
+### 🚨 REGRAS CRÍTICAS DE GIT E COMMITS
+
+**BRANCH:**
+- ✅ **SEMPRE executar em `dev`** (branch principal de desenvolvimento)
+- ❌ **NUNCA criar branches** para testes (ex: `feature/RFXXX-testes-completos`)
+- ❌ **NUNCA fazer checkout** para outros branches
+
+**COMMITS:**
+- ❌ **NUNCA fazer commits** de código durante execução de testes
+- ❌ **NUNCA fazer commits** de STATUS.yaml durante testes
+- ❌ **NUNCA fazer commits** de relatórios ou evidências
+- ✅ **Única exceção:** Commit exclusivo dos próprios artefatos de teste (specs Playwright gerados), SE e SOMENTE SE forem criados pela primeira vez
+
+**CORREÇÕES:**
+- ❌ **NUNCA corrigir código** diretamente durante testes
+- ✅ **SEMPRE gerar prompt de correção** (`.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md`)
+- ✅ **Exibir prompt na tela** para usuário copiar e colar em nova conversa
+
+---
+
 ### FASE 1: VALIDAÇÃO INICIAL (BLOQUEANTE)
 
-#### PASSO 1.1: Validar Pré-Requisitos
+#### PASSO 1.1: Validar Branch Atual
+
+```bash
+# Verificar se está em dev
+git branch --show-current
+# Esperado: dev
+```
+
+**Se NÃO estiver em dev:**
+- ❌ **BLOQUEIO TOTAL**
+- Exibir mensagem: "Este contrato DEVE ser executado no branch `dev`. Use `git checkout dev` antes de prosseguir."
+
+#### PASSO 1.2: Validar Pré-Requisitos
 
 ```bash
 # Verificar STATUS.yaml
@@ -250,7 +282,7 @@ RESPONSABILIDADE: INFRAESTRUTURA (não é erro de código)
 
 **Se qualquer validação FALHAR:** BLOQUEIO TOTAL
 
-#### PASSO 1.2: Matar Processos Travados (AUTOMÁTICO)
+#### PASSO 1.3: Matar Processos Travados (AUTOMÁTICO)
 
 **ANTES de validar builds, o agente DEVE AUTOMATICAMENTE matar processos travados:**
 
@@ -272,7 +304,7 @@ powershell.exe -ExecutionPolicy Bypass -Command "Get-Process | Where-Object { $_
 - **NÃO gerar prompt de correção** para processos travados
 - Apenas matar automaticamente e prosseguir
 
-#### PASSO 1.3: Validar Builds
+#### PASSO 1.4: Validar Builds
 
 ```bash
 # Backend
@@ -622,7 +654,28 @@ Para cada teste FALHADO:
 
 ### FASE 7.4: GERAR PROMPT DE CORREÇÃO AUTOMÁTICO (SE REPROVADO)
 
-**SE taxa de aprovação < 100%, o agente DEVE OBRIGATORIAMENTE gerar um prompt de correção completo e descritivo.**
+**SE taxa de aprovação < 100%, o agente DEVE OBRIGATORIAMENTE:**
+
+1. ✅ **Gerar prompt de correção completo e descritivo**
+2. ✅ **Salvar em `.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md`**
+3. ✅ **Exibir prompt completo na tela**
+4. ✅ **Informar ao usuário:**
+   ```
+   📋 PROMPT DE CORREÇÃO GERADO
+
+   Arquivo: .temp_ia/PROMPT-CORRECAO-RFXXX-2026-01-05-EXECUCAO-1.md
+
+   Para corrigir os erros identificados, COPIE o conteúdo do arquivo acima
+   e COLE em uma NOVA CONVERSA com o Claude Code.
+
+   O prompt já está pronto para uso e contém:
+   - Contexto completo da execução
+   - Erros identificados com responsabilidade atribuída
+   - Evidências técnicas completas
+   - Solução esperada detalhada
+   ```
+5. ❌ **NUNCA tentar corrigir código** durante execução de testes
+6. ❌ **NUNCA fazer commits** de correções
 
 #### ⚠️ REGRA OBRIGATÓRIA: Prompt Completo e Descritivo
 
@@ -647,10 +700,7 @@ O prompt de correção **DEVE** conter:
 #### Template de Prompt de Correção
 
 ```markdown
-# PROMPT PARA CORREÇÃO DE FALHAS RFXXX
-
-Conforme contracts/desenvolvimento/execucao/manutencao/manutencao-controlada.md,
-corrija os seguintes erros CRÍTICOS identificados na Execução [N] de testes do RFXXX:
+Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\manutencao-controlada.md para corrigir os seguintes erros CRÍTICOS identificados na Execução [N] de testes do RFXXX:
 
 ## CONTEXTO DA EXECUÇÃO
 
@@ -840,7 +890,13 @@ Seguir D:\IC2\CLAUDE.md e contracts/desenvolvimento/execucao/manutencao/manutenc
 
 **NÃO EXISTE APROVAÇÃO COM RESSALVAS.**
 
-#### PASSO 8.2: Atualizar STATUS.yaml
+#### PASSO 8.2: Atualizar STATUS.yaml (SEM COMMIT)
+
+**IMPORTANTE:**
+- ✅ Atualizar STATUS.yaml com resultados
+- ❌ **NUNCA fazer commit** de STATUS.yaml durante testes
+- ❌ **NUNCA fazer commit** de relatórios ou evidências
+- ℹ️ Commit será feito APENAS quando correções forem aplicadas em nova conversa
 
 ```yaml
 testes_ti:
@@ -942,11 +998,10 @@ Para cada teste REPROVADO, criar:
 - Resposta esperada: { ... }
 
 ## PRÓXIMO PASSO
-Corrigir via contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md:
+Corrigir via prompt de manutenção:
 
 \```
-Conforme contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md,
-corrija o seguinte erro no [backend/frontend] de RFXXX:
+Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\manutencao-controlada.md para corrigir o seguinte erro no [backend/frontend] de RFXXX:
 
 ERRO IDENTIFICADO:
 - TC falhado: TC-RFXXX-[CAT]-NNN
@@ -969,11 +1024,27 @@ CONTEXTO:
 
 É **PROIBIDO**:
 
+### 7.1. Proibições de Git/Commits
+
+- ❌ **Criar branches** para testes (ex: `feature/RFXXX-testes-completos`)
+- ❌ **Fazer checkout** para outros branches (sempre executar em `dev`)
+- ❌ **Fazer commits** de código durante testes
+- ❌ **Fazer commits** de STATUS.yaml durante testes
+- ❌ **Fazer commits** de relatórios ou evidências
+- ✅ **Única exceção:** Commit de specs Playwright SE gerados pela primeira vez
+
+### 7.2. Proibições de Correção de Código
+
+- ❌ **Alterar código de produção** durante testes
+- ❌ **Corrigir erros** diretamente durante testes
+- ❌ **Modificar testes** para fazer passar
+- ✅ **SEMPRE gerar prompt de correção** quando encontrar problemas
+
+### 7.3. Proibições de Execução
+
 - ❌ Executar apenas subset de testes
 - ❌ Pular testes que falharam
-- ❌ Modificar testes para fazer passar
 - ❌ Marcar como APROVADO se taxa < 100%
-- ❌ Alterar código de produção durante testes
 - ❌ Executar testes sem buildar antes
 - ❌ Executar testes sem seeds aplicados
 - ❌ **Executar testes E2E sem verificar se specs existem**
@@ -986,29 +1057,52 @@ CONTEXTO:
 
 O contrato só é considerado CONCLUÍDO quando:
 
+### 8.1. Validações de Ambiente
+
+- [ ] Branch atual é `dev` (validado no PASSO 1.1)
 - [ ] Pré-requisitos validados (backend/frontend aprovados, MT/TC validados)
 - [ ] Builds validados (backend e frontend buildando sem erros)
 - [ ] Ambiente iniciado (backend porta 5000, frontend porta 4200)
 - [ ] Health checks validados (backend e frontend respondendo)
+
+### 8.2. Execução de Testes
+
 - [ ] **Specs Playwright verificados (se não existem → gerados automaticamente)**
 - [ ] Testes backend executados (dotnet test)
 - [ ] Testes frontend executados (npm run test)
 - [ ] Testes E2E executados (npm run e2e)
 - [ ] Testes de segurança executados
+
+### 8.3. Consolidação de Resultados
+
 - [ ] Taxa de aprovação calculada
 - [ ] Falhas identificadas com responsável atribuído
 - [ ] Evidências geradas (screenshots, logs, traces)
 - [ ] Relatório consolidado criado
-- [ ] **SE REPROVADO: Prompt de correção gerado e validado:**
+
+### 8.4. Prompt de Correção (SE REPROVADO)
+
+- [ ] **SE taxa < 100%: Prompt de correção gerado e validado:**
   - [ ] Arquivo `.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md` criado
   - [ ] Prompt tem > 100 linhas (completo, não vago)
   - [ ] ZERO placeholders não substituídos ([YYYY-MM-DD], [N], etc.)
   - [ ] Todas as seções obrigatórias presentes (incluindo "Comandos Tentados")
-  - [ ] Prompt exibido na tela para validação do usuário
+  - [ ] **Prompt exibido na tela COMPLETO** para usuário copiar
+  - [ ] **Mensagem clara:** "COPIE o prompt acima e COLE em nova conversa"
+
+### 8.5. Atualização de Artefatos (SEM COMMITS)
+
 - [ ] STATUS.yaml atualizado (incluindo testes.azure_devops)
 - [ ] azure-test-cases-RF[XXX].csv atualizado (State conforme resultado)
 - [ ] Decisão registrada (APROVADO/REPROVADO)
+- [ ] **IMPORTANTE:** ZERO commits realizados (exceto specs Playwright se gerados pela primeira vez)
+
+### 8.6. Validações Finais
+
 - [ ] Nenhuma violação de contrato
+- [ ] Nenhum branch criado
+- [ ] Nenhum código de produção alterado
+- [ ] **SE REPROVADO:** Prompt de correção pronto para uso
 
 ---
 
