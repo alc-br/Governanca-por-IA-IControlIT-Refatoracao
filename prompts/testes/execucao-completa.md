@@ -284,6 +284,10 @@ Corrigir via prompt de manutencao:
 \```
 Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\manutencao-controlada.md para corrigir o seguinte erro no [backend/frontend] de RFXXX:
 
+**OU (se > 3 arquivos afetados):**
+
+Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\manutencao-completa.md para corrigir o seguinte erro no [backend/frontend] de RFXXX:
+
 ERRO IDENTIFICADO:
 - TC falhado: TC-RFXXX-[CAT]-NNN
 - [Descricao completa do erro]

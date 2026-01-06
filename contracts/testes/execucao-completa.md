@@ -910,6 +910,8 @@ Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\[TIPO].md para corr
 
 [TIPO] = manutencao-controlada.md (se <= 3 arquivos) OU manutencao-completa.md (se > 3 arquivos)
 
+**REGRA CRÍTICA:** Sempre usar caminho absoluto (D:\IC2_Governanca\prompts\...) no prompt gerado
+
 ## CONTEXTO DA EXECUÇÃO
 
 - **RF:** RFXXX - [Título do RF]
@@ -1222,6 +1224,10 @@ Corrigir via prompt de manutenção:
 
 \```
 Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\manutencao-controlada.md para corrigir o seguinte erro no [backend/frontend] de RFXXX:
+
+**OU (se > 3 arquivos afetados):**
+
+Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\manutencao-completa.md para corrigir o seguinte erro no [backend/frontend] de RFXXX:
 
 ERRO IDENTIFICADO:
 - TC falhado: TC-RFXXX-[CAT]-NNN
