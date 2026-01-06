@@ -212,6 +212,14 @@ AUTONOMIA TOTAL:
 - Garantir que ambiente esteja buildado, rodando e testado
 - Gerar evidencias sem intervencao manual
 
+REGRAS CRITICAS DE GIT E COMMITS:
+- SEMPRE executar em branch `dev` (NUNCA criar branches)
+- NUNCA fazer commits de codigo durante testes
+- NUNCA fazer commits de STATUS.yaml ou relatorios
+- NUNCA corrigir codigo diretamente
+- SEMPRE gerar prompt de correcao quando encontrar problemas
+- Exibir prompt completo na tela para usuario copiar
+
 ATRIBUICAO DE RESPONSABILIDADE EM FALHAS:
 
 Quando um teste FALHAR, o agente DEVE identificar:
@@ -271,11 +279,10 @@ Para cada teste REPROVADO, criar:
 - Resposta esperada: { ... }
 
 ## PROXIMO PASSO
-Corrigir via contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md:
+Corrigir via prompt de manutencao:
 
 \```
-Conforme contracts/desenvolvimento/execucao/manutencao/CONTRATO-MANUTENCAO-CORRECAO-CONTROLADA.md,
-corrija o seguinte erro no [backend/frontend] de RFXXX:
+Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\manutencao-controlada.md para corrigir o seguinte erro no [backend/frontend] de RFXXX:
 
 ERRO IDENTIFICADO:
 - TC falhado: TC-RFXXX-[CAT]-NNN
