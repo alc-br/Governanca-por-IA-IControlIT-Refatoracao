@@ -166,7 +166,7 @@ epic: EPIC001-SYS-Sistema-Infraestrutura
 titulo: Teste Skeleton
 
 documentacao:
-  rf: True
+  documentacao: True
   uc: True
   md: True
   wf: True

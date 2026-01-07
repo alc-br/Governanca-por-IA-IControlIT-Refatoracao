@@ -583,7 +583,7 @@ AI: "RF-010 implementado 100%. Backend e Frontend compilando e rodando.
 ❌ WRONG:
 - relatorio-final.md (no RF)
 - RF005-relatorio.md (no hyphen after RF)
-- rf-005-relatorio.md (RF lowercase)
+- documentacao-005-relatorio.md (RF lowercase)
 ```
 
 ## Success Metrics

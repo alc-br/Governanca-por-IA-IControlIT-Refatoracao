@@ -75,7 +75,7 @@ def validate_rf_transition(rf, next_contract):
     Valida se um RF pode transicionar para o próximo contrato
 
     Args:
-        rf: ID do RF (ex: RF015)
+        documentacao: ID do RF (ex: RF015)
         next_contract: Próximo contrato a ser executado
 
     Returns:
@@ -116,7 +116,7 @@ def main():
         print("  para o próximo contrato é permitida conforme contract-transitions.yaml")
         sys.exit(1)
 
-    rf = sys.argv[1]
+    documentacao = sys.argv[1]
     next_contract = sys.argv[2]
 
     print(f"[VALIDAÇÃO] Verificando transição para {rf}")

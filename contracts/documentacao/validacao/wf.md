@@ -302,7 +302,7 @@ else:
 
 # Verificar se todos os wireframes estão rastreados
 wireframes_doc = set(re.findall(r'WF-(\d+)', wf_md_content))
-wireframes_rastro = set([wf.split('-')[1] for wf, uc, rf in rastro_lines])
+wireframes_rastro = set([wf.split('-')[1] for wf, uc, documentacao in rastro_lines])
 
 missing_rastro = wireframes_doc - wireframes_rastro
 if missing_rastro:

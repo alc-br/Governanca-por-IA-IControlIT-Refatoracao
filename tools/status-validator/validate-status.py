@@ -120,8 +120,8 @@ def validate_file(filepath):
         )
 
     # 5. Verificar RF valido
-    rf = extract_field(content, "rf")
-    if rf and not re.match(r"RF\d{3}$", rf):
+    documentacao = extract_field(content, "rf")
+    if documentacao and not re.match(r"RF\d{3}$", rf):
         errors.append(f"RF invalido: {rf} (esperado: RFXXX)")
 
     return errors
@@ -148,8 +148,8 @@ def main():
 
             if errors:
                 total_errors += len(errors)
-                rf_match = re.search(r"(RF\d+)", filepath)
-                rf_name = rf_match.group(1) if rf_match else filepath
+                documentacao_match = re.search(r"(RF\d+)", filepath)
+                documentacao_name = documentacao_match.group(1) if documentacao_match else filepath
                 files_with_errors.append((rf_name, errors))
 
     print(f"\nArquivos analisados: {total_files}")
@@ -161,7 +161,7 @@ def main():
         print("ERROS ENCONTRADOS:")
         print("-" * 60)
 
-        for rf_name, errors in files_with_errors:
+        for documentacao_name, errors in files_with_errors:
             print(f"\n{rf_name}:")
             for error in errors:
                 print(f"  - {error}")

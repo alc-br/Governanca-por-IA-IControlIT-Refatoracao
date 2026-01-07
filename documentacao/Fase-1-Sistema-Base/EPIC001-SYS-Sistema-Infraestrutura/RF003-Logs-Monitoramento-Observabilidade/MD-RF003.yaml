@@ -1,0 +1,742 @@
+# =============================================
+# MD-RF003 — Modelo de Dados: Sistema de Logs, Monitoramento e Observabilidade
+# Versão: 2.0
+# Data: 2026-01-04
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+# =============================================
+# 1. METADADOS DO DOCUMENTO (OBRIGATÓRIO)
+# =============================================
+metadata:
+  versao: "2.0"
+  data: "2026-01-04"
+  autor: "Agência ALC - alc.dev.br"
+
+  documentacao_relacionado:
+    id: "RF003"
+    nome: "Sistema de Logs, Monitoramento e Observabilidade"
+
+  sistema_modulo: "Infraestrutura - Logs e Observabilidade"
+  banco_de_dados:
+    engine: "N/A - Dados não persistidos em banco relacional"
+    schema: "N/A"
+    observacao: >
+      RF003 NÃO utiliza banco de dados relacional tradicional.
+      Logs são eventos append-only armazenados em sistemas especializados:
+      - Seq (DEV/HOM): Agregação centralizada com interface web
+      - Elasticsearch (PRD): Alta escala, retenção longa, busca full-text
+      - Prometheus: Métricas RED (Rate, Errors, Duration)
+      - Jaeger/Zipkin: Tracing distribuído OpenTelemetry
+      - Application Insights: APM nativo Azure (logs + métricas + traces)
+  padroes:
+    multi_tenancy: false  # Logs não têm tabelas persistentes
+    auditoria: true       # Logs SÃO auditoria por natureza
+    soft_delete: false    # Logs são purgados por retenção automática (RN-LOG-008)
+
+# =============================================
+# 2. OBSERVAÇÃO CRÍTICA (OBRIGATÓRIO)
+# =============================================
+observacao_critica: >
+  RF003 é um caso ATÍPICO e NÃO segue o padrão tradicional de modelo de dados.
+
+  **MOTIVO:**
+  - Logs são eventos append-only (write-only + read-only)
+  - NÃO há CRUD tradicional (Create, Read, Update, Delete)
+  - NÃO há tabelas persistentes em banco relacional
+  - NÃO se aplica multi-tenancy via campo cliente_id/empresa_id
+  - NÃO se aplica soft delete via campo deleted_at
+
+  **DADOS SÃO ARMAZENADOS EM:**
+  - Seq (DEV/HOM): Logs estruturados JSON pesquisáveis
+  - Elasticsearch (PRD): Logs com retenção longa e busca full-text
+  - Prometheus: Métricas RED (Rate, Errors, Duration)
+  - Jaeger/Zipkin: Traces distribuídos OpenTelemetry
+  - Application Insights: APM completo (logs + métricas + traces)
+
+  **LOGS SÃO PURGADOS AUTOMATICAMENTE:**
+  - Info/Debug: 90 dias (LGPD)
+  - Warning/Error: 1 ano (troubleshooting)
+  - Segurança/Auditoria: 7 anos (SOX/ISO 27001)
+
+  **ISOLAMENTO MULTI-TENANT:**
+  - TenantId é CAMPO do log JSON (não FK para tabela)
+  - Filtros por tenant são aplicados em queries Seq/Elasticsearch
+  - Cada tenant vê apenas seus próprios logs (isolamento lógico)
+
+# =============================================
+# 3. ESTRUTURA DE LOG (EVENTO JSON)
+# =============================================
+estrutura_log_event:
+  descricao: >
+    Logs são eventos JSON estruturados enviados para Seq/Elasticsearch.
+    Esta seção documenta a estrutura obrigatória de cada evento de log.
+
+  campos_obrigatorios:
+    - nome: "Timestamp"
+      tipo: "ISO 8601 DateTime"
+      exemplo: "2026-01-04T14:30:15.123Z"
+      descricao: "Data/hora exata do evento"
+      obrigatorio: true
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-001"
+        uc: "UC00, UC01, UC02"
+        wf: "WF-01, WF-02, WF-03"
+
+    - nome: "Level"
+      tipo: "String"
+      valores_permitidos: ["Verbose", "Debug", "Info", "Warning", "Error", "Fatal"]
+      exemplo: "Error"
+      descricao: "Severidade do log"
+      obrigatorio: true
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-002, RN-LOG-006"
+        uc: "UC00"
+        wf: "WF-01 (CMP-WF01-002)"
+
+    - nome: "Message"
+      tipo: "String"
+      exemplo: "FK constraint violation on table users (mascarado)"
+      descricao: "Mensagem do log com mascaramento automático aplicado"
+      mascaramento: true
+      obrigatorio: true
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-001, RN-LOG-004"
+        uc: "UC00, UC01, UC02"
+        wf: "WF-01 (CMP-WF01-004), WF-03 (CMP-WF03-004)"
+
+    - nome: "CorrelationId"
+      tipo: "GUID"
+      exemplo: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      descricao: "Identificador único do request (propagado end-to-end)"
+      obrigatorio: true
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-003"
+        uc: "UC01, UC02, UC07"
+        wf: "WF-01 (CMP-WF01-004), WF-02 (CMP-WF02-001), WF-08"
+
+    - nome: "UserId"
+      tipo: "String (Email)"
+      exemplo: "admin@test.com"
+      descricao: "Email do usuário autenticado (null se request não autenticado)"
+      obrigatorio: false
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-001"
+        uc: "UC00, UC01, UC02"
+        wf: "WF-01 (CMP-WF01-004), WF-02 (CMP-WF02-002)"
+
+    - nome: "TenantId"
+      tipo: "String (GUID ou Código)"
+      exemplo: "tenant-123"
+      descricao: "Identificador do tenant (multi-tenancy) - isolamento lógico"
+      obrigatorio: true
+      observacao: >
+        TenantId é campo JSON, não FK para tabela.
+        Isolamento multi-tenant via filtros em Seq/Elasticsearch.
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-001"
+        uc: "UC00, UC01, UC02"
+        wf: "WF-01, WF-02, WF-03 (CMP-WF03-007)"
+
+    - nome: "IP"
+      tipo: "String (IPv4/IPv6)"
+      exemplo: "192.168.1.100"
+      descricao: "Endereço IP de origem do request"
+      obrigatorio: true
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-001"
+        uc: "UC01"
+        wf: "WF-02 (CMP-WF02-003), WF-03 (CMP-WF03-008)"
+
+    - nome: "UserAgent"
+      tipo: "String"
+      exemplo: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      descricao: "Navegador/dispositivo de origem"
+      obrigatorio: true
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-001"
+        uc: "UC02"
+        wf: "WF-03 (CMP-WF03-009)"
+
+  campos_opcionais:
+    - nome: "Exception"
+      tipo: "String"
+      exemplo: "System.InvalidOperationException: FK constraint violation"
+      descricao: "Mensagem de exceção (se log de erro)"
+      obrigatorio: false
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-001, RN-LOG-004"
+        uc: "UC02"
+        wf: "WF-03 (CMP-WF03-010)"
+
+    - nome: "StackTrace"
+      tipo: "String (multiline)"
+      exemplo: |
+        at MyApp.Services.UserService.CreateUser() in UserService.cs:line 42
+        at MyApp.Controllers.UsersController.Post() in UsersController.cs:line 18
+      descricao: "Stack trace completo (se log de erro)"
+      obrigatorio: false
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-001"
+        uc: "UC02"
+        wf: "WF-03 (CMP-WF03-011)"
+
+    - nome: "TraceId"
+      tipo: "GUID"
+      exemplo: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+      descricao: "OpenTelemetry Trace ID (W3C Trace Context)"
+      obrigatorio: false
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-012"
+        uc: "UC07"
+        wf: "WF-08 (CMP-WF08-001)"
+
+    - nome: "SpanId"
+      tipo: "GUID"
+      exemplo: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+      descricao: "OpenTelemetry Span ID (identificador do span atual)"
+      obrigatorio: false
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-012"
+        uc: "UC07"
+        wf: "WF-08"
+
+    - nome: "ParentSpanId"
+      tipo: "GUID"
+      exemplo: "d4e5f6a7-b8c9-0123-def1-234567890123"
+      descricao: "OpenTelemetry Parent Span ID (span pai na hierarquia)"
+      obrigatorio: false
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-012"
+        uc: "UC07"
+        wf: "WF-08"
+
+# =============================================
+# 4. ESTRUTURA DE MÉTRICAS (PROMETHEUS)
+# =============================================
+estrutura_metricas:
+  descricao: >
+    Métricas RED (Rate, Errors, Duration) expostas via endpoint /metrics
+    em formato Prometheus para coleta e agregação.
+
+  metricas_obrigatorias:
+    - nome: "http_requests_total"
+      tipo: "Counter"
+      descricao: "Total de requests HTTP processados"
+      labels: ["method", "endpoint", "status_code", "tenant_id"]
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-009"
+        uc: "UC05"
+        wf: "WF-06 (CMP-WF06-001)"
+
+    - nome: "http_request_duration_seconds"
+      tipo: "Histogram"
+      descricao: "Latência de requests HTTP (P50/P95/P99)"
+      labels: ["method", "endpoint", "tenant_id"]
+      buckets: [0.01, 0.05, 0.1, 0.5, 1, 3, 5, 10]
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-009"
+        uc: "UC05"
+        wf: "WF-06 (CMP-WF06-003)"
+
+    - nome: "http_errors_total"
+      tipo: "Counter"
+      descricao: "Total de erros HTTP (4xx/5xx)"
+      labels: ["method", "endpoint", "status_code", "tenant_id"]
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-009"
+        uc: "UC05"
+        wf: "WF-06 (CMP-WF06-002)"
+
+    - nome: "health_check_status"
+      tipo: "Gauge"
+      descricao: "Status de dependências críticas (1=healthy, 0=unhealthy)"
+      labels: ["dependency_name", "tenant_id"]
+      valores: ["database", "cache", "queue", "api_externa"]
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-010"
+        uc: "UC06"
+        wf: "WF-07 (CMP-WF07-002)"
+
+# =============================================
+# 5. ESTRUTURA DE TRACING (OPENTELEMETRY)
+# =============================================
+estrutura_tracing:
+  descricao: >
+    Traces distribuídos OpenTelemetry (W3C Trace Context) para rastreamento
+    end-to-end de requests através de múltiplos serviços.
+
+  spans_obrigatorios:
+    - nome: "frontend_render"
+      descricao: "Span de renderização do frontend (Angular)"
+      atributos:
+        - "component: frontend"
+        - "framework: angular"
+        - "route: /logs"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-012"
+        uc: "UC07"
+        wf: "WF-08"
+
+    - nome: "api_gateway"
+      descricao: "Span de roteamento do API Gateway"
+      atributos:
+        - "component: api_gateway"
+        - "http.method: GET"
+        - "http.route: /api/logs"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-012"
+        uc: "UC07"
+        wf: "WF-08"
+
+    - nome: "api_backend"
+      descricao: "Span de processamento da API Backend (.NET)"
+      atributos:
+        - "component: api_backend"
+        - "handler: LogsController.GetLogs"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-012"
+        uc: "UC07"
+        wf: "WF-08"
+
+    - nome: "database_query"
+      descricao: "Span de execução de query SQL"
+      atributos:
+        - "component: database"
+        - "db.system: sqlserver"
+        - "db.statement: SELECT * FROM logs WHERE..."
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-012"
+        uc: "UC07"
+        wf: "WF-08 (CMP-WF08-004 - bottleneck)"
+
+    - nome: "queue_publish"
+      descricao: "Span de publicação em fila de mensagens"
+      atributos:
+        - "component: queue"
+        - "messaging.system: rabbitmq"
+        - "messaging.destination: logs_processing"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-012"
+        uc: "UC07"
+        wf: "WF-08"
+
+    - nome: "background_job"
+      descricao: "Span de processamento assíncrono (background job)"
+      atributos:
+        - "component: background_job"
+        - "job.name: ProcessLogs"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-012"
+        uc: "UC07"
+        wf: "WF-08"
+
+# =============================================
+# 6. POLÍTICA DE RETENÇÃO (RN-LOG-008)
+# =============================================
+politica_retencao:
+  descricao: >
+    Logs são purgados automaticamente por job diário conforme tipo e severidade.
+    Compliance: LGPD (90 dias), Troubleshooting (1 ano), SOX/ISO 27001 (7 anos).
+
+  regras:
+    - categoria: "Info / Debug"
+      retencao: "90 dias"
+      justificativa: "LGPD - dados pessoais em logs operacionais"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-008"
+        uc: "UC02"
+        wf: "WF-03 (Estado 2 - Log Purgado)"
+
+    - categoria: "Warning / Error"
+      retencao: "1 ano"
+      justificativa: "Troubleshooting histórico de problemas"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-008"
+        uc: "UC02"
+        wf: "WF-03"
+
+    - categoria: "Segurança / Auditoria"
+      retencao: "7 anos"
+      justificativa: "SOX, ISO 27001 - logs de acesso, autenticação, alterações críticas"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-008"
+        uc: "UC02"
+        wf: "WF-03"
+
+# =============================================
+# 7. MASCARAMENTO DE DADOS SENSÍVEIS (RN-LOG-004)
+# =============================================
+mascaramento_automatico:
+  descricao: >
+    Dados sensíveis são mascarados ANTES de logar.
+    Compliance: LGPD (não logar dados pessoais), PCI-DSS (não logar dados de cartão).
+
+  regras:
+    - tipo: "CPF"
+      padrao_regex: '\d{3}\.\d{3}\.\d{3}-\d{2}'
+      mascaramento: '***.***.*89-**'
+      exemplo_original: "123.456.789-01"
+      exemplo_mascarado: "***.***.*89-**"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-004"
+        uc: "UC00, UC01, UC02, UC03"
+        wf: "WF-01, WF-02, WF-03, WF-04"
+
+    - tipo: "Senha"
+      padrao_regex: '(password|senha|pwd)[\s:=]+\S+'
+      mascaramento: '***'
+      exemplo_original: "senha: minha_senha_123"
+      exemplo_mascarado: "senha: ***"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-004"
+        uc: "UC00, UC01, UC02, UC03"
+        wf: "WF-01, WF-02, WF-03, WF-04"
+
+    - tipo: "Cartão de Crédito"
+      padrao_regex: '\d{4}\s?\d{4}\s?\d{4}\s?\d{4}'
+      mascaramento: '**** **** **** 1111'
+      exemplo_original: "1111 2222 3333 4444"
+      exemplo_mascarado: "**** **** **** 4444"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-004"
+        uc: "UC00, UC01, UC02, UC03"
+        wf: "WF-01, WF-02, WF-03, WF-04"
+
+    - tipo: "Token de API"
+      padrao_regex: '(token|api_key|bearer)[\s:=]+\S{20,}'
+      mascaramento: '***'
+      exemplo_original: "token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      exemplo_mascarado: "token: ***"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-004"
+        uc: "UC00, UC01, UC02, UC03"
+        wf: "WF-01, WF-02, WF-03, WF-04"
+
+# =============================================
+# 8. CONFIGURAÇÃO DE ALERTAS (UC04, WF-05)
+# =============================================
+alertas_configuracao:
+  descricao: >
+    Configuração de alertas proativos armazenada em banco relacional.
+    ESTA É A ÚNICA TABELA PERSISTENTE DO RF003.
+
+  tabela: "log_alerts_config"
+
+  campos:
+    - nome: "id"
+      tipo: "BIGSERIAL"
+      nulo: false
+      default: "auto"
+      descricao: "Chave primária"
+      pk: true
+
+    - nome: "tenant_id"
+      tipo: "BIGINT"
+      nulo: false
+      descricao: "FK para tenants (multi-tenancy)"
+      fk:
+        tabela: "tenants"
+        coluna: "id"
+        on_delete: "CASCADE"
+      index: true
+      derivado_de:
+        documentacao: "RF003"
+        uc: "UC04"
+        wf: "WF-05"
+
+    - nome: "nome"
+      tipo: "VARCHAR(200)"
+      nulo: false
+      descricao: "Nome descritivo do alerta"
+      derivado_de:
+        documentacao: "RF003"
+        uc: "UC04"
+        wf: "WF-05 (CMP-WF05-001)"
+
+    - nome: "tipo"
+      tipo: "VARCHAR(50)"
+      nulo: false
+      descricao: "Tipo de alerta (ErrorRate, LatencyP95, DependenciaOffline, Disco, Memoria)"
+      check:
+        definicao: "tipo IN ('ErrorRate','LatencyP95','DependenciaOffline','Disco','Memoria')"
+        descricao: "Tipos permitidos"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-011"
+        uc: "UC04"
+        wf: "WF-05 (CMP-WF05-002)"
+
+    - nome: "threshold"
+      tipo: "DECIMAL(10,2)"
+      nulo: false
+      descricao: "Valor do threshold (ex: 5.00 para 5%)"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-011"
+        uc: "UC04"
+        wf: "WF-05 (CMP-WF05-003)"
+
+    - nome: "periodo_minutos"
+      tipo: "INTEGER"
+      nulo: false
+      descricao: "Período de avaliação (1, 5, 15, 30, 60 minutos)"
+      check:
+        definicao: "periodo_minutos IN (1, 5, 15, 30, 60)"
+        descricao: "Períodos permitidos"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-011"
+        uc: "UC04"
+        wf: "WF-05 (CMP-WF05-004)"
+
+    - nome: "dependencia_nome"
+      tipo: "VARCHAR(100)"
+      nulo: true
+      descricao: "Nome da dependência (se tipo=DependenciaOffline)"
+      check:
+        definicao: "dependencia_nome IS NULL OR dependencia_nome IN ('BancoDeDados','Cache','FilaMensagens','APIExterna')"
+        descricao: "Dependências permitidas"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-011"
+        uc: "UC04"
+        wf: "WF-05 (CMP-WF05-005)"
+
+    - nome: "notificacao_pagerduty"
+      tipo: "BOOLEAN"
+      nulo: false
+      default: true
+      descricao: "Habilitar notificação PagerDuty/Opsgenie"
+      derivado_de:
+        documentacao: "RF003"
+        rn: "RN-LOG-011"
+        uc: "UC04"
+        wf: "WF-05 (CMP-WF05-006)"
+
+    - nome: "ativo"
+      tipo: "BOOLEAN"
+      nulo: false
+      default: true
+      descricao: "Alerta ativo/inativo"
+      derivado_de:
+        documentacao: "RF003"
+        uc: "UC04"
+        wf: "WF-05"
+
+    - nome: "created_at"
+      tipo: "TIMESTAMP"
+      nulo: true
+      default: "NOW()"
+      descricao: "Data de criação"
+      audit: true
+      mutavel: false
+
+    - nome: "created_by"
+      tipo: "BIGINT"
+      nulo: true
+      default: null
+      descricao: "Usuário que criou"
+      audit: true
+      mutavel: false
+      fk:
+        tabela: "users"
+        coluna: "id"
+        on_delete: "SET NULL"
+
+    - nome: "updated_at"
+      tipo: "TIMESTAMP"
+      nulo: true
+      default: null
+      descricao: "Data de atualização"
+      audit: true
+      mutavel: false
+
+    - nome: "updated_by"
+      tipo: "BIGINT"
+      nulo: true
+      default: null
+      descricao: "Usuário que atualizou"
+      audit: true
+      mutavel: false
+      fk:
+        tabela: "users"
+        coluna: "id"
+        on_delete: "SET NULL"
+
+    - nome: "deleted_at"
+      tipo: "TIMESTAMP"
+      nulo: true
+      default: null
+      descricao: "Soft delete"
+      audit: true
+      mutavel: false
+
+  indices:
+    - nome: "pk_log_alerts_config"
+      tipo: "PRIMARY"
+      colunas: ["id"]
+      descricao: "Chave primária"
+
+    - nome: "idx_log_alerts_config_tenant"
+      tipo: "BTREE"
+      colunas: ["tenant_id"]
+      descricao: "Performance multi-tenant"
+
+    - nome: "idx_log_alerts_config_tipo"
+      tipo: "BTREE"
+      colunas: ["tipo"]
+      descricao: "Performance em filtros por tipo"
+
+    - nome: "idx_log_alerts_config_ativo"
+      tipo: "BTREE"
+      colunas: ["ativo"]
+      where: "ativo = true"
+      descricao: "Performance em queries de alertas ativos"
+
+  constraints:
+    - nome: "fk_log_alerts_config_tenant"
+      tipo: "FOREIGN KEY"
+      definicao: "tenant_id REFERENCES tenants(id)"
+      on_delete: "CASCADE"
+      descricao: "Multi-tenancy"
+
+    - nome: "uq_log_alerts_config_tenant_nome"
+      tipo: "UNIQUE"
+      definicao: "(tenant_id, nome)"
+      descricao: "Nome único por tenant"
+
+    - nome: "chk_log_alerts_config_tipo"
+      tipo: "CHECK"
+      definicao: "tipo IN ('ErrorRate','LatencyP95','DependenciaOffline','Disco','Memoria')"
+      descricao: "Tipos permitidos"
+
+    - nome: "chk_log_alerts_config_periodo"
+      tipo: "CHECK"
+      definicao: "periodo_minutos IN (1, 5, 15, 30, 60)"
+      descricao: "Períodos permitidos"
+
+# =============================================
+# 9. RELACIONAMENTOS GLOBAIS
+# =============================================
+relacionamentos_globais:
+  - origem: "tenants"
+    cardinalidade: "1:N"
+    destino: "log_alerts_config"
+    descricao: "Um tenant possui muitas configurações de alerta"
+
+# =============================================
+# 10. OBSERVAÇÕES E DECISÕES (OBRIGATÓRIO)
+# =============================================
+observacoes:
+  - categoria: "Modelagem"
+    descricao: >
+      RF003 é ATÍPICO e NÃO segue padrão tradicional de modelo de dados.
+      Logs são eventos append-only armazenados em Seq/Elasticsearch, não em banco relacional.
+      A ÚNICA tabela persistente é log_alerts_config (configuração de alertas).
+
+  - categoria: "Multi-Tenancy"
+    descricao: >
+      Isolamento multi-tenant é LÓGICO, não físico.
+      TenantId é campo JSON em cada log (não FK para tabela).
+      Filtros por tenant são aplicados em queries Seq/Elasticsearch.
+      Tabela log_alerts_config POSSUI multi-tenancy tradicional (FK para tenants).
+
+  - categoria: "Auditoria"
+    descricao: >
+      Logs SÃO auditoria por natureza (registro de eventos do sistema).
+      Não faz sentido auditar logs (would be logs de logs).
+      Tabela log_alerts_config POSSUI auditoria tradicional (created_at, created_by, etc.).
+
+  - categoria: "Performance"
+    descricao: >
+      Seq: Interface web para DEV/HOM, busca simples.
+      Elasticsearch: Alta escala PRD, busca full-text com regex.
+      Prometheus: Métricas agregadas (Rate, Errors, Duration).
+      Índices automáticos em Timestamp, Level, TenantId, CorrelationId.
+
+  - categoria: "Compliance"
+    descricao: >
+      LGPD: Mascaramento automático de CPF, dados pessoais. Retenção 90 dias (Info/Debug).
+      PCI-DSS: Mascaramento de cartões de crédito.
+      SOX/ISO 27001: Retenção 7 anos (logs de segurança/auditoria).
+
+  - categoria: "Sampling (RN-LOG-005)"
+    descricao: >
+      Em produção, apenas 10% dos requests 2xx são logados (Info/Debug).
+      100% dos erros (4xx/5xx) são SEMPRE logados.
+      Reduz volume/custo sem perder capacidade de diagnóstico em falhas.
+      Sampling é invisível ao usuário (implementação técnica de backend).
+
+  - categoria: "Circuit Breaker (RN-LOG-007)"
+    descricao: >
+      Se Seq/Elasticsearch falhar, aplicação degrada graciosamente:
+      escreve logs em arquivo local temporário e NÃO trava/lança exceção.
+      Logging não pode derrubar aplicação principal.
+      Circuit breaker é invisível ao usuário (mecanismo de resiliência técnica).
+
+  - categoria: "Integração"
+    descricao: >
+      Seq: Logs estruturados JSON com interface web (DEV/HOM).
+      Elasticsearch: Busca full-text, retenção longa (PRD).
+      Prometheus: Métricas RED via endpoint /metrics.
+      Grafana: Dashboards visuais de métricas (consome Prometheus).
+      Jaeger/Zipkin: Tracing distribuído OpenTelemetry.
+      Application Insights: APM nativo Azure (logs + métricas + traces).
+      PagerDuty/Opsgenie: Notificações 24/7 de alertas críticos.
+
+# =============================================
+# 11. HISTÓRICO DE ALTERAÇÕES (OBRIGATÓRIO)
+# =============================================
+historico:
+  - versao: "2.0"
+    data: "2026-01-04"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: >
+      Versão inicial derivada do RF003.
+
+      RF003 é ATÍPICO: logs são eventos append-only (não tabelas).
+      Única tabela persistente: log_alerts_config (configuração de alertas).
+
+      Documentado:
+      - Estrutura de log JSON (11 campos obrigatórios + 4 opcionais)
+      - Estrutura de métricas Prometheus (4 métricas RED)
+      - Estrutura de tracing OpenTelemetry (6 spans)
+      - Política de retenção (90d / 1y / 7y)
+      - Mascaramento automático (CPF, senha, cartão, token)
+      - Tabela log_alerts_config (configuração de alertas com multi-tenancy)
+
+      Derivado de:
+      - RF003.yaml (12 regras de negócio)
+      - UC-RF003.yaml (7 casos de uso, 100% cobertura)
+      - WF-RF003.md (8 wireframes, 100% cobertura)

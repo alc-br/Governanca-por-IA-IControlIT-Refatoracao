@@ -7,7 +7,7 @@ Valida que:
 2. RL-RFXXX.yaml existe e está bem formado
 3. Cada item em RL tem campo 'destino' preenchido
 4. Itens com destino=descartado têm justificativa
-5. Itens com destino=assumido têm rf_item_relacionado
+5. Itens com destino=assumido têm documentacao_item_relacionado
 
 Uso:
     python validator-rl.py RFXXX
@@ -32,7 +32,7 @@ from dataclasses import dataclass, asdict
 @dataclass
 class ValidationResult:
     """Resultado da validação de um RF"""
-    rf_id: str
+    documentacao_id: str
     separacao_valida: bool
     rl_estruturado: bool
     itens_legado: int
@@ -68,7 +68,7 @@ class ValidadorRL:
     def __init__(self, base_path: str = "D:\\IC2\\docs\\rf"):
         self.base_path = Path(base_path)
 
-    def encontrar_rf(self, rf_id: str) -> Path:
+    def encontrar_rf(self, documentacao_id: str) -> Path:
         """Encontra a pasta do RF (tolerante a diferentes padrões de estrutura)"""
         # Tentar múltiplos padrões de EPIC
         epic_patterns = ["EPIC*", "EPIC-*", "EPIC[0-9]*"]
@@ -77,24 +77,24 @@ class ValidadorRL:
             for epic_pattern in epic_patterns:
                 for epic_dir in fase_dir.glob(epic_pattern):
                     # Procurar RF com diferentes padrões
-                    rf_patterns = [f"{rf_id}-*", f"{rf_id}"]
-                    for rf_pattern in rf_patterns:
-                        for rf_dir in epic_dir.glob(rf_pattern):
+                    documentacao_patterns = [f"{rf_id}-*", f"{rf_id}"]
+                    for documentacao_pattern in documentacao_patterns:
+                        for documentacao_dir in epic_dir.glob(rf_pattern):
                             # Verificar se é realmente a pasta do RF
-                            if rf_dir.is_dir() and rf_dir.name.startswith(rf_id):
-                                return rf_dir
+                            if documentacao_dir.is_dir() and documentacao_dir.name.startswith(rf_id):
+                                return documentacao_dir
 
         raise FileNotFoundError(f"RF {rf_id} não encontrado em {self.base_path}")
 
-    def validar_rf_limpo(self, rf_path: Path) -> Tuple[bool, List[Dict[str, str]]]:
+    def validar_rf_limpo(self, documentacao_path: Path) -> Tuple[bool, List[Dict[str, str]]]:
         """Valida que RF.md não contém palavras-chave de legado"""
-        rf_md = rf_path / f"{rf_path.name.split('-')[0]}.md"
+        documentacao_md = documentacao_path / f"{rf_path.name.split('-')[0]}.md"
 
-        if not rf_md.exists():
+        if not documentacao_md.exists():
             return False, [{"tipo": "CRÍTICO", "mensagem": f"Arquivo {rf_md.name} não encontrado"}]
 
         gaps = []
-        content = rf_md.read_text(encoding='utf-8')
+        content = documentacao_md.read_text(encoding='utf-8')
 
         # Verificar cada palavra-chave
         for keyword in self.KEYWORDS_LEGADO:
@@ -112,7 +112,7 @@ class ValidadorRL:
 
                 gaps.append({
                     "tipo": "CRÍTICO",
-                    "arquivo": rf_md.name,
+                    "arquivo": documentacao_md.name,
                     "mensagem": f"Palavra-chave legado encontrada: '{keyword}'",
                     "linhas": line_numbers,
                     "ocorrencias": len(matches)
@@ -120,10 +120,10 @@ class ValidadorRL:
 
         return len(gaps) == 0, gaps
 
-    def validar_rl_yaml(self, rf_path: Path) -> Tuple[bool, Dict, List[Dict[str, str]]]:
+    def validar_rl_yaml(self, documentacao_path: Path) -> Tuple[bool, Dict, List[Dict[str, str]]]:
         """Valida que RL-RFXXX.yaml existe e está bem formado"""
-        rf_id = rf_path.name.split('-')[0]
-        rl_yaml = rf_path / f"RL-{rf_id}.yaml"
+        documentacao_id = documentacao_path.name.split('-')[0]
+        rl_yaml = documentacao_path / f"RL-{rf_id}.yaml"
 
         if not rl_yaml.exists():
             return False, {}, [{
@@ -152,7 +152,7 @@ class ValidadorRL:
         # Validar estrutura obrigatória
         if 'rf_id' not in data:
             gaps.append({"tipo": "CRÍTICO", "mensagem": "Campo 'rf_id' ausente"})
-        elif data['rf_id'] != rf_id:
+        elif data['rf_id'] != documentacao_id:
             gaps.append({
                 "tipo": "IMPORTANTE",
                 "mensagem": f"rf_id '{data['rf_id']}' não corresponde ao esperado '{rf_id}'"
@@ -209,7 +209,7 @@ class ValidadorRL:
                             "mensagem": "Item descartado DEVE ter justificativa"
                         })
 
-                    # Se destino = assumido, rf_item_relacionado é recomendado
+                    # Se destino = assumido, documentacao_item_relacionado é recomendado
                     if destino == 'assumido' and not item.get('rf_item_relacionado'):
                         gaps.append({
                             "tipo": "MENOR",
@@ -228,13 +228,13 @@ class ValidadorRL:
 
         return total_itens, itens_com_destino, gaps
 
-    def validar_rf(self, rf_id: str) -> ValidationResult:
+    def validar_rf(self, documentacao_id: str) -> ValidationResult:
         """Valida um RF completo"""
         try:
-            rf_path = self.encontrar_rf(rf_id)
+            documentacao_path = self.encontrar_rf(rf_id)
         except FileNotFoundError as e:
             return ValidationResult(
-                rf_id=rf_id,
+                documentacao_id=rf_id,
                 separacao_valida=False,
                 rl_estruturado=False,
                 itens_legado=0,
@@ -245,7 +245,7 @@ class ValidadorRL:
         all_gaps = []
 
         # Validação 1: RF.md limpo
-        rf_limpo, gaps_rf = self.validar_rf_limpo(rf_path)
+        documentacao_limpo, gaps_rf = self.validar_rf_limpo(rf_path)
         all_gaps.extend(gaps_rf)
 
         # Validação 2: RL.yaml estruturado
@@ -261,11 +261,11 @@ class ValidadorRL:
             all_gaps.extend(gaps_itens)
 
         # Resultado final
-        separacao_valida = rf_limpo and rl_valido
+        separacao_valida = documentacao_limpo and rl_valido
         rl_estruturado = rl_valido and (total_itens == itens_com_destino)
 
         return ValidationResult(
-            rf_id=rf_id,
+            documentacao_id=rf_id,
             separacao_valida=separacao_valida,
             rl_estruturado=rl_estruturado,
             itens_legado=total_itens,
@@ -284,8 +284,8 @@ class ValidadorRL:
 
         # Iterar sobre EPICs e RFs
         for epic_dir in sorted(fase_dir.glob("EPIC-*")):
-            for rf_dir in sorted(epic_dir.glob("RF*")):
-                rf_id = rf_dir.name.split('-')[0]
+            for documentacao_dir in sorted(epic_dir.glob("RF*")):
+                documentacao_id = documentacao_dir.name.split('-')[0]
                 print(f"Validando {rf_id}...")
                 result = self.validar_rf(rf_id)
                 results.append(result)
@@ -421,7 +421,7 @@ def main():
 
     else:
         # Validar RF único
-        rf_id = arg
+        documentacao_id = arg
         print(f"Validando {rf_id}...")
         result = validador.validar_rf(rf_id)
         results = [result]

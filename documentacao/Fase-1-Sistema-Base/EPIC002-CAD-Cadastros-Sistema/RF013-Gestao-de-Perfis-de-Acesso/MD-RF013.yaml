@@ -1,0 +1,887 @@
+# =============================================
+# Modelo de Dados (MD) — RF013 - Gestão de Perfis de Acesso (RBAC)
+# Versão: 2.0
+# Data: 2026-01-04
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+# =============================================
+# 1. METADADOS DO DOCUMENTO (OBRIGATÓRIO)
+# =============================================
+metadata:
+  versao: "2.0"
+  data: "2026-01-04"
+  autor: "Agência ALC - alc.dev.br"
+
+  documentacao_relacionado:
+    id: "RF013"
+    nome: "Gestão de Perfis de Acesso (RBAC)"
+
+  sistema_modulo: "Sistema Base - Segurança e Controle de Acesso"
+  banco_de_dados:
+    engine: "logico"        # Modelo lógico (independente de engine física)
+    schema: "logico"        # Abstração de schema
+  padroes:
+    multi_tenancy: true
+    auditoria: true
+    soft_delete: true
+
+# =============================================
+# 2. ENTIDADES (OBRIGATÓRIO)
+# =============================================
+entidades:
+  # =============================================
+  # 2.1 ENTIDADE: Role (Perfil de Acesso)
+  # =============================================
+  - nome: "Role"
+    descricao: "Perfil de acesso que agrupa permissões (RBAC)"
+
+    # -----------------------------
+    # 2.1.1 CAMPOS (OBRIGATÓRIO)
+    # -----------------------------
+    campos:
+      # CHAVE PRIMÁRIA (OBRIGATÓRIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primária"
+        pk: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: null
+          wf: null
+          campo_wf: null
+          observacao: "Campo gerado automaticamente pelo sistema"
+
+      # MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "empresa_id"
+        tipo: "GUID"
+        nulo: true
+        descricao: "FK para empresa (multi-tenancy). NULL para perfis de sistema."
+        fk:
+          tabela: "empresa"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC00, UC01, UC02, UC03, UC04, UC05, UC06"
+          wf: "WF-01"
+          campo_wf: null
+          observacao: "Perfis de sistema têm empresa_id NULL. Perfis personalizados têm empresa_id do tenant."
+
+      # CAMPOS DE NEGÓCIO
+      - nome: "nome"
+        tipo: "VARCHAR(100)"
+        nulo: false
+        default: null
+        descricao: "Nome do perfil de acesso (ex: 'Administrador', 'Gestor')"
+        unique_por_tenant: true
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF013"
+          uc: "UC01, UC03"
+          wf: "WF-01, WF-02, WF-03, WF-04"
+          campo_wf: "CMP-WF01-002"
+          observacao: "Deve ser único por tenant (RN-RF013-01)"
+
+      - nome: "descricao"
+        tipo: "VARCHAR(500)"
+        nulo: true
+        default: null
+        descricao: "Descrição do perfil e suas responsabilidades"
+        mutavel: true
+        origem:
+          documentacao: "RF013"
+          uc: "UC01, UC03"
+          wf: "WF-01, WF-02, WF-03, WF-04"
+          campo_wf: null
+          observacao: "Campo opcional para documentar propósito do perfil"
+
+      - nome: "is_system_role"
+        tipo: "BIT"
+        nulo: false
+        default: false
+        descricao: "Flag indicando se é perfil de sistema (não-editável nome/descrição)"
+        index: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC00, UC01, UC02, UC03"
+          wf: "WF-01, WF-02, WF-03"
+          campo_wf: "CMP-WF01-011"
+          observacao: "Perfis de sistema: Super Administrador, Administrador, Gestor, Operador, Visualizador (RN-RF013-02)"
+
+      - nome: "fl_super_admin"
+        tipo: "BIT"
+        nulo: false
+        default: false
+        descricao: "Flag indicando se é Super Admin (bypassa validações de permissão)"
+        index: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC00, UC01, UC02, UC03, UC05"
+          wf: null
+          campo_wf: null
+          observacao: "Super Admin tem acesso total irrestrito (RN-RF013-03)"
+
+      - nome: "fl_ativo"
+        tipo: "BIT"
+        nulo: false
+        default: true
+        descricao: "Flag de ativo/inativo (0 = Inativo/Soft Delete, 1 = Ativo)"
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF013"
+          uc: "UC00, UC04"
+          wf: "WF-01, WF-05"
+          campo_wf: "CMP-WF01-004"
+          observacao: "Uso de Fl_Ativo ao invés de Fl_Desativado (RN-RF013-10)"
+
+      # AUDITORIA (OBRIGATÓRIO - 5 campos)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criação"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC01"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente via BaseAuditableEntity (RN-RF013-09)"
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que criou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF013"
+          uc: "UC01"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente com ID do usuário autenticado (RN-RF013-09)"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de atualização"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC03"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente via BaseAuditableEntity (RN-RF013-09)"
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que atualizou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF013"
+          uc: "UC03"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente com ID do usuário autenticado (RN-RF013-09)"
+
+      # SOFT DELETE (OBRIGATÓRIO)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Soft delete (data de exclusão lógica)"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC04"
+          wf: "WF-05"
+          campo_wf: null
+          observacao: "Preenchido automaticamente ao excluir (soft delete)"
+
+    # -----------------------------
+    # 2.1.2 ÍNDICES (OBRIGATÓRIO)
+    # -----------------------------
+    indices:
+      # ÍNDICE PRIMÁRIO (OBRIGATÓRIO)
+      - nome: "pk_role"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primária"
+
+      # ÍNDICE MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "idx_role_empresa"
+        tipo: "BTREE"
+        colunas: ["empresa_id"]
+        descricao: "Performance multi-tenant (queries WHERE empresa_id)"
+
+      # ÍNDICES DE PERFORMANCE (conforme WF - filtros/buscas)
+      - nome: "idx_role_nome"
+        tipo: "BTREE"
+        colunas: ["nome"]
+        descricao: "Performance em buscas por nome (WF-01 CMP-WF01-002)"
+
+      - nome: "idx_role_fl_ativo"
+        tipo: "BTREE"
+        colunas: ["fl_ativo"]
+        descricao: "Performance em filtros por status (WF-01 CMP-WF01-004)"
+
+      - nome: "idx_role_is_system_role"
+        tipo: "BTREE"
+        colunas: ["is_system_role"]
+        descricao: "Performance em filtros por tipo (WF-01 CMP-WF01-003)"
+
+      - nome: "idx_role_fl_super_admin"
+        tipo: "BTREE"
+        colunas: ["fl_super_admin"]
+        descricao: "Performance em validações de Super Admin (RN-RF013-03)"
+
+      - nome: "idx_role_created_at"
+        tipo: "BTREE"
+        colunas: ["created_at"]
+        descricao: "Performance em ordenação por data de criação"
+
+    # -----------------------------
+    # 2.1.3 CONSTRAINTS (OBRIGATÓRIO)
+    # -----------------------------
+    constraints:
+      # FK MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "fk_role_empresa"
+        tipo: "FOREIGN KEY"
+        definicao: "empresa_id REFERENCES empresa(id)"
+        on_delete: "CASCADE"
+        descricao: "Multi-tenancy (NULL permitido para perfis de sistema)"
+
+      # UNIQUE POR TENANT (RN-RF013-01)
+      - nome: "uq_role_empresa_nome"
+        tipo: "UNIQUE"
+        definicao: "(empresa_id, nome) WHERE fl_ativo = 1"
+        descricao: "Nome único por tenant (case-insensitive, apenas ativos)"
+
+      # FKs DE AUDITORIA (OBRIGATÓRIO)
+      - nome: "fk_role_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - criador"
+
+      - nome: "fk_role_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - editor"
+
+  # =============================================
+  # 2.2 ENTIDADE: Permission (Permissão)
+  # =============================================
+  - nome: "Permission"
+    descricao: "Permissão granular de acesso a recursos (catálogo centralizado)"
+
+    # -----------------------------
+    # 2.2.1 CAMPOS (OBRIGATÓRIO)
+    # -----------------------------
+    campos:
+      # CHAVE PRIMÁRIA (OBRIGATÓRIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primária"
+        pk: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: null
+          wf: null
+          campo_wf: null
+          observacao: "Campo gerado automaticamente pelo sistema"
+
+      # CAMPOS DE NEGÓCIO
+      - nome: "codigo"
+        tipo: "VARCHAR(100)"
+        nulo: false
+        default: null
+        descricao: "Código único da permissão (formato: modulo:recurso:acao)"
+        unique_por_tenant: false
+        index: true
+        mutavel: false
+        check:
+          definicao: "codigo LIKE '%:%:%'"
+          descricao: "Formato obrigatório modulo:recurso:acao (RN-RF013-04)"
+        origem:
+          documentacao: "RF013"
+          uc: "UC01, UC03, UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Exemplos: usuarios:usuario:create, perfis:perfil:delete (RN-RF013-04)"
+
+      - nome: "nome"
+        tipo: "VARCHAR(100)"
+        nulo: false
+        default: null
+        descricao: "Nome amigável da permissão (ex: 'Criar Usuário')"
+        mutavel: true
+        origem:
+          documentacao: "RF013"
+          uc: "UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Texto descritivo para exibição na UI"
+
+      - nome: "descricao"
+        tipo: "VARCHAR(500)"
+        nulo: true
+        default: null
+        descricao: "Descrição detalhada da permissão"
+        mutavel: true
+        origem:
+          documentacao: "RF013"
+          uc: "UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Tooltip/Help text na UI (WF-06 FA-UC05-03)"
+
+      - nome: "modulo"
+        tipo: "VARCHAR(50)"
+        nulo: false
+        default: null
+        descricao: "Módulo ao qual a permissão pertence (ex: 'usuarios', 'perfis', 'contratos')"
+        index: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Derivado do código (parte antes do primeiro ':')"
+
+      - nome: "recurso"
+        tipo: "VARCHAR(50)"
+        nulo: false
+        default: null
+        descricao: "Recurso ao qual a permissão se refere (ex: 'usuario', 'perfil', 'contrato')"
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Derivado do código (parte entre os dois ':')"
+
+      - nome: "acao"
+        tipo: "VARCHAR(30)"
+        nulo: false
+        default: null
+        descricao: "Ação da permissão (create, read, update, delete, approve, import, export, view, view_any)"
+        mutavel: false
+        check:
+          definicao: "acao IN ('create','read','update','delete','approve','import','export','view','view_any')"
+          descricao: "Ações permitidas (RN-RF013-04)"
+        origem:
+          documentacao: "RF013"
+          uc: "UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Derivado do código (parte após o segundo ':')"
+
+      - nome: "fl_critica"
+        tipo: "BIT"
+        nulo: false
+        default: false
+        descricao: "Flag indicando se é permissão crítica (exige justificativa e auditoria detalhada)"
+        index: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC03, UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Permissões críticas (RN-RF013-05): create/update/delete em usuarios, perfis, contratos, approve, import"
+
+      # AUDITORIA (OBRIGATÓRIO - 5 campos)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criação"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: null
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente via BaseAuditableEntity"
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que criou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF013"
+          uc: null
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente com ID do usuário autenticado"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de atualização"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: null
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente via BaseAuditableEntity"
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que atualizou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF013"
+          uc: null
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente com ID do usuário autenticado"
+
+      # SOFT DELETE (OBRIGATÓRIO)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Soft delete (data de exclusão lógica)"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: null
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente ao excluir (soft delete)"
+
+    # -----------------------------
+    # 2.2.2 ÍNDICES (OBRIGATÓRIO)
+    # -----------------------------
+    indices:
+      # ÍNDICE PRIMÁRIO (OBRIGATÓRIO)
+      - nome: "pk_permission"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primária"
+
+      # ÍNDICES DE PERFORMANCE
+      - nome: "idx_permission_codigo"
+        tipo: "BTREE"
+        colunas: ["codigo"]
+        descricao: "Performance em validação de permissões (RN-RF013-06)"
+
+      - nome: "idx_permission_modulo"
+        tipo: "BTREE"
+        colunas: ["modulo"]
+        descricao: "Performance em agrupamento por módulo (WF-06 UC05)"
+
+      - nome: "idx_permission_fl_critica"
+        tipo: "BTREE"
+        colunas: ["fl_critica"]
+        descricao: "Performance em filtros de permissões críticas (RN-RF013-05)"
+
+    # -----------------------------
+    # 2.2.3 CONSTRAINTS (OBRIGATÓRIO)
+    # -----------------------------
+    constraints:
+      # UNIQUE GLOBAL (permissões são globais, não por tenant)
+      - nome: "uq_permission_codigo"
+        tipo: "UNIQUE"
+        definicao: "(codigo)"
+        descricao: "Código único global (permissões não são multi-tenant)"
+
+      # FKs DE AUDITORIA (OBRIGATÓRIO)
+      - nome: "fk_permission_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - criador"
+
+      - nome: "fk_permission_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - editor"
+
+  # =============================================
+  # 2.3 ENTIDADE: RolePermission (Relacionamento N:N)
+  # =============================================
+  - nome: "RolePermission"
+    descricao: "Relacionamento entre perfis e permissões (N:N)"
+
+    # -----------------------------
+    # 2.3.1 CAMPOS (OBRIGATÓRIO)
+    # -----------------------------
+    campos:
+      # CHAVE PRIMÁRIA (OBRIGATÓRIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primária"
+        pk: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: null
+          wf: null
+          campo_wf: null
+          observacao: "Campo gerado automaticamente pelo sistema"
+
+      # MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "empresa_id"
+        tipo: "GUID"
+        nulo: true
+        descricao: "FK para empresa (multi-tenancy). NULL para permissões de perfis de sistema."
+        fk:
+          tabela: "empresa"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC01, UC03, UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Replica empresa_id do perfil para facilitar queries multi-tenant"
+
+      # CAMPOS DE RELACIONAMENTO
+      - nome: "role_id"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para role (perfil)"
+        fk:
+          tabela: "role"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC01, UC03, UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Perfil ao qual a permissão está atribuída"
+
+      - nome: "permission_id"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para permission (permissão)"
+        fk:
+          tabela: "permission"
+          coluna: "id"
+          on_delete: "CASCADE"
+        index: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC01, UC03, UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Permissão atribuída ao perfil"
+
+      # CAMPOS DE AUDITORIA ESTENDIDA (para permissões críticas)
+      - nome: "justificativa"
+        tipo: "VARCHAR(1000)"
+        nulo: true
+        default: null
+        descricao: "Justificativa obrigatória para permissões críticas (RN-RF013-05)"
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC03, UC05"
+          wf: "WF-06"
+          campo_wf: null
+          observacao: "Obrigatório quando permission.fl_critica = 1 (RN-RF013-05)"
+
+      - nome: "ip_atribuicao"
+        tipo: "VARCHAR(50)"
+        nulo: true
+        default: null
+        descricao: "IP do usuário que atribuiu a permissão (auditoria de segurança)"
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC03, UC05"
+          wf: null
+          campo_wf: null
+          observacao: "Registrado automaticamente para auditoria de segurança (RN-RF013-05)"
+
+      # AUDITORIA (OBRIGATÓRIO - 5 campos)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criação (atribuição da permissão)"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC01, UC03, UC05"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente via BaseAuditableEntity (RN-RF013-09)"
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que atribuiu a permissão"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF013"
+          uc: "UC01, UC03, UC05"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente com ID do usuário autenticado (RN-RF013-09)"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de atualização"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC03, UC05"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente via BaseAuditableEntity"
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que atualizou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF013"
+          uc: "UC03, UC05"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente com ID do usuário autenticado"
+
+      # SOFT DELETE (OBRIGATÓRIO)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Soft delete (data de remoção da permissão)"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF013"
+          uc: "UC03, UC05"
+          wf: null
+          campo_wf: null
+          observacao: "Preenchido automaticamente ao remover permissão (soft delete)"
+
+    # -----------------------------
+    # 2.3.2 ÍNDICES (OBRIGATÓRIO)
+    # -----------------------------
+    indices:
+      # ÍNDICE PRIMÁRIO (OBRIGATÓRIO)
+      - nome: "pk_role_permission"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primária"
+
+      # ÍNDICE MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "idx_role_permission_empresa"
+        tipo: "BTREE"
+        colunas: ["empresa_id"]
+        descricao: "Performance multi-tenant"
+
+      # ÍNDICES DE RELACIONAMENTO
+      - nome: "idx_role_permission_role"
+        tipo: "BTREE"
+        colunas: ["role_id"]
+        descricao: "Performance em queries de permissões por perfil (UC02, UC05)"
+
+      - nome: "idx_role_permission_permission"
+        tipo: "BTREE"
+        colunas: ["permission_id"]
+        descricao: "Performance em queries de perfis por permissão"
+
+      # ÍNDICE COMPOSTO PARA VALIDAÇÃO DE PERMISSÕES (RN-RF013-06)
+      - nome: "idx_role_permission_validation"
+        tipo: "BTREE"
+        colunas: ["role_id", "permission_id", "deleted_at"]
+        descricao: "Performance em validação de permissões (middleware RN-RF013-06)"
+
+    # -----------------------------
+    # 2.3.3 CONSTRAINTS (OBRIGATÓRIO)
+    # -----------------------------
+    constraints:
+      # FK MULTI-TENANCY (OBRIGATÓRIO)
+      - nome: "fk_role_permission_empresa"
+        tipo: "FOREIGN KEY"
+        definicao: "empresa_id REFERENCES empresa(id)"
+        on_delete: "CASCADE"
+        descricao: "Multi-tenancy (NULL permitido para permissões de perfis de sistema)"
+
+      # FKs DE RELACIONAMENTO
+      - nome: "fk_role_permission_role"
+        tipo: "FOREIGN KEY"
+        definicao: "role_id REFERENCES role(id)"
+        on_delete: "CASCADE"
+        descricao: "Relacionamento com perfil"
+
+      - nome: "fk_role_permission_permission"
+        tipo: "FOREIGN KEY"
+        definicao: "permission_id REFERENCES permission(id)"
+        on_delete: "CASCADE"
+        descricao: "Relacionamento com permissão"
+
+      # UNIQUE POR PERFIL (evitar permissões duplicadas no mesmo perfil)
+      - nome: "uq_role_permission_role_permission"
+        tipo: "UNIQUE"
+        definicao: "(role_id, permission_id) WHERE deleted_at IS NULL"
+        descricao: "Permissão única por perfil (evitar duplicatas)"
+
+      # FKs DE AUDITORIA (OBRIGATÓRIO)
+      - nome: "fk_role_permission_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - quem atribuiu a permissão"
+
+      - nome: "fk_role_permission_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - quem editou/removeu"
+
+# =============================================
+# 3. RELACIONAMENTOS GLOBAIS (OPCIONAL)
+# =============================================
+relacionamentos_globais:
+  - origem: "empresa"
+    cardinalidade: "1:N"
+    destino: "Role"
+    descricao: "Uma empresa possui muitos perfis personalizados. Perfis de sistema têm empresa_id NULL."
+
+  - origem: "Role"
+    cardinalidade: "N:N"
+    destino: "Permission"
+    tabela_intermediaria: "RolePermission"
+    descricao: "Um perfil pode ter muitas permissões. Uma permissão pode estar em muitos perfis."
+
+  - origem: "usuario"
+    cardinalidade: "1:N"
+    destino: "Role"
+    descricao: "Usuário audita criação/edição de perfis (created_by, updated_by)"
+
+  - origem: "usuario"
+    cardinalidade: "1:N"
+    destino: "Permission"
+    descricao: "Usuário audita criação/edição de permissões (created_by, updated_by)"
+
+  - origem: "usuario"
+    cardinalidade: "1:N"
+    destino: "RolePermission"
+    descricao: "Usuário audita atribuição/remoção de permissões (created_by, updated_by)"
+
+# =============================================
+# 4. OBSERVAÇÕES E DECISÕES (OBRIGATÓRIO)
+# =============================================
+observacoes:
+  - categoria: "Modelagem"
+    descricao: "Modelo derivado do RF013 com análise completa de UC-RF013 e WF-RF013. Todas as entidades, campos e relacionamentos foram mapeados a partir dos casos de uso e wireframes."
+
+  - categoria: "Multi-Tenancy"
+    descricao: "Role e RolePermission são multi-tenant (empresa_id). Permission é global (sem empresa_id). Perfis de sistema (IsSystemRole=true) têm empresa_id NULL e são acessíveis por todos os tenants."
+
+  - categoria: "Performance"
+    descricao: "Índices criados para queries principais: UC00 (listagem com filtros), UC02 (visualização com JOINs), UC05 (gerenciamento de permissões), RN-RF013-06 (validação middleware), RN-RF013-07 (cache de permissões)."
+
+  - categoria: "Segurança"
+    descricao: "Multi-tenancy rigoroso em Role e RolePermission (CASCADE). Auditoria completa em todas as tabelas (RN-RF013-09). Auditoria estendida em RolePermission para permissões críticas (justificativa + IP)."
+
+  - categoria: "RBAC"
+    descricao: "Implementação completa de RBAC com catálogo centralizado de permissões, formato padronizado (modulo:recurso:acao RN-RF013-04), permissões críticas flagadas (RN-RF013-05), validação por middleware (RN-RF013-06), cache de 5 minutos (RN-RF013-07)."
+
+  - categoria: "Perfis de Sistema"
+    descricao: "Perfis pré-definidos (Super Administrador, Administrador, Gestor, Operador, Visualizador) são criados com IsSystemRole=true e empresa_id=NULL. Nome/descrição não-editáveis (RN-RF013-02). Super Admin bypassa validações (RN-RF013-03)."
+
+  - categoria: "Soft Delete"
+    descricao: "Todas as tabelas usam soft delete (deleted_at). Role usa fl_ativo adicional (RN-RF013-10: BIT ao invés de INT, clareza semântica). Perfis com usuários vinculados não podem ser deletados (RN-RF013-08)."
+
+  - categoria: "Unicidade"
+    descricao: "Role: nome único por tenant (RN-RF013-01, case-insensitive, apenas ativos). Permission: código único global. RolePermission: permissão única por perfil (evitar duplicatas)."
+
+  - categoria: "Cache"
+    descricao: "Permissões do usuário cacheadas por 5 minutos (cache_key: permissions:{userId}, TTL: 5min, RN-RF013-07). Invalidação automática ao alterar perfil/permissões (UC03, UC05). Invalidação manual via endpoint Admin."
+
+  - categoria: "Migração"
+    descricao: "Perfis de sistema devem ser criados via seeder/migration inicial. Permissões globais devem ser criadas via migration centralizada. RolePermission inicial pode ser criada via seeder para perfis padrão."
+
+# =============================================
+# 5. HISTÓRICO DE ALTERAÇÕES (OBRIGATÓRIO)
+# =============================================
+historico:
+  - versao: "2.0"
+    data: "2026-01-04"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial derivada do RF013, UC-RF013 (7 UCs), WF-RF013 (7 wireframes). Modelo completo de RBAC com 3 entidades (Role, Permission, RolePermission), multi-tenancy, auditoria completa, soft delete, permissões críticas, cache de permissões."

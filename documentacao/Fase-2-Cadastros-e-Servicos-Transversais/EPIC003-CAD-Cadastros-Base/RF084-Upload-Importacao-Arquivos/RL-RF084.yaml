@@ -1,0 +1,826 @@
+# =============================================
+# RL-RF084 - Referência ao Legado: Upload e Importação de Arquivos
+# Versão: 1.0
+# Data: 2025-12-31
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF084
+titulo: "Upload e Importação de Arquivos"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: ".NET Framework 4.5"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2019"
+  multi_tenant: false
+  auditoria: "partial"  # Apenas log básico de importação
+
+# ==============================================================================
+# REFERÊNCIAS AO LEGADO COM DESTINO OBRIGATÓRIO
+# ==============================================================================
+
+referencias:
+  # ----------------------------------------------------------------------------
+  # TELAS ASPX
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF084-001"
+    tipo: "tela"
+    nome: "UploadArquivo.aspx"
+    caminho: "D:\\IC2\\ic1_legado\\IControlIT\\Importacao\\UploadArquivo.aspx"
+    descricao: |
+      Formulário simples de upload de arquivo para importação de dados.
+      Campos: FileUpload1, ddlTipoImportacao, btnUpload, lblMensagem.
+      Limite de 100MB (Web.config maxRequestLength).
+      Processamento imediato após upload (sem preview).
+      Timeout após 5 minutos causa erro.
+
+    regras_implicitas:
+      - "Validação de extensão case-sensitive (.xls, .xlsx, .csv)"
+      - "Nome do arquivo sanitizado manualmente (remove caracteres especiais)"
+      - "Arquivo salvo em C:\\Uploads\\{Id_Cliente}\\{Timestamp}_{NomeArquivo}"
+      - "Importação executa em loop síncrono sem transação"
+      - "Exceções causam página branca (YSOD)"
+
+    destino: "substituido"
+    justificativa: |
+      Tela substituída por componente Angular com drag-and-drop e upload em chunks.
+      Upload síncrono é inviável para arquivos grandes.
+      Falta de preview obrigatório é risco de importação de dados incorretos.
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - Seção 4 (Funcionalidades)"
+      uc_moderno: "UC01"
+      rn_relacionada: "RN-RF084-001, RN-RF084-005"
+
+    migracao_moderna:
+      componente_angular: "uploads-create.component.ts"
+      rota_frontend: "/imports/upload"
+      endpoint_backend: "POST /api/uploads (chunked)"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF084-002"
+    tipo: "tela"
+    nome: "RelatorioImportacoes.aspx"
+    caminho: "D:\\IC2\\ic1_legado\\IControlIT\\Importacao\\RelatorioImportacoes.aspx"
+    descricao: |
+      Lista de importações realizadas com status (sucesso/erro).
+      GridView com paginação server-side (10 itens/página).
+      Filtros: Data Início, Data Fim, Status (Todos/Sucesso/Erro).
+      Sem detalhamento de erros (apenas quantidade).
+      ViewState pesado (>500KB para 100 registros).
+
+    regras_implicitas:
+      - "Paginação server-side com ViewState pesado"
+      - "Coluna 'Erros' mostra apenas quantidade, sem detalhes"
+      - "Sem opção de exportar erros para CSV"
+      - "Importação com erro não pode ser reprocessada"
+
+    destino: "substituido"
+    justificativa: |
+      Tela substituída por componente Angular com paginação client-side.
+      Detalhamento de erros é essencial para correção.
+      Exportação de relatórios é requisito obrigatório.
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - Seção 8 (API Endpoints)"
+      uc_moderno: "UC00"
+      endpoint_relacionado: "GET /api/uploads (paginado)"
+
+    migracao_moderna:
+      componente_angular: "uploads-history.component.ts"
+      rota_frontend: "/imports/history"
+      endpoint_backend: "GET /api/uploads"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF084-003"
+    tipo: "tela"
+    nome: "ValidarImportacao.aspx"
+    caminho: "D:\\IC2\\ic1_legado\\IControlIT\\Importacao\\ValidarImportacao.aspx"
+    descricao: |
+      Preview de dados antes de confirmar importação (raramente usado).
+      GridView mostra primeiras 50 linhas (hardcoded).
+      Validação parcial: schema validado, FK não verificadas.
+      Timeout em arquivos > 50MB.
+      Linhas com erro aparecem sem destaque visual.
+
+    regras_implicitas:
+      - "Limite de preview: 50 linhas (hardcoded)"
+      - "Schema validado, mas Foreign Keys não verificadas"
+      - "Preview de arquivo > 50MB causa timeout"
+      - "Sem marcação de erros (linhas com erro sem destaque)"
+
+    destino: "assumido"
+    justificativa: |
+      Funcionalidade mantida (preview obrigatório) mas reimplementada.
+      Limite aumentado para 100 linhas.
+      Erros mapeados visualmente (linha + coluna + mensagem).
+      Validação completa (schema + FK + tipos de dados).
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - RN-RF084-005, RN-RF084-006, RN-RF084-007"
+      uc_moderno: "UC02"
+      endpoint_relacionado: "GET /api/uploads/{uploadId}/preview"
+
+    migracao_moderna:
+      componente_angular: "uploads-preview.component.ts"
+      rota_frontend: "/imports/{id}/preview"
+      endpoint_backend: "GET /api/uploads/{uploadId}/preview"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF084-004"
+    tipo: "webservice"
+    nome: "WSImport.asmx"
+    caminho: "D:\\IC2\\ic1_legado\\IControlIT\\Services\\WSImport.asmx"
+    descricao: |
+      Processamento de importações via SOAP (usado por integrações antigas).
+      Métodos: UploadArquivo, ValidarArquivo, ProcessarImportacao, ObterStatus.
+      Recebe arquivo base64 (overhead 33%).
+      Sem autenticação, vulnerável a DoS.
+      Timeout após 5 minutos.
+
+    metodos:
+      - nome: "UploadArquivo"
+        parametros: "arquivo As Byte(), tipo As String"
+        retorno: "Integer (Id_Importacao)"
+        descricao: "Recebe arquivo base64, salva em disco"
+        problemas:
+          - "Sem validação de tamanho, risco de OutOfMemoryException"
+          - "Base64 transfer ineficiente (33% overhead)"
+          - "Sem autenticação"
+
+      - nome: "ValidarArquivo"
+        parametros: "idUpload As Integer"
+        retorno: "Boolean"
+        descricao: "Valida estrutura do arquivo"
+        problemas:
+          - "Apenas verifica colunas, não valida dados"
+          - "Sem validação de FK"
+
+      - nome: "ProcessarImportacao"
+        parametros: "idUpload As Integer"
+        retorno: "Boolean"
+        descricao: "Inicia importação síncrona"
+        problemas:
+          - "Timeout após 5 minutos"
+          - "Processamento síncrono bloqueia thread"
+
+      - nome: "ObterStatus"
+        parametros: "idUpload As Integer"
+        retorno: "String (Pendente/Processando/Sucesso/Erro)"
+        descricao: "Retorna status da importação"
+        problemas:
+          - "Polling manual (sem push)"
+          - "Sem detalhamento de progresso"
+
+    destino: "substituido"
+    justificativa: |
+      SOAP é protocolo legado, pesado e complexo.
+      REST é padrão moderno, leve e amplamente suportado.
+      JWT authentication é mais seguro.
+      Chunked upload elimina overhead de base64.
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - Seção 8 (API Endpoints)"
+      endpoints_modernos:
+        - "POST /api/uploads (InitiateUpload)"
+        - "POST /api/uploads/{sessionId}/chunks (UploadChunk)"
+        - "POST /api/uploads/{uploadId}/validate (ValidateUpload)"
+        - "POST /api/uploads/{uploadId}/import (ImportUpload)"
+        - "GET /api/uploads/{uploadId}/status (GetImportStatus)"
+
+    migracao_moderna:
+      tipo_api: "REST"
+      autenticacao: "JWT Bearer Token"
+      transfer_protocol: "Chunked Upload (TUS)"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+    plano_mitigacao: "Manter SOAP em paralelo por 6 meses (período de transição)"
+
+  # ----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF084-005"
+    tipo: "tabela"
+    nome: "Tb_Importacoes"
+    schema_legado: "[dbo].[Tb_Importacoes]"
+    banco: "BDICSYSTEM"
+    descricao: |
+      Tabela de metadados de importações.
+      Campos: Id_Importacao, Id_Usuario, Nm_Arquivo, Tp_Importacao,
+      Qt_Linhas_Importadas, Qt_Linhas_Erros, Dt_Importacao, Status, Ds_Erro.
+
+    problemas_identificados:
+      - "Sem Foreign Key para Usuario (Id_Usuario orphan records)"
+      - "Tipo varchar em Status (deveria ser enum ou lookup table)"
+      - "Ds_Erro como TEXT (deprecated, sem limit, dificulta busca)"
+      - "Sem campos de auditoria (Created, CreatedBy, Modified, ModifiedBy)"
+      - "Sem multi-tenancy (falta Id_Cliente para isolamento)"
+      - "Sem soft delete (exclusão física perde histórico)"
+
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com:
+      - Multi-tenancy (TenantId)
+      - Auditoria completa (Created, CreatedBy, LastModified, LastModifiedBy)
+      - Soft delete (IsDeleted, DeletedAt, DeletedBy)
+      - Foreign Keys para garantir integridade
+      - Status como enum (UploadStatus)
+      - Erros em tabela separada (ImportError)
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - Seção 9 (Modelo de Dados)"
+      md_moderno: "MD-RF084-Upload-Importacao-Arquivos.md - Entidade Upload"
+
+    migracao_moderna:
+      tabela_moderna: "Upload"
+      migration_ef_core: "20251231_CreateUploadTable.cs"
+      campos_adicionados:
+        - "TenantId (GUID, FK)"
+        - "SessionId (GUID, unique)"
+        - "FileHash (SHA256)"
+        - "MimeType (string)"
+        - "Status (enum UploadStatus)"
+        - "IsDeleted (bool)"
+        - "Created, CreatedBy, LastModified, LastModifiedBy"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF084-006"
+    tipo: "tabela"
+    nome: "Tb_Erros_Importacao (NÃO EXISTE)"
+    schema_legado: null
+    banco: null
+    descricao: |
+      No legado, erros de importação são salvos apenas em campo TEXT (Ds_Erro)
+      na tabela Tb_Importacoes, sem estrutura.
+      Exemplo: "Linha 10: CNPJ inválido | Linha 23: Empresa não encontrada"
+
+    problemas_identificados:
+      - "Erros não estruturados (impossível consultar)"
+      - "Sem rastreabilidade de linha/coluna específica"
+      - "Sem possibilidade de exportação detalhada"
+      - "Sem reprocessamento de linhas específicas"
+
+    destino: "substituido"
+    justificativa: |
+      Criada tabela ImportError para rastreabilidade estruturada.
+      Campos: UploadId (FK), LineNumber, ColumnName, ErrorMessage, Value.
+      Permite consultas SQL, exportação CSV e retry seletivo.
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - Seção 9 (Modelo de Dados)"
+      md_moderno: "MD-RF084 - Entidade ImportError"
+
+    migracao_moderna:
+      tabela_moderna: "ImportError"
+      migration_ef_core: "20251231_CreateImportErrorTable.cs"
+      campos_criados:
+        - "UploadId (GUID, FK)"
+        - "LineNumber (int)"
+        - "ColumnName (string)"
+        - "ErrorMessage (string)"
+        - "Value (string, nullable)"
+        - "ErrorType (enum: Validation, FK, Type, Range)"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF084-007"
+    tipo: "regra_negocio"
+    nome: "Limite de Upload 100MB (Web.config)"
+    localizacao_codigo: "Web.config - linha 45"
+    descricao: |
+      Tamanho máximo de upload configurado via Web.config maxRequestLength=102400 (100MB).
+      IIS impõe limite absoluto, impossível aumentar sem afetar outros módulos.
+      Arquivos > 100MB geram HTTP 413 ou timeout.
+
+    codigo_vb: |
+      <httpRuntime maxRequestLength="102400" executionTimeout="300" />
+
+    destino: "substituido"
+    justificativa: |
+      Limite aumentado para 500MB via chunked upload.
+      Chunks de 5-10MB eliminam necessidade de configuração IIS.
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - RN-RF084-001"
+      regra_moderna: "RN-RF084-001: Limite de Tamanho de Arquivo"
+
+    migracao_moderna:
+      validador: "UploadValidator"
+      linha_codigo: "const long MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB"
+
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF084-008"
+    tipo: "regra_negocio"
+    nome: "Validação de Extensão Case-Sensitive"
+    localizacao_codigo: "UploadArquivo.aspx.vb - linha 120"
+    descricao: |
+      Validação de extensão é case-sensitive, apenas minúsculas aceitas.
+      Arquivos com extensão .XLS (maiúscula) são rejeitados.
+
+    codigo_vb: |
+      Dim ext As String = Path.GetExtension(FileUpload1.FileName)
+      If Not (ext = ".xls" Or ext = ".xlsx" Or ext = ".csv") Then
+          lblMensagem.Text = "Tipo de arquivo inválido"
+          Return
+      End If
+
+    destino: "assumido"
+    justificativa: |
+      Regra mantida mas corrigida: validação case-insensitive.
+      Validação adicional de MIME Type para prevenir spoofing.
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - RN-RF084-003"
+      regra_moderna: "RN-RF084-003: Validação de Extensão Consistente"
+
+    migracao_moderna:
+      validador: "FileExtensionValidator"
+      linha_codigo: "var extension = Path.GetExtension(fileName).ToLower();"
+
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF084-009"
+    tipo: "regra_negocio"
+    nome: "Importação Sem Transação (Dados Parciais)"
+    localizacao_codigo: "ImportacaoHelper.vb - linha 250"
+    descricao: |
+      Importação processa linhas em loop síncrono sem transação SQL.
+      Se falhar na linha 500 de 1000, as primeiras 499 já foram inseridas.
+      Banco fica com dados parciais, exige limpeza manual.
+
+    codigo_vb: |
+      For Each row In dt.Rows
+          Try
+              InsertRow(row)
+              successCount += 1
+          Catch ex As Exception
+              errorCount += 1
+              errorLog.Append("Linha " & row.Index & ": " & ex.Message)
+          End Try
+      Next
+
+    destino: "substituido"
+    justificativa: |
+      Importação modernizada com transação SQL única.
+      Rollback automático em caso de erro.
+      Integridade de dados garantida.
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - RN-RF084-010"
+      regra_moderna: "RN-RF084-010: Rollback Transacional"
+
+    migracao_moderna:
+      handler: "ImportUploadCommandHandler"
+      linha_codigo: "using var transaction = await _context.Database.BeginTransactionAsync();"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF084-010"
+    tipo: "regra_negocio"
+    nome: "Nome do Arquivo com Timestamp Manual"
+    localizacao_codigo: "UploadArquivo.aspx.vb - linha 85"
+    descricao: |
+      Arquivo salvo com timestamp no formato yyyyMMddHHmmss_{NomeOriginal}.
+      Risco de colisão se dois uploads ocorrem no mesmo segundo.
+      Sem hash de arquivo (integridade não verificada).
+      Path hardcoded (C:\\Uploads).
+
+    codigo_vb: |
+      Dim fileName As String = DateTime.Now.ToString("yyyyMMddHHmmss") & "_" & FileUpload1.FileName
+      Dim path As String = "C:\\Uploads\\" & Id_Cliente & "\\" & fileName
+      FileUpload1.SaveAs(path)
+
+    destino: "substituido"
+    justificativa: |
+      GUID usado como identificador único (sem colisão).
+      Hash SHA256 calculado para integridade.
+      Armazenamento em Azure Blob Storage (sem path hardcoded).
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - Seção 9 (Modelo de Dados)"
+      campo_moderno: "Upload.SessionId (GUID), Upload.FileHash (SHA256)"
+
+    migracao_moderna:
+      handler: "InitiateUploadCommandHandler"
+      linha_codigo: "var sessionId = Guid.NewGuid(); var hash = ComputeSHA256Hash(stream);"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF084-011"
+    tipo: "regra_negocio"
+    nome: "Processamento Síncrono Bloqueia UI"
+    localizacao_codigo: "UploadArquivo.aspx.vb - linha 150"
+    descricao: |
+      Importação processada no mesmo request HTTP, travando UI até concluir ou timeout (5 min).
+      Usuário fica aguardando sem feedback, conexão pode cair.
+
+    codigo_vb: |
+      Protected Sub btnUpload_Click(sender As Object, e As EventArgs)
+          UploadFile()
+          ProcessImport()  ' <- Síncrono, bloqueia thread
+          lblMensagem.Text = "Importação concluída!"
+      End Sub
+
+    destino: "substituido"
+    justificativa: |
+      Processamento assíncrono com Hangfire para arquivos > 10MB.
+      Notificações em tempo real via SignalR.
+      Usuário pode continuar trabalhando enquanto importação executa.
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - RN-RF084-008, RN-RF084-009"
+      regra_moderna: "RN-RF084-008: Processamento Assíncrono Automático"
+
+    migracao_moderna:
+      job_handler: "ImportUploadJobHandler (Hangfire)"
+      signalr_hub: "UploadProgressHub"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF084-012"
+    tipo: "regra_negocio"
+    nome: "Validação de Schema Incompleta"
+    localizacao_codigo: "ValidationHelper.vb - linha 45"
+    descricao: |
+      Validação verifica apenas se colunas obrigatórias existem.
+      Não valida tipos de dados ou ranges.
+      Campo "CNPJ" pode conter texto inválido ("ABC123").
+      Campo "Email" sem validação de formato.
+
+    codigo_vb: |
+      Public Function ValidateSchema(dt As DataTable) As Boolean
+          Dim requiredColumns As String() = {"CNPJ", "Nome", "Email"}
+          For Each col In requiredColumns
+              If Not dt.Columns.Contains(col) Then
+                  Return False
+              End If
+          Next
+          Return True
+      End Function
+
+    destino: "assumido"
+    justificativa: |
+      Regra mantida mas expandida:
+      - Validação de schema (colunas obrigatórias)
+      - Validação de tipos de dados (int, datetime, decimal)
+      - Validação de ranges (min/max)
+      - Validação de formatos (email, CNPJ, CPF)
+      - Validação de Foreign Keys
+
+    rastreabilidade:
+      documentacao_moderno: "RF084 - RN-RF084-006, RN-RF084-007"
+      regra_moderna: "RN-RF084-006: Validação de Schema Obrigatória + RN-RF084-007: Validação de Dados por Linha"
+
+    migracao_moderna:
+      validador: "SchemaValidator + DataValidator"
+      validacao_fluent: "FluentValidation rules"
+
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# ==============================================================================
+# BANCOS LEGADOS MAPEADOS
+# ==============================================================================
+
+bancos_legados:
+  - nome: "BDICSYSTEM"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "Tb_Importacoes"
+    destino: "CONSOLIDADO"
+    justificativa: "Migrado para banco único com multi-tenancy (Row-Level Security)"
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF084-001"
+    titulo: "Limite de Upload Baixo (100MB)"
+    severidade: "ALTA"
+    descricao: |
+      Web.config limita uploads a 100MB (maxRequestLength).
+      IIS impõe limite absoluto, impossível aumentar sem afetar outros módulos.
+      Arquivos grandes exigem compactação ou split manual.
+    impacto: "Usuários não conseguem importar arquivos grandes (ex: faturas anuais)"
+    solucao_moderna: "Chunked upload permite arquivos até 500MB sem configuração IIS"
+
+  - id: "PROB-RF084-002"
+    titulo: "Upload Síncrono Bloqueia UI"
+    severidade: "CRÍTICA"
+    descricao: |
+      Processamento executa no mesmo request HTTP, travando UI.
+      Timeout após 5 minutos causa perda de progresso.
+      Usuário fica sem feedback visual.
+    impacto: "Experiência de usuário ruim, timeouts frequentes, dados perdidos"
+    solucao_moderna: "Hangfire + SignalR permitem processamento assíncrono com progresso em tempo real"
+
+  - id: "PROB-RF084-003"
+    titulo: "Sem Antivírus (Risco de Malware)"
+    severidade: "CRÍTICA"
+    descricao: |
+      Arquivos não são escaneados antes de processar.
+      Malware pode ser introduzido via upload.
+    impacto: "Segurança comprometida, risco de ransomware"
+    solucao_moderna: "ClamAV scan obrigatório antes de processar arquivo"
+
+  - id: "PROB-RF084-004"
+    titulo: "Importação Sem Transação (Dados Parciais)"
+    severidade: "ALTA"
+    descricao: |
+      Loop processa linhas sem transação SQL.
+      Erro na linha 500 de 1000 deixa banco com dados parciais (499 linhas inseridas).
+      Limpeza manual necessária.
+    impacto: "Integridade de dados comprometida, retrabalho manual"
+    solucao_moderna: "Transação SQL única com rollback automático"
+
+  - id: "PROB-RF084-005"
+    titulo: "Sem Preview Obrigatório"
+    severidade: "MÉDIA"
+    descricao: |
+      Importação processa dados imediatamente após upload.
+      Usuário não consegue validar antes de confirmar.
+      Erros só são descobertos após processamento.
+    impacto: "Importação de dados incorretos, retrabalho"
+    solucao_moderna: "Preview obrigatório com primeiras 100 linhas e erros mapeados"
+
+  - id: "PROB-RF084-006"
+    titulo: "Auditoria Limitada"
+    severidade: "MÉDIA"
+    descricao: |
+      Apenas log de sucesso/falha da importação.
+      Sem detalhes de linhas processadas, erros, usuário, timestamp detalhado.
+    impacto: "Dificulta troubleshooting, não atende LGPD (7 anos retenção)"
+    solucao_moderna: "Auditoria completa com retenção 7 anos (AuditLog)"
+
+  - id: "PROB-RF084-007"
+    titulo: "Armazenamento Local Sem Backup"
+    severidade: "ALTA"
+    descricao: |
+      Arquivos salvos em C:\\Uploads (file system local).
+      Sem backup automático, sem replicação.
+      Perda de disco = perda de arquivos.
+    impacto: "Risco de perda de dados, sem disaster recovery"
+    solucao_moderna: "Azure Blob Storage com replicação e encriptação"
+
+  - id: "PROB-RF084-008"
+    titulo: "Sem Isolamento Multi-Tenant"
+    severidade: "CRÍTICA"
+    descricao: |
+      Arquivos de todos clientes misturados na mesma pasta.
+      Sem isolamento lógico no banco (falta TenantId).
+    impacto: "Risco de acesso cruzado, violação de privacidade"
+    solucao_moderna: "Row-Level Security com TenantId em todas tabelas"
+
+# ==============================================================================
+# GAP ANALYSIS (LEGADO x MODERNO)
+# ==============================================================================
+
+gap_analysis:
+  - item: "Limite de Upload"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: 100MB (Web.config) | Moderno: 500MB (chunked)"
+
+  - item: "Antivírus"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Novo: ClamAV scan obrigatório"
+
+  - item: "Processamento Assíncrono"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Novo: Hangfire para arquivos > 10MB"
+
+  - item: "Progresso em Tempo Real"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Novo: SignalR notifica cliente"
+
+  - item: "Armazenamento Cloud"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Novo: Azure Blob Storage encriptado"
+
+  - item: "Rollback Transacional"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Novo: Transação SQL única"
+
+  - item: "Preview Obrigatório"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: 50 linhas (raramente usado) | Moderno: 100 linhas (obrigatório)"
+
+  - item: "Relatório de Erros Estruturado"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Novo: Tabela ImportError com detalhes"
+
+  - item: "Multi-Tenancy"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Novo: Row-Level Security com TenantId"
+
+  - item: "Auditoria Completa"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: Log básico | Moderno: 7 anos retenção"
+
+# ==============================================================================
+# DECISÕES DE MODERNIZAÇÃO
+# ==============================================================================
+
+decisoes_modernizacao:
+  - decisao: "Substituir WebService SOAP por REST API"
+    motivo: |
+      SOAP é protocolo legado, pesado e complexo.
+      REST é padrão moderno, leve e amplamente suportado.
+      JWT authentication é mais seguro que nenhuma autenticação.
+    impacto: "alto"
+    data: "2025-12-31"
+    mitigacao: "Manter WebService SOAP em paralelo por 6 meses (período de transição)"
+
+  - decisao: "Implementar Chunked Upload (TUS Protocol)"
+    motivo: |
+      Permite uploads > 100MB sem esgotar memória.
+      Retomável em caso de falha de rede.
+      Feedback de progresso em tempo real.
+    impacto: "medio"
+    data: "2025-12-31"
+    mitigacao: "Usar biblioteca TUS.IO (padrão de mercado)"
+
+  - decisao: "Tornar Scan Antivírus Obrigatório"
+    motivo: |
+      Legado permite upload de arquivos maliciosos.
+      Conformidade com políticas de segurança corporativa.
+      Proteção contra ransomware e malware.
+    impacto: "medio"
+    data: "2025-12-31"
+    mitigacao: "Executar scan em paralelo com validação de schema"
+
+  - decisao: "Processamento Assíncrono Obrigatório para Arquivos > 10MB"
+    motivo: |
+      Evitar timeouts do IIS/Kestrel.
+      Liberar thread para outros requests.
+      Permitir cancelamento de importação.
+    impacto: "baixo"
+    data: "2025-12-31"
+    mitigacao: "Notificações em tempo real via SignalR + email ao concluir"
+
+  - decisao: "Migrar de File System para Azure Blob Storage"
+    motivo: |
+      Armazenamento local não tem backup automático.
+      Azure Blob é replicado, encriptado e escalável.
+      Permite CDN para download de relatórios.
+    impacto: "medio"
+    data: "2025-12-31"
+    mitigacao: "Lifecycle policy para deletar arquivos após 90 dias (exceto auditoria)"
+
+# ==============================================================================
+# RISCOS DE MIGRAÇÃO
+# ==============================================================================
+
+riscos_migracao:
+  - risco: "Integrações SOAP quebradas"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: "Manter SOAP em paralelo por 6 meses"
+
+  - risco: "ClamAV indisponível causa bloqueio"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: "Fallback para fila de 'pending scan' + alerta admin"
+
+  - risco: "Azure Blob Storage custo excede orçamento"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: "Implementar lifecycle policy (90 dias)"
+
+  - risco: "Chunked upload incompatível com proxy corporativo"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: "Permitir upload direto (sem chunks) para arquivos < 10MB"
+
+  - risco: "SignalR bloqueado por firewall"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: "Fallback para polling a cada 5s"
+
+  - risco: "Hangfire job queue estoura memória"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: "Limitar concorrência (5 jobs paralelos) + monitoramento"
+
+  - risco: "Usuários não entendem preview obrigatório"
+    impacto: "baixo"
+    probabilidade: "media"
+    mitigacao: "Onboarding + tooltip explicativo"
+
+# ==============================================================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# ==============================================================================
+
+rastreabilidade:
+  - elemento_legado: "UploadArquivo.aspx"
+    referencia_rf: "RF084 - Seção 4 (Funcionalidades)"
+    referencia_uc: "UC01"
+    status: "migrado"
+
+  - elemento_legado: "RelatorioImportacoes.aspx"
+    referencia_rf: "RF084 - Seção 8 (API Endpoints)"
+    referencia_uc: "UC00"
+    status: "migrado"
+
+  - elemento_legado: "ValidarImportacao.aspx"
+    referencia_rf: "RF084 - RN-RF084-005, RN-RF084-006, RN-RF084-007"
+    referencia_uc: "UC02"
+    status: "migrado"
+
+  - elemento_legado: "WSImport.asmx"
+    referencia_rf: "RF084 - Seção 8 (API Endpoints)"
+    referencia_uc: null
+    status: "substituido_por_rest"
+
+  - elemento_legado: "Tb_Importacoes"
+    referencia_rf: "RF084 - Seção 9 (Modelo de Dados)"
+    referencia_uc: null
+    status: "redesenhado_com_multi_tenancy"
+
+  - elemento_legado: "Validação de Extensão"
+    referencia_rf: "RF084 - RN-RF084-003"
+    referencia_uc: null
+    status: "corrigido_case_insensitive"
+
+  - elemento_legado: "Limite de 100MB"
+    referencia_rf: "RF084 - RN-RF084-001"
+    referencia_uc: null
+    status: "aumentado_para_500mb"
+
+  - elemento_legado: "Processamento Síncrono"
+    referencia_rf: "RF084 - RN-RF084-008"
+    referencia_uc: null
+    status: "substituido_por_async"
+
+  - elemento_legado: "Sem Auditoria"
+    referencia_rf: "RF084 - RN-RF084-012"
+    referencia_uc: null
+    status: "auditoria_completa_implementada"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 12
+  itens_assumidos: 3
+  itens_substituidos: 9
+  itens_descartados: 0
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+
+# ==============================================================================
+# CHANGELOG
+# ==============================================================================
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-31"
+    descricao: "Documentação completa da referência ao legado (migração v1.0 → v2.0)"
+    autor: "Agência ALC - alc.dev.br"

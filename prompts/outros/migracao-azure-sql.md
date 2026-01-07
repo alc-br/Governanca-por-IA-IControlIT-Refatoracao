@@ -34,6 +34,12 @@ Seguir D:\IC2\CLAUDE.md.
 
 ---
 
+O plano de migração que deve ser seguido está em D:\IC2\PLANO-MIGRACAO-AZURE-SQL.md
+
+O andamento da migração deve ser atualizado em D:\IC2\ANDAMENTO-MIGRACAO-AZURE-SQL.md
+
+---
+
 ## CONTEXTO
 
 **Motivação:**

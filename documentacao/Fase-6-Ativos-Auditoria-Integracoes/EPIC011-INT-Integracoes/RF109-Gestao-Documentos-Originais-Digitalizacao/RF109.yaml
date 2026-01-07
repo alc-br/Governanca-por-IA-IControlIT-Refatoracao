@@ -1,0 +1,449 @@
+rf_id: RF109
+rf_title: "Gestão de Documentos Originais e Digitalização"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+epic: "EPIC011-INT-Integracoes"
+fase: "Fase 6 - Ativos, Auditoria e Integrações"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF109-001"
+    titulo: "Tamanho Máximo de Arquivo 50MB"
+    descricao: "Documentos uploadados não podem exceder 50MB. Uploads maiores são rejeitados com HTTP 413."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "tamanho_arquivo"
+      mensagem_erro: "Arquivo excede o limite de 50MB"
+      http_code: 413
+
+  - id: "RN-RF109-002"
+    titulo: "Formatos Permitidos: PDF, JPEG, PNG, TIFF, DOCX, XLSX"
+    descricao: "Apenas arquivos nos formatos PDF, JPEG, PNG, TIFF, DOCX, XLSX são aceitos. Outros formatos são rejeitados com HTTP 415."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "formato_arquivo"
+      mensagem_erro: "Formato de arquivo não suportado. Permitidos: PDF, JPEG, PNG, TIFF, DOCX, XLSX"
+      http_code: 415
+
+  - id: "RN-RF109-003"
+    titulo: "OCR Assíncrono Obrigatório via Fila"
+    descricao: "OCR deve ser processado assincronamente via Hangfire. Após upload, retornar HTTP 202 com ID do job."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "processamento_assincrono"
+      mensagem_erro: "OCR enfileirado para processamento. Job ID: {jobId}"
+      http_code: 202
+
+  - id: "RN-RF109-004"
+    titulo: "Detecção de Malware Obrigatória (ClamAV)"
+    descricao: "Todo arquivo deve ser verificado com ClamAV antes de armazenamento. Arquivos infectados são rejeitados com HTTP 400."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "seguranca"
+      mensagem_erro: "Arquivo contém malware e foi rejeitado"
+      http_code: 400
+
+  - id: "RN-RF109-005"
+    titulo: "Assinatura Digital ICP-Brasil Opcional"
+    descricao: "Sistema deve aceitar documentos com assinatura digital ICP-Brasil e validar certificado com AC Raiz."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "assinatura_digital"
+      mensagem_erro: "Certificado digital inválido ou não emitido pela ICP-Brasil"
+      http_code: 400
+
+  - id: "RN-RF109-006"
+    titulo: "Retenção Mínima 7 Anos (LGPD Art. 16)"
+    descricao: "Documentos fiscais e contratuais devem ser retidos por no mínimo 7 anos antes de poderem ser excluídos."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "retencao_dados"
+      mensagem_erro: "Documento não pode ser excluído. Retenção mínima de 7 anos ainda não expirou."
+      http_code: 422
+
+  - id: "RN-RF109-007"
+    titulo: "Indexação Full-Text com ElasticSearch"
+    descricao: "Após OCR bem-sucedido, texto extraído deve ser indexado no ElasticSearch para busca full-text."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "indexacao"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF109-008"
+    titulo: "Multi-tenancy Obrigatória - ClienteId em Todos os Filtros"
+    descricao: "Todos os endpoints devem filtrar documentos obrigatoriamente por ClienteId do usuário autenticado. Nenhum endpoint pode retornar documentos de múltiplos clientes."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "multi_tenancy"
+      mensagem_erro: "Acesso negado. Violação de isolamento de dados"
+      http_code: 403
+
+  - id: "RN-RF109-009"
+    titulo: "Storage Hierarquizado (Hot/Cool/Archive)"
+    descricao: "Documentos recentes (< 6 meses) em Hot Tier, 6-24 meses em Cool Tier, > 24 meses em Archive Tier."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "storage_tier"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF109-010"
+    titulo: "Auditoria Completa de Acesso e Modificações"
+    descricao: "Todo acesso, download, upload, exclusão ou modificação de documento deve ser registrado em log de auditoria com: usuário, timestamp, IP, ação, documento."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "auditoria"
+      mensagem_erro: null
+      http_code: null
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "documento.upload"
+    descricao: "Fazer upload de documentos"
+    roles_autorizadas:
+      - "Usuario"
+      - "Gestor"
+      - "Analista"
+      - "Admin"
+    endpoint: "POST /api/documentos/upload"
+
+  - permission_code: "documento.download"
+    descricao: "Fazer download de documentos"
+    roles_autorizadas:
+      - "Usuario"
+      - "Gestor"
+      - "Analista"
+      - "Admin"
+      - "Auditor"
+    endpoint: "GET /api/documentos/{id}/download"
+
+  - permission_code: "documento.visualizar"
+    descricao: "Visualizar metadados de documentos"
+    roles_autorizadas:
+      - "Usuario"
+      - "Gestor"
+      - "Analista"
+      - "Admin"
+      - "Auditor"
+    endpoint: "GET /api/documentos/*"
+
+  - permission_code: "documento.excluir"
+    descricao: "Excluir documentos (respeitando retenção 7 anos)"
+    roles_autorizadas:
+      - "Gestor"
+      - "Admin"
+    endpoint: "DELETE /api/documentos/{id}"
+
+  - permission_code: "documento.assinar"
+    descricao: "Assinar digitalmente documentos"
+    roles_autorizadas:
+      - "Gestor"
+      - "Admin"
+      - "Assinante Autorizado"
+    endpoint: "POST /api/documentos/{id}/assinar"
+
+  - id: "documento.ocr.visualizar"
+    descricao: "Visualizar resultado de OCR"
+    roles_autorizadas:
+      - "Usuario"
+      - "Gestor"
+      - "Analista"
+      - "Admin"
+    endpoint: "GET /api/documentos/{id}/ocr"
+
+  - permission_code: "documento.pesquisar"
+    descricao: "Pesquisar full-text em documentos"
+    roles_autorizadas:
+      - "Usuario"
+      - "Gestor"
+      - "Analista"
+      - "Admin"
+      - "Auditor"
+    endpoint: "GET /api/documentos/pesquisar"
+
+  - permission_code: "documento.auditoria"
+    descricao: "Visualizar logs de auditoria de documentos"
+    roles_autorizadas:
+      - "Auditor"
+      - "Admin"
+    endpoint: "GET /api/documentos/{id}/auditoria"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  - method: "POST"
+    route: "/api/documentos/upload"
+    descricao: "Fazer upload de documento"
+    autenticacao: true
+    authorization_policy: "documento.upload"
+    request_dto: "UploadDocumentoCommand"
+    response_dto: "DocumentoDto | JobId (se OCR assíncrono)"
+
+  - method: "GET"
+    route: "/api/documentos"
+    descricao: "Listar documentos do cliente autenticado"
+    autenticacao: true
+    authorization_policy: "documento.visualizar"
+    request_dto: "GetDocumentosQuery"
+    response_dto: "List<DocumentoDto>"
+
+  - method: "GET"
+    route: "/api/documentos/{id}"
+    descricao: "Obter metadados de documento específico"
+    autenticacao: true
+    authorization_policy: "documento.visualizar"
+    request_dto: null
+    response_dto: "DocumentoDto"
+
+  - method: "GET"
+    route: "/api/documentos/{id}/download"
+    descricao: "Fazer download do arquivo original"
+    autenticacao: true
+    authorization_policy: "documento.download"
+    request_dto: null
+    response_dto: "FileContentResult"
+
+  - method: "DELETE"
+    route: "/api/documentos/{id}"
+    descricao: "Excluir documento (respeitando retenção 7 anos)"
+    autenticacao: true
+    authorization_policy: "documento.excluir"
+    request_dto: null
+    response_dto: "void"
+
+  - method: "POST"
+    route: "/api/documentos/{id}/assinar"
+    descricao: "Assinar digitalmente documento com certificado ICP-Brasil"
+    autenticacao: true
+    authorization_policy: "documento.assinar"
+    request_dto: "AssinarDocumentoCommand"
+    response_dto: "AssinaturaDto"
+
+  - method: "GET"
+    route: "/api/documentos/{id}/assinaturas"
+    descricao: "Listar assinaturas digitais de um documento"
+    autenticacao: true
+    authorization_policy: "documento.visualizar"
+    request_dto: null
+    response_dto: "List<AssinaturaDto>"
+
+  - method: "GET"
+    route: "/api/documentos/{id}/ocr"
+    descricao: "Obter resultado de OCR (texto extraído)"
+    autenticacao: true
+    authorization_policy: "documento.ocr.visualizar"
+    request_dto: null
+    response_dto: "OcrResultDto"
+
+  - method: "GET"
+    route: "/api/documentos/{id}/ocr/status"
+    descricao: "Obter status do processamento OCR"
+    autenticacao: true
+    authorization_policy: "documento.visualizar"
+    request_dto: null
+    response_dto: "OcrStatusDto"
+
+  - method: "GET"
+    route: "/api/documentos/pesquisar"
+    descricao: "Pesquisar documentos por full-text (ElasticSearch)"
+    autenticacao: true
+    authorization_policy: "documento.pesquisar"
+    request_dto: "PesquisarDocumentosQuery"
+    response_dto: "List<DocumentoDto>"
+
+  - method: "GET"
+    route: "/api/documentos/{id}/auditoria"
+    descricao: "Obter log de auditoria do documento"
+    autenticacao: true
+    authorization_policy: "documento.auditoria"
+    request_dto: null
+    response_dto: "List<AuditoriaDocumentoDto>"
+
+  - method: "POST"
+    route: "/api/documentos/{id}/mover-tier"
+    descricao: "Mover documento para tier diferente (Hot/Cool/Archive)"
+    autenticacao: true
+    authorization_policy: "documento.excluir"
+    request_dto: "MoverTierCommand"
+    response_dto: "void"
+
+  - method: "GET"
+    route: "/api/documentos/tipos"
+    descricao: "Listar tipos de documento cadastrados"
+    autenticacao: true
+    authorization_policy: "documento.visualizar"
+    request_dto: null
+    response_dto: "List<TipoDocumentoDto>"
+
+  - method: "GET"
+    route: "/api/documentos/estatisticas"
+    descricao: "Obter estatísticas de armazenamento e uso"
+    autenticacao: true
+    authorization_policy: "documento.visualizar"
+    request_dto: null
+    response_dto: "EstatisticasDocumentosDto"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Tempo Upload Médio"
+    descricao: "Tempo médio de upload de documento (até confirmação no storage)"
+    meta: "< 3 segundos para 10MB"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Sucesso OCR"
+    descricao: "Percentual de OCR bem-sucedidos vs tentativas totais"
+    meta: ">= 98%"
+    log_obrigatorio: true
+
+  - nome: "Tempo Processamento OCR"
+    descricao: "Tempo médio de processamento OCR (da fila até indexação)"
+    meta: "< 10 segundos por página"
+    log_obrigatorio: true
+
+  - nome: "Taxa Detecção Malware"
+    descricao: "Percentual de arquivos bloqueados por malware"
+    meta: "< 0.1%"
+    log_obrigatorio: true
+
+  - nome: "Disponibilidade do Módulo"
+    descricao: "Uptime do endpoint /api/documentos"
+    meta: ">= 99.95%"
+    log_obrigatorio: true
+
+  - nome: "Taxa de Erro Download"
+    descricao: "Percentual de downloads falhados vs tentativas"
+    meta: "< 0.5%"
+    log_obrigatorio: true
+
+  - nome: "Acurácia OCR"
+    descricao: "Percentual de textos extraídos corretamente (amostra manual 1%)"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Custo Storage por GB/mês"
+    descricao: "Custo médio de armazenamento Azure Blob Storage"
+    meta: "< R$ 0,10/GB/mês"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "OCR Falhando em Massa"
+    threshold: "> 5% de falhas em 1 hora"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+  - evento: "Storage Quase Cheio"
+    threshold: "> 80% da cota utilizada"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+  - evento: "Malware Detectado"
+    threshold: "Qualquer detecção"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "sms"
+
+  - evento: "Certificado Digital Inválido"
+    threshold: "> 3 tentativas de assinatura com certificado inválido"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+
+  - evento: "Performance Upload Degradada"
+    threshold: "Tempo médio > 10 segundos"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+
+  - evento: "ElasticSearch Indisponível"
+    threshold: "Falha na indexação > 5 minutos"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_regras_negocio: 10
+  total_endpoints_api: 14
+  total_permissoes_rbac: 8
+  total_integracoes_obrigatorias: 6
+  total_kpis: 8
+  total_alertas: 6
+  linhas_documentacao:
+    documentacao_md: 437
+    documentacao_yaml: 415

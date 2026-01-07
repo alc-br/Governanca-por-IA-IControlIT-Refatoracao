@@ -1,6 +1,6 @@
 # Validação RFXXX - Validação de ADITIVO
 
-Ele fica nesse endereço D:\IC2\rf\Fase*\EPIC*\RF*
+Ele fica nesse endereço D:\IC2\documentacao\Fase*\EPIC*\RF*
 
 **Instruções:** Altere RFXXX acima para o RF desejado (ex: RF001, RF025, RF028).
 
@@ -196,10 +196,10 @@ else:
 
 ```python
 # Extrair RNs de RFXXX.md
-rns_atual = set(re.findall(r'RN-[A-Z]+-\d+-\d+', rf_md_content))
+rns_atual = set(re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_md_content))
 
 # Extrair RNs de RFXXX_old.md
-rns_old = set(re.findall(r'RN-[A-Z]+-\d+-\d+', rf_old_md_content))
+rns_old = set(re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_old_md_content))
 
 # Delta (RNs novas)
 rns_novas = rns_atual - rns_old
@@ -287,8 +287,8 @@ if not md_old_existe:
     WARNING("RF original sem MD documentado. Validação de MD não aplicável.")
     PASS("N/A - RF original sem baseline de MD")
 else:
-    rf_documenta_mudancas_md = verificar_secao_9_md_mudancas(rf_md_content)
-    if rf_documenta_mudancas_md:
+    documentacao_documenta_mudancas_md = verificar_secao_9_md_mudancas(rf_md_content)
+    if documentacao_documenta_mudancas_md:
         md_foi_atualizado = comparar_md(md_atual, md_old)
         if md_foi_atualizado:
             PASS("MD atualizado conforme documentado no RF")

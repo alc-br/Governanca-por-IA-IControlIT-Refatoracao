@@ -1,0 +1,364 @@
+# =============================================
+# RF - Requisito Funcional (Contrato Canônico)
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF020"
+  nome: "Gestão de Documentos e Anexos"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 2 - Cadastros e Serviços Transversais"
+  epic: "EPIC003-CAD-Cadastros-Base"
+  status: "aprovado"
+
+descricao:
+  objetivo: "Implementar um Sistema Completo de Gestão de Documentos e Anexos (DMS) do IControlIT, responsável por armazenar, versionar, controlar acesso e rastrear o ciclo de vida completo de documentos e arquivos do sistema."
+  problema_resolvido: "Centralizar gestão documental corporativa com segurança, versionamento, OCR, compartilhamento seguro e compliance LGPD/GDPR."
+  publico_afetado: "Todos os usuários do sistema que precisam anexar documentos (contratos, notas fiscais, fotos de ativos, certificados)."
+
+escopo:
+  incluso:
+    - "Upload seguro de documentos (multipart/form-data, drag & drop)"
+    - "Scan antivírus obrigatório (ClamAV/VirusTotal)"
+    - "Armazenamento escalável (FileSystem, Azure Blob, AWS S3)"
+    - "Versionamento automático com rollback"
+    - "Controle de acesso granular (ACL por usuário/perfil/departamento)"
+    - "Compartilhamento seguro via links temporários com senha"
+    - "OCR automático para busca full-text"
+    - "Gestão de validade com alertas automáticos"
+    - "Auditoria completa de todas as operações"
+    - "Visualização embutida (PDF, imagens)"
+    - "Criptografia de documentos confidenciais (AES-256)"
+    - "Soft delete com recuperação em 30 dias"
+    - "Busca full-text avançada (nome, descrição, tags, OCR)"
+    - "Metadados customizáveis via JSON"
+    - "Multi-tenancy por Fornecedor"
+  fora:
+    - "Interface visual específica (design da UI)"
+    - "Tecnologia de armazenamento específica (pode ser FileSystem, Azure Blob ou AWS S3)"
+    - "Layout ou identidade visual"
+    - "Estratégia de deploy ou infraestrutura"
+    - "Editor de documentos (Microsoft Office Online, Google Docs)"
+
+entidades:
+  - nome: "Documento"
+    descricao: "Entidade principal de gestão de documentos e anexos"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    versionamento: true
+  - nome: "DocumentoPermissao"
+    descricao: "ACL granular para controle de acesso por documento"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+  - nome: "DocumentoCompartilhamento"
+    descricao: "Links temporários para compartilhamento externo"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+  - nome: "DocumentoAuditoria"
+    descricao: "Histórico completo de operações em documentos"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+
+regras_negocio:
+  - id: "RN-RF020-001"
+    descricao: "TODO arquivo enviado DEVE passar por scan antivírus antes de ser armazenado"
+    tipo: "seguranca"
+    campos_afetados: ["arquivo_upload"]
+    obrigatorio: true
+
+  - id: "RN-RF020-002"
+    descricao: "Sistema DEVE calcular e armazenar hash SHA-256 de todo arquivo para garantir integridade e detectar duplicatas"
+    tipo: "validacao"
+    campos_afetados: ["Hash_SHA256"]
+    obrigatorio: true
+
+  - id: "RN-RF020-003"
+    descricao: "Alteração em documento existente DEVE criar automaticamente nova versão sem deletar anterior"
+    tipo: "regra_negocio"
+    campos_afetados: ["Versao", "Fl_Versao_Atual", "Id_Documento_Anterior"]
+    obrigatorio: true
+
+  - id: "RN-RF020-004"
+    descricao: "Sistema DEVE implementar controle de acesso granular por documento via ACL"
+    tipo: "seguranca"
+    campos_afetados: ["DocumentoPermissao"]
+    obrigatorio: true
+
+  - id: "RN-RF020-005"
+    descricao: "Documentos escaneados (PDFs de imagem, fotos) DEVEM ter OCR processado automaticamente para permitir busca full-text"
+    tipo: "regra_negocio"
+    campos_afetados: ["Texto_OCR", "Fl_OCR_Processado"]
+    obrigatorio: true
+
+  - id: "RN-RF020-006"
+    descricao: "Sistema DEVE permitir compartilhamento externo via links temporários seguros com expiração, senha e limite de acessos"
+    tipo: "seguranca"
+    campos_afetados: ["Token_Acesso", "Dt_Expiracao", "Hash_Senha"]
+    obrigatorio: true
+
+  - id: "RN-RF020-007"
+    descricao: "Sistema DEVE enviar alertas automáticos para documentos próximos ao vencimento"
+    tipo: "regra_negocio"
+    campos_afetados: ["Dt_Validade"]
+    obrigatorio: true
+
+  - id: "RN-RF020-008"
+    descricao: "Exclusão de documentos DEVE ser lógica (soft delete) com possibilidade de recuperação"
+    tipo: "regra_negocio"
+    campos_afetados: ["Fl_Ativo", "Dt_Exclusao", "Id_Usuario_Exclusao"]
+    obrigatorio: true
+
+  - id: "RN-RF020-009"
+    descricao: "Sistema DEVE impor limites de tamanho de arquivo conforme tipo e contexto"
+    tipo: "validacao"
+    campos_afetados: ["Tamanho_Bytes"]
+    obrigatorio: true
+
+  - id: "RN-RF020-010"
+    descricao: "Sistema DEVE validar extensão e MIME type para garantir que apenas arquivos seguros sejam aceitos"
+    tipo: "seguranca"
+    campos_afetados: ["Nm_Arquivo", "Tipo_MIME"]
+    obrigatorio: true
+
+  - id: "RN-RF020-011"
+    descricao: "Documentos marcados como confidenciais DEVEM ser criptografados em repouso (at-rest)"
+    tipo: "seguranca"
+    campos_afetados: ["Fl_Confidencial"]
+    obrigatorio: true
+
+  - id: "RN-RF020-012"
+    descricao: "TODA operação em documentos DEVE ser auditada para rastreabilidade e compliance"
+    tipo: "seguranca"
+    campos_afetados: ["DocumentoAuditoria"]
+    obrigatorio: true
+
+  - id: "RN-RF020-013"
+    descricao: "Sistema DEVE suportar busca full-text em nome, descrição, tags e texto extraído via OCR"
+    tipo: "regra_negocio"
+    campos_afetados: ["Nm_Documento", "Ds_Documento", "Tags", "Texto_OCR"]
+    obrigatorio: true
+
+  - id: "RN-RF020-014"
+    descricao: "Sistema DEVE permitir armazenar metadados adicionais específicos por tipo de documento via JSON"
+    tipo: "regra_negocio"
+    campos_afetados: ["Metadados_JSON"]
+    obrigatorio: false
+
+  - id: "RN-RF020-015"
+    descricao: "Todos os documentos DEVEM estar isolados por Fornecedor (multi-tenancy)"
+    tipo: "seguranca"
+    campos_afetados: ["Id_Fornecedor"]
+    obrigatorio: true
+
+estados:
+  - id: "processing"
+    descricao: "Upload em andamento (scan antivírus, OCR pendente)"
+  - id: "active"
+    descricao: "Documento disponível para uso"
+  - id: "archived"
+    descricao: "Arquivado (read-only)"
+  - id: "deleted"
+    descricao: "Excluído logicamente (soft delete)"
+
+transicoes:
+  permitidas:
+    - de: "processing"
+      para: "active"
+      condicao: "Scan antivírus OK + upload concluído"
+    - de: "active"
+      para: "archived"
+      condicao: "Usuário arquiva manualmente"
+    - de: "archived"
+      para: "active"
+      condicao: "Usuário desarquiva"
+    - de: "active"
+      para: "deleted"
+      condicao: "Usuário exclui (soft delete)"
+    - de: "deleted"
+      para: "active"
+      condicao: "Admin recupera (< 30 dias)"
+  proibidas:
+    - de: "processing"
+      para: "archived"
+      motivo: "Upload não concluído"
+    - de: "deleted"
+      para: "archived"
+      motivo: "Documento excluído não pode ser arquivado"
+
+permissoes:
+  - codigo: "documentos.view_any"
+    descricao: "Listar documentos"
+  - codigo: "documentos.view"
+    descricao: "Visualizar documento específico"
+  - codigo: "documentos.create"
+    descricao: "Fazer upload de documento"
+  - codigo: "documentos.update"
+    descricao: "Atualizar documento (nova versão)"
+  - codigo: "documentos.delete"
+    descricao: "Excluir documento (soft delete)"
+  - codigo: "documentos.share"
+    descricao: "Compartilhar documento via link temporário"
+  - codigo: "documentos.restore"
+    descricao: "Recuperar documento excluído (apenas admin)"
+  - codigo: "documentos.manage_permissions"
+    descricao: "Gerenciar ACL de documentos"
+
+eventos:
+  - nome: "documento.criado"
+    quando: "Após upload bem-sucedido"
+    acao: "Iniciar OCR (se aplicável), notificar responsável"
+  - nome: "documento.atualizado"
+    quando: "Nova versão criada"
+    acao: "Notificar usuários com permissão de visualização"
+  - nome: "documento.compartilhado"
+    quando: "Link temporário gerado"
+    acao: "Registrar auditoria, enviar e-mail com link"
+  - nome: "documento.vencendo"
+    quando: "Documento próximo ao vencimento"
+    acao: "Enviar alerta ao responsável"
+  - nome: "documento.excluido"
+    quando: "Soft delete executado"
+    acao: "Mover para lixeira, registrar auditoria"
+  - nome: "documento.restaurado"
+    quando: "Recuperação de documento excluído"
+    acao: "Mover de lixeira para storage ativo"
+  - nome: "ocr.processado"
+    quando: "OCR concluído com sucesso"
+    acao: "Atualizar campo Texto_OCR, marcar Fl_OCR_Processado = 1"
+  - nome: "malware.detectado"
+    quando: "Scan antivírus identifica ameaça"
+    acao: "Rejeitar upload, notificar admin, registrar log de segurança"
+
+integracoes:
+  internas:
+    - "Autenticacao (JWT Bearer)"
+    - "Multi-Tenancy (Isolamento por Fornecedor)"
+    - "Auditoria (7 anos LGPD/GDPR)"
+    - "RBAC (Permissões granulares)"
+  externas:
+    - sistema: "ClamAV ou VirusTotal"
+      tipo: "API"
+      obrigatoria: true
+      descricao: "Scan antivírus de arquivos"
+    - sistema: "Tesseract ou Azure Computer Vision"
+      tipo: "API"
+      obrigatoria: false
+      descricao: "OCR de documentos escaneados"
+    - sistema: "Azure Blob Storage ou AWS S3"
+      tipo: "Storage"
+      obrigatoria: false
+      descricao: "Armazenamento escalável de arquivos"
+    - sistema: "Azure Key Vault ou AWS KMS"
+      tipo: "API"
+      obrigatoria: true
+      descricao: "Gerenciamento de chaves de criptografia"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  criptografia_at_rest: true
+  scan_antivirus: true
+  acl_granular: true
+  rate_limiting: true
+  https_only: true
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-listar-documentos"
+    - "UC01-criar-documento"
+    - "UC02-visualizar-documento"
+    - "UC03-editar-documento"
+    - "UC04-excluir-documento"
+    - "UC05-compartilhar-documento"
+    - "UC06-gerenciar-permissoes"
+    - "UC07-buscar-documentos"
+    - "UC08-processar-ocr"
+    - "UC09-alertar-vencimentos"
+    - "UC10-restaurar-documento"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar documento (upload)"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar documentos"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar documento"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar documento (nova versão)"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Excluir documento (soft delete)"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar campos obrigatórios"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar tamanho de arquivo"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar tipo de arquivo (extensão + MIME)"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar integridade via hash SHA-256"
+      required: true
+    - id: "RF-VAL-05"
+      title: "Validar scan antivírus"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant (multi-tenancy)"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC + ACL granular"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Criptografia AES-256 (documentos confidenciais)"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Scan antivírus obrigatório"
+      required: true
+    - id: "RF-SEC-05"
+      title: "Links temporários com expiração"
+      required: true
+    - id: "RF-SEC-06"
+      title: "Auditoria completa de operações"
+      required: true
+    - id: "RF-SEC-07"
+      title: "Rate limiting (100 uploads/min)"
+      required: true
+    - id: "RF-SEC-08"
+      title: "HTTPS Only (TLS 1.2+)"
+      required: true
+    - id: "RF-SEC-09"
+      title: "SQL Injection Prevention"
+      required: true
+    - id: "RF-SEC-10"
+      title: "Path Traversal Prevention"
+      required: true
+
+exclusions:
+  documentacao_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0: Separação RF/RL completa (apenas contrato moderno)"
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Architect Agent"
+    descricao: "Versão inicial expandida (15 regras, 13 endpoints, 4 integrações)"

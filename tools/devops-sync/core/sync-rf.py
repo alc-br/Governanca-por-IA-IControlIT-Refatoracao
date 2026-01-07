@@ -72,8 +72,8 @@ def get_headers():
 
 def normalize_rf(rf_input):
     """Normaliza entrada do RF para formato RF-XXX"""
-    rf_clean = re.sub(r"[^0-9]", "", str(rf_input))
-    rf_num = int(rf_clean)
+    documentacao_clean = re.sub(r"[^0-9]", "", str(rf_input))
+    documentacao_num = int(rf_clean)
     return f"RF-{rf_num:03d}"
 def discover_wef_field_from_board():
     """Descobre o campo WEF correto a partir do Features board"""
@@ -257,7 +257,7 @@ def parse_yaml_simple(content):
 
 def find_status_file(rf_id):
     """Encontra o arquivo STATUS.yaml para o RF especificado"""
-    rf_num = rf_id.replace("RF-", "")
+    documentacao_num = documentacao_id.replace("RF-", "")
     pattern = f"{STATUS_PATH}/**/RF{rf_num}*/STATUS.yaml"
     files = glob.glob(pattern, recursive=True)
     if not files:
@@ -270,7 +270,7 @@ def find_status_file(rf_id):
 def find_work_item(rf_id):
     """Encontra work item pelo RF ID"""
     url = f"{ORG_URL}/{PROJECT}/_apis/wit/wiql?api-version=7.0"
-    q = chr(39) + rf_id + chr(39)
+    q = chr(39) + documentacao_id + chr(39)
     query = {"query": f"SELECT [System.Id], [System.Title], [System.State] FROM WorkItems WHERE [System.TeamProject] = @project AND [System.Title] CONTAINS {q}"}
     r = requests.post(url, json=query, auth=get_auth())
     if not r.ok:
@@ -300,8 +300,8 @@ def load_all_status_files():
             data = parse_yaml_simple(content)
 
             if data and 'rf' in data:
-                rf_raw = str(data['rf']).replace('RF', '').zfill(3)
-                rf_id = f"RF-{rf_raw}"
+                documentacao_raw = str(data['rf']).replace('RF', '').zfill(3)
+                documentacao_id = f"RF-{rf_raw}"
                 statuses[rf_id] = {
                     'file_path': f,
                     'data': data
@@ -379,7 +379,7 @@ def get_existing_items():
 
     return existing
 
-def update_work_item(wi_id, rf_id, column, state, status_data):
+def update_work_item(wi_id, documentacao_id, column, state, status_data):
     """Atualiza work item com nova coluna e estado"""
     url = f"{ORG_URL}/{PROJECT}/_apis/wit/workitems/{wi_id}?api-version=7.0"
 
@@ -486,8 +486,8 @@ def main():
         print("  AZDO_PAT     - Personal Access Token")
         sys.exit(1)
     
-    rf_input = sys.argv[1]
-    rf_id = normalize_rf(rf_input)
+    documentacao_input = sys.argv[1]
+    documentacao_id = normalize_rf(rf_input)
     
     print("="*60)
     print(f"SINCRONIZACAO RF INDIVIDUAL: {rf_id}")
@@ -506,7 +506,7 @@ def main():
         content = f.read()
     
     status_data = parse_yaml_simple(content)
-    titulo = status_data.get("titulo", rf_id)
+    titulo = status_data.get("titulo", documentacao_id)
     info(f"Titulo: {titulo}")
     
     discover_wef_field_from_board()
@@ -534,7 +534,7 @@ def main():
     print()
     print("-"*60)
     status_info = {"data": status_data, "file_path": status_file}
-    if update_work_item(wi_id, rf_id, column, state, status_info):
+    if update_work_item(wi_id, documentacao_id, column, state, status_info):
         ok(f"{rf_id} atualizado para {column}")
         if update_status_file(status_file, wi_id, column):
             ok("STATUS.yaml atualizado")

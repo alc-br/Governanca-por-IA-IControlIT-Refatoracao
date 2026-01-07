@@ -87,23 +87,23 @@ def file_must_exist(path, description):
 # -----------------------------
 def extract_contract_and_rf(content, source):
     contract = None
-    rf = None
+    documentacao = None
 
     for name in CONTRACTS.keys():
         if re.search(rf"CONTRATO:\s*{name}", content):
             contract = name
 
-    rf_match = re.search(r"Requisito Funcional.*:\s*(RF\d+)", content)
+    documentacao_match = re.search(r"Requisito Funcional.*:\s*(RF\d+)", content)
 
-    if rf_match:
-        rf = rf_match.group(1)
+    if documentacao_match:
+        documentacao = documentacao_match.group(1)
 
     if not contract:
         fail(f"Nenhum contrato válido encontrado em {source}")
 
     ok(f"Contrato identificado ({source}): {contract}")
 
-    if rf:
+    if documentacao:
         ok(f"RF identificado ({source}): {rf}")
     else:
         info("Nenhum RF identificado no manifesto")
@@ -263,14 +263,14 @@ Arquivos ilegais detectados:
 # VALIDAÇÃO DE BRANCH POR RF
 # -----------------------------
 def validate_branch_against_rf(contract, rf):
-    if not rf:
+    if not documentacao:
         info("Sem RF declarado — validação de branch ignorada")
         return
 
     branch = os.getenv("BUILD_SOURCEBRANCHNAME", "")
 
     if contract in ("FRONTEND", "BACKEND"):
-        if rf not in branch:
+        if documentacao not in branch:
             fail(
                 f"""
 ❌ BRANCH INVÁLIDO PARA O RF

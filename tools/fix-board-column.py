@@ -73,7 +73,7 @@ def fix_board_column(file_path: Path) -> bool:
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(new_content)
 
-    rf_name = file_path.parent.name
+    documentacao_name = file_path.parent.name
     print(f"[OK] {rf_name} - Board alterado: {current_board_column} -> {correct_board_column}")
     return True
 

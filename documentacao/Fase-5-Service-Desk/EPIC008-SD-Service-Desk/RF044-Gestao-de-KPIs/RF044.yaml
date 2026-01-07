@@ -1,0 +1,333 @@
+# RF044 - Gestão de KPIs
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf:
+  id: "RF044"
+  nome: "Gestão de KPIs (Key Performance Indicators)"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase-5-Service-Desk"
+  epic: "EPIC008-SD-Service-Desk"
+  status: "aprovado"
+
+descricao:
+  objetivo: "Implementar motor completo de KPIs para monitoramento estratégico e operacional do sistema IControlIT"
+  problema_resolvido: "Eliminação de relatórios manuais, KPIs fixos sem customização, falta de alertas automáticos e análise preditiva"
+  publico_afetado: "Executivos (CEO, CFO, COO, CTO), gestores, analistas e operadores"
+
+escopo:
+  incluso:
+    - "Criação de KPIs customizáveis com fórmulas complexas"
+    - "Sistema de metas hierárquicas (operacional → tático → estratégico)"
+    - "Alertas automáticos por threshold"
+    - "Dashboards visuais com gráficos interativos (ApexCharts)"
+    - "Análise de tendências com machine learning (Azure ML)"
+    - "Comparações históricas e benchmarking"
+    - "Exportação para BI tools (Power BI, Tableau, Excel, PDF)"
+    - "Drill-down para análise detalhada"
+    - "Recalculo automático por periodicidade (Hangfire)"
+    - "Versionamento de fórmulas de cálculo"
+    - "Controle de acesso por categoria de KPI (RBAC)"
+    - "Auditoria de operações"
+    - "Isolamento multi-tenant"
+  fora:
+    - "Interface visual específica"
+    - "Tecnologia de implementação"
+    - "Layout e UX"
+    - "Estratégia de deploy"
+    - "Algoritmos específicos de machine learning"
+
+entidades:
+  - nome: "KPI"
+    descricao: "Configuração do indicador-chave de desempenho"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "KPIMeta"
+    descricao: "Metas (mínima, ideal, desafiadora)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "KPIHistorico"
+    descricao: "Valores históricos calculados"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "KPIDashboard"
+    descricao: "Painéis customizados"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "KPIAlerta"
+    descricao: "Configuração de alertas automáticos"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "KPIFormulaVersao"
+    descricao: "Versionamento de fórmulas de cálculo"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF044-01"
+    descricao: "Unicidade de Código de KPI - Formato KPI-{CATEGORIA}-{SEQUENCIAL}"
+    tipo: "unicidade"
+    campos_afetados: ["codigo"]
+    obrigatorio: true
+
+  - id: "RN-RF044-02"
+    descricao: "Validação de Fórmula de Cálculo - SQL query válida retornando valor numérico"
+    tipo: "validacao"
+    campos_afetados: ["formulaCalculo"]
+    obrigatorio: true
+
+  - id: "RN-RF044-03"
+    descricao: "Periodicidade Mínima por Fonte de Dados - API externa: min 1h"
+    tipo: "regra_negocio"
+    campos_afetados: ["fonteDados", "periodicidade"]
+    obrigatorio: true
+
+  - id: "RN-RF044-04"
+    descricao: "Hierarquia de Metas - Soma de metas filhas ≤ 100% meta pai"
+    tipo: "regra_negocio"
+    campos_afetados: ["valor", "metaPaiId"]
+    obrigatorio: true
+
+  - id: "RN-RF044-05"
+    descricao: "Semáforo Automático - Cálculo baseado em % de atingimento"
+    tipo: "regra_negocio"
+    campos_afetados: ["valorAtual", "metaMinima"]
+    obrigatorio: true
+
+  - id: "RN-RF044-06"
+    descricao: "Alerta de Tendência - Disparo com 3 dias de antecedência"
+    tipo: "regra_negocio"
+    campos_afetados: ["previsao", "meta"]
+    obrigatorio: true
+
+  - id: "RN-RF044-07"
+    descricao: "Anomalia Estatística - Alerta se |z-score| > 3"
+    tipo: "regra_negocio"
+    campos_afetados: ["valorAtual", "historico30d"]
+    obrigatorio: true
+
+  - id: "RN-RF044-08"
+    descricao: "Drill-Down - Navegação até transação individual obrigatória"
+    tipo: "regra_negocio"
+    campos_afetados: ["formulaCalculo"]
+    obrigatorio: true
+
+  - id: "RN-RF044-09"
+    descricao: "Recalculo Automático - Conforme periodicidade configurada"
+    tipo: "regra_negocio"
+    campos_afetados: ["periodicidade"]
+    obrigatorio: true
+
+  - id: "RN-RF044-10"
+    descricao: "Cooldown de Alertas - Mínimo 1 hora entre alertas iguais"
+    tipo: "regra_negocio"
+    campos_afetados: ["cooldown"]
+    obrigatorio: true
+
+  - id: "RN-RF044-11"
+    descricao: "Versionamento de Fórmulas - Alteração cria nova versão"
+    tipo: "regra_negocio"
+    campos_afetados: ["formulaCalculo"]
+    obrigatorio: true
+
+  - id: "RN-RF044-12"
+    descricao: "Permissões por Categoria - RBAC filtra KPIs por categoria"
+    tipo: "seguranca"
+    campos_afetados: ["categoria", "usuarioId"]
+    obrigatorio: true
+
+  - id: "RN-RF044-13"
+    descricao: "Dashboard Público - Token JWT temporário (1-30 dias)"
+    tipo: "seguranca"
+    campos_afetados: ["dashboardId", "token"]
+    obrigatorio: true
+
+  - id: "RN-RF044-14"
+    descricao: "Agregação Inteligente - Operação apropriada (SUM, AVG, MAX, MIN)"
+    tipo: "regra_negocio"
+    campos_afetados: ["tipoAgregacao", "kpisFilhos"]
+    obrigatorio: true
+
+  - id: "RN-RF044-15"
+    descricao: "Retenção de Dados - Histórico de 7 anos conforme LGPD"
+    tipo: "regra_negocio"
+    campos_afetados: ["dataCalculo"]
+    obrigatorio: true
+
+estados:
+  - id: "draft"
+    descricao: "Criado, ainda não validado"
+  - id: "active"
+    descricao: "Ativo, cálculo automático habilitado"
+  - id: "inactive"
+    descricao: "Inativo, sem cálculo automático"
+  - id: "deleted"
+    descricao: "Excluído logicamente (soft delete)"
+
+transicoes:
+  permitidas:
+    - de: "draft"
+      para: "active"
+      condicao: "Fórmula validada com sucesso"
+    - de: "active"
+      para: "inactive"
+      condicao: "Desativação manual"
+    - de: "inactive"
+      para: "active"
+      condicao: "Reativação manual"
+    - de: "active"
+      para: "deleted"
+      condicao: "Exclusão (soft delete)"
+    - de: "inactive"
+      para: "deleted"
+      condicao: "Exclusão (soft delete)"
+  proibidas:
+    - de: "deleted"
+      para: "active"
+      motivo: "Exclusão lógica é irreversível"
+    - de: "draft"
+      para: "deleted"
+      motivo: "Deve passar por ACTIVE ou INACTIVE"
+
+permissoes:
+  - codigo: "GES.KPI.LISTAR"
+    descricao: "Listar KPIs"
+  - codigo: "GES.KPI.CRIAR"
+    descricao: "Criar KPI"
+  - codigo: "GES.KPI.EDITAR"
+    descricao: "Editar KPI"
+  - codigo: "GES.KPI.EXCLUIR"
+    descricao: "Excluir KPI"
+  - codigo: "GES.KPI.CALCULAR"
+    descricao: "Recalcular KPIs"
+  - codigo: "GES.KPI.DASHBOARD"
+    descricao: "Visualizar Dashboards"
+  - codigo: "GES.KPI.META.DEFINIR"
+    descricao: "Definir Metas"
+  - codigo: "GES.KPI.ALERTA.CONFIGURAR"
+    descricao: "Configurar Alertas"
+  - codigo: "GES.KPI.HISTORICO"
+    descricao: "Visualizar Histórico"
+  - codigo: "GES.KPI.EXPORTAR"
+    descricao: "Exportar KPIs"
+  - codigo: "GES.KPI.VIEW.FINANCEIRO"
+    descricao: "Visualizar KPIs Financeiros"
+  - codigo: "GES.KPI.VIEW.OPERACIONAL"
+    descricao: "Visualizar KPIs Operacionais"
+  - codigo: "GES.KPI.VIEW.QUALIDADE"
+    descricao: "Visualizar KPIs de Qualidade"
+  - codigo: "GES.KPI.VIEW.COMERCIAL"
+    descricao: "Visualizar KPIs Comerciais"
+  - codigo: "GES.KPI.VIEW.SERVICO"
+    descricao: "Visualizar KPIs de Serviço"
+
+integracoes:
+  internas:
+    - "Autenticacao"
+    - "Multi-Tenancy"
+    - "Auditoria"
+    - "Central de Funcionalidades"
+    - "i18n (pt-BR, en-US, es-ES)"
+  externas:
+    - sistema: "Azure Machine Learning"
+      tipo: "API"
+      obrigatoria: true
+      finalidade: "Forecasting e detecção de anomalias"
+    - sistema: "Power BI"
+      tipo: "OData"
+      obrigatoria: false
+      finalidade: "Exportação de datasets"
+    - sistema: "Tableau"
+      tipo: "API"
+      obrigatoria: false
+      finalidade: "Conector customizado"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  rbac_por_categoria: true
+  token_jwt_publico: true
+  rate_limiting_api: true
+  timeout_queries: 30
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-listar-kpis"
+    - "UC01-criar-kpi"
+    - "UC02-visualizar-kpi"
+    - "UC03-editar-kpi"
+    - "UC04-excluir-kpi"
+    - "UC05-definir-metas"
+    - "UC06-configurar-alertas"
+    - "UC07-visualizar-dashboard"
+    - "UC08-exportar-kpis"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar KPI"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar KPIs"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar KPI"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar KPI"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Excluir KPI (soft delete)"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar código único"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar fórmula de cálculo"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar periodicidade por fonte de dados"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar hierarquia de metas"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento multi-tenant"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC por categoria"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Token JWT para dashboard público"
+      required: true
+
+exclusions:
+  documentacao_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0 (separação RF/RL completa)"
+  - versao: "1.0"
+    data: "2025-01-14"
+    autor: "Equipe IControlIT"
+    descricao: "Versão inicial com conteúdo legado misturado"

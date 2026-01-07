@@ -1,0 +1,796 @@
+# Template de Referência ao Legado (RL-RF030.yaml)
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF030
+titulo: "Gestão de Parâmetros de Faturamento"
+
+legado:
+  sistema: "ASP.NET Web Forms + VB.NET + SQL Server"
+  versao: "Versão 3 (2023)"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server (múltiplos bancos - 1 por cliente)"
+  multi_tenant: false
+  auditoria: "partial" # Logs básicos em arquivos .txt
+
+# ===============================================================================
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+# TODOS os itens DEVEM ter campo "destino" preenchido
+# ===============================================================================
+referencias:
+  # -----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # -----------------------------------------------------------------------------
+  - id: "LEG-RF030-001"
+    tipo: "tabela"
+    nome: "Layout_Importacao"
+    caminho: "SQL Server / dbo.Layout_Importacao"
+    descricao: |
+      Tabela que armazena configurações de layouts de importação.
+      Versão 1 (2014): Não existia (layouts hardcoded em VB.NET)
+      Versão 2 (2020): Criada com JSON sem validação
+      Versão 3 (2023): Adicionado multi-tenancy, hash, flags de controle
+
+      Problemas:
+      - Configuracao_JSON sem validação de sintaxe
+      - Sem Foreign Key para Id_Fornecedor
+      - Fl_Testado_Sandbox era apenas flag (sem sandbox real)
+      - Campos de auditoria incompletos
+      - Sem soft delete
+
+    destino: "assumido"
+    justificativa: |
+      Estrutura básica mantida, mas com melhorias significativas:
+      - Validação completa de JSON schema
+      - Foreign Keys para garantir integridade
+      - Auditoria completa (Created, CreatedBy, LastModified, LastModifiedBy)
+      - Soft delete obrigatório (Fl_Excluido, Data_Exclusao)
+      - Sandbox real (não apenas flag)
+
+    documentacao_item_relacionado: "RN-RF030-001"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF030-002"
+    tipo: "tabela"
+    nome: "Layout_Coluna"
+    caminho: "SQL Server / dbo.Layout_Coluna"
+    descricao: |
+      Tabela que define colunas de cada layout.
+
+      Problemas:
+      - Sem validação de Tipo_Dado (valores inválidos aceitos)
+      - Transformacao como string livre sem validação
+      - Sem auditoria de mudanças
+
+    destino: "assumido"
+    justificativa: |
+      Estrutura mantida com melhorias:
+      - Enum validado para Tipo_Dado
+      - Transformacao validada (ex: UPPER, TRIM, REGEX válidos)
+      - Auditoria completa de mudanças
+
+    documentacao_item_relacionado: "RN-RF030-001"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF030-003"
+    tipo: "tabela"
+    nome: "Regra_Auditoria_Faturamento"
+    caminho: "SQL Server / dbo.Regra_Auditoria_Faturamento"
+    descricao: |
+      Tabela de regras de auditoria configuráveis.
+
+      Problemas:
+      - Expressao sem validação de sintaxe (runtime errors em produção)
+      - Sem teste de expressão antes de ativar
+      - Sem versionamento de regras
+
+    destino: "assumido"
+    justificativa: |
+      Estrutura mantida com validação obrigatória:
+      - Validação de sintaxe com NCalc ANTES de salvar
+      - Teste com dados fictícios obrigatório
+      - Versionamento automático de regras críticas
+
+    documentacao_item_relacionado: "RN-RF030-004"
+    uc_relacionado: "UC07"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF030-004"
+    tipo: "tabela"
+    nome: "Template_Rateio"
+    caminho: "SQL Server / dbo.Template_Rateio"
+    descricao: |
+      Tabela NÃO EXISTIA no legado.
+      Rateio era feito manualmente por analistas em planilhas Excel.
+
+    destino: "substituido"
+    justificativa: |
+      Funcionalidade completamente nova que substitui processo manual.
+      No legado, não havia templates de rateio. Analistas baixavam faturas
+      e distribuíam manualmente em Excel, causando erros e inconsistências.
+
+    documentacao_item_relacionado: "RN-RF030-005"
+    uc_relacionado: "UC09"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF030-005"
+    tipo: "tabela"
+    nome: "Template_Rateio_Item"
+    caminho: "SQL Server / dbo.Template_Rateio_Item"
+    descricao: |
+      Tabela NÃO EXISTIA no legado.
+
+    destino: "substituido"
+    justificativa: |
+      Funcionalidade nova que substitui processo manual.
+      Associada a templates de rateio (substituição de processo Excel).
+
+    documentacao_item_relacionado: "RN-RF030-005"
+    uc_relacionado: "UC09"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF030-006"
+    tipo: "tabela"
+    nome: "Parametro_Faturamento"
+    caminho: "SQL Server / dbo.Parametro_Faturamento"
+    descricao: |
+      Tabela de parâmetros fiscais e tributários.
+
+      Problemas:
+      - Valor_Parametro como string genérico (sem validação de tipo)
+      - Permite sobreposição de vigências (sem constraint)
+      - Sem auditoria automática de mudanças
+
+    destino: "assumido"
+    justificativa: |
+      Estrutura mantida com melhorias:
+      - Validação de tipo do Valor_Parametro
+      - Constraint para evitar sobreposição de vigências
+      - Auditoria automática com before/after para parâmetros críticos
+
+    documentacao_item_relacionado: "RN-RF030-007"
+    uc_relacionado: "UC11"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF030-007"
+    tipo: "tabela"
+    nome: "Fornecedor_Homologacao"
+    caminho: "SQL Server / dbo.Fornecedor_Homologacao"
+    descricao: |
+      Tabela de homologação de fornecedores.
+
+      Problemas:
+      - Documentos_Anexos como JSON sem validação
+      - Sem workflow de aprovação
+      - Sem notificações automáticas de vencimento de certidões
+
+    destino: "assumido"
+    justificativa: |
+      Estrutura mantida com melhorias:
+      - Schema JSON validado para Documentos_Anexos
+      - Workflow de aprovação integrado
+      - Notificações automáticas 30/15/7 dias antes do vencimento
+
+    documentacao_item_relacionado: "RN-RF030-009"
+    uc_relacionado: "UC13"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF030-008"
+    tipo: "tabela"
+    nome: "Importacao_Log"
+    caminho: "SQL Server / dbo.Importacao_Log"
+    descricao: |
+      Tabela de logs de importação.
+
+      Problemas:
+      - Erros_JSON sem schema definido
+      - Hard delete manual (sem job automático de 7 anos)
+      - Sem métricas agregadas para dashboard
+
+    destino: "assumido"
+    justificativa: |
+      Estrutura mantida com melhorias:
+      - Schema JSON definido para Erros_JSON
+      - Job Hangfire de cleanup automático (hard delete após 7 anos)
+      - Métricas agregadas em cache Redis para dashboard
+
+    documentacao_item_relacionado: "RN-RF030-012"
+    uc_relacionado: "UC14"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF030-009"
+    tipo: "tabela"
+    nome: "Layout_Versao"
+    caminho: "SQL Server / dbo.Layout_Versao"
+    descricao: |
+      Tabela de versionamento de layouts.
+
+      Problemas:
+      - Preenchimento manual (não automático)
+      - Sem diff estruturado (apenas JSON completo)
+      - Sem notificações de mudanças
+
+    destino: "assumido"
+    justificativa: |
+      Estrutura mantida com automação:
+      - Criação automática de versões ao detectar mudança (hash)
+      - Diff estruturado (campo a campo)
+      - Notificações automáticas para layouts críticos
+
+    documentacao_item_relacionado: "RN-RF030-003"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # -----------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # -----------------------------------------------------------------------------
+  - id: "LEG-RF030-010"
+    tipo: "stored_procedure"
+    nome: "sp_ValidarFornecedorHomologado"
+    caminho: "SQL Server / dbo.sp_ValidarFornecedorHomologado"
+    descricao: |
+      Valida se fornecedor está homologado e com documentação atualizada.
+
+      Lógica:
+      1. Buscar fornecedor por CNPJ
+      2. Verificar Fl_Ativo = 1
+      3. Verificar homologação ativa
+      4. Verificar validade >= GETDATE()
+      5. Verificar certidões < 90 dias
+      6. Retornar sucesso/erro via OUTPUT
+
+      Problemas:
+      - Lógica fixa em SQL (sem flexibilidade)
+      - Hardcoded 90 dias (deveria ser configurável)
+      - Mensagens de erro não internacionalizadas
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por Command CQRS em C#:
+      - ValidarFornecedorHomologadoCommand
+      - 90 dias configurável (parâmetro do sistema)
+      - Mensagens i18n (pt-BR, en-US, es-ES)
+      - Testável unitariamente
+
+    documentacao_item_relacionado: "RN-RF030-009"
+    uc_relacionado: "UC13"
+    migracao_moderna:
+      command_cqrs: "ValidarFornecedorHomologadoCommand"
+      handler: "ValidarFornecedorHomologadoCommandHandler"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF030-011"
+    tipo: "stored_procedure"
+    nome: "sp_ObterMetricasQualidadeDados"
+    caminho: "SQL Server / dbo.sp_ObterMetricasQualidadeDados"
+    descricao: |
+      Calcula métricas de qualidade para dashboard (últimas 24h).
+
+      Lógica:
+      1. Calcular total importações, sucessos, falhas
+      2. Calcular taxa sucesso percentual
+      3. Calcular tempo médio/máximo processamento
+      4. Retornar top 5 erros (OPENJSON)
+
+      Problemas:
+      - Sem cache (recalcula toda vez)
+      - Sem real-time (depende de polling)
+      - Performance ruim com alto volume
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por Query CQRS + Cache + SignalR:
+      - GetMetricasQualidadeDadosQuery
+      - Cache Redis (TTL 5min)
+      - Push via SignalR (latência <5s)
+      - Performance 10x melhor
+
+    documentacao_item_relacionado: "RN-RF030-015"
+    uc_relacionado: "UC14"
+    migracao_moderna:
+      query_cqrs: "GetMetricasQualidadeDadosQuery"
+      handler: "GetMetricasQualidadeDadosQueryHandler"
+      cache: "Redis (TTL 5min)"
+      realtime: "SignalR Hub"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # -----------------------------------------------------------------------------
+  # WEBSERVICES SOAP
+  # -----------------------------------------------------------------------------
+  - id: "LEG-RF030-012"
+    tipo: "webservice"
+    nome: "ParametrosFaturamentoService.asmx"
+    caminho: "ic1_legado/IControlIT/WebServices/ParametrosFaturamentoService.asmx"
+    descricao: |
+      WebService SOAP legado para expor layouts e regras.
+
+      Métodos:
+      - GetLayoutsPorFornecedor(int idFornecedor)
+      - ValidarArquivoPreImportacao(byte[] arquivo, int idLayout)
+      - GetRegrasAuditoriaAtivas()
+      - GetTemplatesRateio() [não existia]
+
+    destino: "substituido"
+    justificativa: |
+      SOAP WebServices substituídos por REST APIs modernas:
+      - GET /api/parametros/layouts?idFornecedor={id}
+      - POST /api/parametros/layouts/{id}/validar
+      - GET /api/parametros/regras-auditoria?ativas=true
+      - Autenticação JWT (substituindo WS-Security)
+      - Versionamento de API
+      - Documentação automática (Swagger)
+
+    documentacao_item_relacionado: "Seção 9 - Segurança (APIs)"
+    uc_relacionado: null
+    migracao_moderna:
+      api_rest: "ParametrosController (Minimal APIs)"
+      autenticacao: "JWT Bearer"
+      documentacao: "Swagger/OpenAPI"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # -----------------------------------------------------------------------------
+  # REGRAS IMPLÍCITAS NO CÓDIGO VB.NET
+  # -----------------------------------------------------------------------------
+  - id: "LEG-RF030-013"
+    tipo: "regra_negocio"
+    nome: "Layout Fixo Excel (Versão 1)"
+    caminho: "ic1_legado/IControlIT/FaturamentoImporter.vb (presumido)"
+    descricao: |
+      Layout hardcoded no código VB.NET:
+      - Coluna A = CNPJ Fornecedor
+      - Coluna B = Número Fatura
+      - Coluna C = Data Vencimento
+      - Coluna D = Valor Total
+      - Coluna E = Descrição
+
+    destino: "descartado"
+    justificativa: |
+      Layouts fixos completamente descartados.
+      Substituído por sistema de layouts configuráveis que suporta:
+      - N layouts diferentes
+      - Múltiplos formatos (CSV, Excel, XML, JSON, EDI)
+      - Validação configurável por coluna
+      - Transformações (UPPER, TRIM, REGEX)
+
+    documentacao_item_relacionado: "RN-RF030-001"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF030-014"
+    tipo: "regra_negocio"
+    nome: "Importação Aceita Erros Parciais"
+    caminho: "ic1_legado/IControlIT/FaturamentoImporter.vb (presumido)"
+    descricao: |
+      Se 80% das linhas forem válidas, importação prosseguia
+      ignorando 20% com erro sem notificar usuário.
+
+    destino: "descartado"
+    justificativa: |
+      Comportamento descartado completamente.
+      Substituído por validação all-or-nothing (RN-RF030-002):
+      - Se ≥1 linha com erro → rejeita arquivo completo
+      - Gera relatório de erros detalhado
+      - Nenhum dado gravado se houver erro
+      - Rollback automático
+
+    documentacao_item_relacionado: "RN-RF030-002"
+    uc_relacionado: "UC05"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF030-015"
+    tipo: "regra_negocio"
+    nome: "Regras de Auditoria Fixas em SP SQL"
+    caminho: "ic1_legado/Database/Procedures/sp_ValidarFaturaSemAnexo.sql (presumido)"
+    descricao: |
+      Regras de auditoria (ex: "Fatura > R$ 10k deve ter anexo")
+      hardcoded em stored procedures SQL.
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por biblioteca de 50+ regras configuráveis:
+      - Expression Engine (NCalc)
+      - Configuração via UI (sem deploy SQL)
+      - Severidade (Informativa, Alerta, Bloqueante)
+      - Versionamento de regras
+      - Teste com dados fictícios antes de ativar
+
+    documentacao_item_relacionado: "RN-RF030-004"
+    uc_relacionado: "UC07"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF030-016"
+    tipo: "regra_negocio"
+    nome: "Limite Fixo 5000 Linhas"
+    caminho: "Web.config + FaturamentoImporter.vb"
+    descricao: |
+      Limite fixo de 5000 linhas por upload (hardcoded).
+
+    destino: "assumido"
+    justificativa: |
+      Assumido mas com melhorias:
+      - Limite configurável por perfil de usuário:
+        - Admin: 100.000 linhas
+        - Manager: 50.000 linhas
+        - Analyst: 10.000 linhas
+        - Operator: 5.000 linhas
+      - Mensagem clara orientando upload fracionado
+
+    documentacao_item_relacionado: "RN-RF030-014"
+    uc_relacionado: "UC05"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF030-017"
+    tipo: "processo_operacional"
+    nome: "Rateio Manual em Excel"
+    caminho: "N/A (processo operacional)"
+    descricao: |
+      Analistas baixavam faturas, abriam Excel, criavam fórmulas
+      para distribuir custos entre centros de custo.
+
+    destino: "substituido"
+    justificativa: |
+      Processo manual completamente eliminado.
+      Substituído por templates de rateio automáticos:
+      - Templates reutilizáveis (percentual, fixo, proporcional, escalonado)
+      - Simulação antes de aplicar
+      - Ajuste automático de diferenças de arredondamento
+      - Eliminação de 100% do trabalho manual
+
+    documentacao_item_relacionado: "RN-RF030-005"
+    uc_relacionado: "UC09"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF030-018"
+    tipo: "processo_operacional"
+    nome: "Versionamento Manual via Scripts SQL"
+    caminho: "Pasta rede compartilhada (scripts versionados)"
+    descricao: |
+      DBAs criavam scripts SQL manualmente e versionavam em pasta de rede.
+
+    destino: "substituido"
+    justificativa: |
+      Processo manual eliminado.
+      Substituído por versionamento automático:
+      - Detecção automática de mudanças (hash)
+      - Criação de snapshot before/after
+      - Justificativa obrigatória (mínimo 50 caracteres)
+      - Workflow de aprovação para layouts críticos
+      - Notificações automáticas
+
+    documentacao_item_relacionado: "RN-RF030-003"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# ===============================================================================
+# TABELAS LEGADAS (Detalhamento Adicional)
+# ===============================================================================
+tabelas:
+  - nome: "Layout_Importacao"
+    finalidade: "Armazenar configurações de layouts de importação"
+    problemas:
+      - "Configuracao_JSON sem validação de sintaxe"
+      - "Sem Foreign Key para Id_Fornecedor"
+      - "Fl_Testado_Sandbox sem sandbox real"
+      - "Campos de auditoria incompletos (falta LastModified/LastModifiedBy)"
+      - "Sem soft delete"
+    destino: "assumido"
+
+  - nome: "Layout_Coluna"
+    finalidade: "Definir colunas de cada layout"
+    problemas:
+      - "Tipo_Dado sem validação (valores inválidos aceitos)"
+      - "Transformacao sem validação de sintaxe"
+      - "Sem auditoria de mudanças"
+    destino: "assumido"
+
+  - nome: "Regra_Auditoria_Faturamento"
+    finalidade: "Regras de auditoria configuráveis"
+    problemas:
+      - "Expressao sem validação (runtime errors)"
+      - "Sem teste antes de ativar"
+      - "Sem versionamento"
+    destino: "assumido"
+
+  - nome: "Template_Rateio"
+    finalidade: "Templates de rateio de custos"
+    problemas:
+      - "Não existia no legado"
+    destino: "novo"
+
+  - nome: "Parametro_Faturamento"
+    finalidade: "Parâmetros fiscais e tributários"
+    problemas:
+      - "Valor_Parametro como string sem validação de tipo"
+      - "Permite sobreposição de vigências"
+      - "Sem auditoria automática"
+    destino: "assumido"
+
+  - nome: "Fornecedor_Homologacao"
+    finalidade: "Controle de homologação de fornecedores"
+    problemas:
+      - "Documentos_Anexos JSON sem validação"
+      - "Sem workflow de aprovação"
+      - "Sem notificações automáticas"
+    destino: "assumido"
+
+  - nome: "Importacao_Log"
+    finalidade: "Logs de importação"
+    problemas:
+      - "Erros_JSON sem schema"
+      - "Hard delete manual"
+      - "Sem métricas agregadas"
+    destino: "assumido"
+
+  - nome: "Layout_Versao"
+    finalidade: "Histórico de mudanças em layouts"
+    problemas:
+      - "Preenchimento manual"
+      - "Sem diff estruturado"
+      - "Sem notificações"
+    destino: "assumido"
+
+# ===============================================================================
+# GAP ANALYSIS (LEGADO × MODERNO)
+# ===============================================================================
+gap_analysis:
+  - item: "Layouts de Importação"
+    existe_legado: true
+    existe_moderno: true
+    notas: "GRANDE MELHORIA - De hardcoded/tabela sem validação para configurável via UI com validação completa"
+
+  - item: "Validação Pré-Importação"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Validação all-or-nothing obrigatória"
+
+  - item: "Versionamento de Configurações"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Versionamento automático com before/after e justificativa"
+
+  - item: "Regras de Auditoria Configuráveis"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GRANDE MELHORIA - De SP fixos para 50+ regras configuráveis via Expression Engine"
+
+  - item: "Templates de Rateio"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Substituição completa de processo manual em Excel"
+
+  - item: "Sandbox para Testes"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Sandbox obrigatório (no legado testava em produção)"
+
+  - item: "Dashboard de Qualidade"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Real-time via SignalR com latência <5s"
+
+  - item: "Notificações Automáticas"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO - Notificações em até 5 minutos para falhas"
+
+  - item: "Multi-Tenant"
+    existe_legado: true
+    existe_moderno: true
+    notas: "GRANDE MELHORIA - De bancos físicos separados para Row-Level Security (1 banco)"
+
+  - item: "Auditoria"
+    existe_legado: true
+    existe_moderno: true
+    notas: "GRANDE MELHORIA - De logs .txt básicos para auditoria completa (7 anos) com before/after"
+
+  - item: "Performance Importação"
+    existe_legado: true
+    existe_moderno: true
+    notas: "GRANDE MELHORIA - De >5min para <30s em 1000 linhas"
+
+  - item: "API para Integrações"
+    existe_legado: true
+    existe_moderno: true
+    notas: "GRANDE MELHORIA - De SOAP para REST + GraphQL com JWT"
+
+# ===============================================================================
+# DECISÕES DE MODERNIZAÇÃO
+# ===============================================================================
+decisoes_modernizacao:
+  - decisao: "Substituir layouts hardcoded por configuráveis"
+    motivo: |
+      Layouts fixos exigiam 40h de desenvolvimento para adicionar novo fornecedor.
+      Sistema configurável reduz para 2h via UI.
+    impacto: "alto"
+    data: "2025-01-14"
+
+  - decisao: "Implementar validação pré-importação all-or-nothing"
+    motivo: |
+      Importações parciais causavam 120h/mês de retrabalho.
+      Validação prévia reduz para 10h/mês (92% redução).
+    impacto: "alto"
+    data: "2025-01-14"
+
+  - decisao: "Criar biblioteca de regras configuráveis"
+    motivo: |
+      Regras hardcoded exigiam deploy SQL. Detecção automática
+      de glosas aumenta de 0% para 85% (economia R$ 680k/ano).
+    impacto: "alto"
+    data: "2025-01-14"
+
+  - decisao: "Substituir multi-database por Row-Level Security"
+    motivo: |
+      1 banco SQL Server por cliente causava complexidade operacional
+      (backups, migrations, queries cross-database).
+    impacto: "alto"
+    data: "2025-01-14"
+
+  - decisao: "Implementar sandbox obrigatório"
+    motivo: |
+      Testes em produção causavam impacto a usuários e perda de dados.
+      Sandbox elimina 100% dos erros de configuração em produção.
+    impacto: "alto"
+    data: "2025-01-14"
+
+# ===============================================================================
+# RISCOS DE MIGRAÇÃO
+# ===============================================================================
+riscos_migracao:
+  - risco: "Layouts legados incompatíveis com nova estrutura"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      Script de migração de Configuracao_JSON legado → novo schema validado.
+      Período de testes paralelos (sombra) de 2 semanas.
+
+  - risco: "Regras em SP SQL não convertidas"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Mapeamento manual de SP → Expression Engine.
+      Testes paralelos (sombra) com comparação de resultados.
+
+  - risco: "Performance inferior ao legado"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      Testes de carga com 10x volume legado antes de go-live.
+      Benchmark: importação de 1000 linhas em <30s (vs >5min legado).
+
+  - risco: "Resistência de usuários a novo fluxo"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      Treinamento 2 semanas antes de go-live.
+      Período híbrido de 1 mês (legado + moderno paralelos).
+      Suporte dedicado nas primeiras 2 semanas.
+
+  - risco: "Perda de dados em migração"
+    impacto: "critico"
+    probabilidade: "baixa"
+    mitigacao: |
+      Backup completo antes de migração.
+      Dry-run de migração 3 vezes.
+      Rollback plan documentado e testado.
+
+  - risco: "Fornecedores não adaptados a novos layouts"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Comunicação 3 meses antes de go-live.
+      Suporte dedicado para fornecedores.
+      Período de adaptação de 3 meses com layouts legados ativos.
+
+# ===============================================================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# ===============================================================================
+rastreabilidade:
+  - elemento_legado: "Tabela Layout_Importacao"
+    referencia_rf: "RN-RF030-001, RN-RF030-003"
+    referencia_uc: "UC01, UC03"
+    status: "migrado"
+
+  - elemento_legado: "Tabela Regra_Auditoria_Faturamento"
+    referencia_rf: "RN-RF030-004, RN-RF030-011"
+    referencia_uc: "UC07"
+    status: "migrado"
+
+  - elemento_legado: "Tabela Parametro_Faturamento"
+    referencia_rf: "RN-RF030-007, RN-RF030-008"
+    referencia_uc: "UC11"
+    status: "migrado"
+
+  - elemento_legado: "SP sp_ValidarFornecedorHomologado"
+    referencia_rf: "RN-RF030-009"
+    referencia_uc: "UC13"
+    status: "migrado"
+
+  - elemento_legado: "SP sp_ObterMetricasQualidadeDados"
+    referencia_rf: "RN-RF030-015"
+    referencia_uc: "UC14"
+    status: "migrado"
+
+  - elemento_legado: "WebService ParametrosFaturamentoService.asmx"
+    referencia_rf: "Seção 9 - Segurança (APIs)"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "Layouts hardcoded VB.NET"
+    referencia_rf: "RN-RF030-001"
+    referencia_uc: "UC01"
+    status: "descartado"
+
+  - elemento_legado: "Importação parcial com erros"
+    referencia_rf: "RN-RF030-002"
+    referencia_uc: "UC05"
+    status: "descartado"
+
+  - elemento_legado: "Rateio manual Excel"
+    referencia_rf: "RN-RF030-005"
+    referencia_uc: "UC09"
+    status: "descartado"
+
+  - elemento_legado: "Versionamento manual SQL"
+    referencia_rf: "RN-RF030-003"
+    referencia_uc: "UC03"
+    status: "descartado"
+
+# ===============================================================================
+# METADADOS E ESTATÍSTICAS
+# ===============================================================================
+metadados:
+  total_itens_legado: 18
+  itens_assumidos: 8
+  itens_substituidos: 8
+  itens_novos: 0
+  itens_descartados: 2
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+
+# ===============================================================================
+# CHANGELOG
+# ===============================================================================
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Documentação completa de referência ao legado com 100% dos itens com destino definido"
+    autor: "Agência ALC - alc.dev.br"

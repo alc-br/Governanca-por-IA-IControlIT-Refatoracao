@@ -1,0 +1,400 @@
+rf_id: RF034
+rf_title: "Gestão de Itens de Auditoria"
+versao_governanca: "2.0"
+data_migracao: "2025-12-30"
+
+# ==============================================================================
+# ITENS LEGADO RASTREADOS
+# ==============================================================================
+
+itens_legado:
+  # ----------------------------------------------------------------------------
+  # TELAS ASPX
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF034-001"
+    tipo: "tela"
+    titulo: "AuditoriaItens.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Auditoria/AuditoriaItens.aspx"
+    descricao: |
+      Tela principal de CRUD de itens de auditoria com:
+      - Grid de listagem com paginação manual (20 registros/página)
+      - Formulário modal para criar/editar item
+      - Botão exportar para Excel (formato CSV)
+      - Filtros por lote (AAAAMM), operadora e tipo de bilhete
+    regras_implicitas:
+      - "Validação manual de campos obrigatórios em botão Salvar (linha ~350 code-behind)"
+      - "Cálculo de glosa no code-behind: txtGlosa.Text = Val(txtCobrado.Text) - Val(txtCorreto.Text)"
+      - "Atualização de totalizadores via EXEC sp_RecalcularResumo após salvar"
+      - "GridView preenchido via DataBind de DataTable retornado de stored procedure"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tela redesenhada em Angular 19 com Material Design, reactive forms, validações real-time"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - Seção 2 (Funcionalidades F01-F14)"
+      uc_moderno: "UC01-RF034 (Criar), UC02-RF034 (Editar)"
+    migracao_moderna:
+      componente_angular: "auditoria-itens-list.component.ts + auditoria-itens-form.component.ts"
+      rota_frontend: "/gestao/auditoria-itens"
+
+  - id: "LEG-RF034-002"
+    tipo: "tela"
+    titulo: "AuditoriaItensRelatorio.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Auditoria/AuditoriaItensRelatorio.aspx"
+    descricao: |
+      Relatório consolidado de glosas por operadora com:
+      - Gráfico de barras (ASP.NET Chart Control server-side)
+      - Filtros por data início/fim e operadora (multi-select)
+      - Exportação para PDF via iTextSharp (código manual 200 linhas)
+    regras_implicitas:
+      - "Agregação de valores feita em sp_RelatorioGlosasPorOperadora"
+      - "Gráfico renderizado server-side como imagem PNG"
+      - "Paginação manual via Session['PageIndex']"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Relatório redesenhado com Chart.js no frontend, queries otimizadas"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - Funcionalidade F09 (Relatórios Gerenciais)"
+      uc_moderno: "UC04-RF034 (Consultar e Filtrar)"
+    migracao_moderna:
+      componente_angular: "auditoria-itens-relatorios.component.ts"
+      rota_frontend: "/gestao/auditoria-itens/relatorios"
+
+  - id: "LEG-RF034-003"
+    tipo: "tela"
+    titulo: "AuditoriaItensExportar.aspx"
+    caminho_legado: "ic1_legado/IControlIT/Auditoria/AuditoriaItensExportar.aspx"
+    descricao: |
+      Exportação de itens para Excel/PDF com:
+      - Exportação CSV simulada via Response.ContentType
+      - Geração PDF com iTextSharp (código monolítico 400 linhas)
+      - Agrupamento manual por operadora em loop For Each
+      - Formatação manual de valores monetários
+    regras_implicitas:
+      - "Exportação CSV usa Response.ContentType = 'application/vnd.ms-excel'"
+      - "PDF gerado com código monolítico de 400 linhas inline"
+      - "Formatação: Format(valor, 'R$ #,##0.00000000')"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Exportação modernizada com EPPlus (Excel) e QuestPDF (PDF), formatação automática"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - RN-RF034-008 (Exportação Estruturada)"
+      uc_moderno: "UC03-RF034 (Exportar Itens)"
+    migracao_moderna:
+      command_cqrs: "ExportarItensContestacaoCommand"
+      handler: "ExportarItensContestacaoHandler"
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF034-004"
+    tipo: "webservice"
+    titulo: "AuditoriaService.asmx"
+    caminho_legado: "ic1_legado/IControlIT/WebServices/AuditoriaService.asmx"
+    metodos:
+      - nome: "ObterItensAuditoria"
+        parametros: "lote As String, FornecedorId As Integer"
+        retorno: "DataSet"
+      - nome: "SalvarItemAuditoria"
+        parametros: "item As ItemAuditoriaDto"
+        retorno: "Boolean"
+      - nome: "ExcluirItemAuditoria"
+        parametros: "itemId As Integer"
+        retorno: "Boolean"
+    descricao: |
+      WebService SOAP para operações de itens de auditoria.
+      - Sem autenticação JWT (apenas IP whitelist IIS)
+      - Retorna DataSet não tipado
+      - Exceptions não estruturadas
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por REST API com JWT, DTOs tipados, FluentValidation, HTTP Status Codes"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - Seção 6 (API Endpoints)"
+      endpoint_moderno: "GET|POST|DELETE /api/v1/auditoria-itens"
+    migracao_moderna:
+      minimal_api: "ItensAuditoria.cs"
+      commands: "CreateAuditoriaItemCommand, UpdateAuditoriaItemCommand, DeleteAuditoriaItemCommand"
+      queries: "GetAuditoriasItensQuery, GetAuditoriaItemByIdQuery"
+
+  # ----------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF034-005"
+    tipo: "stored_procedure"
+    titulo: "sp_AuditarFatura"
+    caminho_legado: "ic1_legado/Database/Procedures/sp_AuditarFatura.sql"
+    parametros_entrada:
+      - "@Id_Fatura INT"
+      - "@Id_Fornecedor INT"
+      - "@Lote VARCHAR(6)"
+    parametros_saida:
+      - "@TotalItensProcessados INT OUTPUT"
+    descricao: |
+      Processa auditoria de fatura:
+      1. Busca bilhetes da fatura
+      2. Compara valor cobrado vs contratual (tabela TarifasContratos)
+      3. Se divergência, insere em Auditoria_Item
+      4. Calcula glosa (diferença valores)
+      5. Atualiza totalizadores em Auditoria_Resumo
+    destino: "SUBSTITUÍDO"
+    justificativa: "Lógica movida para Application Layer com CQRS, FluentValidation, Domain Events"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - RN-RF034-006 (Sincronização Automática)"
+      regra_moderna: "Domain Event AuditoriaItemCriadoDomainEvent"
+    migracao_moderna:
+      handler: "CreateAuditoriaItemCommandHandler"
+      domain_event_handler: "RecalcularResumoAoItemCriadoHandler"
+
+  - id: "LEG-RF034-006"
+    tipo: "stored_procedure"
+    titulo: "sp_CalcularGlosa"
+    caminho_legado: "ic1_legado/Database/Procedures/sp_CalcularGlosa.sql"
+    parametros_entrada:
+      - "@ValorCobrado NUMERIC(13,8)"
+      - "@ValorCorreto NUMERIC(13,8)"
+    parametros_saida:
+      - "@Glosa NUMERIC(13,8) OUTPUT"
+    descricao: |
+      Cálculo trivial de glosa:
+      SET @Glosa = @ValorCobrado - @ValorCorreto
+    destino: "SUBSTITUÍDO"
+    justificativa: "Cálculo trivial movido para propriedade calculada em Domain Model"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - RN-RF034-002 (Cálculo Automático)"
+      regra_moderna: "Propriedade calculada AuditoriaItem.ValorCobradoAMais"
+    migracao_moderna:
+      entidade: "AuditoriaItem"
+      codigo: "public decimal ValorCobradoAMais => ValorCobrado - ValorCorreto;"
+
+  - id: "LEG-RF034-007"
+    tipo: "stored_procedure"
+    titulo: "sp_GerarRelatorioAuditoria"
+    caminho_legado: "ic1_legado/Database/Procedures/sp_GerarRelatorioAuditoria.sql"
+    parametros_entrada:
+      - "@DataInicio DATE"
+      - "@DataFim DATE"
+      - "@Id_Fornecedor INT"
+    parametros_saida: []
+    descricao: |
+      Relatório consolidado por operadora:
+      1. Agrupa itens por operadora (GROUP BY)
+      2. Calcula SUM(Valor_Cobrado_A_Mais) por operadora
+      3. Retorna: Operadora, TotalGlosa, TotalItens, DivergenciaMedia
+    destino: "SUBSTITUÍDO"
+    justificativa: "Query otimizada com projeções, índices específicos, paginação, filtros dinâmicos"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - Funcionalidade F09 (Relatórios Gerenciais)"
+      regra_moderna: "GetRelatorioOperadoraQuery"
+    migracao_moderna:
+      query: "GetRelatorioOperadoraQuery"
+      handler: "GetRelatorioOperadoraQueryHandler"
+      projecao: "LINQ GroupBy + Select"
+
+  - id: "LEG-RF034-008"
+    tipo: "stored_procedure"
+    titulo: "sp_ExportarItens"
+    caminho_legado: "ic1_legado/Database/Procedures/sp_ExportarItens.sql"
+    parametros_entrada:
+      - "@Id_Auditoria_Resumo INT"
+      - "@Id_Fornecedor INT"
+    parametros_saida: []
+    descricao: |
+      Exportação de itens para Excel/PDF:
+      - SELECT com 7 JOINs
+      - Ordena por Operadora, depois ValorCobradoAMais DESC
+      - Retorna ResultSet completo (sem paginação)
+    destino: "SUBSTITUÍDO"
+    justificativa: "Query otimizada com paginação, filtros dinâmicos, índices, seleção parcial de colunas"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - RN-RF034-008 (Exportação Estruturada)"
+      regra_moderna: "ExportAuditoriasItensQuery"
+    migracao_moderna:
+      query: "ExportAuditoriasItensQuery"
+      handler: "ExportAuditoriasItensHandler"
+
+  # ----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF034-009"
+    tipo: "tabela"
+    titulo: "dbo.Auditoria_Item"
+    schema_legado: "[dbo].[Auditoria_Item]"
+    problemas_identificados:
+      - "Falta de FK: Nenhuma Foreign Key constraint definida"
+      - "Tipo float: Campos QTD_Consumo, Valor_Correto e Valor_Cobrado_A_Mais usam float (impreciso)"
+      - "Campos NULL: Valor_Cobrado, Valor_Contrato, Valor_Correto permitem NULL"
+      - "Sem soft delete: Não possui FlExcluido"
+      - "Sem auditoria: Não possui DataCriacao, UsuarioCriacao, DataAlteracao, UsuarioAlteracao"
+      - "Id_Fornecedor: Sem Row-Level Security (sem índice multi-tenancy)"
+      - "Sem índices: Apenas PK clusterizada, sem índices analíticos"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Tabela redesenhada com GUIDs, FKs, DECIMAL(13,8), NOT NULL, FlExcluido, Shadow Properties, Global Query Filter, índices otimizados"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - Seção 7 (Modelo de Dados)"
+      md_moderno: "MD-RF034.md - Tabela AuditoriaItem"
+    migracao_moderna:
+      tabela_moderna: "AuditoriaItem"
+      migration_ef_core: "20251230_CreateAuditoriaItemTable.cs"
+
+  - id: "LEG-RF034-010"
+    tipo: "tabela"
+    titulo: "dbo.Auditoria_Resumo"
+    schema_legado: "[dbo].[Auditoria_Resumo]"
+    problemas_identificados:
+      - "FK sem constraint: Id_Fornecedor sem FK para Fornecedor"
+      - "Campos NULL: Totalizadores permitem NULL (deveria ser default 0)"
+      - "Sem soft delete: Não possui FlExcluido"
+      - "Auditoria parcial: Possui Data_Criacao, falta UsuarioCriacao, DataAlteracao, UsuarioAlteracao"
+    destino: "ASSUMIDO"
+    justificativa: "Tabela mantida com correções (GUIDs, FKs, soft delete, auditoria completa)"
+    rastreabilidade:
+      documentacao_moderno: "RF035 - Gestão de Resumos de Auditoria"
+      md_moderno: "MD-RF035.md - Tabela AuditoriaResumo"
+    migracao_moderna:
+      tabela_moderna: "AuditoriaResumo"
+      migration_ef_core: "20251230_CreateAuditoriaResumoTable.cs"
+
+  # ----------------------------------------------------------------------------
+  # REGRAS IMPLÍCITAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF034-011"
+    tipo: "regra_negocio"
+    titulo: "Validação de Precisão Decimal (8 casas)"
+    localizacao_codigo: "ic1_legado/IControlIT/Auditoria/AuditoriaItens.aspx.vb - Linha 420"
+    descricao: |
+      Valores monetários devem ter no máximo 8 casas decimais.
+      Validação via Decimal.Round(valor, 8).
+      Rejeição se valor exceder precisão.
+    destino: "ASSUMIDO"
+    justificativa: "Regra documentada e mantida no sistema moderno via FluentValidation"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - RN-RF034-003 (Precisão Numérica)"
+      regra_moderna: "CreateAuditoriaItemCommandValidator"
+    migracao_moderna:
+      validador: "CreateAuditoriaItemCommandValidator"
+      linha_codigo: "RuleFor(x => x.ValorCobrado).PrecisionScale(13, 8, true)"
+
+  - id: "LEG-RF034-012"
+    tipo: "regra_negocio"
+    titulo: "Quantidade Consumo Deve Ser Positiva"
+    localizacao_codigo: "ic1_legado/IControlIT/Auditoria/AuditoriaItens.aspx.vb - Linha 445"
+    descricao: |
+      QuantidadeConsumo não pode ser zero ou negativo.
+      Validação: If QTD_Consumo <= 0 Then Throw New Exception("Quantidade inválida")
+    destino: "ASSUMIDO"
+    justificativa: "Regra documentada e mantida no sistema moderno"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - RN-RF034-004 (Quantidade de Consumo Positiva)"
+      regra_moderna: "CreateAuditoriaItemCommandValidator"
+    migracao_moderna:
+      validador: "CreateAuditoriaItemCommandValidator"
+      linha_codigo: "RuleFor(x => x.QuantidadeConsumo).GreaterThan(0)"
+
+  - id: "LEG-RF034-013"
+    tipo: "regra_negocio"
+    titulo: "Unidade de Consumo Deve Respeitar Tipo de Bilhete"
+    localizacao_codigo: "ic1_legado/IControlIT/WebServices/AuditoriaService.asmx.vb - Linha 180"
+    descricao: |
+      - Tipo "VOZ" só permite Unidade = 1 (minutos)
+      - Tipo "DADOS" só permite Unidade = 2 (MB)
+      - Tipo "SMS" só permite Unidade = 3 (mensagens)
+      Validação manual via SELECT em BilhetesTipos.
+    destino: "ASSUMIDO"
+    justificativa: "Regra documentada e mantida com validação assíncrona"
+    rastreabilidade:
+      documentacao_moderno: "RF034 - RN-RF034-011 (Validação Conforme Tipo)"
+      regra_moderna: "CreateAuditoriaItemCommandValidator"
+    migracao_moderna:
+      validador: "CreateAuditoriaItemCommandValidator"
+      linha_codigo: "Pattern matching com MustAsync para validar Tipo vs Unidade"
+
+# ==============================================================================
+# BANCOS LEGADOS MAPEADOS
+# ==============================================================================
+
+bancos_legados:
+  - nome: "Cliente_Modelo"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "Auditoria_Item"
+      - "Auditoria_Resumo"
+      - "Bilhete"
+      - "BilheteTipo"
+      - "Ativo"
+      - "Contrato"
+      - "Operadora"
+    destino: "CONSOLIDADO"
+    justificativa: "Migrado para banco único com multi-tenancy (Row-Level Security via FornecedorId)"
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF034-001"
+    titulo: "Inconsistência de Tipos Numéricos"
+    severidade: "ALTA"
+    descricao: |
+      Uso de float para valores monetários (QTD_Consumo, Valor_Correto, Valor_Cobrado_A_Mais).
+      Causa arredondamentos incorretos em cálculos financeiros críticos.
+    impacto: "Glosas calculadas com imprecisão de até 0.00000001, acumulando erros em lotes grandes"
+    solucao_moderna: "DECIMAL(13,8) em todas as colunas financeiras, eliminando imprecisão de ponto flutuante"
+
+  - id: "PROB-RF034-002"
+    titulo: "Campo Glosa Editável Manualmente"
+    severidade: "CRÍTICA"
+    descricao: |
+      Campo Valor_Cobrado_A_Mais era editável pelo usuário.
+      Permitia inconsistências entre ValorCobrado, ValorCorreto e Glosa.
+      Usuários podiam inserir glosa diferente do cálculo correto.
+    impacto: "Contestações com valores incorretos, perda de credibilidade junto a operadoras"
+    solucao_moderna: "Campo ValorCobradoAMais como propriedade calculada (read-only), cálculo automático garantido"
+
+  - id: "PROB-RF034-003"
+    titulo: "Falta de Soft Delete"
+    severidade: "ALTA"
+    descricao: |
+      Exclusão física de registros (DELETE FROM Auditoria_Item).
+      Perda permanente de histórico de auditoria.
+      Impossibilidade de investigar contestações antigas.
+    impacto: "Perda de rastreabilidade, violação de conformidade LGPD (retenção 7 anos)"
+    solucao_moderna: "FlExcluido + Global Query Filter, preservando registros com auditoria completa"
+
+  - id: "PROB-RF034-004"
+    titulo: "Falta de Auditoria de Alterações"
+    severidade: "CRÍTICA"
+    descricao: |
+      Sem rastreamento de quem criou/alterou registros.
+      Sem timestamp de alterações.
+      Impossível identificar responsável por mudanças incorretas.
+    impacto: "Impossibilidade de investigação, violação SOX, falta de accountability"
+    solucao_moderna: "Shadow Properties (UsuarioCriacao, DataCriacao, UsuarioAlteracao, DataAlteracao) automáticos via EF Interceptor"
+
+  - id: "PROB-RF034-005"
+    titulo: "Sem Row-Level Security"
+    severidade: "CRÍTICA"
+    descricao: |
+      Campo Id_Fornecedor sem filtro automático.
+      Risco de vazamento cross-tenant se query esquecer cláusula WHERE.
+      Incidentes de acesso indevido entre clientes.
+    impacto: "Vazamento de dados sensíveis entre clientes, violação LGPD"
+    solucao_moderna: "Global Query Filter no DbContext, isolamento automático por FornecedorId em todas as queries"
+
+  - id: "PROB-RF034-006"
+    titulo: "Sem Índices Otimizados para Relatórios"
+    severidade: "MÉDIA"
+    descricao: |
+      Apenas PK clusterizada, sem índices não-clusterizados.
+      Relatórios com milhares de registros causavam full table scans.
+      Travamentos e timeouts frequentes.
+    impacto: "Performance inaceitável em relatórios analíticos, insatisfação de usuários"
+    solucao_moderna: "Índices não-clusterizados otimizados com INCLUDE para colunas de projeção, queries 10x mais rápidas"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 13
+  itens_assumidos: 4  # LEG-RF034-010, 011, 012, 013
+  itens_substituidos: 9  # LEG-RF034-001 até 009
+  itens_descartados: 0
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"  # Todos os 13 itens têm destino definido

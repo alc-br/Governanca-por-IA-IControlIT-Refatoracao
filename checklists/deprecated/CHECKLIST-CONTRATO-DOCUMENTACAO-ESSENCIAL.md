@@ -22,7 +22,7 @@
 
 Antes de iniciar, TODOS devem ser True:
 
-- [ ] **Pasta do RF existe** - em rf/[Fase]/[EPIC]/
+- [ ] **Pasta do RF existe** - em documentacao/[Fase]/[EPIC]/
 - [ ] **Legado acessivel** - D:/IC2/ic1_legado/
 - [ ] **Modelo fisico acessivel** - D:\DocumentosIC2\modelo-fisico-bd.sql
 - [ ] **Templates disponiveis** - templates/TEMPLATE-*.md

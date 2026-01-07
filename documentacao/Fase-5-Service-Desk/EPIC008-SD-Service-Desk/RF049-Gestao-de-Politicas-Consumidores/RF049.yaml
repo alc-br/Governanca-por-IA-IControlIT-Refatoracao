@@ -1,0 +1,483 @@
+# =============================================
+# RF049 - Gestão de Políticas de Consumidores
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF049"
+  nome: "Gestão de Políticas de Consumidores"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 5 - Service Desk"
+  epic: "EPIC008-SD-Service-Desk"
+  status: "draft"
+
+descricao:
+  objetivo: "Implementar sistema completo de gestão de políticas de consumidores que permita definir, aplicar e monitorar regras de uso e restrições para consumidores de telecomunicações."
+  problema_resolvido: "Controlar custos de telecomunicações, prevenir uso indevido, garantir conformidade com políticas corporativas, automatizar bloqueios e notificações."
+  publico_afetado: "Gestores de TI, Financeiro, RH, Consumidores (colaboradores, departamentos, dispositivos)."
+
+escopo:
+  incluso:
+    - "CRUD completo de políticas de consumo"
+    - "Motor de políticas configurável com múltiplos tipos de regras"
+    - "Aplicação automática de políticas por perfil/status/departamento"
+    - "Processamento em lote de aplicação/remoção de políticas"
+    - "Avaliação de políticas em tempo real (API de verificação)"
+    - "Alertas proativos em múltiplos limiares (50%, 80%, 100%)"
+    - "Bloqueios automáticos por violação de políticas"
+    - "Histórico de aplicações de políticas (retenção 7 anos LGPD)"
+    - "Histórico de violações de políticas"
+    - "Dashboard de conformidade com indicadores visuais"
+    - "Simulador de impacto de políticas"
+    - "Relatórios de violações e consumo"
+    - "API REST completa com permissões RBAC"
+    - "Interface Angular 19 com wizard de criação"
+    - "Auditoria completa de todas as operações"
+    - "Suporte multi-tenant com isolamento de dados"
+    - "Templates de políticas pré-configuradas"
+    - "Importação/Exportação de políticas (JSON)"
+  fora:
+    - "Gerenciamento de usuários/perfis (RF006)"
+    - "Gerenciamento de consumidores (RF052)"
+    - "Gerenciamento de status (RF048)"
+    - "Faturamento detalhado (RF026)"
+    - "Auditoria de bilhetes (RF034, RF035)"
+    - "Gestão de contratos (RF023)"
+    - "Inventário de ativos (RF025)"
+    - "Análise preditiva de consumo (roadmap futuro)"
+    - "Interface visual específica (responsabilidade frontend)"
+    - "Tecnologia de implementação (definido em arquitetura)"
+    - "Estratégia de deploy ou infraestrutura"
+
+entidades:
+  - nome: "PoliticaConsumidor"
+    descricao: "Entidade principal que define políticas de consumo"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    campos_obrigatorios:
+      - "Id_Fornecedor"
+      - "Nome"
+      - "Tipo"
+      - "Status"
+
+  - nome: "PoliticaConsumidorAplicacao"
+    descricao: "Vinculação de política a consumidor"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+    campos_obrigatorios:
+      - "Id_Politica"
+      - "Id_Consumidor"
+      - "Dt_Inicio"
+
+  - nome: "PoliticaConsumidorHistorico"
+    descricao: "Histórico imutável de aplicações/remoções (7 anos LGPD)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+    imutavel: true
+    retencao_anos: 7
+
+  - nome: "ViolacaoPolitica"
+    descricao: "Registro de violações de políticas"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "TemplatePolitica"
+    descricao: "Templates pré-configurados de políticas"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF049-01"
+    descricao: "Sistema deve suportar múltiplos tipos de políticas de restrição configuráveis"
+    tipo: "regra_negocio"
+    campos_afetados: ["Tipo", "Configuracao"]
+    obrigatorio: true
+    detalhes:
+      - "Tipos suportados: Limite Monetário (R$), Franquia de Dados (MB/GB), Franquia de Voz (minutos), Franquia de SMS (quantidade)"
+      - "Restrição de Horário, Restrição de Destinos, Limite de Roaming, Limite por Tipo de Serviço"
+      - "Cada política pode combinar múltiplos tipos de restrições"
+      - "Políticas customizadas podem ser criadas por Super Admins"
+
+  - id: "RN-RF049-02"
+    descricao: "Políticas devem ser aplicadas automaticamente conforme perfil do consumidor"
+    tipo: "regra_negocio"
+    campos_afetados: ["Perfil", "Aplicacao_Automatica"]
+    obrigatorio: true
+    detalhes:
+      - "Perfis pré-definidos: Executivo, Gerente, Colaborador, Estagiário, Externo"
+      - "Ao criar consumidor com perfil X, políticas do perfil são aplicadas via Domain Event"
+      - "Mudança de perfil aplica novas políticas e remove antigas (com histórico)"
+
+  - id: "RN-RF049-03"
+    descricao: "Mudança de status do consumidor deve aplicar políticas específicas automaticamente"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "Aplicacao_Automatica"]
+    obrigatorio: true
+    integracao_rf: "RF048"
+    detalhes:
+      - "Status Ativo: Políticas normais do perfil"
+      - "Status Suspenso: Bloqueio de novas operações, mantém consulta"
+      - "Status Bloqueado: Bloqueio total"
+      - "Status Inativo: Sem políticas aplicadas"
+      - "Status Pendente: Políticas restritivas"
+
+  - id: "RN-RF049-04"
+    descricao: "Sistema deve alertar ANTES de atingir limite para permitir ação preventiva"
+    tipo: "regra_negocio"
+    campos_afetados: ["Limiar_Alerta", "Canal_Notificacao"]
+    obrigatorio: true
+    integracao_rf: "RF066,RF067"
+    detalhes:
+      - "Alertas em: 50% (informativo), 80% (crítico), 100% (bloqueio iminente)"
+      - "Canais: E-mail, SMS (crítico), Notificação in-app"
+      - "Destinatários: Consumidor, Gestor responsável, Financeiro"
+      - "Alertas não devem duplicar (apenas 1 por limiar por período)"
+
+  - id: "RN-RF049-05"
+    descricao: "Consumidores que violam políticas devem ser bloqueados automaticamente"
+    tipo: "regra_negocio"
+    campos_afetados: ["Bloqueio_Automatico", "Tipo_Bloqueio"]
+    obrigatorio: true
+    integracao_rf: "RF048"
+    detalhes:
+      - "Ao atingir 100%: Bloqueia novas operações, Notifica stakeholders, Registra violação"
+      - "Bloqueio Total (todos os serviços) ou Parcial (apenas serviço violado)"
+      - "Políticas com flag AlertOnly apenas alertam sem bloquear"
+
+  - id: "RN-RF049-06"
+    descricao: "Permitir aplicar/remover políticas de múltiplos consumidores simultaneamente"
+    tipo: "regra_negocio"
+    campos_afetados: ["Processamento_Lote"]
+    obrigatorio: true
+    detalhes:
+      - "Validar se política é aplicável a cada consumidor"
+      - "Processar de forma assíncrona (Hangfire)"
+      - "Gerar relatório consolidado de sucesso/falha"
+      - "Limite máximo de 1000 consumidores por lote"
+
+  - id: "RN-RF049-07"
+    descricao: "Todas as aplicações/remoções de políticas devem ser registradas de forma imutável"
+    tipo: "lgpd"
+    campos_afetados: ["Historico"]
+    obrigatorio: true
+    detalhes:
+      - "Registra: Data/Hora, Usuário, Consumidor, Política, Motivo, Vigência"
+      - "Retenção de 7 anos conforme LGPD"
+      - "Dados não podem ser alterados, apenas visualizados"
+      - "Histórico é obrigatório para conformidade (sem exceções)"
+
+  - id: "RN-RF049-08"
+    descricao: "Todas as violações de políticas devem ser registradas para auditoria e análise"
+    tipo: "auditoria"
+    campos_afetados: ["Violacao"]
+    obrigatorio: true
+    detalhes:
+      - "Registra: Data/Hora, Consumidor, Política, Valor Limite, Valor Consumido, Ação Tomada"
+      - "Dashboard exibe: Top 10 violadores, Políticas mais violadas, Tendência temporal"
+
+  - id: "RN-RF049-09"
+    descricao: "Sistema deve fornecer API para verificar se ação viola política ANTES de executar"
+    tipo: "performance"
+    campos_afetados: ["Avaliacao_Tempo_Real"]
+    obrigatorio: true
+    detalhes:
+      - "Endpoint POST /api/gestao/politicas-consumidores/avaliar"
+      - "Retorna: Permitido (true/false), Políticas Aplicáveis, Limite, Consumo, Percentual"
+      - "Tempo de resposta ≤ 100ms (P95)"
+      - "Motor avalia regras em memória (cache)"
+      - "Em caso de falha, política padrão é 'permitir' (fail-open)"
+
+  - id: "RN-RF049-10"
+    descricao: "Permitir simular impacto de política antes de aplicar em produção"
+    tipo: "regra_negocio"
+    campos_afetados: ["Simulador"]
+    obrigatorio: true
+    detalhes:
+      - "Analisa consumo histórico dos consumidores afetados"
+      - "Retorna: Quantos seriam bloqueados, Quando, Estimativa de economia"
+      - "Simulador usa dados históricos reais mas não aplica mudanças"
+
+  - id: "RN-RF049-11"
+    descricao: "Sistema deve oferecer templates de políticas comuns para agilizar configuração"
+    tipo: "regra_negocio"
+    campos_afetados: ["Template"]
+    obrigatorio: true
+    detalhes:
+      - "Templates: Executivo (sem limites), Gerente (R$ 500), Colaborador (R$ 200), Estagiário (R$ 50)"
+      - "Templates podem ser customizados ao aplicar"
+      - "Templates não podem ser deletados se estiverem em uso"
+
+  - id: "RN-RF049-12"
+    descricao: "Permitir importar/exportar políticas para replicação entre ambientes ou backup"
+    tipo: "regra_negocio"
+    campos_afetados: ["Importacao_Exportacao"]
+    obrigatorio: true
+    detalhes:
+      - "Exportação: Gera JSON com todas as políticas"
+      - "Importação: Valida estrutura, Verifica conflitos, Permite preview"
+      - "Formato JSON deve seguir schema validado"
+
+  - id: "RN-RF049-13"
+    descricao: "Interface deve exibir visualmente conformidade de consumidores com políticas"
+    tipo: "regra_negocio"
+    campos_afetados: ["Dashboard"]
+    obrigatorio: true
+    detalhes:
+      - "Dashboard exibe: Total por status, Gráfico temporal, Lista crítica (>80%), Top 10 violadores"
+      - "Cores: Verde (Conforme), Amarelo (Aviso), Laranja (Crítico), Vermelho (Violação)"
+      - "Dashboard atualiza em tempo real via SignalR"
+
+  - id: "RN-RF049-14"
+    descricao: "Sistema deve calcular economia gerada por políticas aplicadas"
+    tipo: "regra_negocio"
+    campos_afetados: ["Calculo_Economia"]
+    obrigatorio: true
+    integracao_rf: "RF026"
+    detalhes:
+      - "Cálculo: Consumo Real - Consumo Estimado sem Política = Economia"
+      - "Base de comparação: Média dos 3 meses anteriores"
+      - "Relatório mensal enviado para Gestores"
+
+  - id: "RN-RF049-15"
+    descricao: "Operações sobre políticas devem respeitar permissões por perfil"
+    tipo: "seguranca"
+    campos_afetados: ["Permissoes"]
+    obrigatorio: true
+    detalhes:
+      - "Permissões: VIEW, CREATE, UPDATE, DELETE, APPLY, ADMIN"
+      - "Endpoints validam via RequireAuthorization"
+      - "Commands validam via Authorize(Roles)"
+
+estados:
+  - id: "rascunho"
+    descricao: "Política criada mas não publicada"
+    transicoes_permitidas: ["ativa", "cancelada"]
+  - id: "ativa"
+    descricao: "Política em vigor e aplicável"
+    transicoes_permitidas: ["suspensa", "inativa"]
+  - id: "suspensa"
+    descricao: "Política temporariamente desabilitada"
+    transicoes_permitidas: ["ativa", "inativa"]
+  - id: "inativa"
+    descricao: "Política desabilitada permanentemente"
+    transicoes_permitidas: []
+  - id: "cancelada"
+    descricao: "Política cancelada sem ter sido ativada"
+    transicoes_permitidas: []
+
+transicoes:
+  permitidas:
+    - de: "rascunho"
+      para: "ativa"
+    - de: "rascunho"
+      para: "cancelada"
+    - de: "ativa"
+      para: "suspensa"
+    - de: "ativa"
+      para: "inativa"
+    - de: "suspensa"
+      para: "ativa"
+    - de: "suspensa"
+      para: "inativa"
+  proibidas:
+    - de: "inativa"
+      para: "*"
+      motivo: "Estado final"
+    - de: "cancelada"
+      para: "*"
+      motivo: "Estado final"
+    - de: "rascunho"
+      para: "suspensa"
+      motivo: "Deve ativar primeiro"
+    - de: "rascunho"
+      para: "inativa"
+      motivo: "Deve ativar ou cancelar primeiro"
+
+permissoes:
+  - codigo: "GESTAO.POLITICAS.VIEW"
+    descricao: "Visualizar políticas"
+  - codigo: "GESTAO.POLITICAS.CREATE"
+    descricao: "Criar políticas"
+  - codigo: "GESTAO.POLITICAS.UPDATE"
+    descricao: "Atualizar políticas"
+  - codigo: "GESTAO.POLITICAS.DELETE"
+    descricao: "Excluir políticas (lógica)"
+  - codigo: "GESTAO.POLITICAS.APPLY"
+    descricao: "Aplicar/Remover políticas de consumidores"
+  - codigo: "GESTAO.POLITICAS.ADMIN"
+    descricao: "Gerenciar templates e importação/exportação"
+
+endpoints:
+  - metodo: "GET"
+    rota: "/api/gestao/politicas-consumidores"
+    descricao: "Listar políticas com filtros"
+    permissao: "GESTAO.POLITICAS.VIEW"
+  - metodo: "GET"
+    rota: "/api/gestao/politicas-consumidores/{id}"
+    descricao: "Obter detalhes de uma política"
+    permissao: "GESTAO.POLITICAS.VIEW"
+  - metodo: "POST"
+    rota: "/api/gestao/politicas-consumidores"
+    descricao: "Criar nova política"
+    permissao: "GESTAO.POLITICAS.CREATE"
+  - metodo: "PUT"
+    rota: "/api/gestao/politicas-consumidores/{id}"
+    descricao: "Atualizar política existente"
+    permissao: "GESTAO.POLITICAS.UPDATE"
+  - metodo: "DELETE"
+    rota: "/api/gestao/politicas-consumidores/{id}"
+    descricao: "Excluir política (lógica)"
+    permissao: "GESTAO.POLITICAS.DELETE"
+  - metodo: "POST"
+    rota: "/api/gestao/politicas-consumidores/{id}/apply"
+    descricao: "Aplicar política a consumidores"
+    permissao: "GESTAO.POLITICAS.APPLY"
+  - metodo: "POST"
+    rota: "/api/gestao/politicas-consumidores/{id}/remove"
+    descricao: "Remover política de consumidores"
+    permissao: "GESTAO.POLITICAS.APPLY"
+  - metodo: "POST"
+    rota: "/api/gestao/politicas-consumidores/batch-apply"
+    descricao: "Aplicação em lote"
+    permissao: "GESTAO.POLITICAS.APPLY"
+  - metodo: "POST"
+    rota: "/api/gestao/politicas-consumidores/avaliar"
+    descricao: "Avaliar se ação viola política"
+    permissao: "GESTAO.POLITICAS.VIEW"
+  - metodo: "POST"
+    rota: "/api/gestao/politicas-consumidores/{id}/simular"
+    descricao: "Simular impacto de política"
+    permissao: "GESTAO.POLITICAS.VIEW"
+  - metodo: "GET"
+    rota: "/api/gestao/politicas-consumidores/{id}/historico"
+    descricao: "Obter histórico de aplicações"
+    permissao: "GESTAO.POLITICAS.VIEW"
+  - metodo: "GET"
+    rota: "/api/gestao/politicas-consumidores/violacoes"
+    descricao: "Listar violações de políticas"
+    permissao: "GESTAO.POLITICAS.VIEW"
+  - metodo: "GET"
+    rota: "/api/gestao/politicas-consumidores/dashboard"
+    descricao: "Obter dados do dashboard"
+    permissao: "GESTAO.POLITICAS.VIEW"
+  - metodo: "GET"
+    rota: "/api/gestao/politicas-consumidores/templates"
+    descricao: "Listar templates de políticas"
+    permissao: "GESTAO.POLITICAS.VIEW"
+  - metodo: "POST"
+    rota: "/api/gestao/politicas-consumidores/importar"
+    descricao: "Importar políticas de arquivo"
+    permissao: "GESTAO.POLITICAS.ADMIN"
+  - metodo: "GET"
+    rota: "/api/gestao/politicas-consumidores/exportar"
+    descricao: "Exportar políticas para arquivo"
+    permissao: "GESTAO.POLITICAS.ADMIN"
+
+integracoes:
+  internas:
+    - "Autenticacao (RF006)"
+    - "Multi-Tenancy"
+    - "Auditoria (RF003)"
+    - "Internacionalizacao (i18n)"
+  externas:
+    - sistema: "Hangfire"
+      tipo: "Job Processing"
+      obrigatoria: true
+    - sistema: "SignalR"
+      tipo: "Real-time Updates"
+      obrigatoria: true
+
+integracoes_rfs:
+  - documentacao: "RF003"
+    nome: "Logs, Monitoramento e Observabilidade"
+    tipo: "obrigatoria"
+    descricao: "Auditoria de todas as operações"
+  - documentacao: "RF006"
+    nome: "Gestão de Usuários"
+    tipo: "obrigatoria"
+    descricao: "Validação de permissões RBAC"
+  - documentacao: "RF026"
+    nome: "Gestão de Faturas"
+    tipo: "obrigatoria"
+    descricao: "Cálculo de consumo e economia"
+  - documentacao: "RF048"
+    nome: "Gestão de Status de Consumidores"
+    tipo: "obrigatoria"
+    descricao: "Bloqueios automáticos e aplicação por status"
+  - documentacao: "RF052"
+    nome: "Gestão de Consumidores"
+    tipo: "obrigatoria"
+    descricao: "Entidade principal e aplicação de políticas"
+  - documentacao: "RF066"
+    nome: "Notificações e Alertas"
+    tipo: "obrigatoria"
+    descricao: "Alertas proativos via notificações in-app"
+  - documentacao: "RF067"
+    nome: "Central de E-mails"
+    tipo: "obrigatoria"
+    descricao: "Envio de alertas e relatórios via e-mail"
+  - documentacao: "RF030"
+    nome: "Gestão de Parâmetros de Faturamento"
+    tipo: "opcional"
+    descricao: "Configurações de limites padrão"
+  - documentacao: "RF034"
+    nome: "Gestão de Itens de Auditoria"
+    tipo: "opcional"
+    descricao: "Auditoria avançada de violações"
+  - documentacao: "RF035"
+    nome: "Gestão de Resumos de Auditoria"
+    tipo: "opcional"
+    descricao: "Relatórios consolidados de auditoria"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  autenticacao: "JWT Bearer Token"
+  autorizacao: "RBAC"
+  criptografia_repouso: "AES-256"
+  criptografia_transito: "TLS 1.3"
+  rate_limiting: "100 requests/minuto por usuário"
+  segregacao_duties: true
+
+performance:
+  tempo_resposta_avaliacao_ms: 100
+  throughput_avaliacoes_dia: 50000
+  tempo_lote_1000_consumidores_min: 5
+  tempo_dashboard_seg: 2
+  tempo_simulador_seg: 5
+  cache_politicas_ativas_min: 5
+
+disponibilidade:
+  uptime_percent: 99.9
+  backup_retencao_dias: 30
+  retencao_historico_anos: 7
+  rpo_horas: 1
+  rto_horas: 4
+  fail_open: true
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00"
+    - "UC01"
+    - "UC02"
+    - "UC03"
+    - "UC04"
+
+changelog:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0: Separação RF/RL, sincronização 100% com RF.md"
+  - versao: "1.0"
+    data: "2025-12-18"
+    autor: "IControlIT Architect Agent"
+    descricao: "Versão inicial"

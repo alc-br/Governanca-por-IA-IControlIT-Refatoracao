@@ -142,7 +142,7 @@ Além disso, atualizar:
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 | **TOOLS_PATH** | `D:\IC2\docs\tools\docs\` |
 
@@ -202,7 +202,7 @@ if not exists("templates/RF.yaml"):
 
 # 3. Verificar que NÃO há legado
 if has_legado(rf):
-    ERRO("RF tem legado - usar rf-rl-criacao.md")
+    ERRO("RF tem legado - usar documentacao-rl-criacao.md")
 
 # 4. Verificar que STATUS.yaml NÃO existe
 if exists(f"{pasta_rf}/STATUS.yaml"):
@@ -278,7 +278,7 @@ secao_11 = gerar_integracoes_obrigatorias(rf)
 rf_md = montar_rf_md(template_md, secoes)
 
 # 14. Salvar RFXXX.md
-salvar_arquivo(f"{pasta_rf}/RF{rf}.md", rf_md)
+salvar_arquivo(f"{pasta_rf}/RF{rf}.md", documentacao_md)
 ```
 
 ### Passo 4: Geração de RFXXX.yaml
@@ -313,7 +313,7 @@ rf_yaml = {
 }
 
 # 3. Salvar RFXXX.yaml
-salvar_yaml(f"{pasta_rf}/RF{rf}.yaml", rf_yaml)
+salvar_yaml(f"{pasta_rf}/RF{rf}.yaml", documentacao_yaml)
 ```
 
 ### Passo 5: Criação de STATUS.yaml
@@ -406,7 +406,7 @@ rf/[Fase]/[EPIC]/RFXXX/
 
 ```yaml
 documentacao:
-  rf: true                      ← RF criado
+  documentacao: true                      ← RF criado
   uc: false
   wf: false
   md: false
@@ -414,10 +414,10 @@ documentacao:
   tc: false
 
 validacoes:
-  rf_yaml_sincronizado: true
-  rf_11_secoes_completas: true
-  rf_minimo_10_regras: true
-  rf_integracoes_obrigatorias: true
+  documentacao_yaml_sincronizado: true
+  documentacao_11_secoes_completas: true
+  documentacao_minimo_10_regras: true
+  documentacao_integracoes_obrigatorias: true
 ```
 
 ---

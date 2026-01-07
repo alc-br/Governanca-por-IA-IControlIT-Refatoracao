@@ -115,7 +115,7 @@ def collect_uc_coverage(uc: Dict[str, Any]):
     # Suporta ambas as chaves: "casos_de_uso" (padrão atual) e "ucs" (legado)
     ucs = uc.get("casos_de_uso", []) or uc.get("ucs", []) or []
 
-    rf_items_covered: Set[str] = set()
+    documentacao_items_covered: Set[str] = set()
     uc_ids: Set[str] = set()
     uc_items_required: Set[str] = set()
     ucitem_meta: Dict[str, Dict[str, Any]] = {}
@@ -132,7 +132,7 @@ def collect_uc_coverage(uc: Dict[str, Any]):
 
         covers = u.get("covers", {}) or {}
         for rid in covers.get("rf_items", []) or []:
-            rf_items_covered.add(norm_id(rid))
+            documentacao_items_covered.add(norm_id(rid))
 
         for item in covers.get("uc_items", []) or []:
             if not isinstance(item, dict):
@@ -150,7 +150,7 @@ def collect_uc_coverage(uc: Dict[str, Any]):
             if required:
                 uc_items_required.add(iid)
 
-    return rf_items_covered, uc_ids, uc_items_required, ucitem_meta
+    return documentacao_items_covered, uc_ids, uc_items_required, ucitem_meta
 
 # -------------------------
 # TC
@@ -233,7 +233,7 @@ def main():
     args = ap.parse_args()
 
     try:
-        rf = load_yaml(args.rf)
+        documentacao = load_yaml(args.rf)
         uc = load_yaml(args.uc)
         tc = load_yaml(args.tc) if args.tc else {}
     except Exception as e:
@@ -241,22 +241,22 @@ def main():
         sys.exit(99)  # Exit code 99 = Falha técnica do validador
 
     # RF
-    rf_all, rf_meta = collect_rf_items(rf)
-    rf_required = {i for i in rf_all if rf_meta[i]["required"]}
-    rf_required = apply_exclusions(
-        rf_required,
+    documentacao_all, documentacao_meta = collect_rf_items(rf)
+    documentacao_required = {i for i in documentacao_all if documentacao_meta[i]["required"]}
+    documentacao_required = apply_exclusions(
+        documentacao_required,
         rf.get("exclusions", {}).get("rf_items", [])
     )
 
     # UC
-    rf_items_covered, uc_ids, uc_items_required, ucitem_meta = collect_uc_coverage(uc)
+    documentacao_items_covered, uc_ids, uc_items_required, ucitem_meta = collect_uc_coverage(uc)
 
     # CONTRATO: UCs obrigatórios
     MANDATORY_UCS = {"UC00", "UC01", "UC02", "UC03", "UC04"}
     missing_mandatory_ucs = MANDATORY_UCS - uc_ids
 
     # CONTRATO: UC não cria comportamento fora do RF
-    uc_outside_rf = rf_items_covered - rf_required
+    uc_outside_rf = documentacao_items_covered - documentacao_required
 
     # NOVO: Validar nomenclatura de fluxos
     uc_md_path = args.uc.replace(".yaml", ".md")
@@ -287,8 +287,8 @@ def main():
         "checks": {
             "uc_covers_rf": {
                 "required": sorted(rf_required),
-                "covered": sorted(rf_items_covered & rf_required),
-                "missing": sorted(rf_required - rf_items_covered),
+                "covered": sorted(rf_items_covered & documentacao_required),
+                "missing": sorted(rf_required - documentacao_items_covered),
                 "severity": "CRÍTICO",
                 "blocker": True
             },
@@ -430,7 +430,7 @@ def main():
             md.append("")
             md.append("**RNs faltando:**")
             for rn_id in sorted(report['checks']['uc_covers_rf']['missing']):
-                meta = rf_meta.get(rn_id, {})
+                meta = documentacao_meta.get(rn_id, {})
                 title = meta.get('title', 'N/A')
                 md.append(f"- `{rn_id}`: {title}")
             md.append("")

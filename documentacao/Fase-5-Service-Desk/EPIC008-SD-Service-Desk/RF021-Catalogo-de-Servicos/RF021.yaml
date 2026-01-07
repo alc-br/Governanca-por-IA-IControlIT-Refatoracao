@@ -1,0 +1,569 @@
+# =============================================
+# RF-021: Catálogo de Serviços e Portal Self-Service
+# Versão: 2.0 (Governança)
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF021"
+  nome: "Catálogo de Serviços e Portal Self-Service"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 5 - Service Desk"
+  epic: "EPIC008-SD-Service-Desk"
+  status: "aprovado" # draft | aprovado | em_desenvolvimento | concluido
+
+descricao:
+  objetivo: |
+    Implementar um Catálogo de Serviços e Portal Self-Service que permita aos usuários finais
+    solicitar serviços de TI/Telecom de forma autônoma através de uma interface intuitiva
+    estilo "carrinho de compras", com aprovação automatizada via workflow configurável,
+    tracking visual de SLA e integração com sistemas de estoque e fornecedores.
+
+  problema_resolvido: |
+    - Sobrecarga do Service Desk: 70%+ das solicitações chegam via e-mail/telefone manual
+    - Falta de Padronização: Cada solicitação é descrita de forma diferente
+    - Sem Visibilidade: Usuário não sabe quais serviços estão disponíveis ou quanto tempo levará
+    - Aprovação Manual: Aprovações via e-mail sem rastreabilidade e sem SLA
+    - Impossibilidade de Métricas: Não há como medir demanda, satisfação ou tempo de atendimento
+
+  publico_afetado: |
+    - Usuários Finais: Solicitam serviços (linhas móveis, equipamentos, acessos)
+    - Gestores: Aprovam solicitações de suas equipes
+    - Atendentes TI/Telecom: Executam provisionamento de serviços
+    - Administradores: Configuram catálogo, workflows e SLAs
+
+escopo:
+  incluso:
+    - "Catálogo visual categorizado de serviços disponíveis"
+    - "Busca full-text inteligente no catálogo"
+    - "Carrinho de compras para múltiplos serviços"
+    - "Workflow de aprovação automatizado configurável"
+    - "Formulários dinâmicos por serviço (JSON Schema)"
+    - "SLA tracking visual com semáforo (verde/amarelo/vermelho)"
+    - "Integração com estoque (verificação de disponibilidade)"
+    - "Provisionamento automatizado via APIs de fornecedores"
+    - "Analytics de demanda (serviços mais solicitados, SLA médio)"
+    - "Avaliação de serviço (1-5 estrelas + comentários)"
+    - "Notificações multicanal (e-mail, push, in-app)"
+    - "Auto-aprovação por regras de negócio"
+    - "Cancelamento de solicitações (com restrições)"
+    - "Numeração sequencial de solicitações (SRV-YYYY-NNNNN)"
+
+  fora:
+    - "Interface visual específica (layout, cores, fontes)"
+    - "Tecnologia, framework ou linguagem de implementação"
+    - "Estratégia de deploy ou infraestrutura"
+    - "Integração com sistemas de terceiros não especificados"
+    - "Catálogo de serviços de outros departamentos (RH, Financeiro) - extensão futura"
+
+entidades:
+  - nome: "Servico_Catalogo"
+    descricao: "Catálogo de serviços disponíveis para solicitação"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "Servico_Solicitacao"
+    descricao: "Solicitações de serviços criadas pelos usuários"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "Servico_Aprovacao"
+    descricao: "Aprovações do workflow de cada solicitação"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "Servico_Carrinho"
+    descricao: "Carrinho temporário de serviços antes de finalizar solicitação"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+
+regras_negocio:
+  - id: "RN-RF021-001"
+    descricao: "Workflow de Aprovação Obrigatório - Todo serviço com Fl_Requer_Aprovacao = 1 deve passar por workflow configurável (gestor → TI → financeiro → diretor)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Fl_Requer_Aprovacao", "Nivel_Aprovacao"]
+    obrigatorio: true
+    validacao_server_side: true
+    validacao_client_side: true
+
+  - id: "RN-RF021-002"
+    descricao: "Solicitação para Outro Usuário - Usuários com permissão Solicitar_Para_Terceiros podem criar solicitações em nome de terceiros (registrar ambos solicitante e beneficiário)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Id_Usuario_Solicitante", "Id_Usuario_Beneficiario"]
+    obrigatorio: true
+    validacao_server_side: true
+    validacao_client_side: false
+
+  - id: "RN-RF021-003"
+    descricao: "Carrinho de Compras Temporário - Itens persistem entre sessões, máximo 10 serviços, limpeza automática após 30 dias"
+    tipo: "regra_negocio"
+    campos_afetados: ["Servico_Carrinho"]
+    obrigatorio: true
+    validacao_server_side: true
+    validacao_client_side: true
+
+  - id: "RN-RF021-004"
+    descricao: "Validação de Estoque Automática - Serviços com Fl_Verifica_Estoque = 1 devem validar disponibilidade antes da aprovação, reservar item após aprovação, cancelar se não repor em 15 dias"
+    tipo: "regra_negocio"
+    campos_afetados: ["Fl_Verifica_Estoque", "Id_Item_Estoque"]
+    obrigatorio: true
+    validacao_server_side: true
+    validacao_client_side: false
+
+  - id: "RN-RF021-005"
+    descricao: "SLA Tracking com Semáforo Visual - Cálculo automático considerando dias úteis, semáforo verde (>50%), amarelo (20-50%), vermelho (<20% ou vencido), job Hangfire verifica a cada 15 minutos"
+    tipo: "regra_negocio"
+    campos_afetados: ["SLA_Atendimento_Horas", "SLA_Vencimento_Calculado"]
+    obrigatorio: true
+    validacao_server_side: true
+    validacao_client_side: true
+
+  - id: "RN-RF021-006"
+    descricao: "Formulários Dinâmicos por Serviço - JSON Schema armazenado em Formulario_JSON, validação dupla (client-side UX + server-side segurança)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Formulario_JSON"]
+    obrigatorio: false
+    validacao_server_side: true
+    validacao_client_side: true
+
+  - id: "RN-RF021-007"
+    descricao: "Provisionamento Automatizado - Serviços com Fl_Provisiona_Automatico = 1 chamam API do fornecedor após aprovação, callback atualiza status, erro gera notificação"
+    tipo: "regra_negocio"
+    campos_afetados: ["Fl_Provisiona_Automatico", "API_Fornecedor"]
+    obrigatorio: false
+    validacao_server_side: true
+    validacao_client_side: false
+
+  - id: "RN-RF021-008"
+    descricao: "Auto-Aprovação por Regras - Aprovação automática se: colaborador veterano (>1 ano), valor baixo (<R$ 500), serviço não-crítico, histórico positivo (>10 solicitações concluídas)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Fl_Auto_Aprovacao", "Regra_Auto_Aprovacao"]
+    obrigatorio: false
+    validacao_server_side: true
+    validacao_client_side: false
+
+  - id: "RN-RF021-009"
+    descricao: "Avaliação de Serviço Obrigatória - Nota 1-5 estrelas + comentário opcional, notificações progressivas (imediato/24h/48h), atualizar Avaliacao_Media automaticamente"
+    tipo: "regra_negocio"
+    campos_afetados: ["Avaliacao_Nota", "Avaliacao_Comentario", "Avaliacao_Media"]
+    obrigatorio: true
+    validacao_server_side: true
+    validacao_client_side: true
+
+  - id: "RN-RF021-010"
+    descricao: "Limite de Solicitações Simultâneas - Máximo 5 solicitações Pendente/Em_Atendimento para usuário comum, 20 para Gestor/Diretor"
+    tipo: "validacao"
+    campos_afetados: ["Status"]
+    obrigatorio: true
+    validacao_server_side: true
+    validacao_client_side: true
+
+  - id: "RN-RF021-011"
+    descricao: "Cancelamento de Solicitação - Permitido até início do atendimento (usuário), aprovador pode cancelar a qualquer momento, justificativa obrigatória (mínimo 20 caracteres), liberar reserva de estoque"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "Motivo_Cancelamento", "Dt_Cancelamento"]
+    obrigatorio: true
+    validacao_server_side: true
+    validacao_client_side: true
+
+  - id: "RN-RF021-012"
+    descricao: "Justificativa Obrigatória para Serviços Críticos - Serviços com Fl_Requer_Justificativa = 1 exigem campo Justificativa (50-1000 caracteres)"
+    tipo: "validacao"
+    campos_afetados: ["Fl_Requer_Justificativa", "Justificativa"]
+    obrigatorio: false
+    validacao_server_side: true
+    validacao_client_side: true
+
+  - id: "RN-RF021-013"
+    descricao: "Numeração Sequencial de Solicitações - Formato SRV-YYYY-NNNNN, gerado via sequence SQL Server, reset anual"
+    tipo: "unicidade"
+    campos_afetados: ["Numero_Solicitacao"]
+    obrigatorio: true
+    validacao_server_side: true
+    validacao_client_side: false
+
+  - id: "RN-RF021-014"
+    descricao: "Notificações em Cada Etapa do Workflow - Eventos: criada, aguardando aprovação, aprovada, rejeitada, em atendimento, concluída, SLA em risco, cancelada. Canais: e-mail + push + in-app"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status"]
+    obrigatorio: true
+    validacao_server_side: true
+    validacao_client_side: false
+
+  - id: "RN-RF021-015"
+    descricao: "Analytics de Demanda para Gestão - Métricas: serviços mais solicitados, SLA médio, taxa de aprovação, tempo médio de aprovação, avaliação média, gargalos. Dashboard em tempo real com filtros e exportação"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "SLA_Vencimento_Calculado", "Avaliacao_Nota"]
+    obrigatorio: false
+    validacao_server_side: false
+    validacao_client_side: false
+
+estados:
+  - id: "Rascunho"
+    descricao: "Solicitação iniciada mas não finalizada (ainda no carrinho)"
+
+  - id: "Pendente"
+    descricao: "Aguardando aprovação (em algum nível do workflow)"
+
+  - id: "Aprovada"
+    descricao: "Aprovação completa, aguardando início do atendimento"
+
+  - id: "Em_Atendimento"
+    descricao: "Atendente iniciou provisionamento do serviço"
+
+  - id: "Aguardando_Estoque"
+    descricao: "Aguardando reposição de item em falta"
+
+  - id: "Aguardando_Usuario"
+    descricao: "Aguardando ação do usuário (fornecer informações, confirmar entrega)"
+
+  - id: "Em_Provisionamento"
+    descricao: "Integração com fornecedor em andamento"
+
+  - id: "Concluida"
+    descricao: "Serviço entregue com sucesso"
+
+  - id: "Cancelada"
+    descricao: "Solicitação cancelada pelo usuário ou aprovador"
+
+  - id: "Rejeitada"
+    descricao: "Reprovada por algum aprovador do workflow"
+
+  - id: "Erro_Provisionamento"
+    descricao: "Falha na integração com fornecedor"
+
+transicoes:
+  permitidas:
+    - de: "Rascunho"
+      para: "Pendente"
+
+    - de: "Pendente"
+      para: "Aprovada"
+
+    - de: "Pendente"
+      para: "Rejeitada"
+
+    - de: "Pendente"
+      para: "Cancelada"
+
+    - de: "Aprovada"
+      para: "Em_Atendimento"
+
+    - de: "Aprovada"
+      para: "Aguardando_Estoque"
+
+    - de: "Aprovada"
+      para: "Cancelada"
+
+    - de: "Em_Atendimento"
+      para: "Em_Provisionamento"
+
+    - de: "Em_Atendimento"
+      para: "Aguardando_Usuario"
+
+    - de: "Em_Atendimento"
+      para: "Concluida"
+
+    - de: "Em_Atendimento"
+      para: "Erro_Provisionamento"
+
+    - de: "Em_Atendimento"
+      para: "Cancelada"
+
+    - de: "Aguardando_Estoque"
+      para: "Em_Atendimento"
+
+    - de: "Aguardando_Estoque"
+      para: "Cancelada"
+
+    - de: "Aguardando_Usuario"
+      para: "Em_Atendimento"
+
+    - de: "Aguardando_Usuario"
+      para: "Cancelada"
+
+    - de: "Em_Provisionamento"
+      para: "Concluida"
+
+    - de: "Em_Provisionamento"
+      para: "Erro_Provisionamento"
+
+    - de: "Erro_Provisionamento"
+      para: "Em_Atendimento"
+
+  proibidas:
+    - de: "Concluida"
+      para: "*"
+      motivo: "Solicitação já finalizada (irreversível)"
+
+    - de: "Rejeitada"
+      para: "*"
+      motivo: "Solicitação reprovada (usuário deve criar nova)"
+
+    - de: "Cancelada"
+      para: "*"
+      motivo: "Cancelamento é definitivo"
+
+permissoes:
+  - codigo: "SERVICO.CATALOGO.VIEW"
+    descricao: "Listar catálogo de serviços"
+
+  - codigo: "SERVICO.SOLICITAR"
+    descricao: "Criar solicitação própria"
+
+  - codigo: "SERVICO.SOLICITAR_TERCEIROS"
+    descricao: "Criar solicitação para terceiro"
+
+  - codigo: "SERVICO.APROVAR"
+    descricao: "Aprovar solicitação"
+
+  - codigo: "SERVICO.ATENDER"
+    descricao: "Atender solicitação"
+
+  - codigo: "SERVICO.CANCELAR_FORCADO"
+    descricao: "Cancelar solicitação em atendimento"
+
+  - codigo: "SERVICO.ANALYTICS.VIEW"
+    descricao: "Visualizar analytics de demanda"
+
+  - codigo: "SERVICO.CATALOGO.MANAGE"
+    descricao: "Configurar catálogo de serviços"
+
+eventos_dominio:
+  - evento: "SolicitacaoCriada"
+    quando: "Após finalizar carrinho"
+    notificados: "Solicitante + Aprovador Nível 1"
+
+  - evento: "SolicitacaoAprovada"
+    quando: "Após aprovação final"
+    notificados: "Solicitante + Atendente"
+
+  - evento: "SolicitacaoRejeitada"
+    quando: "Quando aprovador rejeita"
+    notificados: "Solicitante"
+
+  - evento: "SolicitacaoCancelada"
+    quando: "Quando usuário/aprovador cancela"
+    notificados: "Todos os envolvidos"
+
+  - evento: "SLAEmRisco"
+    quando: "Quando entrar em vermelho"
+    notificados: "Atendente + Gestor"
+
+  - evento: "SolicitacaoConcluida"
+    quando: "Após atendente marcar como concluída"
+    notificados: "Solicitante (com solicitação de avaliação)"
+
+  - evento: "AvaliacaoRecebida"
+    quando: "Usuário avalia serviço"
+    notificados: "Atendente + Gestor do catálogo"
+
+  - evento: "ErroProvisionamento"
+    quando: "Falha na integração com fornecedor"
+    notificados: "Atendente"
+
+integracoes:
+  internas:
+    - "Autenticação (JWT Bearer Token)"
+    - "Multi-Tenancy (isolamento por empresa)"
+    - "Auditoria (todas operações)"
+    - "RBAC (permissões por role)"
+    - "Notificações (e-mail + push + in-app)"
+
+  externas:
+    - sistema: "Operadoras Telecom (Vivo, Claro, TIM)"
+      tipo: "API REST"
+      obrigatoria: false
+      proposito: "Ativação automática de linhas"
+
+    - sistema: "Fornecedores Hardware (Dell, HP, Lenovo)"
+      tipo: "EDI"
+      obrigatoria: false
+      proposito: "Pedidos automáticos de equipamentos"
+
+    - sistema: "Provedores Cloud (AWS, Azure)"
+      tipo: "SDK"
+      obrigatoria: false
+      proposito: "Criação automática de recursos cloud"
+
+    - sistema: "Sistema de Estoque"
+      tipo: "API Interna"
+      obrigatoria: true
+      proposito: "Verificação de disponibilidade e reserva"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacoes_obrigatorias:
+    - "XSS em todos os campos de texto"
+    - "SQL Injection em todos os campos"
+    - "CSRF em operações de escrita"
+    - "Sanitização de HTML em comentários"
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-listar-servicos-catalogo"
+    - "UC01-criar-servico-catalogo"
+    - "UC02-visualizar-servico-catalogo"
+    - "UC03-editar-servico-catalogo"
+    - "UC04-inativar-servico-catalogo"
+    - "UC05-adicionar-servico-carrinho"
+    - "UC06-solicitar-servico"
+    - "UC07-aprovar-solicitacao"
+    - "UC08-atender-solicitacao"
+    - "UC09-cancelar-solicitacao"
+    - "UC10-avaliar-servico"
+
+catalog:
+  crud:
+    - id: "RF021-CRUD-01"
+      title: "Criar serviço no catálogo"
+      required: true
+
+    - id: "RF021-CRUD-02"
+      title: "Listar serviços do catálogo"
+      required: true
+
+    - id: "RF021-CRUD-03"
+      title: "Visualizar detalhes do serviço"
+      required: true
+
+    - id: "RF021-CRUD-04"
+      title: "Atualizar serviço no catálogo"
+      required: true
+
+    - id: "RF021-CRUD-05"
+      title: "Inativar serviço no catálogo"
+      required: true
+
+    - id: "RF021-CRUD-06"
+      title: "Adicionar serviço ao carrinho"
+      required: true
+
+    - id: "RF021-CRUD-07"
+      title: "Finalizar solicitação (converter carrinho em solicitação)"
+      required: true
+
+    - id: "RF021-CRUD-08"
+      title: "Aprovar solicitação (workflow)"
+      required: true
+
+    - id: "RF021-CRUD-09"
+      title: "Atender solicitação (provisionamento)"
+      required: true
+
+    - id: "RF021-CRUD-10"
+      title: "Cancelar solicitação"
+      required: true
+
+    - id: "RF021-CRUD-11"
+      title: "Avaliar serviço (1-5 estrelas)"
+      required: true
+
+  validacoes:
+    - id: "RF021-VAL-01"
+      title: "Validar campos obrigatórios do formulário dinâmico"
+      required: true
+
+    - id: "RF021-VAL-02"
+      title: "Validar unicidade de número de solicitação (SRV-YYYY-NNNNN)"
+      required: true
+
+    - id: "RF021-VAL-03"
+      title: "Validar limite de solicitações simultâneas (5 para usuário, 20 para gestor)"
+      required: true
+
+    - id: "RF021-VAL-04"
+      title: "Validar disponibilidade de estoque antes de aprovar"
+      required: false
+
+    - id: "RF021-VAL-05"
+      title: "Validar justificativa obrigatória (50-1000 caracteres) para serviços críticos"
+      required: false
+
+  seguranca:
+    - id: "RF021-SEC-01"
+      title: "Isolamento de tenant (usuários veem apenas catálogo de sua empresa)"
+      required: true
+
+    - id: "RF021-SEC-02"
+      title: "Permissões RBAC (SERVICO.SOLICITAR, SERVICO.APROVAR, etc)"
+      required: true
+
+    - id: "RF021-SEC-03"
+      title: "Auditoria completa de todas operações (criação, aprovação, cancelamento)"
+      required: true
+
+    - id: "RF021-SEC-04"
+      title: "Validação server-side de todas regras de negócio (não confiar apenas no client-side)"
+      required: true
+
+exclusions:
+  documentacao_items: []
+
+metricas:
+  kpis:
+    - nome: "Taxa de Auto-Atendimento"
+      descricao: "Percentual de solicitações criadas via portal self-service vs manual"
+      meta: ">= 70%"
+      log_obrigatorio: true
+
+    - nome: "SLA Médio de Atendimento"
+      descricao: "Tempo médio entre solicitação e conclusão"
+      meta: "<= 48 horas"
+      log_obrigatorio: true
+
+    - nome: "Taxa de Aprovação"
+      descricao: "Percentual de solicitações aprovadas vs rejeitadas"
+      meta: ">= 85%"
+      log_obrigatorio: true
+
+    - nome: "Satisfação Média (NPS)"
+      descricao: "Avaliação média dos serviços (1-5 estrelas)"
+      meta: ">= 4.0"
+      log_obrigatorio: true
+
+    - nome: "Taxa de Auto-Aprovação"
+      descricao: "Percentual de solicitações auto-aprovadas por regras"
+      meta: ">= 40%"
+      log_obrigatorio: true
+
+  alertas:
+    - evento: "SLA Vencido"
+      threshold: "> 10% das solicitações em uma semana"
+      severidade: "ALTA"
+      canal_notificacao:
+        - "email"
+        - "slack"
+
+    - evento: "Avaliação Baixa Recorrente"
+      threshold: "Serviço com média < 3.0 por 3 meses consecutivos"
+      severidade: "MÉDIA"
+      canal_notificacao:
+        - "email"
+
+    - evento: "Erro de Provisionamento"
+      threshold: "> 5 erros em 1 hora"
+      severidade: "CRÍTICA"
+      canal_notificacao:
+        - "email"
+        - "slack"
+        - "sms"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0 com separação estrita RF/RL (CONTRATO-RF-PARA-RL) - RF agora contém APENAS contrato funcional moderno"
+
+  - versao: "1.0"
+    data: "2025-11-03"
+    autor: "Equipe Arquitetura IControlIT"
+    descricao: "Versão inicial com documentação completa (incluía seções de legado)"

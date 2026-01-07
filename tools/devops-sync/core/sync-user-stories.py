@@ -30,7 +30,7 @@ def find_user_stories_yaml(rf_code):
         try:
             with open(yaml_file, 'r', encoding='utf-8') as f:
                 data = yaml.safe_load(f)
-                if data.get('rf_id') == rf_code:
+                if data.get('rf_id') == documentacao_code:
                     return yaml_file, data
         except Exception as e:
             continue
@@ -49,7 +49,7 @@ def get_feature_work_item(feature_id):
     except:
         return None
 
-def create_user_story(parent_feature_id, story_data, rf_code):
+def create_user_story(parent_feature_id, story_data, documentacao_code):
     """Cria uma User Story no Azure DevOps"""
     url = f"{ORG_URL}/{PROJECT}/_apis/wit/workitems/$User Story?api-version=7.0"
 
@@ -136,7 +136,7 @@ def main():
         print("Exemplo: python sync-user-stories.py RF001")
         sys.exit(1)
 
-    rf_code = sys.argv[1].upper()
+    documentacao_code = sys.argv[1].upper()
 
     if not all([ORG_URL, PROJECT, TOKEN]):
         print("Variaveis de ambiente necessarias:")
@@ -206,7 +206,7 @@ def main():
 
         print(f"Criando: {story_code} - {story_title}...", end=' ')
 
-        work_item_id, work_item_title = create_user_story(feature_id, story, rf_code)
+        work_item_id, work_item_title = create_user_story(feature_id, story, documentacao_code)
 
         if work_item_id:
             print(f"[OK] ID: {work_item_id}")

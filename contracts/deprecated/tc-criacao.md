@@ -257,15 +257,15 @@ TC-RF060-HP-001:
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 
 ### 4.2 Permissões de Escrita
 
 O agente PODE escrever **APENAS** em:
 ```
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\TC-RFXXX.yaml
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\TC-RFXXX.yaml
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
@@ -303,19 +303,19 @@ O contrato TRAVA se qualquer condição falhar:
 Antes de criar qualquer caso de teste, o agente DEVE:
 
 #### 1.1 Ler UC-RFXXX.md Completamente
-- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.md`
+- Localização: ` D:\IC2\documentacao\[Fase]\[EPIC]\RFXXX\UC-RFXXX.md`
 - Entender TODOS os casos de uso
 - Identificar TODOS os fluxos (FP, FA, FE)
 - Mapear regras de negócio testáveis
 
 #### 1.2 Ler UC-RFXXX.yaml Completamente
-- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\UC-RFXXX.yaml`
+- Localização: ` D:\IC2\documentacao\[Fase]\[EPIC]\RFXXX\UC-RFXXX.yaml`
 - Extrair cenários de teste necessários
 - Mapear uc_items (granulares)
 - Identificar critérios de aceite
 
 #### 1.3 Ler MT-RFXXX.yaml Completamente
-- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\MT-RFXXX.yaml`
+- Localização: ` D:\IC2\documentacao\[Fase]\[EPIC]\RFXXX\MT-RFXXX.yaml`
 - Identificar massas de teste disponíveis
 - Mapear MT por categoria
 - Entender dados reutilizáveis
@@ -337,7 +337,7 @@ Antes de criar qualquer caso de teste, o agente DEVE:
 
 **Estrutura obrigatória derivada do template:**
 
-- **metadata**: versao, data, autor, rf_relacionado, arquivo_uc_referencia, arquivo_massa_teste, tipo_teste, executor_padrao
+- **metadata**: versao, data, autor, documentacao_relacionado, arquivo_uc_referencia, arquivo_massa_teste, tipo_teste, executor_padrao
 - **estrategia**: objetivo_geral, abordagem
 - **conventions**: nomenclatura_tc, categorias, prioridades
 - **test_cases**: TC-[CATEGORIA]-[NUMERO] organizados por categoria

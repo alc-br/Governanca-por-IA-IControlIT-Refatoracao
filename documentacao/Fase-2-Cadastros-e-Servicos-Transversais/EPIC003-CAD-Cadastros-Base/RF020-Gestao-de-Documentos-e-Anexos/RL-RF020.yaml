@@ -1,0 +1,697 @@
+# Referência ao Legado (RL-RF020.yaml)
+# Versão: 2.0
+# Data: 2025-12-30
+
+rf_id: RF020
+titulo: "Gestão de Documentos e Anexos"
+
+legado:
+  sistema: "IControlIT (VB.NET + ASP.NET Web Forms)"
+  versao: "1.0 (anterior a 2025)"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server"
+  multi_tenant: true  # Parcial - Id_Fornecedor existia mas sem row-level security
+  auditoria: "none"  # Sem auditoria de uploads, downloads, exclusões
+
+# ============================================================================
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+# Cada item DEVE ter campo "destino" preenchido
+# ============================================================================
+referencias:
+  - id: "LEG-RF020-001"
+    tipo: "webservice"
+    nome: "WSDocumentos.asmx::UploadArquivo()"
+    caminho: "ic1_legado/IControlIT/WS_IControlIT/WSDocumentos.asmx.vb"
+    descricao: |
+      Método SOAP legado que recebia arquivo como byte array (base64 encoded).
+      Salvava direto no FileSystem local (D:\Arquivos\) sem scan antivírus.
+      Sem validação robusta de MIME type (apenas extensão).
+      Sem cálculo de hash SHA-256.
+      Upload síncrono bloqueante (timeout >50MB).
+    destino: "substituido"
+    justificativa: |
+      Substituído por POST /api/v1/documents/upload (REST).
+      Nova implementação inclui:
+      - Scan antivírus obrigatório (ClamAV/VirusTotal)
+      - Hash SHA-256 para integridade
+      - Upload assíncrono com SignalR progress tracking
+      - Armazenamento em Azure Blob / AWS S3
+      - Validação extensão + MIME type
+    documentacao_item_relacionado: "RN-RF020-001, RN-RF020-002, RN-RF020-009, RN-RF020-010"
+    uc_relacionado: "UC01-criar-documento"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF020-002"
+    tipo: "webservice"
+    nome: "WSDocumentos.asmx::DownloadArquivo()"
+    caminho: "ic1_legado/IControlIT/WS_IControlIT/WSDocumentos.asmx.vb"
+    descricao: |
+      Buscava caminho do arquivo no banco e retornava byte array.
+      Sem validação de permissões (qualquer usuário autenticado podia baixar qualquer arquivo).
+      Sem auditoria de download.
+      Sem validação de integridade (hash).
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/v1/documents/{id}/download (REST).
+      Nova implementação inclui:
+      - ACL granular (validação de permissões por documento)
+      - Auditoria completa (quem, quando, IP, user-agent)
+      - Validação de hash SHA-256 antes de download
+      - Content-Disposition correto para download seguro
+    documentacao_item_relacionado: "RN-RF020-004, RN-RF020-012"
+    uc_relacionado: "UC02-visualizar-documento"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF020-003"
+    tipo: "webservice"
+    nome: "WSDocumentos.asmx::ListarDocumentos()"
+    caminho: "ic1_legado/IControlIT/WS_IControlIT/WSDocumentos.asmx.vb"
+    descricao: |
+      Listava documentos vinculados a uma entidade (ativo, contrato, fornecedor).
+      Retornava: ID, nome, tamanho, data upload.
+      Sem paginação (crash se muitos documentos).
+      Sem filtros avançados.
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/v1/documents?entityId={id} (REST com OData).
+      Nova implementação inclui:
+      - Paginação obrigatória ($top, $skip)
+      - Filtros avançados ($filter por categoria, data, tipo)
+      - Ordenação ($orderby)
+      - Busca full-text ($search)
+    documentacao_item_relacionado: "RN-RF020-013"
+    uc_relacionado: "UC00-listar-documentos"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF020-004"
+    tipo: "webservice"
+    nome: "WSDocumentos.asmx::ExcluirArquivo()"
+    caminho: "ic1_legado/IControlIT/WS_IControlIT/WSDocumentos.asmx.vb"
+    descricao: |
+      Hard delete (deletava registro do banco + arquivo físico).
+      Sem soft delete (impossível recuperar).
+      Sem log de quem deletou ou motivo.
+      Se delete no banco falhasse mas arquivo físico fosse deletado, ficava inconsistente.
+    destino: "substituido"
+    justificativa: |
+      Substituído por DELETE /api/v1/documents/{id} com soft delete.
+      Nova implementação:
+      - Marca Fl_Ativo = 3 (excluído) ao invés de deletar
+      - Registra: Dt_Exclusao, Id_Usuario_Exclusao, Motivo_Exclusao
+      - Arquivo físico movido para pasta "Lixeira" (não deletado)
+      - Recuperação permitida em até 30 dias (apenas admin)
+      - Hard delete automático após 30 dias (job background)
+    documentacao_item_relacionado: "RN-RF020-008"
+    uc_relacionado: "UC04-excluir-documento"
+    complexidade: "baixa"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF020-005"
+    tipo: "stored_procedure"
+    nome: "sp_ListarArquivosPorEntidade"
+    caminho: "Database/dbo.sp_ListarArquivosPorEntidade"
+    descricao: |
+      Procedure que listava arquivos vinculados a entidades.
+      Lógica similar ao webservice ListarDocumentos.
+      Sem paginação, sem filtros avançados.
+    destino: "descartado"
+    justificativa: |
+      Lógica de listagem agora é feita via EF Core LINQ no backend.
+      Não há necessidade de stored procedure para operações CRUD simples.
+      OData fornece filtros, paginação, ordenação automaticamente.
+    documentacao_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF020-006"
+    tipo: "regra_negocio"
+    nome: "RL-RN-001: Upload Sem Validação de Tipo de Arquivo"
+    caminho: "ic1_legado/IControlIT/Ativo.aspx.vb (linha ~350)"
+    descricao: |
+      Sistema legado aceitava qualquer tipo de arquivo desde que extensão estivesse em whitelist hardcoded.
+      Whitelist verificada apenas pela extensão do arquivo, não pelo MIME type real.
+      Atacante podia renomear malware.exe → documento.pdf.exe e sistema aceitava se .pdf estivesse permitido.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-010 implementa validação de extensão E MIME type.
+      Sistema valida tanto extensão quanto MIME type (não confia apenas em extensão).
+      Bloqueio de executáveis (EXE, BAT, CMD, SH, SCR, VBS, JS).
+      Log de tentativas de upload de arquivos bloqueados.
+    documentacao_item_relacionado: "RN-RF020-010"
+    uc_relacionado: "UC01-criar-documento"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF020-007"
+    tipo: "regra_negocio"
+    nome: "RL-RN-002: Exclusão Definitiva de Arquivos"
+    caminho: "ic1_legado/IControlIT/WSDocumentos.asmx.vb (ExcluirArquivo)"
+    descricao: |
+      Comando de exclusão deletava registro do banco E arquivo físico do FileSystem imediatamente.
+      Sem possibilidade de recuperação.
+      Usuários excluíam documentos importantes por acidente sem forma de restaurar.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-008 implementa soft delete com recuperação em 30 dias.
+      Marcar Fl_Ativo = 3 ao invés de deletar registro.
+      Arquivo físico movido para pasta "Lixeira".
+      Apenas admin pode recuperar documentos excluídos.
+    documentacao_item_relacionado: "RN-RF020-008"
+    uc_relacionado: "UC04-excluir-documento"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF020-008"
+    tipo: "regra_negocio"
+    nome: "RL-RN-003: Sobrescrita de Arquivos Sem Versionamento"
+    caminho: "ic1_legado/IControlIT/WSDocumentos.asmx.vb (UploadArquivo)"
+    descricao: |
+      Se usuário fizesse upload de arquivo com mesmo nome de arquivo existente, sistema sobrescrevia sem criar versão anterior.
+      Perda de histórico de alterações.
+      Usuários não conseguiam reverter para versão anterior de contrato ou documento.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-003 implementa versionamento automático com linked list.
+      Campo Versao incrementado automaticamente (1, 2, 3...).
+      Versão anterior: Fl_Versao_Atual = 0.
+      Nova versão: Fl_Versao_Atual = 1.
+      Campo Id_Documento_Anterior aponta para versão prévia (linked list).
+      Histórico completo de versões mantido indefinidamente.
+    documentacao_item_relacionado: "RN-RF020-003"
+    uc_relacionado: "UC03-editar-documento"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF020-009"
+    tipo: "regra_negocio"
+    nome: "RL-RN-004: Download Sem Validação de Integridade"
+    caminho: "ic1_legado/IControlIT/WSDocumentos.asmx.vb (DownloadArquivo)"
+    descricao: |
+      Download retornava byte array do arquivo sem validar se arquivo foi corrompido ou modificado maliciosamente.
+      Se arquivo no FileSystem fosse corrompido ou alterado por ransomware, usuário baixava arquivo corrompido sem perceber.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-002 implementa hash SHA-256 validado antes de download.
+      Hash calculado imediatamente após upload bem-sucedido.
+      Hash armazenado em campo Hash_SHA256 da tabela Documento.
+      Validação de integridade ao download (hash atual == hash armazenado).
+      Alerta ao usuário se integridade comprometida.
+    documentacao_item_relacionado: "RN-RF020-002"
+    uc_relacionado: "UC02-visualizar-documento"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF020-010"
+    tipo: "regra_negocio"
+    nome: "RL-RN-005: Permissões Globais por Perfil"
+    caminho: "ic1_legado/IControlIT/Global.asax.vb (AuthorizeRequest)"
+    descricao: |
+      Permissões de acesso a documentos eram baseadas apenas em perfis globais (Admin, Gestor, Usuário).
+      Não havia controle granular por documento.
+      Gestor de TI podia ver contratos confidenciais de RH.
+      Não havia como restringir documento específico para grupo específico.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-004 implementa ACL granular por documento.
+      Permissões definidas em Documento_Permissao por: usuário, perfil, departamento.
+      Níveis de acesso: Visualizar, Download, Editar, Excluir, Compartilhar.
+      Deny sobrescreve Allow (se houver permissão de negação, prevalece).
+      Suporte a acesso temporário (Dt_Inicio_Acesso, Dt_Fim_Acesso).
+    documentacao_item_relacionado: "RN-RF020-004"
+    uc_relacionado: "UC06-gerenciar-permissoes"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF020-011"
+    tipo: "regra_negocio"
+    nome: "RL-RN-006: Limite de Tamanho Fixo (Hardcoded)"
+    caminho: "ic1_legado/IControlIT/Web.config + Ativo.aspx.vb"
+    descricao: |
+      Limite de 10MB por arquivo estava hardcoded no código VB.NET.
+      Alterar exigia recompilação e deploy.
+      Impossível fazer upload de vídeos de treinamento, apresentações grandes ou backups.
+      Usuários tinham que compactar arquivos excessivamente, perdendo qualidade.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-009 implementa limites configuráveis por tipo de arquivo via appsettings.json.
+      Limite padrão: 50MB por arquivo.
+      Imagens: 10MB, Vídeos: 500MB, Documentos: 100MB.
+      Rejeição de upload se exceder limite com mensagem clara ao usuário.
+      Configuração centralizada sem necessidade de recompilação.
+    documentacao_item_relacionado: "RN-RF020-009"
+    uc_relacionado: "UC01-criar-documento"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF020-012"
+    tipo: "tela"
+    nome: "Ativo.aspx (fragmento de upload)"
+    caminho: "ic1_legado/IControlIT/Ativo.aspx.vb"
+    descricao: |
+      Tela de gestão de ativos com controle de upload de fotos e manuais.
+      Upload simples sem scan antivírus.
+      Código de upload duplicado em múltiplas páginas (Contrato.aspx, Fornecedor.aspx, Fatura.aspx).
+      Sem componente reutilizável.
+    destino: "substituido"
+    justificativa: |
+      Substituído por componente Angular reutilizável de upload (drag-and-drop).
+      Componente centralizado usado em todas as telas que precisam upload.
+      Upload assíncrono com progress bar (SignalR).
+      Preview de documentos (PDF.js, Office Online).
+      Scan antivírus integrado antes de armazenar.
+    documentacao_item_relacionado: "RN-RF020-001"
+    uc_relacionado: "UC01-criar-documento"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF020-013"
+    tipo: "componente"
+    nome: "Componente FileSystem Local (D:\\Arquivos\\)"
+    caminho: "ic1_legado/IControlIT/App_Code/cls_Upload.vb"
+    descricao: |
+      Classe utilitária para salvar arquivos em FileSystem local (D:\Arquivos\).
+      Sem backup automático.
+      Sem geo-replicação (se servidor pegasse fogo, documentos perdidos).
+      Sem escalabilidade horizontal.
+    destino: "substituido"
+    justificativa: |
+      Substituído por Azure Blob Storage ou AWS S3.
+      Vantagens:
+      - Backup automático com geo-replicação
+      - Escalabilidade infinita (exabytes se necessário)
+      - Lifecycle policies (mover versões antigas para cold storage)
+      - CDN para download rápido globalmente
+      - Criptografia at-rest nativa
+    documentacao_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF020-014"
+    tipo: "regra_negocio"
+    nome: "RL-RN-007: Sem Scan Antivírus"
+    caminho: "ic1_legado/IControlIT/WSDocumentos.asmx.vb"
+    descricao: |
+      Upload de arquivos sem scan antivírus.
+      Risco de malware comprometer segurança do sistema e dados de clientes.
+      Nenhuma validação de conteúdo malicioso.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-001 implementa scan antivírus obrigatório.
+      Arquivo rejeitado automaticamente se malware detectado.
+      Tentativas de upload malicioso registradas em log de segurança.
+      Admin notificado em caso de ameaça detectada.
+      Quarentena temporária durante scan (até 30s para arquivos <50MB).
+    documentacao_item_relacionado: "RN-RF020-001"
+    uc_relacionado: "UC01-criar-documento"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF020-015"
+    tipo: "regra_negocio"
+    nome: "RL-RN-008: Sem OCR para PDFs Escaneados"
+    caminho: "N/A (funcionalidade inexistente)"
+    descricao: |
+      Sistema legado não processava OCR de PDFs escaneados.
+      Impossível buscar texto em documentos escaneados.
+      Usuários não encontravam documentos importantes por conteúdo.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-005 implementa OCR automático.
+      Sistema detecta se documento é escaneado (não possui texto selecionável).
+      OCR processado via Tesseract (local) ou Azure Computer Vision (cloud).
+      Texto extraído armazenado em campo Texto_OCR.
+      Campo Fl_OCR_Processado = 1 marcado após conclusão.
+      Full-text index criado em Texto_OCR para busca eficiente.
+    documentacao_item_relacionado: "RN-RF020-005"
+    uc_relacionado: "UC08-processar-ocr"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF020-016"
+    tipo: "regra_negocio"
+    nome: "RL-RN-009: Sem Compartilhamento Seguro via Links Temporários"
+    caminho: "N/A (funcionalidade inexistente)"
+    descricao: |
+      Sistema legado não permitia compartilhamento externo de documentos.
+      Usuários precisavam enviar arquivos por e-mail (risco de vazamento).
+      Sem controle de quem acessou documentos compartilhados.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-006 implementa compartilhamento seguro via links temporários.
+      Token único aleatório gerado (GUID ou hash de 32 caracteres).
+      Data de expiração obrigatória (máximo: 30 dias).
+      Senha opcional para acesso ao link.
+      Limite de acessos opcional (ex: 5 downloads máximos).
+      Cada acesso registrado em Documento_Compartilhamento_Acesso (IP, timestamp, user-agent).
+    documentacao_item_relacionado: "RN-RF020-006"
+    uc_relacionado: "UC05-compartilhar-documento"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF020-017"
+    tipo: "regra_negocio"
+    nome: "RL-RN-010: Sem Alertas de Validade de Documentos"
+    caminho: "N/A (funcionalidade inexistente)"
+    descricao: |
+      Sistema legado não enviava alertas de documentos próximos ao vencimento.
+      Usuários utilizavam certificados digitais vencidos sem perceber.
+      Contratos expiravam sem renovação.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-007 implementa alertas automáticos de vencimento.
+      Job diário verifica documentos com Dt_Validade próxima (30, 15, 7, 1 dia antes).
+      E-mail + notificação push enviados ao responsável pelo documento.
+      Admin alertado se documento crítico vencer (ex: certificado digital da empresa).
+      Dashboard com documentos vencidos/próximos ao vencimento.
+    documentacao_item_relacionado: "RN-RF020-007"
+    uc_relacionado: "UC09-alertar-vencimentos"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF020-018"
+    tipo: "regra_negocio"
+    nome: "RL-RN-011: Sem Auditoria de Operações"
+    caminho: "ic1_legado/IControlIT/WSDocumentos.asmx.vb"
+    descricao: |
+      Sistema legado não auditava operações em documentos.
+      Impossível rastrear quem acessou documentos sensíveis.
+      Violação de compliance LGPD/GDPR.
+      Sem log de uploads, downloads, visualizações, exclusões.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-012 implementa auditoria completa de operações.
+      Operações auditadas: upload, download, view, edit, delete, share, unshare.
+      Registrar em Documento_Auditoria: operação, usuário, IP, timestamp, dados alterados (JSON).
+      Incluir user-agent para identificar dispositivo/browser.
+      Logs retidos por 7 anos para compliance.
+      Relatório de auditoria exportável (Excel, PDF).
+    documentacao_item_relacionado: "RN-RF020-012"
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF020-019"
+    tipo: "regra_negocio"
+    nome: "RL-RN-012: Sem Criptografia de Documentos Confidenciais"
+    caminho: "N/A (funcionalidade inexistente)"
+    descricao: |
+      Documentos armazenados em texto claro no FileSystem.
+      Risco de vazamento se servidor fosse comprometido.
+      Sem proteção adicional para documentos sensíveis (contratos, dados financeiros).
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-011 implementa criptografia AES-256 para documentos confidenciais.
+      Se Fl_Confidencial = 1, arquivo criptografado com AES-256.
+      Chave de criptografia gerenciada via Azure Key Vault ou AWS KMS.
+      Arquivo descriptografado apenas em memória (nunca salvo descriptografado).
+      Audit log detalhado de acesso a documentos confidenciais.
+    documentacao_item_relacionado: "RN-RF020-011"
+    uc_relacionado: "UC01-criar-documento"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF020-020"
+    tipo: "regra_negocio"
+    nome: "RL-RN-013: Sem Busca Full-Text em Conteúdo"
+    caminho: "N/A (funcionalidade inexistente)"
+    descricao: |
+      Sistema legado permitia busca apenas por nome de arquivo.
+      Impossível buscar conteúdo textual em PDFs ou descrição de documentos.
+      Usuários não encontravam documentos por palavras-chave do conteúdo.
+    destino: "substituido"
+    justificativa: |
+      RN-RF020-013 implementa busca full-text avançada.
+      Full-Text Index em SQL Server ou Elasticsearch.
+      Buscar em: Nm_Documento, Ds_Documento, Tags, Texto_OCR.
+      Suportar busca parcial e com operadores booleanos (AND, OR, NOT).
+      Ranking por relevância (nome > descrição > OCR).
+      Highlighting de termos encontrados no resultado.
+    documentacao_item_relacionado: "RN-RF020-013"
+    uc_relacionado: "UC07-buscar-documentos"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+# ============================================================================
+# Tabelas Legadas com Problemas
+# ============================================================================
+tabelas:
+  - nome: "Arquivo"
+    finalidade: "Armazenar metadados básicos de arquivos (upload de documentos)"
+    problemas:
+      - "Sem campo Hash_SHA256 (integridade não verificável)"
+      - "Sem campo Versao (versionamento inexistente)"
+      - "Sem tabela de permissões granulares (ACL inexistente)"
+      - "Sem tabela de auditoria (compliance impossível)"
+      - "Sem soft delete (Fl_Ativo inexistente)"
+      - "Sem campos de OCR (Texto_OCR, Fl_OCR_Processado)"
+      - "Sem campo Fl_Confidencial (criptografia inexistente)"
+      - "Sem campo Dt_Validade (alertas de vencimento impossíveis)"
+      - "Caminho físico hardcoded (D:\\Arquivos\\ sem configuração)"
+
+# ============================================================================
+# Gap Analysis (Legado x Moderno)
+# ============================================================================
+gap_analysis:
+  - item: "Scan Antivírus"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap crítico de segurança - legado permitia malware"
+
+  - item: "Hash SHA-256"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de integridade - impossível validar corrupção no legado"
+
+  - item: "Versionamento"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de rastreabilidade - sobrescrita perdia versão anterior"
+
+  - item: "ACL Granular"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de segurança - permissões apenas por perfil global"
+
+  - item: "OCR Automático"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de usabilidade - impossível buscar em PDFs escaneados"
+
+  - item: "Compartilhamento Seguro"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de colaboração - sem links temporários"
+
+  - item: "Auditoria Completa"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de compliance - violação LGPD/GDPR"
+
+  - item: "Soft Delete"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de recuperação - hard delete irreversível"
+
+  - item: "Armazenamento Cloud"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de escalabilidade - FileSystem local sem backup"
+
+  - item: "Upload Assíncrono"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de performance - upload síncrono bloqueante"
+
+  - item: "Full-Text Search"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de usabilidade - busca apenas por nome"
+
+  - item: "Metadados Customizáveis"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de extensibilidade - campos fixos"
+
+  - item: "Alertas de Validade"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de gestão - sem notificação de vencimento"
+
+  - item: "Criptografia"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Gap de segurança - arquivos em texto claro"
+
+# ============================================================================
+# Decisões de Modernização
+# ============================================================================
+decisoes_modernizacao:
+  - decisao: "Migração de FileSystem Local para Blob Storage"
+    motivo: |
+      FileSystem local não escala horizontalmente, não tem backup automático, não permite geo-replicação.
+      Azure Blob Storage / AWS S3 oferecem escalabilidade infinita, backup automático, geo-replicação, criptografia at-rest.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Implementação de Scan Antivírus Obrigatório"
+    motivo: |
+      Legado permitia upload de malware sem verificação. Risco inaceitável para ambiente corporativo.
+      ClamAV (on-premise) ou VirusTotal (cloud) garantem segurança antes de armazenar arquivos.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Versionamento Automático com Linked List"
+    motivo: |
+      Legado sobrescrevia arquivos perdendo histórico. Usuários não conseguiam reverter alterações indesejadas.
+      Linked list (Id_Documento_Anterior) permite manter histórico completo de versões.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "ACL Granular com Deny Override"
+    motivo: |
+      Legado tinha permissões globais por perfil. Impossível restringir documento confidencial para grupo específico.
+      ACL granular permite controle fino por usuário/perfil/departamento com Deny sobrescrevendo Allow.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "OCR Automático para PDFs Escaneados"
+    motivo: |
+      Legado não permitia busca em conteúdo de PDFs escaneados. Usuários não encontravam documentos importantes.
+      Tesseract (on-premise) ou Azure Computer Vision (cloud) extraem texto automaticamente.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Soft Delete com Recuperação em 30 Dias"
+    motivo: |
+      Legado fazia hard delete irreversível. Usuários excluíam documentos importantes por acidente.
+      Soft delete (Fl_Ativo = 3) permite recuperação em até 30 dias.
+    impacto: "baixo"
+    data: "2025-12-30"
+
+# ============================================================================
+# Riscos de Migração
+# ============================================================================
+riscos_migracao:
+  - risco: "Perda de arquivos durante migração FileSystem → Blob"
+    impacto: "critico"
+    probabilidade: "media"
+    mitigacao: |
+      - Backup completo antes da migração
+      - Migração em horário de baixo uso
+      - Validação hash SHA-256 pós-migração
+      - Convivência dual (legado + moderno) por 1 mês
+
+  - risco: "Scan antivírus causar timeout em uploads grandes"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      - Upload em chunks (multipart/form-data)
+      - Scan assíncrono via Hangfire job
+      - Aumentar timeout IIS para 10min
+      - Quarentena temporária durante scan
+
+  - risco: "Custo de storage cloud ultrapassar orçamento"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      - Monitoramento de custos mensal
+      - Lifecycle policy (mover versões antigas para cold storage após 90 dias)
+      - Compressão de documentos antes de upload
+
+  - risco: "OCR não funcionar bem em PDFs de baixa qualidade"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      - Pré-processamento de imagem (deskew, denoise)
+      - Permitir OCR manual se automático falhar
+      - Múltiplos engines (Tesseract + Azure Computer Vision)
+
+  - risco: "Usuários não conseguirem acessar documentos após migração ACL"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      - Mapeamento automático de permissões legado → ACL moderno
+      - Período de convivência dual (1 mês)
+      - Comunicação clara sobre novas permissões
+      - Suporte dedicado durante migração
+
+  - risco: "Performance degradada por queries complexas em ACL"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Índices otimizados em Documento_Permissao
+      - Cache Redis de permissões para usuários frequentes
+      - Profile queries antes de deploy produção
+
+# ============================================================================
+# Rastreabilidade (Legado → Moderno)
+# ============================================================================
+rastreabilidade:
+  - elemento_legado: "WSDocumentos.asmx::UploadArquivo()"
+    referencia_rf: "RN-RF020-001, RN-RF020-002, RN-RF020-009, RN-RF020-010"
+    referencia_uc: "UC01-criar-documento"
+    status: "substituido"
+
+  - elemento_legado: "WSDocumentos.asmx::DownloadArquivo()"
+    referencia_rf: "RN-RF020-004, RN-RF020-012"
+    referencia_uc: "UC02-visualizar-documento"
+    status: "substituido"
+
+  - elemento_legado: "WSDocumentos.asmx::ListarDocumentos()"
+    referencia_rf: "RN-RF020-013"
+    referencia_uc: "UC00-listar-documentos"
+    status: "substituido"
+
+  - elemento_legado: "WSDocumentos.asmx::ExcluirArquivo()"
+    referencia_rf: "RN-RF020-008"
+    referencia_uc: "UC04-excluir-documento"
+    status: "substituido"
+
+  - elemento_legado: "Tabela Arquivo"
+    referencia_rf: "Todas as regras RF-020"
+    referencia_uc: "Todos os UCs"
+    status: "substituido"
+
+  - elemento_legado: "FileSystem Local (D:\\Arquivos\\)"
+    referencia_rf: null
+    referencia_uc: null
+    status: "substituido"
+
+# ============================================================================
+# Changelog
+# ============================================================================
+changelog:
+  - versao: "2.0"
+    data: "2025-12-30"
+    descricao: "Documentação completa da referência ao legado RF-020 com 20 itens rastreados"
+    autor: "Agência ALC - alc.dev.br"
+
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Template inicial de referência ao legado"
+    autor: "Agência ALC - alc.dev.br"

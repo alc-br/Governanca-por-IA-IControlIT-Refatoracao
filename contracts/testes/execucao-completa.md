@@ -52,7 +52,7 @@ Seguir D:\IC2\CLAUDE.md.
 
 Exemplo de solicitação simplificada:
 ```
-"Para o RF006 D:\IC2\rf\...\RF006-Gestao-de-Clientes execute o docs\prompts\testes\execucao-completa.md"
+"Para o RF006 D:\IC2\documentacao\...\RF006-Gestao-de-Clientes execute o docs\prompts\testes\execucao-completa.md"
 ```
 
 **O agente DEVE:**
@@ -307,8 +307,8 @@ git branch --show-current
 # Verificar arquivos
 # - D:\IC2\backend\IControlIT.API/IControlIT.API.sln existe
 # - D:\IC2\frontend\icontrolit-app/package.json existe
-# - rf/.../MT-RFXXX.yaml existe
-# - rf/.../TC-RFXXX.yaml existe
+# - documentacao/.../MT-RFXXX.yaml existe
+# - documentacao/.../TC-RFXXX.yaml existe
 ```
 
 **Se qualquer validação FALHAR:** BLOQUEIO TOTAL

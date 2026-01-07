@@ -33,7 +33,7 @@ checklists/
 │
 ├── documentacao/
 │   ├── geracao/
-│   │   ├── rf-rl.yaml
+│   │   ├── documentacao-rl.yaml
 │   │   ├── uc.yaml
 │   │   ├── wf.yaml
 │   │   ├── md.yaml

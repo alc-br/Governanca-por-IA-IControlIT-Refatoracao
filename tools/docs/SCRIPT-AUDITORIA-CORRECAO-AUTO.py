@@ -21,8 +21,8 @@ import sys
 @dataclass
 class AuditResult:
     """Resultado da auditoria de um RF"""
-    rf_id: str
-    rf_nome: str
+    documentacao_id: str
+    documentacao_nome: str
     rns_total: int
     rns_cobertas: int
     cobertura_pct: float
@@ -38,8 +38,8 @@ class AuditResult:
 class UCAdequacaoEngine:
     """Motor de adequação automática de UCs"""
 
-    def __init__(self, rf_path: Path, uc_path: Path):
-        self.rf_path = rf_path
+    def __init__(self, documentacao_path: Path, uc_path: Path):
+        self.rf_path = documentacao_path
         self.uc_path = uc_path
         self.rf_data = None
         self.uc_data = None
@@ -84,8 +84,8 @@ class UCAdequacaoEngine:
 
     def _audit(self) -> AuditResult:
         """Executa auditoria completa"""
-        rf_id = self.rf_data['rf']['id']
-        rf_nome = self.rf_data['rf']['nome']
+        documentacao_id = self.rf_data['rf']['id']
+        documentacao_nome = self.rf_data['rf']['nome']
 
         # Extrair RNs do RF
         rns_rf = self._extract_rns_from_rf()
@@ -114,8 +114,8 @@ class UCAdequacaoEngine:
         severidade = self._calculate_severity(cobertura_pct)
 
         return AuditResult(
-            rf_id=rf_id,
-            rf_nome=rf_nome,
+            documentacao_id=rf_id,
+            documentacao_nome=rf_nome,
             rns_total=rns_total,
             rns_cobertas=rns_cobertas,
             cobertura_pct=cobertura_pct,
@@ -299,7 +299,7 @@ class UCAdequacaoEngine:
 
     def _fix_nomenclatura(self):
         """Migra nomenclatura para padrão oficial"""
-        rf_num = self.rf_data['rf']['id']  # ex: RF023
+        documentacao_num = self.rf_data['rf']['id']  # ex: RF023
 
         # Padrões não-padrão conhecidos
         migrations = {
@@ -427,7 +427,7 @@ class UCAdequacaoEngine:
 
     def _infer_permission(self, rn_id: str) -> str:
         """Infere código de permissão baseado no RF"""
-        rf_id_lower = self.rf_data['rf']['id'].lower()
+        documentacao_id_lower = self.rf_data['rf']['id'].lower()
         return f"{rf_id_lower}:read"
 
     def _document_special_features(self):
@@ -576,10 +576,10 @@ def main():
 
     args = parser.parse_args()
 
-    rf_path = Path(args.rf)
+    documentacao_path = Path(args.rf)
     uc_path = Path(args.uc)
 
-    if not rf_path.exists():
+    if not documentacao_path.exists():
         print(f"❌ RF não encontrado: {rf_path}")
         sys.exit(1)
 

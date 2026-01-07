@@ -43,9 +43,9 @@ from datetime import datetime
 @dataclass
 class ValidationResult:
     """Resultado da validação de conformidade com templates"""
-    rf_id: str
-    rf_md_conforme: bool
-    rf_yaml_conforme: bool
+    documentacao_id: str
+    documentacao_md_conforme: bool
+    documentacao_yaml_conforme: bool
     rl_md_conforme: Optional[bool]
     rl_yaml_conforme: Optional[bool]
     arquivos_ausentes: List[str]
@@ -130,13 +130,13 @@ class ValidadorRFRL:
         self.base_path = Path(base_path)
         self.templates_path = Path(templates_path)
 
-    def encontrar_rf(self, rf_id: str) -> Path:
+    def encontrar_rf(self, documentacao_id: str) -> Path:
         """Encontra a pasta do RF"""
         for fase_dir in self.base_path.glob("Fase-*"):
             for epic_dir in fase_dir.glob("EPIC*"):
-                for rf_dir in epic_dir.glob(f"{rf_id}*"):
-                    if rf_dir.is_dir() and rf_dir.name.startswith(rf_id):
-                        return rf_dir
+                for documentacao_dir in epic_dir.glob(f"{rf_id}*"):
+                    if documentacao_dir.is_dir() and documentacao_dir.name.startswith(rf_id):
+                        return documentacao_dir
 
         raise FileNotFoundError(f"RF {rf_id} não encontrado em {self.base_path}")
 
@@ -248,28 +248,28 @@ class ValidadorRFRL:
 
         return len([g for g in gaps if g['tipo'] == 'CRÍTICO']) == 0, data, gaps
 
-    def validar_rf_md(self, rf_path: Path) -> Tuple[bool, List[Dict[str, str]]]:
+    def validar_rf_md(self, documentacao_path: Path) -> Tuple[bool, List[Dict[str, str]]]:
         """Valida RFXXX.md conforme template RF.md"""
-        rf_id = rf_path.name.split('-')[0]
-        rf_md = rf_path / f"{rf_id}.md"
+        documentacao_id = documentacao_path.name.split('-')[0]
+        documentacao_md = documentacao_path / f"{rf_id}.md"
 
         return self.validar_secoes_md(
-            rf_md,
+            documentacao_md,
             self.RF_MD_SECOES_OBRIGATORIAS,
             tipo="RF"
         )
 
-    def validar_rf_yaml(self, rf_path: Path) -> Tuple[bool, Dict, List[Dict[str, str]]]:
+    def validar_rf_yaml(self, documentacao_path: Path) -> Tuple[bool, Dict, List[Dict[str, str]]]:
         """Valida RFXXX.yaml conforme template RF.yaml"""
-        rf_id = rf_path.name.split('-')[0]
-        rf_yaml = rf_path / f"{rf_id}.yaml"
+        documentacao_id = documentacao_path.name.split('-')[0]
+        documentacao_yaml = documentacao_path / f"{rf_id}.yaml"
 
         return self.validar_campos_yaml(rf_yaml, self.RF_YAML_CAMPOS_OBRIGATORIOS)
 
-    def validar_rl_md(self, rf_path: Path) -> Tuple[Optional[bool], List[Dict[str, str]]]:
+    def validar_rl_md(self, documentacao_path: Path) -> Tuple[Optional[bool], List[Dict[str, str]]]:
         """Valida RL-RFXXX.md conforme template RL.md (se existir)"""
-        rf_id = rf_path.name.split('-')[0]
-        rl_md = rf_path / f"RL-{rf_id}.md"
+        documentacao_id = documentacao_path.name.split('-')[0]
+        rl_md = documentacao_path / f"RL-{rf_id}.md"
 
         # RL.md é opcional
         if not rl_md.exists():
@@ -283,10 +283,10 @@ class ValidadorRFRL:
 
         return conforme, gaps
 
-    def validar_rl_yaml(self, rf_path: Path) -> Tuple[Optional[bool], Optional[Dict], List[Dict[str, str]]]:
+    def validar_rl_yaml(self, documentacao_path: Path) -> Tuple[Optional[bool], Optional[Dict], List[Dict[str, str]]]:
         """Valida RL-RFXXX.yaml conforme template RL.yaml (se existir)"""
-        rf_id = rf_path.name.split('-')[0]
-        rl_yaml = rf_path / f"RL-{rf_id}.yaml"
+        documentacao_id = documentacao_path.name.split('-')[0]
+        rl_yaml = documentacao_path / f"RL-{rf_id}.yaml"
 
         # RL.yaml é opcional
         if not rl_yaml.exists():
@@ -311,15 +311,15 @@ class ValidadorRFRL:
 
         return conforme, data, gaps
 
-    def validar_rf(self, rf_id: str) -> ValidationResult:
+    def validar_rf(self, documentacao_id: str) -> ValidationResult:
         """Valida conformidade completa de um RF com templates"""
         try:
-            rf_path = self.encontrar_rf(rf_id)
+            documentacao_path = self.encontrar_rf(rf_id)
         except FileNotFoundError as e:
             return ValidationResult(
-                rf_id=rf_id,
-                rf_md_conforme=False,
-                rf_yaml_conforme=False,
+                documentacao_id=rf_id,
+                documentacao_md_conforme=False,
+                documentacao_yaml_conforme=False,
                 rl_md_conforme=None,
                 rl_yaml_conforme=None,
                 arquivos_ausentes=[],
@@ -330,20 +330,20 @@ class ValidadorRFRL:
         arquivos_ausentes = []
 
         # Verificar arquivos obrigatórios
-        rf_md_path = rf_path / f"{rf_id}.md"
-        rf_yaml_path = rf_path / f"{rf_id}.yaml"
+        documentacao_md_path = documentacao_path / f"{rf_id}.md"
+        documentacao_yaml_path = documentacao_path / f"{rf_id}.yaml"
 
-        if not rf_md_path.exists():
+        if not documentacao_md_path.exists():
             arquivos_ausentes.append(f"{rf_id}.md")
-        if not rf_yaml_path.exists():
+        if not documentacao_yaml_path.exists():
             arquivos_ausentes.append(f"{rf_id}.yaml")
 
         # Validação 1: RF.md
-        rf_md_conforme, gaps_rf_md = self.validar_rf_md(rf_path)
+        documentacao_md_conforme, gaps_rf_md = self.validar_rf_md(rf_path)
         all_gaps.extend(gaps_rf_md)
 
         # Validação 2: RF.yaml
-        rf_yaml_conforme, rf_data, gaps_rf_yaml = self.validar_rf_yaml(rf_path)
+        documentacao_yaml_conforme, documentacao_data, gaps_rf_yaml = self.validar_rf_yaml(rf_path)
         all_gaps.extend(gaps_rf_yaml)
 
         # Validação 3: RL.md (opcional)
@@ -355,9 +355,9 @@ class ValidadorRFRL:
         all_gaps.extend(gaps_rl_yaml)
 
         return ValidationResult(
-            rf_id=rf_id,
-            rf_md_conforme=rf_md_conforme,
-            rf_yaml_conforme=rf_yaml_conforme,
+            documentacao_id=rf_id,
+            documentacao_md_conforme=rf_md_conforme,
+            documentacao_yaml_conforme=rf_yaml_conforme,
             rl_md_conforme=rl_md_conforme,
             rl_yaml_conforme=rl_yaml_conforme,
             arquivos_ausentes=arquivos_ausentes,
@@ -374,8 +374,8 @@ class ValidadorRFRL:
             return results
 
         for epic_dir in sorted(fase_dir.glob("EPIC-*")):
-            for rf_dir in sorted(epic_dir.glob("RF*")):
-                rf_id = rf_dir.name.split('-')[0]
+            for documentacao_dir in sorted(epic_dir.glob("RF*")):
+                documentacao_id = documentacao_dir.name.split('-')[0]
                 print(f"Validando {rf_id}...")
                 result = self.validar_rf(rf_id)
                 results.append(result)
@@ -422,8 +422,8 @@ def gerar_relatorio_markdown(results: List[ValidationResult], output_path: str =
 
     for result in results:
         status = "[OK] CONFORME" if result.is_compliant() else "[GAPS]"
-        rf_md_icon = "[OK]" if result.rf_md_conforme else "[X]"
-        rf_yaml_icon = "[OK]" if result.rf_yaml_conforme else "[X]"
+        documentacao_md_icon = "[OK]" if result.rf_md_conforme else "[X]"
+        documentacao_yaml_icon = "[OK]" if result.rf_yaml_conforme else "[X]"
         rl_md_icon = "[OK]" if result.rl_md_conforme else ("[X]" if result.rl_md_conforme is False else "N/A")
         rl_yaml_icon = "[OK]" if result.rl_yaml_conforme else ("[X]" if result.rl_yaml_conforme is False else "N/A")
         ausentes = ", ".join(result.arquivos_ausentes) if result.arquivos_ausentes else "-"
@@ -512,7 +512,7 @@ def main():
 
     else:
         # Validar RF único
-        rf_id = arg
+        documentacao_id = arg
         print(f"Validando {rf_id}...")
         result = validador.validar_rf(rf_id)
         results = [result]

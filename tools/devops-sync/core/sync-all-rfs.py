@@ -262,8 +262,8 @@ def load_all_status_files():
             data = parse_yaml_simple(content)
 
             if data and 'rf' in data:
-                rf_raw = str(data['rf']).replace('RF', '').zfill(3)
-                rf_id = f"RF-{rf_raw}"
+                documentacao_raw = str(data['rf']).replace('RF', '').zfill(3)
+                documentacao_id = f"RF-{rf_raw}"
                 statuses[rf_id] = {
                     'file_path': f,
                     'data': data
@@ -341,7 +341,7 @@ def get_existing_items():
 
     return existing
 
-def update_work_item(wi_id, rf_id, column, state, status_data):
+def update_work_item(wi_id, documentacao_id, column, state, status_data):
     """Atualiza work item com nova coluna e estado"""
     url = f"{ORG_URL}/{PROJECT}/_apis/wit/workitems/{wi_id}?api-version=7.0"
 
@@ -471,12 +471,12 @@ def main():
     print("PROCESSANDO RFs")
     print("-"*70)
 
-    for rf_id, status_info in sorted(statuses.items()):
+    for documentacao_id, status_info in sorted(statuses.items()):
         data = status_info['data']
-        titulo = data.get('titulo', rf_id)
+        titulo = data.get('titulo', documentacao_id)
 
         # Encontrar work item
-        rf_title = f"{rf_id} - {titulo}"
+        documentacao_title = f"{rf_id} - {titulo}"
 
         # Tentar variantes do titulo
         wi_info = None
@@ -511,7 +511,7 @@ def main():
         column_stats[column] += 1
 
         # Atualizar work item
-        if update_work_item(wi_id, rf_id, column, state, status_info):
+        if update_work_item(wi_id, documentacao_id, column, state, status_info):
             ok(f"{rf_id} -> {column} ({state})")
             updated += 1
 

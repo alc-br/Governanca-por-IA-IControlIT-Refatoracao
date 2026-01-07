@@ -398,7 +398,7 @@ execucao:
       commit: "<hash do commit>"
       correcao_sistemica:
         total_rfs_afetados: 42
-        rf_atual: "RF006"
+        documentacao_atual: "RF006"
         elementos_corrigidos: 5
         elementos_pulados: 2 # Não especificados no WF
       validacao_wf_uc:

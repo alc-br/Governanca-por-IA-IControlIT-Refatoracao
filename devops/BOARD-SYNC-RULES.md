@@ -33,20 +33,20 @@ Frontend done -> Documentacao Testes -> Testes TI -> Testes QA
 ### 1. Backlog (State: New)
 ```yaml
 documentacao:
-  rf: False  # RF.md NAO existe
+  documentacao: False  # RF.md NAO existe
 ```
 
 ### 2. Documentacao (State: Active, Column: Documentacao)
 ```yaml
 documentacao:
-  rf: True   # RF.md existe
+  documentacao: True   # RF.md existe
   uc: False  # Falta algum doc obrigatorio
 ```
 
 ### 3. Backend (State: Active, Column: Backend)
 ```yaml
 documentacao:
-  rf: True
+  documentacao: True
   uc: True
   md: True
   wf: True   # Todos docs completos

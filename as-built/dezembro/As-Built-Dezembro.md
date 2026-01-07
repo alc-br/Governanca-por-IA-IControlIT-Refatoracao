@@ -57,7 +57,7 @@ Este documento consolida todas as entregas, implementações e melhorias realiza
 
 ### EPIC001-SYS: Sistema e Infraestrutura
 
-#### [RF-001: Parâmetros e Configurações do Sistema](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/RF001.md)
+#### [RF-001: Parâmetros e Configurações do Sistema](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema/RF001.md)
 - **Status:** ✅ Backend + Frontend Completo
 - **Commit Principal:** `748af15b` (09/12/2025)
 - **Descrição:** Sistema centralizado de parâmetros e configurações globais da plataforma
@@ -70,7 +70,7 @@ Este documento consolida todas as entregas, implementações e melhorias realiza
 - **Localização Backend:** `src/Application/Parametros/`
 - **Localização Frontend:** `src/app/modules/admin/parametros/`
 
-#### [RF-002: Configurações e Parametrização](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF002-Configuracoes-e-Parametrizacao/RF002.md)
+#### [RF-002: Configurações e Parametrização](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF002-Configuracoes-e-Parametrizacao/RF002.md)
 - **Status:** ✅ Backend Completo
 - **Descrição:** Sistema de configuração granular por tenant e módulo
 - **Entregas:**
@@ -79,7 +79,7 @@ Este documento consolida todas as entregas, implementações e melhorias realiza
   - Versionamento de configurações
 - **Localização Backend:** `src/Application/Configuracoes/`
 
-#### [RF-003: Logs, Monitoramento e Observabilidade](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF003-Logs-Monitoramento-Observabilidade/RF003.md)
+#### [RF-003: Logs, Monitoramento e Observabilidade](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF003-Logs-Monitoramento-Observabilidade/RF003.md)
 - **Status:** ✅ Backend Completo
 - **Descrição:** Sistema estruturado de logging e monitoramento
 - **Entregas:**
@@ -90,7 +90,7 @@ Este documento consolida todas as entregas, implementações e melhorias realiza
 - **Tecnologias:** Serilog, Application Insights, Prometheus
 - **Localização Backend:** `src/Infrastructure/Logging/`
 
-#### [RF-004: Auditoria e Logs do Sistema](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF004-Auditoria-Logs-Sistema/RF004.md)
+#### [RF-004: Auditoria e Logs do Sistema](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF004-Auditoria-Logs-Sistema/RF004.md)
 - **Status:** ✅ Backend Completo
 - **Descrição:** Auditoria automática de todas as operações do sistema
 - **Entregas:**
@@ -102,7 +102,7 @@ Este documento consolida todas as entregas, implementações e melhorias realiza
 - **Padrão:** `BaseAuditableGuidEntity`
 - **Localização Backend:** `src/Domain/Common/BaseAuditableGuidEntity.cs`
 
-#### [RF-005: i18n (Internacionalização)](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF005-i18n-Orcamento-Provisao/RF005.md)
+#### [RF-005: i18n (Internacionalização)](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF005-i18n-Orcamento-Provisao/RF005.md)
 - **Status:** ✅ Backend + Frontend Completo
 - **Descrição:** Sistema completo de internacionalização
 - **Entregas:**
@@ -115,7 +115,7 @@ Este documento consolida todas as entregas, implementações e melhorias realiza
 - **Localização Backend:** `src/Application/Localization/`
 - **Localização Frontend:** `src/assets/i18n/`
 
-#### [RF-006: Gestão de Clientes (Multi-Tenancy SaaS)](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF006-Gestao-de-Clientes/RF006.md)
+#### [RF-006: Gestão de Clientes (Multi-Tenancy SaaS)](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF006-Gestao-de-Clientes/RF006.md)
 - **Status:** ✅ Backend + Frontend Completo + Documentação Completa
 - **Commits:**
   - `27f8286c` - Merge documentação completa (26/12)
@@ -147,12 +147,12 @@ Este documento consolida todas as entregas, implementações e melhorias realiza
 - **Localização Backend:** `src/Application/Clientes/`
 - **Localização Frontend:** `src/app/modules/admin/clientes/`
 - **Documentação:**
-  - [RF006.md](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF006-Gestao-de-Clientes/RF006.md) - Requisito Funcional
-  - [UC-RF006.md](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF006-Gestao-de-Clientes/UC-RF006.md) - Casos de Uso
-  - [MD-RF006.md](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF006-Gestao-de-Clientes/MD-RF006.md) - Modelo de Dados
-  - [WF-RF006.md](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF006-Gestao-de-Clientes/WF-RF006.md) - Wireframes
+  - [RF006.md](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF006-Gestao-de-Clientes/RF006.md) - Requisito Funcional
+  - [UC-RF006.md](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF006-Gestao-de-Clientes/UC-RF006.md) - Casos de Uso
+  - [MD-RF006.md](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF006-Gestao-de-Clientes/MD-RF006.md) - Modelo de Dados
+  - [WF-RF006.md](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF006-Gestao-de-Clientes/WF-RF006.md) - Wireframes
 
-#### [RF-007: Login e Autenticação](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF007-Login-e-Autenticacao/RF007.md)
+#### [RF-007: Login e Autenticação](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF007-Login-e-Autenticacao/RF007.md)
 - **Status:** ✅ Backend Completo
 - **Descrição:** Sistema de autenticação JWT com refresh token
 - **Entregas:**
@@ -165,7 +165,7 @@ Este documento consolida todas as entregas, implementações e melhorias realiza
 
 ### EPIC002-CAD: Cadastros Base do Sistema
 
-#### [RF-012: Gestão de Usuários](../rf/Fase-1-Sistema-Base/EPIC002-CAD-Cadastros-Sistema/RF012-Gestao-de-Usuarios/RF012.md)
+#### [RF-012: Gestão de Usuários](../documentacao/Fase-1-Sistema-Base/EPIC002-CAD-Cadastros-Sistema/RF012-Gestao-de-Usuarios/RF012.md)
 - **Status:** ✅ Backend + Documentação Atualizada
 - **Commit:** `edabd40e` (27/12) - Atualização com melhorias obrigatórias
 - **Descrição:** CRUD completo de usuários do sistema
@@ -176,7 +176,7 @@ Este documento consolida todas as entregas, implementações e melhorias realiza
   - Reset de senha
   - Bloqueio/Desbloqueio de usuário
 
-#### [RF-013: Gestão de Perfis de Acesso](../rf/Fase-1-Sistema-Base/EPIC002-CAD-Cadastros-Sistema/RF013-Gestao-de-Perfis-de-Acesso/RF013.md)
+#### [RF-013: Gestão de Perfis de Acesso](../documentacao/Fase-1-Sistema-Base/EPIC002-CAD-Cadastros-Sistema/RF013-Gestao-de-Perfis-de-Acesso/RF013.md)
 - **Status:** ✅ Backend + Documentação Atualizada
 - **Commit:** `dddb6ff6` (27/12) - Atualização conforme CONTRATO DE DOCUMENTACAO ESSENCIAL
 - **Descrição:** Sistema RBAC (Role-Based Access Control)
@@ -186,7 +186,7 @@ Este documento consolida todas as entregas, implementações e melhorias realiza
   - Permissões granulares (Create, Read, Update, Delete, Export, etc.)
   - Herança de permissões
 
-#### [RF-014: Configurações do Usuário](../rf/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF014-Configuracoes-do-Usuario/RF014.md)
+#### [RF-014: Configurações do Usuário](../documentacao/Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF014-Configuracoes-do-Usuario/RF014.md)
 - **Status:** ✅ Backend + Documentação Atualizada
 - **Commit:** `1ed70d2e` (27/12) - Atualização conforme CONTRATO DE DOCUMENTACAO ESSENCIAL
 - **Descrição:** Preferências personalizadas por usuário
@@ -264,31 +264,31 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 
 ### EPIC003-CAD: Cadastros Base
 
-#### [RF-015: Gestão de Locais e Endereços](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF015-Gestao-Locais-Enderecos/RF015.md)
+#### [RF-015: Gestão de Locais e Endereços](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF015-Gestao-Locais-Enderecos/RF015.md)
 - **Status:** 📝 Documentado
 - **Descrição:** Cadastro de locais físicos (matriz, filiais, datacenters)
 - **Entregas:** Hierarquia de locais, busca por CEP (ViaCEP API)
 
-#### [RF-016: Gestão de Categorias de Ativos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF016-Gestao-Categorias-Ativos/RF016.md)
+#### [RF-016: Gestão de Categorias de Ativos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF016-Gestao-Categorias-Ativos/RF016.md)
 - **Status:** 📝 Documentado
 - **Descrição:** Categorias hierárquicas de ativos (Hardware, Software, Telecom, etc.)
 
-#### [RF-018: Gestão de Cargos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF018-Gestao-de-Cargos/RF018.md)
+#### [RF-018: Gestão de Cargos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF018-Gestao-de-Cargos/RF018.md)
 - **Status:** 📝 Documentado (expandido 28/12)
 - **Commit:** `6ff90163`
 - **Descrição:** Cadastro de cargos organizacionais
 
-#### [RF-019: Gestão de Tipos de Ativos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF019-Gestao-de-Tipos-de-Ativos/RF019.md)
+#### [RF-019: Gestão de Tipos de Ativos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF019-Gestao-de-Tipos-de-Ativos/RF019.md)
 - **Status:** 📝 Documentado (expandido 28/12)
 - **Commit:** `6ff90163`
 - **Descrição:** Tipos de ativos (Desktop, Notebook, Servidor, Switch, etc.)
 
-#### [RF-020: Gestão de Documentos e Anexos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF020-Gestao-de-Documentos-e-Anexos/RF020.md)
+#### [RF-020: Gestão de Documentos e Anexos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF020-Gestao-de-Documentos-e-Anexos/RF020.md)
 - **Status:** 📝 Documentado (expandido 28/12)
 - **Commit:** `6ff90163`
 - **Descrição:** Upload e gestão de documentos/anexos (Azure Blob Storage)
 
-#### [RF-021: Catálogo de Serviços](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF021-Catalogo-de-Servicos/RF021.md)
+#### [RF-021: Catálogo de Serviços](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF021-Catalogo-de-Servicos/RF021.md)
 - **Status:** ✅ Backend + Frontend Completo
 - **Commit:** `4f8a484b` (21/12)
 - **Descrição:** Catálogo de serviços de TI disponíveis para solicitação
@@ -299,14 +299,14 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Formulários customizados por serviço
 - **Localização Backend:** `src/Application/Servicos/`
 - **Localização Frontend:** `src/app/modules/admin/servicos/`
-- **Documentação:** [RF021.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF021-Catalogo-de-Servicos/RF021.md)
+- **Documentação:** [RF021.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF021-Catalogo-de-Servicos/RF021.md)
 
-#### [RF-022: Gestão de Fornecedores](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF022-Gestao-de-Fornecedores/RF022.md)
+#### [RF-022: Gestão de Fornecedores](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF022-Gestao-de-Fornecedores/RF022.md)
 - **Status:** 📝 Documentado (expandido 28/12)
 - **Commit:** `6ff90163`
 - **Descrição:** Cadastro de fornecedores de produtos/serviços
 
-#### [RF-023: Gestão de Contratos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF023-Gestao-de-Contratos/RF023.md)
+#### [RF-023: Gestão de Contratos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF023-Gestao-de-Contratos/RF023.md)
 - **Status:** ✅ Frontend Completo
 - **Commit:** `ab0a4d06` (21/12)
 - **Descrição:** Gestão completa de contratos com fornecedores
@@ -317,9 +317,9 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Alertas de vencimento
   - Renovação automática
 - **Localização Frontend:** `src/app/modules/admin/contratos/`
-- **Documentação:** [RF023.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF023-Gestao-de-Contratos/RF023.md)
+- **Documentação:** [RF023.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF023-Gestao-de-Contratos/RF023.md)
 
-#### [RF-024: Gestão de Departamentos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF024-Gestao-de-Departamentos/RF024.md)
+#### [RF-024: Gestão de Departamentos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF024-Gestao-de-Departamentos/RF024.md)
 - **Status:** ✅ Frontend Completo + Migração v2.0
 - **Commits:**
   - `754af3a6` (24/12) - Implementação frontend
@@ -332,10 +332,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Gestão de responsáveis
 - **Localização Frontend:** `src/app/modules/admin/departamentos/`
 - **Documentação:**
-  - [RF024.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF024-Gestao-de-Departamentos/RF024.md)
-  - [RL-RF024.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF024-Gestao-de-Departamentos/RL-RF024.yaml) - Mapeamento legado
+  - [RF024.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF024-Gestao-de-Departamentos/RF024.md)
+  - [RL-RF024.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF024-Gestao-de-Departamentos/RL-RF024.yaml) - Mapeamento legado
 
-#### [RF-043: Gestão de Endereços de Entrega](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF043-Gestao-de-Enderecos-Entrega/RF043.md)
+#### [RF-043: Gestão de Endereços de Entrega](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF043-Gestao-de-Enderecos-Entrega/RF043.md)
 - **Status:** ✅ Backend + Frontend Completo
 - **Commits:**
   - `6a55a6d7` (25/12) - Frontend completo
@@ -358,23 +358,23 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Web Layer desatualizada (sincronizada)
 - **Localização Backend:** `src/Application/EnderecosEntrega/`
 - **Localização Frontend:** `src/app/modules/admin/enderecos-entrega/`
-- **Documentação:** [RF043.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF043-Gestao-de-Enderecos-Entrega/RF043.md)
+- **Documentação:** [RF043.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF043-Gestao-de-Enderecos-Entrega/RF043.md)
 
-#### [RF-047: Gestão de Tipos de Consumidores](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF047-Gestao-de-Tipos-Consumidores/RF047.md)
+#### [RF-047: Gestão de Tipos de Consumidores](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF047-Gestao-de-Tipos-Consumidores/RF047.md)
 - **Status:** 📝 Documentado
 - **Descrição:** Tipos de consumidores (Colaborador, Terceiro, Executivo, etc.)
 
-#### [RF-048: Gestão de Status de Consumidores](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF048-Gestao-de-Status-Consumidores/RF048.md)
+#### [RF-048: Gestão de Status de Consumidores](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF048-Gestao-de-Status-Consumidores/RF048.md)
 - **Status:** 📝 Documentado + Migração v2.0
 - **Commit:** `7d272ee9` (30/12)
 - **Descrição:** Status de consumidores (Ativo, Inativo, Afastado, Desligado)
 
-#### [RF-051: Gestão de Marcas e Modelos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF051-Gestao-Marcas-Modelos/RF051.md)
+#### [RF-051: Gestão de Marcas e Modelos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF051-Gestao-Marcas-Modelos/RF051.md)
 - **Status:** 📝 Documentado + Migração v2.0
 - **Commit:** `659a7a1c` (30/12)
 - **Descrição:** Catálogo de marcas e modelos de ativos (Apple, Dell, HP, etc.)
 
-#### [RF-052: Gestão de Consumidores](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF052-Gestao-de-Consumidores/RF052.md)
+#### [RF-052: Gestão de Consumidores](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF052-Gestao-de-Consumidores/RF052.md)
 - **Status:** ✅ Frontend Completo + Migração v2.0
 - **Commits:**
   - `04d09570` (21/12) - Implementação frontend
@@ -387,10 +387,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Histórico de movimentações
 - **Localização Frontend:** `src/app/modules/admin/consumidores/`
 - **Documentação:**
-  - [RF052.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF052-Gestao-de-Consumidores/RF052.md)
-  - [RL-RF052.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF052-Gestao-de-Consumidores/RL-RF052.yaml)
+  - [RF052.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF052-Gestao-de-Consumidores/RF052.md)
+  - [RL-RF052.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF052-Gestao-de-Consumidores/RL-RF052.yaml)
 
-#### [RF-058: Gestão de Tipos de Bilhetes](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF058-Gestao-de-Tipos-Bilhetes/RF058.md)
+#### [RF-058: Gestão de Tipos de Bilhetes](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF058-Gestao-de-Tipos-Bilhetes/RF058.md)
 - **Status:** ✅ Backend + Frontend Completo + Testes E2E + Migração v2.0
 - **Commits:**
   - `fe5fde9e` (21/12) - Frontend completo
@@ -407,20 +407,20 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Localização Frontend:** `src/app/modules/admin/bilhetes-tipos/`
 - **Testes E2E:** `D:\IC2\frontend\icontrolit-app/e2e/rf058-bilhetes-tipos.spec.js`
 - **Documentação:**
-  - [RF058.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF058-Gestao-de-Tipos-Bilhetes/RF058.md)
-  - [RL-RF058.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF058-Gestao-de-Tipos-Bilhetes/RL-RF058.yaml)
+  - [RF058.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF058-Gestao-de-Tipos-Bilhetes/RF058.md)
+  - [RL-RF058.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF058-Gestao-de-Tipos-Bilhetes/RL-RF058.yaml)
 
-#### [RF-059: Gestão de Status e Tipos Genéricos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF059-Gestao-Status-Tipos-Genericos/RF059.md)
+#### [RF-059: Gestão de Status e Tipos Genéricos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF059-Gestao-Status-Tipos-Genericos/RF059.md)
 - **Status:** 📝 Documentado + Migração v2.0
 - **Commit:** `26f13b29` (30/12)
 - **Descrição:** Cadastros genéricos reutilizáveis (Status, Tipos, etc.)
 
-#### [RF-060: Gestão de Tipos de Chamado](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF060-Gestao-Tipos-Chamado/RF060.md)
+#### [RF-060: Gestão de Tipos de Chamado](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF060-Gestao-Tipos-Chamado/RF060.md)
 - **Status:** 📝 Documentado + Migração v2.0 (RF NOVO - sem legado)
 - **Commit:** `acceec49` (30/12)
 - **Descrição:** Tipos de chamados do Service Desk (Incidente, Requisição, Problema)
 
-#### [RF-084: Upload e Importação de Arquivos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF084-Upload-Importacao-Arquivos/RF084.md)
+#### [RF-084: Upload e Importação de Arquivos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF084-Upload-Importacao-Arquivos/RF084.md)
 - **Status:** 📝 Documentado Completo
 - **Commits:**
   - `30f1eaa6` (28/12) - Documentação completa
@@ -432,7 +432,7 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Importação em massa com validação
   - Preview de dados antes de importar
   - Relatório de erros de importação
-- **Documentação:** [RF084.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF084-Upload-Importacao-Arquivos/RF084.md)
+- **Documentação:** [RF084.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF084-Upload-Importacao-Arquivos/RF084.md)
 
 ---
 
@@ -440,7 +440,7 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 
 ### EPIC003-GES: Gestão Financeira
 
-#### [RF-026: Gestão de Faturas de Contratos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF026-Gestao-de-Faturas-de-Contratos/RF026.md)
+#### [RF-026: Gestão de Faturas de Contratos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF026-Gestao-de-Faturas-de-Contratos/RF026.md)
 - **Status:** ✅ Backend + Frontend Completo + Migração v2.0
 - **Commits:**
   - `b04c36a4` (23/12) - Frontend completo
@@ -463,12 +463,12 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Localização Backend:** `src/Application/Faturas/`
 - **Localização Frontend:** `src/app/modules/admin/faturas/`
 - **Documentação:**
-  - [RF026.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF026-Gestao-de-Faturas-de-Contratos/RF026.md)
-  - [UC-RF026.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF026-Gestao-de-Faturas-de-Contratos/UC-RF026.md)
-  - [MD-RF026.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF026-Gestao-de-Faturas-de-Contratos/MD-RF026.md)
-  - [WF-RF026.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF026-Gestao-de-Faturas-de-Contratos/WF-RF026.md)
+  - [RF026.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF026-Gestao-de-Faturas-de-Contratos/RF026.md)
+  - [UC-RF026.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF026-Gestao-de-Faturas-de-Contratos/UC-RF026.md)
+  - [MD-RF026.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF026-Gestao-de-Faturas-de-Contratos/MD-RF026.md)
+  - [WF-RF026.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF026-Gestao-de-Faturas-de-Contratos/WF-RF026.md)
 
-#### [RF-027: Gestão de Aditivos Contratuais](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/RF027.md)
+#### [RF-027: Gestão de Aditivos Contratuais](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/RF027.md)
 - **Status:** ✅ Backend + Frontend Completo + Testes E2E + Migração v2.0
 - **Commits:**
   - `11bf86cb` (22/12) - Frontend completo
@@ -491,18 +491,18 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Testes E2E com Playwright
   - Sincronização com Azure DevOps
 - **Casos de Teste:**
-  - [TC-RF027-BACKEND.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/TC-RF027-BACKEND.md)
-  - [TC-RF027-FRONTEND.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/TC-RF027-FRONTEND.md)
-  - [TC-RF027-SEGURANCA.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/TC-RF027-SEGURANCA.md)
-  - [TC-RF027-E2E.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/TC-RF027-E2E.md)
+  - [TC-RF027-BACKEND.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/TC-RF027-BACKEND.md)
+  - [TC-RF027-FRONTEND.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/TC-RF027-FRONTEND.md)
+  - [TC-RF027-SEGURANCA.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/TC-RF027-SEGURANCA.md)
+  - [TC-RF027-E2E.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/TC-RF027-E2E.md)
 - **Localização Backend:** `src/Application/Aditivos/`
 - **Localização Frontend:** `src/app/modules/admin/aditivos/`
 - **Testes E2E:** `D:\IC2\frontend\icontrolit-app/e2e/rf027-aditivos.spec.js`
 - **Documentação:**
-  - [RF027.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/RF027.md)
-  - [RL-RF027.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/RL-RF027.yaml)
+  - [RF027.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/RF027.md)
+  - [RL-RF027.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF027-Gestao-de-Aditivos-de-Contratos/RL-RF027.yaml)
 
-#### [RF-028: Gestão de SLA Operações](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF028-Gestao-de-SLA-Operacoes/RF028.md)
+#### [RF-028: Gestão de SLA Operações](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF028-Gestao-de-SLA-Operacoes/RF028.md)
 - **Status:** ✅ Backend + Frontend Completo + Testes E2E + Migração v2.0
 - **Commits:**
   - `5d0119fc` (24/12) - Frontend completo
@@ -527,10 +527,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Localização Frontend:** `src/app/modules/admin/sla-operacoes/`
 - **Testes E2E:** `D:\IC2\frontend\icontrolit-app/e2e/rf028-sla-operacoes.spec.js`
 - **Documentação:**
-  - [RF028.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF028-Gestao-de-SLA-Operacoes/RF028.md)
-  - [RL-RF028.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF028-Gestao-de-SLA-Operacoes/RL-RF028.yaml)
+  - [RF028.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF028-Gestao-de-SLA-Operacoes/RF028.md)
+  - [RL-RF028.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF028-Gestao-de-SLA-Operacoes/RL-RF028.yaml)
 
-#### [RF-029: Gestão de SLA Serviços](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF029-Gestao-de-SLA-Servicos/RF029.md)
+#### [RF-029: Gestão de SLA Serviços](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF029-Gestao-de-SLA-Servicos/RF029.md)
 - **Status:** ✅ Backend + Frontend Completo + Migração v2.0
 - **Commits:**
   - `ce8fec8e` (24/12) - Frontend completo
@@ -545,10 +545,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Localização Backend:** `src/Application/SlaServicos/`
 - **Localização Frontend:** `src/app/modules/admin/sla-servicos/`
 - **Documentação:**
-  - [RF029.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF029-Gestao-de-SLA-Servicos/RF029.md)
-  - [RL-RF029.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF029-Gestao-de-SLA-Servicos/RL-RF029.yaml)
+  - [RF029.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF029-Gestao-de-SLA-Servicos/RF029.md)
+  - [RL-RF029.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF029-Gestao-de-SLA-Servicos/RL-RF029.yaml)
 
-#### [RF-030: Gestão de Parâmetros de Faturamento](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF030-Gestao-de-Parametros-de-Faturamento/RF030.md)
+#### [RF-030: Gestão de Parâmetros de Faturamento](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF030-Gestao-de-Parametros-de-Faturamento/RF030.md)
 - **Status:** ✅ Frontend Completo + Migração v2.0
 - **Commits:**
   - `04d09570` (21/12) - Frontend completo
@@ -561,10 +561,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Centro de custo padrão
 - **Localização Frontend:** `src/app/modules/admin/parametros-faturamento/`
 - **Documentação:**
-  - [RF030.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF030-Gestao-de-Parametros-de-Faturamento/RF030.md)
-  - [RL-RF030.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF030-Gestao-de-Parametros-de-Faturamento/RL-RF030.yaml)
+  - [RF030.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF030-Gestao-de-Parametros-de-Faturamento/RF030.md)
+  - [RL-RF030.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF030-Gestao-de-Parametros-de-Faturamento/RL-RF030.yaml)
 
-#### [RF-031: Gestão de Plano de Contas](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF031-Gestao-de-Plano-de-Contas/RF031.md)
+#### [RF-031: Gestão de Plano de Contas](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF031-Gestao-de-Plano-de-Contas/RF031.md)
 - **Status:** ✅ Backend + Frontend Completo + Migração v2.0
 - **Commits:**
   - `fe5fde9e` (21/12) - Frontend completo
@@ -579,10 +579,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Localização Backend:** `src/Application/PlanoContas/`
 - **Localização Frontend:** `src/app/modules/admin/plano-contas/`
 - **Documentação:**
-  - [RF031.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF031-Gestao-de-Plano-de-Contas/RF031.md)
-  - [RL-RF031.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF031-Gestao-de-Plano-de-Contas/RL-RF031.yaml)
+  - [RF031.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF031-Gestao-de-Plano-de-Contas/RF031.md)
+  - [RL-RF031.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF031-Gestao-de-Plano-de-Contas/RL-RF031.yaml)
 
-#### [RF-032: Gestão de Notas Fiscais de Faturas](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF032-Gestao-de-Notas-Fiscais-Faturas/RF032.md)
+#### [RF-032: Gestão de Notas Fiscais de Faturas](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF032-Gestao-de-Notas-Fiscais-Faturas/RF032.md)
 - **Status:** ✅ Backend + Frontend Completo + Migração v2.0
 - **Commits:**
   - `c2f2e081` (24/12) - Frontend completo
@@ -599,10 +599,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Localização Backend:** `src/Application/NotasFiscais/`
 - **Localização Frontend:** `src/app/modules/admin/notas-fiscais/`
 - **Documentação:**
-  - [RF032.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF032-Gestao-de-Notas-Fiscais-Faturas/RF032.md)
-  - [RL-RF032.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF032-Gestao-de-Notas-Fiscais-Faturas/RL-RF032.yaml)
+  - [RF032.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF032-Gestao-de-Notas-Fiscais-Faturas/RF032.md)
+  - [RL-RF032.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF032-Gestao-de-Notas-Fiscais-Faturas/RL-RF032.yaml)
 
-#### [RF-034: Gestão de Itens de Auditoria](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF034-Gestao-de-Itens-de-Auditoria/RF034.md)
+#### [RF-034: Gestão de Itens de Auditoria](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF034-Gestao-de-Itens-de-Auditoria/RF034.md)
 - **Status:** ✅ Frontend Completo + Migração v2.0
 - **Commits:**
   - `1a34c47d` (24/12) - Frontend completo
@@ -610,10 +610,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Descrição:** Gestão de itens auditados (ativos, contratos, etc.)
 - **Localização Frontend:** `src/app/modules/admin/itens-auditoria/`
 - **Documentação:**
-  - [RF034.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF034-Gestao-de-Itens-de-Auditoria/RF034.md)
-  - [RL-RF034.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF034-Gestao-de-Itens-de-Auditoria/RL-RF034.yaml)
+  - [RF034.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF034-Gestao-de-Itens-de-Auditoria/RF034.md)
+  - [RL-RF034.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF034-Gestao-de-Itens-de-Auditoria/RL-RF034.yaml)
 
-#### [RF-035: Gestão de Resumos de Auditoria](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF035-Gestao-de-Resumos-de-Auditoria/RF035.md)
+#### [RF-035: Gestão de Resumos de Auditoria](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF035-Gestao-de-Resumos-de-Auditoria/RF035.md)
 - **Status:** ✅ Frontend Completo + Migração v2.0
 - **Commits:**
   - `6b29b112` (24/12) - Frontend completo
@@ -622,10 +622,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Descrição:** Relatórios consolidados de auditoria
 - **Localização Frontend:** `src/app/modules/admin/resumos-auditoria/`
 - **Documentação:**
-  - [RF035.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF035-Gestao-de-Resumos-de-Auditoria/RF035.md)
-  - [RL-RF035.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF035-Gestao-de-Resumos-de-Auditoria/RL-RF035.yaml)
+  - [RF035.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF035-Gestao-de-Resumos-de-Auditoria/RF035.md)
+  - [RL-RF035.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF035-Gestao-de-Resumos-de-Auditoria/RL-RF035.yaml)
 
-#### [RF-036: Gestão de Custos Fixos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF036-Gestao-de-Custos-Fixos/RF036.md)
+#### [RF-036: Gestão de Custos Fixos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF036-Gestao-de-Custos-Fixos/RF036.md)
 - **Status:** ✅ Frontend Completo + Migração v2.0
 - **Commits:**
   - `11e58cb5` (24/12) - Frontend completo
@@ -640,10 +640,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Correção de permissões RBAC
 - **Localização Frontend:** `src/app/modules/admin/custos-fixos/`
 - **Documentação:**
-  - [RF036.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF036-Gestao-de-Custos-Fixos/RF036.md)
-  - [RL-RF036.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF036-Gestao-de-Custos-Fixos/RL-RF036.yaml)
+  - [RF036.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF036-Gestao-de-Custos-Fixos/RF036.md)
+  - [RL-RF036.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF036-Gestao-de-Custos-Fixos/RL-RF036.yaml)
 
-#### [RF-037: Gestão de Custos por Ativo](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF037-Gestao-de-Custos-por-Ativo/RF037.md)
+#### [RF-037: Gestão de Custos por Ativo](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF037-Gestao-de-Custos-por-Ativo/RF037.md)
 - **Status:** ✅ Frontend Completo + Migração v2.0
 - **Commits:**
   - `84a32d5e` (24/12) - Frontend completo
@@ -657,10 +657,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - DateAdapter configurado
 - **Localização Frontend:** `src/app/modules/admin/custos-ativo/`
 - **Documentação:**
-  - [RF037.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF037-Gestao-de-Custos-por-Ativo/RF037.md)
-  - [RL-RF037.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF037-Gestao-de-Custos-por-Ativo/RL-RF037.yaml)
+  - [RF037.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF037-Gestao-de-Custos-por-Ativo/RF037.md)
+  - [RL-RF037.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF037-Gestao-de-Custos-por-Ativo/RL-RF037.yaml)
 
-#### [RF-038: Gestão de SLA Solicitações](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF038-Gestao-de-SLA-Solicitacoes/RF038.md)
+#### [RF-038: Gestão de SLA Solicitações](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF038-Gestao-de-SLA-Solicitacoes/RF038.md)
 - **Status:** ✅ Frontend Completo + Migração v2.0
 - **Commits:**
   - `1c30d112` (24/12) - Frontend completo
@@ -668,14 +668,14 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Descrição:** SLA específico para solicitações do Service Desk
 - **Localização Frontend:** `src/app/modules/admin/sla-solicitacoes/`
 - **Documentação:**
-  - [RF038.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF038-Gestao-de-SLA-Solicitacoes/RF038.md)
-  - [RL-RF038.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF038-Gestao-de-SLA-Solicitacoes/RL-RF038.yaml)
+  - [RF038.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF038-Gestao-de-SLA-Solicitacoes/RF038.md)
+  - [RL-RF038.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF038-Gestao-de-SLA-Solicitacoes/RL-RF038.yaml)
 
 ---
 
 ## 📞 Telefonia e Telecom
 
-#### [RF-039: Gestão de Bilhetes Telefônicos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF039-Gestao-de-Bilhetes/RF039.md)
+#### [RF-039: Gestão de Bilhetes Telefônicos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF039-Gestao-de-Bilhetes/RF039.md)
 - **Status:** ✅ Backend + Frontend Completo + Migração v2.0
 - **Commits:**
   - `8c3634b1` (24/12) - Frontend completo
@@ -694,10 +694,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Localização Backend:** `src/Application/Bilhetes/`
 - **Localização Frontend:** `src/app/modules/admin/bilhetes/`
 - **Documentação:**
-  - [RF039.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF039-Gestao-de-Bilhetes/RF039.md)
-  - [RL-RF039.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF039-Gestao-de-Bilhetes/RL-RF039.yaml)
+  - [RF039.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF039-Gestao-de-Bilhetes/RF039.md)
+  - [RL-RF039.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF039-Gestao-de-Bilhetes/RL-RF039.yaml)
 
-#### [RF-040: Gestão de Troncos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF040-Gestao-de-Troncos/RF040.md)
+#### [RF-040: Gestão de Troncos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF040-Gestao-de-Troncos/RF040.md)
 - **Status:** ✅ Frontend Completo + Migração v2.0
 - **Commits:**
   - `7698ea11` (21/12) - Frontend completo
@@ -705,17 +705,17 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Descrição:** Gestão de troncos telefônicos (PABX)
 - **Localização Frontend:** `src/app/modules/admin/troncos/`
 - **Documentação:**
-  - [RF040.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF040-Gestao-de-Troncos/RF040.md)
-  - [RL-RF040.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF040-Gestao-de-Troncos/RL-RF040.yaml)
+  - [RF040.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF040-Gestao-de-Troncos/RF040.md)
+  - [RL-RF040.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF040-Gestao-de-Troncos/RL-RF040.yaml)
 
-#### [RF-041: Gestão de Estoque de Aparelhos](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF041-Gestao-de-Estoque-de-Aparelhos/RF041.md)
+#### [RF-041: Gestão de Estoque de Aparelhos](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF041-Gestao-de-Estoque-de-Aparelhos/RF041.md)
 - **Status:** ✅ Frontend Completo
 - **Commit:** `87a8abff` (21/12)
 - **Descrição:** Controle de estoque de aparelhos celulares
 - **Localização Frontend:** `src/app/modules/admin/estoque-aparelhos/`
-- **Documentação:** [RF041.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF041-Gestao-de-Estoque-de-Aparelhos/RF041.md)
+- **Documentação:** [RF041.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF041-Gestao-de-Estoque-de-Aparelhos/RF041.md)
 
-#### [RF-050: Gestão de Linhas Móveis e Chips SIM](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF050-Gestao-Linhas-Moveis-Chips-SIM/RF050.md)
+#### [RF-050: Gestão de Linhas Móveis e Chips SIM](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF050-Gestao-Linhas-Moveis-Chips-SIM/RF050.md)
 - **Status:** ✅ Backend + Frontend Completo + Migração v2.0
 - **Commits:**
   - `dad6c505` (25/12) - Frontend completo
@@ -732,14 +732,14 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Localização Backend:** `src/Application/LinhasTelefonicas/`
 - **Localização Frontend:** `src/app/modules/admin/linhas-moveis/`
 - **Documentação:**
-  - [RF050.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF050-Gestao-Linhas-Moveis-Chips-SIM/RF050.md)
-  - [RL-RF050.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF050-Gestao-Linhas-Moveis-Chips-SIM/RL-RF050.yaml)
+  - [RF050.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF050-Gestao-Linhas-Moveis-Chips-SIM/RF050.md)
+  - [RL-RF050.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF050-Gestao-Linhas-Moveis-Chips-SIM/RL-RF050.yaml)
 
 ---
 
 ## 🎫 Service Desk e Atendimento
 
-#### [RF-033: Gestão de Chamados (Service Desk)](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF033-Gestao-de-Chamados-Service-Desk/RF033.md)
+#### [RF-033: Gestão de Chamados (Service Desk)](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF033-Gestao-de-Chamados-Service-Desk/RF033.md)
 - **Status:** ✅ Backend + Frontend Completo + Migração v2.0
 - **Commits:**
   - `f85f3a45` (24/12) - Frontend completo
@@ -759,10 +759,10 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Localização Backend:** `src/Application/Chamados/`
 - **Localização Frontend:** `src/app/modules/admin/service-desk/chamados/`
 - **Documentação:**
-  - [RF033.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF033-Gestao-de-Chamados-Service-Desk/RF033.md)
-  - [RL-RF033.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF033-Gestao-de-Chamados-Service-Desk/RL-RF033.yaml)
+  - [RF033.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF033-Gestao-de-Chamados-Service-Desk/RF033.md)
+  - [RL-RF033.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF033-Gestao-de-Chamados-Service-Desk/RL-RF033.yaml)
 
-#### [RF-053: Gestão de Solicitações (Service Desk)](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF053-Gestao-de-Solicitacoes-Service-Desk/RF053.md)
+#### [RF-053: Gestão de Solicitações (Service Desk)](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF053-Gestao-de-Solicitacoes-Service-Desk/RF053.md)
 - **Status:** ✅ Backend + Frontend Completo (100% FUNCIONAL)
 - **Commits:**
   - `f63c43a2` (27/12) - Frontend completo
@@ -787,9 +787,9 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
   - Sistema declarado 100% funcional
 - **Localização Backend:** `src/Application/Solicitacoes/`
 - **Localização Frontend:** `src/app/modules/admin/service-desk/solicitacoes/`
-- **Documentação:** [RF053.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF053-Gestao-de-Solicitacoes-Service-Desk/RF053.md)
+- **Documentação:** [RF053.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF053-Gestao-de-Solicitacoes-Service-Desk/RF053.md)
 
-#### [RF-061: Gestão de Ordens de Serviço](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF061-Gestao-de-Ordens-de-Servico/RF061.md)
+#### [RF-061: Gestão de Ordens de Serviço](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF061-Gestao-de-Ordens-de-Servico/RF061.md)
 - **Status:** ✅ Backend Completo + Migração v2.0
 - **Commits:**
   - `040b65f5`, `94129455` (20/12) - OrdensServicoManagement
@@ -797,8 +797,8 @@ protected override void OnModelCreating(ModelBuilder modelBuilder)
 - **Descrição:** Ordens de serviço para manutenção de ativos
 - **Localização Backend:** `src/Application/OrdensServico/`
 - **Documentação:**
-  - [RF061.md](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF061-Gestao-de-Ordens-de-Servico/RF061.md)
-  - [RL-RF061.yaml](../rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF061-Gestao-de-Ordens-de-Servico/RL-RF061.yaml)
+  - [RF061.md](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF061-Gestao-de-Ordens-de-Servico/RF061.md)
+  - [RL-RF061.yaml](../documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-GES-Gestao-Operacional/RF061-Gestao-de-Ordens-de-Servico/RL-RF061.yaml)
 
 ---
 
@@ -1278,8 +1278,8 @@ mapeamento_legado:
 ### Cronogramas Interativos
 - **Commit:** `36481c6f`
 - **Arquivos:**
-  - [cronograma-interativo.html](../rf/cronograma-interativo.html)
-  - [cronograma-moderno.html](../rf/cronograma-moderno.html)
+  - [cronograma-interativo.html](../documentacao/cronograma-interativo.html)
+  - [cronograma-moderno.html](../documentacao/cronograma-moderno.html)
 - **Descrição:** Cronogramas HTML interativos do projeto
 - **Entregas:**
   - Timeline visual de todas as fases

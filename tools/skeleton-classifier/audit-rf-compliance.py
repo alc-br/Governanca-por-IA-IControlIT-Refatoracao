@@ -140,7 +140,7 @@ def extract_business_rules_from_rf(rf_md_path):
     Extrai regras de negócio do RF.md
     Retorna lista de indicadores do que deveria estar implementado
     """
-    if not rf_md_path or not os.path.exists(rf_md_path):
+    if not documentacao_md_path or not os.path.exists(rf_md_path):
         return {"error": "RF.md não encontrado", "rules": []}
 
     try:
@@ -196,7 +196,7 @@ def extract_business_rules_from_rf(rf_md_path):
     except Exception as e:
         return {"error": str(e), "rules": []}
 
-def analyze_backend_completeness(rf_num, rf_indicators):
+def analyze_backend_completeness(rf_num, documentacao_indicators):
     """
     Analisa se o backend implementou tudo do RF
     """
@@ -250,20 +250,20 @@ def analyze_backend_completeness(rf_num, rf_indicators):
     # Comparar com o que deveria ter
     gaps = []
 
-    if rf_indicators.get("has_validations") and not has_complex_validators:
+    if documentacao_indicators.get("has_validations") and not has_complex_validators:
         gaps.append("Validações complexas esperadas mas não encontradas")
 
-    if rf_indicators.get("has_states") and not has_state_enum:
+    if documentacao_indicators.get("has_states") and not has_state_enum:
         gaps.append("Estados/Status esperados mas não encontrados")
 
-    if rf_indicators.get("has_workflows") and not has_workflow_logic:
+    if documentacao_indicators.get("has_workflows") and not has_workflow_logic:
         gaps.append("Workflows esperados mas não encontrados")
 
-    if rf_indicators.get("has_calculations") and not has_calculation_logic:
+    if documentacao_indicators.get("has_calculations") and not has_calculation_logic:
         gaps.append("Cálculos esperados mas não encontrados")
 
     # Se RF tem muitas regras (>10) mas backend tem poucas validações
-    if rf_indicators.get("rules_count", 0) > 10 and validator_count < 5:
+    if documentacao_indicators.get("rules_count", 0) > 10 and validator_count < 5:
         gaps.append(f"RF tem {rf_indicators['rules_count']} regras mas backend tem apenas {validator_count} validações")
 
     is_complete = len(gaps) == 0
@@ -331,8 +331,8 @@ def audit_rf(status_yaml_path):
     """
     Audita um RF comparando especificação com implementação
     """
-    rf_num = extract_rf_number(status_yaml_path)
-    if not rf_num:
+    documentacao_num = extract_rf_number(status_yaml_path)
+    if not documentacao_num:
         return None
 
     # Ler STATUS.yaml
@@ -354,13 +354,13 @@ def audit_rf(status_yaml_path):
     titulo = status_data.get('titulo', 'Sem título')
 
     # Encontrar RF.md
-    rf_md_path = find_rf_md(rf_num)
+    documentacao_md_path = find_rf_md(rf_num)
 
     # Extrair regras do RF
-    rf_indicators = extract_business_rules_from_rf(rf_md_path)
+    documentacao_indicators = extract_business_rules_from_rf(rf_md_path)
 
     # Analisar backend
-    backend_analysis = analyze_backend_completeness(rf_num, rf_indicators)
+    backend_analysis = analyze_backend_completeness(rf_num, documentacao_indicators)
 
     # Analisar frontend
     frontend_analysis = analyze_frontend_completeness(rf_num)
@@ -388,10 +388,10 @@ def audit_rf(status_yaml_path):
     needs_reclassification = current_classification != classification
 
     return {
-        "rf": rf_num,
+        "rf": documentacao_num,
         "titulo": titulo,
-        "rf_md_path": rf_md_path,
-        "rf_indicators": rf_indicators,
+        "rf_md_path": documentacao_md_path,
+        "rf_indicators": documentacao_indicators,
         "backend_analysis": backend_analysis,
         "frontend_analysis": frontend_analysis,
         "classification": classification,
@@ -480,7 +480,7 @@ def main():
 
     # Auditar cada RF
     for i, status_yaml_path in enumerate(sorted(status_files), 1):
-        rf_num = extract_rf_number(status_yaml_path)
+        documentacao_num = extract_rf_number(status_yaml_path)
         print(f"[{i}/{len(status_files)}] Auditando {rf_num}...", end=" ")
 
         result = audit_rf(status_yaml_path)

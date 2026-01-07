@@ -38,14 +38,14 @@ Se forem encontradas não-conformidades:
 **Método:**
 ```python
 # Extrair RNs do RF.yaml
-rf_rns = set(re.findall(r'"(RN-RF\d{3}-\d{2})"', rf_content))
+rf_rns = set(re.findall(r'"(RN-RF\d{3}-\d{2})"', documentacao_content))
 
 # Extrair RNs do UC.yaml (covers.rf_items + regras_aplicadas)
 uc_rns = set(re.findall(r'"(RN-RF\d{3}-\d{2})"', uc_content))
 
 # Calcular gaps
-gaps = rf_rns - uc_rns
-cobertura = len(uc_rns) / len(rf_rns) * 100 if rf_rns else 0
+gaps = documentacao_rns - uc_rns
+cobertura = len(uc_rns) / len(rf_rns) * 100 if documentacao_rns else 0
 ```
 
 **Critério de aprovação:**
@@ -179,7 +179,7 @@ grep -E '\*\*FA-[0-9]{3}:' UC-RF006.md  # Deve retornar VAZIO
    ```yaml
    # Comentário cabeçalho presente
    uc:
-     rf: "RFXXX"
+     documentacao: "RFXXX"
      versao: "2.0"
      data: "AAAA-MM-DD"
    ```
@@ -368,8 +368,8 @@ keywords = ["api", "azure", "brasil", "graph", "externo", "integra"]
 **Método:**
 ```bash
 python tools/docs/validator-rf-uc.py \
-  --rf rf/.../RFXXX.yaml \
-  --uc rf/.../UC-RFXXX.yaml
+  --rf documentacao/.../RFXXX.yaml \
+  --uc documentacao/.../UC-RFXXX.yaml
 
 echo $?  # DEVE ser 0
 ```

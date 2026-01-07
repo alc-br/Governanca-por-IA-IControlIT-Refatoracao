@@ -1,0 +1,491 @@
+# =============================================
+# UC - Casos de Uso RF018 (Gestão de Cargos)
+# Versão: 1.0
+# Autor: Agência ALC - alc.dev.br
+# Data: 2025-12-31
+# =============================================
+
+uc:
+  documentacao: "RF018"
+  versao: "1.0"
+  data: "2025-12-31"
+
+casos_de_uso:
+
+  - id: "UC00"
+    nome: "Listar Cargos"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RF-CRUD-02"
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa funcionalidade Cargos"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema valida permissão cargos:cargo:listar"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Sistema carrega cargos do tenant (ClienteId)"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Sistema aplica paginação e ordenação"
+          required: true
+        - id: "FP-UC00-005"
+          title: "Sistema exibe lista de cargos"
+          required: true
+        - id: "FA-UC00-001"
+          title: "Filtrar por código ou nome"
+          required: false
+        - id: "FA-UC00-002"
+          title: "Ordenar por coluna (código, nome, hierarquia)"
+          required: false
+        - id: "FA-UC00-003"
+          title: "Filtrar por status (Ativo/Inativo)"
+          required: false
+        - id: "FA-UC00-004"
+          title: "Exportar para Excel/CSV"
+          required: false
+        - id: "FE-UC00-001"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+        - id: "FE-UC00-002"
+          title: "Nenhum cargo cadastrado → estado vazio"
+          required: true
+
+    precondicoes:
+      - permissao: "cargos:cargo:listar"
+
+    gatilho: "Usuário acessa menu Cadastros > Cargos"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_cargos"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "listar_cargos_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibir_lista_paginada"
+
+    fluxos_alternativos:
+      - id: "FA-UC00-01"
+        condicao: "usuario_aplica_filtro"
+        resultado: "lista_filtrada"
+      - id: "FA-UC00-02"
+        condicao: "usuario_exporta"
+        resultado: "arquivo_gerado"
+
+    fluxos_excecao:
+      - id: "FE-UC00-01"
+        condicao: "sem_permissao"
+        resultado: "http_403"
+      - id: "FE-UC00-02"
+        condicao: "sem_registros"
+        resultado: "estado_vazio"
+
+    regras_aplicadas:
+      - "RN-RF018-011"  # Isolamento por tenant
+
+    resultado_final:
+      estado: "lista_exibida"
+
+  - id: "UC01"
+    nome: "Criar Cargo"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-CRUD-01"
+        - "RF-VAL-01"
+        - "RF-VAL-02"
+        - "RF-SEC-01"
+        - "RF-SEC-03"
+      uc_items:
+        - id: "FP-UC01-001"
+          title: "Usuário solicita criação de cargo"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema valida permissão cargos:cargo:criar"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Sistema exibe formulário de criação"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Usuário preenche dados obrigatórios (código, nome)"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Usuário preenche dados opcionais (hierarquia, centro custo, alçada)"
+          required: false
+        - id: "FP-UC01-006"
+          title: "Sistema valida unicidade de código (RN-RF018-001)"
+          required: true
+        - id: "FP-UC01-007"
+          title: "Sistema valida hierarquia sem ciclos (RN-RF018-003)"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Sistema valida alçada monotônica (RN-RF018-004)"
+          required: true
+        - id: "FP-UC01-009"
+          title: "Sistema valida centro de custo ativo (RN-RF018-006)"
+          required: true
+        - id: "FP-UC01-010"
+          title: "Sistema cria cargo com ClienteId automático"
+          required: true
+        - id: "FP-UC01-011"
+          title: "Sistema registra auditoria (RN-RF018-010)"
+          required: true
+        - id: "FP-UC01-012"
+          title: "Sistema confirma sucesso"
+          required: true
+        - id: "FA-UC01-001"
+          title: "Salvar e criar outro cargo"
+          required: false
+        - id: "FA-UC01-002"
+          title: "Cancelar criação"
+          required: false
+        - id: "FE-UC01-001"
+          title: "Código duplicado → HTTP 400"
+          required: true
+        - id: "FE-UC01-002"
+          title: "Hierarquia com ciclo → HTTP 400"
+          required: true
+        - id: "FE-UC01-003"
+          title: "Alçada menor que subordinado → HTTP 400"
+          required: true
+        - id: "FE-UC01-004"
+          title: "Centro custo inativo → HTTP 400"
+          required: true
+        - id: "FE-UC01-005"
+          title: "Nome inválido (< 3 caracteres) → HTTP 400"
+          required: true
+
+    precondicoes:
+      - permissao: "cargos:cargo:criar"
+
+    gatilho: "Usuário clica em 'Novo Cargo'"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "exibir_formulario"
+      - passo: 2
+        ator: "usuario"
+        acao: "preencher_campos"
+      - passo: 3
+        ator: "usuario"
+        acao: "salvar"
+      - passo: 4
+        ator: "sistema"
+        acao: "validar_dados"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_regras_negocio"
+      - passo: 6
+        ator: "sistema"
+        acao: "persistir_cargo"
+      - passo: 7
+        ator: "sistema"
+        acao: "registrar_auditoria"
+      - passo: 8
+        ator: "sistema"
+        acao: "confirmar_sucesso"
+
+    fluxos_excecao:
+      - id: "FE-UC01-01"
+        condicao: "validacao_falhou"
+        resultado: "exibir_erros_400"
+      - id: "FE-UC01-02"
+        condicao: "codigo_duplicado"
+        resultado: "http_400_codigo_existente"
+
+    regras_aplicadas:
+      - "RN-RF018-001"  # Código único
+      - "RN-RF018-002"  # Nome 3-150 caracteres
+      - "RN-RF018-003"  # Hierarquia sem ciclos
+      - "RN-RF018-004"  # Alçada monotônica
+      - "RN-RF018-006"  # Centro custo ativo
+      - "RN-RF018-010"  # Auditoria
+      - "RN-RF018-011"  # Multi-tenancy
+
+    resultado_final:
+      estado: "cargo_criado"
+
+  - id: "UC02"
+    nome: "Visualizar Cargo"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RF-CRUD-03"
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Usuário seleciona cargo na listagem"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema valida permissão cargos:cargo:visualizar"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema valida tenant (ClienteId)"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Sistema carrega dados do cargo"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Sistema exibe detalhes (dados, hierarquia, competências, alçada)"
+          required: true
+        - id: "FA-UC02-001"
+          title: "Visualizar organograma a partir deste cargo"
+          required: false
+        - id: "FA-UC02-002"
+          title: "Visualizar subordinados diretos"
+          required: false
+        - id: "FA-UC02-003"
+          title: "Visualizar ocupantes do cargo"
+          required: false
+        - id: "FE-UC02-001"
+          title: "Cargo não encontrado → HTTP 404"
+          required: true
+        - id: "FE-UC02-002"
+          title: "Cargo de outro tenant → HTTP 404"
+          required: true
+
+    precondicoes:
+      - permissao: "cargos:cargo:visualizar"
+
+    gatilho: "Usuário clica em cargo na listagem"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "seleciona_cargo"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "validar_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "carregar_dados"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_detalhes"
+
+    fluxos_excecao:
+      - id: "FE-UC02-01"
+        condicao: "cargo_nao_encontrado"
+        resultado: "http_404"
+      - id: "FE-UC02-02"
+        condicao: "cargo_outro_tenant"
+        resultado: "http_404"
+
+    regras_aplicadas:
+      - "RN-RF018-011"  # Isolamento por tenant
+
+    resultado_final:
+      estado: "detalhes_exibidos"
+
+  - id: "UC03"
+    nome: "Editar Cargo"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-CRUD-04"
+        - "RF-VAL-02"
+        - "RF-VAL-03"
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Usuário solicita edição de cargo"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema valida permissão cargos:cargo:editar"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Sistema carrega dados atuais"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Usuário altera dados (nome, hierarquia, alçada, etc.)"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Sistema valida alterações"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Sistema valida hierarquia sem ciclos (se alterou supervisor)"
+          required: true
+        - id: "FP-UC03-007"
+          title: "Sistema valida alçada monotônica (se alterou alçada ou supervisor)"
+          required: true
+        - id: "FP-UC03-008"
+          title: "Sistema persiste alterações"
+          required: true
+        - id: "FP-UC03-009"
+          title: "Sistema registra auditoria com diff"
+          required: true
+        - id: "FA-UC03-001"
+          title: "Cancelar edição"
+          required: false
+        - id: "FE-UC03-001"
+          title: "Hierarquia com ciclo → HTTP 400"
+          required: true
+        - id: "FE-UC03-002"
+          title: "Alçada inconsistente → HTTP 400"
+          required: true
+        - id: "FE-UC03-003"
+          title: "Nome inválido → HTTP 400"
+          required: true
+
+    precondicoes:
+      - permissao: "cargos:cargo:editar"
+
+    gatilho: "Usuário clica em 'Editar' no detalhe do cargo"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "solicita_edicao"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_dados"
+      - passo: 4
+        ator: "usuario"
+        acao: "alterar_campos"
+      - passo: 5
+        ator: "usuario"
+        acao: "salvar"
+      - passo: 6
+        ator: "sistema"
+        acao: "validar_alteracoes"
+      - passo: 7
+        ator: "sistema"
+        acao: "persistir_mudancas"
+      - passo: 8
+        ator: "sistema"
+        acao: "registrar_auditoria"
+
+    fluxos_excecao:
+      - id: "FE-UC03-01"
+        condicao: "validacao_falhou"
+        resultado: "exibir_erros_400"
+
+    regras_aplicadas:
+      - "RN-RF018-002"  # Nome 3-150 caracteres
+      - "RN-RF018-003"  # Hierarquia sem ciclos
+      - "RN-RF018-004"  # Alçada monotônica
+      - "RN-RF018-010"  # Auditoria
+
+    resultado_final:
+      estado: "cargo_atualizado"
+
+  - id: "UC04"
+    nome: "Inativar Cargo"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-CRUD-05"
+        - "RF-VAL-04"
+      uc_items:
+        - id: "FP-UC04-001"
+          title: "Usuário solicita inativação de cargo"
+          required: true
+        - id: "FP-UC04-002"
+          title: "Sistema exibe confirmação"
+          required: true
+        - id: "FP-UC04-003"
+          title: "Sistema valida permissão cargos:cargo:inativar"
+          required: true
+        - id: "FP-UC04-004"
+          title: "Sistema verifica se cargo tem ocupantes ativos (RN-RF018-005)"
+          required: true
+        - id: "FP-UC04-005"
+          title: "Sistema executa soft delete (FlExcluido = true)"
+          required: true
+        - id: "FP-UC04-006"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FA-UC04-001"
+          title: "Cancelar inativação"
+          required: false
+        - id: "FE-UC04-001"
+          title: "Cargo com ocupantes ativos → HTTP 400"
+          required: true
+        - id: "FE-UC04-002"
+          title: "Cargo já inativo → HTTP 400"
+          required: true
+
+    precondicoes:
+      - permissao: "cargos:cargo:inativar"
+
+    gatilho: "Usuário clica em 'Inativar' no detalhe do cargo"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "solicita_inativacao"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_confirmacao"
+      - passo: 3
+        ator: "usuario"
+        acao: "confirmar"
+      - passo: 4
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_sem_ocupantes"
+      - passo: 6
+        ator: "sistema"
+        acao: "executar_soft_delete"
+      - passo: 7
+        ator: "sistema"
+        acao: "registrar_auditoria"
+
+    fluxos_alternativos:
+      - id: "FA-UC04-01"
+        condicao: "usuario_cancela"
+        resultado: "operacao_cancelada"
+
+    fluxos_excecao:
+      - id: "FE-UC04-01"
+        condicao: "cargo_tem_ocupantes"
+        resultado: "http_400_bloqueio"
+      - id: "FE-UC04-02"
+        condicao: "cargo_ja_inativo"
+        resultado: "http_400_ja_inativo"
+
+    regras_aplicadas:
+      - "RN-RF018-005"  # Cargo sem ocupantes
+      - "RN-RF018-010"  # Auditoria
+
+    resultado_final:
+      estado: "cargo_inativado"
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial - UC canônicos UC00-UC04 para RF018"

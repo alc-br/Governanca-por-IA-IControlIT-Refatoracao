@@ -346,7 +346,7 @@ casos_de_uso:
 Criar arquivo `WF-RF001.md` na pasta do RF baseado no template `WF.md`:
 
 ```bash
-cp D:\IC2\docs\templates\WF.md  D:\IC2\rf\...\RF001\WF-RF001.md
+cp D:\IC2\docs\templates\WF.md  D:\IC2\documentacao\...\RF001\WF-RF001.md
 # Editar WF-RF001.md com conteúdo específico do RF001
 ```
 
@@ -366,7 +366,7 @@ metadata:
   versao: "2.0"
   data: "2025-12-31"
   autor: "Agencia ALC - alc.dev.br"
-  rf_relacionado:
+  documentacao_relacionado:
     id: "RF001"  # ← Adicionar este campo
     nome: "Parametros e Configuracoes do Sistema"
 ```
@@ -404,7 +404,7 @@ entidades:
   - UC.yaml
   - WF.md
   - MD.yaml
-- Documentos gerados: ` D:\IC2\rf\Fase-X\EPIC-XXX\RFXXX\`
+- Documentos gerados: ` D:\IC2\documentacao\Fase-X\EPIC-XXX\RFXXX\`
   - UC-RFXXX.md
   - UC-RFXXX.yaml
   - WF-RFXXX.md
@@ -517,7 +517,7 @@ python tools/docs/validator-uc-wf-md.py --all
 
 **Solução:**
 - Adicionar campo no YAML seguindo estrutura do template
-- Verificar nested paths (ex: `uc.rf` = `uc: { rf: "RFXXX" }`)
+- Verificar nested paths (ex: `uc.rf` = `uc: { documentacao: "RFXXX" }`)
 
 ## Autor
 

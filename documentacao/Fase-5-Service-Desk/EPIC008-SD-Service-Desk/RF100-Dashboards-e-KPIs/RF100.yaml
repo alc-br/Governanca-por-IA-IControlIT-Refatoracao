@@ -1,0 +1,491 @@
+rf_id: RF100
+rf_title: "Dashboards e KPIs com Análise Preditiva"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+epic: "EPIC008-SD-Service-Desk"
+fase: "Fase 5 - Service Desk"
+autor: "Agência ALC - alc.dev.br"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-100-001"
+    titulo: "Forecast Requer Mínimo 12 Meses de Histórico"
+    descricao: "Modelos de forecasting (Prophet, ARIMA) exigem mínimo 365 dias de dados históricos para treinamento"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "historico_minimo"
+      mensagem_erro: "Dados insuficientes para forecasting (mínimo 12 meses requeridos)"
+      http_code: 400
+
+  - id: "RN-100-002"
+    titulo: "Anomaly Detection com Threshold Configurável"
+    descricao: "Sistema detecta anomalias usando Z-score. Threshold padrão: |Z-score| > 3 (99.7% confiança)"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "threshold_estatistico"
+      mensagem_erro: "Anomalia detectada: Z-score {score} excede threshold {threshold}"
+      http_code: 200  # Sucesso com alerta
+
+  - id: "RN-100-003"
+    titulo: "Modelos ML Retreinados Mensalmente via Hangfire"
+    descricao: "Retreinamento automático todo domingo 02h UTC. Degradação >5% bloqueia deploy"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "performance_modelo"
+      mensagem_erro: "Modelo degradou {degradacao}% - requer revisão manual"
+      http_code: 500  # Internal Error se modelo falhar
+
+  - id: "RN-100-004"
+    titulo: "Forecast Requer Intervalo de Confiança Mínimo 95%"
+    descricao: "Forecast com confiança < 95% retorna erro 422 Unprocessable Entity"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "confidence_level"
+      mensagem_erro: "Confiança insuficiente: {confidence}% (mínimo 95% requerido)"
+      http_code: 422
+
+  - id: "RN-100-005"
+    titulo: "Clustering Deve ter Mínimo 3 Clusters, Máximo 10"
+    descricao: "Range [3, 10] clusters. Elbow method determina k ótimo automaticamente"
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "range_clusters"
+      mensagem_erro: "Número de clusters {k} fora do range [3, 10]"
+      http_code: 400
+
+  - id: "RN-100-006"
+    titulo: "Churn Prediction com Score >= 70% de Precisão"
+    descricao: "Modelo de churn requer precision >= 0.70. Score 0-100 onde >= 70 = risco alto"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "precisao_modelo"
+      mensagem_erro: "Modelo churn abaixo de precisão mínima (70%)"
+      http_code: 503  # Service Unavailable
+
+  - id: "RN-100-007"
+    titulo: "What-If Analysis Limitado a 5 Cenários Simultâneos"
+    descricao: "Máximo 5 cenários por usuário. 6º cenário retorna erro 429 Too Many Requests"
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "rate_limit"
+      mensagem_erro: "Máximo 5 cenários simultâneos permitidos"
+      http_code: 429
+
+  - id: "RN-100-008"
+    titulo: "Resultados ML Cacheados por 24 Horas (Redis)"
+    descricao: "Cache TTL 24h. Invalidação automática em: expiração, novo dado, refresh forçado, modelo retreinado"
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "cache_ttl"
+      mensagem_erro: "Erro ao acessar cache Redis"
+      http_code: 503
+
+  - id: "RN-100-009"
+    titulo: "Multi-tenancy - ClienteId em Todos os Datasets"
+    descricao: "Todos os dados ML particionados por ClienteId. PROIBIDO combinar dados de múltiplos clientes"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "multi_tenancy"
+      mensagem_erro: "ClienteId obrigatório e deve ser GUID válido"
+      http_code: 400
+
+  - id: "RN-100-010"
+    titulo: "Auditoria de Todas as Predições e Recomendações"
+    descricao: "Auditoria append-only de TODAS operações ML. Retenção 2 anos (LGPD compliance)"
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "auditoria_obrigatoria"
+      mensagem_erro: "Falha ao registrar auditoria"
+      http_code: 500
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes_rbac:
+  - permission_code: "ml:forecast:create"
+    descricao: "Gerar forecast de custos/KPIs"
+    roles_autorizadas:
+      - "Gestor"
+      - "Diretor"
+      - "Analista BI"
+    endpoint: "POST /api/ml/forecast"
+
+  - permission_code: "ml:forecast:read"
+    descricao: "Visualizar forecasts gerados"
+    roles_autorizadas:
+      - "Gestor"
+      - "Diretor"
+      - "Analista BI"
+      - "Viewer"
+    endpoint: "GET /api/ml/dashboards/{id}"
+
+  - permission_code: "ml:anomaly:read"
+    descricao: "Visualizar anomalias detectadas"
+    roles_autorizadas:
+      - "Gestor Operacional"
+      - "Diretor"
+      - "Analista BI"
+    endpoint: "POST /api/ml/anomaly-detection"
+
+  - permission_code: "ml:clustering:create"
+    descricao: "Executar clustering de ativos/usuários"
+    roles_autorizadas:
+      - "Analista BI"
+      - "Diretor"
+    endpoint: "POST /api/ml/clustering"
+
+  - permission_code: "ml:churn:read"
+    descricao: "Visualizar churn predictions"
+    roles_autorizadas:
+      - "Gerente Comercial"
+      - "Diretor"
+      - "Analista BI"
+    endpoint: "POST /api/ml/churn-prediction"
+
+  - permission_code: "ml:whatif:create"
+    descricao: "Criar cenários what-if"
+    roles_autorizadas:
+      - "Diretor"
+      - "Gestor Sênior"
+    endpoint: "POST /api/ml/what-if"
+
+  - permission_code: "ml:recommendations:accept"
+    descricao: "Aceitar recomendações prescritivas"
+    roles_autorizadas:
+      - "Gestor"
+      - "Diretor"
+    endpoint: "POST /api/ml/recommendations/{id}/accept"
+
+  - permission_code: "ml:models:retrain"
+    descricao: "Retreinar modelos manualmente"
+    roles_autorizadas:
+      - "DevOps"
+      - "Arquiteto"
+      - "Admin"
+    endpoint: "POST /api/ml/models/retrain"
+
+  - permission_code: "ml:audit:read"
+    descricao: "Visualizar auditoria de operações ML"
+    roles_autorizadas:
+      - "Compliance"
+      - "Auditor"
+      - "Admin"
+    endpoint: "GET /api/ml/audit-log"
+
+# ==============================================================================
+# API ENDPOINTS
+# ==============================================================================
+
+endpoints:
+  - method: "POST"
+    route: "/api/ml/forecast"
+    descricao: "Gerar forecast de custos/KPIs para 3, 6 ou 12 meses"
+    autenticacao: true
+    authorization_policy: "ml:forecast:create"
+    request_dto: "ForecastCommand"
+    response_dto: "ForecastResponse"
+    regras_validadas:
+      - "RN-100-001"
+      - "RN-100-004"
+      - "RN-100-009"
+
+  - method: "POST"
+    route: "/api/ml/anomaly-detection"
+    descricao: "Detectar anomalias em tempo real (Z-score, Isolation Forest)"
+    autenticacao: true
+    authorization_policy: "ml:anomaly:read"
+    request_dto: "AnomalyDetectionRequest"
+    response_dto: "AnomalyResult"
+    regras_validadas:
+      - "RN-100-002"
+      - "RN-100-009"
+
+  - method: "POST"
+    route: "/api/ml/clustering"
+    descricao: "Executar clustering K-means/DBSCAN de ativos/usuários"
+    autenticacao: true
+    authorization_policy: "ml:clustering:create"
+    request_dto: "ClusteringRequest"
+    response_dto: "ClusteringResult"
+    regras_validadas:
+      - "RN-100-005"
+      - "RN-100-009"
+
+  - method: "POST"
+    route: "/api/ml/churn-prediction"
+    descricao: "Predizer churn de cliente (score 0-100)"
+    autenticacao: true
+    authorization_policy: "ml:churn:read"
+    request_dto: "ChurnPredictionRequest"
+    response_dto: "ChurnPredictionResult"
+    regras_validadas:
+      - "RN-100-006"
+      - "RN-100-009"
+
+  - method: "POST"
+    route: "/api/ml/what-if"
+    descricao: "Simular cenário hipotético (máx 5 paralelos)"
+    autenticacao: true
+    authorization_policy: "ml:whatif:create"
+    request_dto: "WhatIfAnalysisCommand"
+    response_dto: "WhatIfAnalysisResponse"
+    regras_validadas:
+      - "RN-100-007"
+      - "RN-100-009"
+
+  - method: "GET"
+    route: "/api/ml/trend-analysis"
+    descricao: "Análise de tendências com decomposição STL"
+    autenticacao: true
+    authorization_policy: "ml:forecast:read"
+    request_dto: null
+    response_dto: "TrendAnalysisResponse"
+    regras_validadas:
+      - "RN-100-009"
+
+  - method: "POST"
+    route: "/api/ml/models/retrain"
+    descricao: "Retreinar modelo manualmente (admin only)"
+    autenticacao: true
+    authorization_policy: "ml:models:retrain"
+    request_dto: "ModelRetrainRequest"
+    response_dto: "ModelMetrics"
+    regras_validadas:
+      - "RN-100-003"
+
+  - method: "GET"
+    route: "/api/ml/audit-log"
+    descricao: "Visualizar auditoria de operações ML"
+    autenticacao: true
+    authorization_policy: "ml:audit:read"
+    request_dto: null
+    response_dto: "PaginatedListDto<AuditLogEntity>"
+    regras_validadas:
+      - "RN-100-010"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Acurácia Forecast"
+    descricao: "Percentual de forecasts publicados com confiança >= 95%"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Acurácia Churn Prediction"
+    descricao: "Precision/Recall/F1-score do modelo de churn"
+    meta: ">= 70%"
+    log_obrigatorio: true
+
+  - nome: "Detecção Anomalias - Falsos Positivos"
+    descricao: "Percentual de anomalias detectadas que não são reais"
+    meta: "< 5%"
+    log_obrigatorio: true
+
+  - nome: "Tempo Resposta Forecast"
+    descricao: "P99 latência endpoint POST /forecast"
+    meta: "< 10s"
+    log_obrigatorio: true
+
+  - nome: "Cache Hit Rate"
+    descricao: "Percentual de requisições servidas do Redis cache"
+    meta: ">= 70%"
+    log_obrigatorio: true
+
+  - nome: "Retenção por Recomendação"
+    descricao: "Clientes em risco que aceitaram recomendação e não churnaram"
+    meta: ">= 15%"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "Forecast Confiança Baixa"
+    threshold: "< 90% confiança"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "dashboard"
+
+  - evento: "Modelo Degradação"
+    threshold: "RMSE aumenta > 5%"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "dashboard"
+
+  - evento: "Azure ML Timeout"
+    threshold: "> 30s sem resposta"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+  - evento: "Anomalias em Cascata"
+    threshold: "> 10 anomalias em 1 hora"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "sms"
+
+  - evento: "Cache Redis Down"
+    threshold: "Falha ao conectar Redis"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+
+# ==============================================================================
+# INTEGRA çõES OBRIGATÓRIAS
+# ==============================================================================
+
+integracoes:
+  central_funcionalidades:
+    feature_key: "ML_DASHBOARDS_PREDICTIVE"
+    modulo: "Admin > Analytics"
+    habilitado: true
+    sub_features:
+      - "FORECAST_ENABLED"
+      - "ANOMALY_DETECTION_ENABLED"
+      - "CLUSTERING_ENABLED"
+      - "CHURN_PREDICTION_ENABLED"
+      - "WHAT_IF_ANALYSIS_ENABLED"
+
+  i18n:
+    chaves_traducao:
+      - "dashboards.predictive.title"
+      - "dashboards.predictive.forecast.title"
+      - "dashboards.predictive.anomaly.title"
+      - "dashboards.predictive.clustering.title"
+      - "dashboards.predictive.churn.title"
+      - "dashboards.predictive.whatIf.title"
+      - "dashboards.predictive.messages.success"
+      - "dashboards.predictive.messages.error"
+    idiomas_suportados:
+      - "pt-BR"
+      - "en-US"
+      - "es-ES"
+
+  auditoria:
+    operacoes_auditadas:
+      - "ML_FORECAST_GENERATED"
+      - "ML_ANOMALY_DETECTED"
+      - "ML_CLUSTERING_EXECUTED"
+      - "ML_CHURN_PREDICTED"
+      - "ML_WHATIF_SIMULATED"
+      - "ML_MODEL_RETRAINED"
+      - "ML_RECOMMENDATION_ACCEPTED"
+    retencao_anos: 2
+    imutavel: true
+
+  rbac:
+    matriz_permissoes: true
+    permissoes_total: 9
+    perfis_envolvidos:
+      - "Gestor"
+      - "Diretor"
+      - "Analista BI"
+      - "Gerente Comercial"
+      - "DevOps"
+      - "Compliance"
+
+# ==============================================================================
+# DEPENDÊNCIAS
+# ==============================================================================
+
+dependencias:
+  rfs_upstream:
+    - documentacao_id: "RF099"
+      titulo: "Dashboards tradicionais (base)"
+      tipo: "extends"
+
+  rfs_downstream: []
+
+  bibliotecas_externas:
+    - nome: "Azure Machine Learning SDK"
+      versao: "latest"
+      proposito: "Forecasting, Churn Prediction, Clustering"
+    - nome: "ML.NET"
+      versao: "3.x"
+      proposito: "Modelos ML em .NET"
+    - nome: "Prophet (Python)"
+      versao: "1.x"
+      proposito: "Time series forecasting com sazonalidade"
+    - nome: "Scikit-learn"
+      versao: "1.x"
+      proposito: "K-means, DBSCAN, Isolation Forest"
+    - nome: "StackExchange.Redis"
+      versao: "2.x"
+      proposito: "Cache de resultados ML (24h TTL)"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_rns: 10
+  total_endpoints_api: 8
+  total_permissoes_rbac: 9
+  total_integracoes_obrigatorias: 4
+  total_kpis: 6
+  total_alertas: 5
+  linha_count_rf_md: 306

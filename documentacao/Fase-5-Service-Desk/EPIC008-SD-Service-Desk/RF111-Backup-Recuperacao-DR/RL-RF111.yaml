@@ -1,0 +1,379 @@
+rf_id: RF111
+rf_title: "Backup, Recuperação e Disaster Recovery"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+tipo_migracao: "GREENFIELD"  # Não há legado a migrar, implementação do zero
+
+# ==============================================================================
+# OBSERVAÇÃO IMPORTANTE
+# ==============================================================================
+# Este RF não possui implementação no sistema legado.
+# O módulo de Backup/Recuperação/DR é implementação completamente nova (greenfield).
+# Este arquivo documenta a AUSÊNCIA de legado e os PROBLEMAS identificados
+# que justificam a criação do módulo moderno.
+
+# ==============================================================================
+# ITENS LEGADO RASTREADOS
+# ==============================================================================
+
+itens_legado:
+  # NENHUM ITEM LEGADO ENCONTRADO
+  # O sistema legado não possui módulo de backup/recuperação/DR implementado.
+  # Backups eram executados manualmente via SQL Server Management Studio
+  # ou via Maintenance Plans configurados no SQL Server Agent.
+  []
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO IMPLÍCITAS DESCOBERTAS (Processos Operacionais)
+# ==============================================================================
+
+regras_negocio_implicitas:
+  - id: "RL-RN-001"
+    titulo: "Backup Manual Sob Demanda"
+    descricao: |
+      DBA executava backups manualmente quando solicitado ou em horários
+      definidos informalmente (não automatizados pela aplicação).
+    localizacao: "Processo operacional (não estava no código)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por backups automáticos programados (RN-RF111-001)"
+    rastreabilidade:
+      documentacao_moderno: "RF111 - Seção 5 (Regras de Negócio)"
+      regra_moderna: "RN-RF111-001"
+    migracao_moderna:
+      implementacao: "Backup automático diário às 2h via Hangfire"
+
+  - id: "RL-RN-002"
+    titulo: "Múltiplos Bancos sem Consolidação"
+    descricao: |
+      Cada cliente tinha banco de dados separado (multi-tenancy via múltiplos bancos),
+      dificultando backup unificado.
+    localizacao: "Arquitetura multi-database (um banco por cliente)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Consolidado em banco único com Row-Level Security (RN-RF111-011)"
+    rastreabilidade:
+      documentacao_moderno: "RF111 - Seção 5 (Regras de Negócio)"
+      regra_moderna: "RN-RF111-011"
+    migracao_moderna:
+      implementacao: "Banco único com TenantId e isolamento via Row-Level Security"
+
+  - id: "RL-RN-003"
+    titulo: "Retenção Indefinida de Backups"
+    descricao: |
+      Backups acumulavam indefinidamente até que espaço em disco ficasse crítico.
+      Não havia política definida de retenção.
+    localizacao: "Ausente (falta de planejamento)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por política de retenção automática (RN-RF111-003)"
+    rastreabilidade:
+      documentacao_moderno: "RF111 - Seção 5 (Regras de Negócio)"
+      regra_moderna: "RN-RF111-003"
+    migracao_moderna:
+      implementacao: "Política configurável: 7d daily, 4w weekly, 12m monthly"
+
+  - id: "RL-RN-004"
+    titulo: "Sem Criptografia de Backups"
+    descricao: |
+      Backups eram armazenados em texto claro (sem criptografia).
+      Comando BACKUP DATABASE sem opção WITH ENCRYPTION.
+    localizacao: "Comando SQL Server nativo sem criptografia"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por criptografia obrigatória AES-256 (RN-RF111-004)"
+    rastreabilidade:
+      documentacao_moderno: "RF111 - Seção 5 (Regras de Negócio)"
+      regra_moderna: "RN-RF111-004"
+    migracao_moderna:
+      implementacao: "Criptografia AES-256 com chaves em Azure Key Vault"
+
+  - id: "RL-RN-005"
+    titulo: "Sem Validação de Integridade"
+    descricao: |
+      Backups não tinham checksum calculado ou validado.
+      Confiança na integridade do SQL Server sem validação adicional.
+    localizacao: "Ausente no processo de backup/restore"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por validação obrigatória via checksum SHA-256 (RN-RF111-005)"
+    rastreabilidade:
+      documentacao_moderno: "RF111 - Seção 5 (Regras de Negócio)"
+      regra_moderna: "RN-RF111-005"
+    migracao_moderna:
+      implementacao: "Checksum SHA-256 calculado na criação e validado na restauração"
+
+  - id: "RL-RN-006"
+    titulo: "Sem Plano Formal de DR"
+    descricao: |
+      Não havia plano documentado de disaster recovery.
+      Recuperação era manual, lenta e ad-hoc sem SLA garantido.
+    localizacao: "Ausente (falta de planejamento)"
+    destino: "SUBSTITUÍDO"
+    justificativa: "Substituído por plano formal de DR com failover automático (RN-RF111-008, RN-RF111-009)"
+    rastreabilidade:
+      documentacao_moderno: "RF111 - Seção 5 (Regras de Negócio)"
+      regra_moderna: "RN-RF111-008, RN-RF111-009"
+    migracao_moderna:
+      implementacao: "Plano de DR com failover automático em 15min, testes trimestrais"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RL111-001"
+    titulo: "Ausência Total de Módulo de Backup"
+    severidade: "CRÍTICA"
+    descricao: |
+      Sistema legado não possui módulo de backup dentro da aplicação.
+      Backups dependem de processos manuais de DBA.
+    impacto: |
+      - Sem rastreabilidade de backups
+      - Sem auditoria de operações
+      - Sem SLA garantido
+      - Alto risco de perda de dados
+    solucao_moderna: |
+      Implementação completa de módulo de backup com:
+      - Interface de gerenciamento
+      - Backups automáticos programados
+      - Auditoria obrigatória
+      - Monitoramento e alertas
+
+  - id: "PROB-RL111-002"
+    titulo: "Múltiplos Bancos de Dados por Cliente"
+    severidade: "ALTA"
+    descricao: |
+      Arquitetura multi-tenant via múltiplos bancos de dados (um por cliente)
+      dificulta backup unificado.
+    impacto: |
+      - Backup deve ser executado N vezes (uma por cliente)
+      - Dificuldade de consolidar backups
+      - Maior complexidade operacional
+      - Maior tempo de execução
+    solucao_moderna: |
+      Banco único com Row-Level Security (isolamento lógico via TenantId),
+      backup unificado, menor complexidade.
+
+  - id: "PROB-RL111-003"
+    titulo: "Backups Sem Criptografia"
+    severidade: "CRÍTICA"
+    descricao: |
+      Backups armazenados em texto claro, sem criptografia.
+    impacto: |
+      - Violação de LGPD (dados pessoais sem proteção)
+      - Risco de vazamento de dados sensíveis
+      - Dados acessíveis se backup for roubado
+    solucao_moderna: |
+      Criptografia AES-256 obrigatória com chaves gerenciadas em
+      cofre seguro (Azure Key Vault).
+
+  - id: "PROB-RL111-004"
+    titulo: "Ausência de Validação de Integridade"
+    severidade: "ALTA"
+    descricao: |
+      Backups não têm checksum calculado ou validado.
+    impacto: |
+      - Risco de restaurar dados corrompidos
+      - Sem detecção de corrupção em trânsito ou armazenamento
+      - Piora cenário de falha se backup restaurado estiver corrompido
+    solucao_moderna: |
+      Checksum SHA-256 obrigatório calculado na criação e validado
+      antes de restauração.
+
+  - id: "PROB-RL111-005"
+    titulo: "Sem Plano Formal de Disaster Recovery"
+    severidade: "CRÍTICA"
+    descricao: |
+      Não há plano documentado de DR. Recuperação é manual, lenta e sem SLA.
+    impacto: |
+      - RTO indefinido (pode levar dias)
+      - RPO indefinido (pode perder dias de dados)
+      - Sem testes de DR (risco de falha real)
+      - Dependência de conhecimento tácito de DBAs
+    solucao_moderna: |
+      Plano de DR com failover automático, RTO de 4 horas, RPO de 6 horas,
+      testes trimestrais obrigatórios.
+
+  - id: "PROB-RL111-006"
+    titulo: "Retenção Indefinida de Backups"
+    severidade: "MÉDIA"
+    descricao: |
+      Backups acumulam indefinidamente até que espaço em disco fique crítico.
+    impacto: |
+      - Desperdício de espaço de armazenamento
+      - Custos crescentes
+      - Dificuldade de encontrar backups relevantes
+    solucao_moderna: |
+      Política de retenção automática configurável (7d daily, 4w weekly, 12m monthly),
+      remoção automática de backups expirados.
+
+# ==============================================================================
+# GAP ANALYSIS
+# ==============================================================================
+
+gap_analysis:
+  funcionalidades_legado_nao_migradas:
+    - funcionalidade: "Backups manuais via SQL Server Management Studio"
+      motivo: "Substituído por backups automáticos programados"
+
+    - funcionalidade: "Scripts .bat no Windows Task Scheduler"
+      motivo: "Substituído por jobs de background gerenciados pela aplicação (Hangfire)"
+
+    - funcionalidade: "Múltiplos bancos por cliente"
+      motivo: "Consolidado em banco único com multi-tenancy via Row-Level Security"
+
+    - funcionalidade: "Ausência de auditoria de backups"
+      motivo: "Substituído por auditoria completa obrigatória"
+
+  funcionalidades_novas_moderno:
+    - funcionalidade: "Interface de gerenciamento de backups"
+      justificativa: "Permite usuários agendar, monitorar e restaurar backups sem DBA"
+
+    - funcionalidade: "Backup incremental automático"
+      justificativa: "Garante RPO de 6 horas"
+
+    - funcionalidade: "Criptografia AES-256 obrigatória"
+      justificativa: "Conformidade LGPD e segurança de dados"
+
+    - funcionalidade: "Validação de integridade via checksum SHA-256"
+      justificativa: "Previne restauração de dados corrompidos"
+
+    - funcionalidade: "Política de retenção automática"
+      justificativa: "Otimiza custos de armazenamento"
+
+    - funcionalidade: "Point-in-Time Recovery (PITR)"
+      justificativa: "Restaurar para qualquer momento nos últimos 7 dias"
+
+    - funcionalidade: "Plano de DR com failover automático"
+      justificativa: "RTO de 4 horas, failover em < 15 min"
+
+    - funcionalidade: "Testes trimestrais de DR"
+      justificativa: "Validação periódica que DR funciona"
+
+    - funcionalidade: "Monitoramento e alertas"
+      justificativa: "Notificações de falhas, violações de RPO/RTO"
+
+    - funcionalidade: "Auditoria completa"
+      justificativa: "Rastreabilidade de todas as operações"
+
+  mudancas_comportamento:
+    - aspecto: "Execução de backup"
+      legado: "Manual, sob demanda"
+      moderno: "Automática, programada"
+
+    - aspecto: "Criptografia"
+      legado: "Ausente"
+      moderno: "Obrigatória (AES-256)"
+
+    - aspecto: "Validação de integridade"
+      legado: "Ausente"
+      moderno: "Checksum SHA-256 obrigatório"
+
+    - aspecto: "Retenção"
+      legado: "Indefinida"
+      moderno: "Política configurável (7d/4w/12m)"
+
+    - aspecto: "Disaster Recovery"
+      legado: "Sem plano formal"
+      moderno: "Plano com failover automático"
+
+    - aspecto: "Auditoria"
+      legado: "Ausente"
+      moderno: "Completa e obrigatória"
+
+    - aspecto: "RPO"
+      legado: "Não definido"
+      moderno: "6 horas"
+
+    - aspecto: "RTO"
+      legado: "24+ horas"
+      moderno: "4 horas"
+
+  riscos_migracao:
+    - risco: "Curva de aprendizado de usuários"
+      probabilidade: "ALTA"
+      impacto: "MÉDIO"
+      mitigacao: "Treinamento obrigatório e documentação completa"
+
+    - risco: "Dependência de nova infraestrutura"
+      probabilidade: "MÉDIA"
+      impacto: "ALTO"
+      mitigacao: "Testes extensivos em ambiente de staging"
+
+    - risco: "Aumento de custos de storage"
+      probabilidade: "BAIXA"
+      impacto: "MÉDIO"
+      mitigacao: "Política de retenção otimizada"
+
+    - risco: "Falha de failover automático"
+      probabilidade: "BAIXA"
+      impacto: "CRÍTICO"
+      mitigacao: "Testes trimestrais obrigatórios"
+
+# ==============================================================================
+# DECISÕES DE MODERNIZAÇÃO
+# ==============================================================================
+
+decisoes_modernizacao:
+  - decisao: "Implementação Greenfield vs Migração"
+    descricao: "Implementar módulo de backup completamente do zero (greenfield)"
+    motivo: "Legado não possui nenhuma implementação de backup/DR dentro da aplicação"
+    impacto: "ALTO"
+    justificativa: |
+      Permite aplicar melhores práticas modernas sem dívida técnica.
+      Não há código legado para migrar.
+
+  - decisao: "Banco Único com Multi-Tenancy vs Múltiplos Bancos"
+    descricao: "Consolidar múltiplos bancos em banco único com Row-Level Security"
+    motivo: "Facilita backup unificado, reduz complexidade operacional"
+    impacto: "ALTO"
+    justificativa: |
+      Requer migração de dados, mas simplifica backup significativamente.
+      Melhora performance de backups.
+
+  - decisao: "Criptografia Obrigatória"
+    descricao: "Todos os backups devem ser criptografados com AES-256"
+    motivo: "Conformidade LGPD, proteção contra vazamento de dados"
+    impacto: "MÉDIO"
+    justificativa: |
+      Leve overhead de performance, mas essencial para segurança.
+      Integração com Azure Key Vault obrigatória.
+
+  - decisao: "Failover Automático vs Manual"
+    descricao: "Implementar failover automático em caso de indisponibilidade"
+    motivo: "Reduzir RTO de 24+ horas para 4 horas"
+    impacto: "ALTO"
+    justificativa: |
+      Requer arquitetura multi-região, mas minimiza dependência humana.
+      Melhora significativamente resiliência do sistema.
+
+  - decisao: "Testes de DR Obrigatórios"
+    descricao: "Executar testes trimestrais de disaster recovery automaticamente"
+    motivo: "Validar que DR funciona na prática, não apenas na teoria"
+    impacto: "MÉDIO"
+    justificativa: |
+      Requer ambiente de teste isolado, mas detecta problemas antes
+      de cenário real de desastre.
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 0  # Nenhum item legado encontrado
+  total_regras_negocio_implicitas: 6  # Regras descobertas em processos operacionais
+  total_problemas_identificados: 6  # Problemas graves que justificam modernização
+  tipo_implementacao: "GREENFIELD"  # Implementação do zero, não migração
+  cobertura_destinos: "100%"  # Todas as regras implícitas têm destino definido
+  sincronizado_com_md: true
+
+  observacoes: |
+    Este RF não possui implementação no sistema legado.
+    Módulo de Backup/Recuperação/DR é implementação completamente nova (greenfield).
+    Regras de negócio implícitas foram descobertas em processos operacionais manuais.
+    Todos os problemas identificados foram resolvidos no sistema moderno.
+
+# ==============================================================================
+# REFERÊNCIAS
+# ==============================================================================
+
+referencias:
+  # RF greenfield - sem legado a rastrear
+  # Referências documentadas em "regras_negocio_implicitas" e "gap_analysis"
+  []

@@ -1,0 +1,480 @@
+# =============================================
+# RF091 - Gestão de Anexos e Documentos Contratuais
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF091"
+  nome: "Gestão de Anexos e Documentos Contratuais"
+  versao: "2.0"
+  data: "2025-12-31"
+  fase: "Fase 6 - Ativos, Auditoria e Integrações"
+  epic: "EPIC011-INT-Integracoes"
+  status: "aprovado"
+
+descricao:
+  objetivo: "Gerenciar o ciclo de vida completo de documentos e anexos associados a contratos com segurança, versionamento, auditoria e conformidade legal (LGPD, ISO 27001)."
+  problema_resolvido: "Centralizar e controlar documentação contratual em ambiente multi-tenancy, eliminando silos de documentação física, garantindo rastreabilidade completa e atendendo requisitos de conformidade legal."
+  publico_afetado: "Gestores de contratos, compliance officers, analistas financeiros, usuários finais que necessitam acessar, baixar ou gerenciar documentação contratual."
+
+escopo:
+  incluso:
+    - "Upload de arquivos com validação de tipo, tamanho e integridade"
+    - "Armazenamento seguro em Azure Blob Storage com criptografia AES-256"
+    - "Scan automático de antivírus (ClamAV) em todos os arquivos"
+    - "Versionamento imutável com histórico completo"
+    - "Controle de acesso granular por RBAC e políticas temporárias"
+    - "Download seguro com SAS tokens temporários (15 minutos)"
+    - "Watermark visual em documentos PDF"
+    - "OCR e indexação full-text (Elasticsearch)"
+    - "Integração com DocuSign para assinatura digital"
+    - "Auditoria completa de todas operações"
+    - "Validação de documentação obrigatória por tipo de contrato"
+    - "Compartilhamento de documentos com delegação temporal"
+    - "Busca full-text por conteúdo extraído (OCR)"
+    - "Integração com RF023 (Gestão de Contratos)"
+    - "Integração com Central de Funcionalidades (Feature Flags)"
+    - "Internacionalização completa (pt-BR, en-US, es-ES, fr-FR)"
+  fora:
+    - "Interface visual específica (definida em WF-RF091)"
+    - "Tecnologia de implementação (definida em arquitetura)"
+    - "Layout, UX ou identidade visual (responsabilidade do design)"
+    - "Estratégia de deploy ou infraestrutura (responsabilidade DevOps)"
+    - "Armazenamento local em file system (apenas Azure Blob)"
+    - "Processamento de vídeo ou áudio (apenas documentos: PDF, Office, imagens)"
+
+entidades:
+  - nome: "DocumentAttachment"
+    descricao: "Representa um arquivo digital (anexo) associado a uma entidade do sistema com metadados completos"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "DocumentCategory"
+    descricao: "Categoria de documentação contratual (ex: Proposta Original, Termo Assinado, Aditivo)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "DocumentAccessPolicy"
+    descricao: "Política de acesso a documento específico com permissões e validade temporal"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "SigningFlow"
+    descricao: "Fluxo de assinatura digital (DocuSign) com rastreamento de signatários"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF091-001"
+    descricao: "Validação de tipo de arquivo por whitelist (extensão + MIME type)"
+    tipo: "seguranca"
+    campos_afetados: ["FileName", "MimeType"]
+    obrigatorio: true
+
+  - id: "RN-RF091-002"
+    descricao: "Limite de tamanho de arquivo (50MB máximo)"
+    tipo: "validacao"
+    campos_afetados: ["FileSize"]
+    obrigatorio: true
+
+  - id: "RN-RF091-003"
+    descricao: "Scan obrigatório de antivírus (ClamAV) antes de armazenar"
+    tipo: "seguranca"
+    campos_afetados: ["FileContent"]
+    obrigatorio: true
+
+  - id: "RN-RF091-004"
+    descricao: "Cálculo de hash SHA-256 para validação de integridade"
+    tipo: "seguranca"
+    campos_afetados: ["Sha256Hash"]
+    obrigatorio: true
+
+  - id: "RN-RF091-005"
+    descricao: "Versionamento imutável (cada upload cria nova versão)"
+    tipo: "regra_negocio"
+    campos_afetados: ["VersionNumber", "IsCurrentVersion"]
+    obrigatorio: true
+
+  - id: "RN-RF091-006"
+    descricao: "Armazenamento em Azure Blob Storage com criptografia AES-256"
+    tipo: "seguranca"
+    campos_afetados: ["BlobUri", "BlobKey"]
+    obrigatorio: true
+
+  - id: "RN-RF091-007"
+    descricao: "Controle de acesso granular (RBAC + Policy) com delegação temporal"
+    tipo: "seguranca"
+    campos_afetados: ["Permissions", "ValidUntil"]
+    obrigatorio: true
+
+  - id: "RN-RF091-008"
+    descricao: "Download seguro com SAS token temporário (15 minutos)"
+    tipo: "seguranca"
+    campos_afetados: ["SasToken", "ExpiresAt"]
+    obrigatorio: true
+
+  - id: "RN-RF091-009"
+    descricao: "Watermark visual em PDFs baixados"
+    tipo: "seguranca"
+    campos_afetados: ["FileContent"]
+    obrigatorio: false
+
+  - id: "RN-RF091-010"
+    descricao: "OCR e indexação full-text (Elasticsearch)"
+    tipo: "regra_negocio"
+    campos_afetados: ["ExtractedText"]
+    obrigatorio: false
+
+  - id: "RN-RF091-011"
+    descricao: "Integração com DocuSign para assinatura digital"
+    tipo: "regra_negocio"
+    campos_afetados: ["SigningFlowId", "SignedAt"]
+    obrigatorio: false
+
+  - id: "RN-RF091-012"
+    descricao: "Validação de documentação obrigatória por tipo de contrato"
+    tipo: "validacao"
+    campos_afetados: ["DocumentCategoryId", "IsRequired"]
+    obrigatorio: true
+
+  - id: "RN-RF091-013"
+    descricao: "Auditoria não-repudiável de todas operações"
+    tipo: "seguranca"
+    campos_afetados: ["AuditLog"]
+    obrigatorio: true
+
+  - id: "RN-RF091-014"
+    descricao: "Isolamento multi-tenant estrito (ClienteId)"
+    tipo: "seguranca"
+    campos_afetados: ["ClienteId"]
+    obrigatorio: true
+
+  - id: "RN-RF091-015"
+    descricao: "Compartilhamento com delegação temporal"
+    tipo: "regra_negocio"
+    campos_afetados: ["SharedWithUserId", "ValidUntil", "Permissions"]
+    obrigatorio: false
+
+estados:
+  - id: "uploading"
+    descricao: "Upload em progresso"
+  - id: "scanning"
+    descricao: "Scan de antivírus em andamento"
+  - id: "active"
+    descricao: "Disponível para uso"
+  - id: "quarantined"
+    descricao: "Malware detectado, bloqueado"
+  - id: "deleted"
+    descricao: "Excluído logicamente"
+
+estados_signing_flow:
+  - id: "pending"
+    descricao: "Aguardando assinaturas"
+  - id: "partially_signed"
+    descricao: "Algumas assinaturas coletadas"
+  - id: "completed"
+    descricao: "Todas assinaturas coletadas"
+  - id: "rejected"
+    descricao: "Signatário rejeitou assinatura"
+  - id: "expired"
+    descricao: "Prazo de assinatura expirado"
+
+transicoes:
+  permitidas:
+    - de: "uploading"
+      para: "scanning"
+    - de: "scanning"
+      para: "active"
+    - de: "scanning"
+      para: "quarantined"
+    - de: "active"
+      para: "deleted"
+  proibidas:
+    - de: "quarantined"
+      para: "active"
+    - de: "deleted"
+      para: "active"
+
+transicoes_signing_flow:
+  permitidas:
+    - de: "pending"
+      para: "partially_signed"
+    - de: "partially_signed"
+      para: "completed"
+    - de: "pending"
+      para: "rejected"
+    - de: "pending"
+      para: "expired"
+  proibidas:
+    - de: "completed"
+      para: "pending"
+    - de: "rejected"
+      para: "completed"
+
+permissoes:
+  - codigo: "doc:document:create"
+    descricao: "Criar novo documento"
+  - codigo: "doc:document:read"
+    descricao: "Visualizar documentos"
+  - codigo: "doc:document:download"
+    descricao: "Baixar documentos"
+  - codigo: "doc:document:update"
+    descricao: "Editar metadados de documentos"
+  - codigo: "doc:document:delete"
+    descricao: "Excluir documentos"
+  - codigo: "doc:document:sign"
+    descricao: "Assinar documentos digitalmente"
+  - codigo: "doc:document:share"
+    descricao: "Compartilhar documentos com usuários/grupos"
+  - codigo: "doc:document:audit"
+    descricao: "Visualizar logs de auditoria de documentos"
+  - codigo: "doc:approval:workflow"
+    descricao: "Aprovar fluxo de assinatura"
+  - codigo: "doc:ocr:request"
+    descricao: "Requisitar OCR de documentos"
+
+integracoes:
+  internas:
+    - "Autenticacao (JWT Bearer)"
+    - "Multi-Tenancy (ClienteId)"
+    - "Auditoria (AuditLog)"
+    - "RF023 (Gestão de Contratos)"
+    - "Central de Funcionalidades (Feature Flags)"
+  externas:
+    - sistema: "Azure Blob Storage"
+      tipo: "Cloud Storage"
+      obrigatoria: true
+    - sistema: "ClamAV"
+      tipo: "Antivirus"
+      obrigatoria: true
+    - sistema: "Azure Cognitive Services (OCR)"
+      tipo: "AI/ML"
+      obrigatoria: false
+    - sistema: "Elasticsearch"
+      tipo: "Search Engine"
+      obrigatoria: false
+    - sistema: "DocuSign"
+      tipo: "Digital Signature"
+      obrigatoria: false
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  criptografia_repouso: true
+  criptografia_transito: true
+  validacao_dupla_tipo: true
+  scan_antivirus: true
+  hash_integridade: true
+  sas_token_temporario: true
+  watermark: true
+  rbac_granular: true
+  mfa_assinatura: true
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC-091-01: Upload de Documento Contratual"
+    - "UC-091-02: Enviar Documento para Assinatura"
+    - "UC-091-03: Baixar Documento com Rastreamento"
+    - "UC-091-04: Compartilhar Documento com Usuário Externo"
+    - "UC-091-05: Restaurar Versão Anterior"
+    - "UC-091-06: Auditar Acesso a Documento"
+    - "UC-091-07: Validar Documentação Contratual Obrigatória"
+    - "UC-091-08: Buscar Documento por Conteúdo (OCR)"
+  mds_esperados:
+    - "MD-RF091: DocumentAttachment, DocumentCategory, DocumentAccessPolicy, SigningFlow"
+  wfs_esperados:
+    - "WF-091-01: Listagem de Documentos"
+    - "WF-091-02: Upload de Documento"
+    - "WF-091-03: Visualização de Documento"
+    - "WF-091-04: Histórico de Versões"
+    - "WF-091-05: Fluxo de Assinatura Digital"
+    - "WF-091-06: Gestão de Permissões"
+    - "WF-091-07: Auditoria de Acessos"
+    - "WF-091-08: Busca Full-Text"
+  tcs_esperados:
+    - "TC-RF091-BACKEND.yaml"
+    - "TC-RF091-FRONTEND.yaml"
+    - "TC-RF091-SEGURANCA.yaml"
+    - "TC-RF091-E2E.yaml"
+
+catalog:
+  crud:
+    - id: "RF091-CRUD-01"
+      title: "Upload de documento"
+      required: true
+    - id: "RF091-CRUD-02"
+      title: "Listar documentos"
+      required: true
+    - id: "RF091-CRUD-03"
+      title: "Visualizar documento"
+      required: true
+    - id: "RF091-CRUD-04"
+      title: "Atualizar metadados de documento"
+      required: true
+    - id: "RF091-CRUD-05"
+      title: "Excluir documento (soft delete)"
+      required: true
+
+  validacoes:
+    - id: "RF091-VAL-01"
+      title: "Validar tipo de arquivo (whitelist)"
+      required: true
+    - id: "RF091-VAL-02"
+      title: "Validar tamanho máximo (50MB)"
+      required: true
+    - id: "RF091-VAL-03"
+      title: "Scan de antivírus (ClamAV)"
+      required: true
+    - id: "RF091-VAL-04"
+      title: "Calcular hash SHA-256"
+      required: true
+    - id: "RF091-VAL-05"
+      title: "Validar integridade (hash)"
+      required: true
+    - id: "RF091-VAL-06"
+      title: "Validar documentação obrigatória"
+      required: true
+
+  seguranca:
+    - id: "RF091-SEC-01"
+      title: "Isolamento de tenant (ClienteId)"
+      required: true
+    - id: "RF091-SEC-02"
+      title: "Permissões RBAC granulares"
+      required: true
+    - id: "RF091-SEC-03"
+      title: "Criptografia AES-256 em repouso"
+      required: true
+    - id: "RF091-SEC-04"
+      title: "Criptografia TLS 1.2+ em trânsito"
+      required: true
+    - id: "RF091-SEC-05"
+      title: "SAS token temporário (15 minutos)"
+      required: true
+    - id: "RF091-SEC-06"
+      title: "Watermark em PDFs"
+      required: false
+    - id: "RF091-SEC-07"
+      title: "Auditoria completa de operações"
+      required: true
+    - id: "RF091-SEC-08"
+      title: "Rate limiting (uploads/downloads)"
+      required: true
+    - id: "RF091-SEC-09"
+      title: "MFA para assinatura digital"
+      required: false
+
+  operacoes_especiais:
+    - id: "RF091-OP-01"
+      title: "Gerar URL de download segura (SAS token)"
+      required: true
+    - id: "RF091-OP-02"
+      title: "Listar histórico de versões"
+      required: true
+    - id: "RF091-OP-03"
+      title: "Restaurar versão anterior (rollback)"
+      required: true
+    - id: "RF091-OP-04"
+      title: "Compartilhar documento com delegação temporal"
+      required: true
+    - id: "RF091-OP-05"
+      title: "Visualizar histórico de acesso (audit log)"
+      required: true
+    - id: "RF091-OP-06"
+      title: "Iniciar fluxo de assinatura (DocuSign)"
+      required: false
+    - id: "RF091-OP-07"
+      title: "Verificar status de assinatura"
+      required: false
+    - id: "RF091-OP-08"
+      title: "Requisitar OCR para indexação"
+      required: false
+    - id: "RF091-OP-09"
+      title: "Busca full-text em conteúdo (OCR + metadata)"
+      required: false
+    - id: "RF091-OP-10"
+      title: "Gerenciar permissões de acesso"
+      required: true
+    - id: "RF091-OP-11"
+      title: "Revogar acesso imediatamente"
+      required: true
+
+exclusions:
+  documentacao_items: []
+
+dependencias:
+  rfs_relacionados:
+    - id: "RF023"
+      titulo: "Gestão de Contratos"
+      tipo: "forte"
+      descricao: "Documentos vinculados a contratos"
+    - id: "RF020"
+      titulo: "Documentos e Anexos"
+      tipo: "fraca"
+      descricao: "Base conceitual"
+  external_services:
+    - servico: "Azure Blob Storage"
+      criticidade: "alta"
+    - servico: "ClamAV"
+      criticidade: "alta"
+    - servico: "Azure Cognitive Services (OCR)"
+      criticidade: "media"
+    - servico: "Elasticsearch"
+      criticidade: "media"
+    - servico: "DocuSign"
+      criticidade: "baixa"
+
+metricas:
+  kpis:
+    - nome: "Taxa de Sucesso de Upload"
+      meta: "99.5%+"
+      medicao: "(Uploads Sucesso / Uploads Total) × 100"
+    - nome: "Tempo Médio de Upload"
+      meta: "< 5 segundos (p50)"
+      medicao: "Timestamp POST até HTTP 201"
+    - nome: "Taxa de Detecção de Malware"
+      meta: "100% (0 falsos-negativos)"
+      medicao: "Arquivos quarentenados / Scans executados"
+    - nome: "Disponibilidade do Serviço"
+      meta: "99.9%"
+      medicao: "Uptime / Tempo Total"
+    - nome: "Tempo Médio de OCR"
+      meta: "< 30 segundos"
+      medicao: "Tempo de processamento por página"
+    - nome: "Taxa de Erro em Downloads"
+      meta: "< 0.5%"
+      medicao: "(Downloads com erro / Total downloads) × 100"
+
+eventos_dominio:
+  - evento: "document.uploaded"
+    quando: "Após upload bem-sucedido e scan de antivírus"
+  - evento: "document.malware_detected"
+    quando: "Quando ClamAV detecta vírus"
+  - evento: "document.downloaded"
+    quando: "Quando SAS token é gerado para download"
+  - evento: "document.shared"
+    quando: "Quando documento é compartilhado com usuário/grupo"
+  - evento: "document.signed"
+    quando: "Quando assinatura é coletada (DocuSign)"
+  - evento: "document.deleted"
+    quando: "Quando documento é excluído logicamente"
+  - evento: "document.version_created"
+    quando: "Quando nova versão é criada"
+  - evento: "document.ocr_completed"
+    quando: "Quando OCR é finalizado e texto indexado"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão modernizada orientada a contrato, sem código legado, separação RF/RL completa"
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Claude Code"
+    descricao: "Versão inicial com código VB.NET e SQL embarcado (depreciada)"

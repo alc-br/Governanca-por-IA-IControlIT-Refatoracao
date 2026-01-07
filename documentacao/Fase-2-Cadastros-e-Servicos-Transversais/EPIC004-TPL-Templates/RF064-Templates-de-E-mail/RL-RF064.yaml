@@ -1,0 +1,230 @@
+# Template de Referência ao Legado (RL-RF064.yaml)
+# Versão: 2.0 (Adequação para Automação e Rastreabilidade)
+# Data: 2025-01-14
+
+rf_id: RF064
+titulo: "Gestão de Templates de E-mail"
+
+legado:
+  sistema: "IControlIT v1.0 (VB.NET + ASP.NET Web Forms)"
+  versao: "1.0"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server"
+  multi_tenant: false
+  auditoria: "none"
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+referencias:
+  - id: "LEG-RF064-001"
+    tipo: "tela"
+    nome: "Correio.aspx - Tela de Envio Manual de E-mails"
+    caminho: "ic1_legado/IControlIT/Correio.aspx"
+    descricao: |
+      Tela simples para envio manual de e-mails com formulário básico:
+      - Campo "Para" (destinatário, aceita múltiplos separados por vírgula)
+      - Campo "Assunto" (texto simples)
+      - Campo "Mensagem" (TextArea aceita HTML básico, sem validação)
+      - Campo "Anexos" (FileUpload opcional)
+
+      Comportamentos implícitos:
+      - Sem validação de formato de e-mail
+      - Sem preview antes de enviar
+      - Sem histórico de e-mails enviados (não armazena no banco)
+      - Sem retry em caso de falha (perda do e-mail)
+      - SMTP hardcoded no Web.config (usuário não pode alterar)
+      - Sem rastreamento de abertura ou cliques
+
+    destino: "substituido"
+    justificativa: |
+      Tela legada será substituída por UI moderna de gestão de templates (Angular 19).
+      Nova UI permitirá:
+      - Seleção de template pré-configurado
+      - Preview multi-dispositivo antes de enviar
+      - Agendamento de envio
+      - Rastreamento de abertura/cliques
+      - Histórico completo de e-mails enviados
+
+    documentacao_item_relacionado: "RN-RF064-001 (Design Responsivo), Seção 6.1 (Endpoint POST /api/templates-email/{id}/enviar)"
+    uc_relacionado: "UC01 - Enviar E-mail com Template"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF064-002"
+    tipo: "componente"
+    nome: "EnviarEmail() - Método VB.NET de Envio SMTP"
+    caminho: "ic1_legado/IControlIT/Default.aspx.vb"
+    descricao: |
+      Método estático usado em várias partes do sistema para envio básico via System.Net.Mail.SmtpClient:
+
+      ```vb
+      Public Shared Sub EnviarEmail(destinatario As String, assunto As String, corpo As String)
+          Dim smtp As New SmtpClient(ConfigurationManager.AppSettings("SmtpHost"))
+          smtp.Port = CInt(ConfigurationManager.AppSettings("SmtpPort"))
+          smtp.Credentials = New NetworkCredential(
+              ConfigurationManager.AppSettings("SmtpUser"),
+              ConfigurationManager.AppSettings("SmtpPassword")
+          )
+          Dim mail As New MailMessage()
+          mail.From = New MailAddress(ConfigurationManager.AppSettings("SmtpFrom"))
+          mail.To.Add(destinatario)
+          mail.Subject = assunto
+          mail.Body = corpo
+          mail.IsBodyHtml = True
+          smtp.Send(mail) ' Sem tratamento de erro, sem retry
+      End Sub
+      ```
+
+      Problemas:
+      - Sem tratamento de exceção
+      - Sem fila de envio (bloqueio síncrono)
+      - Sem retry automático em caso de falha
+      - Corpo do e-mail concatenado manualmente (strings hardcoded)
+      - Sem validação de destinatário
+      - Sem logs de auditoria
+
+    destino: "substituido"
+    justificativa: |
+      Método síncrono com SmtpClient será substituído por fila assíncrona Hangfire.
+      Nova implementação:
+      - Fila assíncrona de envio (não bloqueia requisição HTTP)
+      - Retry automático 3x em caso de falha
+      - Tratamento de exceção estruturado
+      - Logs de auditoria completos (AuditableEntity)
+      - Validação de destinatário
+      - Rastreamento de status de envio (Pendente, Enviado, Falha)
+
+    documentacao_item_relacionado: "RN-RF064-018 (Fila assíncrona via Hangfire)"
+    uc_relacionado: "UC01 - Enviar E-mail com Template"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF064-003"
+    tipo: "componente"
+    nome: "Web.config - Configuração SMTP Hardcoded"
+    caminho: "ic1_legado/IControlIT/Web.config"
+    descricao: |
+      Configurações de servidor SMTP embutidas no Web.config:
+
+      ```xml
+      <appSettings>
+        <add key="SmtpHost" value="smtp.servidor.com" />
+        <add key="SmtpPort" value="587" />
+        <add key="SmtpUser" value="usuario@servidor.com" />
+        <add key="SmtpPassword" value="senha123" />
+        <add key="SmtpFrom" value="noreply@icontrolit.com" />
+      </appSettings>
+      ```
+
+      Problemas:
+      - Configuração global (uma única configuração SMTP para todo o sistema)
+      - Impossível customizar servidor SMTP por empresa/cliente
+      - Senha em texto plano no arquivo de configuração
+      - Alteração exige recompilação e deploy
+      - Sem validação de SPF/DKIM/DMARC
+
+    destino: "substituido"
+    justificativa: |
+      Configuração hardcoded será migrada para tabela ConfiguracaoSMTP no banco de dados.
+      Nova implementação:
+      - Configuração por empresa (multi-tenancy)
+      - Senha criptografada (não texto plano)
+      - Gestão via UI (sem necessidade de deploy)
+      - Validação automática de SPF/DKIM/DMARC antes de ativar
+      - Auditoria de alterações de configuração
+
+    documentacao_item_relacionado: "RN-RF064-017 (Validação SPF/DKIM/DMARC), Seção 5.7 (Entidade ConfiguracaoSMTP)"
+    uc_relacionado: "UC03 - Configurar Branding de E-mails (inclui SMTP)"
+    complexidade: "media"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF064-004"
+    tipo: "regra_negocio"
+    nome: "Templates Hardcoded no Código VB.NET"
+    caminho: "ic1_legado/IControlIT/Termo module (Default.aspx.vb)"
+    descricao: |
+      Templates de e-mail embutidos diretamente no código VB.NET como strings concatenadas:
+
+      Exemplo (e-mail de notificação de aceite de termo):
+      ```vb
+      Dim corpoEmail As String = "<html><body>" & _
+          "<h1>Termo Aceito</h1>" & _
+          "<p>Olá, " & nomeUsuario & "</p>" & _
+          "<p>Seu termo foi aceito com sucesso.</p>" & _
+          "</body></html>"
+      EnviarEmail(emailUsuario, "Termo Aceito", corpoEmail)
+      ```
+
+      Problemas:
+      - Templates não gerenciáveis (exigem recompilação para alterar)
+      - Sem design responsivo (HTML estático desktop-only)
+      - Sem branding customizado (logo e cores fixos)
+      - Sem rastreamento de abertura ou cliques
+      - Variáveis substituídas manualmente (sem sistema de merge)
+
+    destino: "substituido"
+    justificativa: |
+      Templates hardcoded serão migrados para biblioteca gerenciável (tabela TemplateEmail).
+      Nova implementação:
+      - Templates criados/editados via UI (sem necessidade de código)
+      - Design responsivo obrigatório (mobile-first)
+      - Branding customizado por empresa (logo, cores, rodapé)
+      - Sistema de merge de variáveis (ex: {{nomeUsuario}}, {{dataAceite}})
+      - Rastreamento automático de abertura/cliques
+      - Versionamento de templates (v1.0 → v1.1 → v2.0)
+
+    documentacao_item_relacionado: "RN-RF064-001 (Design Responsivo), RN-RF064-005 (Branding), Seção 5.1 (Entidade TemplateEmail)"
+    uc_relacionado: "UC00 - Gerenciar Templates de E-mail (CRUD)"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF064-005"
+    tipo: "regra_negocio"
+    nome: "Ausência de Rastreamento de Abertura/Cliques"
+    caminho: "N/A (funcionalidade inexistente no legado)"
+    descricao: |
+      Sistema legado NÃO possui rastreamento de:
+      - Abertura de e-mails (sem pixel tracking)
+      - Cliques em links (sem URL wrapping)
+      - Métricas de engajamento (open rate, CTR)
+
+      Consequências:
+      - Impossível saber se e-mail foi entregue e aberto
+      - Impossível medir efetividade de comunicação
+      - Sem dados para otimização de templates
+      - Sem visibilidade de conversão
+
+    destino: "descartado"
+    justificativa: |
+      Funcionalidade de rastreamento NÃO EXISTE no legado (descartado pois não há nada para migrar).
+      Rastreamento é funcionalidade NOVA no RF-064.
+      Implementação moderna:
+      - Pixel invisível (1x1) para rastreamento de abertura
+      - URL wrapping para rastreamento de cliques
+      - Tabelas EnvioEmail, ClickRastreamento, MetricasTemplate
+      - Dashboard de métricas (open rate, CTR, conversão)
+      - Teste A/B baseado em métricas
+
+    documentacao_item_relacionado: "RN-RF064-003 (Pixel tracking), RN-RF064-004 (URL wrapping), RN-RF064-014 (Métricas)"
+    uc_relacionado: "UC02 - Rastrear Métricas de Engajamento"
+    complexidade: "alta"
+    risco_migracao: null
+    prioridade: 1
+
+# Changelog
+changelog:
+  - versao: "2.0"
+    data: "2025-01-14"
+    descricao: |
+      Adequação para Governança v2.0 - Separação estrita RF/RL.
+      Todos os 5 itens legados possuem campo destino obrigatório.
+      Identificação de que RF-064 é 95% funcionalidade nova (apenas 5% migração de SMTP básico).
+    autor: "Agência ALC - alc.dev.br"
+
+  - versao: "1.0"
+    data: "2025-01-14"
+    descricao: "Template inicial de referência ao legado - Análise completa do sistema legado IControlIT v1.0"
+    autor: "Agência ALC - alc.dev.br"

@@ -1,0 +1,719 @@
+# =============================================
+# RF-024: Gestão de Departamentos e Estrutura Organizacional
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF024"
+  nome: "Gestão de Departamentos e Estrutura Organizacional"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 3 - Financeiro I - Base Contábil"
+  epic: "EPIC006-FIN"
+  status: "aprovado"
+
+descricao:
+  objetivo: "Fornecer CRUD completo de departamentos organizacionais com hierarquia recursiva ilimitada, gestão de líderes, lotação matricial, organograma visual, sincronização Azure AD, workflow de movimentações e analytics de força de trabalho."
+  problema_resolvido: "Gestão moderna de estrutura organizacional com hierarquia complexa, movimentações controladas e integração com sistemas corporativos."
+  publico_afetado: "RH, Gestores, Diretores, Colaboradores, Administradores de TI"
+
+escopo:
+  incluso:
+    - "CRUD departamentos com hierarquia recursiva ilimitada"
+    - "Gestão de líderes (FK Usuario válida)"
+    - "Lotação de colaboradores com estrutura matricial (principal + dotted-line)"
+    - "Organograma visual interativo D3.js (zoom, pan, collapse/expand)"
+    - "Sincronização automática Azure AD (grupos segurança)"
+    - "Workflow aprovação movimentações interdepartamentais"
+    - "Dashboard headcount tempo real (SignalR)"
+    - "Analytics turnover departamental"
+    - "Validação referências circulares hierarquia"
+    - "Auditoria completa (change tracking)"
+    - "Isolamento multi-tenant"
+  fora:
+    - "Gestão folha pagamento (RF-FIN-002)"
+    - "Avaliações desempenho (RF-RH-001)"
+    - "Gestão férias (RF-RH-002)"
+    - "Ponto eletrônico detalhado (RF-RH-003)"
+    - "Interface visual específica (em WF-RF024.md)"
+
+entidades:
+  - nome: "Departamento"
+    descricao: "Unidade organizacional com hierarquia recursiva"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "Id_Departamento (Guid PK)"
+      - "Id_Departamento_Pai (Guid FK nullable - self-referencing)"
+      - "Codigo_Departamento (NVARCHAR(30) unique por Fornecedor)"
+      - "Nome_Departamento (NVARCHAR(200))"
+      - "Id_Usuario_Lider (Guid FK Usuario)"
+      - "Tipo_Departamento (enum: Diretoria/Gerencia/Coordenacao/Equipe)"
+      - "Nivel_Hierarquia (INT calculado trigger)"
+      - "Caminho_Hierarquico (NVARCHAR(500) calculado trigger)"
+      - "Qtd_Colaboradores (INT calculado trigger)"
+      - "Azure_AD_Object_Id (NVARCHAR(100))"
+      - "Id_Fornecedor (Guid FK - multi-tenancy)"
+
+  - nome: "Usuario_Departamento"
+    descricao: "Tabela intermediária N:N para lotações múltiplas (estrutura matricial)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "Id (Guid PK)"
+      - "Id_Usuario (Guid FK Usuario)"
+      - "Id_Departamento (Guid FK Departamento)"
+      - "Tipo_Lotacao (enum: Principal/DottedLine/Temporaria)"
+      - "Percentual_Alocacao (DECIMAL(5,2) CHECK >0 AND <=100)"
+      - "Dt_Inicio (DATE)"
+      - "Dt_Fim (DATE nullable)"
+
+  - nome: "Departamento_Movimentacao"
+    descricao: "Histórico movimentações interdepartamentais com workflow aprovação"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+    campos_principais:
+      - "Id (Guid PK)"
+      - "Id_Usuario (Guid FK Usuario)"
+      - "Id_Departamento_Origem (Guid FK Departamento)"
+      - "Id_Departamento_Destino (Guid FK Departamento)"
+      - "Tipo_Movimentacao (enum: Transferencia/Promocao/Realocacao/Temporaria/Retorno)"
+      - "Status_Aprovacao (enum: Pendente/Aprovado_Origem/Aprovado_Destino/Aprovado_RH/Rejeitado)"
+      - "Motivo (NVARCHAR(1000))"
+      - "Dt_Efetivacao (DATETIME nullable)"
+
+  - nome: "Departamento_Meta"
+    descricao: "Metas departamentais OKRs trimestrais"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "Departamento_Historico"
+    descricao: "Versionamento change tracking append-only"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+
+regras_negocio:
+  - id: "RN-RF024-001"
+    titulo: "Código Departamento Único Alfanumérico"
+    descricao: "Código departamento DEVE ser único por Fornecedor, formato alfanumérico [TIPO]-[NOME] 3-30 caracteres (ex: DIR-TI, GER-DEV, COORD-BACKEND)."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "unicidade"
+      regex: "^[A-Z]{3,5}-[A-Z0-9]{2,20}$"
+      mensagem_erro: "Código departamento deve seguir formato [TIPO]-[NOME] (ex: DIR-TI)"
+      http_code: 409
+
+  - id: "RN-RF024-002"
+    titulo: "Hierarquia Multinível Ilimitada Self-Referencing"
+    descricao: "Sistema suporta hierarquia recursiva ilimitada através de self-referencing FK Id_Departamento_Pai. Campo nullable (NULL = raiz)."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "integridade_referencial"
+      mensagem_erro: "Departamento pai inválido"
+      http_code: 422
+
+  - id: "RN-RF024-003"
+    titulo: "Validação Referências Circulares Hierarquia"
+    descricao: "Sistema DEVE detectar e bloquear loops infinitos hierarquia (ex: A → B → C → A). Algoritmo usa HashSet visitados."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "regra_negocio"
+      mensagem_erro: "Referência circular detectada na hierarquia"
+      http_code: 422
+
+  - id: "RN-RF024-004"
+    titulo: "Líder Obrigatório Usuário Válido FK"
+    descricao: "Departamento ativo DEVE ter líder válido (FK Usuario). Campo Id_Usuario_Lider NOT NULL (exceto tipo Equipe)."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "campo_obrigatorio"
+      mensagem_erro: "Líder inválido ou inativo"
+      http_code: 422
+
+  - id: "RN-RF024-005"
+    titulo: "Sincronização Automática Azure AD"
+    descricao: "Sistema sincroniza UNIDIRECIONAL IControlIT → Azure AD. Job Hangfire diário às 03:00 BRT. Ao criar departamento, cria grupo Azure AD via Microsoft Graph API."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "integracao"
+      mensagem_erro: "Falha sincronização Azure AD"
+      http_code: 500
+
+  - id: "RN-RF024-006"
+    titulo: "Workflow Aprovação Movimentações Multinível"
+    descricao: "Transferências exigem aprovação sequencial: (1) Líder Origem, (2) Líder Destino, (3) RH. Status: Pendente → Aprovado_Origem → Aprovado_Destino → Aprovado_RH."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "workflow"
+      mensagem_erro: "Aprovação inválida ou fora de sequência"
+      http_code: 422
+
+  - id: "RN-RF024-007"
+    titulo: "Dotted-Line Soma Alocações ≤100%"
+    descricao: "Colaborador pode ter lotações múltiplas: Principal=100%, DottedLine=parcial, Temporária=com Dt_Fim. Validação: SUM(Percentual_Alocacao) WHERE Fl_Ativo ≤100."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "regra_negocio"
+      mensagem_erro: "Soma de alocações do usuário excede 100%"
+      http_code: 422
+
+  - id: "RN-RF024-008"
+    titulo: "Atualização Automática Qtd_Colaboradores"
+    descricao: "Campo Qtd_Colaboradores atualizado automaticamente por trigger After INSERT/UPDATE/DELETE em Usuario_Departamento. Cálculo: COUNT WHERE Tipo_Lotacao=Principal AND Fl_Ativo=1."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "trigger_database"
+      mensagem_erro: "Erro atualização automática qtd colaboradores"
+      http_code: 500
+
+  - id: "RN-RF024-009"
+    titulo: "Organograma Visual D3.js Interativo"
+    descricao: "Frontend Angular renderiza organograma D3.js v7 com zoom, pan, collapse/expand, busca, filtro, export PNG/PDF/SVG. Backend retorna DTO recursivo. Cache Redis TTL 1h."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "performance"
+      mensagem_erro: "Organograma muito grande para renderizar"
+      http_code: 413
+
+  - id: "RN-RF024-010"
+    titulo: "Notificação Líder Multicanal"
+    descricao: "Líder recebe notificação quando colaborador alocado: Email, Push mobile, Inbox in-app. SignalR Hub broadcast OnColaboradorAlocado. Domain event via MediatR."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "notificacao"
+      mensagem_erro: "Falha envio notificação"
+      http_code: 500
+
+  - id: "RN-RF024-011"
+    titulo: "Dashboard Headcount Tempo Real SignalR"
+    descricao: "Dashboard KPIs atualizado tempo real via SignalR: Headcount Atual, Orçado, Taxa Ocupação (>=90% verde, 75-89% amarelo, <75% vermelho), Variação Mês, Projeção Trimestre."
+    criticidade: "BAIXA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "tempo_real"
+      mensagem_erro: "Erro atualização dashboard tempo real"
+      http_code: 500
+
+  - id: "RN-RF024-012"
+    titulo: "Analytics Turnover Departamental"
+    descricao: "Cálculo turnover últimos 12 meses: (Saídas / Headcount Médio) * 100. Benchmark <10% ao ano. Alertas se >15% trimestre → RH + Diretor."
+    criticidade: "BAIXA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "calculo_kpi"
+      mensagem_erro: "Erro cálculo turnover"
+      http_code: 500
+
+  - id: "RN-RF024-013"
+    titulo: "Relatório Movimentações RH Compliance"
+    descricao: "Relatório consolidado Excel (EPPlus) 4 abas: Transferências, Promoções, Realocações, Temporárias. Job Hangfire Cron 0 8 1 * * (1º dia útil mês). Storage Azure Blob 7 anos."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "compliance"
+      mensagem_erro: "Erro geração relatório compliance"
+      http_code: 500
+
+  - id: "RN-RF024-014"
+    titulo: "Integração Ponto Eletrônico Presença Física"
+    descricao: "Webhook POST /api/v1/departamentos/validar-presenca. Backend compara localBatida com Localizacao_Fisica. Se diferente → alerta RH + Gestor. Exceções: Fl_Trabalho_Remoto=1 ou Temporaria."
+    criticidade: "BAIXA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "integracao"
+      mensagem_erro: "Erro validação presença física"
+      http_code: 500
+
+  - id: "RN-RF024-015"
+    titulo: "Versionamento Change Tracking"
+    descricao: "Departamento_Historico append-only registra TODOS eventos: Criacao/Alteracao/Exclusao/Movimentacao_Hierarquia/Mudanca_Lider. EF Core SaveChangesInterceptor serializa JSON. Retenção 7 anos."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "auditoria"
+      mensagem_erro: "Erro registro histórico"
+      http_code: 500
+
+estados:
+  - id: "ativo"
+    descricao: "Departamento operacional"
+  - id: "inativo"
+    descricao: "Departamento desativado temporariamente"
+  - id: "excluido"
+    descricao: "Departamento excluído logicamente (soft delete)"
+
+transicoes:
+  permitidas:
+    - de: "ativo"
+      para: "inativo"
+    - de: "inativo"
+      para: "ativo"
+    - de: "ativo"
+      para: "excluido"
+    - de: "inativo"
+      para: "excluido"
+  proibidas:
+    - de: "excluido"
+      para: "ativo"
+      motivo: "Soft delete permanente"
+    - de: "excluido"
+      para: "inativo"
+      motivo: "Soft delete permanente"
+
+permissoes:
+  - codigo: "CAD.DEPARTAMENTOS.CREATE"
+    descricao: "Criar novo departamento"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+    endpoint: "POST /api/v1/departamentos"
+
+  - codigo: "CAD.DEPARTAMENTOS.UPDATE"
+    descricao: "Editar departamento existente"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Admin"
+      - "Gestor"
+    endpoint: "PUT /api/v1/departamentos/{id}"
+
+  - codigo: "CAD.DEPARTAMENTOS.DELETE"
+    descricao: "Excluir departamento"
+    roles_autorizadas:
+      - "Super Admin"
+    endpoint: "DELETE /api/v1/departamentos/{id}"
+
+  - codigo: "CAD.DEPARTAMENTOS.VIEW_ORGCHART"
+    descricao: "Visualizar organograma"
+    roles_autorizadas:
+      - "Todos autenticados"
+    endpoint: "GET /api/v1/departamentos/organograma"
+
+  - codigo: "CAD.DEPARTAMENTOS.APPROVE_MOVE_ORIGIN"
+    descricao: "Aprovar movimentação (Líder Origem)"
+    roles_autorizadas:
+      - "Gestor"
+    endpoint: "PUT /api/v1/departamentos/movimentacoes/{id}/aprovar-origem"
+
+  - codigo: "CAD.DEPARTAMENTOS.APPROVE_MOVE_DEST"
+    descricao: "Aprovar movimentação (Líder Destino)"
+    roles_autorizadas:
+      - "Gestor"
+    endpoint: "PUT /api/v1/departamentos/movimentacoes/{id}/aprovar-destino"
+
+  - codigo: "CAD.DEPARTAMENTOS.APPROVE_MOVE_HR"
+    descricao: "Aprovar movimentação (RH)"
+    roles_autorizadas:
+      - "RH"
+    endpoint: "PUT /api/v1/departamentos/movimentacoes/{id}/aprovar-rh"
+
+  - codigo: "CAD.DEPARTAMENTOS.SYNC_AZUREAD"
+    descricao: "Sincronizar Azure AD"
+    roles_autorizadas:
+      - "Super Admin"
+    endpoint: "POST /api/v1/departamentos/{id}/sincronizar-azuread"
+
+endpoints:
+  - method: "GET"
+    route: "/api/v1/departamentos"
+    descricao: "Listar departamentos com filtros e paginação"
+    autenticacao: true
+    authorization_policy: "Authenticated"
+    request_dto: "GetDepartamentosQuery (pageNumber, pageSize, tipo, nivelHierarquia, idLider)"
+    response_dto: "PaginatedListDto<DepartamentoDto>"
+
+  - method: "GET"
+    route: "/api/v1/departamentos/{id}"
+    descricao: "Obter departamento por ID"
+    autenticacao: true
+    authorization_policy: "Authenticated"
+    request_dto: null
+    response_dto: "DepartamentoDto"
+
+  - method: "POST"
+    route: "/api/v1/departamentos"
+    descricao: "Criar novo departamento"
+    autenticacao: true
+    authorization_policy: "DepartamentosCreate"
+    request_dto: "CreateDepartamentoCommand (codigoDepartamento, nomeDepartamento, idDepartamentoPai, idUsuarioLider, tipoDepartamento)"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/v1/departamentos/{id}"
+    descricao: "Atualizar departamento"
+    autenticacao: true
+    authorization_policy: "DepartamentosUpdate"
+    request_dto: "UpdateDepartamentoCommand (id, nomeDepartamento, idDepartamentoPai, idUsuarioLider, tipoDepartamento)"
+    response_dto: "void"
+
+  - method: "DELETE"
+    route: "/api/v1/departamentos/{id}"
+    descricao: "Excluir departamento (soft delete)"
+    autenticacao: true
+    authorization_policy: "DepartamentosDelete"
+    request_dto: null
+    response_dto: "void"
+
+  - method: "GET"
+    route: "/api/v1/departamentos/organograma"
+    descricao: "Obter organograma completo (DTO recursivo)"
+    autenticacao: true
+    authorization_policy: "DepartamentosViewOrgChart"
+    request_dto: "GetOrganogramaQuery (idRaiz, nivelMax, incluirColaboradores)"
+    response_dto: "List<NodeDto> (recursivo)"
+
+  - method: "POST"
+    route: "/api/v1/departamentos/movimentacoes"
+    descricao: "Criar movimentação interdepartamental"
+    autenticacao: true
+    authorization_policy: "Authenticated"
+    request_dto: "CreateMovimentacaoCommand (idUsuario, idDepartamentoOrigem, idDepartamentoDestino, tipoMovimentacao, motivo)"
+    response_dto: "Guid"
+
+  - method: "PUT"
+    route: "/api/v1/departamentos/movimentacoes/{id}/aprovar-origem"
+    descricao: "Aprovar movimentação (Líder Origem)"
+    autenticacao: true
+    authorization_policy: "DepartamentosApproveMoveOrigin"
+    request_dto: null
+    response_dto: "void"
+
+  - method: "PUT"
+    route: "/api/v1/departamentos/movimentacoes/{id}/aprovar-destino"
+    descricao: "Aprovar movimentação (Líder Destino)"
+    autenticacao: true
+    authorization_policy: "DepartamentosApproveMoveDest"
+    request_dto: null
+    response_dto: "void"
+
+  - method: "PUT"
+    route: "/api/v1/departamentos/movimentacoes/{id}/aprovar-rh"
+    descricao: "Aprovar movimentação (RH)"
+    autenticacao: true
+    authorization_policy: "DepartamentosApproveMoveHR"
+    request_dto: null
+    response_dto: "void"
+
+  - method: "POST"
+    route: "/api/v1/departamentos/{id}/sincronizar-azuread"
+    descricao: "Sincronizar departamento com Azure AD (sob demanda)"
+    autenticacao: true
+    authorization_policy: "DepartamentosSyncAzureAD"
+    request_dto: null
+    response_dto: "AzureADSyncResultDto"
+
+  - method: "GET"
+    route: "/api/v1/departamentos/dashboard/headcount"
+    descricao: "Obter dashboard headcount tempo real"
+    autenticacao: true
+    authorization_policy: "Authenticated"
+    request_dto: "GetDashboardHeadcountQuery (idDepartamento)"
+    response_dto: "DashboardHeadcountDto"
+
+  - method: "GET"
+    route: "/api/v1/departamentos/analytics/turnover"
+    descricao: "Obter analytics turnover departamental"
+    autenticacao: true
+    authorization_policy: "Authenticated"
+    request_dto: "GetAnalyticsTurnoverQuery (idDepartamento, periodo)"
+    response_dto: "TurnoverAnalyticsDto"
+
+  - method: "POST"
+    route: "/api/v1/departamentos/validar-presenca"
+    descricao: "Webhook ponto eletrônico - validar presença física"
+    autenticacao: true
+    authorization_policy: "System"
+    request_dto: "ValidarPresencaCommand (idUsuario, localBatida, dtHora)"
+    response_dto: "void"
+
+integracoes:
+  internas:
+    - "Autenticacao JWT"
+    - "Multi-Tenancy (Id_Fornecedor)"
+    - "Auditoria (Created, CreatedBy, LastModified, LastModifiedBy)"
+    - "RBAC (Permissões baseadas em roles)"
+    - "Notificações multicanal (Email, Push, Inbox)"
+    - "SignalR (Dashboard tempo real)"
+  externas:
+    - sistema: "Azure AD / Microsoft Graph API"
+      tipo: "REST API"
+      obrigatoria: true
+      descricao: "Sincronização grupos segurança (criar, atualizar, adicionar membros)"
+    - sistema: "Ponto Eletrônico (REP-A, Dimep, Secullum)"
+      tipo: "Webhook"
+      obrigatoria: false
+      descricao: "Validação presença física colaborador"
+    - sistema: "eSocial"
+      tipo: "Compliance"
+      obrigatoria: true
+      descricao: "Relatório movimentações mensais"
+    - sistema: "RAIS"
+      tipo: "Compliance"
+      obrigatoria: true
+      descricao: "Relatório estrutura organizacional anual"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  autenticacao: "JWT Bearer"
+  autorizacao: "RBAC (Super Admin, Admin, Gestor, RH)"
+  validacao_entrada: "FluentValidation"
+  protecao_sql_injection: "EF Core parametrizado"
+  protecao_xss: "Sanitização frontend Angular"
+
+rastreabilidade:
+  dependencias_upstream:
+    - documentacao: "RF-CAD-005"
+      descricao: "Gestão de Usuários"
+      tipo: "FK Usuario (líder e colaboradores)"
+    - documentacao: "RF-CAD-006"
+      descricao: "Gestão de Perfis"
+      tipo: "Permissões RBAC"
+    - documentacao: "RF-NOT-001"
+      descricao: "Notificações"
+      tipo: "Multicanal (email, push, inbox)"
+    - documentacao: "RF-AUD-001"
+      descricao: "Auditoria"
+      tipo: "Change tracking histórico"
+
+  dependencias_downstream:
+    - documentacao: "RF-FIN-002"
+      descricao: "Folha Pagamento"
+      tipo: "Custos departamentais"
+    - documentacao: "RF-RH-001"
+      descricao: "Avaliações Desempenho"
+      tipo: "Span of control, analytics"
+    - documentacao: "RF-RH-002"
+      descricao: "Gestão Férias"
+      tipo: "Aprovações por líder"
+    - documentacao: "RF-RH-003"
+      descricao: "Ponto Eletrônico"
+      tipo: "Validação presença física"
+
+  ucs_esperados:
+    - "UC00-listar-departamentos"
+    - "UC01-criar-departamento"
+    - "UC02-visualizar-departamento"
+    - "UC03-editar-departamento"
+    - "UC04-excluir-departamento"
+    - "UC05-visualizar-organograma"
+    - "UC06-alocar-colaborador"
+    - "UC07-criar-movimentacao"
+    - "UC08-aprovar-movimentacao"
+    - "UC09-sincronizar-azuread"
+    - "UC10-dashboard-headcount"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar departamento"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar departamentos"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar departamento"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar departamento"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Excluir departamento"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar código único alfanumérico"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar referências circulares hierarquia"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar líder usuário válido"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar soma alocações ≤100%"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant (multi-tenancy)"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria completa (change tracking)"
+      required: true
+
+  funcionalidades_especificas:
+    - id: "RF-FUNC-01"
+      title: "Hierarquia recursiva ilimitada"
+      required: true
+    - id: "RF-FUNC-02"
+      title: "Organograma visual D3.js interativo"
+      required: true
+    - id: "RF-FUNC-03"
+      title: "Estrutura matricial dotted-line"
+      required: true
+    - id: "RF-FUNC-04"
+      title: "Sincronização Azure AD automática"
+      required: true
+    - id: "RF-FUNC-05"
+      title: "Workflow aprovação movimentações multinível"
+      required: true
+    - id: "RF-FUNC-06"
+      title: "Dashboard headcount tempo real SignalR"
+      required: true
+    - id: "RF-FUNC-07"
+      title: "Analytics turnover departamental"
+      required: true
+
+exclusions:
+  documentacao_items: []
+
+kpis:
+  - nome: "Organograma Rendering Performance"
+    descricao: "Tempo renderização organograma com >500 nós"
+    meta: "< 2 segundos"
+    log_obrigatorio: true
+
+  - nome: "SignalR Latency Headcount"
+    descricao: "Latência broadcast SignalR OnHeadcountAtualizado"
+    meta: "< 500ms"
+    log_obrigatorio: true
+
+  - nome: "Taxa Sucesso Sincronização Azure AD"
+    descricao: "Percentual sucesso sincronização grupos Azure AD"
+    meta: ">= 95%"
+    log_obrigatorio: true
+
+  - nome: "Validação Referências Circulares Complexity"
+    descricao: "Complexidade algoritmo detecção loops"
+    meta: "O(n) onde n=profundidade hierarquia"
+    log_obrigatorio: false
+
+alertas:
+  - evento: "Turnover Departamental Alto"
+    threshold: "> 15% em trimestre"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+    destinatarios:
+      - "RH"
+      - "Diretor departamento"
+
+  - evento: "Falha Sincronização Azure AD"
+    threshold: "> 3 falhas consecutivas"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "sms"
+    destinatarios:
+      - "TI"
+      - "Super Admin"
+
+  - evento: "Movimentação Rejeitada"
+    threshold: "> 5 rejeições em 24h"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+    destinatarios:
+      - "RH"
+
+  - evento: "Referência Circular Detectada"
+    threshold: "> 1 tentativa"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "log"
+    destinatarios:
+      - "Admin"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Separação RF/RL - Contrato funcional moderno (sem legado)"
+  - versao: "1.0"
+    data: "2025-11-03"
+    autor: "Equipe IControlIT"
+    descricao: "Versão inicial com legado misturado"

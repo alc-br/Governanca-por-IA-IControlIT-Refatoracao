@@ -1,0 +1,601 @@
+# Template de Referência ao Legado (RL-RF032.yaml)
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF032
+titulo: "Gestão de Notas Fiscais e Faturas"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "IControlIT Legado v1.0 (2015-2024)"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2019"
+  multi_tenant: false
+  auditoria: "none"
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+referencias:
+  # TELAS ASPX
+  - id: "LEG-RF032-001"
+    tipo: "tela"
+    nome: "NotaFiscal.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/NotaFiscal.aspx"
+    descricao: |
+      Tela de listagem e CRUD de notas fiscais.
+      Campos: Número, Série, Data Emissão, CNPJ Emitente, Valor Total, Upload XML.
+      Sem validação de duplicidade, sem cálculo automático de impostos.
+    destino: "substituido"
+    justificativa: |
+      Substituída por `/app/financeiro/notas-fiscais` (Angular 19) com:
+      - Validação de chave de acesso única
+      - Cálculo automático de impostos
+      - Conciliação automática com pedidos
+      - Integração com SEFAZ
+    documentacao_item_relacionado: "RN-NFE-032-01"
+    uc_relacionado: "UC00-listar-notas-fiscais"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF032-002"
+    tipo: "tela"
+    nome: "ImportarNotaFiscal.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/ImportarNotaFiscal.aspx"
+    descricao: |
+      Tela de upload de XML de nota fiscal.
+      Aceita qualquer XML sem validação de estrutura ou assinatura digital.
+      Salva arquivo local em D:\NotasFiscais\XML\ sem backup.
+    destino: "substituido"
+    justificativa: |
+      Substituída por `POST /api/notas-fiscais/importar` com:
+      - Validação de estrutura XML (schema XSD 4.00 SEFAZ)
+      - Validação de assinatura digital (RSA-2048, SHA-256, ICP-Brasil)
+      - Armazenamento Azure Blob Storage (7 anos LGPD)
+      - Consulta SEFAZ obrigatória antes de processar
+    documentacao_item_relacionado: "RN-NFE-032-01, RN-NFE-032-02, RN-NFE-032-03"
+    uc_relacionado: "UC01-importar-nota-fiscal"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF032-003"
+    tipo: "tela"
+    nome: "RatearNotaFiscal.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/RatearNotaFiscal.aspx"
+    descricao: |
+      Tela de configuração manual de rateio entre filiais.
+      Aceita soma de percentuais diferente de 100% (bug).
+      Sem rateio por volume, peso ou contrato.
+    destino: "substituido"
+    justificativa: |
+      Substituída por `POST /api/notas-fiscais/{id}/rateio` com:
+      - Validação obrigatória de soma = 100% (tolerância 0,01%)
+      - Suporte a 4 tipos de rateio: percentual fixo, volume, peso, contrato
+      - Redistribuição automática da última regra
+    documentacao_item_relacionado: "RN-NFE-032-07"
+    uc_relacionado: "UC04-ratear-nota-fiscal"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF032-004"
+    tipo: "tela"
+    nome: "RelatorioConciliacao.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/RelatorioConciliacao.aspx"
+    descricao: |
+      Relatório de conciliação manual (NF vs Pedido).
+      Usuário faz matching visual em GridView.
+      Exportação para Excel sem formatação.
+      Performance lenta (> 10s para 3 meses).
+    destino: "substituido"
+    justificativa: |
+      Substituída por `/app/financeiro/notas-fiscais/relatorio-conciliacao` com:
+      - Conciliação automática por CNPJ emitente + valor + data
+      - Detecção automática de divergências (quantidade, valor, CFOP, NCM)
+      - Classificação por severidade (crítica, importante, menor)
+      - Performance otimizada (< 2s para 1 ano)
+    documentacao_item_relacionado: "RN-NFE-032-04"
+    uc_relacionado: "UC03-conciliar-nota-fiscal"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF032-005"
+    tipo: "tela"
+    nome: "DashboardFiscal.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/DashboardFiscal.aspx"
+    descricao: |
+      Dashboard de impostos e indicadores fiscais.
+      Dados estáticos, sem atualização em tempo real.
+      Carregamento lento (> 10 segundos).
+      Sem filtros de período ou filial.
+    destino: "substituido"
+    justificativa: |
+      Substituída por `/app/financeiro/dashboard-fiscal` com:
+      - Atualização em tempo real (SignalR)
+      - Gráficos interativos (ApexCharts)
+      - Filtros de período, filial, emitente
+      - Performance < 2s para carga inicial
+    documentacao_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # WEBSERVICES ASMX
+  - id: "LEG-RF032-006"
+    tipo: "webservice"
+    nome: "WSNotaFiscal.asmx - ImportarXml"
+    caminho: "ic1_legado/IControlIT/WebService/WSNotaFiscal.asmx.vb"
+    descricao: |
+      Método de importação de XML de nota fiscal.
+      Sem validação de estrutura, aceita qualquer XML.
+      Sem autenticação, serviço público interno.
+      Sem tratamento de erro (retorna 500 em exceção).
+    destino: "substituido"
+    justificativa: |
+      Substituído por `POST /api/notas-fiscais/importar` com:
+      - Validação completa de estrutura e assinatura
+      - Autenticação JWT obrigatória
+      - Tratamento de erro estruturado (ProblemDetails)
+      - Auditoria completa de operação
+    documentacao_item_relacionado: "RN-NFE-032-01, RN-NFE-032-02"
+    uc_relacionado: "UC01-importar-nota-fiscal"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF032-007"
+    tipo: "webservice"
+    nome: "WSNotaFiscal.asmx - CalcularRateio"
+    caminho: "ic1_legado/IControlIT/WebService/WSNotaFiscal.asmx.vb"
+    descricao: |
+      Método de cálculo de rateio simples.
+      Não valida soma de percentuais.
+      Sem validação de filiais/centros existentes.
+    destino: "substituido"
+    justificativa: |
+      Substituído por `POST /api/notas-fiscais/{id}/rateio` com validação completa.
+    documentacao_item_relacionado: "RN-NFE-032-07"
+    uc_relacionado: "UC04-ratear-nota-fiscal"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF032-008"
+    tipo: "webservice"
+    nome: "WSNotaFiscal.asmx - ConciliarComFatura"
+    caminho: "ic1_legado/IControlIT/WebService/WSNotaFiscal.asmx.vb"
+    descricao: |
+      Match manual NF vs Fatura.
+      Sem detecção automática de divergências.
+      Relacionamento com tabela Fatura não existe (erro de design).
+    destino: "substituido"
+    justificativa: |
+      Substituído por `POST /api/notas-fiscais/{id}/conciliar` com detecção automática.
+      Relacionamento corrigido: NF vs Pedido (RF026).
+    documentacao_item_relacionado: "RN-NFE-032-04"
+    uc_relacionado: "UC03-conciliar-nota-fiscal"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF032-009"
+    tipo: "webservice"
+    nome: "WSNotaFiscal.asmx - ExportarSped"
+    caminho: "ic1_legado/IControlIT/WebService/WSNotaFiscal.asmx.vb"
+    descricao: |
+      Gera arquivo SPED Fiscal.
+      Processo síncrono, trava servidor em períodos grandes (> 3 meses).
+      Sem validação de permissões.
+    destino: "substituido"
+    justificativa: |
+      Substituído por `GET /api/relatorios/sped-fiscal` assíncrono (Hangfire).
+      Validação de permissão obrigatória (fin:notasfiscais:exportar).
+    documentacao_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF032-010"
+    tipo: "webservice"
+    nome: "WSNotaFiscal.asmx - ConsultarStatusSefaz"
+    caminho: "ic1_legado/IControlIT/WebService/WSNotaFiscal.asmx.vb"
+    descricao: |
+      CRÍTICO: Método NÃO IMPLEMENTADO no legado.
+      Retorna sempre "Autorizada" sem consultar SEFAZ real.
+      Permite processamento de notas rejeitadas ou canceladas.
+    destino: "substituido"
+    justificativa: |
+      Substituído por `POST /api/notas-fiscais/{id}/consultar-sefaz` com:
+      - Consulta real à SEFAZ (WebService ou API REST conforme UF)
+      - Retry automático com exponential backoff (até 10 tentativas)
+      - Registro de status (autorizada, rejeitada, cancelada)
+      - Bloqueio automático de NF rejeitadas
+    documentacao_item_relacionado: "RN-NFE-032-03"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # STORED PROCEDURES
+  - id: "LEG-RF032-011"
+    tipo: "stored_procedure"
+    nome: "pa_ImportarNotaFiscal"
+    caminho: "Database/dbo.pa_ImportarNotaFiscal"
+    descricao: |
+      Importa XML de arquivo local.
+      Lógica de negócio em banco dificulta testes e manutenção.
+      Sem validação de entrada, aceita duplicatas.
+    destino: "descartado"
+    justificativa: |
+      Lógica migrada para `ImportarNotaFiscalCommandHandler` (C# + CQRS).
+      Benefícios: testabilidade, Clean Architecture, facilidade de debug.
+      Stored procedures descartadas em favor de lógica de domínio.
+    documentacao_item_relacionado: "RN-NFE-032-01"
+    uc_relacionado: "UC01-importar-nota-fiscal"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF032-012"
+    tipo: "stored_procedure"
+    nome: "pa_CalcularRateio"
+    caminho: "Database/dbo.pa_CalcularRateio"
+    descricao: |
+      Calcula rateio simples.
+      Sem validação de soma = 100%.
+    destino: "descartado"
+    justificativa: |
+      Lógica migrada para `RatearNotaFiscalCommandHandler` (C#).
+    documentacao_item_relacionado: "RN-NFE-032-07"
+    uc_relacionado: "UC04-ratear-nota-fiscal"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF032-013"
+    tipo: "stored_procedure"
+    nome: "pa_ConciliarComFatura"
+    caminho: "Database/dbo.pa_ConciliarComFatura"
+    descricao: |
+      Match manual NF vs Fatura.
+      Sem detecção de divergências.
+    destino: "descartado"
+    justificativa: |
+      Lógica migrada para `ConciliarNotaFiscalComPedidoCommandHandler` (C#).
+    documentacao_item_relacionado: "RN-NFE-032-04"
+    uc_relacionado: "UC03-conciliar-nota-fiscal"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF032-014"
+    tipo: "stored_procedure"
+    nome: "pa_GerarSped"
+    caminho: "Database/dbo.pa_GerarSped"
+    descricao: |
+      Gera arquivo SPED Fiscal.
+      Processo síncrono, lento em períodos grandes.
+    destino: "descartado"
+    justificativa: |
+      Lógica migrada para `ScheduleSpedGenerationService` (C# + Hangfire assíncrono).
+    documentacao_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  - id: "LEG-RF032-015"
+    tipo: "regra_negocio"
+    nome: "Aceitação de XML sem validação"
+    caminho: "ic1_legado/IControlIT/Financeiro/ImportarNotaFiscal.aspx.vb (linhas 125-140)"
+    descricao: |
+      Sistema aceita qualquer XML sem validar estrutura ou assinatura digital.
+      Permite importação de NF falsas ou alteradas.
+      Risco crítico de fraude.
+    destino: "assumido"
+    justificativa: |
+      Comportamento legado INCORRETO.
+      Sistema moderno implementa:
+      - RN-NFE-032-01: Validação obrigatória de estrutura (schema XSD 4.00)
+      - RN-NFE-032-02: Validação obrigatória de assinatura digital (RSA-2048, SHA-256)
+      Rejeição automática de XML inválido ou alterado.
+    documentacao_item_relacionado: "RN-NFE-032-01, RN-NFE-032-02"
+    uc_relacionado: "UC01-importar-nota-fiscal"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF032-016"
+    tipo: "regra_negocio"
+    nome: "Cálculo manual de impostos"
+    caminho: "ic1_legado/IControlIT/Financeiro/NotaFiscal.aspx.vb (linhas 200-250)"
+    descricao: |
+      Usuário digita manualmente valores de ICMS, IPI, PIS, COFINS.
+      Erros de até 15% identificados em auditoria.
+      Risco alto de não conformidade fiscal.
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-NFE-032-05: Cálculo automático de impostos.
+      Precisão mínima 99,99% (desvio máx 1 centavo).
+      Integração com regras fiscais do FiscoData.
+    documentacao_item_relacionado: "RN-NFE-032-05"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF032-017"
+    tipo: "regra_negocio"
+    nome: "Sem consulta SEFAZ"
+    caminho: "ic1_legado/IControlIT/WebService/WSNotaFiscal.asmx.vb (método ConsultarStatusSefaz)"
+    descricao: |
+      CRÍTICO: Método retorna sempre "Autorizada" sem consultar SEFAZ real.
+      Permite processamento de notas rejeitadas ou canceladas pela fazenda.
+      Risco crítico de não conformidade fiscal.
+    destino: "assumido"
+    justificativa: |
+      Comportamento legado INCORRETO.
+      Sistema moderno implementa:
+      - RN-NFE-032-03: Consulta obrigatória à SEFAZ antes de processar
+      - Retry automático até 10 tentativas
+      - Bloqueio automático de NF rejeitadas ou canceladas
+    documentacao_item_relacionado: "RN-NFE-032-03"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF032-018"
+    tipo: "regra_negocio"
+    nome: "Rateio sem validação de 100%"
+    caminho: "ic1_legado/IControlIT/Financeiro/RatearNotaFiscal.aspx.vb (linhas 80-100)"
+    descricao: |
+      Aceita soma de percentuais diferente de 100%.
+      Causa lançamentos contábeis incorretos.
+      Risco médio de divergências financeiras.
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-NFE-032-07: Rateio automático com validação obrigatória.
+      Soma = 100% (tolerância 0,01%).
+      Redistribuição automática da última regra se necessário.
+    documentacao_item_relacionado: "RN-NFE-032-07"
+    uc_relacionado: "UC04-ratear-nota-fiscal"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF032-019"
+    tipo: "regra_negocio"
+    nome: "Armazenamento local sem backup"
+    caminho: "ic1_legado/IControlIT/Financeiro/ImportarNotaFiscal.aspx.vb (linhas 150-165)"
+    descricao: |
+      XML salvo em D:\NotasFiscais\XML\ sem política de backup.
+      Risco crítico de perda de dados em caso de falha de disco.
+      Não conformidade com LGPD (retenção 7 anos não garantida).
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-NFE-032-08: Armazenamento Azure Blob Storage.
+      Durabilidade 99,9999999999%.
+      Política de retenção 7 anos (LGPD).
+      Versionamento habilitado.
+    documentacao_item_relacionado: "RN-NFE-032-08"
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+# Telas Legadas (estrutura detalhada)
+telas:
+  - id: "LEG-RF032-001"
+    nome: "NotaFiscal.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/NotaFiscal.aspx"
+    responsabilidade: "Listagem e CRUD de notas fiscais"
+    campos:
+      - nome: "Número da Nota"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Apenas numérico (sem validação de duplicidade)"
+      - nome: "Série"
+        tipo: "TextBox"
+        obrigatorio: false
+        validacao: "Sem validação"
+      - nome: "Data de Emissão"
+        tipo: "DatePicker"
+        obrigatorio: true
+        validacao: "Sem validação de datas futuras"
+      - nome: "CNPJ Emitente"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Sem máscara, aceita formato livre"
+      - nome: "Valor Total"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Aceita valores negativos (bug)"
+      - nome: "Arquivo XML"
+        tipo: "FileUpload"
+        obrigatorio: false
+        validacao: "Sem validação de estrutura"
+    comportamentos_implicitos:
+      - "Upload salva em D:\\NotasFiscais\\XML\\ sem validação"
+      - "Não verifica duplicidade de chave de acesso"
+      - "Cálculo de impostos manual (propenso a erros)"
+
+# WebServices Legados
+servicos:
+  - id: "LEG-RF032-006"
+    nome: "WSNotaFiscal.asmx"
+    localizacao: "ic1_legado/IControlIT/WebService/WSNotaFiscal.asmx.vb"
+    responsabilidade: "Importação, rateio, conciliação, exportação SPED"
+    notas: "Sem autenticação, sem validação de entrada, sem auditoria"
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "Nota_Fiscal"
+    finalidade: "Armazenamento de notas fiscais"
+    problemas:
+      - "Sem chave de acesso única (permite duplicatas)"
+      - "Sem campos de auditoria completos (falta Id_Usuario_Criacao)"
+      - "Sem multi-tenancy (Id_Fornecedor ausente)"
+      - "XML em campo TEXT (performance ruim)"
+      - "Sem validação de CNPJ (aceita valores inválidos)"
+      - "Sem índices (listagem lenta > 5s para 10.000 registros)"
+  - nome: "Nota_Fiscal_Fatura"
+    finalidade: "Rateio de notas entre filiais"
+    problemas:
+      - "Sem validação de soma = 100%"
+      - "Relacionamento com Fatura não existe (erro de design)"
+      - "Sem tipo de rateio (não diferencia percentual, volume, peso)"
+
+# Regras de Negócio Implícitas (não documentadas)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: "Aceitação de XML sem validação de estrutura ou assinatura"
+    fonte: "ImportarNotaFiscal.aspx.vb, linhas 125-140"
+  - id: "RL-RN-002"
+    descricao: "Cálculo manual de impostos (erro até 15%)"
+    fonte: "NotaFiscal.aspx.vb, linhas 200-250"
+  - id: "RL-RN-003"
+    descricao: "Sem consulta SEFAZ (retorna sempre Autorizada)"
+    fonte: "WSNotaFiscal.asmx.vb, método ConsultarStatusSefaz"
+  - id: "RL-RN-004"
+    descricao: "Rateio sem validação de soma = 100%"
+    fonte: "RatearNotaFiscal.aspx.vb, linhas 80-100"
+  - id: "RL-RN-005"
+    descricao: "Armazenamento local D:\\ sem backup"
+    fonte: "ImportarNotaFiscal.aspx.vb, linhas 150-165"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Validação de Assinatura Digital"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Segurança crítica - RSA-2048, SHA-256, ICP-Brasil"
+  - item: "Consulta SEFAZ"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Conformidade fiscal obrigatória"
+  - item: "Cálculo Automático de Impostos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Precisão 99,99% vs erro 15% manual"
+  - item: "Conciliação Automática"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Redução 90% do tempo vs processo manual"
+  - item: "Armazenamento Azure Blob"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Durabilidade 99,999% vs risco perda local"
+  - item: "OCR de DANFE"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade para XMLs indisponíveis"
+  - item: "Auditoria Completa"
+    existe_legado: false
+    existe_moderno: true
+    notas: "LGPD compliance (7 anos)"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Descartar todas stored procedures"
+    motivo: |
+      Lógica de negócio em banco dificulta testes, manutenção e versionamento.
+      Migração para Clean Architecture com CQRS em C#.
+    impacto: "alto"
+    data: "2025-12-28"
+  - decisao: "Migrar armazenamento para Azure Blob Storage"
+    motivo: |
+      Servidor local sem backup, risco crítico de perda de dados.
+      Azure oferece durabilidade 99,9999999999% e conformidade LGPD.
+    impacto: "medio"
+    data: "2025-12-28"
+  - decisao: "Implementar consulta SEFAZ obrigatória"
+    motivo: |
+      Sistema legado processava notas rejeitadas/canceladas.
+      Conformidade fiscal crítica.
+    impacto: "medio"
+    data: "2025-12-28"
+  - decisao: "Cálculo automático de impostos"
+    motivo: |
+      Erros manuais de até 15% identificados em auditoria.
+      Precisão 99,99% obrigatória.
+    impacto: "alto"
+    data: "2025-12-28"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Perda de dados durante migração"
+    impacto: "critico"
+    probabilidade: "baixa"
+    mitigacao: "Backup completo antes de migração, validação pós-migração"
+  - risco: "Incompatibilidade de XML (versões antigas 3.10)"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: "Validação contra múltiplas versões XSD (3.10, 4.00)"
+  - risco: "Performance de consulta SEFAZ"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: "Retry exponential backoff, cache de respostas"
+  - risco: "Divergências em cálculo de impostos"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: "Validação cruzada com cálculo legado, testes em HOM"
+  - risco: "Resistência de usuários à mudança"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: "Treinamento, documentação, suporte dedicado"
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "NotaFiscal.aspx"
+    referencia_rf: "RN-NFE-032-01"
+    referencia_uc: "UC00-listar-notas-fiscais"
+    status: "migrado"
+  - elemento_legado: "ImportarNotaFiscal.aspx"
+    referencia_rf: "RN-NFE-032-01, RN-NFE-032-02, RN-NFE-032-03"
+    referencia_uc: "UC01-importar-nota-fiscal"
+    status: "migrado"
+  - elemento_legado: "RatearNotaFiscal.aspx"
+    referencia_rf: "RN-NFE-032-07"
+    referencia_uc: "UC04-ratear-nota-fiscal"
+    status: "migrado"
+  - elemento_legado: "RelatorioConciliacao.aspx"
+    referencia_rf: "RN-NFE-032-04"
+    referencia_uc: "UC03-conciliar-nota-fiscal"
+    status: "migrado"
+  - elemento_legado: "pa_ImportarNotaFiscal"
+    referencia_rf: "RN-NFE-032-01"
+    referencia_uc: "UC01-importar-nota-fiscal"
+    status: "descartado"
+  - elemento_legado: "WSNotaFiscal.asmx - ConsultarStatusSefaz"
+    referencia_rf: "RN-NFE-032-03"
+    referencia_uc: null
+    status: "migrado"
+
+# Estatísticas do Legado
+estatisticas:
+  total_notas: 127542
+  periodo: "2015-01-01 a 2024-12-31 (10 anos)"
+  tamanho_banco: "3.2 GB"
+  xmls_armazenados: 89234
+  xmls_ausentes: 38308
+  percentual_sem_xml: 30.0
+  erros_validacao: 4521
+  divergencias_impostos: 1892
+  duplicatas: 234
+
+# Changelog
+changelog:
+  - versao: "2.0"
+    data: "2025-12-30"
+    descricao: "Migração v1.0 → v2.0: Separação completa RF/RL, 100% dos itens com campo destino obrigatório"
+    autor: "Agência ALC - alc.dev.br"
+  - versao: "1.0"
+    data: "2025-01-14"
+    descricao: "Versão inicial (legado misturado com RF)"
+    autor: "Architect Agent"

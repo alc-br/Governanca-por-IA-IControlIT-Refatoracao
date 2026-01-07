@@ -1,0 +1,937 @@
+# Template de Referência ao Legado (RL-RF091.yaml)
+# Versão: 2.0
+# Data: 2025-12-31
+
+rf_id: RF091
+titulo: "Gestão de Anexos e Documentos Contratuais"
+
+legado:
+  sistema: "IControlIT VB.NET + ASP.NET Web Forms"
+  versao: "Legado (pré-modernização)"
+  arquitetura: "Monolítica ASP.NET Web Forms"
+  banco_dados: "SQL Server"
+  multi_tenant: true  # Parcial (coluna ClienteId em algumas tabelas)
+  auditoria: "partial"  # Apenas timestamp e usuário, sem metadados completos
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+# 100% dos itens têm campo "destino" preenchido
+referencias:
+  - id: "LEG-RF091-001"
+    tipo: "tela"
+    nome: "GerenciarAnexos.aspx"
+    caminho: "ic1_legado/IControlIT/Contratos/GerenciarAnexos.aspx"
+    descricao: |
+      Tela de upload e listagem de anexos associados a contratos.
+      Comportamentos implícitos:
+      - Validação de tipo apenas por extensão (sem MIME type)
+      - Tamanho máximo controlado por web.config (100MB)
+      - Arquivo armazenado em file system local (D:\\IControlIT\\Anexos\\{IdContrato}\\{NomeArquivo})
+      - Upload com mesmo nome sobrescreve arquivo anterior (sem versionamento)
+      - Botão "Excluir" remove fisicamente o arquivo (sem soft delete)
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoints REST API modernos com:
+      - Validação dupla (extensão + MIME type)
+      - Limite de 50MB (reduzido de 100MB)
+      - Armazenamento em Azure Blob Storage (não file system)
+      - Versionamento imutável (sem sobrescrever)
+      - Soft delete em vez de exclusão física
+    documentacao_item_relacionado: "RN-RF091-001, RN-RF091-002, RN-RF091-005, RN-RF091-006"
+    uc_relacionado: "UC-091-01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF091-002"
+    tipo: "tela"
+    nome: "VisualizarAnexo.aspx"
+    caminho: "ic1_legado/IControlIT/Contratos/VisualizarAnexo.aspx"
+    descricao: |
+      Visualização de PDF em nova aba.
+      Comportamentos implícitos:
+      - Abre arquivo diretamente via URL física (/Anexos/{IdContrato}/{NomeArquivo})
+      - Sem controle de acesso (qualquer usuário com URL pode acessar)
+      - Sem auditoria de visualização
+      - Sem watermark ou marca de rastreamento
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint moderno com:
+      - SAS token temporário (15 minutos, não URL permanente)
+      - Controle de acesso RBAC rigoroso
+      - Auditoria completa de visualização
+      - Watermark em PDFs baixados
+    documentacao_item_relacionado: "RN-RF091-007, RN-RF091-008, RN-RF091-009, RN-RF091-013"
+    uc_relacionado: "UC-091-03"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF091-003"
+    tipo: "tela"
+    nome: "DownloadAnexo.aspx"
+    caminho: "ic1_legado/IControlIT/Contratos/DownloadAnexo.aspx"
+    descricao: |
+      Download de arquivo com validação mínima de acesso.
+      Comportamentos implícitos:
+      - Valida apenas se usuário pertence ao mesmo ClienteId do contrato
+      - Registra download em tblHistoricoDownload (apenas usuário, data, IP)
+      - Sem token temporário (URL permanente se conhecida)
+      - Sem watermark em PDFs
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint moderno com:
+      - Validação RBAC granular (não apenas ClienteId)
+      - SAS token temporário (15 minutos)
+      - Auditoria completa (IP, User-Agent, geolocalização, metadados)
+      - Watermark obrigatório em PDFs
+    documentacao_item_relacionado: "RN-RF091-007, RN-RF091-008, RN-RF091-009, RN-RF091-013"
+    uc_relacionado: "UC-091-03"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF091-004"
+    tipo: "tela"
+    nome: "HistoricoAnexos.aspx"
+    caminho: "ic1_legado/IControlIT/Contratos/HistoricoAnexos.aspx"
+    descricao: |
+      Exibir histórico de uploads de um contrato.
+      Comportamentos implícitos:
+      - GridView com colunas: NomeArquivo, DataUpload, UsuarioUpload
+      - Sem histórico de versões (apenas último upload)
+      - Sem rastreamento de exclusões
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint moderno com:
+      - Histórico completo de versões (versionamento imutável)
+      - Rastreamento de exclusões (soft delete com auditoria)
+      - Auditoria de todas operações (não apenas uploads)
+    documentacao_item_relacionado: "RN-RF091-005, RN-RF091-013"
+    uc_relacionado: "UC-091-05, UC-091-06"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF091-005"
+    tipo: "webservice"
+    nome: "UploadAnexo(idContrato, arquivo)"
+    caminho: "ic1_legado/IControlIT/Services/WSAnexos.asmx.vb"
+    descricao: |
+      Upload de arquivo.
+      Comportamento:
+      - Salva em file system (D:\\IControlIT\\Anexos\\)
+      - Registra metadados em tblAnexos
+      - Sem scan de antivírus
+      - Sem hash de integridade
+    destino: "substituido"
+    justificativa: |
+      Substituído por Command moderno (UploadDocumentCommand) com:
+      - Armazenamento em Azure Blob Storage
+      - Scan ClamAV obrigatório
+      - Hash SHA-256 para integridade
+      - Versionamento imutável
+    documentacao_item_relacionado: "RN-RF091-001 a RN-RF091-006"
+    uc_relacionado: "UC-091-01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF091-006"
+    tipo: "webservice"
+    nome: "ListarAnexosPorContrato(idContrato)"
+    caminho: "ic1_legado/IControlIT/Services/WSAnexos.asmx.vb"
+    descricao: |
+      Listar documentos de um contrato.
+      Comportamento:
+      - Retorna DataTable com anexos
+      - Queries N+1 (sem otimização)
+      - Sem paginação
+    destino: "substituido"
+    justificativa: |
+      Substituído por Query moderna (GetDocumentsByContractQuery) com:
+      - DTO moderno (não DataTable)
+      - Queries otimizadas (eager loading)
+      - Paginação obrigatória
+    documentacao_item_relacionado: "RN-RF091-014"
+    uc_relacionado: "UC-091-01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF091-007"
+    tipo: "webservice"
+    nome: "DownloadAnexo(idAnexo)"
+    caminho: "ic1_legado/IControlIT/Services/WSAnexos.asmx.vb"
+    descricao: |
+      Download com acesso local.
+      Comportamento:
+      - Retorna byte[] do arquivo do file system
+      - Sem token temporário
+      - Sem watermark
+    destino: "substituido"
+    justificativa: |
+      Substituído por Command moderno (GenerateSecureDownloadUrlCommand) com:
+      - SAS token temporário do Azure Blob
+      - Watermark em PDFs
+      - Auditoria completa
+    documentacao_item_relacionado: "RN-RF091-008, RN-RF091-009, RN-RF091-013"
+    uc_relacionado: "UC-091-03"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF091-008"
+    tipo: "webservice"
+    nome: "ExcluirAnexo(idAnexo)"
+    caminho: "ic1_legado/IControlIT/Services/WSAnexos.asmx.vb"
+    descricao: |
+      Exclusão lógica.
+      Comportamento:
+      - Marca Ativo=0 em tblAnexos
+      - NÃO remove arquivo físico (orphan data)
+    destino: "assumido"
+    justificativa: |
+      Comportamento de soft delete mantido (IsDeleted=true), mas com melhoria:
+      - Arquivo pode ser removido do Azure Blob (opcional, configurável)
+      - Auditoria registra exclusão completa
+    documentacao_item_relacionado: "RN-RF091-013"
+    uc_relacionado: "UC-091-01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 4
+
+  - id: "LEG-RF091-009"
+    tipo: "webservice"
+    nome: "GetHistoricoDownloads(idAnexo)"
+    caminho: "ic1_legado/IControlIT/Services/WSAnexos.asmx.vb"
+    descricao: |
+      Auditoria de downloads.
+      Comportamento:
+      - Retorna histórico simples (usuário, data, IP)
+      - Sem User-Agent, sem geolocalização
+    destino: "substituido"
+    justificativa: |
+      Substituído por Query moderna (GetDocumentAuditLogQuery) com:
+      - Auditoria completa (IP, User-Agent, geolocalização, metadata JSON)
+      - Retenção de 10 anos
+      - Imutabilidade de logs
+    documentacao_item_relacionado: "RN-RF091-013"
+    uc_relacionado: "UC-091-06"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF091-010"
+    tipo: "stored_procedure"
+    nome: "sp_UploadAnexo"
+    caminho: "Database/dbo.sp_UploadAnexo"
+    descricao: |
+      Registra novo anexo no banco.
+      Comportamento:
+      - INSERT em tblAnexos com NomeArquivo, CaminhoArquivo (path físico), DataUpload, UsuarioUpload
+      - Sem validação de tipo
+      - Sem hash de integridade
+    destino: "substituido"
+    justificativa: |
+      Substituído por Command Handler (UploadDocumentCommandHandler) com:
+      - Validação dupla (extensão + MIME type)
+      - Hash SHA-256 obrigatório
+      - Versionamento automático
+      - Metadata completo
+    documentacao_item_relacionado: "RN-RF091-001 a RN-RF091-006"
+    uc_relacionado: "UC-091-01"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF091-011"
+    tipo: "stored_procedure"
+    nome: "sp_ListarAnexosPorContrato"
+    caminho: "Database/dbo.sp_ListarAnexosPorContrato"
+    descricao: |
+      Lista anexos de um contrato.
+      Comportamento:
+      - SELECT com JOINs simples
+      - Queries N+1 (sem eager loading)
+      - Sem paginação
+    destino: "substituido"
+    justificativa: |
+      Substituído por Query Handler (GetDocumentsByContractQueryHandler) com:
+      - Queries otimizadas (eager loading)
+      - Paginação obrigatória
+      - Filtros avançados
+    documentacao_item_relacionado: "RN-RF091-014"
+    uc_relacionado: "UC-091-01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF091-012"
+    tipo: "stored_procedure"
+    nome: "sp_ExcluirAnexo"
+    caminho: "Database/dbo.sp_ExcluirAnexo"
+    descricao: |
+      Marca anexo como inativo.
+      Comportamento:
+      - UPDATE tblAnexos SET Ativo=0
+      - NÃO remove arquivo físico
+    destino: "assumido"
+    justificativa: |
+      Comportamento de soft delete mantido, mas com melhorias:
+      - Campo IsDeleted (mais claro que Ativo invertido)
+      - Auditoria completa da exclusão
+      - Opção de remover blob do Azure (configurável)
+    documentacao_item_relacionado: "RN-RF091-013"
+    uc_relacionado: "UC-091-01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 4
+
+  - id: "LEG-RF091-013"
+    tipo: "stored_procedure"
+    nome: "sp_AtualizarStatusAnexo"
+    caminho: "Database/dbo.sp_AtualizarStatusAnexo"
+    descricao: |
+      Atualiza status (ativo/inativo) de anexo.
+      Comportamento:
+      - UPDATE tblAnexos SET Ativo=@Status
+      - Lógica duplicada em code-behind VB.NET
+    destino: "substituido"
+    justificativa: |
+      Substituído por integração em Command Handlers modernos:
+      - Lógica centralizada em handlers CQRS
+      - Sem duplicação entre stored procedures e código
+      - Estado gerenciado por Entity Framework
+    documentacao_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF091-014"
+    tipo: "regra_negocio"
+    nome: "Validação de tipo de arquivo apenas por extensão"
+    caminho: "ic1_legado/IControlIT/Contratos/GerenciarAnexos.aspx.vb"
+    descricao: |
+      Regra implícita no code-behind:
+      - If extension = ".pdf" Or extension = ".docx" Or extension = ".xlsx" Then
+      - Bypass fácil (renomear malware.exe para malware.pdf)
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação dupla (RN-RF091-001):
+      - Extensão + MIME type obrigatórios
+      - Rejeição de qualquer divergência
+      - Maior segurança contra bypass
+    documentacao_item_relacionado: "RN-RF091-001"
+    uc_relacionado: "UC-091-01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF091-015"
+    tipo: "regra_negocio"
+    nome: "Tamanho máximo de arquivo controlado por web.config (100MB)"
+    caminho: "ic1_legado/Web.config"
+    descricao: |
+      Configuração:
+      <httpRuntime maxRequestLength="102400" /> <!-- 100MB -->
+      - Sem mensagem clara ao usuário
+      - Erro genérico HTTP 500 se excedido
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação explícita (RN-RF091-002):
+      - Limite de 50MB (reduzido para otimização)
+      - Validação server-side + client-side
+      - Mensagem clara "Arquivo excede tamanho máximo de 50MB"
+    documentacao_item_relacionado: "RN-RF091-002"
+    uc_relacionado: "UC-091-01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF091-016"
+    tipo: "regra_negocio"
+    nome: "Upload com mesmo nome sobrescreve arquivo anterior (sem versionamento)"
+    caminho: "ic1_legado/IControlIT/Contratos/GerenciarAnexos.aspx.vb"
+    descricao: |
+      Regra implícita:
+      - FileUpload1.SaveAs(savePath) sobrescreve arquivo se existir
+      - Sem histórico, sem rollback
+    destino: "substituido"
+    justificativa: |
+      Substituído por versionamento imutável (RN-RF091-005):
+      - Cada upload cria nova versão
+      - Versões anteriores preservadas
+      - Rollback disponível
+    documentacao_item_relacionado: "RN-RF091-005"
+    uc_relacionado: "UC-091-05"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF091-017"
+    tipo: "regra_negocio"
+    nome: "Exclusão marca Ativo=0 mas não remove arquivo físico"
+    caminho: "ic1_legado/IControlIT/Services/WSAnexos.asmx.vb"
+    descricao: |
+      Regra implícita:
+      - UPDATE tblAnexos SET Ativo=0
+      - Arquivo físico permanece em D:\\IControlIT\\Anexos\\
+      - Orphan data acumula no file system
+    destino: "assumido"
+    justificativa: |
+      Soft delete mantido, mas com melhorias:
+      - Campo IsDeleted (mais claro)
+      - Opção de remover blob do Azure (configurável)
+      - Auditoria completa da exclusão
+    documentacao_item_relacionado: "RN-RF091-013"
+    uc_relacionado: "UC-091-01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 4
+
+  - id: "LEG-RF091-018"
+    tipo: "regra_negocio"
+    nome: "Acesso validado apenas por ClienteId (sem RBAC granular)"
+    caminho: "ic1_legado/IControlIT/Contratos/DownloadAnexo.aspx.vb"
+    descricao: |
+      Regra implícita:
+      - Valida apenas se usuário pertence ao mesmo ClienteId do contrato
+      - Sem permissões granulares (qualquer usuário do tenant pode acessar qualquer documento)
+    destino: "substituido"
+    justificativa: |
+      Substituído por RBAC completo (RN-RF091-007):
+      - Permissões granulares (read, download, delete, sign, share)
+      - Políticas temporárias
+      - Revogação imediata
+    documentacao_item_relacionado: "RN-RF091-007"
+    uc_relacionado: "UC-091-03, UC-091-04"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF091-019"
+    tipo: "regra_negocio"
+    nome: "Histórico de download registra apenas IP e timestamp"
+    caminho: "ic1_legado/Database/dbo.tblHistoricoDownload"
+    descricao: |
+      Regra implícita:
+      - INSERT em tblHistoricoDownload (IdAnexo, UsuarioDownload, DataDownload, IPAddress)
+      - Sem User-Agent, sem geolocalização, sem metadata
+    destino: "substituido"
+    justificativa: |
+      Substituído por auditoria completa (RN-RF091-013):
+      - UserId, UserEmail, Action, Timestamp (UTC)
+      - IpAddress, UserAgent, Geolocalização
+      - Metadata JSON (informações contextuais)
+      - Retenção 10 anos, imutabilidade
+    documentacao_item_relacionado: "RN-RF091-013"
+    uc_relacionado: "UC-091-06"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF091-020"
+    tipo: "regra_negocio"
+    nome: "Categorias de documento são globais (não contextuais por tipo de contrato)"
+    caminho: "ic1_legado/Database/dbo.tblCategoriaDocumento"
+    descricao: |
+      Regra implícita:
+      - Campo Obrigatoria (bit) global para todas categorias
+      - Sem contexto de tipo de contrato (ex: "Proposta" obrigatória para todos contratos)
+    destino: "assumido"
+    justificativa: |
+      Estrutura mantida com melhorias (RN-RF091-012):
+      - Categorias contextuais por tipo de contrato
+      - Obrigatoriedade definida por relação ContractType x DocumentCategory
+      - Maior flexibilidade
+    documentacao_item_relacionado: "RN-RF091-012"
+    uc_relacionado: "UC-091-07"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF091-021"
+    tipo: "regra_negocio"
+    nome: "Sem scan de antivírus em arquivos uploadados"
+    caminho: "ic1_legado/IControlIT/Contratos/GerenciarAnexos.aspx.vb"
+    descricao: |
+      Regra inexistente (gap de segurança):
+      - Nenhuma validação de malware
+      - Arquivos aceitos diretamente
+    destino: "substituido"
+    justificativa: |
+      Substituído por scan ClamAV obrigatório (RN-RF091-003):
+      - Todo arquivo passa por ClamAV antes de armazenar
+      - Quarentena automática se malware detectado
+      - Auditoria de ameaças detectadas
+    documentacao_item_relacionado: "RN-RF091-003"
+    uc_relacionado: "UC-091-01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF091-022"
+    tipo: "regra_negocio"
+    nome: "Sem criptografia de arquivos em repouso"
+    caminho: "ic1_legado/File System (D:\\IControlIT\\Anexos\\)"
+    descricao: |
+      Regra inexistente (gap de segurança):
+      - Arquivos armazenados em texto plano no file system
+      - Apenas ACLs NTFS para controle de acesso
+    destino: "substituido"
+    justificativa: |
+      Substituído por criptografia obrigatória (RN-RF091-006):
+      - AES-256 em repouso (Azure Blob Storage)
+      - TLS 1.2+ em trânsito
+      - Conformidade LGPD
+    documentacao_item_relacionado: "RN-RF091-006"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF091-023"
+    tipo: "regra_negocio"
+    nome: "Sem OCR ou busca full-text em documentos"
+    caminho: "ic1_legado/IControlIT/"
+    descricao: |
+      Regra inexistente (funcionalidade ausente):
+      - Busca apenas por nome de arquivo (LIKE em banco)
+      - Documentos scaneados inacessíveis por conteúdo
+    destino: "substituido"
+    justificativa: |
+      Substituído por OCR + Elasticsearch (RN-RF091-010):
+      - Azure Cognitive Services para extração de texto
+      - Indexação em Elasticsearch
+      - Busca full-text em conteúdo de PDFs e imagens
+    documentacao_item_relacionado: "RN-RF091-010"
+    uc_relacionado: "UC-091-08"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+
+# Telas Legadas (estrutura detalhada)
+telas:
+  - id: "LEG-RF091-001"
+    nome: "GerenciarAnexos.aspx"
+    caminho: "ic1_legado/IControlIT/Contratos/GerenciarAnexos.aspx"
+    responsabilidade: "Upload e listagem de anexos associados a contratos"
+    campos:
+      - nome: "IdContrato"
+        tipo: "Hidden"
+        obrigatorio: true
+        validacao: "Deve ser INT válido"
+      - nome: "FileUpload"
+        tipo: "File Input"
+        obrigatorio: true
+        validacao: "Extensão apenas (.pdf, .docx, .xlsx)"
+      - nome: "TipoAnexo"
+        tipo: "DropDown"
+        obrigatorio: false
+        validacao: "Nenhuma (campo opcional)"
+      - nome: "GridAnexos"
+        tipo: "GridView"
+        obrigatorio: false
+        validacao: "Exibe lista de anexos com botões Download/Excluir"
+    comportamentos_implicitos:
+      - "Validação de tipo apenas por extensão (bypass possível)"
+      - "Upload sobrescreve arquivo com mesmo nome (sem versionamento)"
+      - "Botão Excluir remove logicamente mas não fisicamente"
+      - "Sem scan de antivírus"
+      - "Sem auditoria de visualização"
+
+  - id: "LEG-RF091-002"
+    nome: "VisualizarAnexo.aspx"
+    caminho: "ic1_legado/IControlIT/Contratos/VisualizarAnexo.aspx"
+    responsabilidade: "Visualização de PDF em nova aba"
+    campos: []
+    comportamentos_implicitos:
+      - "Abre arquivo via URL física permanente"
+      - "Sem controle de acesso granular"
+      - "Sem auditoria de visualização"
+      - "Sem watermark"
+
+  - id: "LEG-RF091-003"
+    nome: "DownloadAnexo.aspx"
+    caminho: "ic1_legado/IControlIT/Contratos/DownloadAnexo.aspx"
+    responsabilidade: "Download de arquivo com validação mínima"
+    campos: []
+    comportamentos_implicitos:
+      - "Validação apenas por ClienteId (não RBAC)"
+      - "URL permanente (não expira)"
+      - "Auditoria mínima (IP + timestamp)"
+      - "Sem watermark"
+
+  - id: "LEG-RF091-004"
+    nome: "HistoricoAnexos.aspx"
+    caminho: "ic1_legado/IControlIT/Contratos/HistoricoAnexos.aspx"
+    responsabilidade: "Exibir histórico de uploads de um contrato"
+    campos:
+      - nome: "GridHistorico"
+        tipo: "GridView"
+        obrigatorio: false
+        validacao: "Exibe NomeArquivo, DataUpload, UsuarioUpload"
+    comportamentos_implicitos:
+      - "Sem histórico de versões (apenas último upload)"
+      - "Sem rastreamento de exclusões"
+
+# WebServices Legados
+servicos:
+  - id: "LEG-RF091-005"
+    nome: "WSAnexos.asmx - UploadAnexo"
+    localizacao: "ic1_legado/IControlIT/Services/WSAnexos.asmx"
+    responsabilidade: "Upload de arquivo para file system e registro em banco"
+    notas: "Substituído por UploadDocumentCommand (Azure Blob + ClamAV + versionamento)"
+
+  - id: "LEG-RF091-006"
+    nome: "WSAnexos.asmx - ListarAnexosPorContrato"
+    localizacao: "ic1_legado/IControlIT/Services/WSAnexos.asmx"
+    responsabilidade: "Listar anexos de um contrato"
+    notas: "Substituído por GetDocumentsByContractQuery (otimizado + paginação)"
+
+  - id: "LEG-RF091-007"
+    nome: "WSAnexos.asmx - DownloadAnexo"
+    localizacao: "ic1_legado/IControlIT/Services/WSAnexos.asmx"
+    responsabilidade: "Retornar byte[] de arquivo do file system"
+    notas: "Substituído por GenerateSecureDownloadUrlCommand (SAS token + watermark)"
+
+  - id: "LEG-RF091-008"
+    nome: "WSAnexos.asmx - ExcluirAnexo"
+    localizacao: "ic1_legado/IControlIT/Services/WSAnexos.asmx"
+    responsabilidade: "Soft delete (Ativo=0)"
+    notas: "Assumido com melhorias (IsDeleted + auditoria completa)"
+
+  - id: "LEG-RF091-009"
+    nome: "WSAnexos.asmx - GetHistoricoDownloads"
+    localizacao: "ic1_legado/IControlIT/Services/WSAnexos.asmx"
+    responsabilidade: "Retornar histórico simples de downloads"
+    notas: "Substituído por GetDocumentAuditLogQuery (auditoria completa + metadata JSON)"
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "tblAnexos"
+    finalidade: "Armazenar metadados de anexos"
+    problemas:
+      - "CaminhoArquivo VARCHAR(500) - path físico hardcoded (não portável)"
+      - "Sem campo Sha256Hash (sem validação de integridade)"
+      - "Sem campo VersionNumber (sem versionamento)"
+      - "Sem campo ClienteId em todas versões (multi-tenancy parcial)"
+      - "UsuarioUpload VARCHAR(100) - apenas nome, sem FK para Users (GUID)"
+
+  - nome: "tblCategoriaDocumento"
+    finalidade: "Categorias de documento (Proposta, Termo, Aditivo)"
+    problemas:
+      - "Obrigatoria BIT global - sem contexto de tipo de contrato"
+      - "Sem FK para ContractType (obrigatoriedade deveria ser contextual)"
+      - "Sem campo ClienteId (multi-tenancy ausente)"
+
+  - nome: "tblHistoricoDownload"
+    finalidade: "Auditoria de downloads"
+    problemas:
+      - "Dados mínimos (sem User-Agent, sem geolocalização, sem metadata)"
+      - "UsuarioDownload VARCHAR(100) - apenas nome, sem FK para Users"
+      - "IPAddress VARCHAR(15) - suporta apenas IPv4 (não IPv6)"
+      - "Sem campo Action (registra apenas downloads, não visualizações, exclusões, etc)"
+
+# Regras de Negócio Implícitas (não documentadas no legado)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      Validação de tipo de arquivo apenas por extensão (.pdf, .docx, .xlsx permitidos).
+      Bypass fácil renomeando malware.exe para malware.pdf.
+    fonte: "ic1_legado/IControlIT/Contratos/GerenciarAnexos.aspx.vb:42"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Tamanho máximo de arquivo controlado por web.config (100MB).
+      Erro genérico HTTP 500 se excedido, sem mensagem clara.
+    fonte: "ic1_legado/Web.config:15"
+
+  - id: "RL-RN-003"
+    descricao: |
+      Upload com mesmo nome sobrescreve arquivo anterior (sem versionamento).
+      Perda de histórico irreversível.
+    fonte: "ic1_legado/IControlIT/Contratos/GerenciarAnexos.aspx.vb:58"
+
+  - id: "RL-RN-004"
+    descricao: |
+      Exclusão marca Ativo=0 mas não remove arquivo físico.
+      Orphan data acumula no file system.
+    fonte: "ic1_legado/IControlIT/Services/WSAnexos.asmx.vb:120"
+
+  - id: "RL-RN-005"
+    descricao: |
+      Acesso validado apenas por ClienteId (sem RBAC granular).
+      Qualquer usuário do tenant pode acessar qualquer documento.
+    fonte: "ic1_legado/IControlIT/Contratos/DownloadAnexo.aspx.vb:25"
+
+  - id: "RL-RN-006"
+    descricao: |
+      Histórico de download registra apenas IP e timestamp.
+      Sem User-Agent, sem geolocalização, sem metadata.
+    fonte: "ic1_legado/Database/dbo.tblHistoricoDownload"
+
+  - id: "RL-RN-007"
+    descricao: |
+      Categorias de documento são globais (não contextuais por tipo de contrato).
+      Obrigatoriedade não considera tipo de contrato.
+    fonte: "ic1_legado/Database/dbo.tblCategoriaDocumento"
+
+  - id: "RL-RN-008"
+    descricao: |
+      Sem scan de antivírus em arquivos uploadados.
+      Gap de segurança crítico.
+    fonte: "ic1_legado/IControlIT/ (ausência de validação)"
+
+  - id: "RL-RN-009"
+    descricao: |
+      Sem criptografia de arquivos em repouso.
+      Dados em texto plano no file system.
+    fonte: "ic1_legado/File System (D:\\IControlIT\\Anexos\\)"
+
+  - id: "RL-RN-010"
+    descricao: |
+      Sem OCR ou busca full-text em documentos.
+      Busca apenas por nome de arquivo (LIKE).
+    fonte: "ic1_legado/IControlIT/ (funcionalidade ausente)"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Armazenamento em File System"
+    existe_legado: true
+    existe_moderno: false
+    notas: "Modernizado para Azure Blob Storage com AES-256"
+
+  - item: "Validação de tipo apenas por extensão"
+    existe_legado: true
+    existe_moderno: false
+    notas: "Modernizado para validação dupla (extensão + MIME type)"
+
+  - item: "Scan de antivírus"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade (ClamAV obrigatório)"
+
+  - item: "Versionamento de documentos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade (versionamento imutável)"
+
+  - item: "Criptografia AES-256"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade (conformidade LGPD)"
+
+  - item: "SAS tokens temporários"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade (URLs expiram em 15 minutos)"
+
+  - item: "Watermark em PDFs"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade (rastreabilidade de vazamentos)"
+
+  - item: "OCR e busca full-text"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade (Azure Cognitive Services + Elasticsearch)"
+
+  - item: "Assinatura digital (DocuSign)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade (validade legal)"
+
+  - item: "Auditoria completa"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado tinha auditoria parcial (apenas IP + timestamp)"
+
+  - item: "RBAC granular"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado validava apenas ClienteId"
+
+  - item: "Soft delete"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Mantido com melhorias (IsDeleted + auditoria)"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Migrar de File System para Azure Blob Storage"
+    motivo: |
+      Escalabilidade, redundância geográfica, criptografia nativa,
+      integração com SAS tokens temporários.
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Reduzir tamanho máximo de 100MB para 50MB"
+    motivo: |
+      Otimizar tempo de upload/download, reduzir custos de armazenamento,
+      melhorar performance de visualizadores. 50MB é suficiente para
+      contratos PDF de alta qualidade.
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "Introduzir versionamento imutável"
+    motivo: |
+      Atender requisitos de auditoria, permitir rollback,
+      preservar histórico forense de alterações.
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "Implementar scan de antivírus obrigatório (ClamAV)"
+    motivo: |
+      Segurança da informação, conformidade ISO 27001,
+      prevenir distribuição de malware.
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Substituir URLs físicas por SAS tokens temporários"
+    motivo: |
+      Segurança (URLs não podem ser compartilhadas indefinidamente),
+      auditoria de cada acesso.
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "Integrar OCR para busca full-text"
+    motivo: |
+      Melhorar experiência de busca, permitir localizar documentos
+      por conteúdo (não apenas nome de arquivo).
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "Integrar DocuSign para assinatura digital"
+    motivo: |
+      Validade legal de assinaturas (Lei 14.063/2020),
+      evidência forense de quem assinou, quando e de qual IP.
+    impacto: "alto"
+    data: "2025-12-31"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Perda de arquivos durante migração para Azure Blob"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Script de migração com validação SHA-256 antes/depois
+      - Backup completo do file system antes de migrar
+      - Migração incremental (não big-bang)
+      - Rollback planejado
+
+  - risco: "Arquivos > 50MB existentes não podem ser migrados"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      - Análise prévia de tamanhos de arquivo existentes
+      - Notificação de usuários sobre novo limite
+      - Exceção temporária (6 meses) para arquivos legados
+
+  - risco: "Quebra de URLs físicas existentes (bookmarks, documentação)"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      - Manter redirecionamento temporário (6 meses)
+      - URLs antigas redirecionam para geração de SAS token
+      - Notificação em massa sobre mudança
+
+  - risco: "Custo de OCR e DocuSign inviável para alguns clientes"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      - Feature flags para habilitar/desabilitar por cliente
+      - Planos diferenciados (básico sem OCR/DocuSign, premium com tudo)
+      - Cobrança separada de serviços AI
+
+  - risco: "Processamento de OCR muito lento (gargalo)"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      - Processamento assíncrono com fila (Azure Queue)
+      - Retry automático em falhas
+      - Monitoramento de SLA (30s por página)
+
+  - risco: "ClamAV bloqueia upload legítimo (falso positivo)"
+    impacto: "baixo"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Processo de quarentena revisável
+      - Whitelist de hashes conhecidos (SHA-256)
+      - Suporte para liberar arquivo manualmente
+
+  - risco: "Elasticsearch fora de sincronia com banco"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Job noturno de reindexação completa
+      - Monitoramento de consistência
+      - Fallback para busca em banco se Elasticsearch falhar
+
+  - risco: "Versionamento consome muito armazenamento"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      - Policy de retenção configurável (ex: 5 versões ou 2 anos)
+      - Compressão de versões antigas (gzip)
+      - Migração de versões antigas para storage tier frio (reduz custo)
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "GerenciarAnexos.aspx"
+    referencia_rf: "RN-RF091-001, RN-RF091-002, RN-RF091-005, RN-RF091-006"
+    referencia_uc: "UC-091-01"
+    status: "migrado"
+
+  - elemento_legado: "VisualizarAnexo.aspx"
+    referencia_rf: "RN-RF091-007, RN-RF091-008, RN-RF091-009, RN-RF091-013"
+    referencia_uc: "UC-091-03"
+    status: "migrado"
+
+  - elemento_legado: "DownloadAnexo.aspx"
+    referencia_rf: "RN-RF091-007, RN-RF091-008, RN-RF091-009, RN-RF091-013"
+    referencia_uc: "UC-091-03"
+    status: "migrado"
+
+  - elemento_legado: "HistoricoAnexos.aspx"
+    referencia_rf: "RN-RF091-005, RN-RF091-013"
+    referencia_uc: "UC-091-05, UC-091-06"
+    status: "migrado"
+
+  - elemento_legado: "sp_UploadAnexo"
+    referencia_rf: "RN-RF091-001 a RN-RF091-006"
+    referencia_uc: "UC-091-01"
+    status: "migrado"
+
+  - elemento_legado: "sp_ListarAnexosPorContrato"
+    referencia_rf: "RN-RF091-014"
+    referencia_uc: "UC-091-01"
+    status: "migrado"
+
+  - elemento_legado: "sp_ExcluirAnexo"
+    referencia_rf: "RN-RF091-013"
+    referencia_uc: "UC-091-01"
+    status: "migrado"
+
+  - elemento_legado: "tblAnexos.CaminhoArquivo"
+    referencia_rf: "RN-RF091-006"
+    referencia_uc: null
+    status: "migrado"
+
+  - elemento_legado: "tblHistoricoDownload"
+    referencia_rf: "RN-RF091-013"
+    referencia_uc: "UC-091-06"
+    status: "migrado"
+
+# Changelog
+changelog:
+  - versao: "2.0"
+    data: "2025-12-31"
+    descricao: "Documentação completa de referência ao legado de RF091 com destinos obrigatórios para 100% dos itens"
+    autor: "Agência ALC - alc.dev.br"
+
+  - versao: "1.0"
+    data: "2025-12-28"
+    descricao: "Template inicial de referência ao legado (depreciado)"
+    autor: "Claude Code"

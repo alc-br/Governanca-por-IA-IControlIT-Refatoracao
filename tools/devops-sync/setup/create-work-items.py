@@ -126,7 +126,7 @@ def load_all_status_files():
     """Carrega todos os STATUS.yaml"""
     # Processar apenas docs/rf
     patterns = [
-        "D:/IC2/docs/rf/**/STATUS.yaml"
+        "D:/IC2/docs/documentacao/**/STATUS.yaml"
     ]
 
     statuses = {}
@@ -141,8 +141,8 @@ def load_all_status_files():
                 data = parse_yaml_simple(content)
 
                 if data and 'rf' in data:
-                    rf_raw = str(data['rf']).replace('RF', '').replace('RF-', '').zfill(3)
-                    rf_id = f"RF-{rf_raw}"
+                    documentacao_raw = str(data['rf']).replace('RF', '').replace('RF-', '').zfill(3)
+                    documentacao_id = f"RF-{rf_raw}"
                     statuses[rf_id] = {
                         'file_path': f,
                         'data': data
@@ -154,7 +154,7 @@ def load_all_status_files():
 
 def extract_fase_from_path(file_path):
     """Extrai codigo da Fase a partir do caminho do arquivo"""
-    # Exemplo:  D:\IC2\rf\Fase-1-Fundacao-e-Cadastros-Base\...
+    # Exemplo:  D:\IC2\documentacao\Fase-1-Fundacao-e-Cadastros-Base\...
     parts = file_path.replace('\\', '/').split('/')
 
     for part in parts:
@@ -299,7 +299,7 @@ def main():
 
     # Filtrar RFs sem work_item_id
     rfs_without_wi = {}
-    for rf_id, status_info in statuses.items():
+    for documentacao_id, status_info in statuses.items():
         data = status_info['data']
         devops = data.get('devops', {})
         work_item_id = devops.get('work_item_id')
@@ -323,7 +323,7 @@ def main():
     print("CRIANDO WORK ITEMS")
     print("-" * 80)
 
-    for rf_id, status_info in sorted(rfs_without_wi.items()):
+    for documentacao_id, status_info in sorted(rfs_without_wi.items()):
         data = status_info['data']
         titulo = data.get('titulo', 'Sem titulo')
         epic = data.get('epic', None)

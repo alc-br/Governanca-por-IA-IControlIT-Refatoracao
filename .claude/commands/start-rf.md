@@ -11,7 +11,7 @@ Prepare o ambiente para trabalhar em um Requisito Funcional específico.
 
 1. **Pergunte ao usuário:** Qual RF deseja iniciar? (ex: RF-015)
 
-2. **Valide:** RF existe em `D:\IC2_Governanca\rf\Fase-*/EPIC-*/RF-XXX/`
+2. **Valide:** RF existe em `D:\IC2_Governanca\documentacao\Fase-*/EPIC-*/RF-XXX/`
    ```bash
    # Buscar pasta do RF
    find docs/rf -type d -name "RF-015"
@@ -26,7 +26,7 @@ Prepare o ambiente para trabalhar em um Requisito Funcional específico.
 4. **Leia STATUS.yaml** para entender estado atual:
    ```yaml
    documentacao:
-     rf: true/false
+     documentacao: true/false
      uc: true/false
      md: true/false
      wf: true/false
@@ -69,7 +69,7 @@ Prepare o ambiente para trabalhar em um Requisito Funcional específico.
    ```
    ✅ RF-XXX pronto para desenvolvimento
 
-   📂 Localização: D:\IC2_Governanca\rf\Fase-X/EPIC-YYY/RF-XXX/
+   📂 Localização: D:\IC2_Governanca\documentacao\Fase-X/EPIC-YYY/RF-XXX/
 
    📋 Documentação:
    - RF: [completo/incompleto]
@@ -100,7 +100,7 @@ Usuário: RF-028
 Agente:
 ✅ RF-028 pronto para desenvolvimento
 
-📂 Localização: D:\IC2_Governanca\rf\Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF-028/
+📂 Localização: D:\IC2_Governanca\documentacao\Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF-028/
 
 📋 Documentação:
 - RF: completo ✅
@@ -132,7 +132,7 @@ Usuário: RF-015
 Agente:
 ✅ RF-015 pronto para desenvolvimento de frontend
 
-📂 Localização: D:\IC2_Governanca\rf\Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF-015/
+📂 Localização: D:\IC2_Governanca\documentacao\Fase-2-Cadastros-e-Servicos-Transversais/EPIC003-CAD-Cadastros-Base/RF-015/
 
 📋 Documentação:
 - RF: completo ✅

@@ -1,0 +1,959 @@
+# =============================================
+# UC-RF051 - Casos de Uso - Gestão de Marcas e Modelos de Ativos
+# Versão: 1.0
+# Data: 2025-12-31
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+uc:
+  documentacao: "RF051"
+  documentacao_id: "RF051"
+  documentacao_nome: "Gestão de Marcas e Modelos de Ativos"
+  versao: "2.0"
+  data: "2025-12-31"
+  autor: "Agência ALC - alc.dev.br"
+  total_ucs: 15
+  total_regras_cobertas: 12
+  cobertura_percentual: 100
+
+casos_de_uso:
+  - id: "UC00"
+    nome: "Listar Fabricantes"
+    tipo: "leitura"
+    objetivo: "Exibir lista paginada de fabricantes com filtros e ordenação"
+    covers:
+      documentacao_items:
+        - "RN-RF051-001"
+        - "RN-RF051-007"
+      uc_items:
+        - "UC00"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão FABRICANTES.VIEW"
+    fluxo_principal:
+      - "Usuário acessa tela Fabricantes"
+      - "Sistema carrega fabricantes do tenant atual (EmpresaId)"
+      - "Sistema aplica filtros padrão (FlAtivo = true)"
+      - "Sistema retorna lista paginada (20 itens por página)"
+      - "Sistema exibe: Nome, País, FlAtivo, CriadoEm"
+    fluxos_alternativos:
+      - id: "FA-UC00-001"
+        nome: "Filtrar por Nome"
+        passos:
+          - "Usuário digita texto no campo Buscar"
+          - "Sistema aplica filtro case-insensitive em Nome"
+          - "Sistema retorna resultados filtrados"
+      - id: "FA-UC00-002"
+        nome: "Incluir Fabricantes Inativos"
+        passos:
+          - "Usuário marca checkbox Incluir inativos"
+          - "Sistema remove filtro FlAtivo = true"
+          - "Sistema retorna todos os fabricantes (ativos + inativos)"
+      - id: "FA-UC00-003"
+        nome: "Ordenar Resultados"
+        passos:
+          - "Usuário clica em coluna (Nome, País, CriadoEm)"
+          - "Sistema ordena ASC/DESC conforme clique"
+          - "Sistema retorna lista ordenada"
+    fluxos_excecao:
+      - id: "FE-UC00-001"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+          - "Mensagem: Você não tem permissão para visualizar fabricantes"
+      - id: "FE-UC00-002"
+        nome: "Nenhum Fabricante Cadastrado"
+        passos:
+          - "Sistema retorna HTTP 200 com array vazio"
+          - "Exibe mensagem: Nenhum fabricante cadastrado"
+    regras_aplicadas:
+      - "RN-RF051-001: Nome único (exibir indicador se duplicado)"
+      - "RN-RF051-007: Fabricantes inativos não permitem novos modelos"
+
+  - id: "UC01"
+    nome: "Criar Fabricante"
+    tipo: "crud"
+    objetivo: "Cadastrar novo fabricante no sistema"
+    covers:
+      documentacao_items:
+        - "RN-RF051-001"
+      uc_items:
+        - "UC01"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão FABRICANTES.CREATE"
+    fluxo_principal:
+      - "Usuário clica em Novo Fabricante"
+      - "Sistema exibe formulário: Nome, País, Site, FlAtivo"
+      - "Usuário preenche campos e clica Salvar"
+      - "Sistema valida campos (RN-RF051-001)"
+      - "Sistema verifica unicidade de Nome (case-insensitive, por tenant)"
+      - "Sistema cria registro com EmpresaId, CriadoPor, CriadoEm, FlAtivo = true"
+      - "Sistema retorna HTTP 201 Created com ID do fabricante"
+    fluxos_alternativos:
+      - id: "FA-UC01-001"
+        nome: "Criar Fabricante Inativo"
+        passos:
+          - "Usuário desmarca checkbox Ativo"
+          - "Sistema cria fabricante com FlAtivo = false"
+          - "Sistema exibe aviso: Fabricante inativo não permite cadastro de novos modelos"
+    fluxos_excecao:
+      - id: "FE-UC01-001"
+        nome: "Nome Duplicado"
+        passos:
+          - "Sistema detecta Nome já existente (case-insensitive, mesmo tenant)"
+          - "Sistema retorna HTTP 409 Conflict"
+          - "Mensagem: Já existe um fabricante com este nome nesta empresa"
+      - id: "FE-UC01-002"
+        nome: "Campos Obrigatórios Vazios"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Campo Nome é obrigatório / Campo País é obrigatório"
+      - id: "FE-UC01-003"
+        nome: "URL Inválida"
+        passos:
+          - "Sistema valida formato de Site (URL válida)"
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: URL do site inválida"
+      - id: "FE-UC01-004"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+          - "Mensagem: Você não tem permissão para criar fabricantes"
+    regras_aplicadas:
+      - "RN-RF051-001: Nome de Fabricante único (case-insensitive, por tenant)"
+
+  - id: "UC02"
+    nome: "Editar Fabricante"
+    tipo: "crud"
+    objetivo: "Alterar dados de fabricante existente"
+    covers:
+      documentacao_items:
+        - "RN-RF051-001"
+      uc_items:
+        - "UC02"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão FABRICANTES.UPDATE"
+      - "Fabricante existe"
+    fluxo_principal:
+      - "Usuário clica em Editar em fabricante da lista"
+      - "Sistema carrega dados do fabricante"
+      - "Sistema exibe formulário preenchido"
+      - "Usuário altera campos (Nome, País, Site)"
+      - "Usuário clica Salvar"
+      - "Sistema valida campos (RN-RF051-001)"
+      - "Sistema verifica unicidade de Nome (exceto próprio registro)"
+      - "Sistema atualiza registro com AlteradoPor, AlteradoEm"
+      - "Sistema retorna HTTP 200 OK"
+    fluxos_alternativos:
+      - id: "FA-UC02-001"
+        nome: "Alterar Nome para Mesmo Nome (Case Diferente)"
+        passos:
+          - "Usuário altera DELL para Dell"
+          - "Sistema permite (mesmo registro, case-insensitive)"
+          - "Sistema atualiza normalmente"
+    fluxos_excecao:
+      - id: "FE-UC02-001"
+        nome: "Nome Duplicado em Outro Fabricante"
+        passos:
+          - "Sistema detecta Nome existente em outro fabricante (mesmo tenant)"
+          - "Sistema retorna HTTP 409 Conflict"
+          - "Mensagem: Já existe outro fabricante com este nome"
+      - id: "FE-UC02-002"
+        nome: "Fabricante Não Encontrado"
+        passos:
+          - "Sistema retorna HTTP 404 Not Found"
+          - "Mensagem: Fabricante não encontrado"
+      - id: "FE-UC02-003"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+          - "Mensagem: Você não tem permissão para editar fabricantes"
+      - id: "FE-UC02-004"
+        nome: "Campos Obrigatórios Vazios"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Campo Nome é obrigatório"
+    regras_aplicadas:
+      - "RN-RF051-001: Nome único (case-insensitive, exceto próprio registro)"
+
+  - id: "UC03"
+    nome: "Ativar/Desativar Fabricante"
+    tipo: "acao"
+    objetivo: "Alterar status de ativação de fabricante (soft delete)"
+    covers:
+      documentacao_items:
+        - "RN-RF051-007"
+      uc_items:
+        - "UC03"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão FABRICANTES.UPDATE"
+      - "Fabricante existe"
+    fluxo_principal:
+      - "Usuário clica em Desativar em fabricante ativo"
+      - "Sistema verifica se fabricante possui modelos ativos"
+      - "Sistema exibe confirmação: Desativar fabricante impedirá criação de novos modelos. Confirma?"
+      - "Usuário confirma"
+      - "Sistema atualiza FlAtivo = false"
+      - "Sistema atualiza auditoria (AlteradoPor, AlteradoEm)"
+      - "Sistema retorna HTTP 200 OK"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC03-001"
+        nome: "Fabricante Possui Modelos Ativos"
+        passos:
+          - "Sistema exibe aviso: Este fabricante possui N modelos ativos. Ao desativar, não será possível criar novos modelos."
+          - "Sistema permite desativação (não bloqueia)"
+      - id: "FE-UC03-002"
+        nome: "Fabricante Não Encontrado"
+        passos:
+          - "Sistema retorna HTTP 404 Not Found"
+      - id: "FE-UC03-003"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+    regras_aplicadas:
+      - "RN-RF051-007: Fabricante inativo não permite criar novos modelos"
+
+  - id: "UC04"
+    nome: "Listar Marcas"
+    tipo: "leitura"
+    objetivo: "Exibir lista paginada de marcas com filtros e ordenação"
+    covers:
+      documentacao_items:
+        - "RN-RF051-002"
+        - "RN-RF051-006"
+        - "RN-RF051-008"
+      uc_items:
+        - "UC04"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão MARCAS.VIEW"
+    fluxo_principal:
+      - "Usuário acessa tela Marcas"
+      - "Sistema carrega marcas do tenant atual (EmpresaId)"
+      - "Sistema aplica filtros padrão (FlAtivo = true)"
+      - "Sistema retorna lista paginada (20 itens por página)"
+      - "Sistema exibe: Nome, Fabricante, Part Number, FlAtivo"
+    fluxos_alternativos:
+      - id: "FA-UC04-001"
+        nome: "Filtrar por Fabricante"
+        passos:
+          - "Usuário seleciona fabricante no dropdown"
+          - "Sistema filtra marcas por FabricanteId"
+          - "Sistema retorna resultados filtrados"
+      - id: "FA-UC04-002"
+        nome: "Filtrar por Part Number"
+        passos:
+          - "Usuário digita Part Number no campo busca"
+          - "Sistema aplica filtro case-insensitive"
+          - "Sistema retorna resultados"
+      - id: "FA-UC04-003"
+        nome: "Incluir Marcas Inativas"
+        passos:
+          - "Usuário marca checkbox Incluir inativas"
+          - "Sistema remove filtro FlAtivo = true"
+          - "Sistema retorna todas as marcas"
+    fluxos_excecao:
+      - id: "FE-UC04-001"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+      - id: "FE-UC04-002"
+        nome: "Nenhuma Marca Cadastrada"
+        passos:
+          - "Sistema retorna HTTP 200 com array vazio"
+          - "Exibe mensagem: Nenhuma marca cadastrada"
+    regras_aplicadas:
+      - "RN-RF051-002: Part Number único por Fabricante"
+      - "RN-RF051-006: Marca pertence a Fabricante"
+      - "RN-RF051-008: Marca inativa não permite novos modelos"
+
+  - id: "UC05"
+    nome: "Criar Marca"
+    tipo: "crud"
+    objetivo: "Cadastrar nova marca vinculada a um fabricante"
+    covers:
+      documentacao_items:
+        - "RN-RF051-002"
+        - "RN-RF051-006"
+      uc_items:
+        - "UC05"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão MARCAS.CREATE"
+      - "Fabricante ativo existe"
+    fluxo_principal:
+      - "Usuário clica em Nova Marca"
+      - "Sistema exibe formulário: Fabricante, Nome, Part Number, FlAtivo"
+      - "Usuário preenche campos e clica Salvar"
+      - "Sistema valida campos (RN-RF051-002, RN-RF051-006)"
+      - "Sistema verifica unicidade de Part Number (por Fabricante, case-insensitive)"
+      - "Sistema cria registro com EmpresaId, FabricanteId, CriadoPor, CriadoEm, FlAtivo = true"
+      - "Sistema retorna HTTP 201 Created"
+    fluxos_alternativos:
+      - id: "FA-UC05-001"
+        nome: "Criar Marca Inativa"
+        passos:
+          - "Usuário desmarca checkbox Ativo"
+          - "Sistema cria marca com FlAtivo = false"
+          - "Sistema exibe aviso: Marca inativa não permite cadastro de novos modelos"
+    fluxos_excecao:
+      - id: "FE-UC05-001"
+        nome: "Part Number Duplicado no Mesmo Fabricante"
+        passos:
+          - "Sistema detecta Part Number existente (mesmo Fabricante, case-insensitive)"
+          - "Sistema retorna HTTP 409 Conflict"
+          - "Mensagem: Já existe uma marca com este Part Number neste fabricante"
+      - id: "FE-UC05-002"
+        nome: "Fabricante Não Existe"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Fabricante selecionado não existe"
+      - id: "FE-UC05-003"
+        nome: "Campos Obrigatórios Vazios"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Campos Nome, Fabricante e Part Number são obrigatórios"
+      - id: "FE-UC05-004"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+    regras_aplicadas:
+      - "RN-RF051-002: Part Number único por Fabricante (case-insensitive)"
+      - "RN-RF051-006: Marca pertence a Fabricante"
+
+  - id: "UC06"
+    nome: "Editar Marca"
+    tipo: "crud"
+    objetivo: "Alterar dados de marca existente"
+    covers:
+      documentacao_items:
+        - "RN-RF051-002"
+        - "RN-RF051-006"
+      uc_items:
+        - "UC06"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão MARCAS.UPDATE"
+      - "Marca existe"
+    fluxo_principal:
+      - "Usuário clica em Editar em marca da lista"
+      - "Sistema carrega dados da marca"
+      - "Sistema exibe formulário preenchido"
+      - "Usuário altera campos (Nome, Part Number)"
+      - "Usuário clica Salvar"
+      - "Sistema valida campos (RN-RF051-002, RN-RF051-006)"
+      - "Sistema verifica unicidade de Part Number (exceto próprio registro)"
+      - "Sistema atualiza registro"
+      - "Sistema retorna HTTP 200 OK"
+    fluxos_alternativos:
+      - id: "FA-UC06-001"
+        nome: "Alterar Fabricante da Marca"
+        passos:
+          - "Usuário seleciona novo Fabricante no dropdown"
+          - "Sistema valida Part Number no novo Fabricante"
+          - "Sistema atualiza FabricanteId"
+          - "Sistema exibe aviso: Modelos vinculados a esta marca permanecerão inalterados"
+    fluxos_excecao:
+      - id: "FE-UC06-001"
+        nome: "Part Number Duplicado em Outra Marca (Mesmo Fabricante)"
+        passos:
+          - "Sistema retorna HTTP 409 Conflict"
+          - "Mensagem: Já existe outra marca com este Part Number neste fabricante"
+      - id: "FE-UC06-002"
+        nome: "Marca Não Encontrada"
+        passos:
+          - "Sistema retorna HTTP 404 Not Found"
+      - id: "FE-UC06-003"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+      - id: "FE-UC06-004"
+        nome: "Campos Obrigatórios Vazios"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+    regras_aplicadas:
+      - "RN-RF051-002: Part Number único por Fabricante"
+      - "RN-RF051-006: Marca pertence a Fabricante"
+
+  - id: "UC07"
+    nome: "Ativar/Desativar Marca"
+    tipo: "acao"
+    objetivo: "Alterar status de ativação de marca (soft delete)"
+    covers:
+      documentacao_items:
+        - "RN-RF051-008"
+      uc_items:
+        - "UC07"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão MARCAS.UPDATE"
+      - "Marca existe"
+    fluxo_principal:
+      - "Usuário clica em Desativar em marca ativa"
+      - "Sistema verifica se marca possui modelos ativos"
+      - "Sistema exibe confirmação: Desativar marca impedirá criação de novos modelos. Confirma?"
+      - "Usuário confirma"
+      - "Sistema atualiza FlAtivo = false"
+      - "Sistema retorna HTTP 200 OK"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC07-001"
+        nome: "Marca Possui Modelos Ativos"
+        passos:
+          - "Sistema exibe aviso: Esta marca possui N modelos ativos. Ao desativar, não será possível criar novos modelos."
+          - "Sistema permite desativação (não bloqueia)"
+      - id: "FE-UC07-002"
+        nome: "Marca Não Encontrada"
+        passos:
+          - "Sistema retorna HTTP 404 Not Found"
+      - id: "FE-UC07-003"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+    regras_aplicadas:
+      - "RN-RF051-008: Marca inativa não permite criar novos modelos"
+
+  - id: "UC08"
+    nome: "Listar Modelos"
+    tipo: "leitura"
+    objetivo: "Exibir lista paginada de modelos com filtros avançados"
+    covers:
+      documentacao_items:
+        - "RN-RF051-009"
+      uc_items:
+        - "UC08"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão MODELOS.VIEW"
+    fluxo_principal:
+      - "Usuário acessa tela Modelos"
+      - "Sistema carrega modelos do tenant atual (EmpresaId)"
+      - "Sistema aplica filtros padrão (FlExcluido = false)"
+      - "Sistema retorna lista paginada (20 itens por página)"
+      - "Sistema exibe: Nome, SKU, Marca, Fabricante, FlHomologado, FlEOL"
+    fluxos_alternativos:
+      - id: "FA-UC08-001"
+        nome: "Filtrar por Fabricante"
+        passos:
+          - "Usuário seleciona fabricante no dropdown"
+          - "Sistema filtra modelos por Fabricante (via Marca)"
+          - "Sistema retorna resultados"
+      - id: "FA-UC08-002"
+        nome: "Filtrar por Marca"
+        passos:
+          - "Usuário seleciona marca no dropdown"
+          - "Sistema filtra modelos por MarcaId"
+          - "Sistema retorna resultados"
+      - id: "FA-UC08-003"
+        nome: "Filtrar por SKU"
+        passos:
+          - "Usuário digita SKU no campo busca"
+          - "Sistema aplica filtro case-insensitive"
+          - "Sistema retorna resultados"
+      - id: "FA-UC08-004"
+        nome: "Filtrar por Status (Homologado/EOL)"
+        passos:
+          - "Usuário seleciona checkbox Apenas homologados ou Apenas EOL"
+          - "Sistema aplica filtro FlHomologado = true ou FlEOL = true"
+          - "Sistema retorna resultados"
+    fluxos_excecao:
+      - id: "FE-UC08-001"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+      - id: "FE-UC08-002"
+        nome: "Nenhum Modelo Cadastrado"
+        passos:
+          - "Sistema retorna HTTP 200 com array vazio"
+    regras_aplicadas:
+      - "RN-RF051-009: SKU único (global)"
+
+  - id: "UC09"
+    nome: "Criar Modelo"
+    tipo: "crud"
+    objetivo: "Cadastrar novo modelo de ativo vinculado a uma marca"
+    covers:
+      documentacao_items:
+        - "RN-RF051-004"
+        - "RN-RF051-006"
+        - "RN-RF051-007"
+        - "RN-RF051-008"
+        - "RN-RF051-009"
+        - "RN-RF051-012"
+      uc_items:
+        - "UC09"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão MODELOS.CREATE"
+      - "Fabricante ativo existe"
+      - "Marca ativa existe"
+    fluxo_principal:
+      - "Usuário clica em Novo Modelo"
+      - "Sistema exibe formulário: Fabricante, Marca, Nome, SKU, Especificações Técnicas (JSON), Imagens (até 10), FlHomologado, FlEOL"
+      - "Usuário preenche campos e clica Salvar"
+      - "Sistema valida campos (RN-RF051-004, RN-RF051-006, RN-RF051-007, RN-RF051-008, RN-RF051-009, RN-RF051-012)"
+      - "Sistema verifica: Fabricante ativo, Marca ativa, Marca pertence ao Fabricante, SKU único (global), JSON válido, Máximo 10 imagens"
+      - "Sistema cria registro com EmpresaId, MarcaId, CriadoPor, CriadoEm, FlExcluido = false"
+      - "Sistema retorna HTTP 201 Created"
+    fluxos_alternativos:
+      - id: "FA-UC09-001"
+        nome: "Criar Modelo Homologado"
+        passos:
+          - "Usuário marca checkbox Homologado"
+          - "Sistema exige justificativa (20-500 caracteres) - RN-RF051-010"
+          - "Sistema preenche HomologadoEm, HomologadoPor, JustificativaHomologacao"
+          - "Sistema cria modelo com FlHomologado = true"
+      - id: "FA-UC09-002"
+        nome: "Upload de Múltiplas Imagens"
+        passos:
+          - "Usuário faz upload de 5 imagens"
+          - "Sistema valida cada imagem (formato, tamanho, resolução)"
+          - "Sistema associa imagens ao modelo"
+    fluxos_excecao:
+      - id: "FE-UC09-001"
+        nome: "SKU Duplicado (Global)"
+        passos:
+          - "Sistema detecta SKU existente em QUALQUER tenant"
+          - "Sistema retorna HTTP 409 Conflict"
+          - "Mensagem: SKU já cadastrado no sistema (global)"
+      - id: "FE-UC09-002"
+        nome: "Fabricante Inativo"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Não é possível criar modelo com fabricante inativo"
+      - id: "FE-UC09-003"
+        nome: "Marca Inativa"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Não é possível criar modelo com marca inativa"
+      - id: "FE-UC09-004"
+        nome: "Marca Não Pertence ao Fabricante"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Marca selecionada não pertence ao fabricante selecionado"
+      - id: "FE-UC09-005"
+        nome: "JSON Inválido"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Especificações Técnicas contêm JSON inválido"
+      - id: "FE-UC09-006"
+        nome: "Mais de 10 Imagens"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Máximo de 10 imagens permitido por modelo"
+      - id: "FE-UC09-007"
+        nome: "Imagem com Formato Inválido"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Formato de imagem inválido (permitidos: JPG, PNG, WEBP)"
+      - id: "FE-UC09-008"
+        nome: "Imagem Muito Grande"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Imagem excede 5MB"
+      - id: "FE-UC09-009"
+        nome: "Resolução Inválida"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Resolução da imagem fora do range permitido (800x600 a 4096x4096)"
+      - id: "FE-UC09-010"
+        nome: "Homologação Sem Justificativa"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Homologação requer justificativa (20-500 caracteres)"
+      - id: "FE-UC09-011"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+    regras_aplicadas:
+      - "RN-RF051-004: Especificações em JSON válido"
+      - "RN-RF051-006: Modelo pertence a Marca do mesmo Fabricante"
+      - "RN-RF051-007: Fabricante inativo não permite novo modelo"
+      - "RN-RF051-008: Marca inativa não permite novo modelo"
+      - "RN-RF051-009: SKU único (global)"
+      - "RN-RF051-012: Máximo 10 imagens (JPG/PNG/WEBP, 5MB, 800x600-4096x4096)"
+
+  - id: "UC10"
+    nome: "Editar Modelo"
+    tipo: "crud"
+    objetivo: "Alterar dados de modelo existente"
+    covers:
+      documentacao_items:
+        - "RN-RF051-004"
+        - "RN-RF051-006"
+        - "RN-RF051-009"
+        - "RN-RF051-012"
+      uc_items:
+        - "UC10"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão MODELOS.UPDATE"
+      - "Modelo existe"
+    fluxo_principal:
+      - "Usuário clica em Editar em modelo da lista"
+      - "Sistema carrega dados do modelo"
+      - "Sistema exibe formulário preenchido"
+      - "Usuário altera campos (Nome, SKU, Especificações, Imagens)"
+      - "Usuário clica Salvar"
+      - "Sistema valida campos (RN-RF051-004, RN-RF051-006, RN-RF051-009, RN-RF051-012)"
+      - "Sistema verifica: SKU único (exceto próprio registro), JSON válido, Máximo 10 imagens"
+      - "Sistema atualiza registro"
+      - "Sistema retorna HTTP 200 OK"
+    fluxos_alternativos:
+      - id: "FA-UC10-001"
+        nome: "Alterar Marca do Modelo"
+        passos:
+          - "Usuário seleciona nova Marca (mesmo Fabricante)"
+          - "Sistema valida hierarquia (RN-RF051-006)"
+          - "Sistema atualiza MarcaId"
+      - id: "FA-UC10-002"
+        nome: "Adicionar/Remover Imagens"
+        passos:
+          - "Usuário adiciona 3 novas imagens (total 8)"
+          - "Sistema valida limite (RN-RF051-012)"
+          - "Sistema associa imagens ao modelo"
+    fluxos_excecao:
+      - id: "FE-UC10-001"
+        nome: "SKU Duplicado (Outro Modelo)"
+        passos:
+          - "Sistema retorna HTTP 409 Conflict"
+          - "Mensagem: SKU já cadastrado em outro modelo"
+      - id: "FE-UC10-002"
+        nome: "Marca Não Pertence ao Fabricante"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Marca selecionada não pertence ao fabricante do modelo"
+      - id: "FE-UC10-003"
+        nome: "JSON Inválido"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+      - id: "FE-UC10-004"
+        nome: "Mais de 10 Imagens"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+      - id: "FE-UC10-005"
+        nome: "Modelo Não Encontrado"
+        passos:
+          - "Sistema retorna HTTP 404 Not Found"
+      - id: "FE-UC10-006"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+    regras_aplicadas:
+      - "RN-RF051-004: JSON válido"
+      - "RN-RF051-006: Hierarquia Marca→Fabricante"
+      - "RN-RF051-009: SKU único"
+      - "RN-RF051-012: Máximo 10 imagens"
+
+  - id: "UC11"
+    nome: "Homologar/Desomologar Modelo"
+    tipo: "acao"
+    objetivo: "Alterar status de homologação de modelo"
+    covers:
+      documentacao_items:
+        - "RN-RF051-010"
+      uc_items:
+        - "UC11"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão MODELOS.HOMOLOGAR"
+      - "Modelo existe"
+    fluxo_principal:
+      - "Usuário clica em Homologar em modelo não homologado"
+      - "Sistema exibe modal solicitando justificativa (20-500 caracteres)"
+      - "Usuário preenche justificativa e confirma"
+      - "Sistema valida justificativa (RN-RF051-010)"
+      - "Sistema atualiza: FlHomologado = true, HomologadoEm (timestamp), HomologadoPor (usuário), JustificativaHomologacao (texto), AlteradoPor, AlteradoEm"
+      - "Sistema retorna HTTP 200 OK"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC11-001"
+        nome: "Justificativa Fora do Range (20-500 caracteres)"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Justificativa deve ter entre 20 e 500 caracteres"
+      - id: "FE-UC11-002"
+        nome: "Modelo Não Encontrado"
+        passos:
+          - "Sistema retorna HTTP 404 Not Found"
+      - id: "FE-UC11-003"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+      - id: "FE-UC11-004"
+        nome: "Modelo Já Homologado"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Modelo já está homologado"
+      - id: "FE-UC11-005"
+        nome: "Modelo Já Desomologado"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Modelo já está desomologado"
+    regras_aplicadas:
+      - "RN-RF051-010: Homologação requer justificativa (20-500 caracteres)"
+
+  - id: "UC12"
+    nome: "Marcar Modelo como EOL"
+    tipo: "acao"
+    objetivo: "Marcar modelo como EOL (End of Life) e automaticamente desomologar"
+    covers:
+      documentacao_items:
+        - "RN-RF051-003"
+      uc_items:
+        - "UC12"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão MODELOS.UPDATE"
+      - "Modelo existe"
+      - "Modelo não está marcado como EOL"
+    fluxo_principal:
+      - "Usuário clica em Marcar como EOL em modelo ativo"
+      - "Sistema exibe confirmação: Marcar modelo como EOL irá desomologá-lo automaticamente. Confirma?"
+      - "Usuário confirma"
+      - "Sistema atualiza: FlEOL = true, EOLEm (timestamp), EOLPor (usuário), FlHomologado = false, HomologadoEm = null, HomologadoPor = null, JustificativaHomologacao = null, AlteradoPor, AlteradoEm"
+      - "Sistema retorna HTTP 200 OK"
+    fluxos_alternativos:
+      - id: "FA-UC12-001"
+        nome: "Marcar EOL Sem Desomologar (Override)"
+        passos:
+          - "Usuário marca checkbox Manter homologação ao confirmar EOL"
+          - "Sistema exige justificativa (20-500 caracteres)"
+          - "Sistema atualiza: FlEOL = true, EOLEm, EOLPor, FlHomologado = true (MANTÉM), JustificativaManutencaoHomologacao (texto)"
+          - "Sistema retorna HTTP 200 OK"
+    fluxos_excecao:
+      - id: "FE-UC12-001"
+        nome: "Modelo Já Marcado como EOL"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Modelo já está marcado como EOL"
+      - id: "FE-UC12-002"
+        nome: "Justificativa Fora do Range (Override)"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Justificativa para manter homologação deve ter entre 20 e 500 caracteres"
+      - id: "FE-UC12-003"
+        nome: "Modelo Não Encontrado"
+        passos:
+          - "Sistema retorna HTTP 404 Not Found"
+      - id: "FE-UC12-004"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+    regras_aplicadas:
+      - "RN-RF051-003: Marcar EOL automaticamente desomologa (com override + justificativa)"
+
+  - id: "UC13"
+    nome: "Registrar Preço de Modelo"
+    tipo: "crud"
+    objetivo: "Adicionar novo registro de preço ao histórico imutável de preços do modelo"
+    covers:
+      documentacao_items:
+        - "RN-RF051-005"
+      uc_items:
+        - "UC13"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão PRECOS.CREATE"
+      - "Modelo existe"
+    fluxo_principal:
+      - "Usuário acessa tela Histórico de Preços do modelo"
+      - "Sistema exibe histórico ordenado por data (mais recente primeiro)"
+      - "Usuário clica em Registrar Novo Preço"
+      - "Sistema exibe formulário: Valor, Moeda (ISO 4217), Data Vigência, Observações"
+      - "Usuário preenche campos e clica Salvar"
+      - "Sistema valida campos"
+      - "Sistema cria registro em HistoricoPrecoModelo com ModeloId, Valor, Moeda, DataVigencia, Observacoes, CriadoPor, CriadoEm"
+      - "Sistema retorna HTTP 201 Created"
+    fluxos_alternativos:
+      - id: "FA-UC13-001"
+        nome: "Consultar Histórico Completo"
+        passos:
+          - "Usuário acessa histórico de preços"
+          - "Sistema exibe todos os registros (ordem cronológica reversa)"
+          - "Sistema destaca preço vigente (maior DataVigencia <= data atual)"
+    fluxos_excecao:
+      - id: "FE-UC13-001"
+        nome: "Tentativa de Editar Preço Existente"
+        passos:
+          - "Sistema bloqueia edição de preço existente"
+          - "Sistema retorna HTTP 403 Forbidden"
+          - "Mensagem: Histórico de preços é imutável. Registre um novo preço ao invés de editar."
+      - id: "FE-UC13-002"
+        nome: "Tentativa de Excluir Preço Existente"
+        passos:
+          - "Sistema bloqueia exclusão de preço existente"
+          - "Sistema retorna HTTP 403 Forbidden"
+          - "Mensagem: Histórico de preços é imutável. Não é possível excluir registros."
+      - id: "FE-UC13-003"
+        nome: "Valor Inválido (≤ 0)"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Valor deve ser maior que zero"
+      - id: "FE-UC13-004"
+        nome: "Data Vigência no Passado"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Data de vigência não pode ser no passado"
+      - id: "FE-UC13-005"
+        nome: "Moeda Inválida"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Moeda inválida (use código ISO 4217: BRL, USD, EUR, etc.)"
+      - id: "FE-UC13-006"
+        nome: "Modelo Não Encontrado"
+        passos:
+          - "Sistema retorna HTTP 404 Not Found"
+      - id: "FE-UC13-007"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+    regras_aplicadas:
+      - "RN-RF051-005: Histórico de Preços é imutável (somente INSERT, UPDATE/DELETE proibidos)"
+
+  - id: "UC14"
+    nome: "Importar Modelos em Massa"
+    tipo: "batch"
+    objetivo: "Importar múltiplos modelos via arquivo CSV/Excel com validação atômica"
+    covers:
+      documentacao_items:
+        - "RN-RF051-011"
+        - "RN-RF051-004"
+        - "RN-RF051-006"
+        - "RN-RF051-007"
+        - "RN-RF051-008"
+        - "RN-RF051-009"
+      uc_items:
+        - "UC14"
+    precondicoes:
+      - "Usuário autenticado"
+      - "Permissão MODELOS.CREATE"
+      - "Arquivo CSV/Excel válido"
+    fluxo_principal:
+      - "Usuário acessa tela Importar Modelos"
+      - "Sistema exibe instruções e template CSV"
+      - "Usuário faz upload do arquivo (CSV ou Excel)"
+      - "Sistema lê arquivo e valida estrutura (colunas obrigatórias)"
+      - "Sistema valida TODOS os registros ANTES de persistir (RN-RF051-011): Fabricante ativo, Marca ativa pertence ao Fabricante, SKU único (global), JSON válido, Campos obrigatórios"
+      - "SE todos válidos: Sistema inicia transação, cria TODOS os modelos, comita transação, retorna HTTP 201 Created com resumo"
+      - "SE pelo menos 1 inválido: Sistema NÃO persiste NENHUM registro, retorna HTTP 400 Bad Request com relatório detalhado de erros"
+    fluxos_alternativos:
+      - id: "FA-UC14-001"
+        nome: "Download de Template CSV"
+        passos:
+          - "Usuário clica em Baixar Template"
+          - "Sistema gera arquivo CSV com colunas: FabricanteNome, MarcaNome, ModeloNome, SKU, EspecificacoesTecnicas (JSON)"
+          - "Sistema retorna arquivo para download"
+      - id: "FA-UC14-002"
+        nome: "Validação Prévia (Dry-Run)"
+        passos:
+          - "Usuário marca checkbox Apenas validar (não importar)"
+          - "Sistema valida todos os registros"
+          - "Sistema retorna relatório de validação SEM persistir"
+          - "Sistema retorna HTTP 200 OK com resumo: X registros válidos, Y inválidos"
+    fluxos_excecao:
+      - id: "FE-UC14-001"
+        nome: "Arquivo com Estrutura Inválida"
+        passos:
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Mensagem: Arquivo inválido. Colunas obrigatórias: FabricanteNome, MarcaNome, ModeloNome, SKU"
+      - id: "FE-UC14-002"
+        nome: "Pelo Menos 1 Registro Inválido (Transação Atômica)"
+        passos:
+          - "Sistema NÃO persiste NENHUM registro (rollback completo)"
+          - "Sistema retorna HTTP 400 Bad Request"
+          - "Relatório detalhado: totalLinhas, linhasValidas, linhasInvalidas, erros (linha, campo, mensagem)"
+      - id: "FE-UC14-003"
+        nome: "Arquivo Muito Grande (> 10.000 linhas)"
+        passos:
+          - "Sistema retorna HTTP 413 Payload Too Large"
+          - "Mensagem: Arquivo excede limite de 10.000 registros. Divida em arquivos menores."
+      - id: "FE-UC14-004"
+        nome: "Sem Permissão"
+        passos:
+          - "Sistema retorna HTTP 403 Forbidden"
+    regras_aplicadas:
+      - "RN-RF051-011: Importação em massa valida TODOS os registros antes de persistir (transação atômica)"
+      - "RN-RF051-004: JSON válido"
+      - "RN-RF051-006: Hierarquia Marca→Fabricante"
+      - "RN-RF051-007: Fabricante ativo"
+      - "RN-RF051-008: Marca ativa"
+      - "RN-RF051-009: SKU único (global)"
+
+exclusions:
+  uc_items: []
+
+padroes_gerais:
+  multi_tenancy:
+    descricao: "Todos os registros são isolados por EmpresaId (tenant), exceto SKU que é globalmente único"
+    aplicacao: "Fabricante, Marca, Modelo"
+    violacao: "HTTP 409"
+    ucs: ["UC01", "UC02", "UC05", "UC06", "UC09", "UC10", "UC14"]
+  rbac:
+    descricao: "Controle de acesso baseado em permissões (FABRICANTES.*, MARCAS.*, MODELOS.*, PRECOS.*)"
+    aplicacao: "Todos os UCs"
+    violacao: "HTTP 403"
+    ucs: ["UC00", "UC01", "UC02", "UC03", "UC04", "UC05", "UC06", "UC07", "UC08", "UC09", "UC10", "UC11", "UC12", "UC13", "UC14"]
+  auditoria:
+    descricao: "Todos os registros possuem CriadoPor, CriadoEm, AlteradoPor, AlteradoEm"
+    aplicacao: "Fabricante, Marca, Modelo, HistoricoPrecoModelo"
+    ucs: ["UC01", "UC02", "UC03", "UC05", "UC06", "UC07", "UC09", "UC10", "UC11", "UC12", "UC13"]
+  soft_delete:
+    descricao: "Exclusões são lógicas (FlAtivo = false para Fabricante/Marca, FlExcluido = true para Modelo)"
+    aplicacao: "Fabricante, Marca, Modelo"
+    ucs: ["UC03", "UC07"]
+  validacoes_unicidade:
+    descricao: "Validações case-insensitive: Nome Fabricante (tenant), Part Number (por Fabricante), SKU (global)"
+    aplicacao: "Fabricante, Marca, Modelo"
+    violacao: "HTTP 409"
+    ucs: ["UC01", "UC02", "UC05", "UC06", "UC09", "UC10", "UC14"]
+  hierarquia_referencial:
+    descricao: "Modelo → Marca → Fabricante (hierarquia estrita)"
+    aplicacao: "Modelo"
+    violacao: "HTTP 400"
+    ucs: ["UC09", "UC10", "UC14"]
+  restricoes_estado:
+    descricao: "Fabricante/Marca inativos não permitem criar/editar modelos"
+    aplicacao: "Modelo"
+    violacao: "HTTP 400"
+    ucs: ["UC09", "UC10", "UC14"]
+  json_dinamico:
+    descricao: "Especificações Técnicas em JSON válido (estrutura dinâmica)"
+    aplicacao: "Modelo"
+    violacao: "HTTP 400"
+    ucs: ["UC09", "UC10", "UC14"]
+  imutabilidade_historico:
+    descricao: "Histórico de Preços é append-only (INSERT permitido, UPDATE/DELETE proibidos)"
+    aplicacao: "HistoricoPrecoModelo"
+    violacao: "HTTP 403"
+    ucs: ["UC13"]
+  homologacao_justificativa:
+    descricao: "Homologar modelo exige justificativa (20-500 caracteres)"
+    aplicacao: "Modelo"
+    violacao: "HTTP 400"
+    ucs: ["UC11"]
+  eol_desomologacao:
+    descricao: "Marcar EOL automaticamente desomologa (com override + justificativa)"
+    aplicacao: "Modelo"
+    violacao: "HTTP 400"
+    ucs: ["UC12"]
+  importacao_atomica:
+    descricao: "Importação valida TODOS os registros antes de persistir (all-or-nothing)"
+    aplicacao: "Modelo"
+    violacao: "HTTP 400"
+    ucs: ["UC14"]
+  gestao_imagens:
+    descricao: "Máximo 10 imagens por modelo (JPG/PNG/WEBP, 5MB, 800x600-4096x4096)"
+    aplicacao: "Modelo"
+    violacao: "HTTP 400"
+    ucs: ["UC09", "UC10"]
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Geração completa de UCs v2.0 YAML conforme CONTRATO-GERACAO-DOCS-UC.md: 15 UCs cobrindo 12 RNs, hierarquia Fabricante→Marca→Modelo com operações especializadas (homologação, EOL, histórico preços, importação massa)"

@@ -1,0 +1,704 @@
+# =============================================
+# RL-RF035 - Referência ao Legado
+# Gestão de Resumos de Auditoria
+# Versão: 1.0
+# Data: 2025-12-30
+# =============================================
+
+rf_id: RF035
+titulo: "Gestão de Resumos de Auditoria"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms + SQL Server"
+  versao: "IControlIT Legado v4.2"
+  arquitetura: "Monolítica WebForms com lógica em ASPX/VB.NET/SQL"
+  banco_dados: "SQL Server 2019+ (banco Auditoria)"
+  multi_tenant: false # Campo Id_Fornecedor sem RLS automática
+  auditoria: "partial" # Log básico sem Event Sourcing
+
+# ==============================================================================
+# REFERÊNCIAS AO LEGADO (OBRIGATÓRIO: 100% com campo destino)
+# ==============================================================================
+
+referencias:
+  # ============================================================================
+  # TELAS ASPX
+  # ============================================================================
+  - id: "LEG-RF035-001"
+    tipo: "tela"
+    nome: "ResumoAuditoria.aspx"
+    caminho: "ic1_legado/IControlIT/Auditoria/ResumoAuditoria.aspx"
+    descricao: |
+      Listagem paginada de resumos consolidados com filtros por período, operadora e lote.
+      Permite exportação para Excel (VBA instável) e navegação para detalhes.
+    regras_implicitas:
+      - "Validação client-side apenas (DataFim >= DataInicio sem server-side)"
+      - "Filtro automático por Id_Fornecedor via Session (risco de vazamento)"
+      - "Paginação em memória (GridView carrega todos registros)"
+      - "Totalizadores calculados em loop VB.NET após binding"
+      - "Exportação Excel síncrona (timeout > 30s em bases grandes)"
+    destino: "substituido"
+    justificativa: |
+      Tela completamente redesenhada em Angular 19 com:
+      - Paginação server-side obrigatória
+      - Filtros reativos com debounce
+      - Exportação assíncrona (job Hangfire)
+      - Validação FluentValidation server-side
+      - Row-Level Security automática
+    rastreabilidade:
+      documentacao_moderno: "RF035 - Seção 2 (Funcionalidades), RN-RF035-001, RN-RF035-002"
+      uc_moderno: "UC02-RF035 - Visualizar Dashboard Executivo"
+    migracao_moderna:
+      componente_angular: "resumos-auditoria-list.component.ts"
+      rota_frontend: "/admin/auditoria/resumos"
+      api_endpoint: "GET /api/auditoria/resumos"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF035-002"
+    tipo: "tela"
+    nome: "DashboardAuditoria.aspx"
+    caminho: "ic1_legado/IControlIT/Auditoria/DashboardAuditoria.aspx"
+    descricao: |
+      Dashboard executivo com gráficos de glosa por operadora, evolução temporal,
+      Top 10 operadoras divergentes e KPIs consolidados (glosa média, ROI).
+    regras_implicitas:
+      - "Gráficos estáticos (ASP.NET Chart Controls sem interatividade)"
+      - "Atualização manual (F5 obrigatório, sem refresh automático)"
+      - "KPIs re-calculados a cada PostBack (ineficiente)"
+      - "Sem drill-down contextual (apenas MessageBox com valor)"
+    destino: "substituido"
+    justificativa: |
+      Dashboard modernizado com:
+      - Chart.js interativo (hover, zoom, drill-down)
+      - SignalR real-time (atualização automática sem F5)
+      - KPIs pré-calculados e cacheados
+      - Navegação contextual para detalhes
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-004, RN-RF035-005"
+      uc_moderno: "UC02-RF035 - Visualizar Dashboard Executivo"
+    migracao_moderna:
+      componente_angular: "dashboard-auditoria.component.ts"
+      rota_frontend: "/admin/auditoria/dashboard"
+      api_endpoint: "GET /api/auditoria/dashboard"
+      biblioteca_graficos: "Chart.js 4.0+"
+      notificacao_realtime: "SignalR"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF035-003"
+    tipo: "tela"
+    nome: "ComparaPeriodos.aspx"
+    caminho: "ic1_legado/IControlIT/Auditoria/ComparaPeriodos.aspx"
+    descricao: |
+      Análise comparativa entre dois períodos (mês, trimestre, ano).
+      Exibe variação em R$ e % com destaque visual (vermelho > 20%).
+    regras_implicitas:
+      - "Cálculo de variação manual em VB.NET sem tratamento de divisão por zero"
+      - "Variações > 20% apenas destacadas em CSS (sem alerta persistido)"
+      - "Comparação limitada a 2 períodos (sem análise multi-período)"
+    destino: "substituido"
+    justificativa: |
+      Componente Angular com:
+      - Comparação multi-período (até 5 períodos simultaneamente)
+      - Tratamento de edge cases (divisão por zero, períodos vazios)
+      - Alertas automáticos persistidos (variação > 20%)
+      - Gráficos comparativos interativos
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-003"
+      uc_moderno: "UC03-RF035 - Analisar Comparativo de Períodos"
+    migracao_moderna:
+      componente_angular: "comparacao-periodos.component.ts"
+      rota_frontend: "/admin/auditoria/comparacao"
+      api_endpoint: "POST /api/auditoria/resumos/{id}/comparar-periodos"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF035-004"
+    tipo: "tela"
+    nome: "AlertasAuditoria.aspx"
+    caminho: "ic1_legado/IControlIT/Auditoria/AlertasAuditoria.aspx"
+    descricao: |
+      Listagem de alertas de desvios (glosa alta, variação anormal).
+      Permite reconhecimento manual mas sem rastreamento de quem/quando reconheceu.
+    regras_implicitas:
+      - "Alertas não persistidos (gerados em Jobs mas apenas em log texto)"
+      - "Severidade como texto livre (sem enum: 'Alto', 'Médio', 'Baixo')"
+      - "Reconhecimento sem auditoria (não registra usuário ou timestamp)"
+    destino: "substituido"
+    justificativa: |
+      Sistema Angular com:
+      - Alertas persistidos em tabela AlertaAuditoria
+      - Severidade enum estruturado (CRITICO, ALERTA, AVISO)
+      - Auditoria completa de reconhecimento (UserId + Timestamp)
+      - Notificação real-time via SignalR
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-005"
+      uc_moderno: "UC02-RF035 - Visualizar Dashboard Executivo (alertas)"
+    migracao_moderna:
+      componente_angular: "alertas-list.component.ts"
+      rota_frontend: "/admin/auditoria/alertas"
+      api_endpoint: "GET /api/auditoria/alertas"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ============================================================================
+  # WEBSERVICES
+  # ============================================================================
+  - id: "LEG-RF035-005"
+    tipo: "webservice"
+    nome: "WSAuditoria.asmx"
+    caminho: "ic1_legado/IControlIT/WebService/WSAuditoria.asmx.vb"
+    metodos:
+      - nome: "GetResumosPeriodo"
+        parametros: "IdFornecedor As Integer, DataInicio As Date, DataFim As Date"
+        retorno: "DataSet com resumos"
+      - nome: "GetResumoDetalhes"
+        parametros: "IdResumo As Integer"
+        retorno: "DataRow com detalhe"
+      - nome: "CalcularIndicadores"
+        parametros: "IdFornecedor As Integer, Periodo As String"
+        retorno: "DataSet com KPIs"
+      - nome: "GetAlertas"
+        parametros: "IdFornecedor As Integer, Severidade As String"
+        retorno: "DataSet com alertas"
+      - nome: "ExportarPDF"
+        parametros: "IdResumo As Integer"
+        retorno: "Byte() (PDF binário)"
+      - nome: "ExportarExcel"
+        parametros: "IdResumo As Integer"
+        retorno: "Byte() (XLSX binário)"
+    descricao: |
+      WebService SOAP (.asmx) com métodos para listar resumos, calcular indicadores,
+      obter alertas e exportar relatórios em PDF/Excel.
+    regras_implicitas:
+      - "Sem validação de entrada (aceita DataFim < DataInicio sem erro)"
+      - "SQL Injection potencial (concatenação de strings SQL sem parametrização)"
+      - "Sem autenticação (WebService público)"
+      - "Sem paginação (GetResumosPeriodo retorna TODOS os registros)"
+      - "Timeout fixo 30s (insuficiente para bases grandes)"
+    destino: "substituido"
+    justificativa: |
+      WebService SOAP obsoleto substituído por REST API moderna (.NET 10 Minimal APIs) com:
+      - Autenticação JWT obrigatória
+      - Validação FluentValidation em todos os endpoints
+      - Paginação obrigatória (PaginatedList<T>)
+      - Parametrização EF Core (proteção SQL Injection)
+      - Timeout configurável por endpoint
+    rastreabilidade:
+      documentacao_moderno: "RF035 - Seção 6 (API Endpoints)"
+      uc_moderno: "UC00-UC04 (todos)"
+    migracao_moderna:
+      rest_api_endpoints:
+        - "GET /api/auditoria/resumos"
+        - "GET /api/auditoria/resumos/{id}"
+        - "POST /api/auditoria/resumos/{id}/calcular-indicadores"
+        - "GET /api/auditoria/alertas"
+        - "GET /api/auditoria/resumos/{id}/exportar/pdf"
+        - "GET /api/auditoria/resumos/{id}/exportar/excel"
+      command_cqrs:
+        - "GetAuditoriaResumosQuery"
+        - "GetAuditoriaResumoByIdQuery"
+        - "CalcularIndicadoresCommand"
+        - "GetAlertasQuery"
+        - "ExportarPdfQuery"
+        - "ExportarExcelQuery"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # ============================================================================
+  # STORED PROCEDURES
+  # ============================================================================
+  - id: "LEG-RF035-006"
+    tipo: "stored_procedure"
+    nome: "pa_ConsolidarAuditoria"
+    caminho: "Database.[dbo].[pa_ConsolidarAuditoria]"
+    parametros_entrada:
+      - "@DataConsolidacao DATE - Data dos itens a consolidar"
+      - "@IdFornecedor INT - Filtro por Fornecedor"
+    parametros_saida: []
+    descricao: |
+      Stored Procedure que consolida itens auditados em resumos agrupados.
+      Deleta consolidações anteriores do mesmo período antes de inserir novas.
+      Agrupa por Operadora, TipoServico, Lote e calcula totalizadores.
+    regras_implicitas:
+      - "DELETE sem WHERE pode apagar TODOS os resumos se @DataConsolidacao null"
+      - "Query sem índices adequados (Full Table Scan em > 1M registros)"
+      - "Sem validação (permite INSERT vazio se não houver itens)"
+      - "Sem TRY-CATCH (falha silenciosa em constraint violation)"
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Application Layer com:
+      - ConsolidacaoAuditoriaJobHandler (Hangfire)
+      - Domain Aggregates (AuditoriaResumo.CriarDoGrupoItens)
+      - Validações determinísticas (FluentValidation)
+      - Tratamento de erros estruturado (try-catch com logging)
+      - Retry automático (Hangfire)
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-001"
+      regra_moderna: "RN-RF035-001: Consolidação Automática Diária"
+      uc_moderno: "UC01-RF035 - Consolidar Auditorias (Job Automático)"
+    migracao_moderna:
+      handler: "ConsolidacaoAuditoriaJobHandler"
+      aggregate: "AuditoriaResumo.CriarDoGrupoItens()"
+      job_hangfire: "ConsolidacaoAuditoriaJob (cron: 0 2 * * *)"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF035-007"
+    tipo: "stored_procedure"
+    nome: "pa_CalcularIndicadores"
+    caminho: "Database.[dbo].[pa_CalcularIndicadores]"
+    parametros_entrada:
+      - "@IdFornecedor INT"
+      - "@Periodo VARCHAR(7) - Formato: YYYY-MM"
+    parametros_saida:
+      - "Tabela temporária #Indicadores com KPIs calculados"
+    descricao: |
+      Calcula indicadores de performance: % Glosa Média, ROI, Ticket Médio, Eficiência.
+      ROI usa investimento hardcoded de R$ 50.000,00.
+    regras_implicitas:
+      - "Investimento de auditoria hardcoded (R$ 50.000) sem parametrização"
+      - "Divisão por zero quando SUM(Qt_Itens_Auditados) = 0"
+      - "Indicadores calculados on-demand mas não salvos (sem histórico)"
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Domain Service com:
+      - IndicadorPerformanceCalculador (Value Object)
+      - Configuração dinâmica de investimento (tabela ConfiguracaoAuditoria)
+      - Validação de divisão por zero
+      - Persistência em tabela AuditoriaIndicadores (histórico completo)
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-004"
+      regra_moderna: "RN-RF035-004: Cálculo de Indicadores de Performance"
+      uc_moderno: "UC02-RF035 - Visualizar Dashboard Executivo"
+    migracao_moderna:
+      domain_service: "IndicadorPerformanceCalculador"
+      value_object: "TotalizadorAuditoriaValueObject"
+      persistencia: "AuditoriaIndicadores (tabela histórico)"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF035-008"
+    tipo: "stored_procedure"
+    nome: "pa_GerarAlertas"
+    caminho: "Database.[dbo].[pa_GerarAlertas]"
+    parametros_entrada:
+      - "@IdResumo INT"
+    parametros_saida: []
+    descricao: |
+      Gera alertas de desvios comparando % Glosa com limite configurado
+      e variação entre períodos. Insere alertas em tabela Alerta_Auditoria.
+    regras_implicitas:
+      - "Execução manual (chamada explícita por Job, não automática)"
+      - "Sem Domain Events (lógica isolada)"
+      - "Alertas salvos mas sem notificação (sem email, SMS, push)"
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Domain Service com:
+      - AlertaGlosaDomainService
+      - Domain Events (AuditoriaResumoConsolidadoEvent)
+      - Notificação real-time (SignalR + Email + Slack)
+      - Event Handler automático
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-005"
+      regra_moderna: "RN-RF035-005: Alertas de Desvios Automáticos"
+      uc_moderno: "UC02-RF035 - Visualizar Dashboard Executivo (alertas)"
+    migracao_moderna:
+      domain_service: "AlertaGlosaDomainService"
+      domain_event: "AuditoriaResumoConsolidadoEvent"
+      event_handler: "AlertaGlosaDomainEventHandler"
+      notificacao: "SignalR + Email (SMTP) + Slack (Webhook)"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF035-009"
+    tipo: "stored_procedure"
+    nome: "pa_ExportarPDF"
+    caminho: "Database.[dbo].[pa_ExportarPDF]"
+    parametros_entrada:
+      - "@IdResumo INT"
+      - "@Caminho VARCHAR(500) - Path físico do arquivo"
+    parametros_saida:
+      - "Path do arquivo PDF gerado"
+    descricao: |
+      Gera relatório PDF usando Crystal Reports via COM interop.
+      Salva arquivo em disco (C:\Temp\Relatorios\) e retorna path.
+    regras_implicitas:
+      - "Arquivo salvo em disco compartilhado (risco de segurança)"
+      - "Crystal Reports requer licença paga"
+      - "Sem streaming (OutOfMemoryException > 100MB)"
+      - "Sem i18n (relatório fixo em português)"
+    destino: "substituido"
+    justificativa: |
+      Geração modernizada com:
+      - iText 8+ (sem licença paga)
+      - Streaming server-side (FileStreamResult)
+      - 16 pontos i18n (pt-BR, en, es)
+      - Assinatura digital opcional
+      - Geração assíncrona (job Hangfire)
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-008"
+      regra_moderna: "RN-RF035-008: Exportação em Múltiplos Formatos"
+      uc_moderno: "UC04-RF035 - Exportar Relatórios Gerenciais"
+    migracao_moderna:
+      service: "ExportadorResumoPDF"
+      biblioteca: "iText 8+"
+      streaming: "FileStreamResult (ASP.NET Core)"
+      assincrono: "ExportarPdfJob (Hangfire)"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF035-010"
+    tipo: "stored_procedure"
+    nome: "pa_ExportarExcel"
+    caminho: "Database.[dbo].[pa_ExportarExcel]"
+    parametros_entrada:
+      - "@IdResumo INT"
+      - "@Caminho VARCHAR(500)"
+    parametros_saida:
+      - "Path do arquivo Excel gerado"
+    descricao: |
+      Gera arquivo Excel usando VBA script externo (instável).
+      Salva em C:\Temp\Relatorios\.
+    regras_implicitas:
+      - "VBA instável (corrupção de arquivo > 5MB)"
+      - "Aba única sem separação Consolidado/Detalhes/Gráficos"
+      - "Sem formatação (tabela simples)"
+    destino: "substituido"
+    justificativa: |
+      Geração modernizada com:
+      - EPPlus 6+ (biblioteca .NET nativa)
+      - Múltiplas abas (Consolidado, Detalhes, Gráficos)
+      - Formatação completa (cores, bordas, títulos)
+      - Gráficos incorporados (Chart.js renderizado)
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-008"
+      regra_moderna: "RN-RF035-008: Exportação em Múltiplos Formatos"
+      uc_moderno: "UC04-RF035 - Exportar Relatórios Gerenciais"
+    migracao_moderna:
+      service: "ExportadorResumoExcel"
+      biblioteca: "EPPlus 6+"
+      abas:
+        - "Consolidado (resumos)"
+        - "Detalhes (itens)"
+        - "Gráficos (charts renderizados)"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ============================================================================
+  # TABELAS LEGADAS
+  # ============================================================================
+  - id: "LEG-RF035-011"
+    tipo: "tabela"
+    nome: "[dbo].[Auditoria_Resumo]"
+    caminho: "Database/Auditoria/[dbo].[Auditoria_Resumo]"
+    schema_legado: "[dbo].[Auditoria_Resumo]"
+    problemas_identificados:
+      - "Falta de FK explícita (Id_Lote_Auditoria sem FOREIGN KEY constraint)"
+      - "Campo redundante (Nm_Operadora duplicado)"
+      - "Sem auditoria de campos (Created/Modified/By ausentes)"
+      - "Tipo numeric(13,2) - overflow possível > R$ 99.999.999.999,99"
+      - "Sem índices de consulta (apenas Clustered PK)"
+      - "Sem particionamento (performance ruim > 10M registros)"
+      - "Vl_Ticket_Medio redundante (deveria ser computed column)"
+    descricao: |
+      Tabela que armazena resumos consolidados de auditorias.
+      Problemas de design impedem performance e rastreabilidade.
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com:
+      - FK explícitas validadas (ON DELETE RESTRICT)
+      - Normalização (referência a Operadora por Id)
+      - Auditoria completa (Created, Modified, By)
+      - Tipo decimal(18,8) com precisão adequada
+      - Índices estratégicos (Covering Index em queries frequentes)
+      - Particionamento por DataPeriodo (partition scheme)
+      - Computed columns para campos derivados
+    rastreabilidade:
+      documentacao_moderno: "RF035 - Seção 7 (Modelo de Dados)"
+      md_moderno: "MD-RF035.md - Tabela AuditoriaResumo"
+    migracao_moderna:
+      tabela_moderna: "AuditoriaResumo"
+      migration_ef_core: "20251230_CreateAuditoriaResumoTable.cs"
+      indices:
+        - "IX_AuditoriaResumo_ClienteId_DataPeriodo (Covering)"
+        - "IX_AuditoriaResumo_Operadora"
+        - "IX_AuditoriaResumo_LoteId"
+      particionamento: "PARTITION SCHEME por DataPeriodo (mensal)"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF035-012"
+    tipo: "tabela"
+    nome: "[dbo].[Alerta_Auditoria]"
+    caminho: "Database/Auditoria/[dbo].[Alerta_Auditoria]"
+    schema_legado: "[dbo].[Alerta_Auditoria]"
+    problemas_identificados:
+      - "Campo Severidade VARCHAR (sem enum)"
+      - "Sem FK para Resumo (alertas órfãos)"
+      - "Reconhecimento sem rastreamento (DataReconhecimento, UsuarioReconhecimento ausentes)"
+    descricao: |
+      Tabela que armazena alertas de desvios de auditoria.
+      Falta de estruturação impede análise e auditoria.
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com:
+      - Enum TipoSeveridade (CRITICO, ALERTA, AVISO)
+      - FK obrigatória AuditoriaResumoId
+      - Campos ReconhecidoPorUserId e DataReconhecimento
+      - Auditoria completa de lifecycle do alerta
+    rastreabilidade:
+      documentacao_moderno: "RF035 - Seção 7 (Modelo de Dados)"
+      md_moderno: "MD-RF035.md - Tabela AlertaAuditoria"
+    migracao_moderna:
+      tabela_moderna: "AlertaAuditoria"
+      migration_ef_core: "20251230_CreateAlertaAuditoriaTable.cs"
+      enum: "TipoSeveridadeAlerta (CRITICO, ALERTA, AVISO)"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ============================================================================
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  # ============================================================================
+  - id: "LEG-RF035-013"
+    tipo: "regra_negocio"
+    nome: "Investimento de Auditoria Hardcoded"
+    caminho: "Database.[dbo].[pa_CalcularIndicadores] linha 42"
+    localizacao_codigo: "pa_CalcularIndicadores linha 42"
+    descricao: |
+      ROI calculado com investimento fixo de R$ 50.000,00 sem parametrização.
+      Código: DECLARE @InvestimentoAuditoria NUMERIC(13,2) = 50000.00
+    destino: "assumido"
+    justificativa: |
+      Regra mantida mas parametrizada dinamicamente.
+      Investimento configurável por Fornecedor e período em tabela ConfiguracaoAuditoria.
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-004"
+      documentacao_item_relacionado: "RN-RF035-004"
+      regra_moderna: "RN-RF035-004: Cálculo de Indicadores de Performance"
+    migracao_moderna:
+      configuracao: "ConfiguracaoAuditoria.InvestimentoPeriodo (tabela)"
+      validacao: "InvestimentoDeveSerMaiorQueZero (FluentValidation)"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF035-014"
+    tipo: "regra_negocio"
+    nome: "Limite de Glosa por Operadora Configurável"
+    caminho: "Database.[dbo].[pa_GerarAlertas] linha 15-20"
+    localizacao_codigo: "pa_GerarAlertas linha 15-20"
+    descricao: |
+      Alertas gerados quando % Glosa > limite configurado por operadora em Config_Alertas.
+      Código SQL: IF @PercentualGlosa > @LimiteGlosa THEN INSERT INTO Alerta_Auditoria
+    destino: "assumido"
+    justificativa: |
+      Regra mantida e aprimorada com Domain Events.
+      Cada operadora pode ter limite diferente configurado.
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-005"
+      documentacao_item_relacionado: "RN-RF035-005"
+      regra_moderna: "RN-RF035-005: Alertas de Desvios Automáticos"
+    migracao_moderna:
+      configuracao: "ConfiguracaoAlertaGlosa (tabela por operadora)"
+      domain_service: "AlertaGlosaDomainService.Verificar()"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF035-015"
+    tipo: "regra_negocio"
+    nome: "Consolidação Deleta Anteriores do Mesmo Período"
+    caminho: "Database.[dbo].[pa_ConsolidarAuditoria] linha 5-8"
+    localizacao_codigo: "pa_ConsolidarAuditoria linha 5-8"
+    descricao: |
+      SP deleta consolidações anteriores do mesmo período antes de inserir novas.
+      Código SQL: DELETE FROM Auditoria_Resumo WHERE Dt_Resumo = @DataConsolidacao
+    destino: "substituido"
+    justificativa: |
+      DELETE/INSERT substituído por UPSERT (UPDATE se existe, INSERT se não).
+      Evita perda de dados em caso de falha parcial.
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-001"
+      documentacao_item_relacionado: "RN-RF035-001"
+      regra_moderna: "RN-RF035-001: Consolidação Automática Diária"
+    migracao_moderna:
+      implementacao: "Repository.UpsertResumo() com MERGE SQL"
+      validacao: "ResumoUnicoConstraint (ClienteId, Operadora, TipoServico, DataPeriodo)"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF035-016"
+    tipo: "regra_negocio"
+    nome: "Exportação Salva Arquivo em Disco"
+    caminho: "Database.[dbo].[pa_ExportarPDF], [pa_ExportarExcel]"
+    localizacao_codigo: "pa_ExportarPDF, pa_ExportarExcel"
+    descricao: |
+      Exportações salvam arquivo físico em C:\Temp\Relatorios\ e retornam path.
+    destino: "descartado"
+    justificativa: |
+      Sistema moderno usa streaming direto para client (FileStreamResult) sem salvar em disco.
+      Elimina riscos de segurança e necessidade de cleanup manual.
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-008"
+      documentacao_item_relacionado: null
+      regra_moderna: null # Regra descartada
+    migracao_moderna: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF035-017"
+    tipo: "regra_negocio"
+    nome: "Validação Client-Side de Período"
+    caminho: "ic1_legado/IControlIT/Auditoria/ResumoAuditoria.aspx.vb (JavaScript)"
+    localizacao_codigo: "ResumoAuditoria.aspx.vb código JavaScript"
+    descricao: |
+      Validação de DataFim >= DataInicio feita APENAS em JavaScript sem server-side.
+    destino: "assumido"
+    justificativa: |
+      Regra mantida mas implementada em ambos os lados:
+      - Server-side: FluentValidation
+      - Client-side: Angular Reactive Forms
+    rastreabilidade:
+      documentacao_moderno: "RF035 - RN-RF035-002"
+      documentacao_item_relacionado: "RN-RF035-002"
+      regra_moderna: "RN-RF035-002: Cálculo Automático e Validado de Totalizadores"
+    migracao_moderna:
+      validador_backend: "CreateAuditoriaResumoCommandValidator (FluentValidation)"
+      validador_frontend: "ResumoFormValidator (Angular Reactive Forms)"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+# ==============================================================================
+# BANCOS LEGADOS MAPEADOS
+# ==============================================================================
+
+bancos_legados:
+  - nome: "Auditoria"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "Auditoria_Resumo"
+      - "Alerta_Auditoria"
+      - "Config_Alertas"
+      - "Auditoria_Item (referência de RF034)"
+      - "Lote_Auditoria (referência de RF054)"
+    destino: "CONSOLIDADO"
+    justificativa: |
+      Banco legado multi-database migrado para banco único com multi-tenancy.
+      Row-Level Security garante isolamento por ClienteId.
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod com RLS)"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF035-001"
+    titulo: "Lógica de Negócio Espalhada (Code Smell: Scattered Logic)"
+    severidade: "ALTA"
+    descricao: |
+      Cálculos complexos distribuídos entre ASPX (VB.NET), WebServices (.asmx)
+      e Stored Procedures SQL. Dificulta manutenção e testes unitários.
+    impacto: "Manutenção cara, bugs recorrentes, impossibilidade de testes automatizados"
+    solucao_moderna: |
+      Clean Architecture com Domain Aggregates.
+      Lógica centralizada em AuditoriaResumo (aggregate) e Value Objects.
+      Testes unitários 100% cobertura de domain layer.
+
+  - id: "PROB-RF035-002"
+    titulo: "Queries SQL Complexas sem Otimização"
+    severidade: "CRÍTICA"
+    descricao: |
+      Queries de consolidação com múltiplos JOINs e subconsultas aninhadas
+      sem índices adequados. Full Table Scan em > 1M registros.
+    impacto: "Lentidão extrema (> 5 minutos) em bases grandes. Timeout frequente."
+    solucao_moderna: |
+      Índices estratégicos (Covering Index em queries frequentes).
+      Particionamento por DataPeriodo (partition scheme).
+      CQRS: queries otimizadas separadas de commands.
+
+  - id: "PROB-RF035-003"
+    titulo: "Multi-tenancy Frágil (Risco de Vazamento de Dados)"
+    severidade: "CRÍTICA"
+    descricao: |
+      Filtro manual Id_Fornecedor em cada query.
+      Sujeito a vazamento por esquecimento ou erro humano.
+    impacto: "LGPD violation. Dados de clientes vazam entre si."
+    solucao_moderna: |
+      SQL Server Row-Level Security (RLS) automática.
+      CONTEXT_INFO com ClienteId definido no início de cada conexão.
+      Impossível esquecer filtro (bloqueio em nível de banco).
+
+  - id: "PROB-RF035-004"
+    titulo: "Consolidação Manual ou Semi-automática"
+    severidade: "ALTA"
+    descricao: |
+      Job SQL Server Agent com dependências externas (DTS packages antigos).
+      Sem retry automático ou tratamento de falhas estruturado.
+    impacto: "Consolidações falhadas passam despercebidas. Dados desatualizados."
+    solucao_moderna: |
+      Hangfire Job com retry automático (3 tentativas).
+      Dashboard visual (/hangfire) com monitoramento.
+      Alertas críticos em caso de 3 falhas consecutivas.
+
+  - id: "PROB-RF035-005"
+    titulo: "Relatórios Estáticos em Crystal Reports"
+    severidade: "MÉDIA"
+    descricao: |
+      Geração síncrona bloqueando interface.
+      Sem suporte a exportação assíncrona ou streaming.
+    impacto: "Timeout > 30s em bases grandes. Interface trava."
+    solucao_moderna: |
+      iText 8+ com geração assíncrona (job Hangfire).
+      Streaming server-side (FileStreamResult).
+      Sem bloqueio de interface.
+
+  - id: "PROB-RF035-006"
+    titulo: "Auditoria Limitada (Compliance Risk)"
+    severidade: "ALTA"
+    descricao: |
+      Log básico em tabela única sem rastreamento de campos alterados (antes/depois).
+      Dificulta investigações e compliance LGPD.
+    impacto: "Auditoria externa não pode validar conformidade. LGPD violation risk."
+    solucao_moderna: |
+      Event Sourcing completo com quem/quando/o quê/por quê.
+      Retenção de 7 anos (LGPD).
+      Exportação de logs para análise externa.
+
+# ==============================================================================
+# METADADOS (CALCULADO AUTOMATICAMENTE)
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 17 # 4 telas + 1 webservice + 5 SPs + 2 tabelas + 5 regras
+  itens_assumidos: 4 # LEG-013, LEG-014, LEG-015, LEG-017
+  itens_substituidos: 12 # LEG-001 a 012
+  itens_descartados: 1 # LEG-016
+  itens_a_revisar: 0
+  cobertura_destinos: "100%" # Todos os itens têm campo destino preenchido
+
+# ==============================================================================
+# CHANGELOG
+# ==============================================================================
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Criação do RL-YAML com rastreabilidade completa (17 itens, 100% com destino)"
+    autor: "Architect Agent"

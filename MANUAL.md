@@ -91,7 +91,7 @@ Conforme CONTRATO-DOCUMENTACAO-ESSENCIAL para RF-XXX
 
 **Como validar:**
 - Arquivos criados em `rf/Fase-X/EPIC-XXX/RF-XXX/`
-- STATUS.yaml com `documentacao: { rf: True, uc: True, md: True, wf: True, user_stories: True }`
+- STATUS.yaml com `documentacao: { documentacao: True, uc: True, md: True, wf: True, user_stories: True }`
 
 **Tempo estimado:** 30-60 minutos
 

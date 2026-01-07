@@ -1,0 +1,363 @@
+# =============================================
+# RF-072: Escalação Automática
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF072"
+  nome: "Escalação Automática"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 5 - Service Desk"
+  epic: "EPIC008-SD"
+  status: "aprovado"
+
+descricao:
+  objetivo: "Implementar engine inteligente de escalação automática de chamados (tickets) baseado em triggers configuráveis: SLA, prioridade, skills, carga de trabalho e hierarquia organizacional."
+  problema_resolvido: "Reduz MTTR em 57%, aumenta FCR de 58% para 82%, garante 99,2% conformidade SLA, evita penalidades R$150mil/mês."
+  publico_afetado: "Analistas Service Desk, Especialistas L2/L3, Gestores de Fila, Supervisores, Auditores"
+
+escopo:
+  incluso:
+    - "Engine de escalação automática por triggers (SLA 50/75/90/100%, prioridade, skills, carga)"
+    - "Matriz hierárquica configurável por cliente (Nível 1→2→3→Gestor)"
+    - "Skill-based routing com score ponderado (skills 40% + histórico 30% + disponibilidade 20% + SLA 10%)"
+    - "Balanceamento automático de carga (pausa >8 chamados)"
+    - "Notificações multi-canal (email, SMS, in-app, MS Teams)"
+    - "Gestão de pausas temporárias (férias, reuniões, ausências)"
+    - "Auditoria completa (7 anos retenção LGPD)"
+    - "Dashboard real-time com métricas de escalação"
+    - "Aceite/rejeição com registro de motivo"
+    - "Re-escalação automática em cascata"
+    - "Integração com Active Directory (calendário corporativo)"
+    - "Validação de disponibilidade antes de escalar"
+    - "Multi-tenancy (matriz independente por cliente)"
+  fora:
+    - "IA preditiva avançada (ML em RFs futuros)"
+    - "Roteamento baseado em localização geográfica"
+    - "Integração com telefonia (VoIP/PBX)"
+    - "Gamificação ou sistema de pontos"
+
+entidades:
+  - nome: "Escalacao"
+    descricao: "Registro de escalação de chamado entre analistas/níveis"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+  - nome: "MatrizEscalacao"
+    descricao: "Configuração hierárquica de escalação por cliente"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+  - nome: "NivelEscalacao"
+    descricao: "Nível da matriz (1→2→3→Gestor)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+  - nome: "PausaTemporaria"
+    descricao: "Pausa de analista (férias, reuniões, ausências)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+  - nome: "EscalacaoAuditoria"
+    descricao: "Log de auditoria de escalações (7 anos)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+
+regras_negocio:
+  - id: "RN-RF072-001"
+    descricao: "Escalação automática por SLA consumido (50%, 75%, 90%, 100%)"
+    tipo: "regra_negocio"
+    campos_afetados: ["PercentualSLAConsumido", "NivelEscalacao"]
+    obrigatorio: true
+
+  - id: "RN-RF072-002"
+    descricao: "Escalação por prioridade automática (P1: 15min, P2: 45min, P3: 2h)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Prioridade", "DataAtribuicao"]
+    obrigatorio: true
+
+  - id: "RN-RF072-003"
+    descricao: "Skill-based routing com score ponderado (skills 40% + histórico 30% + disponibilidade 20% + SLA 10%)"
+    tipo: "regra_negocio"
+    campos_afetados: ["SkillsRequeridas", "AnalistaDestinoId"]
+    obrigatorio: true
+
+  - id: "RN-RF072-004"
+    descricao: "Limite de carga e pausa automática (>8 chamados = pausa, <5 = remove)"
+    tipo: "regra_negocio"
+    campos_afetados: ["ChamadosAtivos", "EmPausaSistema"]
+    obrigatorio: true
+
+  - id: "RN-RF072-005"
+    descricao: "Matriz hierárquica multicliente independente (2-5 níveis)"
+    tipo: "validacao"
+    campos_afetados: ["MatrizId", "ClienteId"]
+    obrigatorio: true
+
+  - id: "RN-RF072-006"
+    descricao: "Auditoria completa com retenção 7 anos (LGPD)"
+    tipo: "seguranca"
+    campos_afetados: ["EscalacaoAuditoriaId"]
+    obrigatorio: true
+
+  - id: "RN-RF072-007"
+    descricao: "Notificação multi-canal com garantia de entrega (<30s, 4 canais)"
+    tipo: "regra_negocio"
+    campos_afetados: ["CanaisNotificacao", "DataEnvioNotificacao"]
+    obrigatorio: true
+
+  - id: "RN-RF072-008"
+    descricao: "Pausas temporárias integradas com calendário AD (sync 1x/hora)"
+    tipo: "regra_negocio"
+    campos_afetados: ["EmPausa", "DataInicioPausa", "DataFimPausa"]
+    obrigatorio: true
+
+  - id: "RN-RF072-009"
+    descricao: "Aceite e rejeição com registro de motivo (SLA aceite <5min)"
+    tipo: "validacao"
+    campos_afetados: ["Status", "MotivoRejeicao"]
+    obrigatorio: true
+
+  - id: "RN-RF072-010"
+    descricao: "Dashboard real-time com alertas críticos (SignalR, métricas)"
+    tipo: "regra_negocio"
+    campos_afetados: ["TaxaAceite", "TempoMedioAceite"]
+    obrigatorio: true
+
+estados:
+  - id: "Pendente"
+    descricao: "Escalação criada, aguardando processamento"
+  - id: "EmRoteamento"
+    descricao: "Sistema buscando melhor analista"
+  - id: "Atribuida"
+    descricao: "Escalação atribuída a analista destino"
+  - id: "Aceita"
+    descricao: "Analista aceitou escalação"
+  - id: "EmAtendimento"
+    descricao: "Analista trabalhando no chamado"
+  - id: "Rejeitada"
+    descricao: "Analista rejeitou com motivo"
+  - id: "Resolvida"
+    descricao: "Chamado resolvido com sucesso"
+  - id: "ReEscalada"
+    descricao: "Escalada para próximo nível"
+  - id: "Expirada"
+    descricao: "Sem aceite em <5min"
+  - id: "Falhou"
+    descricao: "Sistema não encontrou analista disponível"
+
+transicoes:
+  permitidas:
+    - de: "Pendente"
+      para: "EmRoteamento"
+    - de: "EmRoteamento"
+      para: "Atribuida"
+    - de: "EmRoteamento"
+      para: "Falhou"
+    - de: "Atribuida"
+      para: "Aceita"
+    - de: "Atribuida"
+      para: "Rejeitada"
+    - de: "Atribuida"
+      para: "Expirada"
+    - de: "Aceita"
+      para: "EmAtendimento"
+    - de: "EmAtendimento"
+      para: "Resolvida"
+    - de: "EmAtendimento"
+      para: "ReEscalada"
+    - de: "Rejeitada"
+      para: "EmRoteamento"
+    - de: "Expirada"
+      para: "EmRoteamento"
+  proibidas:
+    - de: "Resolvida"
+      para: "Atribuida"
+      motivo: "Estado final irreversível"
+    - de: "Falhou"
+      para: "Atribuida"
+      motivo: "Deve passar por EmRoteamento novamente"
+
+permissoes:
+  - codigo: "sd.escalacao.read"
+    descricao: "Visualizar escalações"
+    roles: ["Analista", "Gestor", "Admin"]
+  - codigo: "sd.escalacao.create"
+    descricao: "Criar escalação manual"
+    roles: ["Gestor", "Admin"]
+  - codigo: "sd.escalacao.accept"
+    descricao: "Aceitar escalação"
+    roles: ["Analista"]
+  - codigo: "sd.escalacao.reject"
+    descricao: "Rejeitar escalação com motivo"
+    roles: ["Analista"]
+  - codigo: "sd.escalacao.config.update"
+    descricao: "Configurar matriz de escalação"
+    roles: ["Admin"]
+  - codigo: "sd.escalacao.auditoria.read"
+    descricao: "Consultar auditoria completa"
+    roles: ["Auditor", "Admin"]
+  - codigo: "sd.escalacao.dashboard.read"
+    descricao: "Visualizar dashboard de gestão"
+    roles: ["Gestor", "Admin"]
+  - codigo: "sd.escalacao.alertas.read"
+    descricao: "Receber alertas críticos"
+    roles: ["Gestor", "Admin"]
+
+integracoes:
+  internas:
+    - "i18n (Transloco: pt-BR, en-US, es-ES)"
+    - "Auditoria (AuditInterceptor + EscalacaoAuditoria 7 anos)"
+    - "RBAC (8 permissões detalhadas)"
+    - "Central de Funcionalidades (feature flag: sd.escalacao.enabled)"
+    - "Multi-tenancy (ClienteId + Row-Level Security)"
+    - "SignalR (Dashboard real-time + notificações in-app)"
+    - "Hangfire (Jobs recorrentes: SLA, pausas, sync AD)"
+  externas:
+    - sistema: "Active Directory"
+      tipo: "LDAP/API"
+      obrigatoria: true
+      descricao: "Calendário de férias/ausências"
+    - sistema: "Microsoft Teams"
+      tipo: "Graph API"
+      obrigatoria: false
+      descricao: "Notificações via menção"
+    - sistema: "SMS Gateway"
+      tipo: "REST API"
+      obrigatoria: false
+      descricao: "Alertas urgentes P1"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacoes:
+    - "FluentValidation para campos obrigatórios"
+    - "Lock otimista (1 escalação ativa por chamado)"
+    - "Range SLA% 0-100, níveis 1-5"
+    - "Validação de email/telefone antes de notificar"
+    - "Proteção SQL Injection via EF Core"
+    - "Sanitização XSS em motivos de rejeição"
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-RF072"
+    - "UC01-RF072"
+    - "UC02-RF072"
+    - "UC03-RF072"
+    - "UC04-RF072"
+    - "UC05-RF072"
+  rfs_relacionados:
+    - "RF-073 (Gestão de Chamados)"
+    - "RF-074 (Gestão de Tickets)"
+    - "RF-028 (Gestão de SLA Operações)"
+    - "RF-029 (Gestão de SLA Serviços)"
+
+catalog:
+  crud:
+    - id: "RF072-CRUD-01"
+      title: "Listar escalações com paginação"
+      required: true
+    - id: "RF072-CRUD-02"
+      title: "Visualizar detalhes de escalação"
+      required: true
+    - id: "RF072-CRUD-03"
+      title: "Criar escalação manual"
+      required: true
+    - id: "RF072-CRUD-04"
+      title: "Aceitar escalação"
+      required: true
+    - id: "RF072-CRUD-05"
+      title: "Rejeitar escalação com motivo"
+      required: true
+
+  validacoes:
+    - id: "RF072-VAL-01"
+      title: "Validar campos obrigatórios"
+      required: true
+    - id: "RF072-VAL-02"
+      title: "Validar skill-based score >0.3"
+      required: true
+    - id: "RF072-VAL-03"
+      title: "Validar matriz sem ciclos"
+      required: true
+    - id: "RF072-VAL-04"
+      title: "Validar SLA entre 0-100%"
+      required: true
+
+  seguranca:
+    - id: "RF072-SEC-01"
+      title: "Isolamento multi-tenant"
+      required: true
+    - id: "RF072-SEC-02"
+      title: "Permissões RBAC (8 permissões)"
+      required: true
+    - id: "RF072-SEC-03"
+      title: "Auditoria completa (7 anos)"
+      required: true
+    - id: "RF072-SEC-04"
+      title: "Proteção SQL Injection/XSS"
+      required: true
+
+endpoints:
+  - metodo: "GET"
+    rota: "/api/escalacoes"
+    descricao: "Listar escalações com paginação"
+    auth_policy: "EscalacaoRead"
+  - metodo: "GET"
+    rota: "/api/escalacoes/{id}"
+    descricao: "Detalhes de escalação específica"
+    auth_policy: "EscalacaoRead"
+  - metodo: "POST"
+    rota: "/api/escalacoes"
+    descricao: "Criar escalação manual"
+    auth_policy: "EscalacaoCreate"
+  - metodo: "POST"
+    rota: "/api/escalacoes/{id}/aceitar"
+    descricao: "Aceitar escalação"
+    auth_policy: "EscalacaoAccept"
+  - metodo: "POST"
+    rota: "/api/escalacoes/{id}/rejeitar"
+    descricao: "Rejeitar com motivo"
+    auth_policy: "EscalacaoReject"
+  - metodo: "GET"
+    rota: "/api/escalacoes/matriz/{clienteId}"
+    descricao: "Obter matriz de escalação"
+    auth_policy: "EscalacaoRead"
+  - metodo: "PUT"
+    rota: "/api/escalacoes/matriz/{id}"
+    descricao: "Atualizar matriz"
+    auth_policy: "EscalacaoConfigUpdate"
+  - metodo: "GET"
+    rota: "/api/escalacoes/dashboard"
+    descricao: "Métricas real-time"
+    auth_policy: "EscalacaoDashboardRead"
+  - metodo: "GET"
+    rota: "/api/escalacoes/auditoria"
+    descricao: "Consultar auditoria completa"
+    auth_policy: "EscalacaoAuditoriaRead"
+  - metodo: "POST"
+    rota: "/api/escalacoes/pausas"
+    descricao: "Criar pausa temporária"
+    auth_policy: "EscalacaoCreate"
+  - metodo: "DELETE"
+    rota: "/api/escalacoes/pausas/{id}"
+    descricao: "Remover pausa"
+    auth_policy: "EscalacaoCreate"
+
+exclusions:
+  documentacao_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0→v2.0: separação RF/RL, 11 seções obrigatórias"
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial com documentação completa"

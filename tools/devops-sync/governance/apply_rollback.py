@@ -306,7 +306,7 @@ def main():
     if args.manual and not args.authorized_by:
         abort("Rollback manual requer --authorized-by")
 
-    rf = args.rf
+    documentacao = args.rf
     trigger = "AUTOMÁTICO" if args.automatic else "MANUAL"
     authorized_by = args.authorized_by if args.manual else "DevOps Agent (Automatic)"
 

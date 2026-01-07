@@ -84,7 +84,7 @@ class FileValidation:
 @dataclass
 class RFValidationResult:
     """Resultado completo da validação de um RF"""
-    rf_id: str
+    documentacao_id: str
     pasta: str
     arquivos_esperados: Dict[str, FileValidation] = field(default_factory=dict)
     arquivos_duplicados: List[str] = field(default_factory=list)
@@ -518,38 +518,38 @@ class RFDocumentationValidator:
         self.analyzer = TemplateAnalyzer()
         self.file_validator = FileValidator(self.analyzer)
 
-    def encontrar_rf(self, rf_id: str) -> Path:
+    def encontrar_rf(self, documentacao_id: str) -> Path:
         """Encontra pasta de um RF"""
         for fase_dir in self.base_path.glob("Fase-*"):
             for epic_dir in fase_dir.glob("EPIC*"):
-                for rf_dir in epic_dir.glob(f"{rf_id}*"):
-                    if rf_dir.is_dir():
-                        return rf_dir
+                for documentacao_dir in epic_dir.glob(f"{rf_id}*"):
+                    if documentacao_dir.is_dir():
+                        return documentacao_dir
 
         raise FileNotFoundError(f"RF {rf_id} não encontrado em {self.base_path}")
 
-    def validar_rf(self, rf_id: str) -> RFValidationResult:
+    def validar_rf(self, documentacao_id: str) -> RFValidationResult:
         """Valida documentação completa de um RF"""
         try:
-            rf_path = self.encontrar_rf(rf_id)
+            documentacao_path = self.encontrar_rf(rf_id)
         except FileNotFoundError as e:
             return RFValidationResult(
-                rf_id=rf_id,
+                documentacao_id=rf_id,
                 pasta="NÃO ENCONTRADA",
                 conforme=False,
                 total_gaps=1
             )
 
         result = RFValidationResult(
-            rf_id=rf_id,
+            documentacao_id=rf_id,
             pasta=str(rf_path)
         )
 
         # Validar cada arquivo esperado
         for pattern, (template_name, tipo) in self.ARQUIVOS_ESPERADOS.items():
             # Substituir RF pelo RF real
-            filename = pattern.replace('RF', rf_id)
-            filepath = rf_path / filename
+            filename = pattern.replace('RF', documentacao_id)
+            filepath = documentacao_path / filename
 
             if tipo == 'md':
                 validation = self.file_validator.validar_md(filepath, template_name)
@@ -560,10 +560,10 @@ class RFDocumentationValidator:
             result.total_gaps += len(validation.gaps)
 
         # Detectar arquivos duplicados
-        result.arquivos_duplicados = self._detectar_duplicados(rf_path, rf_id)
+        result.arquivos_duplicados = self._detectar_duplicados(rf_path, documentacao_id)
 
         # Detectar arquivos extra (não esperados)
-        result.arquivos_extra = self._detectar_arquivos_extra(rf_path, rf_id)
+        result.arquivos_extra = self._detectar_arquivos_extra(rf_path, documentacao_id)
 
         # Determinar se está conforme
         result.conforme = (
@@ -574,11 +574,11 @@ class RFDocumentationValidator:
 
         return result
 
-    def _detectar_duplicados(self, rf_path: Path, rf_id: str) -> List[str]:
+    def _detectar_duplicados(self, documentacao_path: Path, documentacao_id: str) -> List[str]:
         """Detecta arquivos duplicados/backup"""
         duplicados = []
 
-        for arquivo in rf_path.glob("*"):
+        for arquivo in documentacao_path.glob("*"):
             if arquivo.is_file():
                 nome = arquivo.name
 
@@ -590,10 +590,10 @@ class RFDocumentationValidator:
 
         return duplicados
 
-    def _detectar_arquivos_extra(self, rf_path: Path, rf_id: str) -> List[str]:
+    def _detectar_arquivos_extra(self, documentacao_path: Path, documentacao_id: str) -> List[str]:
         """Detecta arquivos na raiz do RF que não são esperados"""
         esperados = {
-            pattern.replace('RF', rf_id)
+            pattern.replace('RF', documentacao_id)
             for pattern in self.ARQUIVOS_ESPERADOS.keys()
         }
         esperados.add("README.md")  # README é permitido
@@ -601,7 +601,7 @@ class RFDocumentationValidator:
 
         extras = []
 
-        for arquivo in rf_path.glob("*"):
+        for arquivo in documentacao_path.glob("*"):
             if arquivo.is_file() and arquivo.name not in esperados:
                 # Ignorar duplicados (já contabilizados)
                 if not any(re.search(p, arquivo.name) for p in self.PADROES_DUPLICADOS):
@@ -634,12 +634,12 @@ class RFDocumentationValidator:
             if not epic_dir.is_dir():
                 continue
 
-            for rf_dir in sorted(epic_dir.glob("RF*")):
-                if rf_dir.is_dir():
+            for documentacao_dir in sorted(epic_dir.glob("RF*")):
+                if documentacao_dir.is_dir():
                     # Extrair RF ID do nome da pasta
-                    match = re.match(r'(RF\d+)', rf_dir.name)
+                    match = re.match(r'(RF\d+)', documentacao_dir.name)
                     if match:
-                        rf_id = match.group(1)
+                        documentacao_id = match.group(1)
                         print(f"Validando {rf_id}...")
                         result = self.validar_rf(rf_id)
                         results.append(result)
@@ -1318,7 +1318,7 @@ def gerar_relatorio_html(results: List[RFValidationResult], output_path: str):
 
     # Gerar linhas da tabela
     for result in sorted(results, key=lambda x: x.rf_id):
-        rf_id = result.rf_id
+        documentacao_id = result.rf_id
         conforme = result.conforme
 
         # Função auxiliar para gerar célula com check/cross
@@ -1573,7 +1573,7 @@ def gerar_relatorio_completo_html(results: List[RFValidationResult], output_path
     # Organizar por fase
     fases = {}
     for result in results:
-        # Extrair fase do caminho (ex: "docs/rf/Fase-1-Sistema-Base/...")
+        # Extrair fase do caminho (ex: "docs/documentacao/Fase-1-Sistema-Base/...")
         fase_match = re.search(r'Fase-(\d+)', result.pasta)
         if fase_match:
             fase_num = int(fase_match.group(1))
@@ -2059,8 +2059,8 @@ def gerar_relatorio_completo_html(results: List[RFValidationResult], output_path
 
     # Gerar conteúdo por fase
     for fase_nome, rfs in fases_ordenadas.items():
-        fase_gaps = sum(rf.total_gaps for rf in rfs)
-        fase_duplicados = sum(len(rf.arquivos_duplicados) for rf in rfs)
+        fase_gaps = sum(rf.total_gaps for documentacao in rfs)
+        fase_duplicados = sum(len(rf.arquivos_duplicados) for documentacao in rfs)
 
         html += f'''
             <div class="fase">
@@ -2080,7 +2080,7 @@ def gerar_relatorio_completo_html(results: List[RFValidationResult], output_path
 '''
 
         # Gerar conteúdo por RF
-        for rf in sorted(rfs, key=lambda x: x.rf_id):
+        for documentacao in sorted(rfs, key=lambda x: x.rf_id):
             gaps_criticos = sum(1 for arq in rf.arquivos_esperados.values() for gap in arq.gaps if gap.get('tipo') == 'CRÍTICO')
             gaps_importantes = sum(1 for arq in rf.arquivos_esperados.values() for gap in arq.gaps if gap.get('tipo') == 'IMPORTANTE')
 
@@ -2442,7 +2442,7 @@ def main():
 
     validator = RFDocumentationValidator()
     results = []
-    rf_mode = False  # Modo RF específico
+    documentacao_mode = False  # Modo RF específico
     doc_filter = None  # Filtro de tipo de documento
 
     # Validar uso de --doc (só pode ser usado com --rf)
@@ -2454,7 +2454,7 @@ def main():
     # Determinar modo de execução
     if args.rf:
         # Modo --rf: valida RF específico e gera em relatorios/RFXXX/
-        rf_id = args.rf.upper()
+        documentacao_id = args.rf.upper()
         doc_filter = args.doc.upper() if args.doc else None
 
         if doc_filter:
@@ -2504,7 +2504,7 @@ def main():
             result.conforme = result.total_gaps == 0
 
         results = [result]
-        rf_mode = True
+        documentacao_mode = True
 
         # Definir caminho de saída específico
         if doc_filter:
@@ -2514,8 +2514,8 @@ def main():
             args.output = str(doc_dir / "auditoria.json")
         else:
             # Sem filtro: relatorios/rfXXX/auditoria.json (todos os documentos)
-            rf_dir = Path(f"D:\\IC2\\relatorios\\{rf_id.lower()}")
-            rf_dir.mkdir(parents=True, exist_ok=True)
+            documentacao_dir = Path(f"D:\\IC2\\relatorios\\{rf_id.lower()}")
+            documentacao_dir.mkdir(parents=True, exist_ok=True)
             args.output = str(rf_dir / "auditoria.json")
 
     elif args.all:
@@ -2536,7 +2536,7 @@ def main():
     if results:
         gerar_relatorio_json(results, args.output)
 
-        if rf_mode:
+        if documentacao_mode:
             # Modo RF: gerar JSON específico em relatorios/RFXXX/[doc]/auditoria.json
             print(f"\nRelatorio de auditoria salvo em: {args.output}")
             print(f"Pasta do RF: {Path(args.output).parent}")
@@ -2558,11 +2558,11 @@ def main():
                     with open(json_consolidado, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                         # Reconstruir RFValidation objects dos dados existentes
-                        for rf_data in data:
+                        for documentacao_data in data:
                             # Criar objeto RFValidation a partir do JSON
                             # (simplificado - assumindo que os campos principais existem)
-                            rf_val = RFValidation(
-                                rf_id=rf_data['rf_id'],
+                            documentacao_val = RFValidation(
+                                documentacao_id=rf_data['rf_id'],
                                 pasta=rf_data['pasta'],
                                 arquivos_esperados={},
                                 arquivos_duplicados=rf_data.get('arquivos_duplicados', []),

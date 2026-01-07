@@ -1,0 +1,976 @@
+# =============================================
+# UC - Casos de Uso (Contrato Comportamental)
+# RF027 - Gestão de Aditivos de Contratos
+# Versão: 2.0
+# Autor padrão: Agência ALC - alc.dev.br
+# Data: 2025-12-31
+# =============================================
+
+uc:
+  documentacao: "RF027"
+  titulo: "Gestão de Aditivos de Contratos"
+  versao: "2.0"
+  data: "2025-12-31"
+  epic: "EPIC008-SD - Service Desk"
+  fase: "Fase 5 - Service Desk"
+
+casos_de_uso:
+
+  - id: "UC00"
+    nome: "Listar Aditivos de Contratos"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RN-RF027-009"  # Dashboard Pipeline Kanban
+        - "RN-RF027-012"  # Multi-tenancy
+        - "RN-RF027-013"  # Soft Delete
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa menu 'Contratos' → 'Aditivos'"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema valida permissão aditivos.view_any"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Sistema carrega aditivos do tenant (ClienteId + FlExcluido=FALSE)"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Sistema aplica paginação padrão (20 registros/página)"
+          required: true
+        - id: "FP-UC00-005"
+          title: "Sistema exibe colunas: Número, Contrato, Tipo, Data, Impacto, Status, Ações"
+          required: true
+        - id: "FP-UC00-006"
+          title: "Sistema permite troca visualização (Tabela ⇄ Kanban)"
+          required: true
+        - id: "FA-UC00-001"
+          title: "Usuário aplica filtro por Contrato Base"
+          required: false
+        - id: "FA-UC00-002"
+          title: "Usuário aplica filtro por Tipo Aditivo (múltipla escolha)"
+          required: false
+        - id: "FA-UC00-003"
+          title: "Usuário aplica filtro por Status"
+          required: false
+        - id: "FA-UC00-004"
+          title: "Usuário aplica filtro por período (date range)"
+          required: false
+        - id: "FA-UC00-005"
+          title: "Usuário ordena por coluna (ASC/DESC)"
+          required: false
+        - id: "FA-UC00-006"
+          title: "Usuário busca por número/descrição (debounce 300ms)"
+          required: false
+        - id: "FA-UC00-007"
+          title: "Usuário clica 'Visualizar Pipeline' → Sistema exibe Kanban"
+          required: false
+        - id: "FE-UC00-001"
+          title: "Usuário sem permissão → HTTP 403 Acesso negado"
+          required: true
+        - id: "FE-UC00-002"
+          title: "Nenhum aditivo encontrado → Estado vazio + botão Criar"
+          required: true
+        - id: "FE-UC00-003"
+          title: "Erro comunicação servidor → Mensagem erro + Tentar novamente"
+          required: true
+
+    precondicoes:
+      - permissao: "aditivos.view_any"
+      - condicao: "usuario_autenticado"
+
+    gatilho: "Usuario acessa menu Contratos > Aditivos"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_aditivos"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_view_any"
+      - passo: 3
+        ator: "sistema"
+        acao: "listar_aditivos_tenant"
+        query: "WHERE ClienteId = @tenantId AND FlExcluido = FALSE"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibir_lista_paginada"
+
+    fluxos_alternativos:
+      - id: "FA-UC00-01"
+        condicao: "usuario_clica_visualizar_pipeline"
+        resultado: "exibir_kanban_5_colunas"
+        colunas_kanban: ["Rascunho", "Aprovação", "Assinatura", "Vigente", "Encerrado"]
+
+    fluxos_excecao:
+      - id: "FE-UC00-01"
+        condicao: "sem_permissao_view_any"
+        resultado: "http_403_acesso_negado"
+
+    regras_aplicadas:
+      - "RN-RF027-009"  # Dashboard Pipeline
+      - "RN-RF027-012"  # Multi-tenancy
+      - "RN-RF027-013"  # Soft Delete
+
+    resultado_final:
+      estado: "lista_exibida_com_filtros"
+
+  - id: "UC01"
+    nome: "Criar Aditivo via Wizard Multi-Step"
+    ator_principal: "gestor_contratos"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF027-001"  # 8 Tipos Suportados
+        - "RN-RF027-002"  # Wizard 5 Etapas
+        - "RN-RF027-003"  # Cálculo Impacto
+        - "RN-RF027-007"  # Gestão Documental + OCR
+        - "RN-RF027-011"  # Validação Datas
+        - "RN-RF027-012"  # Multi-tenancy
+      uc_items:
+        # Etapa 1 - Identificação
+        - id: "FP-UC01-001"
+          title: "Usuário clica 'Novo Aditivo'"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema valida permissão aditivos.create"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Sistema exibe Etapa 1: Identificação"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Sistema carrega dropdown Contrato Base (vigentes do tenant)"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Usuário seleciona Contrato Base"
+          required: true
+        - id: "FP-UC01-006"
+          title: "Usuário seleciona Tipo Aditivo (8 opções)"
+          required: true
+        - id: "FP-UC01-007"
+          title: "Sistema gera Número Aditivo (ADD-{Num}-{Seq})"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Sistema valida: Contrato vigente (Status = Ativo)"
+          required: true
+        - id: "FP-UC01-009"
+          title: "Usuário clica Próximo → Avança Etapa 2"
+          required: true
+        # Etapa 2 - Dados Específicos
+        - id: "FP-UC01-010"
+          title: "Sistema exibe campos dinâmicos baseados no tipo"
+          required: true
+        - id: "FP-UC01-011"
+          title: "Usuário preenche Datas Vigência"
+          required: true
+        - id: "FP-UC01-012"
+          title: "Sistema valida: Vigência aditivo ⊆ Vigência contrato"
+          required: true
+        - id: "FP-UC01-013"
+          title: "Usuário preenche campos específicos do tipo"
+          required: true
+        - id: "FP-UC01-014"
+          title: "Sistema aplica validações específicas por tipo"
+          required: true
+        - id: "FP-UC01-015"
+          title: "Usuário clica Próximo → Avança Etapa 3"
+          required: true
+        # Etapa 3 - Impacto Financeiro
+        - id: "FP-UC01-016"
+          title: "Sistema calcula automaticamente 4 métricas"
+          required: true
+        - id: "FP-UC01-017"
+          title: "Sistema exibe gráfico waterfall"
+          required: true
+        - id: "FP-UC01-018"
+          title: "Se variação >20% → Sistema exige justificativa"
+          required: true
+        - id: "FP-UC01-019"
+          title: "Usuário pode ajustar valores com justificativa"
+          required: false
+        - id: "FP-UC01-020"
+          title: "Usuário clica Próximo → Avança Etapa 4"
+          required: true
+        # Etapa 4 - Documentos
+        - id: "FP-UC01-021"
+          title: "Usuário faz upload PDF/Word (obrigatório ao finalizar)"
+          required: true
+        - id: "FP-UC01-022"
+          title: "Sistema executa OCR (Azure Form Recognizer)"
+          required: true
+        - id: "FP-UC01-023"
+          title: "Sistema gera hash SHA-256"
+          required: true
+        - id: "FP-UC01-024"
+          title: "Sistema valida divergência OCR vs dados (tolerância 5%)"
+          required: true
+        - id: "FP-UC01-025"
+          title: "Usuário adiciona anexos opcionais"
+          required: false
+        - id: "FP-UC01-026"
+          title: "Usuário clica Próximo → Avança Etapa 5"
+          required: true
+        # Etapa 5 - Revisão
+        - id: "FP-UC01-027"
+          title: "Sistema exibe sumário completo"
+          required: true
+        - id: "FP-UC01-028"
+          title: "Sistema exibe comparação lado a lado"
+          required: true
+        - id: "FP-UC01-029"
+          title: "Usuário clica Salvar Rascunho OU Enviar para Aprovação"
+          required: true
+        # Fluxos Alternativos
+        - id: "FA-UC01-001"
+          title: "Usuário clica Voltar → Volta etapa sem perder dados"
+          required: false
+        - id: "FA-UC01-002"
+          title: "Salvamento automático a cada 30s"
+          required: true
+        - id: "FA-UC01-003"
+          title: "Usuário fecha wizard → Salvo como rascunho"
+          required: false
+        - id: "FA-UC01-004"
+          title: "Tipo = Reajuste Inflacionário → Consulta API Banco Central"
+          required: false
+        - id: "FA-UC01-005"
+          title: "Tipo = Supressão → Calcula multa rescisória"
+          required: false
+        # Fluxos de Exceção
+        - id: "FE-UC01-001"
+          title: "Contrato NÃO vigente → HTTP 400"
+          required: true
+        - id: "FE-UC01-002"
+          title: "Validação tipo falha → HTTP 400"
+          required: true
+        - id: "FE-UC01-003"
+          title: "Vigência aditivo fora do range → HTTP 400"
+          required: true
+        - id: "FE-UC01-004"
+          title: "Upload >25MB → HTTP 413"
+          required: true
+        - id: "FE-UC01-005"
+          title: "OCR divergência >5% → Alerta visual (não bloqueia)"
+          required: true
+
+    precondicoes:
+      - permissao: "aditivos.create"
+      - condicao: "contrato_base_vigente"
+
+    gatilho: "Usuario clica Novo Aditivo"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_novo_aditivo"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_wizard_etapa_1"
+      - passo: 3
+        ator: "usuario"
+        acao: "preencher_identificacao"
+      - passo: 4
+        ator: "sistema"
+        acao: "validar_etapa_1"
+      - passo: 5
+        ator: "sistema"
+        acao: "avancar_etapa_2_dados_especificos"
+      - passo: 6
+        ator: "usuario"
+        acao: "preencher_dados_especificos"
+      - passo: 7
+        ator: "sistema"
+        acao: "validar_etapa_2"
+      - passo: 8
+        ator: "sistema"
+        acao: "avancar_etapa_3_impacto_financeiro"
+      - passo: 9
+        ator: "sistema"
+        acao: "calcular_impacto_automatico"
+      - passo: 10
+        ator: "sistema"
+        acao: "avancar_etapa_4_documentos"
+      - passo: 11
+        ator: "usuario"
+        acao: "upload_documentos"
+      - passo: 12
+        ator: "sistema"
+        acao: "executar_ocr"
+      - passo: 13
+        ator: "sistema"
+        acao: "avancar_etapa_5_revisao"
+      - passo: 14
+        ator: "usuario"
+        acao: "salvar_rascunho_ou_enviar_aprovacao"
+
+    fluxos_alternativos:
+      - id: "FA-UC01-01"
+        condicao: "salvamento_automatico_30s"
+        resultado: "dados_persistidos_background"
+
+    fluxos_excecao:
+      - id: "FE-UC01-01"
+        condicao: "contrato_nao_vigente"
+        resultado: "http_400_contrato_deve_estar_vigente"
+
+    regras_aplicadas:
+      - "RN-RF027-001"  # 8 Tipos
+      - "RN-RF027-002"  # Wizard
+      - "RN-RF027-003"  # Impacto
+      - "RN-RF027-007"  # OCR
+      - "RN-RF027-011"  # Validação Datas
+      - "RN-RF027-012"  # Multi-tenancy
+
+    resultado_final:
+      estado: "aditivo_criado_rascunho_ou_aprovacao"
+
+  - id: "UC02"
+    nome: "Visualizar Detalhes do Aditivo"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RN-RF027-012"  # Multi-tenancy
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Usuário seleciona aditivo (clica em linha)"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema valida permissão aditivos.view"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema valida tenant (ClienteId)"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Sistema carrega dados completos"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Sistema exibe tabs: Dados, Impacto, Documentos, Histórico, Comparação"
+          required: true
+        - id: "FP-UC02-006"
+          title: "Sistema exibe timeline aprovações"
+          required: true
+        - id: "FP-UC02-007"
+          title: "Sistema exibe documentos com links download"
+          required: true
+        - id: "FP-UC02-008"
+          title: "Sistema exibe comparação lado a lado"
+          required: true
+        - id: "FA-UC02-001"
+          title: "Usuário clica tab Impacto Financeiro"
+          required: false
+        - id: "FA-UC02-002"
+          title: "Usuário clica tab Documentos"
+          required: false
+        - id: "FA-UC02-003"
+          title: "Usuário clica tab Histórico Aprovações"
+          required: false
+        - id: "FA-UC02-004"
+          title: "Usuário clica Exportar PDF"
+          required: false
+        - id: "FE-UC02-001"
+          title: "Aditivo inexistente → HTTP 404"
+          required: true
+        - id: "FE-UC02-002"
+          title: "Aditivo outro tenant → HTTP 404"
+          required: true
+        - id: "FE-UC02-003"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+
+    precondicoes:
+      - permissao: "aditivos.view"
+      - condicao: "aditivo_existe_tenant"
+
+    gatilho: "Usuario clica em aditivo na listagem"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_aditivo"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_view"
+      - passo: 3
+        ator: "sistema"
+        acao: "validar_tenant"
+        query: "WHERE Id = @id AND ClienteId = @tenantId"
+      - passo: 4
+        ator: "sistema"
+        acao: "carregar_dados_completos"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_tabs"
+
+    fluxos_excecao:
+      - id: "FE-UC02-01"
+        condicao: "aditivo_outro_tenant"
+        resultado: "http_404_nao_revelar_existencia"
+
+    regras_aplicadas:
+      - "RN-RF027-012"  # Multi-tenancy
+
+    resultado_final:
+      estado: "dados_exibidos_tabs"
+
+  - id: "UC03"
+    nome: "Editar Aditivo em Rascunho"
+    ator_principal: "gestor_contratos"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF027-012"  # Multi-tenancy
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Usuário clica Editar em aditivo Rascunho"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema valida permissão aditivos.update"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Sistema valida status = Rascunho"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Sistema abre wizard na etapa interrompida"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Usuário altera dados"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Sistema aplica mesmas validações UC01"
+          required: true
+        - id: "FP-UC03-007"
+          title: "Sistema persiste alterações"
+          required: true
+        - id: "FP-UC03-008"
+          title: "Sistema atualiza DataModificacao e UsuarioModificacao"
+          required: true
+        - id: "FA-UC03-001"
+          title: "Usuário cancela edição"
+          required: false
+        - id: "FE-UC03-001"
+          title: "Aditivo NÃO Rascunho → HTTP 400"
+          required: true
+        - id: "FE-UC03-002"
+          title: "Erro validação → HTTP 400"
+          required: true
+        - id: "FE-UC03-003"
+          title: "Aditivo outro tenant → HTTP 404"
+          required: true
+
+    precondicoes:
+      - permissao: "aditivos.update"
+      - condicao: "status_rascunho"
+
+    gatilho: "Usuario clica Editar"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_editar"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_status_rascunho"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_wizard_preenchido"
+      - passo: 4
+        ator: "usuario"
+        acao: "alterar_dados"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_alteracoes"
+      - passo: 6
+        ator: "sistema"
+        acao: "persistir_alteracoes"
+      - passo: 7
+        ator: "sistema"
+        acao: "atualizar_auditoria"
+
+    fluxos_excecao:
+      - id: "FE-UC03-01"
+        condicao: "status_diferente_rascunho"
+        resultado: "http_400_apenas_rascunhos_editaveis"
+
+    regras_aplicadas:
+      - "RN-RF027-012"  # Multi-tenancy
+
+    resultado_final:
+      estado: "aditivo_atualizado"
+
+  - id: "UC04"
+    nome: "Excluir Aditivo (Soft Delete)"
+    ator_principal: "administrador"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF027-013"  # Soft Delete Obrigatório
+        - "RN-RF027-012"  # Multi-tenancy
+      uc_items:
+        - id: "FP-UC04-001"
+          title: "Usuário clica Excluir"
+          required: true
+        - id: "FP-UC04-002"
+          title: "Sistema exige confirmação explícita"
+          required: true
+        - id: "FP-UC04-003"
+          title: "Sistema valida permissão aditivos.delete"
+          required: true
+        - id: "FP-UC04-004"
+          title: "Sistema valida status (Rascunho ou Cancelado)"
+          required: true
+        - id: "FP-UC04-005"
+          title: "Sistema executa soft delete (FlExcluido = TRUE)"
+          required: true
+        - id: "FP-UC04-006"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FA-UC04-001"
+          title: "Usuário cancela confirmação"
+          required: false
+        - id: "FE-UC04-001"
+          title: "Status diferente Rascunho/Cancelado → HTTP 400"
+          required: true
+        - id: "FE-UC04-002"
+          title: "Aditivo já excluído → HTTP 400"
+          required: true
+
+    precondicoes:
+      - permissao: "aditivos.delete"
+      - condicao: "status_rascunho_ou_cancelado"
+
+    gatilho: "Usuario clica Excluir"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_excluir"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_confirmacao"
+      - passo: 3
+        ator: "usuario"
+        acao: "confirmar_exclusao"
+      - passo: 4
+        ator: "sistema"
+        acao: "executar_soft_delete"
+        sql: "UPDATE Aditivo SET FlExcluido = TRUE WHERE Id = @id"
+      - passo: 5
+        ator: "sistema"
+        acao: "registrar_auditoria"
+
+    fluxos_excecao:
+      - id: "FE-UC04-01"
+        condicao: "aditivo_vigente"
+        resultado: "http_400_nao_pode_excluir_vigente"
+
+    regras_aplicadas:
+      - "RN-RF027-013"  # Soft Delete
+      - "RN-RF027-012"  # Multi-tenancy
+
+    resultado_final:
+      estado: "aditivo_excluido_logicamente"
+
+  - id: "UC05"
+    nome: "Calcular Impacto Financeiro Automático"
+    ator_principal: "sistema"
+    tipo: "acao"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RN-RF027-003"  # Cálculo Automático 4 Métricas
+      uc_items:
+        - id: "FP-UC05-001"
+          title: "Sistema detecta alteração campos financeiros"
+          required: true
+        - id: "FP-UC05-002"
+          title: "Sistema executa cálculo automático (motor backend)"
+          required: true
+        - id: "FP-UC05-003"
+          title: "Sistema calcula Métrica 1: Valor Incremental Mensal"
+          required: true
+        - id: "FP-UC05-004"
+          title: "Sistema calcula Métrica 2: Valor Incremental Anual"
+          required: true
+        - id: "FP-UC05-005"
+          title: "Sistema calcula Métrica 3: Valor Total Pós-Aditivo"
+          required: true
+        - id: "FP-UC05-006"
+          title: "Sistema calcula Métrica 4: Projeção 12 Meses"
+          required: true
+        - id: "FP-UC05-007"
+          title: "Sistema gera gráfico waterfall"
+          required: true
+        - id: "FP-UC05-008"
+          title: "Sistema exibe métricas com color coding (verde/vermelho)"
+          required: true
+        - id: "FA-UC05-001"
+          title: "Usuário clica Recalcular"
+          required: false
+        - id: "FE-UC05-001"
+          title: "Erro cálculo → HTTP 500"
+          required: true
+        - id: "FE-UC05-002"
+          title: "Timeout (>5s) → Mensagem timeout"
+          required: true
+
+    precondicoes:
+      - condicao: "aditivo_criado_dados_completos"
+
+    gatilho: "Sistema detecta alteracao campos financeiros"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "detectar_alteracao_financeira"
+      - passo: 2
+        ator: "sistema"
+        acao: "carregar_dados_contrato_base"
+      - passo: 3
+        ator: "sistema"
+        acao: "calcular_metrica_1_incremental_mensal"
+        formula: "Valor_Novo_Mensal - Valor_Atual_Mensal"
+      - passo: 4
+        ator: "sistema"
+        acao: "calcular_metrica_2_incremental_anual"
+        formula: "Mensal × Meses_Restantes"
+      - passo: 5
+        ator: "sistema"
+        acao: "calcular_metrica_3_total_pos_aditivo"
+        formula: "Base + Σ Aditivos_Vigentes"
+      - passo: 6
+        ator: "sistema"
+        acao: "calcular_metrica_4_projecao_12m"
+      - passo: 7
+        ator: "sistema"
+        acao: "gerar_grafico_waterfall"
+      - passo: 8
+        ator: "sistema"
+        acao: "exibir_metricas_color_coding"
+
+    fluxos_excecao:
+      - id: "FE-UC05-01"
+        condicao: "timeout_maior_5s"
+        resultado: "mensagem_timeout"
+
+    regras_aplicadas:
+      - "RN-RF027-003"  # Cálculo Impacto
+
+    resultado_final:
+      estado: "impacto_calculado_exibido"
+
+  - id: "UC06"
+    nome: "Versionar Contrato Pós-Aditivo"
+    ator_principal: "sistema"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF027-004"  # Versionamento Semântico
+      uc_items:
+        - id: "FP-UC06-001"
+          title: "Sistema detecta status = Vigente (evento aditivo.vigente)"
+          required: true
+        - id: "FP-UC06-002"
+          title: "Sistema cria snapshot JSON contrato ANTES aditivo"
+          required: true
+        - id: "FP-UC06-003"
+          title: "Sistema aplica alterações do aditivo"
+          required: true
+        - id: "FP-UC06-004"
+          title: "Sistema cria nova versão com versionamento semântico"
+          required: true
+        - id: "FP-UC06-005"
+          title: "Sistema gera hash SHA-256 da nova versão"
+          required: true
+        - id: "FP-UC06-006"
+          title: "Sistema persiste em Contrato_Versao"
+          required: true
+        - id: "FP-UC06-007"
+          title: "Sistema marca versão anterior como Histórico"
+          required: true
+        - id: "FA-UC06-001"
+          title: "Impacto ≤15% → Incrementa minor (v1.0 → v1.1)"
+          required: false
+        - id: "FA-UC06-002"
+          title: "Impacto >15% → Incrementa major (v1.2 → v2.0)"
+          required: false
+        - id: "FE-UC06-001"
+          title: "Erro criar versão → HTTP 500 + rollback aprovação"
+          required: true
+
+    precondicoes:
+      - condicao: "aditivo_aprovado_vigente"
+
+    gatilho: "Sistema detecta mudanca status para Vigente"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "detectar_evento_aditivo_vigente"
+      - passo: 2
+        ator: "sistema"
+        acao: "criar_snapshot_json_antes"
+      - passo: 3
+        ator: "sistema"
+        acao: "aplicar_alteracoes_aditivo"
+      - passo: 4
+        ator: "sistema"
+        acao: "criar_nova_versao_semantica"
+        regra: "Se impacto ≤15%: minor; Se >15%: major"
+      - passo: 5
+        ator: "sistema"
+        acao: "gerar_hash_sha256"
+      - passo: 6
+        ator: "sistema"
+        acao: "persistir_contrato_versao"
+      - passo: 7
+        ator: "sistema"
+        acao: "marcar_anterior_historico"
+
+    fluxos_excecao:
+      - id: "FE-UC06-01"
+        condicao: "erro_criar_versao"
+        resultado: "http_500_rollback_aprovacao"
+
+    regras_aplicadas:
+      - "RN-RF027-004"  # Versionamento Semântico
+
+    resultado_final:
+      estado: "nova_versao_criada_hash_validado"
+
+  - id: "UC07"
+    nome: "Aprovar Aditivo via Workflow Multi-Nível"
+    ator_principal: "aprovadores"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF027-005"  # Workflow 3 Níveis
+        - "RN-RF027-012"  # Multi-tenancy
+      uc_items:
+        # Envio Aprovação
+        - id: "FP-UC07-001"
+          title: "Usuário clica Enviar para Aprovação"
+          required: true
+        - id: "FP-UC07-002"
+          title: "Sistema valida: 5 etapas wizard concluídas"
+          required: true
+        - id: "FP-UC07-003"
+          title: "Sistema inicia workflow Nível 1 (Gestor)"
+          required: true
+        - id: "FP-UC07-004"
+          title: "Sistema atualiza status = Em Aprovação"
+          required: true
+        - id: "FP-UC07-005"
+          title: "Sistema envia email/push para Gestor Nível 1"
+          required: true
+        - id: "FP-UC07-006"
+          title: "Sistema inicia SLA (2 dias Nível 1)"
+          required: true
+        # Aprovação Nível 1
+        - id: "FP-UC07-007"
+          title: "Gestor acessa aditivo pendente"
+          required: true
+        - id: "FP-UC07-008"
+          title: "Sistema valida permissão aditivos.approve_level1"
+          required: true
+        - id: "FP-UC07-009"
+          title: "Gestor preenche checklist técnico"
+          required: true
+        - id: "FP-UC07-010"
+          title: "Gestor clica Aprovar OU Rejeitar (justificativa obrigatória)"
+          required: true
+        - id: "FP-UC07-011"
+          title: "Se APROVADO: Avança Nível 2 (Jurídico) + notifica"
+          required: true
+        - id: "FP-UC07-012"
+          title: "Se REJEITADO: Status = Rejeitado + notifica criador"
+          required: true
+        # Aprovação Nível 2
+        - id: "FP-UC07-013"
+          title: "Jurídico acessa aditivo"
+          required: true
+        - id: "FP-UC07-014"
+          title: "Sistema valida permissão aditivos.approve_level2"
+          required: true
+        - id: "FP-UC07-015"
+          title: "Jurídico valida conformidade cláusulas, riscos, multas"
+          required: true
+        - id: "FP-UC07-016"
+          title: "Jurídico pode retornar Nível 1 (permite_retorno = true)"
+          required: false
+        - id: "FP-UC07-017"
+          title: "Se APROVADO: Avança Nível 3 OU pula se impacto <R$50k"
+          required: true
+        - id: "FP-UC07-018"
+          title: "Se REJEITADO: Status = Rejeitado"
+          required: true
+        # Aprovação Nível 3
+        - id: "FP-UC07-019"
+          title: "Diretoria acessa (se impacto >R$50k/ano)"
+          required: true
+        - id: "FP-UC07-020"
+          title: "Sistema valida permissão aditivos.approve_level3"
+          required: true
+        - id: "FP-UC07-021"
+          title: "Diretoria valida aprovação orçamentária"
+          required: true
+        - id: "FP-UC07-022"
+          title: "Se APROVADO: Envia DocuSign (requer_docusign = true)"
+          required: true
+        - id: "FP-UC07-023"
+          title: "Após assinatura: Status = Vigente + dispara UC06 (versionamento)"
+          required: true
+        # Fluxos Alternativos
+        - id: "FA-UC07-001"
+          title: "SLA 80% → Alerta escalação"
+          required: false
+        - id: "FA-UC07-002"
+          title: "SLA 100% → Escalação automática superior"
+          required: false
+        - id: "FA-UC07-003"
+          title: "Impacto <R$50k → Pula Nível 3, vai DocuSign"
+          required: false
+        # Fluxos de Exceção
+        - id: "FE-UC07-001"
+          title: "Usuário sem permissão nível atual → HTTP 403"
+          required: true
+        - id: "FE-UC07-002"
+          title: "Workflow não pode pular níveis → HTTP 400"
+          required: true
+        - id: "FE-UC07-003"
+          title: "DocuSign falha → Status = Aguardando Assinatura (retry)"
+          required: true
+
+    precondicoes:
+      - permissao: "aditivos.approve_level1|level2|level3"
+      - condicao: "aditivo_status_rascunho"
+      - condicao: "workflow_configurado"
+
+    gatilho: "Usuario clica Enviar para Aprovacao"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_enviar_aprovacao"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_wizard_completo"
+      - passo: 3
+        ator: "sistema"
+        acao: "iniciar_workflow_nivel_1"
+      - passo: 4
+        ator: "sistema"
+        acao: "enviar_notificacao_gestor"
+      - passo: 5
+        ator: "gestor"
+        acao: "aprovar_nivel_1"
+      - passo: 6
+        ator: "sistema"
+        acao: "avancar_nivel_2_juridico"
+      - passo: 7
+        ator: "juridico"
+        acao: "aprovar_nivel_2"
+      - passo: 8
+        ator: "sistema"
+        acao: "avancar_nivel_3_diretoria_ou_docusign"
+      - passo: 9
+        ator: "diretoria"
+        acao: "aprovar_nivel_3"
+      - passo: 10
+        ator: "sistema"
+        acao: "enviar_docusign"
+      - passo: 11
+        ator: "sistema"
+        acao: "marcar_vigente_versionar_contrato"
+
+    fluxos_alternativos:
+      - id: "FA-UC07-01"
+        condicao: "sla_atingiu_80_porcento"
+        resultado: "enviar_alerta_escalacao"
+      - id: "FA-UC07-02"
+        condicao: "impacto_menor_50k"
+        resultado: "pular_nivel_3_ir_docusign"
+
+    fluxos_excecao:
+      - id: "FE-UC07-01"
+        condicao: "usuario_sem_permissao_nivel_atual"
+        resultado: "http_403_nao_autorizado_aprovar_nivel_x"
+
+    regras_aplicadas:
+      - "RN-RF027-005"  # Workflow 3 Níveis
+      - "RN-RF027-012"  # Multi-tenancy
+
+    resultado_final:
+      estado: "aditivo_aprovado_ou_rejeitado_workflow_completo"
+
+exclusions:
+  uc_items: []
+
+# ==============================================================================
+# RASTREABILIDADE: UC → RN do RF027
+# ==============================================================================
+
+rastreabilidade:
+  total_ucs: 8
+  total_rns_rf027: 15
+  cobertura_percentual: "100%"
+
+  ucs:
+    - uc_id: "UC00"
+      rns_cobertas: ["RN-RF027-009", "RN-RF027-012", "RN-RF027-013"]
+    - uc_id: "UC01"
+      rns_cobertas: ["RN-RF027-001", "RN-RF027-002", "RN-RF027-003", "RN-RF027-007", "RN-RF027-011", "RN-RF027-012"]
+    - uc_id: "UC02"
+      rns_cobertas: ["RN-RF027-012"]
+    - uc_id: "UC03"
+      rns_cobertas: ["RN-RF027-012"]
+    - uc_id: "UC04"
+      rns_cobertas: ["RN-RF027-013", "RN-RF027-012"]
+    - uc_id: "UC05"
+      rns_cobertas: ["RN-RF027-003"]
+    - uc_id: "UC06"
+      rns_cobertas: ["RN-RF027-004"]
+    - uc_id: "UC07"
+      rns_cobertas: ["RN-RF027-005", "RN-RF027-012"]
+
+  rns_nao_explicitamente_mapeadas:
+    - rn_id: "RN-RF027-006"
+      titulo: "Library Jurídica de Cláusulas"
+      justificativa: "Implícita no UC01 (Etapa 4 - uso de templates) e gestão separada"
+    - rn_id: "RN-RF027-008"
+      titulo: "Alertas Vencimento + ML"
+      justificativa: "Job Hangfire automático, não é UC interativo"
+    - rn_id: "RN-RF027-010"
+      titulo: "Comparação Visual Versões"
+      justificativa: "Implícita no UC02 (tab Comparação) e UC06 (diff visual)"
+    - rn_id: "RN-RF027-014"
+      titulo: "Cálculo Multas Rescisórias"
+      justificativa: "Implícita no UC01 (Tipo Supressão) e UC05 (cálculo impacto)"
+    - rn_id: "RN-RF027-015"
+      titulo: "Integração Sistema Jurídico Externo"
+      justificativa: "Automática após aprovação (webhook pós UC07)"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v2.0 Governança - 8 UCs cobrindo 100% das 15 RNs do RF027"
+  - versao: "1.0"
+    data: "2025-12-17"
+    autor: "Architect Agent"
+    descricao: "Versão inicial"

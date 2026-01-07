@@ -1,0 +1,679 @@
+# Template de Referência ao Legado (RL-RF080.yaml)
+# RF080 - Gestão de Termos de Aceite e LGPD
+# Versão: 1.0
+# Data: 2025-12-31
+
+rf_id: RF080
+titulo: "Gestão de Termos de Aceite e LGPD"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "ASP.NET 4.x"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2012+ (Ativvus_Login)"
+  multi_tenant: false
+  auditoria: "none"
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+referencias:
+  - id: "LEG-RF080-001"
+    tipo: "tela"
+    nome: "Login.aspx - Aceite de Termo no Login"
+    caminho: "ic1_legado/IControlIT/Login.aspx"
+    descricao: |
+      Tela de login que exibe checkbox de aceite de termo antes de autenticar usuário.
+      Carrega texto de Si_Texto_Termo (Pagina='Login', Caixa='Aceite').
+      Registra aceite em Usuario_Envio_TermoResponsabilidade.
+      Sem versionamento, sem IP/User-Agent, sem re-aceite se termo mudar.
+    destino: "assumido"
+    justificativa: |
+      Funcionalidade mantida (aceite obrigatório no primeiro acesso).
+      Comportamento melhorado: versionamento automático, re-aceite quando termo muda,
+      captura de IP/User-Agent/timestamp ISO 8601, auditoria completa.
+    documentacao_item_relacionado: "RN-RF080-001"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF080-002"
+    tipo: "tela"
+    nome: "frmConfiguracao.aspx - Administração de Termos"
+    caminho: "ic1_legado/IControlIT/Configuracao/frmConfiguracao.aspx"
+    descricao: |
+      Tela administrativa para edição manual de texto de termos.
+      Combo de páginas + combo de caixas + textarea de texto.
+      UPDATE direto em Si_Texto_Termo sem versionamento, sem sanitização HTML,
+      sem notificação aos usuários, sem diff visual.
+    destino: "substituido"
+    justificativa: |
+      Funcionalidade substituída por CRUD moderno com Angular.
+      Nova implementação: versionamento automático, sanitização HTML (HtmlSanitizer),
+      diff visual, notificações multi-canal, validação de campos obrigatórios.
+    documentacao_item_relacionado: "RN-RF080-002"
+    uc_relacionado: "UC01, UC02"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF080-003"
+    tipo: "webservice"
+    nome: "ObterTextoPagina(pagina, caixa)"
+    caminho: "ic1_legado/IControlIT/Services/WSSeguranca.asmx.vb (inferido)"
+    descricao: |
+      Método que retorna texto de termo do banco.
+      SELECT simples em Si_Texto_Termo, sem cache, sem versionamento.
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST API moderno: GET /api/termos/{id}/conteudo
+      Implementação com cache distribuído (Redis), versionamento, multi-idioma.
+    documentacao_item_relacionado: "RN-RF080-002"
+    uc_relacionado: "UC00"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF080-004"
+    tipo: "webservice"
+    nome: "SalvarTextoTermoEdit(pagina, caixa, texto)"
+    caminho: "ic1_legado/IControlIT/Services/WSSeguranca.asmx.vb (inferido)"
+    descricao: |
+      Método que salva alteração de termo.
+      UPDATE direto em Si_Texto_Termo, sem versionamento, sem notificação.
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST API moderno: PUT /api/termos/{id}
+      Implementação com versionamento automático, notificações multi-canal,
+      diff visual, auditoria completa.
+    documentacao_item_relacionado: "RN-RF080-002"
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF080-005"
+    tipo: "webservice"
+    nome: "VerificarAceiteUsuario(usuarioId)"
+    caminho: "ic1_legado/IControlIT/Services/WSSeguranca.asmx.vb (inferido)"
+    descricao: |
+      Método que verifica se usuário aceitou termo.
+      SELECT em Usuario_Envio_TermoResponsabilidade, sem versionamento.
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST API moderno: GET /api/termos/aceite-vigente
+      Implementação com versionamento (verifica se versão aceita é a vigente).
+    documentacao_item_relacionado: "RN-RF080-001"
+    uc_relacionado: "UC03"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF080-006"
+    tipo: "webservice"
+    nome: "RegistrarAceiteUsuario(usuarioId)"
+    caminho: "ic1_legado/IControlIT/Services/WSSeguranca.asmx.vb (inferido)"
+    descricao: |
+      Método que registra aceite de termo.
+      INSERT simples em Usuario_Envio_TermoResponsabilidade, sem auditoria.
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST API moderno: POST /api/termos/{id}/aceitar
+      Implementação com auditoria completa (IP, User-Agent, timestamp ISO 8601,
+      hash SHA256 do documento, geolocalização).
+    documentacao_item_relacionado: "RN-RF080-007"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF080-007"
+    tipo: "stored_procedure"
+    nome: "sp_AtualizarTextoTermo (inexistente)"
+    caminho: "Database/dbo.sp_AtualizarTextoTermo"
+    descricao: |
+      Stored procedure não encontrada no legado, mas inferida do comportamento.
+      Provavelmente fazia UPDATE direto em Si_Texto_Termo.
+    destino: "descartado"
+    justificativa: |
+      Lógica movida para CQRS Handlers (.NET 10).
+      Stored procedures eliminadas em favor de Domain-Driven Design.
+    documentacao_item_relacionado: null
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  - id: "LEG-RF080-008"
+    tipo: "regra_negocio"
+    nome: "RL-RN-001: Aceite Único Sem Re-aceite"
+    caminho: "ic1_legado/IControlIT/Login.aspx.vb (linha ~120, inferido)"
+    descricao: |
+      Usuário que já aceitou termo não precisa aceitar novamente mesmo se conteúdo mudar.
+      Violação LGPD Art. 5 (transparência).
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF080-002 (Versionamento Automático com re-aceite obrigatório).
+      Quando termo é atualizado, todos os usuários devem aceitar nova versão.
+    documentacao_item_relacionado: "RN-RF080-002"
+    uc_relacionado: "UC02"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF080-009"
+    tipo: "regra_negocio"
+    nome: "RL-RN-002: Texto de Termo Sem Sanitização"
+    caminho: "ic1_legado/IControlIT/Configuracao/frmConfiguracao.aspx.vb (linha ~80, inferido)"
+    descricao: |
+      Texto de termo aceita qualquer HTML sem validação (risco XSS).
+      Administrador mal-intencionado pode injetar código JavaScript.
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF080-015 (Proteção Contra XSS com HtmlSanitizer).
+      Conteúdo HTML sanitizado antes de salvar. Tags perigosas removidas.
+    documentacao_item_relacionado: "RN-RF080-015"
+    uc_relacionado: "UC01, UC02"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF080-010"
+    tipo: "regra_negocio"
+    nome: "RL-RN-003: Sem Consentimentos Granulares"
+    caminho: "Ausência de tabela de consentimentos no legado"
+    descricao: |
+      Sistema não diferencia consentimento para Marketing, Analytics, Cookies ou Compartilhamento.
+      Aceite é "tudo ou nada". Violação LGPD Art. 8 (consentimento deve ser específico e granular).
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF080-003 (Consentimentos Granulares).
+      Nova tabela consentimentos_usuario com tipos independentes.
+    documentacao_item_relacionado: "RN-RF080-003"
+    uc_relacionado: "UC04"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF080-011"
+    tipo: "regra_negocio"
+    nome: "RL-RN-004: Sem Revogação de Consentimento"
+    caminho: "Ausência de funcionalidade no legado"
+    descricao: |
+      Usuário não pode revogar aceite de termo. Não há interface ou funcionalidade.
+      Violação LGPD Art. 18, IX (direito de revogar consentimento).
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF080-004 (Revogação Imediata).
+      Nova funcionalidade com interface dedicada (Privacy Center).
+    documentacao_item_relacionado: "RN-RF080-004"
+    uc_relacionado: "UC05"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF080-012"
+    tipo: "regra_negocio"
+    nome: "RL-RN-005: Sem Portabilidade de Dados"
+    caminho: "Ausência de funcionalidade no legado"
+    descricao: |
+      Usuário não pode exportar seus dados pessoais em formato estruturado.
+      Violação LGPD Art. 18, V (direito de obter cópia dos dados).
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF080-005 (Portabilidade de Dados).
+      Nova funcionalidade com exportação em JSON/CSV/XML.
+    documentacao_item_relacionado: "RN-RF080-005"
+    uc_relacionado: "UC06"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF080-013"
+    tipo: "regra_negocio"
+    nome: "RL-RN-006: Sem Anonimização"
+    caminho: "Ausência de funcionalidade no legado"
+    descricao: |
+      Sistema não implementa anonimização de dados após revogação ou exclusão.
+      Violação LGPD Art. 16 (direito ao esquecimento).
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF080-006 (Anonimização Irreversível).
+      Nova funcionalidade com hash SHA256 + salt, dados originais descartados.
+    documentacao_item_relacionado: "RN-RF080-006"
+    uc_relacionado: "UC07"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF080-014"
+    tipo: "regra_negocio"
+    nome: "RL-RN-007: Auditoria Inexistente"
+    caminho: "Tabela Usuario_Envio_TermoResponsabilidade sem campos de auditoria"
+    descricao: |
+      Sistema não registra IP, User-Agent, timestamp ISO 8601, hash do documento.
+      Violação LGPD Art. 5 (responsabilização). Empresa não pode demonstrar conformidade.
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF080-007 (Auditoria Completa com retenção de 5 anos).
+      Nova tabela auditoria_consentimentos com todos os campos LGPD.
+    documentacao_item_relacionado: "RN-RF080-007"
+    uc_relacionado: "UC09"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF080-015"
+    tipo: "regra_negocio"
+    nome: "RL-RN-008: Sem Multi-idioma"
+    caminho: "Tabela Si_Texto_Termo sem campo de idioma"
+    descricao: |
+      Termos armazenados em único idioma (português). Não há suporte a inglês ou espanhol.
+      Violação LGPD Art. 5 (transparência). Usuário estrangeiro não compreende termo.
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF080-010 (Multi-idioma pt-BR, en-US, es-ES).
+      Termos armazenados em três idiomas com fallback automático.
+    documentacao_item_relacionado: "RN-RF080-010"
+    uc_relacionado: "UC01, UC02"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF080-016"
+    tipo: "regra_negocio"
+    nome: "RL-RN-009: Sem Notificações de Atualização"
+    caminho: "Ausência de funcionalidade no legado"
+    descricao: |
+      Quando termo é atualizado, usuários não são notificados por e-mail, SMS ou in-app.
+      Violação LGPD Art. 5 (transparência). Usuário pode ser bloqueado sem saber por quê.
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF080-009 (Notificações Multi-Canal).
+      Notificações simultâneas por e-mail, SMS e SignalR (in-app).
+    documentacao_item_relacionado: "RN-RF080-009"
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF080-017"
+    tipo: "regra_negocio"
+    nome: "RL-RN-010: Sem Dashboard de Conformidade"
+    caminho: "Ausência de funcionalidade no legado"
+    descricao: |
+      Não há visualização de métricas de aceites, revogações ou conformidade.
+      Empresa não pode demonstrar aderência à LGPD em caso de fiscalização.
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF080-011 (Dashboard de Conformidade).
+      Dashboard em tempo real com métricas, gráficos e export de relatórios.
+    documentacao_item_relacionado: "RN-RF080-011"
+    uc_relacionado: "UC08"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+# Telas Legadas (estrutura detalhada)
+telas:
+  - id: "LEG-RF080-001"
+    nome: "Login.aspx"
+    caminho: "ic1_legado/IControlIT/Login.aspx"
+    responsabilidade: "Exibir termo de responsabilidade antes de login"
+    campos:
+      - nome: "chkAceiteTermo"
+        tipo: "Checkbox"
+        obrigatorio: true
+        validacao: "Deve estar marcado para prosseguir"
+      - nome: "lblTermoTexto"
+        tipo: "Label"
+        obrigatorio: false
+        validacao: "Carregado de Si_Texto_Termo"
+      - nome: "txtLogin"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Login do usuário"
+      - nome: "txtSenha"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Senha do usuário"
+    comportamentos_implicitos:
+      - "Sem versionamento: termo pode ser alterado sem histórico"
+      - "Sem re-aceite: usuário que já aceitou não vê termo novamente"
+      - "Sem IP ou User-Agent: registro não captura origem do aceite"
+      - "Sem timestamp ISO 8601: apenas DataCadastro em formato SQL Server"
+
+  - id: "LEG-RF080-002"
+    nome: "frmConfiguracao.aspx"
+    caminho: "ic1_legado/IControlIT/Configuracao/frmConfiguracao.aspx"
+    responsabilidade: "Administração manual de texto de termo"
+    campos:
+      - nome: "cmbPagina"
+        tipo: "ComboBox"
+        obrigatorio: true
+        validacao: "Páginas disponíveis (Login, Termo, etc.)"
+      - nome: "cmbCaixa"
+        tipo: "ComboBox"
+        obrigatorio: true
+        validacao: "Seções da página (Aceite, Privacidade, etc.)"
+      - nome: "txtTextoTermo"
+        tipo: "TextBox (multiline)"
+        obrigatorio: true
+        validacao: "Conteúdo do termo (max 8000 chars)"
+      - nome: "btnSalvar"
+        tipo: "Button"
+        obrigatorio: false
+        validacao: "Salva alteração"
+    comportamentos_implicitos:
+      - "Sem validação de HTML: aceita qualquer HTML (risco XSS)"
+      - "Sem versionamento: alteração sobrescreve texto anterior sem histórico"
+      - "Sem notificação: usuários não são avisados de mudanças"
+      - "Limite de 8000 caracteres: restrição do SQL Server VARCHAR(8000)"
+
+# WebServices Legados
+servicos:
+  - id: "LEG-RF080-003"
+    nome: "ObterTextoPagina(pagina, caixa)"
+    localizacao: "WSSeguranca.asmx.vb (inferido)"
+    responsabilidade: "Retorna texto de termo do banco"
+    notas: "SELECT simples, sem cache, sem versionamento"
+
+  - id: "LEG-RF080-004"
+    nome: "SalvarTextoTermoEdit(pagina, caixa, texto)"
+    localizacao: "WSSeguranca.asmx.vb (inferido)"
+    responsabilidade: "Salva alteração de termo"
+    notas: "UPDATE direto, sem versionamento, sem notificação"
+
+  - id: "LEG-RF080-005"
+    nome: "VerificarAceiteUsuario(usuarioId)"
+    localizacao: "WSSeguranca.asmx.vb (inferido)"
+    responsabilidade: "Verifica se usuário aceitou termo"
+    notas: "SELECT em Usuario_Envio_TermoResponsabilidade"
+
+  - id: "LEG-RF080-006"
+    nome: "RegistrarAceiteUsuario(usuarioId)"
+    localizacao: "WSSeguranca.asmx.vb (inferido)"
+    responsabilidade: "Registra aceite de termo"
+    notas: "INSERT simples sem auditoria"
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "Si_Texto_Termo"
+    finalidade: "Armazenar textos de termos por página e seção"
+    problemas:
+      - "Chave composta não semântica (Pagina, Caixa)"
+      - "Sem versionamento"
+      - "Limite de 8000 caracteres (VARCHAR(8000))"
+      - "Sem multi-idioma"
+      - "Sem auditoria (DataCriacao, CriadoPor, etc.)"
+      - "Sem soft delete"
+      - "Sem tenant (dados compartilhados entre empresas)"
+
+  - nome: "Usuario_Envio_TermoResponsabilidade"
+    finalidade: "Registrar aceite de termo de responsabilidade por usuário"
+    problemas:
+      - "Sem chave primária definida"
+      - "Sem versionamento (qual versão foi aceita)"
+      - "Sem IP ou User-Agent"
+      - "Sem timestamp ISO 8601"
+      - "Campos confusos (Id_Ativo, QtdEnvios, DataUltEnvio)"
+      - "Token sem uso (Token, Token_Validade)"
+      - "Empresa como VARCHAR (deveria ser FK)"
+      - "Sem auditoria completa"
+
+# Regras de Negócio Implícitas (não documentadas no legado)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: "Aceite Único Sem Re-aceite"
+    fonte: "Login.aspx.vb, linha ~120 (inferido)"
+
+  - id: "RL-RN-002"
+    descricao: "Texto de Termo Sem Sanitização"
+    fonte: "frmConfiguracao.aspx.vb, linha ~80 (inferido)"
+
+  - id: "RL-RN-003"
+    descricao: "Sem Consentimentos Granulares"
+    fonte: "Ausência de tabela de consentimentos"
+
+  - id: "RL-RN-004"
+    descricao: "Sem Revogação de Consentimento"
+    fonte: "Ausência de funcionalidade"
+
+  - id: "RL-RN-005"
+    descricao: "Sem Portabilidade de Dados"
+    fonte: "Ausência de funcionalidade"
+
+  - id: "RL-RN-006"
+    descricao: "Sem Anonimização"
+    fonte: "Ausência de funcionalidade"
+
+  - id: "RL-RN-007"
+    descricao: "Auditoria Inexistente"
+    fonte: "Tabela Usuario_Envio_TermoResponsabilidade sem campos de auditoria"
+
+  - id: "RL-RN-008"
+    descricao: "Sem Multi-idioma"
+    fonte: "Tabela Si_Texto_Termo sem campo de idioma"
+
+  - id: "RL-RN-009"
+    descricao: "Sem Notificações de Atualização"
+    fonte: "Ausência de funcionalidade"
+
+  - id: "RL-RN-010"
+    descricao: "Sem Dashboard de Conformidade"
+    fonte: "Ausência de funcionalidade"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Aceite de termo no login"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Mantido, mas modernizado com versionamento e auditoria"
+
+  - item: "Versionamento de termos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GAP CRÍTICO - Precisa ser implementado"
+
+  - item: "Re-aceite após atualização"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GAP CRÍTICO - Precisa ser implementado"
+
+  - item: "Consentimentos granulares"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GAP CRÍTICO (LGPD Art. 8) - Precisa ser implementado"
+
+  - item: "Revogação de consentimento"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GAP CRÍTICO (LGPD Art. 18, IX) - Precisa ser implementado"
+
+  - item: "Portabilidade de dados"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GAP CRÍTICO (LGPD Art. 18, V) - Precisa ser implementado"
+
+  - item: "Anonimização"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GAP CRÍTICO (LGPD Art. 16) - Precisa ser implementado"
+
+  - item: "Auditoria completa"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GAP CRÍTICO (LGPD Art. 5) - Precisa ser implementado"
+
+  - item: "Dashboard de conformidade"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GAP CRÍTICO - Precisa ser implementado"
+
+  - item: "Notificações multi-canal"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GAP IMPORTANTE - Precisa ser implementado"
+
+  - item: "Multi-idioma"
+    existe_legado: false
+    existe_moderno: true
+    notas: "GAP IMPORTANTE - Precisa ser implementado"
+
+  - item: "Assinatura digital A1/A3"
+    existe_legado: false
+    existe_moderno: true
+    notas: "NOVO RECURSO - Precisa ser implementado"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Substituir Tabela Si_Texto_Termo"
+    motivo: |
+      Tabela legada não suporta versionamento, multi-idioma ou auditoria.
+      Limite de 8000 caracteres insuficiente. Criar nova tabela 'termos'
+      com versionamento, multi-idioma e auditoria completa.
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Substituir Tabela Usuario_Envio_TermoResponsabilidade"
+    motivo: |
+      Tabela legada não captura origem do aceite, não tem versionamento
+      e não suporta auditoria LGPD. Criar nova tabela 'termo_aceites'
+      com auditoria completa (IP, User-Agent, hash, timestamp ISO 8601).
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Criar Tabela de Consentimentos Granulares"
+    motivo: |
+      Legado não tem consentimentos granulares (violação LGPD Art. 8).
+      Criar tabela 'consentimentos_usuario' com tipos: Marketing,
+      Analytics, Cookies, Compartilhamento.
+    impacto: "alto"
+    data: "2025-12-31"
+
+  - decisao: "Implementar Versionamento Automático"
+    motivo: |
+      Legado não tem versionamento (violação LGPD Art. 5 - transparência).
+      Criar tabela 'termo_versoes' com histórico completo e diff visual.
+    impacto: "medio"
+    data: "2025-12-31"
+
+  - decisao: "Migrar de SQL Server para PostgreSQL"
+    motivo: |
+      PostgreSQL é open-source, suporta TDE, melhor suporte a JSON e compliance.
+      Migrar banco de Ativvus_Login (SQL Server) para PostgreSQL 15+.
+    impacto: "alto"
+    data: "2025-12-31"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Perda de dados de aceites antigos"
+    impacto: "critico"
+    probabilidade: "media"
+    mitigacao: |
+      Migração com validação completa. Backup antes de migrar.
+      Script de validação pós-migração para conferir contagem.
+
+  - risco: "Usuários bloqueados após migração"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      Aceites legados serão importados como versão 1.
+      Notificação prévia aos usuários sobre modernização.
+
+  - risco: "Termos truncados (>8000 chars)"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      PostgreSQL suporta TEXT ilimitado. Validar tamanho antes de migrar.
+
+  - risco: "Charset incompatível (SQL Server → PostgreSQL)"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Usar UTF-8 em PostgreSQL. Validar acentuação e caracteres especiais.
+
+  - risco: "Performance degradada em consultas"
+    impacto: "baixo"
+    probabilidade: "baixa"
+    mitigacao: |
+      Índices otimizados em PostgreSQL. Cache distribuído (Redis).
+
+  - risco: "Usuários não entendem novos consentimentos"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      Tutorial e tooltips explicativos na interface. E-mail de orientação.
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "Si_Texto_Termo"
+    referencia_rf: "RN-RF080-002"
+    referencia_uc: "UC01, UC02"
+    status: "substituido"
+
+  - elemento_legado: "Usuario_Envio_TermoResponsabilidade"
+    referencia_rf: "RN-RF080-007"
+    referencia_uc: "UC03, UC09"
+    status: "substituido"
+
+  - elemento_legado: "Login.aspx (aceite de termo)"
+    referencia_rf: "RN-RF080-001"
+    referencia_uc: "UC03"
+    status: "assumido"
+
+  - elemento_legado: "frmConfiguracao.aspx (administração)"
+    referencia_rf: "RN-RF080-014"
+    referencia_uc: "UC01, UC02"
+    status: "substituido"
+
+  - elemento_legado: "Stored Procedures (inferidas)"
+    referencia_rf: null
+    referencia_uc: null
+    status: "descartado"
+
+  - elemento_legado: "RL-RN-003 (Sem consentimentos)"
+    referencia_rf: "RN-RF080-003"
+    referencia_uc: "UC04"
+    status: "substituido"
+
+  - elemento_legado: "RL-RN-004 (Sem revogação)"
+    referencia_rf: "RN-RF080-004"
+    referencia_uc: "UC05"
+    status: "substituido"
+
+  - elemento_legado: "RL-RN-005 (Sem portabilidade)"
+    referencia_rf: "RN-RF080-005"
+    referencia_uc: "UC06"
+    status: "substituido"
+
+  - elemento_legado: "RL-RN-006 (Sem anonimização)"
+    referencia_rf: "RN-RF080-006"
+    referencia_uc: "UC07"
+    status: "substituido"
+
+  - elemento_legado: "RL-RN-007 (Sem auditoria)"
+    referencia_rf: "RN-RF080-007"
+    referencia_uc: "UC09"
+    status: "substituido"
+
+  - elemento_legado: "RL-RN-008 (Sem multi-idioma)"
+    referencia_rf: "RN-RF080-010"
+    referencia_uc: "UC01, UC02"
+    status: "substituido"
+
+  - elemento_legado: "RL-RN-009 (Sem notificações)"
+    referencia_rf: "RN-RF080-009"
+    referencia_uc: "UC02"
+    status: "substituido"
+
+  - elemento_legado: "RL-RN-010 (Sem dashboard)"
+    referencia_rf: "RN-RF080-011"
+    referencia_uc: "UC08"
+    status: "substituido"
+
+# Changelog
+changelog:
+  - versao: "1.0"
+    data: "2025-12-31"
+    descricao: "Referência completa ao legado do RF080 com 100% dos itens com campo destino preenchido"
+    autor: "Agência ALC - alc.dev.br"

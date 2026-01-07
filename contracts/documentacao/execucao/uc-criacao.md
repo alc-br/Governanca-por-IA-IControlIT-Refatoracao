@@ -129,7 +129,7 @@ casos_de_uso:
   - id: "UC01"
     nome: "Criar Entidade"
     covers:
-      rf_items:
+      documentacao_items:
         - "RF-CRUD-01"  # Funcionalidade de criação no RF
         - "RF-VAL-01"   # Validação de campos obrigatórios
         - "RF-SEC-01"   # Permissão create
@@ -146,16 +146,16 @@ casos_de_uso:
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 
 ### 4.2 Permissões de Escrita
 
 O agente PODE escrever **APENAS** em:
 ```
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\UC-RFXXX.md
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\UC-RFXXX.yaml
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\UC-RFXXX.md
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\UC-RFXXX.yaml
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
@@ -191,13 +191,13 @@ O contrato TRAVA se qualquer condição falhar:
 Antes de criar qualquer documento, o agente DEVE:
 
 #### 1.1 Ler RFXXX.md Completamente
-- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\RFXXX.md`
+- Localização: ` D:\IC2\documentacao\[Fase]\[EPIC]\RFXXX\RFXXX.md`
 - Entender TODAS as funcionalidades descritas
 - Identificar TODAS as regras de negócio (RN-RFXXX-NNN)
 - Mapear endpoints, permissões e integrações
 
 #### 1.2 Ler RFXXX.yaml Completamente
-- Localização: ` D:\IC2\rf\[Fase]\[EPIC]\RFXXX\RFXXX.yaml`
+- Localização: ` D:\IC2\documentacao\[Fase]\[EPIC]\RFXXX\RFXXX.yaml`
 - Extrair catálogo de funcionalidades (`rf_items`)
 - Mapear regras de negócio estruturadas
 - Identificar entidades principais
@@ -269,7 +269,7 @@ Antes de criar qualquer documento, o agente DEVE:
 
 ```yaml
 uc:
-  rf: "RFXXX"
+  documentacao: "RFXXX"
   versao: "1.0"
   data: "YYYY-MM-DD"
 
@@ -279,7 +279,7 @@ casos_de_uso:
     ator_principal: "usuario_autenticado"
 
     covers:
-      rf_items:
+      documentacao_items:
         - "RF-FUNCIONALIDADE-01"  # ID da funcionalidade no RFXXX.yaml
         - "RF-FUNCIONALIDADE-02"
       uc_items:
@@ -367,8 +367,8 @@ import yaml
 from pathlib import Path
 
 rf_base_path = Path('rf/[FASE]/[EPIC]/RFXXX/')
-md_file = rf_base_path / 'MD-RFXXX.md'
-uc_file = rf_base_path / 'UC-RFXXX.yaml'
+md_file = documentacao_base_path / 'MD-RFXXX.md'
+uc_file = documentacao_base_path / 'UC-RFXXX.yaml'
 
 # Ler MD para extrair entidades
 if md_file.exists():
@@ -476,15 +476,15 @@ else:
 
 ```python
 # Detectar jobs background
-rf_file = rf_base_path / 'RFXXX.yaml'
+rf_file = documentacao_base_path / 'RFXXX.yaml'
 with open(rf_file) as f:
-    rf_content = f.read().lower()
+    documentacao_content = f.read().lower()
 
 keywords_jobs = ['hangfire', 'job', 'scheduler', 'cron', 'background', 'recorrente', 'periódico', 'agendado']
 jobs_detected = []
 
 for keyword in keywords_jobs:
-    if keyword in rf_content:
+    if keyword in documentacao_content:
         jobs_detected.append(keyword)
 
 if jobs_detected:
@@ -560,7 +560,7 @@ keywords_integracoes = [
 integracoes_detected = []
 
 for keyword in keywords_integracoes:
-    if keyword in rf_content:
+    if keyword in documentacao_content:
         integracoes_detected.append(keyword)
 
 if integracoes_detected:
@@ -641,8 +641,8 @@ Esta fase AUMENTA automaticamente a cobertura de UC ao detectar:
 
 ```bash
 python D:\IC2_Governanca\tools\docs\validator-rf-uc.py \
-  --rf rf/[Fase]/[EPIC]/RFXXX/RFXXX.yaml \
-  --uc rf/[Fase]/[EPIC]/RFXXX/UC-RFXXX.yaml
+  --rf documentacao/[Fase]/[EPIC]/RFXXX/RFXXX.yaml \
+  --uc documentacao/[Fase]/[EPIC]/RFXXX/UC-RFXXX.yaml
 ```
 
 **IMPORTANTE:** O parâmetro `--tc` é **opcional** nesta fase, pois TC só será criado em contrato posterior.
@@ -692,7 +692,7 @@ documentacao:
   uc: true           # UC-RFXXX.md E UC-RFXXX.yaml criados
 
 validacoes:
-  rf_uc_cobertura_total: true   # validator-rf-uc.py passou
+  documentacao_uc_cobertura_total: true   # validator-rf-uc.py passou
   uc_yaml_sincronizado: true    # UC.md == UC.yaml
 ```
 

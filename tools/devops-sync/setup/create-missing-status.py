@@ -18,20 +18,20 @@ RF_DIRS = [
 def extract_rf_info(rf_path: Path) -> dict:
     """Extrai informações do RF a partir do caminho da pasta"""
     # Exemplo: Fase-1-Sistema-Base/EPIC001-SYS-Sistema-Infraestrutura/RF001-Parametros-e-Configuracoes-do-Sistema
-    parts = rf_path.parts
+    parts = documentacao_path.parts
 
     # Encontrar RF, EPIC e Fase
-    rf_folder = parts[-1]
+    documentacao_folder = parts[-1]
     epic_folder = parts[-2] if len(parts) > 1 else "UNKNOWN"
     fase_folder = parts[-3] if len(parts) > 2 else "UNKNOWN"
 
     # Extrair RF number e título
-    rf_match = re.match(r'RF(\d+)-(.*)', rf_folder)
-    if not rf_match:
+    documentacao_match = re.match(r'RF(\d+)-(.*)', documentacao_folder)
+    if not documentacao_match:
         return None
 
-    rf_num = rf_match.group(1)
-    rf_title = rf_match.group(2).replace('-', ' ')
+    documentacao_num = documentacao_match.group(1)
+    documentacao_title = documentacao_match.group(2).replace('-', ' ')
 
     # Extrair EPIC
     epic_match = re.match(r'(EPIC\d+)-(.*)', epic_folder)
@@ -43,11 +43,11 @@ def extract_rf_info(rf_path: Path) -> dict:
 
     return {
         'rf': f'RF{rf_num}',
-        'rf_num': rf_num,
-        'titulo': rf_title,
+        'rf_num': documentacao_num,
+        'titulo': documentacao_title,
         'epic': epic_code,
         'fase': fase_code,
-        'path': rf_path
+        'path': documentacao_path
     }
 
 def create_status_yaml(rf_info: dict) -> str:
@@ -58,7 +58,7 @@ epic: {rf_info['epic']}
 titulo: {rf_info['titulo']}
 
 documentacao:
-  rf: False
+  documentacao: False
   uc: False
   md: False
   wf: False
@@ -110,7 +110,7 @@ def process_rf_directories():
     skipped = []
     errors = []
 
-    for rf_dir_root in RF_DIRS:
+    for documentacao_dir_root in RF_DIRS:
         if not os.path.exists(rf_dir_root):
             print(f"[!] Diretorio nao encontrado: {rf_dir_root}")
             continue
@@ -121,8 +121,8 @@ def process_rf_directories():
         for root, dirs, files in os.walk(rf_dir_root):
             for dir_name in dirs:
                 if dir_name.startswith('RF') and re.match(r'RF\d+', dir_name):
-                    rf_path = Path(root) / dir_name
-                    status_file = rf_path / 'STATUS.yaml'
+                    documentacao_path = Path(root) / dir_name
+                    status_file = documentacao_path / 'STATUS.yaml'
 
                     # Verificar se STATUS.yaml já existe
                     if status_file.exists():
@@ -130,8 +130,8 @@ def process_rf_directories():
                         continue
 
                     # Extrair informações do RF
-                    rf_info = extract_rf_info(rf_path)
-                    if not rf_info:
+                    documentacao_info = extract_rf_info(rf_path)
+                    if not documentacao_info:
                         errors.append(f"Não foi possível extrair info de {rf_path}")
                         continue
 
@@ -164,7 +164,7 @@ def main():
 
     if created:
         print(f"\n[+] RFs com STATUS.yaml criado:")
-        for rf in sorted(created):
+        for documentacao in sorted(created):
             print(f"   - {rf}")
 
     if errors:

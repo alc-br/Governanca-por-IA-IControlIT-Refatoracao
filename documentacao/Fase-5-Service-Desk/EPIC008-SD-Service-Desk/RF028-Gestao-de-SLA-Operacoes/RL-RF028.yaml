@@ -1,0 +1,508 @@
+# Referência ao Legado - RF-028: Gestão de SLA - Operações
+# Versão: 2.0 (Separação RF/RL Completa)
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF028
+titulo: "Gestão de SLA - Operações"
+
+legado:
+  sistema: "IC1_Sistema_Producao - ASP.NET Web Forms + VB.NET"
+  versao: ".NET Framework 4.5"
+  arquitetura: "Monolítica WebForms com ASMX WebServices"
+  banco_dados: "SQL Server 2012"
+  multi_tenant: true  # Por banco separado
+  auditoria: "partial"  # Logs textuais em text.log
+
+# ============================================================================
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+# Cada item DEVE ter campo "destino" preenchido (100%)
+# ============================================================================
+
+referencias:
+  # --------------------------------------------------------------------------
+  # TELAS ASPX
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF028-001"
+    tipo: "tela"
+    nome: "SLAOperacao.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/SLA/SLAOperacao.aspx"
+    descricao: |
+      Formulário de criação/edição de SLA (Server-Side Rendering).
+      Campos: txtNome, txtDescricao, ddlCalendario, txtMetaRespostaP1-P4, txtMetaResolucaoP1-P4, txtMetaAtendimentoP1-P4.
+      Comportamentos implícitos:
+      - Não validava hierarquia (resposta < resolução < atendimento)
+      - Cálculo manual de horas (usuário digitava minutos)
+      - Sem validação de duplicatas (permitia 2 SLAs com mesmo nome)
+      - Auditoria gravava log textual em text.log
+    destino: "substituido"
+    justificativa: |
+      Tela ASPX substituída por componente Angular SPA com validações robustas.
+      Sistema moderno valida hierarquia (RN-SLA-028-01), multi-tenancy, duplicatas.
+    documentacao_item_relacionado: "RF-028 - Seção 4 (Funcionalidades: Criação de SLA)"
+    uc_relacionado: "UC01-RF028"
+    componente_angular: "sla-operacoes-form.component.ts"
+    rota_frontend: "/sla-operacoes/novo, /sla-operacoes/{id}/editar"
+    endpoint_backend: "POST /api/sla-operacoes, PUT /api/sla-operacoes/{id}"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF028-002"
+    tipo: "tela"
+    nome: "SLAOperacaoLista.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/SLA/SLAOperacaoLista.aspx"
+    descricao: |
+      Listagem e busca de SLAs com GridView (paginação server-side no ViewState).
+      Problemas: ViewState >500KB, paginação ineficiente (carregava TODOS registros), filtros limitados, sem exportação inline.
+    destino: "substituido"
+    justificativa: |
+      Substituído por SPA Angular com DataTable/Grid moderno, filtros dinâmicos, paginação server-side eficiente e exportação inline.
+    documentacao_item_relacionado: "RF-028 - Seção 4 (Funcionalidades: Listagem de SLAs)"
+    uc_relacionado: "UC03-RF028"
+    componente_angular: "sla-operacoes-list.component.ts"
+    rota_frontend: "/sla-operacoes"
+    endpoint_backend: "GET /api/sla-operacoes?page=1&pageSize=50"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF028-003"
+    tipo: "tela"
+    nome: "SLAOperacaoConsulta.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/SLA/SLAOperacaoConsulta.aspx"
+    descricao: |
+      Consulta de SLA de uma OS específica.
+      Comportamento: Cálculo on-demand (chamava paCalculaSLA ao abrir tela, lento para >100 OSs), sem cache, dashboard estático (não atualizava em tempo real).
+    destino: "substituido"
+    justificativa: |
+      Substituído por dashboard SignalR em tempo real com cache inteligente e cálculo assíncrono.
+    documentacao_item_relacionado: "RF-028 - Seção 4 (Funcionalidades: Dashboard em Tempo Real)"
+    uc_relacionado: "UC05-RF028"
+    componente_angular: "sla-operacoes-dashboard.component.ts"
+    rota_frontend: "/sla-operacoes/dashboard"
+    endpoint_backend: "GET /api/sla-operacoes/{id}/calcular"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # --------------------------------------------------------------------------
+  # WEBSERVICES ASMX
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF028-004"
+    tipo: "webservice"
+    nome: "WSSLA.asmx - ListarSLAOperacao()"
+    caminho: "ic1_legado/IControlIT/WebService/WSSLA.asmx.vb"
+    descricao: |
+      Método que retorna lista de todos os SLAs sem paginação, sem multi-tenancy.
+      SQL: SELECT * FROM SLAOperacao WHERE IdEmpresa = @id
+      Problemas: Sem paginação (timeout com >100 registros), sem isolamento rigoroso.
+    destino: "substituido"
+    justificativa: |
+      Webservice ASMX substituído por REST API GET /api/sla-operacoes com paginação, multi-tenancy (ClienteId obrigatório) e autenticação JWT.
+    documentacao_item_relacionado: "RF-028 - Seção 8 (API Endpoints: GET /api/sla-operacoes)"
+    uc_relacionado: "UC03-RF028"
+    endpoint_moderno: "GET /api/sla-operacoes"
+    query_cqrs: "GetSLAOperacoesQuery"
+    handler_cqrs: "GetSLAOperacoesQueryHandler"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF028-005"
+    tipo: "webservice"
+    nome: "WSSLA.asmx - CriarSLAOperacao()"
+    caminho: "ic1_legado/IControlIT/WebService/WSSLA.asmx.vb"
+    descricao: |
+      Método que cria novo SLA com validações mínimas (confia no frontend).
+      Não validava hierarquia de tempos, CNPJ, multi-tenancy.
+    destino: "substituido"
+    justificativa: |
+      Substituído por POST /api/sla-operacoes (CriarSLAOperacaoCommand) com 12 RNs de validação rigorosa (RN-SLA-028-01 até RN-SLA-028-12).
+    documentacao_item_relacionado: "RF-028 - Seção 8 (API Endpoints: POST /api/sla-operacoes)"
+    uc_relacionado: "UC01-RF028"
+    endpoint_moderno: "POST /api/sla-operacoes"
+    command_cqrs: "CriarSLAOperacaoCommand"
+    handler_cqrs: "CriarSLAOperacaoCommandHandler"
+    validador_cqrs: "CriarSLAOperacaoCommandValidator (FluentValidation)"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF028-006"
+    tipo: "webservice"
+    nome: "WSSLA.asmx - DeletarSLAOperacao()"
+    caminho: "ic1_legado/IControlIT/WebService/WSSLA.asmx.vb"
+    descricao: |
+      Método que deleta SLA com hard delete (DELETE FROM SLAOperacao).
+      Sem verificação de dependências, sem auditoria estruturada.
+    destino: "substituido"
+    justificativa: |
+      Hard delete substituído por Soft Delete (RN-SLA-028-11) com auditoria completa.
+    documentacao_item_relacionado: "RF-028 - Seção 8 (API Endpoints: DELETE /api/sla-operacoes/{id})"
+    uc_relacionado: "UC04-RF028"
+    endpoint_moderno: "DELETE /api/sla-operacoes/{id}"
+    command_cqrs: "ExcluirSLAOperacaoCommand"
+    handler_cqrs: "ExcluirSLAOperacaoCommandHandler"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF028-007"
+    tipo: "webservice"
+    nome: "WSSLA.asmx - CalcularSLAOS()"
+    caminho: "ic1_legado/IControlIT/WebService/WSSLA.asmx.vb"
+    descricao: |
+      Método que calcula SLA de uma OS.
+      Chamava stored procedure paCalculaSLA (lento, não considerava feriados).
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/sla-operacoes/{id}/calcular com algoritmo C# otimizado e BrasilAPI para feriados.
+    documentacao_item_relacionado: "RF-028 - Seção 8 (API Endpoints: GET /api/sla-operacoes/{id}/calcular)"
+    uc_relacionado: "UC05-RF028"
+    endpoint_moderno: "GET /api/sla-operacoes/{id}/calcular"
+    query_cqrs: "CalcularSLAQuery"
+    handler_cqrs: "CalcularSLAQueryHandler"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # --------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF028-008"
+    tipo: "stored_procedure"
+    nome: "pa_CalculaSLA"
+    caminho: "ic1_legado/Database/Procedures/pa_CalculaSLA.sql"
+    parametros_entrada:
+      - "@IdOS INT"
+      - "@IdSLA INT"
+    parametros_saida:
+      - "@PercentualConsumido DECIMAL OUTPUT"
+    descricao: |
+      Lógica de cálculo de SLA:
+      1. Obtém data abertura da OS
+      2. Obtém data atual ou resolução
+      3. Calcula diferença em minutos
+      4. Deduz pausas manuais
+      5. NÃO deduz feriados ou fins de semana (problema identificado)
+      6. Retorna percentual consumido
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Application Layer (SLACalculator em C#) com algoritmo otimizado que considera feriados (BrasilAPI) e fins de semana.
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-02)"
+    regra_moderna: "RN-SLA-028-02"
+    migracao_moderna:
+      handler: "CalcularSLAQueryHandler"
+      validacao: "Integração com BrasilAPI"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF028-009"
+    tipo: "stored_procedure"
+    nome: "pa_ListarSLAOperacao"
+    caminho: "ic1_legado/Database/Procedures/pa_ListarSLAOperacao.sql"
+    parametros_entrada:
+      - "@IdEmpresa INT"
+    descricao: |
+      Lista SLAs da empresa: SELECT * FROM SLAOperacao WHERE IdEmpresa = @id
+      Problema: Sem paginação, carregava todos os registros.
+    destino: "substituido"
+    justificativa: |
+      Substituído por Query CQRS com paginação server-side eficiente.
+    documentacao_item_relacionado: "RF-028 - Seção 8 (API Endpoints: GET /api/sla-operacoes)"
+    query_moderna: "GetSLAOperacoesQuery"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # --------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF028-010"
+    tipo: "tabela"
+    nome: "SLAOperacao"
+    schema_legado: "[dbo].[SLAOperacao]"
+    problemas_identificados:
+      - "Metas em int (minutos) - difícil conversão para horas"
+      - "Sem ClienteId (Guid) - multi-tenancy por banco separado"
+      - "Sem IsDeleted - hard delete"
+      - "Sem versionamento - sobrescreve dados"
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com ClienteId (Guid), metas em TimeSpan, soft delete (IsDeleted), versionamento completo.
+    documentacao_item_relacionado: "RF-028 - Seção 7 (Modelo de Dados)"
+    md_moderno: "MD-RF028.md - Tabela SLAOperacao"
+    migracao_moderna:
+      tabela_moderna: "SLAOperacao"
+      migration_ef_core: "20251230_CreateSLAOperacaoTable.cs"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF028-011"
+    tipo: "tabela"
+    nome: "Calendario"
+    schema_legado: "[dbo].[Calendario]"
+    problemas_identificados:
+      - "Hardcoded (24x7, Comercial, Dias Úteis) - sem exceções"
+      - "Sem feriados dinâmicos"
+    destino: "assumido"
+    justificativa: |
+      Tabela mantida, mas melhorada com exceções e integração com BrasilAPI para feriados.
+    documentacao_item_relacionado: "RF-028 - Seção 3 (Conceitos: Calendário de Atendimento)"
+    migracao_moderna:
+      tabela_moderna: "Calendario"
+      integracao_feriados: "BrasilAPI"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF028-012"
+    tipo: "tabela"
+    nome: "PausaSLA"
+    schema_legado: "[dbo].[PausaSLA]"
+    problemas_identificados:
+      - "Apenas manual (usuário criava) - sem pausa automática"
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada para suportar pausa automática fora de horário (RN-SLA-028-03).
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-03)"
+    migracao_moderna:
+      tabela_moderna: "PausaSLA"
+      campo_novo: "TipoPausa (Manual | ForaHorario)"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF028-013"
+    tipo: "tabela"
+    nome: "LogSLA"
+    schema_legado: "[dbo].[LogSLA]"
+    problemas_identificados:
+      - "Auditoria textual sem estrutura JSON"
+      - "Difícil consultar e analisar"
+    destino: "substituido"
+    justificativa: |
+      Substituído por Event Sourcing estruturado em JSON com códigos de operação (SLA_OP_CREATE, SLA_OP_CALC, etc).
+    documentacao_item_relacionado: "RF-028 - Seção 9 (Auditoria)"
+    migracao_moderna:
+      tabela_moderna: "AuditLog"
+      event_sourcing: true
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # --------------------------------------------------------------------------
+  # REGRAS IMPLÍCITAS
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF028-014"
+    tipo: "regra_negocio"
+    titulo: "Cálculo de SLA sem Feriados"
+    localizacao_codigo: "ic1_legado/Database/Procedures/pa_CalculaSLA.sql - Linha 45"
+    descricao: |
+      Stored procedure não consultava tabela de feriados, resultando em SLA consumido maior que o real.
+      Contava Natal, Ano Novo, etc como dias úteis.
+    destino: "assumido"
+    justificativa: |
+      Regra corrigida no sistema moderno com integração BrasilAPI (RN-SLA-028-12).
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-12)"
+    regra_moderna: "RN-SLA-028-12"
+    migracao_moderna:
+      integracao: "BrasilAPI"
+      service: "FeriadoService"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF028-015"
+    tipo: "regra_negocio"
+    titulo: "Escalação Manual"
+    localizacao_codigo: "ic1_legado/IControlIT/ServiceDesk/SLA/SLAOperacaoConsulta.aspx.vb - Linha 120"
+    descricao: |
+      Técnico precisava escalar manualmente via botão "Escalar" na tela de OS.
+      Nenhum sistema automático quando SLA atingia 75%, 90% ou 100%.
+    destino: "substituido"
+    justificativa: |
+      Substituído por escalação automática em cascata (RN-SLA-028-05).
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-05)"
+    regra_moderna: "RN-SLA-028-05"
+    migracao_moderna:
+      service: "EscalacaoSLAService"
+      automacao: true
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF028-016"
+    tipo: "regra_negocio"
+    titulo: "Alertas Apenas por Email"
+    localizacao_codigo: "ic1_legado/IControlIT/ServiceDesk/Jobs/JobAlertaSLA.vb - Linha 80"
+    descricao: |
+      Job background executava a cada hora e enviava emails.
+      Técnico não via alerta em tempo real no dashboard.
+    destino: "substituido"
+    justificativa: |
+      Substituído por SignalR para notificações em tempo real + email (RN-SLA-028-04).
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-04)"
+    regra_moderna: "RN-SLA-028-04"
+    migracao_moderna:
+      signalr_hub: "SLAHub"
+      notificacao_realtime: true
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF028-017"
+    tipo: "regra_negocio"
+    titulo: "Sem Validação de Hierarquia de Tempos"
+    localizacao_codigo: "ic1_legado/IControlIT/ServiceDesk/SLA/SLAOperacao.aspx.vb - Linha 200"
+    descricao: |
+      Sistema permitia criar SLA com resposta >= resolução (ex: resposta=8h, resolução=4h).
+      Validação apenas no frontend (Javascript), backend aceitava qualquer valor.
+    destino: "substituido"
+    justificativa: |
+      Validação rigorosa em backend com FluentValidation (RN-SLA-028-01).
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-01)"
+    regra_moderna: "RN-SLA-028-01"
+    migracao_moderna:
+      validador: "CriarSLAOperacaoCommandValidator"
+      fluent_validation: true
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF028-018"
+    tipo: "regra_negocio"
+    titulo: "Pausa Apenas Manual"
+    localizacao_codigo: "ic1_legado/IControlIT/ServiceDesk/SLA/SLAOperacaoConsulta.aspx.vb - Linha 150"
+    descricao: |
+      Pausas de SLA eram criadas manualmente via botão "Pausar SLA".
+      Sistema contava tempo à noite e fins de semana mesmo em calendário "Dias Úteis".
+    destino: "substituido"
+    justificativa: |
+      Pausa automática fora de horário implementada (RN-SLA-028-03).
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-03)"
+    regra_moderna: "RN-SLA-028-03"
+    migracao_moderna:
+      service: "PausaSLAService"
+      job_background: "JobPausaAutomatica"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  # --------------------------------------------------------------------------
+  # CONFIGURAÇÕES E CONSTANTES
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF028-019"
+    tipo: "configuracao"
+    nome: "Web.config - Metas de SLA Padrão"
+    caminho: "ic1_legado/IControlIT/Web.config"
+    descricao: |
+      Metas de SLA padrão hardcoded em Web.config:
+      - MetaRespostaP1Default = 120 (minutos)
+      - MetaResolucaoP1Default = 240 (minutos)
+      - MetaAtendimentoP1Default = 480 (minutos)
+    destino: "substituido"
+    justificativa: |
+      Substituído por seeds em banco de dados com valores configuráveis por cliente.
+    documentacao_item_relacionado: "RF-028 - Seção 5 (Regras de Negócio)"
+    migracao_moderna:
+      seed_data: "SLAOperacaoSeed.cs"
+      configuravel: true
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF028-020"
+    tipo: "configuracao"
+    nome: "Constante ALERTA_PERCENTUAIS"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/Jobs/JobAlertaSLA.vb - Linha 20"
+    descricao: |
+      Constante VB.NET definindo percentuais de alerta: 50%, 75%, 100%
+      Não incluía alerta em 90% (crítico).
+    destino: "substituido"
+    justificativa: |
+      Substituído por thresholds configuráveis: 50%, 75%, 90%, 100% (RN-SLA-028-04).
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-04)"
+    migracao_moderna:
+      constant: "AlertaSLAService.THRESHOLDS"
+      configuravel: true
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # --------------------------------------------------------------------------
+  # JOBS BACKGROUND
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF028-021"
+    tipo: "job_background"
+    nome: "JobAlertaSLA"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/Jobs/JobAlertaSLA.vb"
+    descricao: |
+      Job executava a cada hora, buscava SLAs próximos de vencer e enviava emails.
+      Problema: Execução a cada hora (não em tempo real), apenas email.
+    destino: "substituido"
+    justificativa: |
+      Substituído por job a cada 15 minutos + SignalR em tempo real.
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-04)"
+    migracao_moderna:
+      job_hangfire: "JobAlertaSLA"
+      intervalo: "15 minutos"
+      signalr: true
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF028-022"
+    tipo: "job_background"
+    nome: "JobCalculaSLA"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/Jobs/JobCalculaSLA.vb"
+    descricao: |
+      Job executava a cada 30 minutos, recalculava SLA de todas as OSs abertas.
+      Problema: Lento para >500 OSs, travava banco.
+    destino: "substituido"
+    justificativa: |
+      Substituído por cálculo assíncrono sob demanda + cache inteligente.
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-02)"
+    migracao_moderna:
+      job_hangfire: "JobCalculaSLAAsync"
+      cache: "MemoryCache"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # --------------------------------------------------------------------------
+  # INTEGRAÇÕES EXTERNAS
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF028-023"
+    tipo: "integracao"
+    nome: "Tabela de Feriados Manual"
+    caminho: "ic1_legado/Database/Tables/Feriados.sql"
+    descricao: |
+      Tabela manual com feriados nacionais e estaduais.
+      Problema: Exigia manutenção anual, sujeita a erro humano.
+    destino: "substituido"
+    justificativa: |
+      Substituído por integração com BrasilAPI (RN-SLA-028-12) com fallback para cache.
+    documentacao_item_relacionado: "RF-028 - Seção 5 (RN-SLA-028-12)"
+    migracao_moderna:
+      integracao_api: "BrasilAPI"
+      service: "FeriadoService"
+      cache_local: true
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# ============================================================================
+# METADADOS
+# ============================================================================
+
+metadados:
+  total_itens_legado: 23
+  itens_assumidos: 2
+  itens_substituidos: 21
+  itens_descartados: 0
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"

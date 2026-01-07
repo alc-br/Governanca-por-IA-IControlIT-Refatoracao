@@ -12,13 +12,13 @@ from datetime import datetime
 
 # RFs que precisam ser reclassificados (resultado da auditoria)
 RFS_TO_RECLASSIFY = {
-    'RF042': 'd:/IC2/docs/rf/Fase-4-Financeiro-II-Processos/EPIC007-FIN-Financeiro-Processos/RF042-Gestao-de-Notas-Fiscais-Estoque/STATUS.yaml',
-    'RF053': 'd:/IC2/docs/rf/Fase-5-Service-Desk/EPIC008-SD-Service-Desk/RF053-Gestao-de-Solicitacoes/STATUS.yaml',
-    'RF055': 'd:/IC2/docs/rf/Fase-4-Financeiro-II-Processos/EPIC007-FIN-Financeiro-Processos/RF055-Gestao-de-Rateio/STATUS.yaml',
-    'RF057': 'd:/IC2/docs/rf/Fase-4-Financeiro-II-Processos/EPIC007-FIN-Financeiro-Processos/RF057-Gestao-de-Itens-Rateio/STATUS.yaml',
-    'RF061': 'd:/IC2/docs/rf/Fase-5-Service-Desk/EPIC008-SD-Service-Desk/RF061-Gestao-Ordens-Servico/STATUS.yaml',
-    'RF062': 'd:/IC2/docs/rf/Fase-5-Service-Desk/EPIC008-SD-Service-Desk/RF062-Gestao-Fornecedores-Parceiros/STATUS.yaml',
-    'RF067': 'd:/IC2/docs/rf/Fase-2-Cadastros-e-Servicos-Transversais/EPIC005-NOT-Notificacoes/RF067-Central-Emails/STATUS.yaml',
+    'RF042': 'd:/IC2/docs/documentacao/Fase-4-Financeiro-II-Processos/EPIC007-FIN-Financeiro-Processos/RF042-Gestao-de-Notas-Fiscais-Estoque/STATUS.yaml',
+    'RF053': 'd:/IC2/docs/documentacao/Fase-5-Service-Desk/EPIC008-SD-Service-Desk/RF053-Gestao-de-Solicitacoes/STATUS.yaml',
+    'RF055': 'd:/IC2/docs/documentacao/Fase-4-Financeiro-II-Processos/EPIC007-FIN-Financeiro-Processos/RF055-Gestao-de-Rateio/STATUS.yaml',
+    'RF057': 'd:/IC2/docs/documentacao/Fase-4-Financeiro-II-Processos/EPIC007-FIN-Financeiro-Processos/RF057-Gestao-de-Itens-Rateio/STATUS.yaml',
+    'RF061': 'd:/IC2/docs/documentacao/Fase-5-Service-Desk/EPIC008-SD-Service-Desk/RF061-Gestao-Ordens-Servico/STATUS.yaml',
+    'RF062': 'd:/IC2/docs/documentacao/Fase-5-Service-Desk/EPIC008-SD-Service-Desk/RF062-Gestao-Fornecedores-Parceiros/STATUS.yaml',
+    'RF067': 'd:/IC2/docs/documentacao/Fase-2-Cadastros-e-Servicos-Transversais/EPIC005-NOT-Notificacoes/RF067-Central-Emails/STATUS.yaml',
 }
 
 
@@ -92,7 +92,7 @@ def main():
     success = 0
     failed = 0
 
-    for rf_num, file_path in RFS_TO_RECLASSIFY.items():
+    for documentacao_num, file_path in RFS_TO_RECLASSIFY.items():
         if reclassify_status_yaml(rf_num, file_path):
             success += 1
         else:

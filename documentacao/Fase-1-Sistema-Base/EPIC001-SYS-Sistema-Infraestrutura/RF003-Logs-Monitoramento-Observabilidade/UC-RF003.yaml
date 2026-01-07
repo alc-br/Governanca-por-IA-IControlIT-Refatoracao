@@ -1,0 +1,819 @@
+# =============================================
+# UC-RF003 - Casos de Uso: Sistema de Logs, Monitoramento e Observabilidade
+# Versão: 1.0
+# Data: 2025-12-29
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+uc:
+  documentacao: "RF003"
+  versao: "1.0"
+  data: "2025-12-29"
+
+observacao_sistema: |
+  RF-003 NÃO é um CRUD tradicional. Logs são eventos append-only (write-only + read-only).
+  Não há criação, edição ou exclusão manual de logs. Logs são gerados automaticamente pelo sistema
+  e consultados posteriormente.
+
+casos_de_uso:
+
+  - id: "UC00"
+    nome: "Listar Logs"
+    ator_principal: "usuario_autenticado"
+
+    covers:
+      documentacao_items:
+        - "RN-LOG-001"  # Logs estruturados JSON
+        - "RN-LOG-002"  # Níveis de log por ambiente
+        - "RN-LOG-004"  # Mascaramento automático
+        - "RN-LOG-006"  # 100% de erros sempre logados
+      uc_items:
+        - id: "UC00-FP-01"
+          title: "Fluxo principal - listagem paginada com mascaramento"
+          required: true
+        - id: "UC00-FA-01"
+          title: "Filtrar por período"
+          required: true
+        - id: "UC00-FA-02"
+          title: "Filtrar por nível de log"
+          required: true
+        - id: "UC00-FA-03"
+          title: "Ordenar por coluna"
+          required: false
+        - id: "UC00-FE-01"
+          title: "Usuário sem permissão SYS.LOGS.READ"
+          required: true
+        - id: "UC00-FE-02"
+          title: "Nenhum log no período selecionado"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.LOGS.READ"
+      - usuario_autenticado: true
+
+    gatilho: "Usuário acessa funcionalidade 'Logs do Sistema'"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_logs"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_logs_read"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_ultimos_100_logs_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "aplicar_mascaramento_automatico"
+        regras: ["RN-LOG-004"]
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_lista_paginada"
+        campos: ["Timestamp", "Level", "Message", "CorrelationId", "UserId"]
+
+    fluxos_alternativos:
+      - id: "FA-UC00-01"
+        condicao: "usuario_filtra_por_periodo"
+        passos:
+          - "Usuario seleciona periodo (ultimas 24h, ultima semana, personalizado)"
+          - "Sistema recarrega logs do periodo selecionado"
+          - "Sistema exibe lista filtrada"
+        resultado: "lista_filtrada_por_periodo"
+
+      - id: "FA-UC00-02"
+        condicao: "usuario_filtra_por_nivel"
+        passos:
+          - "Usuario seleciona nivel (Verbose, Debug, Info, Warning, Error, Fatal)"
+          - "Sistema recarrega apenas logs do nivel selecionado"
+          - "Sistema exibe lista filtrada"
+        resultado: "lista_filtrada_por_nivel"
+        regras: ["RN-LOG-002", "RN-LOG-006"]
+
+      - id: "FA-UC00-03"
+        condicao: "usuario_ordena_coluna"
+        passos:
+          - "Usuario clica em cabecalho de coluna"
+          - "Sistema reordena lista (ascendente/descendente)"
+          - "Sistema exibe lista ordenada"
+        resultado: "lista_ordenada"
+
+    fluxos_excecao:
+      - id: "FE-UC00-01"
+        condicao: "sem_permissao_logs_read"
+        passos:
+          - "Sistema verifica que usuario nao possui SYS.LOGS.READ"
+          - "Sistema retorna HTTP 403 Forbidden"
+          - "Sistema exibe mensagem 'Acesso negado. Permissao SYS.LOGS.READ necessaria.'"
+          - "Sistema registra tentativa de acesso negado em log de auditoria"
+        resultado: "acesso_negado"
+
+      - id: "FE-UC00-02"
+        condicao: "nenhum_log_no_periodo"
+        passos:
+          - "Sistema busca logs do periodo selecionado"
+          - "Sistema nao encontra nenhum log"
+          - "Sistema exibe mensagem 'Nenhum log encontrado no periodo selecionado.'"
+        resultado: "lista_vazia"
+
+    regras_aplicadas:
+      - "RN-LOG-001"
+      - "RN-LOG-002"
+      - "RN-LOG-004"
+      - "RN-LOG-006"
+
+    resultado_final:
+      estado: "lista_logs_exibida"
+
+
+  - id: "UC01"
+    nome: "Buscar Logs com Filtros Avançados"
+    ator_principal: "usuario_autenticado"
+
+    covers:
+      documentacao_items:
+        - "RN-LOG-001"  # Logs estruturados JSON
+        - "RN-LOG-003"  # Correlation IDs obrigatórios
+        - "RN-LOG-004"  # Mascaramento automático
+      uc_items:
+        - id: "UC01-FP-01"
+          title: "Fluxo principal - busca avançada com múltiplos filtros"
+          required: true
+        - id: "UC01-FA-01"
+          title: "Buscar por Correlation ID"
+          required: true
+        - id: "UC01-FA-02"
+          title: "Buscar por UserId"
+          required: true
+        - id: "UC01-FA-03"
+          title: "Buscar por IP"
+          required: false
+        - id: "UC01-FA-04"
+          title: "Buscar por Text Search (regex)"
+          required: true
+        - id: "UC01-FE-01"
+          title: "Usuário sem permissão SYS.LOGS.SEARCH"
+          required: true
+        - id: "UC01-FE-02"
+          title: "Nenhum log encontrado com critérios"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.LOGS.SEARCH"
+      - usuario_autenticado: true
+
+    gatilho: "Usuário clica em 'Busca Avançada'"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_busca_avancada"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_logs_search"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_formulario_busca"
+        campos: ["CorrelationId", "UserId", "IP", "Level", "Periodo", "TextSearch"]
+      - passo: 4
+        ator: "usuario"
+        acao: "preencher_criterios"
+      - passo: 5
+        ator: "usuario"
+        acao: "clicar_buscar"
+      - passo: 6
+        ator: "sistema"
+        acao: "executar_query_seq_elasticsearch"
+      - passo: 7
+        ator: "sistema"
+        acao: "aplicar_mascaramento_automatico"
+        regras: ["RN-LOG-004"]
+      - passo: 8
+        ator: "sistema"
+        acao: "exibir_resultados_paginados"
+        paginacao: "100_por_pagina"
+
+    fluxos_alternativos:
+      - id: "FA-UC01-01"
+        condicao: "buscar_por_correlation_id"
+        passos:
+          - "Usuario informa apenas Correlation ID (GUID)"
+          - "Sistema busca TODOS logs relacionados ao request (frontend → API → banco → fila → job)"
+          - "Sistema exibe sequencia completa de logs (ordenado por Timestamp)"
+        resultado: "request_completo_rastreado"
+        regras: ["RN-LOG-003"]
+
+      - id: "FA-UC01-02"
+        condicao: "buscar_por_userid"
+        passos:
+          - "Usuario informa UserId (ex: admin@test.com)"
+          - "Sistema busca todos logs do usuario no periodo"
+          - "Sistema exibe logs filtrados"
+        resultado: "logs_usuario_especifico"
+
+      - id: "FA-UC01-03"
+        condicao: "buscar_por_ip"
+        passos:
+          - "Usuario informa endereco IP (ex: 192.168.1.100)"
+          - "Sistema busca todos logs originados daquele IP"
+          - "Sistema exibe logs filtrados"
+        resultado: "logs_ip_especifico"
+
+      - id: "FA-UC01-04"
+        condicao: "text_search_regex"
+        passos:
+          - "Usuario informa texto ou regex (ex: 'FK constraint violation')"
+          - "Sistema executa busca full-text em campo Message"
+          - "Sistema exibe logs que contem o padrao"
+        resultado: "logs_text_search"
+
+    fluxos_excecao:
+      - id: "FE-UC01-01"
+        condicao: "sem_permissao_logs_search"
+        passos:
+          - "Sistema verifica que usuario nao possui SYS.LOGS.SEARCH"
+          - "Sistema retorna HTTP 403 Forbidden"
+          - "Sistema exibe mensagem 'Acesso negado. Permissao SYS.LOGS.SEARCH necessaria.'"
+        resultado: "acesso_negado"
+
+      - id: "FE-UC01-02"
+        condicao: "nenhum_log_encontrado"
+        passos:
+          - "Sistema executa query com criterios informados"
+          - "Sistema nao encontra nenhum log"
+          - "Sistema exibe mensagem 'Nenhum log encontrado com os criterios informados.'"
+        resultado: "busca_vazia"
+
+    regras_aplicadas:
+      - "RN-LOG-001"
+      - "RN-LOG-003"
+      - "RN-LOG-004"
+
+    resultado_final:
+      estado: "resultados_busca_exibidos"
+
+
+  - id: "UC02"
+    nome: "Visualizar Detalhes de Log"
+    ator_principal: "usuario_autenticado"
+
+    covers:
+      documentacao_items:
+        - "RN-LOG-001"  # Logs estruturados JSON
+        - "RN-LOG-003"  # Correlation IDs
+        - "RN-LOG-004"  # Mascaramento
+        - "RN-LOG-008"  # Retenção automática
+      uc_items:
+        - id: "UC02-FP-01"
+          title: "Fluxo principal - visualizar log completo"
+          required: true
+        - id: "UC02-FA-01"
+          title: "Visualizar stack trace completo"
+          required: true
+        - id: "UC02-FA-02"
+          title: "Navegar para logs relacionados (mesmo CorrelationId)"
+          required: true
+        - id: "UC02-FE-01"
+          title: "Usuário sem permissão SYS.LOGS.READ"
+          required: true
+        - id: "UC02-FE-02"
+          title: "Log já foi purgado (política de retenção)"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.LOGS.READ"
+      - usuario_autenticado: true
+
+    gatilho: "Usuário clica em um log na lista (UC00 ou UC01)"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_em_log"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_logs_read"
+      - passo: 3
+        ator: "sistema"
+        acao: "buscar_log_completo"
+      - passo: 4
+        ator: "sistema"
+        acao: "aplicar_mascaramento_automatico"
+        regras: ["RN-LOG-004"]
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_detalhes_completos"
+        campos: ["Timestamp", "Level", "Message", "CorrelationId", "UserId", "TenantId", "IP", "UserAgent", "Exception", "StackTrace"]
+
+    fluxos_alternativos:
+      - id: "FA-UC02-01"
+        condicao: "visualizar_stack_trace"
+        passos:
+          - "Usuario clica em 'Expandir Stack Trace'"
+          - "Sistema exibe stack trace completo formatado"
+          - "Sistema destaca arquivo:linha de codigo relevante"
+        resultado: "stack_trace_exibido"
+
+      - id: "FA-UC02-02"
+        condicao: "navegar_logs_relacionados"
+        passos:
+          - "Usuario clica em CorrelationId (link)"
+          - "Sistema busca todos logs com mesmo CorrelationId"
+          - "Sistema exibe timeline de logs relacionados (UC01)"
+        resultado: "request_completo_rastreado"
+        regras: ["RN-LOG-003"]
+
+    fluxos_excecao:
+      - id: "FE-UC02-01"
+        condicao: "sem_permissao_logs_read"
+        passos:
+          - "Sistema verifica que usuario nao possui SYS.LOGS.READ"
+          - "Sistema retorna HTTP 403 Forbidden"
+          - "Sistema exibe mensagem 'Acesso negado.'"
+        resultado: "acesso_negado"
+
+      - id: "FE-UC02-02"
+        condicao: "log_purgado"
+        passos:
+          - "Sistema busca log pelo ID"
+          - "Sistema verifica que log ja foi purgado (politica retencao)"
+          - "Sistema exibe mensagem 'Log nao disponivel. Purgado conforme politica de retencao (90d/1y/7y).'"
+        resultado: "log_nao_disponivel"
+        regras: ["RN-LOG-008"]
+
+    regras_aplicadas:
+      - "RN-LOG-001"
+      - "RN-LOG-003"
+      - "RN-LOG-004"
+      - "RN-LOG-008"
+
+    resultado_final:
+      estado: "detalhes_log_exibidos"
+
+
+  - id: "UC03"
+    nome: "Exportar Logs (CSV/JSON)"
+    ator_principal: "usuario_autenticado"
+
+    covers:
+      documentacao_items:
+        - "RN-LOG-004"  # Mascaramento
+        - "RN-LOG-008"  # Retenção
+      uc_items:
+        - id: "UC03-FP-01"
+          title: "Fluxo principal - exportar logs filtrados"
+          required: true
+        - id: "UC03-FA-01"
+          title: "Exportar em CSV"
+          required: true
+        - id: "UC03-FA-02"
+          title: "Exportar em JSON"
+          required: true
+        - id: "UC03-FE-01"
+          title: "Usuário sem permissão SYS.LOGS.EXPORT"
+          required: true
+        - id: "UC03-FE-02"
+          title: "Exportação com muitos logs (limite 10.000)"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.LOGS.EXPORT"
+      - usuario_autenticado: true
+
+    gatilho: "Usuário clica em 'Exportar' após busca (UC00 ou UC01)"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_exportar"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_logs_export"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_opcoes_exportacao"
+        formatos: ["CSV", "JSON"]
+      - passo: 4
+        ator: "usuario"
+        acao: "seleciona_formato"
+      - passo: 5
+        ator: "sistema"
+        acao: "aplicar_mascaramento_automatico"
+        regras: ["RN-LOG-004"]
+      - passo: 6
+        ator: "sistema"
+        acao: "gerar_arquivo_exportacao"
+      - passo: 7
+        ator: "sistema"
+        acao: "iniciar_download"
+
+    fluxos_alternativos:
+      - id: "FA-UC03-01"
+        condicao: "exportar_csv"
+        passos:
+          - "Usuario seleciona formato CSV"
+          - "Sistema gera arquivo CSV com colunas: Timestamp, Level, Message, CorrelationId, UserId"
+          - "Sistema inicia download logs_export_YYYYMMDD_HHMMSS.csv"
+        resultado: "arquivo_csv_baixado"
+
+      - id: "FA-UC03-02"
+        condicao: "exportar_json"
+        passos:
+          - "Usuario seleciona formato JSON"
+          - "Sistema gera arquivo JSON estruturado (array de logs)"
+          - "Sistema inicia download logs_export_YYYYMMDD_HHMMSS.json"
+        resultado: "arquivo_json_baixado"
+
+    fluxos_excecao:
+      - id: "FE-UC03-01"
+        condicao: "sem_permissao_logs_export"
+        passos:
+          - "Sistema verifica que usuario nao possui SYS.LOGS.EXPORT"
+          - "Sistema retorna HTTP 403 Forbidden"
+          - "Sistema exibe mensagem 'Acesso negado. Permissao SYS.LOGS.EXPORT necessaria.'"
+        resultado: "acesso_negado"
+
+      - id: "FE-UC03-02"
+        condicao: "muitos_logs"
+        passos:
+          - "Sistema verifica que busca retornou mais de 10.000 logs"
+          - "Sistema exibe mensagem 'Exportacao limitada a 10.000 logs. Refine os filtros.'"
+          - "Sistema nao permite exportacao"
+        resultado: "exportacao_bloqueada"
+
+    regras_aplicadas:
+      - "RN-LOG-004"
+      - "RN-LOG-008"
+
+    resultado_final:
+      estado: "arquivo_exportado"
+
+
+  - id: "UC04"
+    nome: "Configurar Alertas"
+    ator_principal: "admin_devops"
+
+    covers:
+      documentacao_items:
+        - "RN-LOG-011"  # Alertas automáticos
+      uc_items:
+        - id: "UC04-FP-01"
+          title: "Fluxo principal - configurar alerta"
+          required: true
+        - id: "UC04-FA-01"
+          title: "Configurar alerta de error rate"
+          required: true
+        - id: "UC04-FA-02"
+          title: "Configurar alerta de latência P95"
+          required: true
+        - id: "UC04-FA-03"
+          title: "Configurar alerta de dependência offline"
+          required: true
+        - id: "UC04-FE-01"
+          title: "Usuário sem permissão SYS.ALERTS.UPDATE"
+          required: true
+        - id: "UC04-FE-02"
+          title: "Threshold inválido"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.ALERTS.UPDATE"
+      - perfil: ["Super Admin", "Admin DevOps"]
+
+    gatilho: "Admin DevOps acessa 'Configuração de Alertas'"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "admin"
+        acao: "acessa_configuracao_alertas"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_alerts_update"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_formulario_alerta"
+        campos: ["Nome", "Tipo", "Threshold", "Periodo", "NotificacaoPagerDuty"]
+      - passo: 4
+        ator: "admin"
+        acao: "preencher_configuracao"
+      - passo: 5
+        ator: "admin"
+        acao: "salvar_alerta"
+      - passo: 6
+        ator: "sistema"
+        acao: "validar_threshold"
+      - passo: 7
+        ator: "sistema"
+        acao: "ativar_alerta"
+
+    fluxos_alternativos:
+      - id: "FA-UC04-01"
+        condicao: "alerta_error_rate"
+        passos:
+          - "Admin configura: Tipo=ErrorRate, Threshold=5%, Periodo=5min"
+          - "Sistema ativa monitoramento: disparar se error_rate > 5% nos ultimos 5min"
+          - "Sistema integra com PagerDuty"
+        resultado: "alerta_error_rate_ativo"
+        regras: ["RN-LOG-011"]
+
+      - id: "FA-UC04-02"
+        condicao: "alerta_latencia_p95"
+        passos:
+          - "Admin configura: Tipo=LatencyP95, Threshold=3000ms, Periodo=5min"
+          - "Sistema ativa monitoramento: disparar se P95 > 3s nos ultimos 5min"
+        resultado: "alerta_latencia_ativo"
+
+      - id: "FA-UC04-03"
+        condicao: "alerta_dependencia_offline"
+        passos:
+          - "Admin configura: Tipo=DependenciaOffline, Dependencia=BancoDeDados"
+          - "Sistema ativa monitoramento: disparar se health check falhar"
+        resultado: "alerta_dependencia_ativo"
+
+    fluxos_excecao:
+      - id: "FE-UC04-01"
+        condicao: "sem_permissao_alerts_update"
+        passos:
+          - "Sistema verifica que usuario nao possui SYS.ALERTS.UPDATE"
+          - "Sistema retorna HTTP 403 Forbidden"
+        resultado: "acesso_negado"
+
+      - id: "FE-UC04-02"
+        condicao: "threshold_invalido"
+        passos:
+          - "Sistema valida threshold (ex: ErrorRate deve ser 0-100%)"
+          - "Sistema detecta valor invalido (ex: 150%)"
+          - "Sistema exibe mensagem 'Threshold invalido. ErrorRate deve estar entre 0% e 100%.'"
+        resultado: "validacao_falhou"
+
+    regras_aplicadas:
+      - "RN-LOG-011"
+
+    resultado_final:
+      estado: "alerta_configurado"
+
+
+  - id: "UC05"
+    nome: "Visualizar Dashboards de Métricas"
+    ator_principal: "usuario_autenticado"
+
+    covers:
+      documentacao_items:
+        - "RN-LOG-009"  # Métricas RED (Rate, Errors, Duration)
+      uc_items:
+        - id: "UC05-FP-01"
+          title: "Fluxo principal - visualizar dashboard"
+          required: true
+        - id: "UC05-FA-01"
+          title: "Dashboard de Rate (requests/segundo)"
+          required: true
+        - id: "UC05-FA-02"
+          title: "Dashboard de Errors (% de erros)"
+          required: true
+        - id: "UC05-FA-03"
+          title: "Dashboard de Duration (P50/P95/P99)"
+          required: true
+        - id: "UC05-FE-01"
+          title: "Usuário sem permissão SYS.METRICS.READ"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.METRICS.READ"
+      - usuario_autenticado: true
+
+    gatilho: "Usuário acessa 'Dashboards de Métricas'"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_dashboards"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_metrics_read"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_dashboard_red"
+        metricas: ["Rate", "Errors", "Duration"]
+      - passo: 4
+        ator: "sistema"
+        acao: "atualizar_metricas_tempo_real"
+
+    fluxos_alternativos:
+      - id: "FA-UC05-01"
+        condicao: "visualizar_rate"
+        passos:
+          - "Usuario seleciona dashboard 'Rate (Requests/segundo)'"
+          - "Sistema exibe grafico de requests/segundo (ultimas 24h)"
+          - "Sistema destaca picos e vales"
+        resultado: "dashboard_rate_exibido"
+        regras: ["RN-LOG-009"]
+
+      - id: "FA-UC05-02"
+        condicao: "visualizar_errors"
+        passos:
+          - "Usuario seleciona dashboard 'Errors (% de erros)'"
+          - "Sistema exibe grafico de error_rate % (ultimas 24h)"
+          - "Sistema destaca threshold de 5% (linha vermelha)"
+        resultado: "dashboard_errors_exibido"
+
+      - id: "FA-UC05-03"
+        condicao: "visualizar_duration"
+        passos:
+          - "Usuario seleciona dashboard 'Duration (Latencia)'"
+          - "Sistema exibe graficos P50, P95, P99 (ultimas 24h)"
+          - "Sistema destaca threshold de 3s (linha vermelha)"
+        resultado: "dashboard_duration_exibido"
+
+    fluxos_excecao:
+      - id: "FE-UC05-01"
+        condicao: "sem_permissao_metrics_read"
+        passos:
+          - "Sistema verifica que usuario nao possui SYS.METRICS.READ"
+          - "Sistema retorna HTTP 403 Forbidden"
+        resultado: "acesso_negado"
+
+    regras_aplicadas:
+      - "RN-LOG-009"
+
+    resultado_final:
+      estado: "dashboard_exibido"
+
+
+  - id: "UC06"
+    nome: "Verificar Health Checks"
+    ator_principal: "usuario_autenticado"
+
+    covers:
+      documentacao_items:
+        - "RN-LOG-010"  # Health Checks /health
+        - "RN-LOG-011"  # Alertas automáticos
+      uc_items:
+        - id: "UC06-FP-01"
+          title: "Fluxo principal - verificar health checks"
+          required: true
+        - id: "UC06-FA-01"
+          title: "Verificar dependências críticas (banco, cache, filas)"
+          required: true
+        - id: "UC06-FE-01"
+          title: "Usuário sem permissão SYS.HEALTH.READ"
+          required: true
+        - id: "UC06-FE-02"
+          title: "Dependência crítica offline"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.HEALTH.READ"
+      - usuario_autenticado: true
+
+    gatilho: "Usuário acessa 'Health Checks'"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_health_checks"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_health_read"
+      - passo: 3
+        ator: "sistema"
+        acao: "executar_health_checks"
+        dependencias: ["BancoDeDados", "Cache", "FilaMensagens", "APIsExternas"]
+      - passo: 4
+        ator: "sistema"
+        acao: "exibir_status_dependencias"
+        status_possiveis: ["Healthy (HTTP 200)", "Unhealthy (HTTP 503)"]
+
+    fluxos_alternativos:
+      - id: "FA-UC06-01"
+        condicao: "verificar_dependencias_criticas"
+        passos:
+          - "Sistema verifica conexao com Banco de Dados (SELECT 1)"
+          - "Sistema verifica conexao com Cache (PING)"
+          - "Sistema verifica conexao com Fila de Mensagens (GET /healthcheck)"
+          - "Sistema exibe status verde (Healthy) se todas online"
+        resultado: "sistema_saudavel"
+        regras: ["RN-LOG-010"]
+
+    fluxos_excecao:
+      - id: "FE-UC06-01"
+        condicao: "sem_permissao_health_read"
+        passos:
+          - "Sistema verifica que usuario nao possui SYS.HEALTH.READ"
+          - "Sistema retorna HTTP 403 Forbidden"
+        resultado: "acesso_negado"
+
+      - id: "FE-UC06-02"
+        condicao: "dependencia_critica_offline"
+        passos:
+          - "Sistema verifica conexao com Banco de Dados"
+          - "Sistema detecta que Banco de Dados esta offline (timeout)"
+          - "Sistema exibe status vermelho (Unhealthy) com mensagem 'Banco de Dados offline'"
+          - "Sistema dispara alerta automatico (PagerDuty)"
+        resultado: "sistema_nao_saudavel"
+        regras: ["RN-LOG-010", "RN-LOG-011"]
+
+    regras_aplicadas:
+      - "RN-LOG-010"
+      - "RN-LOG-011"
+
+    resultado_final:
+      estado: "health_checks_exibidos"
+
+
+  - id: "UC07"
+    nome: "Visualizar Tracing Distribuído"
+    ator_principal: "desenvolvedor"
+
+    covers:
+      documentacao_items:
+        - "RN-LOG-012"  # Tracing distribuído OpenTelemetry
+        - "RN-LOG-003"  # Correlation IDs
+      uc_items:
+        - id: "UC07-FP-01"
+          title: "Fluxo principal - visualizar tracing"
+          required: true
+        - id: "UC07-FA-01"
+          title: "Rastrear request end-to-end (frontend → API → banco → fila → job)"
+          required: true
+        - id: "UC07-FA-02"
+          title: "Identificar span mais lento (bottleneck)"
+          required: true
+        - id: "UC07-FE-01"
+          title: "Usuário sem permissão SYS.LOGS.READ"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.LOGS.READ"
+      - perfil: ["Desenvolvedor", "Admin DevOps"]
+
+    gatilho: "Desenvolvedor acessa 'Tracing Distribuído'"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "desenvolvedor"
+        acao: "acessa_tracing"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_logs_read"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_interface_jaeger_zipkin"
+      - passo: 4
+        ator: "desenvolvedor"
+        acao: "informa_traceid"
+      - passo: 5
+        ator: "sistema"
+        acao: "buscar_spans_relacionados"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibir_timeline_spans"
+
+    fluxos_alternativos:
+      - id: "FA-UC07-01"
+        condicao: "rastrear_request_end_to_end"
+        passos:
+          - "Desenvolvedor informa TraceId (ex: a1b2c3d4-e5f6-7890-abcd-ef1234567890)"
+          - "Sistema busca todos spans do request: frontend → API → banco → fila → job"
+          - "Sistema exibe timeline visual com duracao de cada span"
+          - "Sistema destaca caminho critico (span mais lento)"
+        resultado: "request_completo_rastreado"
+        regras: ["RN-LOG-012", "RN-LOG-003"]
+
+      - id: "FA-UC07-02"
+        condicao: "identificar_bottleneck"
+        passos:
+          - "Sistema analisa timeline de spans"
+          - "Sistema identifica span com maior duracao (ex: 'Database Query - 2.5s')"
+          - "Sistema destaca span em vermelho"
+          - "Desenvolvedor clica no span e visualiza detalhes (query SQL, parametros)"
+        resultado: "bottleneck_identificado"
+
+    fluxos_excecao:
+      - id: "FE-UC07-01"
+        condicao: "sem_permissao_logs_read"
+        passos:
+          - "Sistema verifica que usuario nao possui SYS.LOGS.READ"
+          - "Sistema retorna HTTP 403 Forbidden"
+        resultado: "acesso_negado"
+
+    regras_aplicadas:
+      - "RN-LOG-012"
+      - "RN-LOG-003"
+
+    resultado_final:
+      estado: "tracing_exibido"
+
+
+exclusions:
+  uc_items: []
+  justificativa: "Nenhum caso de uso foi excluído. Todos os 7 UCs são necessários para cobertura 100% do RF-003."
+
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-29"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: |
+      Versão inicial - 7 UCs cobrindo 100% das 12 regras de negócio do RF-003.
+      RF-003 NÃO é um CRUD tradicional (logs são eventos append-only).
+      UCs focam em: Listar, Buscar, Visualizar, Exportar, Configurar, Dashboards, Health Checks, Tracing.

@@ -14,18 +14,18 @@ Valida que um Requisito Funcional está completo e pronto para produção.
 2. **Validar Documentação (5/5)**
    ```bash
    # Verificar arquivos obrigatórios
-   ls D:\IC2_Governanca\rf\Fase-*/EPIC-*/RF-XXX/RF-XXX.md
-   ls D:\IC2_Governanca\rf\Fase-*/EPIC-*/RF-XXX/UC-RF-XXX.md
-   ls D:\IC2_Governanca\rf\Fase-*/EPIC-*/RF-XXX/MD-RF-XXX.md
-   ls D:\IC2_Governanca\rf\Fase-*/EPIC-*/RF-XXX/WF-RF-XXX.md
-   ls D:\IC2_Governanca\rf\Fase-*/EPIC-*/RF-XXX/user-stories.yaml
+   ls D:\IC2_Governanca\documentacao\Fase-*/EPIC-*/RF-XXX/RF-XXX.md
+   ls D:\IC2_Governanca\documentacao\Fase-*/EPIC-*/RF-XXX/UC-RF-XXX.md
+   ls D:\IC2_Governanca\documentacao\Fase-*/EPIC-*/RF-XXX/MD-RF-XXX.md
+   ls D:\IC2_Governanca\documentacao\Fase-*/EPIC-*/RF-XXX/WF-RF-XXX.md
+   ls D:\IC2_Governanca\documentacao\Fase-*/EPIC-*/RF-XXX/user-stories.yaml
    ```
 
 3. **Validar STATUS.yaml**
    ```yaml
    # Verificar que tudo está True
    documentacao:
-     rf: true
+     documentacao: true
      uc: true
      md: true
      wf: true

@@ -1,0 +1,557 @@
+# =============================================
+# RF-023 - Gestão de Contratos (Contrato Canônico v2.0)
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# Data Migração v1.0 → v2.0: 2025-12-30
+# =============================================
+
+rf:
+  id: "RF023"
+  nome: "Gestão de Contratos"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 3 - Financeiro I - Base Contábil"
+  epic: "EPIC006-FIN-Financeiro-Base"
+  status: "concluido" # draft | aprovado | em_desenvolvimento | concluido
+  rfs_relacionados:
+    - "RF022" # Gestão de Fornecedores
+    - "RF090" # Medição e Faturamento de Contratos
+    - "RF092" # Garantias e Seguros Contratuais
+    - "RF093" # Indicadores de Performance e Compliance
+
+descricao:
+  objetivo: "Especificar o módulo de Gestão de Contratos do sistema IControlIT, responsável pela administração completa do ciclo de vida de contratos comerciais, de fornecimento, locação, manutenção e telecomunicações com fornecedores, operadoras e prestadores de serviço."
+  problema_resolvido: "Centralizar a gestão de documentos contratuais, vigências, valores, reajustes, anexos, workflows de aprovação, alertas automáticos, medições, garantias e histórico completo de alterações, garantindo conformidade legal e controle financeiro rigoroso."
+  publico_afetado: "Gestores de Contratos, Gerentes Financeiros, Jurídico, Diretoria, Fornecedores (indireto)"
+
+escopo:
+  incluso:
+    - "CRUD completo de contratos"
+    - "Gestão de tipos de contrato (Compra, Locação, Manutenção, Telecom, Serviço)"
+    - "Controle de vigência (data início, data fim, renovação automática)"
+    - "Gestão de anexos contratuais (upload/download com versioning)"
+    - "Controle de valores (valor total, valor mensal, moeda, reajustes)"
+    - "Workflow de aprovação por alçadas de valor"
+    - "Medição e faturamento (FK para RF090)"
+    - "Garantias e seguros (FK para RF092)"
+    - "Indicadores de performance (FK para RF093)"
+    - "Versionamento de contratos"
+    - "Relatórios gerenciais"
+    - "Integração com fornecedores (FK para RF022)"
+    - "Multi-tenancy rigoroso (isolamento por ClienteId)"
+    - "Auditoria imutável de todas as operações"
+    - "Alertas automáticos de vencimento"
+  fora:
+    - "Interface visual específica (responsabilidade do frontend)"
+    - "Tecnologia, framework ou linguagem de implementação"
+    - "Layout, UX ou identidade visual"
+    - "Estratégia de deploy ou infraestrutura"
+    - "Integração com sistemas externos de e-procurement"
+
+entidades:
+  - nome: "Contrato"
+    descricao: "Entidade central do requisito - documento formal que estabelece direitos, obrigações e condições entre a empresa (ClienteId) e um terceiro (fornecedor, operadora, prestador)"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "Id (Guid)"
+      - "ClienteId (Guid) - Multi-tenancy"
+      - "FornecedorId (Guid) - FK para RF022"
+      - "Numero (string) - Unique por ClienteId"
+      - "Descricao (string)"
+      - "TipoContrato (enum)"
+      - "DataInicio (DateTime)"
+      - "DataFim (DateTime)"
+      - "ValorTotal (decimal)"
+      - "ValorMensal (decimal)"
+      - "Moeda (string)"
+      - "IndiceReajuste (string)"
+      - "RenovacaoAutomatica (bool)"
+      - "Status (enum)"
+      - "IsDeleted (bool)"
+      - "DataDelecao (DateTime?)"
+      - "DeletadoPor (string)"
+
+  - nome: "ContratoAnexo"
+    descricao: "Anexos contratuais (PDF, DOCX, XML) com versionamento e validação de integridade"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "ContratoHistorico"
+    descricao: "Histórico de alterações do contrato (versionamento)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-CTR-023-01"
+    descricao: "A data de término (DataFim) de um contrato deve ser sempre maior ou igual à data de início (DataInicio). Vigência máxima de 10 anos."
+    tipo: "validacao"
+    campos_afetados: ["DataInicio", "DataFim"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Campo DataFim ausente ou vazio → Rejeição HTTP 400"
+      - "DataFim <= DataInicio → Rejeição HTTP 400"
+      - "Vigência > 10 anos → Rejeição HTTP 400"
+      - "Mensagem de erro clara e específica retornada ao usuário"
+
+  - id: "RN-CTR-023-02"
+    descricao: "Cálculo automático de valor mensal proporcional dividindo ValorTotal pela quantidade de meses da vigência (30,44 dias/mês). Se ValorMensal informado, ValorTotal é recalculado."
+    tipo: "regra_negocio"
+    campos_afetados: ["ValorTotal", "ValorMensal", "DataInicio", "DataFim"]
+    obrigatorio: true
+    criterios_aceite:
+      - "ValorTotal informado, ValorMensal não → ValorMensal = ValorTotal / (meses de vigência)"
+      - "ValorMensal informado → ValorTotal recalculado proporcionalmente"
+      - "Valores negativos → Rejeição HTTP 400"
+      - "Arredondamento em 2 casas decimais"
+
+  - id: "RN-CTR-023-03"
+    descricao: "Contratos com RenovacaoAutomatica = true são prolongados automaticamente quando a DataFim é atingida. Novo contrato criado, anterior marcado como Renovado."
+    tipo: "regra_negocio"
+    campos_afetados: ["RenovacaoAutomatica", "DataFim", "Status"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Job background executa diariamente às 00:00 UTC"
+      - "Contrato com RenovacaoAutomatica = true e DataFim = hoje → Novo contrato criado"
+      - "Novo contrato: DataInicio = DataFim anterior + 1 dia, periodicidade mantida"
+      - "Contrato original: Status = Renovado"
+      - "Notificação enviada ao responsável (e-mail + SignalR)"
+      - "Auditoria completa registrada"
+
+  - id: "RN-CTR-023-04"
+    descricao: "Sistema gera alertas automáticos (e-mail + SignalR) para vencimento em 30, 60 ou 90 dias. Alertas gravados em AuditoriaAlerta para rastreamento e evitar duplicatas."
+    tipo: "regra_negocio"
+    campos_afetados: ["DataFim"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Job background executa diariamente às 00:00 UTC"
+      - "Alertas gerados em 30, 60 e 90 dias antes do vencimento"
+      - "Apenas um alerta por período (verificação de duplicatas)"
+      - "E-mail assíncrono enviado ao responsável"
+      - "Notificação SignalR em tempo real no dashboard"
+      - "Auditoria com código CTR_CONTRATO_ALERTA_VENCIMENTO"
+
+  - id: "RN-CTR-023-05"
+    descricao: "Workflow de aprovação baseado em faixas de valor configuráveis. State-machine: Rascunho → PendenteAprovacao → Aprovado/Rejeitado. Cada nível registra auditoria."
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "ValorTotal"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Apenas contratos em status Rascunho podem ser submetidos"
+      - "Alçada determinada pelo valor do contrato"
+      - "Sistema identifica próximo aprovador automaticamente"
+      - "Notificação enviada ao aprovador (e-mail + SignalR)"
+      - "Aprovação/Rejeição registra timestamp, usuário, justificativa"
+      - "Tentativa de aprovação sem permissão → HTTP 403 Forbidden"
+
+  - id: "RN-CTR-023-06"
+    descricao: "Contrato não pode ser excluído se possuir medições ou faturas associadas (FK em RF090). Retorna HTTP 409 Conflict informando quantidade exata."
+    tipo: "validacao"
+    campos_afetados: ["IsDeleted"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Verificação de medições antes de exclusão"
+      - "Contrato com medições → HTTP 409 Conflict"
+      - "Mensagem de erro clara indicando quantidade de medições e valor total"
+      - "Contrato sem medições → Soft delete executado normalmente"
+
+  - id: "RN-CTR-023-07"
+    descricao: "Contratos com reajustes automáticos anuais conforme índice econômico (IGPM, IPCA, INPC). Reajuste calculado na data aniversário e aplicado a ValorMensal e ValorTotal."
+    tipo: "regra_negocio"
+    campos_afetados: ["IndiceReajuste", "ValorMensal", "ValorTotal", "DataInicio"]
+    obrigatorio: false
+    criterios_aceite:
+      - "Job background executa diariamente às 00:00 UTC"
+      - "Contratos com IndiceReajuste configurado e data aniversário = hoje → Reajuste aplicado"
+      - "Percentual do índice obtido de serviço externo ou tabela de índices"
+      - "ValorMensal e ValorTotal atualizados proporcionalmente"
+      - "Histórico registrado: valor anterior, novo valor, percentual, índice, data"
+      - "Auditoria com código CTR_CONTRATO_REAJUSTE"
+
+  - id: "RN-CTR-023-08"
+    descricao: "Todo contrato deve estar associado a fornecedor válido (FK para RF022). CNPJ validado na criação/edição. CNPJ inválido ou fornecedor inativo retorna HTTP 400."
+    tipo: "validacao"
+    campos_afetados: ["FornecedorId"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Fornecedor inexistente → HTTP 400 Fornecedor não encontrado"
+      - "Fornecedor inativo → HTTP 400 Fornecedor [Nome] está inativo"
+      - "CNPJ inválido (dígitos verificadores) → HTTP 400 CNPJ inválido"
+      - "Validação executada antes de criação/atualização do contrato"
+
+  - id: "RN-CTR-023-09"
+    descricao: "Todos os contratos isolados por ClienteId. Queries sempre filtram por ClienteId do usuário autenticado. Acesso cruzado retorna HTTP 403 Forbidden."
+    tipo: "seguranca"
+    campos_afetados: ["ClienteId"]
+    obrigatorio: true
+    criterios_aceite:
+      - "Todas as queries incluem WHERE ClienteId = [ClienteId do usuário autenticado]"
+      - "Tentativa de acesso cruzado → HTTP 403 Forbidden"
+      - "Middleware valida ClienteId em todas as requisições"
+      - "Logs de segurança para tentativas de violação"
+
+  - id: "RN-CTR-023-10"
+    descricao: "Contratos nunca deletados fisicamente. Soft delete marca IsDeleted = true, DataDelecao, DeletadoPor. Queries filtram IsDeleted = false automaticamente."
+    tipo: "seguranca"
+    campos_afetados: ["IsDeleted", "DataDelecao", "DeletadoPor"]
+    obrigatorio: true
+    criterios_aceite:
+      - "DELETE nunca executa físico (no DELETE FROM)"
+      - "Soft delete marca IsDeleted = true, DataDelecao = timestamp UTC, DeletadoPor = usuário"
+      - "Auditoria registra snapshot completo do contrato"
+      - "Queries padrão filtram WHERE IsDeleted = false"
+      - "Possibilidade de restauração (reversão de soft delete)"
+
+estados:
+  - id: "Rascunho"
+    descricao: "Contrato criado, não submetido para aprovação"
+  - id: "PendenteAprovacao"
+    descricao: "Aguardando aprovação conforme alçada"
+  - id: "Aprovado"
+    descricao: "Contrato aprovado, aguardando início de vigência"
+  - id: "Ativo"
+    descricao: "Contrato em vigência ativa"
+  - id: "Vencido"
+    descricao: "DataFim ultrapassada sem renovação"
+  - id: "Renovado"
+    descricao: "Contrato foi renovado (novo contrato criado)"
+  - id: "RenovacaoAutomatica"
+    descricao: "Contrato criado por renovação automática"
+  - id: "Rejeitado"
+    descricao: "Rejeitado no workflow de aprovação"
+  - id: "Cancelado"
+    descricao: "Cancelado manualmente antes do término"
+  - id: "Deletado"
+    descricao: "Soft delete (IsDeleted = true)"
+
+transicoes:
+  permitidas:
+    - de: "Rascunho"
+      para: "PendenteAprovacao"
+      acao: "Submeter"
+    - de: "PendenteAprovacao"
+      para: "Aprovado"
+      acao: "Aprovar"
+    - de: "PendenteAprovacao"
+      para: "Rejeitado"
+      acao: "Rejeitar"
+    - de: "Aprovado"
+      para: "Ativo"
+      acao: "DataInicio atingida"
+    - de: "Ativo"
+      para: "Vencido"
+      acao: "DataFim atingida"
+    - de: "Ativo"
+      para: "Cancelado"
+      acao: "Cancelar"
+    - de: "Vencido"
+      para: "Renovado"
+      acao: "Renovação automática executada"
+    - de: "RenovacaoAutomatica"
+      para: "Ativo"
+      acao: "DataInicio atingida"
+    - de: "Rejeitado"
+      para: "Rascunho"
+      acao: "Reabrir"
+  proibidas:
+    - de: "Renovado"
+      para: "*"
+      motivo: "Estado final"
+    - de: "Cancelado"
+      para: "*"
+      motivo: "Estado final"
+    - de: "Deletado"
+      para: "*"
+      motivo: "Estado final (recuperável apenas por admin)"
+
+permissoes:
+  - codigo: "contratos:contratos:create"
+    descricao: "Criar contrato"
+    perfis: ["Gestor", "Gerente Contrato", "Admin"]
+  - codigo: "contratos:contratos:read"
+    descricao: "Visualizar contrato"
+    perfis: ["Gestor", "Gerente Contrato", "Admin", "Financeiro"]
+  - codigo: "contratos:contratos:update"
+    descricao: "Editar contrato"
+    perfis: ["Gerente Contrato", "Admin"]
+  - codigo: "contratos:contratos:delete"
+    descricao: "Excluir contrato"
+    perfis: ["Admin"]
+  - codigo: "contratos:contratos:approve"
+    descricao: "Aprovar contrato"
+    perfis: ["Gerente Contrato", "Jurista", "Diretor"]
+  - codigo: "contratos:contratos:reject"
+    descricao: "Rejeitar contrato"
+    perfis: ["Gerente Contrato", "Jurista", "Diretor"]
+  - codigo: "contratos:contratos:export"
+    descricao: "Exportar relatório"
+    perfis: ["Gerente Contrato", "Admin", "Financeiro"]
+  - codigo: "contratos:anexos:upload"
+    descricao: "Upload de anexo"
+    perfis: ["Gerente Contrato", "Admin"]
+  - codigo: "contratos:anexos:read"
+    descricao: "Visualizar anexo"
+    perfis: ["Gestor", "Gerente Contrato", "Admin"]
+  - codigo: "contratos:renovacao:criar"
+    descricao: "Criar renovação"
+    perfis: ["Gerente Contrato", "Admin"]
+
+integracoes:
+  internas:
+    - nome: "Autenticação JWT"
+      obrigatoria: true
+    - nome: "Multi-Tenancy (ClienteId)"
+      obrigatoria: true
+    - nome: "Auditoria Imutável"
+      obrigatoria: true
+    - nome: "RBAC (Permissões)"
+      obrigatoria: true
+    - nome: "Central de Funcionalidades (Feature Flags)"
+      obrigatoria: true
+      features:
+        - "CONTRATOS_GESTAO"
+        - "CONTRATOS_WORKFLOW"
+        - "CONTRATOS_ALERTAS"
+        - "CONTRATOS_REAJUSTES"
+        - "CONTRATOS_RENOVACAO_AUTOMATICA"
+    - nome: "i18n (Transloco)"
+      obrigatoria: true
+      idiomas: ["pt-BR", "en-US", "es-ES"]
+  externas:
+    - sistema: "RF022 - Gestão de Fornecedores"
+      tipo: "FK (FornecedorId)"
+      obrigatoria: true
+    - sistema: "RF090 - Medição e Faturamento"
+      tipo: "FK (ContratoId)"
+      obrigatoria: false
+    - sistema: "RF092 - Garantias e Seguros"
+      tipo: "FK (ContratoId)"
+      obrigatoria: false
+    - sistema: "RF093 - Indicadores de Performance"
+      tipo: "FK (ContratoId)"
+      obrigatoria: false
+    - sistema: "Serviço de Índices Econômicos (IGPM, IPCA, INPC)"
+      tipo: "API Externa"
+      obrigatoria: false
+
+api_endpoints:
+  crud_principal:
+    - metodo: "GET"
+      rota: "/api/contratos"
+      descricao: "Listar contratos com filtros"
+      permissao: "contratos:contratos:read"
+      status_http: [200, 403]
+    - metodo: "GET"
+      rota: "/api/contratos/{id}"
+      descricao: "Obter contrato por ID"
+      permissao: "contratos:contratos:read"
+      status_http: [200, 403, 404]
+    - metodo: "POST"
+      rota: "/api/contratos"
+      descricao: "Criar contrato"
+      permissao: "contratos:contratos:create"
+      status_http: [201, 400, 403]
+    - metodo: "PUT"
+      rota: "/api/contratos/{id}"
+      descricao: "Atualizar contrato"
+      permissao: "contratos:contratos:update"
+      status_http: [200, 400, 403, 404]
+    - metodo: "DELETE"
+      rota: "/api/contratos/{id}"
+      descricao: "Excluir contrato (soft delete)"
+      permissao: "contratos:contratos:delete"
+      status_http: [204, 403, 404, 409]
+
+  operacoes_especiais:
+    - metodo: "POST"
+      rota: "/api/contratos/{id}/anexos"
+      descricao: "Upload de anexo"
+      permissao: "contratos:anexos:upload"
+      status_http: [201, 400, 403, 404]
+    - metodo: "POST"
+      rota: "/api/contratos/{id}/aprovar"
+      descricao: "Aprovar contrato"
+      permissao: "contratos:contratos:approve"
+      status_http: [200, 400, 403, 404]
+    - metodo: "POST"
+      rota: "/api/contratos/{id}/rejeitar"
+      descricao: "Rejeitar contrato"
+      permissao: "contratos:contratos:reject"
+      status_http: [200, 400, 403, 404]
+    - metodo: "POST"
+      rota: "/api/contratos/{id}/renovar"
+      descricao: "Renovar contrato"
+      permissao: "contratos:renovacao:criar"
+      status_http: [201, 400, 403, 404]
+    - metodo: "GET"
+      rota: "/api/contratos/vencimentos"
+      descricao: "Contratos próximos de vencer"
+      permissao: "contratos:contratos:read"
+      status_http: [200, 400]
+    - metodo: "GET"
+      rota: "/api/contratos/export"
+      descricao: "Exportar relatório (Excel/PDF)"
+      permissao: "contratos:contratos:export"
+      status_http: [200, 400, 403]
+    - metodo: "GET"
+      rota: "/api/contratos/{id}/historico"
+      descricao: "Histórico de alterações"
+      permissao: "contratos:contratos:read"
+      status_http: [200, 403, 404]
+    - metodo: "POST"
+      rota: "/api/contratos/{id}/simular-reajuste"
+      descricao: "Simular reajuste futuro"
+      permissao: "contratos:contratos:read"
+      status_http: [200, 400, 403, 404]
+    - metodo: "GET"
+      rota: "/api/contratos/metricas"
+      descricao: "Métricas gerenciais"
+      permissao: "contratos:contratos:read"
+      status_http: [200, 403]
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_entrada: true
+  rbac: true
+  protecoes:
+    - "SQL Injection Protection (queries parametrizadas, EF Core)"
+    - "XSS Prevention (sanitização backend + encoding Angular)"
+    - "CSRF Protection (tokens obrigatórios em POST/PUT/DELETE)"
+    - "Rate Limiting (máximo 1000 req/hora por IP)"
+    - "Criptografia de dados sensíveis (CNPJ, anexos)"
+  testes_seguranca_obrigatorios:
+    - "SQL Injection em campos de busca"
+    - "XSS em descrição"
+    - "CSRF em POST sem token"
+    - "Validação de permissões (acesso cruzado entre clientes)"
+    - "Alçada não autorizada (gestor aprovando R$1.000.000)"
+    - "Bypass de soft delete"
+    - "Validação de CNPJ inválido"
+    - "Datas inválidas (DataFim < DataInicio)"
+    - "Upload malicioso (.exe disfarçado de .pdf)"
+    - "Rate limiting (1001+ requisições/hora)"
+
+kpis:
+  - nome: "Contratos Ativos"
+    meta: ">= 80% dos contratos em status Aprovado/Ativo"
+    medicao: "Contagem mensal em dashboard"
+  - nome: "Taxa de Aprovação"
+    meta: ">= 90% dos contratos aprovados em até 5 dias"
+    medicao: "Diferença (DataAprovacao - DataSubmissao)"
+  - nome: "Alertas de Vencimento Enviados"
+    meta: "100% dos contratos a vencer recebem alerta"
+    medicao: "Contagem de CTR_CONTRATO_ALERTA_VENCIMENTO"
+  - nome: "Renovações Automáticas Sucesso"
+    meta: ">= 95% das renovações automáticas executadas com sucesso"
+    medicao: "Contagem de renovações bem-sucedidas / total"
+  - nome: "Tempo Médio de Aprovação"
+    meta: "<= 3 dias por nível de aprovação"
+    medicao: "(DataAprovacao - DataSubmissao) / níveis"
+  - nome: "Cobertura de Medições"
+    meta: ">= 80% dos contratos tem medições associadas"
+    medicao: "Contratos com FK em Medicao / total"
+  - nome: "Aderência de Reajustes"
+    meta: "100% dos reajustes automáticos aplicados conforme índice"
+    medicao: "Reajustes aplicados / reajustes esperados"
+  - nome: "Integridade de Anexos"
+    meta: "100% dos anexos com hash de integridade validado"
+    medicao: "Anexos com hash válido / total"
+  - nome: "Conformidade de Vigência"
+    meta: "0 contratos com DataFim inválida"
+    medicao: "Contratos com DataFim < DataInicio"
+  - nome: "Taxa de Exclusão Bloqueada"
+    meta: "100% das exclusões bloqueadas com motivo claro"
+    medicao: "Exclusões rejeitadas com RN-CTR-023-06"
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-RF023" # Visão Geral do Módulo
+    - "UC01-RF023" # Criar Contrato
+    - "UC02-RF023" # Editar Contrato
+    - "UC03-RF023" # Consultar Contrato
+    - "UC04-RF023" # Excluir Contrato
+    - "UC05-RF023" # Workflow de Aprovação
+    - "UC06-RF023" # Gestão de Anexos
+    - "UC07-RF023" # Renovação Automática
+    - "UC08-RF023" # Reajustes por Índice
+  mds_esperados:
+    - "MD-RF023" # Modelo de Dados Completo
+  tcs_esperados:
+    - "TC-RF023-BACKEND.md"
+    - "TC-RF023-FRONTEND.md"
+    - "TC-RF023-SEGURANCA.md"
+
+catalog:
+  crud:
+    - id: "RF023-CRUD-01"
+      title: "Criar contrato"
+      required: true
+    - id: "RF023-CRUD-02"
+      title: "Listar contratos"
+      required: true
+    - id: "RF023-CRUD-03"
+      title: "Visualizar contrato"
+      required: true
+    - id: "RF023-CRUD-04"
+      title: "Atualizar contrato"
+      required: true
+    - id: "RF023-CRUD-05"
+      title: "Excluir contrato (soft delete)"
+      required: true
+
+  validacoes:
+    - id: "RF023-VAL-01"
+      title: "Validar vigência contratual (RN-CTR-023-01)"
+      required: true
+    - id: "RF023-VAL-02"
+      title: "Validar CNPJ do fornecedor (RN-CTR-023-08)"
+      required: true
+    - id: "RF023-VAL-03"
+      title: "Validar bloqueio de exclusão com medições (RN-CTR-023-06)"
+      required: true
+    - id: "RF023-VAL-04"
+      title: "Calcular valor mensal proporcional (RN-CTR-023-02)"
+      required: true
+
+  seguranca:
+    - id: "RF023-SEC-01"
+      title: "Isolamento de tenant (RN-CTR-023-09)"
+      required: true
+    - id: "RF023-SEC-02"
+      title: "Permissões RBAC por alçada de valor"
+      required: true
+    - id: "RF023-SEC-03"
+      title: "Soft delete com auditoria (RN-CTR-023-10)"
+      required: true
+
+  workflows:
+    - id: "RF023-WF-01"
+      title: "Workflow de aprovação por alçada (RN-CTR-023-05)"
+      required: true
+    - id: "RF023-WF-02"
+      title: "Renovação automática de contratos (RN-CTR-023-03)"
+      required: true
+    - id: "RF023-WF-03"
+      title: "Alertas automáticos de vencimento (RN-CTR-023-04)"
+      required: true
+    - id: "RF023-WF-04"
+      title: "Reajustes automáticos por índice (RN-CTR-023-07)"
+      required: true
+
+exclusions:
+  documentacao_items: []
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-28"
+    autor: "Claude Code"
+    descricao: "Versão inicial com 10 RNs, 13+ endpoints, fluxos, segurança e KPIs"
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0 (separação RF/RL completa, sem referências ao legado)"

@@ -1,0 +1,774 @@
+uc:
+  documentacao: "RF056"
+  versao: "1.0"
+  data: "2025-12-31"
+
+casos_de_uso:
+  - id: "UC00"
+    nome: "Listar Filas de Atendimento"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      documentacao_items:
+        - "RN-RF056-009"  # Filas por Categoria
+        - "RF056-CRUD-01"  # Visualizar filas
+        - "RF056-SEC-01"  # Isolamento tenant
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa tela de filas de atendimento"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema valida permissão SD.FILAS.VIEW_ANY"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Sistema carrega filas do tenant atual"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Sistema exibe grid com colunas: Nome, Categoria, Qtd Atendentes, Qtd Solicitações, Status"
+          required: true
+        - id: "FA-UC00-001"
+          title: "Filtrar por categoria de serviço"
+          required: false
+        - id: "FA-UC00-002"
+          title: "Ordenar por quantidade de solicitações"
+          required: false
+        - id: "FE-UC00-001"
+          title: "Usuário sem permissão → acesso negado (HTTP 403)"
+          required: true
+    precondicoes:
+      - permissao: "SD.FILAS.VIEW_ANY"
+      - usuario_autenticado: true
+    gatilho: "Usuario acessa menu Filas de Atendimento"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_filas"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "listar_filas_tenant"
+        filtro: "ClienteId = Current"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibir_grid"
+        colunas: ["Nome", "Categoria", "Qtd Atendentes", "Qtd Solicitações", "Status"]
+    fluxos_alternativos:
+      - id: "FA-UC00-01"
+        condicao: "usuario_aplica_filtro_categoria"
+        resultado: "lista_filtrada_por_categoria"
+    fluxos_excecao:
+      - id: "FE-UC00-01"
+        condicao: "sem_permissao"
+        resultado: "acesso_negado_http_403"
+    regras_aplicadas:
+      - "RN-RF056-009"
+    resultado_final:
+      estado: "lista_filas_exibida"
+
+  - id: "UC01"
+    nome: "Distribuir Solicitação Automaticamente"
+    ator_principal: "sistema"
+    tipo: "acao"
+    impacta_dados: true
+    covers:
+      documentacao_items:
+        - "RN-RF056-001"  # Priorização na Fila
+        - "RN-RF056-002"  # Routing por Skills
+        - "RN-RF056-003"  # Balanceamento de Carga
+        - "RN-RF056-004"  # Escalação Automática
+        - "RN-RF056-005"  # Limite Solicitações Simultâneas
+        - "RN-RF056-009"  # Filas por Categoria
+        - "RN-RF056-010"  # Priorização de VIPs
+        - "RF056-CRUD-02"  # Atribuir solicitação automaticamente
+        - "RF056-VAL-01"  # Validar skill do atendente
+        - "RF056-VAL-02"  # Validar limite de solicitações
+      uc_items:
+        - id: "FP-UC01-001"
+          title: "Nova solicitação criada no sistema"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema identifica categoria da solicitação"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Sistema seleciona fila correspondente à categoria"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Sistema ordena solicitação na fila por prioridade, % SLA, tempo de espera"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Sistema busca atendentes disponíveis com skill adequada"
+          required: true
+        - id: "FP-UC01-006"
+          title: "Sistema valida limite de 5 solicitações simultâneas por atendente"
+          required: true
+        - id: "FP-UC01-007"
+          title: "Sistema atribui para atendente com menor carga de trabalho"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Sistema atualiza status solicitação para EM_ATENDIMENTO"
+          required: true
+        - id: "FP-UC01-009"
+          title: "Sistema registra auditoria de distribuição"
+          required: true
+        - id: "FA-UC01-001"
+          title: "Solicitação de VIP (CEO/Diretor) → prioridade CRÍTICA automática"
+          required: false
+        - id: "FA-UC01-002"
+          title: "Nenhum atendente disponível → manter na fila com status AGUARDANDO_ATENDIMENTO"
+          required: false
+        - id: "FA-UC01-003"
+          title: "Solicitação >30 min na fila → escalação automática"
+          required: false
+        - id: "FE-UC01-001"
+          title: "Nenhum atendente com skill adequada → alerta gestor"
+          required: true
+        - id: "FE-UC01-002"
+          title: "Todos atendentes com skill atingiram limite 5 → fila aguarda liberação"
+          required: true
+    precondicoes:
+      - solicitacao_criada: true
+      - categoria_definida: true
+    gatilho: "Evento SolicitacaoCriada recebido do RF055"
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "receber_evento_solicitacao_criada"
+      - passo: 2
+        ator: "sistema"
+        acao: "identificar_categoria_solicitacao"
+      - passo: 3
+        ator: "sistema"
+        acao: "selecionar_fila_por_categoria"
+      - passo: 4
+        ator: "sistema"
+        acao: "ordenar_fila"
+        criterios: ["Prioridade DESC", "PercentualSLA DESC", "DataAbertura ASC"]
+      - passo: 5
+        ator: "sistema"
+        acao: "buscar_atendentes_disponiveis"
+        filtros: ["Status = DISPONIVEL", "Skill = Categoria", "CargaAtual < 5"]
+      - passo: 6
+        ator: "sistema"
+        acao: "selecionar_atendente_menor_carga"
+        algoritmo: "MIN(CargaAtual)"
+      - passo: 7
+        ator: "sistema"
+        acao: "atribuir_solicitacao_atendente"
+      - passo: 8
+        ator: "sistema"
+        acao: "atualizar_status_em_atendimento"
+      - passo: 9
+        ator: "sistema"
+        acao: "incrementar_carga_atendente"
+      - passo: 10
+        ator: "sistema"
+        acao: "registrar_auditoria"
+    fluxos_alternativos:
+      - id: "FA-UC01-01"
+        condicao: "solicitante_vip"
+        passos:
+          - passo: 1
+            ator: "sistema"
+            acao: "verificar_perfil_solicitante"
+          - passo: 2
+            ator: "sistema"
+            acao: "se_cargo_ceo_ou_diretor_marcar_prioridade_critica"
+          - passo: 3
+            ator: "sistema"
+            acao: "posicionar_no_topo_da_fila"
+        regras: ["RN-RF056-010"]
+      - id: "FA-UC01-02"
+        condicao: "nenhum_atendente_disponivel"
+        passos:
+          - passo: 1
+            ator: "sistema"
+            acao: "verificar_lista_atendentes_disponiveis_vazia"
+          - passo: 2
+            ator: "sistema"
+            acao: "manter_solicitacao_status_aguardando_atendimento"
+          - passo: 3
+            ator: "sistema"
+            acao: "aguardar_proximo_ciclo_distribuicao"
+            intervalo: "Job a cada 30 segundos"
+        regras: []
+      - id: "FA-UC01-03"
+        condicao: "solicitacao_mais_30_min_fila"
+        passos:
+          - passo: 1
+            ator: "job_hangfire"
+            acao: "executar_job_escalacao_automatica"
+            frequencia: "A cada 5 minutos"
+          - passo: 2
+            ator: "sistema"
+            acao: "identificar_solicitacoes_data_abertura_maior_30_min"
+          - passo: 3
+            ator: "sistema"
+            acao: "aumentar_prioridade_automaticamente"
+          - passo: 4
+            ator: "sistema"
+            acao: "notificar_supervisor_via_rf066"
+        regras: ["RN-RF056-004"]
+    fluxos_excecao:
+      - id: "FE-UC01-01"
+        condicao: "nenhum_atendente_skill_adequada"
+        passos:
+          - passo: 1
+            ator: "sistema"
+            acao: "verificar_skill_requerida_vs_atendentes_disponiveis"
+          - passo: 2
+            ator: "sistema"
+            acao: "se_nenhum_match_alertar_gestor"
+          - passo: 3
+            ator: "sistema"
+            acao: "manter_solicitacao_aguardando_com_flag_sem_skill"
+        regras: ["RN-RF056-002"]
+      - id: "FE-UC01-02"
+        condicao: "todos_atendentes_limite_5_atingido"
+        passos:
+          - passo: 1
+            ator: "sistema"
+            acao: "verificar_carga_atual_todos_atendentes"
+          - passo: 2
+            ator: "sistema"
+            acao: "se_todos_carga_igual_5_aguardar_liberacao"
+          - passo: 3
+            ator: "sistema"
+            acao: "tentar_novamente_proximo_ciclo"
+        regras: ["RN-RF056-005"]
+    pos_condicoes:
+      - solicitacao_atribuida: true
+      - status_em_atendimento: true
+      - carga_atendente_incrementada: true
+      - auditoria_registrada: true
+    regras_aplicadas:
+      - "RN-RF056-001"
+      - "RN-RF056-002"
+      - "RN-RF056-003"
+      - "RN-RF056-004"
+      - "RN-RF056-005"
+      - "RN-RF056-009"
+      - "RN-RF056-010"
+    resultado_final:
+      estado: "solicitacao_distribuida"
+
+  - id: "UC02"
+    nome: "Alterar Status de Atendente"
+    ator_principal: "atendente"
+    tipo: "crud"
+    impacta_dados: true
+    covers:
+      documentacao_items:
+        - "RN-RF056-006"  # Status de Disponibilidade
+        - "RN-RF056-007"  # Pausas Automáticas
+        - "RN-RF056-008"  # Redistribuição em Ausência
+        - "RF056-CRUD-03"  # Alterar status de atendente
+        - "RF056-VAL-03"  # Validar transições de estado
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Atendente acessa controle de status"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema valida permissão SD.ATENDENTE.STATUS"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema exibe status atual e opções de transição"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Atendente seleciona novo status (DISPONIVEL, PAUSA, AUSENTE)"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Sistema valida transição de estado permitida"
+          required: true
+        - id: "FP-UC02-006"
+          title: "Sistema atualiza status do atendente"
+          required: true
+        - id: "FP-UC02-007"
+          title: "Sistema registra histórico de mudança de status"
+          required: true
+        - id: "FA-UC02-001"
+          title: "Mudança para PAUSA em horário configurado → pausa automática"
+          required: false
+        - id: "FA-UC02-002"
+          title: "Mudança para AUSENTE → redistribuir solicitações ativas"
+          required: false
+        - id: "FA-UC02-003"
+          title: "Mudança para DISPONIVEL após ausência → permitir receber novas solicitações"
+          required: false
+        - id: "FE-UC02-001"
+          title: "Transição de estado inválida → rejeitar (HTTP 400)"
+          required: true
+    precondicoes:
+      - permissao: "SD.ATENDENTE.STATUS"
+      - usuario_autenticado: true
+      - atendente_ativo: true
+    gatilho: "Atendente clica em botão de mudança de status"
+    fluxo_principal:
+      - passo: 1
+        ator: "atendente"
+        acao: "acessar_controle_status"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_status_atual"
+        status_possiveis: ["DISPONIVEL", "OCUPADO", "PAUSA", "AUSENTE"]
+      - passo: 4
+        ator: "atendente"
+        acao: "selecionar_novo_status"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_transicao_permitida"
+        regras: "Conforme tabela de transições permitidas"
+      - passo: 6
+        ator: "sistema"
+        acao: "atualizar_status_atendente"
+      - passo: 7
+        ator: "sistema"
+        acao: "registrar_historico_status"
+        dados: ["AtendenteId", "StatusAnterior", "StatusNovo", "DataHora", "Usuario"]
+      - passo: 8
+        ator: "sistema"
+        acao: "exibir_mensagem_sucesso"
+    fluxos_alternativos:
+      - id: "FA-UC02-01"
+        condicao: "pausa_automatica_horario_configurado"
+        passos:
+          - passo: 1
+            ator: "job_hangfire"
+            acao: "verificar_horarios_pausa_configurados"
+            exemplo: "12h00-13h00 (almoço)"
+          - passo: 2
+            ator: "sistema"
+            acao: "se_horario_atual_dentro_intervalo_marcar_pausa"
+          - passo: 3
+            ator: "sistema"
+            acao: "bloquear_atribuicao_novas_solicitacoes"
+        regras: ["RN-RF056-007"]
+      - id: "FA-UC02-02"
+        condicao: "mudanca_para_ausente_redistribuir_solicitacoes"
+        passos:
+          - passo: 1
+            ator: "atendente"
+            acao: "selecionar_status_ausente"
+          - passo: 2
+            ator: "sistema"
+            acao: "buscar_solicitacoes_ativas_atendente"
+            status: "EM_ATENDIMENTO"
+          - passo: 3
+            ator: "sistema"
+            acao: "redistribuir_solicitacoes_outros_atendentes_disponiveis"
+            criterio: "Mesma skill + menor carga"
+          - passo: 4
+            ator: "sistema"
+            acao: "atualizar_carga_atendentes_envolvidos"
+        regras: ["RN-RF056-008"]
+    fluxos_excecao:
+      - id: "FE-UC02-01"
+        condicao: "transicao_estado_invalida"
+        passos:
+          - passo: 1
+            ator: "sistema"
+            acao: "validar_transicao_tabela_permitidas"
+          - passo: 2
+            ator: "sistema"
+            acao: "se_nao_permitida_retornar_http_400"
+            mensagem: "Transição de estado inválida"
+        regras: []
+    pos_condicoes:
+      - status_atualizado: true
+      - historico_registrado: true
+      - solicitacoes_redistribuidas_se_ausente: true
+    regras_aplicadas:
+      - "RN-RF056-006"
+      - "RN-RF056-007"
+      - "RN-RF056-008"
+    resultado_final:
+      estado: "status_atendente_atualizado"
+
+  - id: "UC03"
+    nome: "Transferir Solicitação entre Atendentes"
+    ator_principal: "atendente_ou_supervisor"
+    tipo: "crud"
+    impacta_dados: true
+    covers:
+      documentacao_items:
+        - "RN-RF056-002"  # Routing por Skills
+        - "RN-RF056-005"  # Limite Solicitações Simultâneas
+        - "RN-RF056-011"  # Transferência entre Atendentes
+        - "RF056-CRUD-04"  # Transferir solicitação
+        - "RF056-VAL-01"  # Validar skill do atendente
+        - "RF056-VAL-02"  # Validar limite de solicitações
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Atendente/Supervisor acessa solicitação em atendimento"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema valida permissão SD.FILAS.TRANSFER"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Atendente solicita transferência"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Sistema exibe lista de atendentes disponíveis com skill adequada"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Atendente seleciona atendente destino e informa motivo"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Sistema valida skill do atendente destino"
+          required: true
+        - id: "FP-UC03-007"
+          title: "Sistema valida limite de 5 solicitações do atendente destino"
+          required: true
+        - id: "FP-UC03-008"
+          title: "Sistema transfere solicitação"
+          required: true
+        - id: "FP-UC03-009"
+          title: "Sistema atualiza carga de ambos atendentes"
+          required: true
+        - id: "FP-UC03-010"
+          title: "Sistema registra histórico de transferência"
+          required: true
+        - id: "FE-UC03-001"
+          title: "Atendente destino sem skill adequada → rejeitar (HTTP 400)"
+          required: true
+        - id: "FE-UC03-002"
+          title: "Atendente destino com carga=5 → rejeitar (HTTP 400)"
+          required: true
+    precondicoes:
+      - permissao: "SD.FILAS.TRANSFER"
+      - usuario_autenticado: true
+      - solicitacao_em_atendimento: true
+    gatilho: "Atendente clica em botão Transferir Solicitação"
+    fluxo_principal:
+      - passo: 1
+        ator: "atendente"
+        acao: "acessar_solicitacao_em_atendimento"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_transferencia"
+      - passo: 3
+        ator: "atendente"
+        acao: "solicitar_transferencia"
+      - passo: 4
+        ator: "sistema"
+        acao: "buscar_atendentes_disponiveis_mesma_skill"
+        filtros: ["Skill = Categoria", "Status = DISPONIVEL", "CargaAtual < 5"]
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_lista_atendentes_destino_possiveis"
+      - passo: 6
+        ator: "atendente"
+        acao: "selecionar_atendente_destino"
+      - passo: 7
+        ator: "atendente"
+        acao: "informar_motivo_transferencia"
+        obrigatorio: true
+      - passo: 8
+        ator: "sistema"
+        acao: "validar_skill_atendente_destino"
+      - passo: 9
+        ator: "sistema"
+        acao: "validar_limite_5_solicitacoes_destino"
+      - passo: 10
+        ator: "sistema"
+        acao: "atribuir_solicitacao_atendente_destino"
+      - passo: 11
+        ator: "sistema"
+        acao: "decrementar_carga_atendente_origem"
+      - passo: 12
+        ator: "sistema"
+        acao: "incrementar_carga_atendente_destino"
+      - passo: 13
+        ator: "sistema"
+        acao: "registrar_historico_transferencia"
+        dados: ["SolicitacaoId", "AtendenteOrigem", "AtendenteDestino", "Motivo", "DataHora"]
+      - passo: 14
+        ator: "sistema"
+        acao: "exibir_mensagem_sucesso"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC03-01"
+        condicao: "atendente_destino_sem_skill"
+        passos:
+          - passo: 1
+            ator: "sistema"
+            acao: "validar_skill_destino_vs_categoria_solicitacao"
+          - passo: 2
+            ator: "sistema"
+            acao: "se_skill_nao_match_retornar_http_400"
+            mensagem: "Atendente destino não possui skill necessária para esta categoria"
+        regras: ["RN-RF056-002", "RN-RF056-011"]
+      - id: "FE-UC03-02"
+        condicao: "atendente_destino_limite_5_atingido"
+        passos:
+          - passo: 1
+            ator: "sistema"
+            acao: "verificar_carga_atual_atendente_destino"
+          - passo: 2
+            ator: "sistema"
+            acao: "se_carga_igual_5_retornar_http_400"
+            mensagem: "Atendente destino atingiu limite de 5 solicitações simultâneas"
+        regras: ["RN-RF056-005"]
+    pos_condicoes:
+      - solicitacao_transferida: true
+      - carga_origem_decrementada: true
+      - carga_destino_incrementada: true
+      - historico_registrado: true
+    regras_aplicadas:
+      - "RN-RF056-002"
+      - "RN-RF056-005"
+      - "RN-RF056-011"
+    resultado_final:
+      estado: "solicitacao_transferida"
+
+  - id: "UC04"
+    nome: "Visualizar Métricas em Tempo Real"
+    ator_principal: "gestor_ou_supervisor"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      documentacao_items:
+        - "RN-RF056-012"  # Métricas em Tempo Real
+        - "RN-RF056-013"  # Fila de Retorno (Follow-up)
+        - "RN-RF056-014"  # SLA Pausado em Pendência Externa
+        - "RN-RF056-015"  # Relatório de Produtividade
+        - "RF056-CRUD-05"  # Visualizar métricas em tempo real
+      uc_items:
+        - id: "FP-UC04-001"
+          title: "Gestor acessa dashboard de métricas"
+          required: true
+        - id: "FP-UC04-002"
+          title: "Sistema valida permissão SD.FILAS.METRICS"
+          required: true
+        - id: "FP-UC04-003"
+          title: "Sistema carrega métricas consolidadas do tenant"
+          required: true
+        - id: "FP-UC04-004"
+          title: "Sistema exibe dashboard com KPIs em tempo real (SignalR)"
+          required: true
+        - id: "FA-UC04-001"
+          title: "Filtrar métricas por período (dia, semana, mês)"
+          required: false
+        - id: "FA-UC04-002"
+          title: "Exportar relatório de produtividade mensal (Excel/PDF)"
+          required: false
+        - id: "FA-UC04-003"
+          title: "Visualizar detalhamento de solicitações reabertas (follow-up)"
+          required: false
+        - id: "FE-UC04-001"
+          title: "Falha conexão SignalR → fallback polling a cada 30s"
+          required: true
+    precondicoes:
+      - permissao: "SD.FILAS.METRICS"
+      - usuario_autenticado: true
+    gatilho: "Gestor acessa menu Dashboard Filas"
+    fluxo_principal:
+      - passo: 1
+        ator: "gestor"
+        acao: "acessar_dashboard_metricas"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_metricas_tempo_real"
+        metricas:
+          - "Total solicitações por fila"
+          - "Total solicitações por status"
+          - "Atendentes disponíveis vs ocupados"
+          - "Tempo médio de espera por fila"
+          - "% SLA cumprido por fila"
+          - "Top 10 atendentes (solicitações resolvidas)"
+          - "Solicitações reabertas (follow-up)"
+          - "Solicitações em pendência externa (SLA pausado)"
+      - passo: 4
+        ator: "sistema"
+        acao: "estabelecer_conexao_signalr"
+      - passo: 5
+        ator: "sistema"
+        acao: "atualizar_dashboard_a_cada_30_segundos"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibir_graficos_kpis"
+    fluxos_alternativos:
+      - id: "FA-UC04-01"
+        condicao: "filtrar_metricas_periodo"
+        passos:
+          - passo: 1
+            ator: "gestor"
+            acao: "selecionar_filtro_periodo"
+            opcoes: ["Hoje", "Esta Semana", "Este Mês", "Customizado"]
+          - passo: 2
+            ator: "sistema"
+            acao: "recalcular_metricas_periodo_selecionado"
+          - passo: 3
+            ator: "sistema"
+            acao: "atualizar_dashboard"
+        regras: []
+      - id: "FA-UC04-02"
+        condicao: "exportar_relatorio_produtividade"
+        passos:
+          - passo: 1
+            ator: "gestor"
+            acao: "clicar_exportar_relatorio"
+          - passo: 2
+            ator: "sistema"
+            acao: "gerar_relatorio_mensal_consolidado_por_atendente"
+            dados: ["Total solicitações resolvidas", "Tempo médio resolução", "% SLA cumprido", "Avaliação média"]
+          - passo: 3
+            ator: "sistema"
+            acao: "exportar_formato_excel_ou_pdf"
+        regras: ["RN-RF056-015"]
+      - id: "FA-UC04-03"
+        condicao: "visualizar_follow_up"
+        passos:
+          - passo: 1
+            ator: "gestor"
+            acao: "clicar_card_solicitacoes_reabertas"
+          - passo: 2
+            ator: "sistema"
+            acao: "exibir_lista_solicitacoes_status_reaberta"
+          - passo: 3
+            ator: "sistema"
+            acao: "destacar_se_retornou_atendente_original"
+            regra: "Se disponível, retornar para atendente original"
+        regras: ["RN-RF056-013"]
+    fluxos_excecao:
+      - id: "FE-UC04-01"
+        condicao: "falha_conexao_signalr"
+        passos:
+          - passo: 1
+            ator: "sistema"
+            acao: "detectar_falha_conexao_signalr"
+          - passo: 2
+            ator: "sistema"
+            acao: "ativar_fallback_polling_a_cada_30_segundos"
+          - passo: 3
+            ator: "sistema"
+            acao: "tentar_reconectar_signalr_em_background"
+        regras: []
+    pos_condicoes:
+      - metricas_exibidas: true
+      - dashboard_tempo_real_ativo: true
+    regras_aplicadas:
+      - "RN-RF056-012"
+      - "RN-RF056-013"
+      - "RN-RF056-014"
+      - "RN-RF056-015"
+    resultado_final:
+      estado: "dashboard_metricas_exibido"
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    mudancas: "Criação inicial do UC-RF056.yaml com 5 UCs cobrindo 15 regras de negócio"
+    detalhes: |
+      UC00: Listar Filas de Atendimento
+      - Cobre: RN-RF056-009 (Filas por Categoria)
+      - Visualização de filas com isolamento por tenant
+
+      UC01: Distribuir Solicitação Automaticamente
+      - Cobre: RN-RF056-001, 002, 003, 004, 005, 009, 010 (7 regras)
+      - Priorização: Prioridade → % SLA → Tempo de espera
+      - Routing por Skills com validação obrigatória
+      - Balanceamento de carga (menor carga de trabalho)
+      - Escalação automática >30 min na fila
+      - Limite de 5 solicitações simultâneas por atendente
+      - Priorização automática de VIPs (CEO/Diretor)
+
+      UC02: Alterar Status de Atendente
+      - Cobre: RN-RF056-006, 007, 008 (3 regras)
+      - Status: DISPONIVEL, OCUPADO, PAUSA, AUSENTE
+      - Pausas automáticas em horários configurados
+      - Redistribuição automática quando atendente fica AUSENTE
+
+      UC03: Transferir Solicitação entre Atendentes
+      - Cobre: RN-RF056-002, 005, 011 (3 regras)
+      - Validação de skill obrigatória
+      - Validação de limite de 5 solicitações
+      - Histórico de transferências completo
+
+      UC04: Visualizar Métricas em Tempo Real
+      - Cobre: RN-RF056-012, 013, 014, 015 (4 regras)
+      - Dashboard SignalR atualizado a cada 30s
+      - Fila de retorno (follow-up) para atendente original
+      - SLA pausado em status AGUARDANDO_CLIENTE
+      - Relatório de produtividade mensal exportável
+
+      Cobertura: 15/15 regras (100%)
+
+rastreabilidade:
+  total_regras_rf: 15
+  total_ucs: 5
+  cobertura_percentual: 100.0
+
+  mapeamento_regras_para_ucs:
+    - documentacao_item: "RN-RF056-001"
+      titulo: "Priorização na Fila"
+      coberto_por: ["UC01"]
+      gap: false
+    - documentacao_item: "RN-RF056-002"
+      titulo: "Routing por Skills"
+      coberto_por: ["UC01", "UC03"]
+      gap: false
+    - documentacao_item: "RN-RF056-003"
+      titulo: "Balanceamento de Carga"
+      coberto_por: ["UC01"]
+      gap: false
+    - documentacao_item: "RN-RF056-004"
+      titulo: "Escalação Automática"
+      coberto_por: ["UC01"]
+      gap: false
+    - documentacao_item: "RN-RF056-005"
+      titulo: "Limite de Solicitações Simultâneas"
+      coberto_por: ["UC01", "UC03"]
+      gap: false
+    - documentacao_item: "RN-RF056-006"
+      titulo: "Status de Disponibilidade"
+      coberto_por: ["UC02"]
+      gap: false
+    - documentacao_item: "RN-RF056-007"
+      titulo: "Pausas Automáticas"
+      coberto_por: ["UC02"]
+      gap: false
+    - documentacao_item: "RN-RF056-008"
+      titulo: "Redistribuição em Ausência"
+      coberto_por: ["UC02"]
+      gap: false
+    - documentacao_item: "RN-RF056-009"
+      titulo: "Filas por Categoria"
+      coberto_por: ["UC00", "UC01"]
+      gap: false
+    - documentacao_item: "RN-RF056-010"
+      titulo: "Priorização de VIPs"
+      coberto_por: ["UC01"]
+      gap: false
+    - documentacao_item: "RN-RF056-011"
+      titulo: "Transferência entre Atendentes"
+      coberto_por: ["UC03"]
+      gap: false
+    - documentacao_item: "RN-RF056-012"
+      titulo: "Métricas em Tempo Real"
+      coberto_por: ["UC04"]
+      gap: false
+    - documentacao_item: "RN-RF056-013"
+      titulo: "Fila de Retorno (Follow-up)"
+      coberto_por: ["UC04"]
+      gap: false
+    - documentacao_item: "RN-RF056-014"
+      titulo: "SLA Pausado em Pendência Externa"
+      coberto_por: ["UC04"]
+      gap: false
+    - documentacao_item: "RN-RF056-015"
+      titulo: "Relatório de Produtividade"
+      coberto_por: ["UC04"]
+      gap: false

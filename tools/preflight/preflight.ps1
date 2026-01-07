@@ -26,16 +26,16 @@ Set-Content $manifest
 
 Write-Host "✅ EXECUTION-MANIFEST.md atualizado"
 
-$statusPath = "docs/rf/$RF/STATUS.yaml"
+$statusPath = "docs/documentacao/$RF/STATUS.yaml"
 
 if (!(Test-Path $statusPath)) {
   Write-Host "🆕 Criando STATUS.yaml"
-  New-Item -ItemType Directory -Force -Path "docs/rf/$RF" | Out-Null
+  New-Item -ItemType Directory -Force -Path "docs/documentacao/$RF" | Out-Null
   @"
 rf: $RF
 status:
   documentation:
-    rf: false
+    documentacao: false
     uc: false
     md: false
     wf: false

@@ -33,7 +33,7 @@ from datetime import datetime
 @dataclass
 class GovernanceValidationResult:
     """Resultado da validação de governança de um RF"""
-    rf_id: str
+    documentacao_id: str
     status_yaml_valido: bool
     arquivos_obrigatorios_presentes: bool
     status_reflete_realidade: bool
@@ -89,18 +89,18 @@ class ValidadorGovernanca:
     def __init__(self, base_path: str = "D:\\IC2\\docs\\rf"):
         self.base_path = Path(base_path)
 
-    def encontrar_rf(self, rf_id: str) -> Path:
+    def encontrar_rf(self, documentacao_id: str) -> Path:
         """Encontra a pasta do RF"""
         for fase_dir in self.base_path.glob("Fase-*"):
             for epic_dir in fase_dir.glob("EPIC-*"):
-                for rf_dir in epic_dir.glob(f"{rf_id}-*"):
-                    return rf_dir
+                for documentacao_dir in epic_dir.glob(f"{rf_id}-*"):
+                    return documentacao_dir
 
         raise FileNotFoundError(f"RF {rf_id} não encontrado em {self.base_path}")
 
-    def validar_status_yaml(self, rf_path: Path) -> Tuple[bool, Dict, List[Dict[str, str]]]:
+    def validar_status_yaml(self, documentacao_path: Path) -> Tuple[bool, Dict, List[Dict[str, str]]]:
         """Valida STATUS.yaml existe e está bem formado"""
-        status_yaml = rf_path / "STATUS.yaml"
+        status_yaml = documentacao_path / "STATUS.yaml"
         gaps = []
 
         if not status_yaml.exists():
@@ -164,14 +164,14 @@ class ValidadorGovernanca:
 
         return len(gaps) == 0, data, gaps
 
-    def validar_arquivos_obrigatorios(self, rf_path: Path, rf_id: str) -> Tuple[bool, List[Dict[str, str]]]:
+    def validar_arquivos_obrigatorios(self, documentacao_path: Path, documentacao_id: str) -> Tuple[bool, List[Dict[str, str]]]:
         """Valida presença de arquivos obrigatórios"""
         gaps = []
         arquivos_presentes = {}
 
         for key, template in self.ARQUIVOS_OBRIGATORIOS.items():
             filename = template.format(rf_id=rf_id)
-            filepath = rf_path / filename
+            filepath = documentacao_path / filename
             presente = filepath.exists()
             arquivos_presentes[key] = presente
 
@@ -189,7 +189,7 @@ class ValidadorGovernanca:
                     })
 
         # Verificar README.md
-        readme = rf_path / "README.md"
+        readme = documentacao_path / "README.md"
         if not readme.exists():
             gaps.append({
                 "tipo": "MENOR",
@@ -201,8 +201,8 @@ class ValidadorGovernanca:
 
     def validar_status_reflete_realidade(
         self,
-        rf_path: Path,
-        rf_id: str,
+        documentacao_path: Path,
+        documentacao_id: str,
         status_data: Dict
     ) -> Tuple[bool, List[Dict[str, str]]]:
         """Valida que STATUS.yaml reflete arquivos reais"""
@@ -305,13 +305,13 @@ class ValidadorGovernanca:
 
         return len(gaps) == 0, gaps
 
-    def validar_user_stories(self, rf_path: Path, status_data: Dict) -> Tuple[bool, List[Dict[str, str]]]:
+    def validar_user_stories(self, documentacao_path: Path, status_data: Dict) -> Tuple[bool, List[Dict[str, str]]]:
         """Valida user-stories.yaml se STATUS marca como criado"""
         gaps = []
         doc = status_data.get('documentacao', {})
         us_declarado = doc.get('user_stories', False)
 
-        us_file = rf_path / 'user-stories.yaml'
+        us_file = documentacao_path / 'user-stories.yaml'
         us_existe = us_file.exists()
 
         if us_declarado and not us_existe:
@@ -370,13 +370,13 @@ class ValidadorGovernanca:
 
         return len(gaps) == 0, gaps
 
-    def validar_rf(self, rf_id: str) -> GovernanceValidationResult:
+    def validar_rf(self, documentacao_id: str) -> GovernanceValidationResult:
         """Valida governança completa de um RF"""
         try:
-            rf_path = self.encontrar_rf(rf_id)
+            documentacao_path = self.encontrar_rf(rf_id)
         except FileNotFoundError as e:
             return GovernanceValidationResult(
-                rf_id=rf_id,
+                documentacao_id=rf_id,
                 status_yaml_valido=False,
                 arquivos_obrigatorios_presentes=False,
                 status_reflete_realidade=False,
@@ -392,13 +392,13 @@ class ValidadorGovernanca:
         all_gaps.extend(gaps_status)
 
         # Validação 2: Arquivos obrigatórios presentes
-        arquivos_ok, gaps_arq = self.validar_arquivos_obrigatorios(rf_path, rf_id)
+        arquivos_ok, gaps_arq = self.validar_arquivos_obrigatorios(rf_path, documentacao_id)
         all_gaps.extend(gaps_arq)
 
         # Validação 3: STATUS reflete realidade
         status_reflete = True
         if status_valido and status_data:
-            status_reflete, gaps_reflete = self.validar_status_reflete_realidade(rf_path, rf_id, status_data)
+            status_reflete, gaps_reflete = self.validar_status_reflete_realidade(rf_path, documentacao_id, status_data)
             all_gaps.extend(gaps_reflete)
 
         # Validação 4: Observações backend válidas
@@ -414,7 +414,7 @@ class ValidadorGovernanca:
             all_gaps.extend(gaps_us)
 
         return GovernanceValidationResult(
-            rf_id=rf_id,
+            documentacao_id=rf_id,
             status_yaml_valido=status_valido,
             arquivos_obrigatorios_presentes=arquivos_ok,
             status_reflete_realidade=status_reflete,
@@ -433,8 +433,8 @@ class ValidadorGovernanca:
             return results
 
         for epic_dir in sorted(fase_dir.glob("EPIC-*")):
-            for rf_dir in sorted(epic_dir.glob("RF*")):
-                rf_id = rf_dir.name.split('-')[0]
+            for documentacao_dir in sorted(epic_dir.glob("RF*")):
+                documentacao_id = documentacao_dir.name.split('-')[0]
                 print(f"Validando {rf_id}...")
                 result = self.validar_rf(rf_id)
                 results.append(result)
@@ -567,7 +567,7 @@ def main():
         output_file = f"D:\\IC2\\relatorios\\validacao-governanca-fase{fase_num}.md"
 
     else:
-        rf_id = arg
+        documentacao_id = arg
         print(f"Validando {rf_id}...")
         result = validador.validar_rf(rf_id)
         results = [result]

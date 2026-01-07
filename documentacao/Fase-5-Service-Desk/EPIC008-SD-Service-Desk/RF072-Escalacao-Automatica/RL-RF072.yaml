@@ -1,0 +1,427 @@
+# Template de Referência ao Legado (RL-RF072.yaml)
+# Versão: 1.0
+# Data: 2025-12-30
+
+rf_id: RF072
+titulo: "Escalação Automática"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "4.x"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server (multi-database por cliente)"
+  multi_tenant: false
+  auditoria: "none"
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+# RF-072 é FUNCIONALIDADE NOVA sem equivalente direto no legado
+referencias:
+  - id: "LEG-RF072-001"
+    tipo: "tela"
+    nome: "ChamadoDetalhe.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/ChamadoDetalhe.aspx"
+    descricao: |
+      Tela de detalhes do chamado que permitia reatribuição manual.
+      Dropdown de analistas disponíveis, sem registro de histórico.
+      Ao salvar, sobrescrevia AnalistaResponsavelId sem auditoria.
+    destino: "substituido"
+    justificativa: |
+      Substituído por UC01-RF072 (Criar escalação manual) que:
+      - Registra auditoria completa (quem escalou, quando, para quem)
+      - Envia notificações multi-canal automaticamente
+      - Cria histórico de escalações do chamado
+    documentacao_item_relacionado: "RN-RF072-001"
+    uc_relacionado: "UC01-RF072"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF072-002"
+    tipo: "tela"
+    nome: "ChamadoLista.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/ChamadoLista.aspx"
+    descricao: |
+      Lista de chamados com cálculo visual de SLA consumido.
+      Sistema exibia tempo decorrido, mas NÃO disparava ações automáticas.
+      Gestores verificavam manualmente 2x/dia.
+    destino: "substituido"
+    justificativa: |
+      Substituído por triggers automáticos de SLA (RN-RF072-001):
+      - SLA 50% consumido → escala automaticamente Nível 2
+      - SLA 75% consumido → escala Nível 3
+      - SLA 90% consumido → escala Gestor
+      - SLA 100% → alerta crítico + escala imediata
+    documentacao_item_relacionado: "RN-RF072-001"
+    uc_relacionado: "UC00-RF072"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF072-003"
+    tipo: "componente"
+    nome: "EmailHelper.vb (envio email manual)"
+    caminho: "ic1_legado/IControlIT/Helpers/EmailHelper.vb"
+    descricao: |
+      Helper de envio de email usado para notificar analistas após reatribuição.
+      Email enviado em BCC (não-rastreável).
+      Sem confirmação de leitura, sem retry, sem fallback.
+    destino: "substituido"
+    justificativa: |
+      Substituído por RN-RF072-007 (Notificações multi-canal):
+      - Email (detalhes completos)
+      - SMS (para P1 urgente)
+      - In-app (badge contador)
+      - MS Teams (menção direta)
+      - SLA entrega <30s, tracking de leitura
+    documentacao_item_relacionado: "RN-RF072-007"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF072-004"
+    tipo: "regra_negocio"
+    nome: "Reatribuição sem histórico"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/ChamadoDetalhe.aspx.vb - Linha ~450"
+    descricao: |
+      Ao reatribuir chamado, código sobrescrevia campo AnalistaResponsavelId
+      sem registrar quem fez a reatribuição, quando, ou por quê.
+      Impossível auditar ou rastrear escalações.
+    destino: "substituido"
+    justificativa: |
+      Substituído por entidade Escalacao + EscalacaoAuditoria (RN-RF072-006):
+      - Registro automático em toda escalação
+      - Campos: origem, destino, timestamp, motivo, duração
+      - Retenção 7 anos (LGPD)
+      - Permissão auditoria obrigatória
+    documentacao_item_relacionado: "RN-RF072-006"
+    uc_relacionado: "UC01-RF072"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF072-005"
+    tipo: "ausencia"
+    nome: "Escalação Automática (NÃO EXISTE)"
+    caminho: "N/A"
+    descricao: |
+      Sistema legado NÃO possui engine de escalação automática.
+      Todas as escalações eram manuais (via UI ou email).
+      Sem triggers, sem skill-based routing, sem SLA automático.
+    destino: "descartado"
+    justificativa: |
+      Funcionalidade completamente nova no RF-072 (não existia no legado para migrar):
+      - Engine automática com 5 tipos de triggers
+      - Skill-based routing com score ponderado
+      - Matriz hierárquica configurável
+      - Balanceamento de carga automático
+      - Dashboard real-time com SignalR
+    documentacao_item_relacionado: "RN-RF072-001, RN-RF072-002, RN-RF072-003"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF072-006"
+    tipo: "ausencia"
+    nome: "Matriz de Escalação (NÃO EXISTE)"
+    caminho: "N/A"
+    descricao: |
+      Não há matriz hierárquica configurável no legado.
+      Estrutura de escalação era conhecimento pessoal (não sistematizado).
+      Cada gestor escalava de forma diferente.
+    destino: "descartado"
+    justificativa: |
+      Funcionalidade completamente nova no RF-072 (não existia no legado para migrar):
+      Criada matriz hierárquica configurável (RN-RF072-005):
+      - 2-5 níveis por cliente (Nível 1→2→3→4→5)
+      - Validação de ciclos
+      - Editor visual drag-and-drop
+      - Multi-tenancy (matriz independente por cliente)
+    documentacao_item_relacionado: "RN-RF072-005"
+    uc_relacionado: "UC04-RF072"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF072-007"
+    tipo: "ausencia"
+    nome: "Skills de Analistas (NÃO EXISTE)"
+    caminho: "N/A"
+    descricao: |
+      Tabela Usuario não possui campos de skills, competências, histórico.
+      Escalações eram aleatórias ou baseadas em conhecimento pessoal.
+      Sem skill-based routing.
+    destino: "descartado"
+    justificativa: |
+      Funcionalidade completamente nova no RF-072 (não existia no legado para migrar):
+      Criado skill-based routing (RN-RF072-003):
+      - Score ponderado (skills 40% + histórico 30% + disponibilidade 20% + SLA 10%)
+      - Tabela Skills + relacionamento N:N com Usuario
+      - Histórico de sucesso por categoria
+      - Seleção automática do melhor analista
+    documentacao_item_relacionado: "RN-RF072-003"
+    uc_relacionado: "UC01-RF072"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF072-008"
+    tipo: "ausencia"
+    nome: "Balanceamento de Carga (NÃO EXISTE)"
+    caminho: "N/A"
+    descricao: |
+      Sistema não monitora carga de trabalho de analistas.
+      Frequentemente analistas sobrecarregados (>10 chamados) enquanto outros ociosos.
+      Sem pausa automática, sem redistribuição.
+    destino: "descartado"
+    justificativa: |
+      Funcionalidade completamente nova no RF-072 (não existia no legado para migrar):
+      Criado balanceamento automático (RN-RF072-004):
+      - Pausa automática se >8 chamados ativos
+      - Remove pausa se <5 chamados
+      - Round-robin ponderado
+      - Exceção P1 violando SLA
+    documentacao_item_relacionado: "RN-RF072-004"
+    uc_relacionado: null
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF072-009"
+    tipo: "ausencia"
+    nome: "Pausas Temporárias (NÃO EXISTE)"
+    caminho: "N/A"
+    descricao: |
+      Sistema não gerencia pausas de analistas (férias, ausências, reuniões).
+      Analistas de férias continuavam recebendo atribuições.
+      Sem integração com calendário corporativo.
+    destino: "descartado"
+    justificativa: |
+      Funcionalidade completamente nova no RF-072 (não existia no legado para migrar):
+      Criado gestão de pausas (RN-RF072-008):
+      - Integração com Active Directory (calendário)
+      - Sincronização automática 1x/hora
+      - Pausas manuais sobrepõem AD
+      - Analista pausado removido de roteamento
+    documentacao_item_relacionado: "RN-RF072-008"
+    uc_relacionado: "UC05-RF072"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF072-010"
+    tipo: "ausencia"
+    nome: "Dashboard de Escalações (NÃO EXISTE)"
+    caminho: "N/A"
+    descricao: |
+      Sem visibilidade real-time de escalações em andamento.
+      Gestores dependiam de relatórios estáticos 1x/dia.
+      Sem métricas de taxa de aceite, tempo médio, padrões.
+    destino: "descartado"
+    justificativa: |
+      Funcionalidade completamente nova no RF-072 (não existia no legado para migrar):
+      Criado dashboard real-time (RN-RF072-010):
+      - SignalR para atualização <2s
+      - Métricas: escalações/hora, taxa aceite, tempo médio
+      - Alertas críticos (>5% violação SLA, >10 rejeições)
+      - Filtros: período, analista, categoria, prioridade
+    documentacao_item_relacionado: "RN-RF072-010"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# Telas Legadas (não aplicável - funcionalidade nova)
+telas: []
+
+# WebServices Legados (não aplicável - funcionalidade nova)
+servicos: []
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "Chamado"
+    finalidade: "Registro de chamados/tickets"
+    problemas:
+      - "Campo AnalistaResponsavelId sobrescrito sem histórico"
+      - "Sem FK constraint com Usuario (integridade frágil)"
+      - "Sem campos de auditoria (Created, Modified, CreatedBy, ModifiedBy)"
+      - "Sem campo SLAConsumidoPercentual (calculado em tempo real, não armazenado)"
+    destino: "assumido"
+    tabela_moderna: "Escalacao + EscalacaoAuditoria"
+    migration: "Não há migração de dados (legado não registrava escalações)"
+
+  - nome: "Usuario"
+    finalidade: "Cadastro de analistas/usuários"
+    problemas:
+      - "Sem skills/competências associadas"
+      - "Sem nível de escalação (Nível 1/2/3)"
+      - "Sem carga de trabalho (ChamadosAtivos)"
+      - "Sem pausa temporária (EmPausa, DataInicioPausa, DataFimPausa)"
+    destino: "assumido"
+    tabela_moderna: "Usuario + Skills + NivelEscalacao + PausaTemporaria"
+    migration: "Campos adicionados, sem quebrar estrutura existente"
+
+# Regras de Negócio Implícitas (extraídas do código VB.NET)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      Reatribuição manual via dropdown em ChamadoDetalhe.aspx.
+      Ação NÃO registrada em auditoria.
+    fonte: "ic1_legado/IControlIT/ServiceDesk/ChamadoDetalhe.aspx.vb - Linha ~450"
+    destino: "substituido"
+    documentacao_moderno: "RN-RF072-001"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Após reatribuir, analista origem enviava email manual (não-rastreável).
+    fonte: "ic1_legado/IControlIT/Helpers/EmailHelper.vb - Linha ~230"
+    destino: "substituido"
+    documentacao_moderno: "RN-RF072-007"
+
+  - id: "RL-RN-003"
+    descricao: |
+      SLA calculado em tempo real na UI, mas sem triggers automáticos.
+      Gestores checavam relatórios 2x/dia manualmente.
+    fonte: "ic1_legado/IControlIT/ServiceDesk/ChamadoLista.aspx.vb"
+    destino: "substituido"
+    documentacao_moderno: "RN-RF072-001"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Escalação Automática"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade completamente nova - motor inteligente com triggers configuráveis"
+
+  - item: "Skill-Based Routing"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Algoritmo com score ponderado (skills + histórico + disponibilidade + SLA)"
+
+  - item: "Matriz Hierárquica"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Configurável por cliente (2-5 níveis), validação de ciclos"
+
+  - item: "Balanceamento de Carga"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Pausa automática >8 chamados, redistribuição inteligente"
+
+  - item: "Notificações Multi-Canal"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: só email manual. Moderno: email + SMS + in-app + Teams (automático)"
+
+  - item: "Auditoria de Escalações"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Log completo (7 anos retenção), rastreabilidade total"
+
+  - item: "Dashboard Real-time"
+    existe_legado: false
+    existe_moderno: true
+    notas: "SignalR, métricas, alertas, filtros avançados"
+
+  - item: "Pausas Temporárias"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Integração com AD (calendário corporativo)"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Criar funcionalidade do zero sem migrar histórico"
+    motivo: |
+      Legado não registrava escalações (apenas sobrescrevia AnalistaResponsavelId).
+      Não há dados históricos para migrar.
+      Implementar do zero permite arquitetura limpa (CQRS, eventos, SignalR).
+    impacto: "alto"
+    data: "2025-12-28"
+
+  - decisao: "Implementar multi-tenancy com matriz independente por cliente"
+    motivo: |
+      Legado tinha bancos separados. Modernizar permite matriz configurável
+      em banco único (Row-Level Security).
+    impacto: "medio"
+    data: "2025-12-28"
+
+  - decisao: "Manter reatribuição manual por 3 meses após rollout"
+    motivo: |
+      Permitir transição gradual. Usuários podem preferir manual inicialmente.
+      Após 3 meses, automático se torna padrão.
+    impacto: "baixo"
+    data: "2025-12-28"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Resistência de usuários à automação"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      - Treinamento intensivo (2 sessões de 2h)
+      - Rollout gradual (10% → 50% → 100% usuários)
+      - Manter reatribuição manual por 3 meses
+      - Dashboard para mostrar benefícios (MTTR reduzido)
+
+  - risco: "Complexidade de configuração inicial de matriz"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      - Wizard de configuração guiado
+      - Templates pré-prontos (helpdesk padrão, TI enterprise)
+      - Suporte dedicado primeiros 30 dias
+
+  - risco: "Integração com AD pode falhar"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Fallback para pausas manuais
+      - Retry automático 5x com exponential backoff
+      - Alertas se sync falhar >3x consecutivas
+
+  - risco: "Performance com 1000+ analistas"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Cache Redis para scores de analistas (TTL 30min)
+      - Indexação otimizada em Skills, NivelAcesso, ClienteId
+      - Testes de carga obrigatórios (500 escalações simultâneas)
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "ChamadoDetalhe.aspx (reatribuição manual)"
+    referencia_rf: "RN-RF072-001"
+    referencia_uc: "UC01-RF072"
+    status: "substituido"
+
+  - elemento_legado: "EmailHelper.vb (email manual)"
+    referencia_rf: "RN-RF072-007"
+    referencia_uc: null
+    status: "substituido"
+
+  - elemento_legado: "Cálculo SLA manual"
+    referencia_rf: "RN-RF072-001"
+    referencia_uc: null
+    status: "substituido"
+
+  - elemento_legado: "N/A (escalação automática não existia)"
+    referencia_rf: "RN-RF072-001, RN-RF072-002, RN-RF072-003"
+    referencia_uc: "UC01-RF072, UC03-RF072, UC04-RF072"
+    status: "funcionalidade_nova"
+
+# Changelog
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Versão inicial - Documentação de ausência de escalação automática no legado + mapeamento de funcionalidades novas"
+    autor: "Agência ALC - alc.dev.br"
+
+# Metadados de Cobertura
+metadados:
+  total_itens_legado: 10
+  itens_assumidos: 2  # Tabelas Chamado e Usuario
+  itens_substituidos: 4  # Telas, email, reatribuição manual, SLA manual
+  itens_descartados: 0
+  itens_funcionalidade_nova: 4  # Escalação auto, matriz, skills, dashboard
+  cobertura_destinos: "100%"

@@ -1,0 +1,739 @@
+# =============================================
+# RF035 - Gestão de Resumos de Auditoria
+# Versão: 2.0 (Governança v2.0 - Separação RF/RL)
+# Data: 2025-12-30
+# Autor: Architect Agent
+# =============================================
+
+rf:
+  id: "RF035"
+  nome: "Gestão de Resumos de Auditoria"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 6 - Ativos, Auditoria e Integrações"
+  epic: "EPIC010-AUD-Auditoria-Avancada"
+  status: "documentado" # draft | aprovado | em_desenvolvimento | concluido
+
+descricao:
+  objetivo: "Consolidar, analisar e gerar relatórios gerenciais de auditorias de faturas de telecomunicações através de resumos agregados por período, operadora, tipo de serviço e lote."
+  problema_resolvido: "Elimina análise manual de milhares de itens individuais. Fornece visão executiva consolidada com KPIs, ROI, alertas automáticos e exportação gerencial."
+  publico_afetado: "Gestores, diretores, analistas de auditoria, stakeholders financeiros e equipes de compliance."
+
+escopo:
+  incluso:
+    - "Consolidação automática diária (job Hangfire às 02h UTC)"
+    - "Cálculo de totalizadores financeiros (faturado, glosado, economia, %)"
+    - "Análise comparativa entre períodos (mês, trimestre, ano)"
+    - "Indicadores de performance (ROI, % glosa, ticket médio, eficiência)"
+    - "Dashboard executivo com gráficos em tempo real (Chart.js + SignalR)"
+    - "Drill-down navegável com preservação de contexto"
+    - "Alertas automáticos de desvios (glosa > limite, variação > 20%)"
+    - "Exportação PDF (iText) e Excel (EPPlus) com gráficos"
+    - "Histórico de períodos (3 anos online, 7 anos backup)"
+    - "Integração bidirecional com lotes (RF054)"
+    - "Row-Level Security automática por ClienteId"
+    - "Integração com SLA Audit (RF028, RF029)"
+  fora:
+    - "Interface visual específica (definida em WF-RF035)"
+    - "Tecnologia de implementação (definida em padrões)"
+    - "Layout, UX ou identidade visual"
+    - "Estratégia de deploy ou infraestrutura"
+    - "Análise manual de glosas (sistema é automático)"
+    - "Geração de contestações formais (RF futuro)"
+
+entidades:
+  - nome: "AuditoriaResumo"
+    descricao: "Resumo consolidado de auditorias agrupado por período/operadora/tipo serviço/lote"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "ClienteId (Guid, FK, multi-tenancy obrigatório)"
+      - "Operadora (string, agrupamento)"
+      - "TipoServico (string, agrupamento)"
+      - "LoteAuditoriaId (Guid, FK nullable)"
+      - "DataPeriodo (DateTime, período consolidado)"
+      - "TotalFaturado (decimal, Σ ValorCobrado)"
+      - "TotalGlosado (decimal, Σ ValorCobradoAMais)"
+      - "TotalEconomia (decimal, = TotalGlosado)"
+      - "PercentualGlosa (decimal, calculado)"
+      - "PercentualEconomia (decimal, calculado)"
+      - "QuantidadeItens (int, contador)"
+      - "DataConsolidacao (DateTime, timestamp job)"
+
+  - nome: "AlertaAuditoria"
+    descricao: "Alertas de desvios gerados automaticamente"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "AuditoriaIndicadores"
+    descricao: "Histórico de KPIs calculados"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO
+# ==============================================================================
+
+regras_negocio:
+  - id: "RN-RF035-001"
+    descricao: "Consolidação automática diária com agrupamento multi-dimensional"
+    tipo: "regra_negocio"
+    campos_afetados: ["ClienteId", "Operadora", "TipoServico", "LoteAuditoriaId", "DataPeriodo"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "job_automatizado"
+      mensagem_erro: "Falha na consolidação automática - Job Hangfire"
+      http_code: 500
+    detalhes: |
+      - Job executa diariamente às 02h00 UTC
+      - Agrupa itens por (ClienteId, Operadora, TipoServico, LoteId, DataPeriodo)
+      - Cria resumo único por combinação
+      - Proteção contra execução concorrente
+
+  - id: "RN-RF035-002"
+    descricao: "Cálculo automático e validado de totalizadores"
+    tipo: "validacao"
+    campos_afetados: ["TotalFaturado", "TotalGlosado", "TotalEconomia", "PercentualGlosa", "PercentualEconomia"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "range"
+      mensagem_erro: "Glosa não pode ser maior que faturado"
+      http_code: 400
+    detalhes: |
+      - TotalFaturado = Σ ValorCobrado
+      - TotalGlosado = Σ ValorCobradoAMais
+      - PercentualGlosa = (TotalGlosado / TotalFaturado) * 100
+      - Validar: TotalGlosado ≤ TotalFaturado
+      - Validar: valores não negativos
+      - Precisão: 8 casas decimais (cálculo), 2 casas (resultado)
+
+  - id: "RN-RF035-003"
+    descricao: "Análise comparativa automática entre períodos"
+    tipo: "regra_negocio"
+    campos_afetados: ["DataPeriodo", "TotalGlosado", "PercentualGlosa"]
+    obrigatorio: true
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: true
+    detalhes: |
+      - Comparar: mês atual vs. anterior
+      - Comparar: trimestre atual vs. anterior
+      - Comparar: ano atual vs. anterior
+      - Calcular variação absoluta (R$) e percentual (%)
+      - SE variação > +20% ENTÃO gerar alerta
+
+  - id: "RN-RF035-004"
+    descricao: "Cálculo de indicadores de performance"
+    tipo: "regra_negocio"
+    campos_afetados: ["TotalGlosado", "TotalFaturado", "QuantidadeItens"]
+    obrigatorio: true
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    detalhes: |
+      - % Glosa Média por Operadora
+      - ROI = (Economia / Investimento) * 100
+      - Ticket Médio = TotalGlosado / QuantidadeItens
+      - Eficiência = QuantidadeItens / DiasUteis
+      - Recalcular após cada consolidação
+      - Armazenar histórico em AuditoriaIndicadores
+
+  - id: "RN-RF035-005"
+    descricao: "Alertas de desvios automáticos"
+    tipo: "regra_negocio"
+    campos_afetados: ["PercentualGlosa", "TotalGlosado"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: true
+    detalhes: |
+      - Gerar alerta SE: % Glosa > limite configurado
+      - Gerar alerta SE: variação período > ±20%
+      - Gerar alerta SE: Economia < 80% meta
+      - Gerar alerta SE: valor > média + 2σ
+      - Severidade: CRITICO, ALERTA, AVISO
+      - Notificar via SignalR em tempo real
+
+  - id: "RN-RF035-006"
+    descricao: "Drill-down com preservação de contexto"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: true
+    detalhes: |
+      - Navegação: Resumo → Itens → Bilhete
+      - Preservar TODOS os filtros (operadora, período, lote)
+      - Exibir breadcrumb de navegação
+      - Permitir retorno restaurando contexto
+      - Validar permissão em todos os níveis
+
+  - id: "RN-RF035-007"
+    descricao: "Integração bidirecional com lotes (RF054)"
+    tipo: "integracao"
+    campos_afetados: ["LoteAuditoriaId"]
+    obrigatorio: true
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "integridade_referencial"
+      mensagem_erro: "Lote de auditoria não encontrado"
+      http_code: 404
+    detalhes: |
+      - Resumo DEVE ter FK LoteAuditoriaId (nullable)
+      - Navegar: Resumo → Lote
+      - Navegar: Lote → Resumos relacionados
+      - Validar existência do lote antes de criar resumo
+
+  - id: "RN-RF035-008"
+    descricao: "Exportação em múltiplos formatos"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "permissao"
+      mensagem_erro: "Permissão de exportação negada"
+      http_code: 403
+    detalhes: |
+      - PDF: iText 8+ com gráficos, tabelas, 16 pontos i18n
+      - Excel: EPPlus 6+ com abas (Consolidado, Detalhes, Gráficos)
+      - Exportação assíncrona (job Hangfire)
+      - Validar permissão AUD.RESUMOS.EXPORT
+      - Registrar exportação em auditoria
+
+  - id: "RN-RF035-009"
+    descricao: "Row-Level Security por ClienteId"
+    tipo: "seguranca"
+    campos_afetados: ["ClienteId"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "isolamento_tenant"
+      mensagem_erro: "Acesso negado - violação de multi-tenancy"
+      http_code: 403
+    detalhes: |
+      - TODAS queries: WHERE ClienteId = @ClienteIdUsuario
+      - SQL Server RLS (Row-Level Security)
+      - CONTEXT_INFO com ClienteId
+      - Acesso cruzado → 403 Forbidden
+      - Auditar tentativas de violação
+
+  - id: "RN-RF035-010"
+    descricao: "Auditoria completa de alterações"
+    tipo: "seguranca"
+    campos_afetados: []
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    detalhes: |
+      - Registrar: UserId, Timestamp, IP, Ação
+      - Registrar estado anterior/novo (JSON)
+      - Retenção: 7 anos (LGPD)
+      - Consulta de histórico por período/usuário/ação
+      - Exportação de logs em Excel
+
+  - id: "RN-RF035-011"
+    descricao: "Validação de integridade referencial"
+    tipo: "validacao"
+    campos_afetados: ["LoteAuditoriaId", "ClienteId", "DataPeriodo"]
+    obrigatorio: true
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: true
+      validacao_ui: false
+    validacao:
+      tipo: "integridade_referencial"
+      mensagem_erro: "Falha na validação de integridade referencial"
+      http_code: 400
+    detalhes: |
+      - SE LoteId informado ENTÃO validar existência
+      - TODOS itens: ClienteId = ClienteIdResumo
+      - DataPeriodo dos itens ≈ DataPeriodo do resumo
+      - Falha → DomainException
+      - Registrar falhas em log
+
+# ==============================================================================
+# ESTADOS DA ENTIDADE
+# ==============================================================================
+
+estados:
+  - id: "ativo"
+    descricao: "Resumo consolidado e disponível para análise"
+  - id: "arquivado"
+    descricao: "Resumo arquivado (> 3 anos) mas disponível para consulta"
+  - id: "excluido"
+    descricao: "Resumo excluído logicamente (soft delete)"
+
+transicoes:
+  permitidas:
+    - de: "ativo"
+      para: "arquivado"
+      condicao: "DataConsolidacao > 3 anos"
+    - de: "ativo"
+      para: "excluido"
+      condicao: "Permissão AUD.RESUMOS.DELETE"
+  proibidas:
+    - de: "excluido"
+      para: "ativo"
+      motivo: "Resumos excluídos não podem ser reativados"
+
+# ==============================================================================
+# PERMISSÕES RBAC
+# ==============================================================================
+
+permissoes:
+  - codigo: "AUD.RESUMOS.READ"
+    descricao: "Listar e visualizar resumos de auditoria"
+    roles_autorizadas: ["Gerente", "Auditor", "Diretor", "Admin"]
+  - codigo: "AUD.RESUMOS.CREATE"
+    descricao: "Criar resumo (job automático)"
+    roles_autorizadas: ["System (Hangfire Job)", "Admin"]
+  - codigo: "AUD.RESUMOS.UPDATE"
+    descricao: "Atualizar resumo existente"
+    roles_autorizadas: ["Admin"]
+  - codigo: "AUD.RESUMOS.DELETE"
+    descricao: "Excluir resumo (soft delete)"
+    roles_autorizadas: ["Admin"]
+  - codigo: "AUD.RESUMOS.EXPORT"
+    descricao: "Exportar resumos em PDF ou Excel"
+    roles_autorizadas: ["Gerente", "Diretor", "Admin"]
+  - codigo: "AUD.INDICADORES.READ"
+    descricao: "Visualizar indicadores de performance"
+    roles_autorizadas: ["Gerente", "Diretor", "Admin"]
+  - codigo: "AUD.ALERTAS.READ"
+    descricao: "Visualizar alertas de desvios"
+    roles_autorizadas: ["Gerente", "Diretor", "Admin"]
+  - codigo: "AUD.ALERTAS.ACKNOWLEDGE"
+    descricao: "Reconhecer alertas"
+    roles_autorizadas: ["Gerente", "Diretor", "Admin"]
+  - codigo: "AUD.ITENS.READ"
+    descricao: "Drill-down para itens de auditoria"
+    roles_autorizadas: ["Gerente", "Auditor", "Diretor", "Admin"]
+
+# ==============================================================================
+# INTEGRAÇÕES
+# ==============================================================================
+
+integracoes:
+  internas:
+    - nome: "Autenticacao"
+      obrigatoria: true
+      descricao: "JWT Bearer Token para todas as requisições"
+    - nome: "Multi-Tenancy"
+      obrigatoria: true
+      descricao: "Row-Level Security por ClienteId"
+    - nome: "Auditoria"
+      obrigatoria: true
+      descricao: "Log completo de operações (CREATE/UPDATE/DELETE/EXPORT)"
+    - nome: "Central de Funcionalidades"
+      obrigatoria: true
+      descricao: "Registro da feature AUDITORIA_RESUMOS"
+    - nome: "i18n (Transloco)"
+      obrigatoria: true
+      descricao: "16 pontos de tradução (pt-BR, en, es)"
+  externas:
+    - sistema: "RF034 - Gestão de Itens de Auditoria"
+      tipo: "Agregação de Dados"
+      obrigatoria: true
+      descricao: "Consolida itens auditados em resumos"
+    - sistema: "RF054 - Gestão de Lotes de Auditoria"
+      tipo: "Integração Bidirecional"
+      obrigatoria: true
+      descricao: "Vinculação de resumos a lotes de origem"
+    - sistema: "RF028 - SLA de Auditoria"
+      tipo: "Referência"
+      obrigatoria: false
+      descricao: "Links para configurações de SLA"
+    - sistema: "RF029 - Configurações de Auditoria"
+      tipo: "Parâmetros"
+      obrigatoria: false
+      descricao: "Parâmetros de alertas e limites"
+
+# ==============================================================================
+# SEGURANÇA
+# ==============================================================================
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  protecoes:
+    - "Row-Level Security (SQL Server RLS + CONTEXT_INFO)"
+    - "JWT Validation ([Authorize] attribute)"
+    - "RBAC (AuthorizationHandler customizado)"
+    - "SQL Injection (EF Core + parametrização)"
+    - "XSS (Angular sanitizer + CSP)"
+    - "CSRF (AntiForgeryToken middleware)"
+    - "Encryption (HTTPS/TLS obrigatório)"
+    - "Audit Logging ([Audit] attribute + Log)"
+    - "Concurrency (RowVersion em aggregates)"
+    - "Input Validation (FluentValidation)"
+
+# ==============================================================================
+# RASTREABILIDADE
+# ==============================================================================
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-RF035 - Visão Geral e Navegação"
+    - "UC01-RF035 - Consolidar Auditorias (Job Automático)"
+    - "UC02-RF035 - Visualizar Dashboard Executivo"
+    - "UC03-RF035 - Analisar Comparativo de Períodos"
+    - "UC04-RF035 - Exportar Relatórios Gerenciais"
+  mds_esperados:
+    - "MD-RF035 - Modelo de Dados Completo"
+  wfs_esperados:
+    - "WF-RF035 - Workflows e Mockups Angular"
+
+# ==============================================================================
+# CATALOG (Funcionalidades CRUD e Validações)
+# ==============================================================================
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar resumo (job automático)"
+      required: true
+      endpoint: "POST /api/auditoria/resumos"
+      permission: "AUD.RESUMOS.CREATE"
+    - id: "RF-CRUD-02"
+      title: "Listar resumos com filtros e paginação"
+      required: true
+      endpoint: "GET /api/auditoria/resumos"
+      permission: "AUD.RESUMOS.READ"
+    - id: "RF-CRUD-03"
+      title: "Visualizar resumo específico"
+      required: true
+      endpoint: "GET /api/auditoria/resumos/{id}"
+      permission: "AUD.RESUMOS.READ"
+    - id: "RF-CRUD-04"
+      title: "Atualizar resumo existente"
+      required: false
+      endpoint: "PUT /api/auditoria/resumos/{id}"
+      permission: "AUD.RESUMOS.UPDATE"
+    - id: "RF-CRUD-05"
+      title: "Excluir resumo (soft delete)"
+      required: true
+      endpoint: "DELETE /api/auditoria/resumos/{id}"
+      permission: "AUD.RESUMOS.DELETE"
+
+  operacoes_especiais:
+    - id: "RF-OP-01"
+      title: "Recalcular indicadores manualmente"
+      required: false
+      endpoint: "POST /api/auditoria/resumos/{id}/calcular-indicadores"
+      permission: "AUD.INDICADORES.READ"
+    - id: "RF-OP-02"
+      title: "Drill-down para itens"
+      required: true
+      endpoint: "GET /api/auditoria/resumos/{id}/itens"
+      permission: "AUD.ITENS.READ"
+    - id: "RF-OP-03"
+      title: "Comparar períodos"
+      required: true
+      endpoint: "POST /api/auditoria/resumos/{id}/comparar-periodos"
+      permission: "AUD.RESUMOS.READ"
+    - id: "RF-OP-04"
+      title: "Exportar PDF"
+      required: true
+      endpoint: "GET /api/auditoria/resumos/{id}/exportar/pdf"
+      permission: "AUD.RESUMOS.EXPORT"
+    - id: "RF-OP-05"
+      title: "Exportar Excel"
+      required: true
+      endpoint: "GET /api/auditoria/resumos/{id}/exportar/excel"
+      permission: "AUD.RESUMOS.EXPORT"
+    - id: "RF-OP-06"
+      title: "Navegar para lote de origem"
+      required: true
+      endpoint: "GET /api/auditoria/resumos/{id}/lote"
+      permission: "AUD.RESUMOS.READ"
+    - id: "RF-OP-07"
+      title: "Consolidar agora (job manual)"
+      required: false
+      endpoint: "POST /api/auditoria/resumos/consolidar/agora"
+      permission: "AUD.RESUMOS.CREATE"
+    - id: "RF-OP-08"
+      title: "Listar alertas de desvios"
+      required: true
+      endpoint: "GET /api/auditoria/alertas"
+      permission: "AUD.ALERTAS.READ"
+    - id: "RF-OP-09"
+      title: "Reconhecer alerta"
+      required: true
+      endpoint: "POST /api/auditoria/alertas/{id}/reconhecer"
+      permission: "AUD.ALERTAS.ACKNOWLEDGE"
+    - id: "RF-OP-10"
+      title: "Dashboard executivo"
+      required: true
+      endpoint: "GET /api/auditoria/dashboard"
+      permission: "AUD.INDICADORES.READ"
+    - id: "RF-OP-11"
+      title: "Top 10 maiores divergências"
+      required: true
+      endpoint: "GET /api/auditoria/resumos/top10/divergencias"
+      permission: "AUD.RESUMOS.READ"
+    - id: "RF-OP-12"
+      title: "Evolução últimos 12 meses"
+      required: true
+      endpoint: "GET /api/auditoria/evolucao/ultimos-12-meses"
+      permission: "AUD.RESUMOS.READ"
+    - id: "RF-OP-13"
+      title: "ROI da auditoria"
+      required: true
+      endpoint: "GET /api/auditoria/indicadores/roi"
+      permission: "AUD.INDICADORES.READ"
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar totalizadores (Glosado ≤ Faturado)"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar isolamento multi-tenancy"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar integridade referencial (lote existe)"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar valores não negativos"
+      required: true
+    - id: "RF-VAL-05"
+      title: "Validar precisão decimal (8 casas)"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant (Row-Level Security)"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC em todos os endpoints"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria de todas operações CRUD + EXPORT"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Proteção contra SQL Injection (EF Core)"
+      required: true
+    - id: "RF-SEC-05"
+      title: "Proteção contra XSS (Angular sanitizer)"
+      required: true
+    - id: "RF-SEC-06"
+      title: "Proteção contra CSRF (AntiForgeryToken)"
+      required: true
+
+# ==============================================================================
+# EXCLUSÕES (items fora do escopo)
+# ==============================================================================
+
+exclusions:
+  documentacao_items:
+    - item: "Geração automática de contestações formais"
+      motivo: "Será implementado em RF futuro (RF036)"
+    - item: "Análise preditiva com ML de padrões de glosa"
+      motivo: "Fora do escopo atual - versão futura"
+    - item: "Integração com sistemas externos de operadoras"
+      motivo: "Não aplicável - sistema interno"
+
+# ==============================================================================
+# KPIs E MÉTRICAS
+# ==============================================================================
+
+kpis:
+  - nome: "Glosa Média"
+    descricao: "Percentual médio de glosa sobre faturado"
+    meta: "< 10%"
+    formula: "(TotalGlosado / TotalFaturado) * 100"
+    log_obrigatorio: true
+  - nome: "ROI Auditoria"
+    descricao: "Retorno sobre investimento em auditoria"
+    meta: "> 300%"
+    formula: "(TotalEconomia / InvestimentoAuditoria) * 100"
+    log_obrigatorio: true
+  - nome: "Taxa de Economia"
+    descricao: "Economia realizada vs. meta"
+    meta: "> 80%"
+    formula: "(TotalEconomia / MetaEconomia) * 100"
+    log_obrigatorio: true
+  - nome: "Ticket Médio Glosado"
+    descricao: "Valor médio glosado por item"
+    meta: "> R$ 100"
+    formula: "TotalGlosado / QuantidadeItens"
+    log_obrigatorio: true
+  - nome: "Eficiência Auditor"
+    descricao: "Itens processados por auditor por dia"
+    meta: "> 50 itens/dia"
+    formula: "QuantidadeItens / DiasUteis"
+    log_obrigatorio: true
+  - nome: "Tempo Resposta API"
+    descricao: "Tempo médio de resposta dos endpoints"
+    meta: "< 5s"
+    formula: "Medido por APM"
+    log_obrigatorio: true
+  - nome: "Disponibilidade"
+    descricao: "Uptime do sistema"
+    meta: "> 99.5%"
+    formula: "Uptime / Total Time"
+    log_obrigatorio: true
+  - nome: "Taxa de Conformidade"
+    descricao: "Itens conformes vs. total"
+    meta: "> 95%"
+    formula: "ItensConformes / QuantidadeItens"
+    log_obrigatorio: true
+
+# ==============================================================================
+# ALERTAS CRÍTICOS
+# ==============================================================================
+
+alertas:
+  - evento: "Glosa Alta"
+    threshold: "% Glosa Operadora > limite configurado (padrão: 15%)"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "signalr"
+  - evento: "Aumento Anormal"
+    threshold: "Variação mês atual vs. anterior > +20%"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "signalr"
+      - "sms"
+  - evento: "Meta Não Atingida"
+    threshold: "Economia < 80% da meta"
+    severidade: "MÉDIA"
+    canal_notificacao:
+      - "email"
+      - "signalr"
+  - evento: "Lentidão de API"
+    threshold: "Tempo de resposta > 10s"
+    severidade: "ALTA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+  - evento: "Falha no Job"
+    threshold: "Job consolidação com erro"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "sms"
+  - evento: "Inconsistência de Dados"
+    threshold: "Validação de integridade falha"
+    severidade: "CRÍTICA"
+    canal_notificacao:
+      - "email"
+      - "slack"
+      - "dba_alert"
+
+# ==============================================================================
+# DEPENDÊNCIAS
+# ==============================================================================
+
+dependencias:
+  upstream:
+    - documentacao_id: "RF034"
+      nome: "Gestão de Itens de Auditoria"
+      tipo: "bloqueante"
+      descricao: "RF035 consolida itens de RF034"
+    - documentacao_id: "RF054"
+      nome: "Gestão de Lotes de Auditoria"
+      tipo: "bloqueante"
+      descricao: "Resumos vinculados a lotes"
+    - documentacao_id: "RF028"
+      nome: "SLA de Auditoria"
+      tipo: "opcional"
+      descricao: "Links para configurações SLA"
+    - documentacao_id: "RF029"
+      nome: "Configurações de Auditoria"
+      tipo: "opcional"
+      descricao: "Parâmetros de alertas"
+  downstream:
+    - documentacao_id: "RF036"
+      nome: "Contestações de Auditoria"
+      tipo: "consumidor"
+      descricao: "Consome resumos para geração de contestações"
+    - documentacao_id: "RF037"
+      nome: "Relatórios Gerenciais Consolidados"
+      tipo: "consumidor"
+      descricao: "Agrega múltiplos resumos"
+  bibliotecas_externas:
+    - nome: "Hangfire"
+      versao: "1.8+"
+      finalidade: "Jobs de consolidação automática"
+    - nome: "iText 8+"
+      versao: "8.0+"
+      finalidade: "Geração de PDF"
+    - nome: "EPPlus"
+      versao: "6.0+"
+      finalidade: "Geração de Excel"
+    - nome: "SignalR"
+      versao: "ASP.NET Core"
+      finalidade: "Notificações em tempo real"
+    - nome: "Chart.js"
+      versao: "4.0+ (frontend)"
+      finalidade: "Gráficos no dashboard"
+
+# ==============================================================================
+# HISTÓRICO
+# ==============================================================================
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Architect Agent"
+    descricao: "Migração v1.0 → v2.0: Separação RF/RL, sincronização 100% com RF.md"
+  - versao: "1.0"
+    data: "2025-01-14"
+    autor: "Architect Agent"
+    descricao: "Versão inicial com 11 regras, 13 endpoints especiais"

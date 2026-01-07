@@ -1,6 +1,6 @@
 # Validação de MD do RFXXX - Validação de Modelo de Dados
 
-Ele fica nesse endereço D:\IC2\rf\Fase*\EPIC*\RF*
+Ele fica nesse endereço D:\IC2\documentacao\Fase*\EPIC*\RF*
 
 ---
 

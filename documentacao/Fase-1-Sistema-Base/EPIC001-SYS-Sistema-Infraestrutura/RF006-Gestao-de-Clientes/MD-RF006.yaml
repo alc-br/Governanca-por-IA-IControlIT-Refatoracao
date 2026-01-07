@@ -1,0 +1,472 @@
+# =============================================
+# Modelo de Dados (MD) — RF006: Gestão de Clientes
+# Versão: 2.0
+# Data: 2026-01-02
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+# =============================================
+# 1. METADADOS DO DOCUMENTO (OBRIGATÓRIO)
+# =============================================
+metadata:
+  versao: "2.0"
+  data: "2026-01-02"
+  autor: "Agência ALC - alc.dev.br"
+
+  documentacao_relacionado:
+    id: "RF006"
+    nome: "Gestão de Clientes (Multi-Tenancy SaaS)"
+
+  sistema_modulo: "Cadastros / Sistema Base"
+  banco_de_dados:
+    engine: "logico"  # Modelo lógico (independente de engine física)
+    schema: "logico"  # Abstração de schema
+  padroes:
+    multi_tenancy: false  # Cliente É a raiz do multi-tenancy (não possui cliente_id)
+    auditoria: true
+    soft_delete: true
+
+# =============================================
+# 2. ENTIDADES (OBRIGATÓRIO)
+# =============================================
+entidades:
+  - nome: "cliente"
+    descricao: "Entidade raiz de multi-tenancy. Representa empresa que assinou a plataforma IControlIT SaaS."
+
+    # -----------------------------
+    # 2.1 CAMPOS (OBRIGATÓRIO)
+    # -----------------------------
+    campos:
+      # CHAVE PRIMÁRIA
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primária"
+        pk: true
+        mutavel: false
+        origem:
+          documentacao: "RF006"
+          uc: null
+          wf: null
+          campo_wf: null
+          observacao: "PK padrão do sistema"
+
+      # DADOS DE IDENTIFICAÇÃO OFICIAL (RN-CLI-006-02, RN-CLI-006-03)
+      - nome: "cnpj"
+        tipo: "VARCHAR(14)"
+        nulo: false
+        default: null
+        descricao: "CNPJ da empresa (somente números, sem máscara)"
+        unique: true
+        index: true
+        mutavel: false  # CNPJ não pode ser alterado após criação (RN-CLI-006-03)
+        origem:
+          documentacao: "RF006"
+          uc: "UC01"
+          wf: "WF-01 (Tela 02 - Criar Cliente)"
+          campo_wf: "CNPJ (campo obrigatório)"
+          observacao: "RN-CLI-006-02: CNPJ único. RN-CLI-006-03: Validação dígitos verificadores obrigatória."
+
+      - nome: "razao_social"
+        tipo: "VARCHAR(200)"
+        nulo: false
+        default: null
+        descricao: "Razão social da empresa (nome oficial registrado na Receita Federal)"
+        mutavel: true
+        index: true
+        origem:
+          documentacao: "RF006"
+          uc: "UC01"
+          wf: "WF-01 (Tela 02 - Criar Cliente)"
+          campo_wf: "Razão Social (campo obrigatório)"
+          observacao: "RN-CLI-006-04: Mínimo 3 caracteres, máximo 200."
+
+      - nome: "nome_fantasia"
+        tipo: "VARCHAR(200)"
+        nulo: true
+        default: null
+        descricao: "Nome fantasia da empresa (opcional)"
+        mutavel: true
+        index: true
+        origem:
+          documentacao: "RF006"
+          uc: "UC01"
+          wf: "WF-01 (Tela 02 - Criar Cliente)"
+          campo_wf: "Nome Fantasia (opcional)"
+          observacao: "Pode ser preenchido via ReceitaWS (UC08)"
+
+      - nome: "inscricao_estadual"
+        tipo: "VARCHAR(20)"
+        nulo: true
+        default: null
+        descricao: "Inscrição estadual (opcional)"
+        mutavel: true
+        origem:
+          documentacao: "RF006"
+          uc: "UC01"
+          wf: "WF-01 (Tela 02 - Criar Cliente)"
+          campo_wf: "Inscrição Estadual (opcional)"
+          observacao: "Opcional"
+
+      # CONTATO (RN-CLI-006-05)
+      - nome: "email"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Email principal da empresa"
+        mutavel: true
+        origem:
+          documentacao: "RF006"
+          uc: "UC01"
+          wf: "WF-01 (Tab: Contato)"
+          campo_wf: "Email"
+          observacao: "Pode ser preenchido via ReceitaWS (UC08)"
+
+      - nome: "telefone"
+        tipo: "VARCHAR(20)"
+        nulo: true
+        default: null
+        descricao: "Telefone principal da empresa"
+        mutavel: true
+        origem:
+          documentacao: "RF006"
+          uc: "UC01"
+          wf: "WF-01 (Tab: Contato)"
+          campo_wf: "Telefone"
+          observacao: "Pode ser preenchido via ReceitaWS (UC08)"
+
+      - nome: "site"
+        tipo: "VARCHAR(200)"
+        nulo: true
+        default: null
+        descricao: "Website da empresa"
+        mutavel: true
+        origem:
+          documentacao: "RF006"
+          uc: "UC01"
+          wf: "WF-01 (Tab: Contato)"
+          campo_wf: "Site"
+          observacao: "Opcional"
+
+      # ENDEREÇO (RN-CLI-006-05)
+      - nome: "endereco"
+        tipo: "VARCHAR(500)"
+        nulo: true
+        default: null
+        descricao: "Endereço completo da empresa (logradouro, número, complemento, bairro, cidade, UF, CEP)"
+        mutavel: true
+        origem:
+          documentacao: "RF006"
+          uc: "UC01"
+          wf: "WF-01 (Tab: Endereço)"
+          campo_wf: "Endereço completo"
+          observacao: "Pode ser preenchido via ReceitaWS (UC08). Armazenamento desnormalizado."
+
+      # BRANDING (RN-CLI-006-06)
+      - nome: "logo_url"
+        tipo: "VARCHAR(500)"
+        nulo: true
+        default: null
+        descricao: "URL do logo do cliente no Azure Blob Storage (white-label)"
+        mutavel: true
+        origem:
+          documentacao: "RF006"
+          uc: "UC05"
+          wf: "WF-01 (Tab: Branding)"
+          campo_wf: "Logo URL"
+          observacao: "RN-CLI-006-06: Upload JPG/PNG/SVG (max 2MB). Validação magic bytes obrigatória."
+
+      # FLAGS DE CONTROLE (RN-CLI-006-09)
+      - nome: "fl_ativo"
+        tipo: "BOOLEAN"
+        nulo: false
+        default: true
+        descricao: "Flag de cliente ativo (true) ou desativado (false)"
+        mutavel: true
+        index: true
+        index_parcial:
+          where: "fl_ativo = true"
+          descricao: "Acelera listagens de clientes ativos"
+        origem:
+          documentacao: "RF006"
+          uc: "UC07"
+          wf: "WF-01 (Tela 01 - Listagem)"
+          campo_wf: "Status (filtro)"
+          observacao: "RN-CLI-006-09: Desativar cliente bloqueia TODOS os usuários vinculados."
+
+      # AUDITORIA (RN-CLI-006-10)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criação"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF006"
+          uc: "UC01"
+          wf: "WF-03 (Tela de Visualização - Tab: Auditoria)"
+          campo_wf: "Criado em"
+          observacao: "Campo gerado automaticamente pelo sistema"
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que criou (FK para usuario)"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF006"
+          uc: "UC01"
+          wf: "WF-03 (Tela de Visualização - Tab: Auditoria)"
+          campo_wf: "Criado por"
+          observacao: "Preenchido automaticamente com ID do usuário autenticado (Super Admin)"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de última atualização"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF006"
+          uc: "UC03"
+          wf: "WF-03 (Tela de Visualização - Tab: Auditoria)"
+          campo_wf: "Atualizado em"
+          observacao: "Campo gerado automaticamente pelo sistema"
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuário que atualizou (FK para usuario)"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF006"
+          uc: "UC03"
+          wf: "WF-03 (Tela de Visualização - Tab: Auditoria)"
+          campo_wf: "Atualizado por"
+          observacao: "Preenchido automaticamente com ID do usuário autenticado"
+
+      # SOFT DELETE (RN-CLI-006-07)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de exclusão lógica (soft delete)"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF006"
+          uc: "UC04"
+          wf: null
+          campo_wf: null
+          observacao: "RN-CLI-006-07: Soft delete obrigatório. DELETE físico bloqueado por trigger."
+
+    # -----------------------------
+    # 2.2 ÍNDICES (OBRIGATÓRIO)
+    # -----------------------------
+    indices:
+      - nome: "pk_cliente"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primária"
+
+      - nome: "uq_cliente_cnpj"
+        tipo: "UNIQUE"
+        colunas: ["cnpj"]
+        descricao: "CNPJ único no sistema (RN-CLI-006-02)"
+
+      - nome: "idx_cliente_razao_social"
+        tipo: "BTREE"
+        colunas: ["razao_social"]
+        descricao: "Performance em buscas textuais por Razão Social (UC00 - WF-01)"
+
+      - nome: "idx_cliente_nome_fantasia"
+        tipo: "BTREE"
+        colunas: ["nome_fantasia"]
+        descricao: "Performance em buscas textuais por Nome Fantasia (UC00 - WF-01)"
+
+      - nome: "idx_cliente_fl_ativo"
+        tipo: "BTREE"
+        colunas: ["fl_ativo"]
+        descricao: "Performance em filtros por status (UC00 - WF-01 filtro Status)"
+
+      - nome: "idx_cliente_created_at"
+        tipo: "BTREE"
+        colunas: ["created_at"]
+        descricao: "Performance em ordenação por data de criação (UC00 - WF-01)"
+
+      # Índice parcial (acelera consultas de ativos)
+      - nome: "idx_cliente_ativos"
+        tipo: "BTREE"
+        colunas: ["fl_ativo"]
+        where: "fl_ativo = true AND deleted_at IS NULL"
+        descricao: "Acelera consultas apenas de clientes ativos e não excluídos (UC00 - WF-01)"
+
+    # -----------------------------
+    # 2.3 CONSTRAINTS (OBRIGATÓRIO)
+    # -----------------------------
+    constraints:
+      # UNIQUE CNPJ
+      - nome: "uq_cliente_cnpj_unique"
+        tipo: "UNIQUE"
+        definicao: "(cnpj)"
+        descricao: "RN-CLI-006-02: CNPJ único por cliente"
+
+      # CHECK Razão Social (mínimo 3 caracteres)
+      - nome: "chk_cliente_razao_social_length"
+        tipo: "CHECK"
+        definicao: "LEN(LTRIM(RTRIM(razao_social))) >= 3"
+        descricao: "RN-CLI-006-04: Razão Social mínimo 3 caracteres"
+
+      # CHECK CNPJ (14 dígitos)
+      - nome: "chk_cliente_cnpj_length"
+        tipo: "CHECK"
+        definicao: "LEN(cnpj) = 14"
+        descricao: "RN-CLI-006-03: CNPJ deve ter exatamente 14 dígitos"
+
+      # FK created_by
+      - nome: "fk_cliente_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - criador (RN-CLI-006-10)"
+
+      # FK updated_by
+      - nome: "fk_cliente_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - editor (RN-CLI-006-10)"
+
+    # -----------------------------
+    # 2.4 TRIGGERS (OBRIGATÓRIO)
+    # -----------------------------
+    triggers:
+      - nome: "trg_cliente_prevent_physical_delete"
+        tipo: "INSTEAD OF DELETE"
+        descricao: "RN-CLI-006-07: Bloqueia DELETE físico. Força soft delete via deleted_at."
+        sql: |
+          CREATE TRIGGER trg_cliente_prevent_physical_delete
+          ON cliente
+          INSTEAD OF DELETE
+          AS
+          BEGIN
+              RAISERROR('DELETE físico bloqueado. Use soft delete (UPDATE deleted_at = GETDATE()).', 16, 1);
+              ROLLBACK TRANSACTION;
+          END
+
+      - nome: "trg_cliente_deactivate_users"
+        tipo: "AFTER UPDATE"
+        descricao: "RN-CLI-006-09: Ao desativar Cliente (fl_ativo = false), bloqueia TODOS os usuários vinculados."
+        sql: |
+          CREATE TRIGGER trg_cliente_deactivate_users
+          ON cliente
+          AFTER UPDATE
+          AS
+          BEGIN
+              IF UPDATE(fl_ativo)
+              BEGIN
+                  UPDATE usuario
+                  SET fl_ativo = 0,
+                      motivo_inativacao = 'Cliente desativado',
+                      updated_at = GETDATE()
+                  WHERE cliente_id IN (SELECT id FROM inserted WHERE fl_ativo = 0);
+              END
+          END
+
+# =============================================
+# 3. RELACIONAMENTOS GLOBAIS
+# =============================================
+relacionamentos_globais:
+  - origem: "cliente"
+    cardinalidade: "1:N"
+    destino: "usuario"
+    descricao: "Um cliente possui muitos usuários (RN-CLI-006-01: ClienteId é discriminador de tenant)"
+
+  - origem: "cliente"
+    cardinalidade: "1:N"
+    destino: "empresa"
+    descricao: "Um cliente possui muitas empresas (estrutura hierárquica multi-tenant)"
+
+  - origem: "cliente"
+    cardinalidade: "1:N"
+    destino: "audit_log"
+    descricao: "Um cliente possui muitos registros de auditoria (RN-CLI-006-10)"
+
+# =============================================
+# 4. OBSERVAÇÕES E DECISÕES (OBRIGATÓRIO)
+# =============================================
+observacoes:
+  - categoria: "Modelagem"
+    descricao: |
+      Cliente é a RAIZ do multi-tenancy no sistema IControlIT. Não possui cliente_id (exceção ao padrão).
+      Todos os dados do sistema são isolados por ClienteId via EF Core Query Filters (RN-CLI-006-01).
+      No legado: 18 bancos SQL Server isolados (physical separation).
+      No moderno: 1 banco único com Row-Level Security (logical separation).
+
+  - categoria: "Performance"
+    descricao: |
+      Índices criados para queries principais do UC00 (listagem):
+      - Busca textual: idx_cliente_razao_social, idx_cliente_nome_fantasia
+      - Filtro por status: idx_cliente_fl_ativo
+      - Ordenação por data: idx_cliente_created_at
+      - Índice parcial: idx_cliente_ativos (acelera 90% das consultas)
+
+  - categoria: "Segurança"
+    descricao: |
+      - CNPJ: Validação dígitos verificadores obrigatória no backend (RN-CLI-006-03)
+      - CNPJ: Imutável após criação (mutavel: false)
+      - Logo Upload: Validação magic bytes obrigatória (PNG, JPG, SVG) - RN-CLI-006-06
+      - Soft Delete: DELETE físico bloqueado por trigger (RN-CLI-006-07)
+      - Desativação: Bloqueia automaticamente TODOS os usuários vinculados (RN-CLI-006-09)
+
+  - categoria: "Auditoria"
+    descricao: |
+      RN-CLI-006-10: TODAS as operações registradas em AuditLog (retenção 7 anos - LGPD Art. 16).
+      Operações auditadas:
+      - CLI_CREATE (criação de cliente)
+      - CLI_UPDATE (atualização de dados)
+      - CLI_DELETE (soft delete)
+      - CLI_LOGO_UPLOAD (upload de logo)
+      - CLI_DEACTIVATE_USERS (desativação de usuários)
+      - CLI_RECEITA_QUERY (consulta ReceitaWS)
+
+  - categoria: "Integração ReceitaWS"
+    descricao: |
+      RN-CLI-006-05: Consulta ReceitaWS automática para preencher dados cadastrais.
+      Endpoint: https://www.receitaws.com.br/v1/cnpj/{cnpj}
+      Timeout: 10 segundos
+      Rate limit: 3 consultas/minuto/usuário
+      Fallback: Preenchimento manual permitido (sistema funcional offline)
+
+  - categoria: "Migração"
+    descricao: |
+      Migração do legado:
+      - 18 bancos SQL Server isolados → 1 banco único com ClienteId
+      - Onboarding manual DBA (3-5 dias) → Automatizado < 5 minutos
+      - Logo em arquivo local ~/Images/Clientes/ → Azure Blob Storage CDN
+      - Sem ReceitaWS → Consulta automática API
+      - DELETE físico permitido → Soft delete obrigatório
+
+# =============================================
+# 5. HISTÓRICO DE ALTERAÇÕES (OBRIGATÓRIO)
+# =============================================
+historico:
+  - versao: "2.0"
+    data: "2026-01-02"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "MD retroativo criado para RF006 (backend e frontend já implementados a 100%)"

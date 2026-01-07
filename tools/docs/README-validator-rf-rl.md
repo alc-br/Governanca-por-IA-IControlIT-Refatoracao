@@ -342,7 +342,7 @@ referencias:
   - RF.yaml
   - RL.md
   - RL.yaml
-- Documentos gerados: ` D:\IC2\rf\Fase-X\EPIC-XXX\RFXXX\`
+- Documentos gerados: ` D:\IC2\documentacao\Fase-X\EPIC-XXX\RFXXX\`
 - Relatórios: `D:\IC2\relatorios\`
 
 ## Autor

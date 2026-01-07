@@ -1,0 +1,724 @@
+# ====================================================================================
+# RL-RF026: Referência ao Legado - Gestão de Faturas
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# ====================================================================================
+
+rf_id: RF026
+titulo: "Gestão Completa de Faturas de Telecom e TI"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: ".NET Framework 4.5"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2008 R2"
+  multi_tenant: false
+  auditoria: "partial"  # Apenas log de texto, sem estrutura JSON
+
+# ====================================================================================
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+# Cada item DEVE ter campo "destino" preenchido
+# ====================================================================================
+
+referencias:
+  # ------------------------------------------------------------------------------
+  # TELAS ASPX
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF026-001"
+    tipo: "tela"
+    nome: "Fatura/Upload.aspx"
+    caminho: "ic1_legado/IControlIT/Fatura/Upload.aspx"
+    descricao: |
+      Upload manual de arquivo CSV com layout fixo.
+      Problemas: Layout fixo (quebrava a cada mudança operadora), timeout em arquivos >1000 linhas,
+      sem preview (dados importados diretamente), encoding fixo UTF-8 (ISO-8859-1 corrompia caracteres).
+    destino: "substituido"
+    justificativa: |
+      Substituído por engine multi-layout moderno com 15+ templates pré-configurados + auto-detect encoding
+      + preview antes de confirmar + processamento assíncrono Hangfire (sem timeout).
+    documentacao_item_relacionado: "RN-RF026-001"
+    uc_relacionado: "UC01-importar-fatura"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+    migracao_moderna:
+      componente_angular: "faturas-importar.component.ts"
+      rota_frontend: "/faturas/importar"
+      endpoint_api: "POST /api/v1/faturas/importar"
+
+  - id: "LEG-RF026-002"
+    tipo: "tela"
+    nome: "Fatura/Lista.aspx"
+    caminho: "ic1_legado/IControlIT/Fatura/Lista.aspx"
+    descricao: |
+      Listar faturas importadas sem paginação.
+      Problemas: Sem paginação (carregava TODAS faturas em memória, lento com >500 faturas),
+      filtros client-side (JavaScript) ineficiente, sem ordenação configurável, sem status workflow detalhado.
+    destino: "substituido"
+    justificativa: |
+      Substituído por listagem moderna com paginação cursor-based server-side + filtros server-side parametrizados
+      + ordenação configurável + status workflow detalhado (8 estados vs 2 legado).
+    documentacao_item_relacionado: "RN-RF026-007"
+    uc_relacionado: "UC00-listar-faturas"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+    migracao_moderna:
+      componente_angular: "faturas-list.component.ts"
+      rota_frontend: "/faturas"
+      endpoint_api: "GET /api/v1/faturas"
+
+  - id: "LEG-RF026-003"
+    tipo: "tela"
+    nome: "Fatura/Detalhes.aspx"
+    caminho: "ic1_legado/IControlIT/Fatura/Detalhes.aspx"
+    descricao: |
+      Visualizar detalhes de fatura (cabeçalho + linhas).
+      Problemas: Sem conciliação visual, sem resultado auditoria, sem histórico de versões,
+      sem timeline de eventos, campo observação vulnerável a SQL injection.
+    destino: "substituido"
+    justificativa: |
+      Substituído por visualização moderna com resultado conciliação visual destacado + resultado auditoria
+      com falhas em vermelho + histórico de versões com diff + timeline de eventos completa + sanitização de inputs.
+    documentacao_item_relacionado: "RN-RF026-003"
+    uc_relacionado: "UC02-visualizar-fatura"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+    migracao_moderna:
+      componente_angular: "faturas-detail.component.ts"
+      rota_frontend: "/faturas/{id}"
+      endpoint_api: "GET /api/v1/faturas/{id}"
+
+  - id: "LEG-RF026-004"
+    tipo: "tela"
+    nome: "Fatura/Rateio.aspx"
+    caminho: "ic1_legado/IControlIT/Fatura/Rateio.aspx"
+    descricao: |
+      Rateio manual de custos de fatura por centro de custo.
+      Problemas: Rateio item por item (fatura 500 linhas = 500 seleções manuais), sem validação soma 100%,
+      sem regras reutilizáveis, sem dimensões múltiplas, exportação manual para ERP.
+    destino: "substituido"
+    justificativa: |
+      Substituído por rateio multi-dimensional automático com 5 dimensões + validação soma 100% obrigatória
+      + regras reutilizáveis + exportação automática para ERP com retry policy + DLQ.
+    documentacao_item_relacionado: "RN-RF026-006"
+    uc_relacionado: "UC06-ratear-fatura"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+    migracao_moderna:
+      componente_angular: "faturas-rateio.component.ts"
+      rota_frontend: "/faturas/{id}/rateio"
+      endpoint_api: "POST /api/v1/faturas/{id}/ratear"
+
+  # ------------------------------------------------------------------------------
+  # WEBSERVICES (.asmx)
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF026-005"
+    tipo: "webservice"
+    nome: "Fatura.asmx"
+    caminho: "ic1_legado/IControlIT/WebServices/Fatura.asmx"
+    metodos:
+      - nome: "ImportarFatura"
+        parametros: "arquivoBase64: String, idOperadora: Integer"
+        retorno: "Integer (ID fatura ou -1 se erro)"
+        descricao: "Importação síncrona de CSV com layout fixo"
+        problemas:
+          - "Layout fixo assumido (quebra silenciosa se mudança)"
+          - "Sem validação de dados (aceitava valores inválidos)"
+          - "Processamento síncrono (timeout >30s em arquivos grandes)"
+          - "Sem transação atômica (estado inconsistente em caso de falha)"
+          - "Sem log de erros (apenas retorno -1)"
+    descricao: |
+      Web Service SOAP para importação de faturas.
+      Todos os métodos substituídos por REST API moderno com validação, processamento assíncrono, transações atômicas e logs estruturados.
+    destino: "substituido"
+    justificativa: |
+      SOAP obsoleto. Substituído por REST API com endpoints .NET 10 Minimal API + MediatR CQRS + FluentValidation
+      + Hangfire para processamento assíncrono + EF Core transações atômicas + Application Insights logs estruturados.
+    documentacao_item_relacionado: "RN-RF026-001"
+    uc_relacionado: "UC01-importar-fatura"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+    migracao_moderna:
+      command_cqrs: "ImportarFaturaCommand"
+      handler: "ImportarFaturaCommandHandler"
+      validator: "ImportarFaturaCommandValidator"
+      endpoint_api: "POST /api/v1/faturas/importar"
+
+  - id: "LEG-RF026-006"
+    tipo: "webservice"
+    nome: "Fatura.asmx - ConsultarFaturas"
+    caminho: "ic1_legado/IControlIT/WebServices/Fatura.asmx"
+    metodos:
+      - nome: "ConsultarFaturas"
+        parametros: "idOperadora: Integer, periodo: String, status: String"
+        retorno: "DataSet (tabela com faturas)"
+        descricao: "Consulta de faturas com filtros básicos"
+        problemas:
+          - "SQL Injection (concatenação de strings)"
+          - "Sem paginação (retorna TODAS faturas, lento >500)"
+          - "Sem ordenação configurável"
+          - "DataSet pesado (XML >5MB com 500 linhas)"
+          - "Case sensitive (status='paga' lowercase retorna 0)"
+    descricao: |
+      Método SOAP para consultar faturas.
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST com paginação cursor-based + filtros parametrizados (proteção SQL injection)
+      + ordenação configurável + JSON leve + case insensitive.
+    documentacao_item_relacionado: "RN-RF026-007"
+    uc_relacionado: "UC00-listar-faturas"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+    migracao_moderna:
+      query_cqrs: "GetFaturasQuery"
+      handler: "GetFaturasQueryHandler"
+      endpoint_api: "GET /api/v1/faturas"
+
+  - id: "LEG-RF026-007"
+    tipo: "webservice"
+    nome: "Fatura.asmx - AprovarFatura"
+    caminho: "ic1_legado/IControlIT/WebServices/Fatura.asmx"
+    metodos:
+      - nome: "AprovarFatura"
+        parametros: "idFatura: Integer, idUsuario: Integer"
+        retorno: "Boolean"
+        descricao: "Aprovação direta de fatura"
+        problemas:
+          - "Sem workflow multi-nível"
+          - "Sem validação de permissões (qualquer usuário podia aprovar)"
+          - "Sem assinatura digital (sem validade legal)"
+          - "Sem validação de estado (permitia dupla aprovação)"
+          - "Sem notificação"
+    descricao: |
+      Método SOAP para aprovar faturas.
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST com workflow multi-nível + validação RBAC por valor + assinatura digital DocuSign
+      + validação de estado + notificações push.
+    documentacao_item_relacionado: "RN-RF026-010"
+    uc_relacionado: "UC07-aprovar-fatura"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+    migracao_moderna:
+      command_cqrs: "AprovarFaturaCommand"
+      handler: "AprovarFaturaCommandHandler"
+      validator: "AprovarFaturaCommandValidator"
+      endpoint_api: "POST /api/v1/faturas/{id}/aprovar"
+
+  - id: "LEG-RF026-008"
+    tipo: "webservice"
+    nome: "Fatura.asmx - RatearFatura"
+    caminho: "ic1_legado/IControlIT/WebServices/Fatura.asmx"
+    metodos:
+      - nome: "RatearFatura"
+        parametros: "idFatura: Integer, rateios: List<RateioDto>"
+        retorno: "Boolean"
+        descricao: "Rateio manual linha por linha"
+        problemas:
+          - "Sem validação soma 100%"
+          - "Rateio linha por linha (payload pesado, fatura 500 linhas = XML >10MB)"
+          - "Sem regras reutilizáveis"
+          - "Sem dimensões múltiplas"
+          - "Sem exportação automática para ERP"
+    descricao: |
+      Método SOAP para ratear faturas.
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST com validação soma 100% + regras reutilizáveis automáticas + rateio multi-dimensional
+      (5 dimensões) + exportação automática ERP com retry policy + DLQ.
+    documentacao_item_relacionado: "RN-RF026-006"
+    uc_relacionado: "UC06-ratear-fatura"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+    migracao_moderna:
+      command_cqrs: "RatearFaturaCommand"
+      handler: "RatearFaturaCommandHandler"
+      validator: "RatearFaturaCommandValidator"
+      endpoint_api: "POST /api/v1/faturas/{id}/ratear"
+
+  # ------------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF026-009"
+    tipo: "stored_procedure"
+    nome: "sp_CalcularTotalFatura"
+    caminho: "ic1_legado/Database/Procedures/sp_CalcularTotalFatura.sql"
+    parametros_entrada:
+      - "@Id_Fatura INT"
+    parametros_saida:
+      - "@Valor_Total DECIMAL(18,2) OUTPUT"
+    descricao: |
+      Somar todos os valores de Fatura_Detalhe para calcular total da fatura.
+      Problemas: Sem tratamento de exceção (retorna NULL se vazio, não 0.00), sem validação de valores negativos.
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para propriedade computada na entidade Fatura com LINQ _detalhes.Sum(d => d.Valor)
+      + validação FluentValidation bloqueando valores negativos.
+    documentacao_item_relacionado: "RN-RF026-001"
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+    migracao_moderna:
+      entidade: "Fatura"
+      propriedade_computada: "ValorTotal"
+      validacao: "CreateFaturaCommandValidator"
+
+  - id: "LEG-RF026-010"
+    tipo: "stored_procedure"
+    nome: "sp_BuscarFaturasAtrasadas"
+    caminho: "ic1_legado/Database/Procedures/sp_BuscarFaturasAtrasadas.sql"
+    parametros_entrada:
+      - "@Dias_Atraso INT"
+    parametros_saida: []
+    descricao: |
+      Selecionar faturas onde Dt_Vencimento < GETDATE() - @Dias_Atraso E Fl_Paga = 0.
+      Problemas: Sem índice (full table scan lento >5000 faturas), lógica de negócio hard-coded na procedure.
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para query LINQ com índice composto (Fl_Paga, Dt_Vencimento) + regra de negócio configurável via appsettings.json.
+    documentacao_item_relacionado: null
+    uc_relacionado: "UC00-listar-faturas"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+    migracao_moderna:
+      query_cqrs: "GetFaturasAtrasadasQuery"
+      handler: "GetFaturasAtrasadasQueryHandler"
+      configuracao: "appsettings.json:FaturasAtrasadas:DiasParaConsiderarAtrasada"
+
+  # ------------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF026-011"
+    tipo: "tabela"
+    nome: "[dbo].[Fatura]"
+    caminho: "ic1_legado/Database/Tables/dbo.Fatura.sql"
+    schema_legado: "[dbo].[Fatura]"
+    descricao: "Tabela principal de faturas no banco SQL Server legado"
+    problemas_identificados:
+      - "Falta Foreign Key para Operadora (permitia referências órfãs)"
+      - "Sem campos de auditoria (Created, CreatedBy, LastModified, LastModifiedBy)"
+      - "Sem multi-tenancy (faltava ClienteId, bancos separados por cliente)"
+      - "DELETE físico (perda de histórico, violação compliance fiscal 7 anos)"
+      - "Sem soft delete (faltava FlExcluido)"
+      - "Campo Status limitado (apenas Fl_Paga 0/1, sem estados intermediários)"
+      - "Sem versionamento (reimportação sobrescrevia dados)"
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada completamente com multi-tenancy (ClienteId), auditoria completa (campos Created/Modified),
+      soft delete (FlExcluido), workflow com 8 estados (Enum Status), versionamento (Numero_Versao), OCR metadata,
+      integração ERP (ERP_Sincronizado, ERP_Documento_Numero), 40+ campos adicionais.
+    documentacao_item_relacionado: "RN-RF026-011"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+    migracao_moderna:
+      tabela_moderna: "Fatura"
+      migration_ef_core: "20251230_CreateFaturaTable.cs"
+      campos_adicionados: 42
+      script_migracao: "migrate-faturas-legado-para-moderno.sql"
+
+  - id: "LEG-RF026-012"
+    tipo: "tabela"
+    nome: "[dbo].[Fatura_Detalhe]"
+    caminho: "ic1_legado/Database/Tables/dbo.Fatura_Detalhe.sql"
+    schema_legado: "[dbo].[Fatura_Detalhe]"
+    descricao: "Tabela de linhas detalhadas das faturas (itens cobrados) no banco SQL Server legado"
+    problemas_identificados:
+      - "Sem conciliação (faltavam Conciliado, Id_Contrato_Item, Id_Ativo, Match_Score)"
+      - "Sem resultado auditoria (faltavam Auditoria_Status, Auditoria_Regras_Falhas_JSON)"
+      - "Sem rateio vinculado (faltavam Rateio_Centro_Custo, Rateio_Projeto, Rateio_Departamento)"
+      - "DELETE físico (perda de histórico)"
+      - "Sem soft delete (faltava FlExcluido)"
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com campos de conciliação automática, auditoria vinculada, rateio multi-dimensional vinculado,
+      soft delete.
+    documentacao_item_relacionado: "RN-RF026-003"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+    migracao_moderna:
+      tabela_moderna: "Fatura_Detalhe"
+      migration_ef_core: "20251230_CreateFaturaDetalheTable.cs"
+      campos_adicionados: 18
+      script_migracao: "migrate-fatura-detalhes-legado-para-moderno.sql"
+
+  - id: "LEG-RF026-013"
+    tipo: "tabela"
+    nome: "[dbo].[Fatura_Rateio]"
+    caminho: "ic1_legado/Database/Tables/dbo.Fatura_Rateio.sql"
+    schema_legado: "[dbo].[Fatura_Rateio]"
+    descricao: "Tabela de rateio de custos de faturas por centro de custo no banco SQL Server legado"
+    problemas_identificados:
+      - "Apenas 1 dimensão (Id_Centro_Custo, não suportava Projeto, Departamento, Geolocalização, Tipo Serviço)"
+      - "Sem regras reutilizáveis (rateio item por item sem memória)"
+      - "Sem validação soma 100% (permitia erro contábil)"
+      - "DELETE físico (recalcular deletava anteriores, perda de histórico)"
+    destino: "substituido"
+    justificativa: |
+      Estrutura redesenhada com campos JSON multi-dimensionais em Fatura_Detalhe.Rateio_* + nova tabela
+      Fatura_Rateio_Regra para regras reutilizáveis + validação soma 100% + histórico de recálculos preservado.
+    documentacao_item_relacionado: "RN-RF026-006"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+    migracao_moderna:
+      tabela_moderna: "Fatura_Rateio_Regra"
+      migration_ef_core: "20251230_CreateFaturaRateioRegraTable.cs"
+      estrutura_nova: "JSON multi-dimensional + tabela de regras"
+      script_migracao: "migrate-fatura-rateio-legado-para-moderno.sql"
+
+  # ------------------------------------------------------------------------------
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF026-014"
+    tipo: "regra_negocio"
+    nome: "Importação Assume Encoding UTF-8"
+    caminho: "ic1_legado/IControlIT/Fatura/Upload.aspx.vb"
+    localizacao_codigo: "ic1_legado/IControlIT/Fatura/Upload.aspx.vb - Linha 145"
+    descricao: |
+      Sistema assume que todos os arquivos CSV são UTF-8. Arquivos em ISO-8859-1 (comum em operadoras brasileiras)
+      importam com caracteres corrompidos (ex: "São Paulo" → "S�o Paulo").
+    destino: "substituido"
+    justificativa: |
+      RF moderno tem auto-detect de encoding (detecta UTF-8, ISO-8859-1, Windows-1252 automaticamente)
+      usando biblioteca detectora de charset + fallback para revisão manual se detecção <80% confiança.
+    documentacao_item_relacionado: "RN-RF026-001"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+    migracao_moderna:
+      validador: "ImportarFaturaCommandValidator"
+      linha_codigo: "Encoding.GetEncoding(EncodingDetector.DetectEncoding(stream))"
+
+  - id: "LEG-RF026-015"
+    tipo: "regra_negocio"
+    nome: "Valor Fatura Calculado como Soma de Detalhes"
+    caminho: "ic1_legado/Database/Procedures/sp_CalcularTotalFatura.sql"
+    localizacao_codigo: "ic1_legado/Database/Procedures/sp_CalcularTotalFatura.sql - Linha 8"
+    descricao: |
+      Valor total da fatura é sempre calculado como soma simples de linhas detalhadas.
+      Não considera descontos globais, acréscimos, impostos separados (ICMS, PIS, COFINS).
+    destino: "assumido"
+    justificativa: |
+      Regra mantida mas com evolução: RF moderno mantém cálculo por soma mas adiciona campos separados para
+      descontos globais, acréscimos, impostos (ICMS, PIS, COFINS) permitindo auditoria mais precisa.
+    documentacao_item_relacionado: "RN-RF026-001"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+    migracao_moderna:
+      entidade: "Fatura"
+      propriedade_computada: "ValorTotal"
+      campos_adicionais: "DescontosGlobais, Acrescimos, ICMS, PIS, COFINS"
+
+  - id: "LEG-RF026-016"
+    tipo: "regra_negocio"
+    nome: "Aprovação Permitida Apenas se Fl_Paga = 0"
+    caminho: "ic1_legado/IControlIT/WebServices/Fatura.asmx.vb"
+    localizacao_codigo: "ic1_legado/IControlIT/WebServices/Fatura.asmx.vb - Linha 312"
+    descricao: |
+      Sistema bloqueia dupla aprovação verificando flag Fl_Paga. Porém não valida se usuário tem permissão
+      para aprovar valores altos (qualquer usuário podia aprovar qualquer valor).
+    destino: "assumido"
+    justificativa: |
+      Regra de bloqueio dupla aprovação mantida mas com evolução: RF moderno mantém bloqueio de dupla aprovação
+      mas adiciona workflow multi-nível com validação de permissões RBAC por valor (ex: <R$10k Gerente, >R$10k Diretor, >R$100k CFO).
+    documentacao_item_relacionado: "RN-RF026-010"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+    migracao_moderna:
+      validador: "AprovarFaturaCommandValidator"
+      linha_codigo: "RuleFor(x => x).Must(NotBeDuplicateApproval).WithMessage(...)"
+      evolucao: "Workflow multi-nível + RBAC por valor"
+
+  - id: "LEG-RF026-017"
+    tipo: "regra_negocio"
+    nome: "Rateio Permite Soma ≠ 100%"
+    caminho: "ic1_legado/IControlIT/Fatura/Rateio.aspx.vb"
+    localizacao_codigo: "ic1_legado/IControlIT/Fatura/Rateio.aspx.vb - Linha 256"
+    descricao: |
+      Sistema não valida se soma de percentuais de rateio = 100%. Permite salvar rateio com soma 90% ou 110%
+      (erro contábil descoberto apenas na contabilização posterior).
+    destino: "substituido"
+    justificativa: |
+      RF moderno bloqueia salvamento se soma ≠ 100% com validação FluentValidation retornando HTTP 400
+      com mensagem específica "Soma dos percentuais deve ser exatamente 100%".
+    documentacao_item_relacionado: "RN-RF026-006"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+    migracao_moderna:
+      validador: "RatearFaturaCommandValidator"
+      linha_codigo: "RuleFor(x => x.Percentuais).Must(SumTo100).WithMessage('Soma dos percentuais deve ser 100%')"
+
+  - id: "LEG-RF026-018"
+    tipo: "regra_negocio"
+    nome: "Filtro de Operadora é Case Sensitive"
+    caminho: "ic1_legado/IControlIT/WebServices/Fatura.asmx.vb"
+    localizacao_codigo: "ic1_legado/IControlIT/WebServices/Fatura.asmx.vb - Linha 178"
+    descricao: |
+      Filtro status = "paga" (lowercase) retorna 0 resultados porque comparação SQL Server padrão é case sensitive
+      e banco tem "Paga" com P maiúsculo. Usuários precisavam saber exatamente o case correto.
+    destino: "descartado"
+    justificativa: |
+      RF moderno usa Enum C# FaturaStatus com valores tipados (FaturaStatus.Paga, FaturaStatus.Aprovada)
+      → impossível erro de case. Comparação é sempre case insensitive via Enum.
+    documentacao_item_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+    migracao_moderna:
+      enum: "FaturaStatus"
+      valores: "Rascunho, AguardandoConciliacao, AguardandoAuditoria, AguardandoAprovacao, Aprovada, Paga, Contestada, Cancelada"
+
+  - id: "LEG-RF026-019"
+    tipo: "regra_negocio"
+    nome: "DELETE Físico Permitido em Faturas"
+    caminho: "ic1_legado/IControlIT/Fatura/Lista.aspx.vb"
+    localizacao_codigo: "ic1_legado/IControlIT/Fatura/Lista.aspx.vb - Linha 89"
+    descricao: |
+      Botão "Excluir" fazia DELETE físico no banco sem soft delete. Perda permanente de histórico
+      (violação compliance fiscal que exige 7 anos de retenção de faturas para auditoria).
+    destino: "substituido"
+    justificativa: |
+      RF moderno usa soft delete obrigatório FlExcluido = TRUE + EF Core Query Filter global que filtra
+      automaticamente registros excluídos. Preservação de histórico 7 anos para compliance fiscal.
+    documentacao_item_relacionado: "RN-RF026-012"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 1
+    migracao_moderna:
+      entity_framework: "Query Filter global: .Where(f => !f.FlExcluido)"
+      migration_ef_core: "20251230_AddSoftDeleteToFatura.cs"
+
+  - id: "LEG-RF026-020"
+    tipo: "regra_negocio"
+    nome: "Conciliação Manual em Planilha Excel"
+    caminho: "N/A - Processo manual não documentado"
+    localizacao_codigo: "Processo manual não documentado no código"
+    descricao: |
+      Controlador exportava fatura para Excel, abria planilha de contratos, usava VLOOKUP para tentar conciliar
+      cada linha com contrato correspondente. Processo demorava 40 horas/mês e tinha taxa de erro 15%.
+    destino: "substituido"
+    justificativa: |
+      RF moderno tem conciliação automática com algoritmo fuzzy matching (Levenshtein distance threshold 90%)
+      + matching exato (número, IMEI, serial) + sugestões top 3 para match <90%. Reduz conciliação de 40h/mês para 2h/mês
+      (95% de ganho de eficiência) com taxa de erro <2%.
+    documentacao_item_relacionado: "RN-RF026-003"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+    migracao_moderna:
+      command_cqrs: "ConciliarFaturaCommand"
+      handler: "ConciliarFaturaCommandHandler"
+      algoritmo: "Levenshtein distance + matching exato + ML suggestions"
+
+  - id: "LEG-RF026-021"
+    tipo: "regra_negocio"
+    nome: "Auditoria Manual em Checklist Papel"
+    caminho: "N/A - Processo manual não documentado"
+    localizacao_codigo: "Processo manual não documentado no código"
+    descricao: |
+      Controlador imprimia checklist em papel com 12 itens de verificação (linha sem contrato, valor suspeito,
+      serviço cancelado cobrado, etc.) e verificava manualmente APÓS aprovar pagamento (descoberta tardia de erros).
+      Taxa de descoberta de erros: 85% APÓS pagamento (necessário processo de contestação demorado).
+    destino: "substituido"
+    justificativa: |
+      RF moderno tem auditoria automática pré-pagamento com 25+ regras configuráveis + custom rules engine visual
+      + severidade (Alta bloqueia aprovação, Média exige justificativa, Baixa apenas alerta). Recupera 12-18% do valor
+      total em cobranças indevidas ANTES de pagar (vs. descoberta tardia no legado).
+    documentacao_item_relacionado: "RN-RF026-004"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+    migracao_moderna:
+      command_cqrs: "AuditarFaturaCommand"
+      handler: "AuditarFaturaCommandHandler"
+      regras_pre_definidas: 25
+      custom_rules_engine: "Visual builder para regras customizadas"
+
+  - id: "LEG-RF026-022"
+    tipo: "regra_negocio"
+    nome: "Workflow de Aprovação por Email"
+    caminho: "N/A - Processo manual não documentado"
+    localizacao_codigo: "Processo manual não documentado no código"
+    descricao: |
+      Controlador enviava email para gestor com PDF da fatura anexado. Gestor respondia email com "Aprovado" ou "Negado".
+      Sem rastreamento formal de histórico ou SLA. Impossível saber quando fatura foi enviada para aprovação,
+      quanto tempo levou para aprovar, quem aprovou exatamente.
+    destino: "substituido"
+    justificativa: |
+      RF moderno tem workflow formal 7 etapas (Criação → Aprovação Interna → Envio Operadora → Acompanhamento SLA
+      → Resposta → Validação Crédito → Fechamento) + assinatura digital DocuSign + rastreamento SLA completo
+      + alertas se operadora não responde em 80% do prazo + timeline de eventos com todos responsáveis.
+    documentacao_item_relacionado: "RN-RF026-005"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+    migracao_moderna:
+      entidade: "Fatura_Contestacao"
+      workflow_etapas: 7
+      integracao: "DocuSign API para assinatura digital"
+
+  - id: "LEG-RF026-023"
+    tipo: "regra_negocio"
+    nome: "Sem Alertas de Estouro de Budget"
+    caminho: "N/A - Funcionalidade inexistente no legado"
+    localizacao_codigo: "Funcionalidade inexistente no legado"
+    descricao: |
+      Sistema não tinha alertas preditivos. Descoberta de estouro de budget apenas ao fechar mês
+      (tarde demais para ação corretiva). Controller descobria estouro no dia 5 do mês seguinte quando já havia
+      comprometido budget de outros departamentos.
+    destino: "substituido"
+    justificativa: |
+      RF moderno tem alertas preditivos ML (Random Forest Regressor) com 7/15/30 dias antecedência baseado
+      em tendências históricas + consumo atual projetado. Dispara alertas se previsão >90% budget aprovado
+      + sugestões automáticas de ação corretiva. Permite ações preventivas ANTES do estouro.
+    documentacao_item_relacionado: "RN-RF026-008"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 2
+    migracao_moderna:
+      entidade: "Fatura_Previsao_ML"
+      modelo_ml: "Random Forest Regressor (ML.NET)"
+      features: "Consumo histórico 12 meses, sazonalidade, crescimento headcount, novos contratos, cancelamentos"
+      accuracy_minima: "85%"
+
+# ====================================================================================
+# BANCOS LEGADOS MAPEADOS
+# ====================================================================================
+
+bancos_legados:
+  - nome: "IControlIT_Cliente01"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "Fatura"
+      - "Fatura_Detalhe"
+      - "Fatura_Rateio"
+    destino: "consolidado"
+    justificativa: "Migrado para banco único multi-tenant com Row-Level Security (ClienteId = 1)"
+    banco_moderno: "IControlIT.db (SQLite dev) / IControlIT_Modern (SQL Server prod)"
+    script_migracao: "migrate-cliente01-to-multi-tenant.sql"
+
+  - nome: "IControlIT_Cliente02"
+    servidor: "SQL-LEGADO-02"
+    tabelas_relacionadas:
+      - "Fatura"
+      - "Fatura_Detalhe"
+      - "Fatura_Rateio"
+    destino: "consolidado"
+    justificativa: "Migrado para banco único multi-tenant com Row-Level Security (ClienteId = 2)"
+    banco_moderno: "IControlIT.db (SQLite dev) / IControlIT_Modern (SQL Server prod)"
+    script_migracao: "migrate-cliente02-to-multi-tenant.sql"
+
+  - nome: "IControlIT_Cliente03"
+    servidor: "SQL-LEGADO-03"
+    tabelas_relacionadas:
+      - "Fatura"
+      - "Fatura_Detalhe"
+      - "Fatura_Rateio"
+    destino: "consolidado"
+    justificativa: "Migrado para banco único multi-tenant com Row-Level Security (ClienteId = 3)"
+    banco_moderno: "IControlIT.db (SQLite dev) / IControlIT_Modern (SQL Server prod)"
+    script_migracao: "migrate-cliente03-to-multi-tenant.sql"
+
+# ====================================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ====================================================================================
+
+problemas_legado:
+  - id: "PROB-RF026-001"
+    titulo: "Processamento Síncrono Causa Timeout em Arquivos Grandes"
+    severidade: "CRÍTICA"
+    descricao: |
+      Upload de faturas CSV com >1000 linhas demorava >30s e causava timeout HTTP do IIS.
+      Usuário precisava quebrar arquivo manualmente em múltiplos CSVs menores (perda de produtividade).
+    impacto: "Impossível importar faturas grandes (operadoras frequentemente enviam faturas >5000 linhas)"
+    solucao_moderna: "Processamento assíncrono com Hangfire + SignalR para notificar usuário quando concluir"
+
+  - id: "PROB-RF026-002"
+    titulo: "Conciliação Manual Consome 40 Horas/Mês"
+    severidade: "ALTA"
+    descricao: |
+      Controlador gasta 40 horas/mês conciliando faturas com contratos em planilha Excel com VLOOKUP.
+      Taxa de erro 15% (linhas conciliadas incorretamente ou não conciliadas quando deveriam).
+    impacto: "Custo operacional alto (R$42k/ano salário controller) + erro em 15% das conciliações"
+    solucao_moderna: "Conciliação automática fuzzy matching reduz de 40h/mês para 2h/mês (95% ganho eficiência) + taxa erro <2%"
+
+  - id: "PROB-RF026-003"
+    titulo: "Auditoria Pós-Pagamento Descobre Erros Tarde Demais"
+    severidade: "CRÍTICA"
+    descricao: |
+      Auditoria manual em checklist papel executada APÓS aprovar pagamento. 85% dos erros descobertos
+      APÓS pagar (necessário processo demorado de contestação com operadora, taxa sucesso 40%).
+    impacto: "Perda de 12-18% do valor total de faturas em cobranças indevidas não recuperadas"
+    solucao_moderna: "Auditoria automática pré-pagamento recupera 12-18% ANTES de pagar (economia R$180k/ano para empresa R$1,5M/ano Telecom)"
+
+  - id: "PROB-RF026-004"
+    titulo: "Rateio Manual em Excel Consome 8 Horas para Recalcular"
+    severidade: "ALTA"
+    descricao: |
+      Rateio em planilha Excel com VLOOKUP complexos quebra frequentemente. Recalcular rateio de todas faturas
+      do mês ao mudar regra = 8 horas de trabalho manual (planilhas com 500+ linhas travam Excel).
+    impacto: "Impossível testar cenários alternativos de rateio (controller evita recalcular por custo alto)"
+    solucao_moderna: "Rateio multi-dimensional automático calcula em <2s + permite simular múltiplos cenários antes de aplicar"
+
+  - id: "PROB-RF026-005"
+    titulo: "Sem Versionamento Perde Histórico de Alterações"
+    severidade: "ALTA"
+    descricao: |
+      Reimportação ou correção manual de fatura sobrescreve dados anteriores. Impossível saber o que mudou,
+      quando mudou, quem mudou e por quê. Auditoria retroativa impossível (violação compliance fiscal).
+    impacto: "Violação compliance fiscal (obrigatório preservar histórico 7 anos) + impossível rastrear erros"
+    solucao_moderna: "Versionamento automático preserva snapshots de todas versões + diff highlighting + rastreamento completo (usuário, timestamp, motivo)"
+
+  - id: "PROB-RF026-006"
+    titulo: "DELETE Físico Viola Compliance Fiscal"
+    severidade: "CRÍTICA"
+    descricao: |
+      Botão "Excluir" faz DELETE físico no banco sem soft delete. Perda permanente de histórico.
+      Legislação brasileira exige preservação de faturas por 7 anos para auditoria fiscal. Empresa pode ser multada
+      se não conseguir comprovar faturas em auditoria Receita Federal.
+    impacto: "Risco multa fiscal + impossível recuperar faturas deletadas acidentalmente"
+    solucao_moderna: "Soft delete obrigatório FlExcluido = TRUE + preservação 7 anos + Query Filter EF Core global"
+
+# ====================================================================================
+# METADADOS
+# ====================================================================================
+
+metadados:
+  total_itens_legado: 23
+  itens_assumidos: 3
+  itens_substituidos: 19
+  itens_descartados: 1
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+  telas_legado: 4
+  webservices_legado: 1  # Fatura.asmx com 4 métodos
+  stored_procedures_legado: 2
+  tabelas_legado: 3
+  regras_implicitas_legado: 10
+  bancos_separados_legado: 3
+  problemas_criticos_identificados: 6
+
+# ====================================================================================
+# CHANGELOG
+# ====================================================================================
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Documentação completa do legado de gestão de faturas VB.NET/ASP.NET Web Forms com rastreabilidade 100% (23 itens com destino definido). Gap analysis detalhado, problemas identificados, riscos de migração mapeados."
+    autor: "Agência ALC - alc.dev.br"

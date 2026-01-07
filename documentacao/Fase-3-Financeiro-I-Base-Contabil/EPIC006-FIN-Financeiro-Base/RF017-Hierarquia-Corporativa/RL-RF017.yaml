@@ -1,0 +1,768 @@
+# =============================================
+# RL-RF017 - Referência ao Legado
+# Gestão de Hierarquia Corporativa
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF017
+titulo: "Gestão de Hierarquia Corporativa"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "Legado IControlIT v1.0 (2010-2024)"
+  arquitetura: "Monolítica WebForms Cliente-Servidor"
+  banco_dados: "SQL Server (18 bancos separados, um por cliente)"
+  multi_tenant: false # Cada cliente tem banco separado fisicamente
+  auditoria: "partial" # Tabelas de histórico sem dados anteriores em JSON
+
+# =============================================
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+# =============================================
+referencias:
+  - id: "LEG-RF017-001"
+    tipo: "tela"
+    nome: "Centro_Custo.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastro/Centro_Custo.aspx"
+    descricao: |
+      Tela de gestão de Centros de Custo (CRUD completo).
+      Campos: Id_Centro_Custo, Id_Filial, Cd_Centro_Custo, Nm_Centro_Custo, Id_Gestor, Vr_Budget_Mensal, Fl_Ativo.
+      Comportamentos implícitos:
+      - Validação de código único em VB.NET (não em constraint do banco)
+      - Modal de lixeira para visualizar e restaurar registros inativados
+      - Permite budget negativo ou zero (problema identificado)
+      - Código aceita qualquer formato (problema identificado)
+      - Não valida inativação com departamentos ativos (problema grave)
+
+    destino: "assumido" # assumido | substituido | descartado | a_revisar
+    justificativa: |
+      Funcionalidade mantida com melhorias:
+      - Validação de código único movida para FluentValidation + constraint composta
+      - Budget deve ser > 0 se informado
+      - Código deve seguir padrão UPPER_SNAKE_CASE
+      - Inativação com filhos ativos proibida (exceto cascata opcional)
+      - Auditoria completa com dados anteriores em JSON
+
+    documentacao_item_relacionado: "RN-RF017-01, RN-RF017-03, RN-RF017-05, RN-RF017-07"
+    uc_relacionado: "UC01, UC02, UC03"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF017-002"
+    tipo: "tela"
+    nome: "Departamento.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastro/Departamento.aspx"
+    descricao: |
+      Tela de gestão de Departamentos (CRUD completo).
+      Campos: Id_Departamento, Id_Centro_Custo, Cd_Departamento, Nm_Departamento, Id_Gerente, Fl_Ativo.
+      Problemas identificados:
+      - Não valida inativação com setores ativos
+      - Código duplicado entre Fornecedores (validação não considera multi-tenancy)
+      - Sem auditoria de alterações completa
+
+    destino: "assumido"
+    justificativa: |
+      Funcionalidade mantida com correções de problemas identificados.
+      Validações de integridade referencial adicionadas.
+
+    documentacao_item_relacionado: "RN-RF017-01, RN-RF017-03, RN-RF017-10"
+    uc_relacionado: "UC01, UC02, UC03"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF017-003"
+    tipo: "tela"
+    nome: "Setor.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastro/Setor.aspx"
+    descricao: |
+      Tela de gestão de Setores (CRUD completo).
+      Campos: Id_Setor, Id_Departamento, Cd_Setor, Nm_Setor, Id_Supervisor, Fl_Ativo.
+      Problemas identificados:
+      - Permite criar setor órfão se departamento for inativado depois
+      - Sem validação de supervisor ativo
+
+    destino: "assumido"
+    justificativa: |
+      Funcionalidade mantida com validações de hierarquia e gestor ativo.
+
+    documentacao_item_relacionado: "RN-RF017-02, RN-RF017-04"
+    uc_relacionado: "UC01, UC02, UC03"
+
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF017-004"
+    tipo: "tela"
+    nome: "Secao.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastro/Secao.aspx"
+    descricao: |
+      Tela de gestão de Seções (CRUD completo).
+      Campos: Id_Secao, Id_Setor, Cd_Secao, Nm_Secao, Id_Coordenador, Fl_Ativo.
+      Última camada hierárquica (não tem filhos).
+      Limitação: Budget só existe em Centro de Custo.
+
+    destino: "assumido"
+    justificativa: |
+      Funcionalidade mantida. Limitação de budget (só em CC) pode ser expandida futuramente.
+
+    documentacao_item_relacionado: "RN-RF017-01, RN-RF017-02, RN-RF017-04"
+    uc_relacionado: "UC01, UC02, UC03"
+
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF017-005"
+    tipo: "webservice"
+    nome: "WS_Centro_Custo.asmx"
+    caminho: "ic1_legado/IControlIT/Services/WS_Centro_Custo.asmx"
+    descricao: |
+      WebService SOAP com métodos:
+      - ListarCentrosCusto: Retorna DataTable com centros de custo por filial
+      - BuscarCentroCusto: Busca por ID
+      - InserirCentroCusto: Insert sem FluentValidation
+      - AtualizarCentroCusto: Update sem validação de histórico financeiro
+      - InativarCentroCusto: Inativa sem validar filhos ativos
+
+      Problemas:
+      - SOAP ao invés de REST
+      - Sem validação de payload estruturada
+      - Erros genéricos não estruturados
+      - Sem autenticação por token (usa Session ASP.NET)
+      - Sem rate limiting
+      - Sem auditoria completa
+
+    destino: "substituido"
+    justificativa: |
+      WebService SOAP substituído por REST API moderna com:
+      - Endpoints REST padronizados (GET/POST/PUT/DELETE)
+      - FluentValidation em todos os payloads
+      - Erros estruturados (ProblemDetails)
+      - Autenticação JWT Bearer Token
+      - Rate limiting (100 req/min por usuário)
+      - Auditoria completa automática
+      - CQRS (Commands e Queries separados)
+
+    documentacao_item_relacionado: "Endpoints /api/centrocusto/*"
+    uc_relacionado: "UC01, UC02, UC03"
+
+    complexidade: "alta"
+    risco_migracao: "alto" # Manter facade SOAP temporário para não quebrar integrações
+    prioridade: 1
+
+  - id: "LEG-RF017-006"
+    tipo: "webservice"
+    nome: "WS_Departamento.asmx, WS_Setor.asmx, WS_Secao.asmx"
+    caminho: "ic1_legado/IControlIT/Services/"
+    descricao: |
+      WebServices SOAP para Departamento, Setor e Seção.
+      Mesmos problemas do WS_Centro_Custo.
+
+    destino: "substituido"
+    justificativa: |
+      Todos substituídos por REST API moderna.
+
+    documentacao_item_relacionado: "Endpoints /api/departamento/*, /api/setor/*, /api/secao/*"
+    uc_relacionado: "UC01, UC02, UC03"
+
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF017-007"
+    tipo: "stored_procedure"
+    nome: "sp_Validar_Codigo_Unico"
+    caminho: "Database/dbo.sp_Validar_Codigo_Unico"
+    descricao: |
+      Stored procedure que valida se código já existe (UNIQUE constraint).
+      Problema: Validação global, não considera multi-tenancy.
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por constraint composta UNIQUE (Id_Fornecedor, Codigo)
+      + validação em FluentValidation.
+
+    documentacao_item_relacionado: "RN-RF017-01"
+    uc_relacionado: "UC01"
+
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+# =============================================
+# TELAS LEGADAS (ESTRUTURA DETALHADA)
+# =============================================
+telas:
+  - id: "LEG-RF017-001"
+    nome: "Centro_Custo.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastro/Centro_Custo.aspx"
+    responsabilidade: "Gestão de Centros de Custo (CRUD completo)"
+    campos:
+      - nome: "Id_Centro_Custo"
+        tipo: "TextBox (readonly)"
+        obrigatorio: false
+        validacao: "Auto-increment no banco"
+      - nome: "Id_Filial"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "Deve existir e estar ativa"
+      - nome: "Cd_Centro_Custo"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Único (problema: não considera multi-tenancy)"
+      - nome: "Nm_Centro_Custo"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Max 120 caracteres"
+      - nome: "Id_Gestor"
+        tipo: "DropDownList"
+        obrigatorio: false
+        validacao: "Nenhuma (problema: permite gestor inativo)"
+      - nome: "Vr_Budget_Mensal"
+        tipo: "TextBox (decimal)"
+        obrigatorio: false
+        validacao: "Nenhuma (problema: permite negativo/zero)"
+      - nome: "Fl_Ativo"
+        tipo: "CheckBox"
+        obrigatorio: true
+        validacao: "Default: true"
+    comportamentos_implicitos:
+      - "Validação de código único em code-behind VB.NET (não em constraint)"
+      - "Modal de lixeira para restaurar registros inativados"
+      - "Filtro por Filial via ComboBox"
+      - "Não valida inativação com departamentos ativos (problema grave)"
+
+  - id: "LEG-RF017-002"
+    nome: "Departamento.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastro/Departamento.aspx"
+    responsabilidade: "Gestão de Departamentos (CRUD completo)"
+    campos:
+      - nome: "Id_Departamento"
+        tipo: "TextBox (readonly)"
+        obrigatorio: false
+        validacao: "Auto-increment no banco"
+      - nome: "Id_Centro_Custo"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "Deve existir e estar ativo"
+      - nome: "Cd_Departamento"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Único"
+      - nome: "Nm_Departamento"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Max 120 caracteres"
+      - nome: "Id_Gerente"
+        tipo: "DropDownList"
+        obrigatorio: false
+        validacao: "Nenhuma (problema: permite gerente inativo)"
+      - nome: "Fl_Ativo"
+        tipo: "CheckBox"
+        obrigatorio: true
+        validacao: "Default: true"
+    comportamentos_implicitos:
+      - "Não valida inativação com setores ativos (problema)"
+      - "Sem auditoria de dados anteriores (problema)"
+
+  - id: "LEG-RF017-003"
+    nome: "Setor.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastro/Setor.aspx"
+    responsabilidade: "Gestão de Setores (CRUD completo)"
+    campos:
+      - nome: "Id_Setor"
+        tipo: "TextBox (readonly)"
+        obrigatorio: false
+        validacao: "Auto-increment no banco"
+      - nome: "Id_Departamento"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "Deve existir e estar ativo"
+      - nome: "Cd_Setor"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Único"
+      - nome: "Nm_Setor"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Max 120 caracteres"
+      - nome: "Id_Supervisor"
+        tipo: "DropDownList"
+        obrigatorio: false
+        validacao: "Nenhuma (problema: permite supervisor inativo)"
+      - nome: "Fl_Ativo"
+        tipo: "CheckBox"
+        obrigatorio: true
+        validacao: "Default: true"
+    comportamentos_implicitos:
+      - "Permite criar setor órfão se departamento for inativado depois (problema)"
+
+  - id: "LEG-RF017-004"
+    nome: "Secao.aspx"
+    caminho: "ic1_legado/IControlIT/Cadastro/Secao.aspx"
+    responsabilidade: "Gestão de Seções (CRUD completo)"
+    campos:
+      - nome: "Id_Secao"
+        tipo: "TextBox (readonly)"
+        obrigatorio: false
+        validacao: "Auto-increment no banco"
+      - nome: "Id_Setor"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "Deve existir e estar ativo"
+      - nome: "Cd_Secao"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Único"
+      - nome: "Nm_Secao"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Max 120 caracteres"
+      - nome: "Id_Coordenador"
+        tipo: "DropDownList"
+        obrigatorio: false
+        validacao: "Nenhuma (problema: permite coordenador inativo)"
+      - nome: "Fl_Ativo"
+        tipo: "CheckBox"
+        obrigatorio: true
+        validacao: "Default: true"
+    comportamentos_implicitos:
+      - "Última camada hierárquica (não tem filhos)"
+      - "Sem budget individual (limitação)"
+
+# =============================================
+# WEBSERVICES LEGADOS
+# =============================================
+servicos:
+  - id: "LEG-RF017-005"
+    nome: "WS_Centro_Custo.ListarCentrosCusto"
+    localizacao: "Services/WS_Centro_Custo.asmx"
+    responsabilidade: "Listar centros de custo por filial (SOAP)"
+    notas: "Retorna DataTable. Substituído por GET /api/centrocusto"
+
+  - id: "LEG-RF017-006"
+    nome: "WS_Centro_Custo.BuscarCentroCusto"
+    localizacao: "Services/WS_Centro_Custo.asmx"
+    responsabilidade: "Buscar centro de custo por ID (SOAP)"
+    notas: "Substituído por GET /api/centrocusto/{id}"
+
+  - id: "LEG-RF017-007"
+    nome: "WS_Centro_Custo.InserirCentroCusto"
+    localizacao: "Services/WS_Centro_Custo.asmx"
+    responsabilidade: "Inserir novo centro de custo (SOAP)"
+    notas: "Sem FluentValidation. Substituído por POST /api/centrocusto"
+
+  - id: "LEG-RF017-008"
+    nome: "WS_Centro_Custo.AtualizarCentroCusto"
+    localizacao: "Services/WS_Centro_Custo.asmx"
+    responsabilidade: "Atualizar centro de custo (SOAP)"
+    notas: "Sem validação de histórico financeiro. Substituído por PUT /api/centrocusto/{id}"
+
+  - id: "LEG-RF017-009"
+    nome: "WS_Centro_Custo.InativarCentroCusto"
+    localizacao: "Services/WS_Centro_Custo.asmx"
+    responsabilidade: "Inativar centro de custo (SOAP)"
+    notas: "Não valida filhos ativos. Substituído por DELETE /api/centrocusto/{id}"
+
+  - id: "LEG-RF017-010"
+    nome: "WS_Departamento.*, WS_Setor.*, WS_Secao.*"
+    localizacao: "Services/"
+    responsabilidade: "CRUD de Departamento, Setor, Seção (SOAP)"
+    notas: "Mesmas limitações. Substituídos por REST API moderna"
+
+# =============================================
+# TABELAS LEGADAS COM PROBLEMAS
+# =============================================
+tabelas:
+  - nome: "Centro_Custo"
+    finalidade: "Armazenar centros de custo (primeira camada hierárquica)"
+    problemas:
+      - "Sem campo Id_Fornecedor (problema crítico de multi-tenancy)"
+      - "Constraint UNIQUE global (não considera multi-tenancy)"
+      - "Sem auditoria completa (faltam campos Dt_Alteracao, Id_Usuario_Alteracao, Dt_Exclusao)"
+      - "Permite Vr_Budget_Mensal negativo/zero (sem CHECK constraint)"
+
+  - nome: "Departamento"
+    finalidade: "Armazenar departamentos (segunda camada hierárquica)"
+    problemas:
+      - "Mesmos problemas de multi-tenancy e auditoria do Centro_Custo"
+      - "Sem validação de integridade ao inativar (permite inativar com setores ativos)"
+
+  - nome: "Setor"
+    finalidade: "Armazenar setores (terceira camada hierárquica)"
+    problemas:
+      - "Mesmos problemas de multi-tenancy e auditoria"
+
+  - nome: "Secao"
+    finalidade: "Armazenar seções (quarta camada hierárquica)"
+    problemas:
+      - "Mesmos problemas de multi-tenancy e auditoria"
+
+  - nome: "Centro_Custo_Historico, Departamento_Historico, Setor_Historico, Secao_Historico"
+    finalidade: "Auditoria parcial de operações"
+    problemas:
+      - "Não salva dados anteriores em JSON (problema grave)"
+      - "Apenas registra que houve operação, mas não permite reverter ou comparar"
+      - "Estrutura: Id_Historico, Id_Entidade, Dt_Operacao, Tp_Operacao, Id_Usuario"
+
+# =============================================
+# REGRAS DE NEGÓCIO IMPLÍCITAS (NÃO DOCUMENTADAS NO LEGADO)
+# =============================================
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      Código Único (Implementação Incorreta):
+      Sistema valida código único em nível de banco (UNIQUE constraint) mas não considera
+      multi-tenancy porque cada cliente tem banco separado. Na migração para banco único
+      com Id_Fornecedor, a constraint deve ser UNIQUE (Id_Fornecedor, Codigo).
+    fonte: "Centro_Custo.aspx.vb, linha 245"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Validação de Filial Ativa (Code-Behind):
+      Antes de criar Centro de Custo, code-behind valida se Filial existe e está ativa.
+      Implementação em VB.NET (não em trigger ou constraint).
+      Regra extraída: Sistema valida se Filial existe e está ativa antes de permitir criar CC.
+    fonte: "Centro_Custo.aspx.vb, linha 180-190"
+
+  - id: "RL-RN-003"
+    descricao: |
+      Não Valida Inativação com Filhos (Problema Grave):
+      Sistema permite inativar Centro de Custo mesmo com Departamentos ativos.
+      Não há validação de integridade referencial antes de inativar. Causa registros órfãos.
+    fonte: "Centro_Custo.aspx.vb, linha 350"
+
+  - id: "RL-RN-004"
+    descricao: |
+      Budget Pode Ser Negativo (Problema):
+      Sistema não valida se Vr_Budget_Mensal é > 0. Permite valores negativos ou zero.
+    fonte: "Centro_Custo.aspx.vb, linha 245"
+
+  - id: "RL-RN-005"
+    descricao: |
+      Código Aceita Qualquer Formato (Problema):
+      Sistema não valida formato do código. Aceita "depto ti", "DEPTO-TI", "Depto.TI", etc.
+    fonte: "Centro_Custo.aspx.vb, linha 245"
+
+  - id: "RL-RN-006"
+    descricao: |
+      Permite Alterar Código com Histórico Financeiro (Problema):
+      Sistema permite alterar código mesmo se houver movimentações financeiras vinculadas,
+      causando perda de rastreabilidade em relatórios históricos.
+    fonte: "Centro_Custo.aspx.vb, linha 300"
+
+  - id: "RL-RN-007"
+    descricao: |
+      Gestor Pode Estar Inativo (Problema):
+      Sistema permite vincular consumidor inativo como gestor/gerente/supervisor/coordenador.
+    fonte: "Centro_Custo.aspx.vb, linha 245"
+
+# =============================================
+# GAP ANALYSIS (LEGADO x MODERNO)
+# =============================================
+gap_analysis:
+  - item: "Multi-tenancy"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: 18 bancos separados. Moderno: 1 banco com Id_Fornecedor + Row-Level Security"
+
+  - item: "Auditoria completa com dados anteriores em JSON"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: Tabelas de histórico sem dados anteriores. Moderno: Auditoria completa"
+
+  - item: "Validação de código único por Fornecedor"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: UNIQUE global. Moderno: UNIQUE (Id_Fornecedor, Codigo)"
+
+  - item: "Validação de budget > 0"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: Permite negativo/zero. Moderno: Budget > 0 se informado"
+
+  - item: "Validação de código UPPER_SNAKE_CASE"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: Qualquer formato. Moderno: UPPER_SNAKE_CASE obrigatório"
+
+  - item: "Validação de inativação com filhos ativos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: Permite inativar com filhos ativos. Moderno: Proíbe (exceto cascata opcional)"
+
+  - item: "Validação de gestor ativo"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: Permite gestor inativo. Moderno: Exige gestor ativo"
+
+  - item: "Proteção contra alteração de código com histórico financeiro"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: Sempre permite. Moderno: Proíbe se houver histórico financeiro"
+
+  - item: "Autenticação JWT"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: Session ASP.NET. Moderno: JWT Bearer Token"
+
+  - item: "REST API com CQRS"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: SOAP WebServices. Moderno: REST API com MediatR + CQRS"
+
+  - item: "Alertas de budget excedido"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade no sistema moderno"
+
+  - item: "Relatórios de consumo multi-nível"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade no sistema moderno"
+
+  - item: "Inativação em cascata opcional"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Nova funcionalidade no sistema moderno"
+
+# =============================================
+# DECISÕES DE MODERNIZAÇÃO
+# =============================================
+decisoes_modernizacao:
+  - decisao: "Migrar de 18 bancos separados para 1 banco com multi-tenancy"
+    motivo: |
+      - Reduzir custo operacional de manutenção
+      - Facilitar backup, restore e deploy
+      - Simplificar administração de banco de dados
+      - Permitir análises cross-tenant (com permissão) para suporte
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Substituir SOAP por REST API com CQRS"
+    motivo: |
+      - SOAP é verboso e difícil de consumir
+      - REST é padrão moderno, mais simples e performático
+      - CQRS permite separar leituras (queries otimizadas) de escritas (commands com validação)
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Implementar auditoria completa com dados anteriores em JSON"
+    motivo: |
+      - Compliance e rastreabilidade obrigatórios
+      - Permitir rollback de alterações indevidas
+      - LGPD exige rastreabilidade de alterações de dados
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Não permitir inativação com filhos ativos (exceto cascata opcional)"
+    motivo: |
+      - Evitar registros órfãos (problema crítico do legado)
+      - Garantir integridade referencial
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Exigir padrão UPPER_SNAKE_CASE para códigos"
+    motivo: |
+      - Padronização e consistência
+      - Facilitar identificação visual em relatórios
+    impacto: "baixo"
+    data: "2025-12-30"
+
+# =============================================
+# RISCOS DE MIGRAÇÃO
+# =============================================
+riscos_migracao:
+  - risco: "Perda de dados durante migração de 18 bancos para 1"
+    impacto: "critico"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Backup completo antes da migração
+      - Validação de contagem de registros
+      - Testes em ambiente de homologação
+
+  - risco: "Conflito de códigos duplicados entre Fornecedores"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      - Script de pré-validação para identificar duplicados
+      - Relatório para ajuste manual antes da migração
+
+  - risco: "Quebra de integrações SOAP existentes"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      - Manter WebServices SOAP legados como facade temporário
+      - Facade chama REST API internamente
+
+  - risco: "Performance degradada em queries cross-tenant"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Implementar índices compostos (Id_Fornecedor, Codigo)
+      - Particionamento de tabelas por Fornecedor
+
+  - risco: "Usuários estranharem mudança de códigos para UPPER_SNAKE_CASE"
+    impacto: "baixo"
+    probabilidade: "alta"
+    mitigacao: |
+      - Comunicação prévia + treinamento
+      - Manter códigos legados como alias temporário
+
+  - risco: "Resistência à validação de inativação com filhos ativos"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      - Oferecer opção de inativação em cascata opcional
+
+# =============================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# =============================================
+rastreabilidade:
+  - elemento_legado: "Centro_Custo.aspx"
+    referencia_rf: "RN-RF017-01 a RN-RF017-15"
+    referencia_uc: "UC01, UC02, UC03"
+    status: "assumido" # assumido | migrado | em_analise | descartado
+
+  - elemento_legado: "Departamento.aspx"
+    referencia_rf: "RN-RF017-01 a RN-RF017-15"
+    referencia_uc: "UC01, UC02, UC03"
+    status: "assumido"
+
+  - elemento_legado: "Setor.aspx"
+    referencia_rf: "RN-RF017-01 a RN-RF017-15"
+    referencia_uc: "UC01, UC02, UC03"
+    status: "assumido"
+
+  - elemento_legado: "Secao.aspx"
+    referencia_rf: "RN-RF017-01 a RN-RF017-15"
+    referencia_uc: "UC01, UC02, UC03"
+    status: "assumido"
+
+  - elemento_legado: "WS_Centro_Custo.*"
+    referencia_rf: "Endpoints /api/centrocusto/*"
+    referencia_uc: "UC01, UC02, UC03"
+    status: "migrado"
+
+  - elemento_legado: "WS_Departamento.*, WS_Setor.*, WS_Secao.*"
+    referencia_rf: "Endpoints /api/departamento/*, /api/setor/*, /api/secao/*"
+    referencia_uc: "UC01, UC02, UC03"
+    status: "migrado"
+
+  - elemento_legado: "Tabela Centro_Custo"
+    referencia_rf: "Entidade CentroCusto"
+    referencia_uc: null
+    status: "assumido"
+
+  - elemento_legado: "Tabelas *_Historico"
+    referencia_rf: "Auditoria completa com JSON"
+    referencia_uc: null
+    status: "migrado"
+
+# =============================================
+# BASES DE DADOS LEGADAS MAPEADAS
+# =============================================
+bases_dados_legadas:
+  total_Fornecedores: 18
+  estimativa_registros:
+    centros_custo: 250
+    departamentos: 700
+    setores: 1400
+    secoes: 2100
+
+  Fornecedores:
+    - cnpj: "12.345.678/0001-90"
+      razao_social: "Empresa A"
+      banco: "DB_IControlIT_EmpresaA"
+      qtd_centros_custo: 15
+      qtd_departamentos: 42
+      qtd_setores: 78
+      qtd_secoes: 105
+
+    - cnpj: "23.456.789/0001-01"
+      razao_social: "Empresa B"
+      banco: "DB_IControlIT_EmpresaB"
+      qtd_centros_custo: 8
+      qtd_departamentos: 21
+      qtd_setores: 35
+      qtd_secoes: 48
+
+    - cnpj: "34.567.890/0001-12"
+      razao_social: "Empresa C"
+      banco: "DB_IControlIT_EmpresaC"
+      qtd_centros_custo: 22
+      qtd_departamentos: 67
+      qtd_setores: 134
+      qtd_secoes: 201
+
+# =============================================
+# ESTRATÉGIA DE MIGRAÇÃO
+# =============================================
+estrategia_migracao:
+  decisao_arquitetural: "CRIAR_DO_ZERO" # CRIAR_DO_ZERO | MIGRAR_INCREMENTAL | REPLICAR_ESTRUTURA
+  justificativa: |
+    Criar estrutura moderna desde o início porque:
+    - Multi-tenancy requer mudanças estruturais profundas (Id_Fornecedor)
+    - Auditoria completa exige novos campos e triggers
+    - REST API não é compatível com SOAP
+    - Melhor garantir qualidade desde o início
+
+  fases:
+    - fase: 1
+      nome: "Preparação"
+      atividades:
+        - "Criar banco unificado com Id_Fornecedor em todas as tabelas"
+        - "Criar script de migração que lê cada banco separado"
+        - "Atribuir Id_Fornecedor único (1, 2, 3...)"
+        - "Inserir dados no banco unificado preservando IDs originais"
+
+    - fase: 2
+      nome: "Validação"
+      atividades:
+        - "Comparar contagem de registros (legado vs unificado)"
+        - "Validar integridade referencial (FKs)"
+        - "Validar códigos únicos por Fornecedor"
+        - "Identificar códigos duplicados entre Fornecedores"
+
+    - fase: 3
+      nome: "Ajustes"
+      atividades:
+        - "Converter códigos para UPPER_SNAKE_CASE"
+        - "Corrigir budgets negativos/zero (setar NULL)"
+        - "Desvincular gestores inativos (setar NULL)"
+        - "Inativar níveis órfãos (sem nível pai ativo)"
+
+    - fase: 4
+      nome: "Homologação"
+      atividades:
+        - "Testar acesso multi-tenant"
+        - "Testar APIs REST"
+        - "Testar auditoria completa"
+        - "Testar validações novas (inativação com filhos, etc)"
+
+    - fase: 5
+      nome: "Produção"
+      atividades:
+        - "Backup completo de todos os 18 bancos legados"
+        - "Executar migração em horário de menor uso"
+        - "Validar pós-migração"
+        - "Manter bancos legados como backup por 6 meses"
+
+# =============================================
+# CHANGELOG
+# =============================================
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: |
+      Versão inicial de referência ao legado estruturada e sincronizada com RL-RF017.md.
+      Destino obrigatório em todas as referências.
+      Rastreabilidade completa de telas, WebServices, tabelas, regras implícitas, gap analysis
+      e estratégia de migração.
+    autor: "Agência ALC - alc.dev.br"

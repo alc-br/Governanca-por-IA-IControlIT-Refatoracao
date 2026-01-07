@@ -1,0 +1,502 @@
+rf:
+  id: RF046
+  nome: Gestão de Grupos de Troncos
+  versao: '2.0'
+  data: '2025-12-30'
+  fase: Fase-6-Ativos-Auditoria-Integracoes
+  epic: EPIC009-AST-Ativos-Inventario
+  status: em_desenvolvimento
+descricao:
+  objetivo: Implementar sistema completo de agrupamento lógico, roteamento inteligente e monitoramento de troncos telefônicos
+    (SIP, E1, móvel) com failover automático, balanceamento de carga e otimização de custos (LCR)
+  problema_resolvido: Eliminar falhas de telefonia, otimizar custos com roteamento inteligente e garantir alta disponibilidade
+    (≥99.9%) através de failover automático
+  publico_afetado: Gestores de Telecom, Administradores de Infraestrutura, Operadores de TI
+escopo:
+  incluso:
+  - Criação e gerenciamento de grupos hierárquicos de troncos
+  - Configuração de algoritmos de balanceamento (Round-Robin, Least-Used, Weighted, Priority, LCR)
+  - Health checks automáticos a cada 30 segundos
+  - Failover automático com detecção de falha em 3 tentativas consecutivas
+  - Monitoramento de métricas QoS (Jitter, Latência, Packet Loss, MOS Score)
+  - Dashboard de status em tempo real via SignalR
+  - Alertas proativos de capacidade e disponibilidade
+  - Integração com PABX/SIP trunk providers via APIs e webhooks
+  - Histórico de 7 anos de logs de failover e uso
+  - Isolamento multi-tenant por fornecedor
+  fora:
+  - Configuração de hardware PABX (apenas integração via API)
+  - Gerenciamento de ramais individuais (responsabilidade de outro RF)
+  - Tarifação detalhada de chamadas (outro módulo)
+  - Gravação de chamadas (outro módulo)
+  - Interface visual específica (definida no WF)
+entidades:
+- nome: GrupoTronco
+  descricao: Agrupamento lógico de troncos com algoritmo de roteamento e failover configuráveis
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: Tronco
+  descricao: Canal de comunicação telefônica (SIP trunk, linha E1, chip móvel 4G)
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: TroncoHealthCheck
+  descricao: Histórico de verificações de saúde de tronco (latência, packet loss, jitter, MOS)
+  multi_tenant: true
+  soft_delete: false
+  auditoria: false
+- nome: TroncoFailoverLog
+  descricao: Registro de todos os failovers automáticos executados
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: TroncoUso
+  descricao: Estatísticas de uso de tronco (chamadas, duração, custo)
+  multi_tenant: true
+  soft_delete: false
+  auditoria: false
+regras_negocio:
+- id: RN-RF046-001
+  descricao: Grupo Deve Ter Pelo Menos 1 Tronco Ativo
+  tipo: validacao
+  campos_afetados:
+  - ativo
+  - status
+  obrigatorio: true
+  criterio_aceite: Tentativa de criar grupo sem troncos → HTTP 400. Tentativa de desativar último tronco ativo → HTTP 409
+    Conflict
+- id: RN-RF046-002
+  descricao: Prioridade Única por Tronco no Grupo
+  tipo: unicidade
+  campos_afetados:
+  - grupoId
+  - prioridade
+  obrigatorio: true
+  criterio_aceite: Constraint única IX_Tronco_GrupoId_Prioridade. Tentativa de criar tronco com prioridade duplicada → HTTP
+    400
+- id: RN-RF046-003
+  descricao: Soma de Pesos Deve Ser 100% (Weighted Balancing)
+  tipo: validacao
+  campos_afetados:
+  - algoritmoBalanceamento
+  - peso
+  obrigatorio: false
+  criterio_aceite: Se algoritmo WEIGHTED, soma de pesos de troncos ativos deve ser exatamente 100%. Soma ≠ 100% → HTTP 400
+- id: RN-RF046-004
+  descricao: Health Check Mínimo de 10 Segundos
+  tipo: validacao
+  campos_afetados:
+  - tempoHealthCheck
+  obrigatorio: true
+  criterio_aceite: 'Valor < 10s → HTTP 400. Mensagem: ''Intervalo mínimo: 10 segundos'''
+- id: RN-RF046-005
+  descricao: Failover Apenas se Grupo Tiver 2+ Troncos
+  tipo: regra_negocio
+  campos_afetados:
+  - failoverAutomatico
+  - troncos
+  obrigatorio: true
+  criterio_aceite: Grupo com 1 tronco + tentativa de ativar failover → HTTP 400. Desabilita automaticamente se último tronco
+    backup for removido
+- id: RN-RF046-006
+  descricao: LCR Requer Campo Custo Por Minuto Preenchido
+  tipo: validacao
+  campos_afetados:
+  - algoritmoBalanceamento
+  - custoPorMinuto
+  obrigatorio: false
+  criterio_aceite: Se algoritmo LCR, todos os troncos devem ter custoPorMinuto > 0. Tronco sem custo → HTTP 400
+- id: RN-RF046-007
+  descricao: Notificação Imediata em Failover
+  tipo: regra_negocio
+  campos_afetados: []
+  obrigatorio: true
+  criterio_aceite: Failover automático dispara notificação imediata via e-mail + SMS para Administrador e Gestor de Telecom.
+    Severidade ALTA
+- id: RN-RF046-008
+  descricao: Restauração Automática Após 3 Health Checks OK
+  tipo: regra_negocio
+  campos_afetados:
+  - status
+  obrigatorio: true
+  criterio_aceite: Tronco em FALHA só retorna para ATIVO após 3 health checks consecutivos bem-sucedidos. Contador reinicia
+    se qualquer falhar
+- id: RN-RF046-009
+  descricao: Alerta em 80% da Capacidade de Concurrent Calls
+  tipo: regra_negocio
+  campos_afetados:
+  - concurrentCalls
+  - capacidadeMaxima
+  obrigatorio: true
+  criterio_aceite: 'Uso > 80% capacidade → alerta enviado 1x por dia. Mensagem: ''Grupo {nome} próximo da capacidade ({percentual}%)'''
+- id: RN-RF046-010
+  descricao: Rotação de Logs de Health Check (30 Dias)
+  tipo: regra_negocio
+  campos_afetados: []
+  obrigatorio: true
+  criterio_aceite: Hangfire job diário agrega health checks para métricas diárias e deleta logs > 30 dias. Preserva agregados
+    por 7 anos
+- id: RN-RF046-011
+  descricao: Prioridade Sempre Crescente (Sem Saltos)
+  tipo: validacao
+  campos_afetados:
+  - prioridade
+  obrigatorio: true
+  criterio_aceite: Prioridades devem ser sequenciais (1, 2, 3, ...). Tentativa de criar prioridade 3 quando só existe 1 →
+    auto-ajuste para 2
+- id: RN-RF046-012
+  descricao: MOS Mínimo de 3.0 para Tronco Ser Elegível
+  tipo: regra_negocio
+  campos_afetados:
+  - qualidadeMOS
+  obrigatorio: true
+  criterio_aceite: 'Tronco com MOS < 3.0 não usado em roteamento normal (apenas failover extremo). Exceção: se TODOS < 3.0,
+    usa o melhor'
+- id: RN-RF046-013
+  descricao: Bloqueio de Alteração de Grupo com Chamadas Ativas
+  tipo: seguranca
+  campos_afetados:
+  - concurrentCalls
+  obrigatorio: true
+  criterio_aceite: Alterar algoritmo ou remover tronco com concurrentCalls > 0 → HTTP 409 Conflict. Permite override com forceUpdate=true
+- id: RN-RF046-014
+  descricao: Histórico de 7 Anos para Auditoria
+  tipo: regra_negocio
+  campos_afetados: []
+  obrigatorio: true
+  criterio_aceite: Logs de failover, uso e alterações mantidos por 7 anos (LGPD). Particionamento anual. Cold storage após
+    2 anos
+- id: RN-RF046-015
+  descricao: Isolamento Multi-Tenancy por Fornecedor
+  tipo: seguranca
+  campos_afetados:
+  - fornecedorId
+  obrigatorio: true
+  criterio_aceite: Coluna FornecedorId em GrupoTronco e Tronco. Filtro automático por fornecedorId. Acesso cruzado → HTTP
+    403. Row-Level Security
+estados:
+  grupo_tronco:
+  - id: ATIVO
+    descricao: Grupo configurado e operacional
+  - id: INATIVO
+    descricao: Grupo desabilitado (não aceita chamadas)
+  - id: MANUTENCAO
+    descricao: Grupo em manutenção programada
+  tronco:
+  - id: ATIVO
+    descricao: Tronco operacional e disponível
+  - id: INATIVO
+    descricao: Tronco desabilitado manualmente
+  - id: FALHA
+    descricao: Tronco com falha detectada por health check
+  - id: MANUTENCAO
+    descricao: Tronco em manutenção programada
+transicoes:
+  grupo:
+    permitidas:
+    - de: ATIVO
+      para: INATIVO
+      condicao: Manual
+    - de: ATIVO
+      para: MANUTENCAO
+      condicao: Manual
+    - de: INATIVO
+      para: ATIVO
+      condicao: Deve ter ≥1 tronco ativo
+    - de: MANUTENCAO
+      para: ATIVO
+      condicao: Após conclusão de manutenção
+  tronco:
+    permitidas:
+    - de: ATIVO
+      para: FALHA
+      condicao: 3 health checks consecutivos falharam
+    - de: FALHA
+      para: ATIVO
+      condicao: 3 health checks consecutivos OK
+    - de: ATIVO
+      para: INATIVO
+      condicao: Manual (se não for último ativo)
+    - de: INATIVO
+      para: ATIVO
+      condicao: Manual
+    - de: '*'
+      para: MANUTENCAO
+      condicao: Manual
+    - de: MANUTENCAO
+      para: ATIVO
+      condicao: Manual
+eventos_dominio:
+- evento: GrupoTronco.Criado
+  quando: Após criação de grupo
+  payload: GrupoId, Nome, Algoritmo
+- evento: GrupoTronco.Atualizado
+  quando: Após alteração de configuração
+  payload: GrupoId, Alterações
+- evento: Tronco.Adicionado
+  quando: Após adição de tronco ao grupo
+  payload: TroncoId, GrupoId, Prioridade
+- evento: Tronco.StatusAlterado
+  quando: Mudança de status (ATIVO↔FALHA)
+  payload: TroncoId, StatusAntigo, StatusNovo
+- evento: Failover.Executado
+  quando: Após failover automático
+  payload: TroncoOrigemId, TroncoDestinoId, Motivo
+- evento: Tronco.CapacidadeAtingida
+  quando: Uso > 80% capacidade
+  payload: TroncoId, UsoAtual, Capacidade
+- evento: HealthCheck.Falhou
+  quando: Health check com falha
+  payload: TroncoId, Latencia, PacketLoss
+permissoes:
+- codigo: AST.GRUPOS_TRONCOS.LIST
+  descricao: Visualizar lista de grupos
+  roles_autorizadas:
+  - Admin
+  - Gestor Telecom
+  - Operador
+- codigo: AST.GRUPOS_TRONCOS.CREATE
+  descricao: Criar novo grupo
+  roles_autorizadas:
+  - Admin
+  - Gestor Telecom
+- codigo: AST.GRUPOS_TRONCOS.UPDATE
+  descricao: Alterar configuração de grupo
+  roles_autorizadas:
+  - Admin
+  - Gestor Telecom
+- codigo: AST.GRUPOS_TRONCOS.DELETE
+  descricao: Inativar grupo
+  roles_autorizadas:
+  - Admin
+- codigo: AST.TRONCOS.CREATE
+  descricao: Adicionar tronco ao grupo
+  roles_autorizadas:
+  - Admin
+  - Gestor Telecom
+- codigo: AST.GRUPOS_TRONCOS.CONFIGURE_ROUTING
+  descricao: Alterar algoritmo/prioridades
+  roles_autorizadas:
+  - Admin
+  - Gestor Telecom
+- codigo: AST.GRUPOS_TRONCOS.FAILOVER
+  descricao: Forçar failover manualmente
+  roles_autorizadas:
+  - Admin
+  - Gestor Telecom
+- codigo: AST.GRUPOS_TRONCOS.MONITOR
+  descricao: Visualizar dashboard de saúde
+  roles_autorizadas:
+  - Admin
+  - Gestor Telecom
+  - Operador
+- codigo: AST.GRUPOS_TRONCOS.REPORTS
+  descricao: Acessar relatórios de uso
+  roles_autorizadas:
+  - Admin
+  - Gestor Telecom
+endpoints:
+- method: GET
+  route: /api/v1/grupos-troncos
+  descricao: Listar grupos com paginação
+  autenticacao: true
+  authorization_policy: AST.GRUPOS_TRONCOS.LIST
+  request_dto: null
+  response_dto: PaginatedListDto<GrupoTroncoDto>
+- method: GET
+  route: /api/v1/grupos-troncos/{id}
+  descricao: Obter grupo por ID
+  autenticacao: true
+  authorization_policy: AST.GRUPOS_TRONCOS.LIST
+  request_dto: null
+  response_dto: GrupoTroncoDto
+- method: POST
+  route: /api/v1/grupos-troncos
+  descricao: Criar novo grupo
+  autenticacao: true
+  authorization_policy: AST.GRUPOS_TRONCOS.CREATE
+  request_dto: CreateGrupoTroncoCommand
+  response_dto: Guid
+- method: PUT
+  route: /api/v1/grupos-troncos/{id}
+  descricao: Atualizar grupo
+  autenticacao: true
+  authorization_policy: AST.GRUPOS_TRONCOS.UPDATE
+  request_dto: UpdateGrupoTroncoCommand
+  response_dto: void
+- method: DELETE
+  route: /api/v1/grupos-troncos/{id}
+  descricao: Inativar grupo
+  autenticacao: true
+  authorization_policy: AST.GRUPOS_TRONCOS.DELETE
+  request_dto: null
+  response_dto: void
+- method: POST
+  route: /api/v1/grupos-troncos/{id}/troncos
+  descricao: Adicionar tronco ao grupo
+  autenticacao: true
+  authorization_policy: AST.TRONCOS.CREATE
+  request_dto: AddTroncoCommand
+  response_dto: Guid
+- method: PUT
+  route: /api/v1/grupos-troncos/{id}/roteamento
+  descricao: Configurar algoritmo/prioridades
+  autenticacao: true
+  authorization_policy: AST.GRUPOS_TRONCOS.CONFIGURE_ROUTING
+  request_dto: ConfigureRoutingCommand
+  response_dto: void
+- method: GET
+  route: /api/v1/grupos-troncos/{id}/saude
+  descricao: Obter status de saúde em tempo real
+  autenticacao: true
+  authorization_policy: AST.GRUPOS_TRONCOS.MONITOR
+  request_dto: null
+  response_dto: GrupoSaudeDto
+- method: POST
+  route: /api/v1/grupos-troncos/{id}/failover
+  descricao: Executar failover manual
+  autenticacao: true
+  authorization_policy: AST.GRUPOS_TRONCOS.FAILOVER
+  request_dto: ExecuteFailoverCommand
+  response_dto: void
+- method: GET
+  route: /api/v1/grupos-troncos/{id}/relatorios
+  descricao: Obter relatórios de uso
+  autenticacao: true
+  authorization_policy: AST.GRUPOS_TRONCOS.REPORTS
+  request_dto: null
+  response_dto: RelatorioUsoDto
+- method: POST
+  route: /api/v1/webhooks/call-status
+  descricao: Receber eventos de chamadas do PABX
+  autenticacao: true
+  authorization_policy: null
+  request_dto: CallEventDto
+  response_dto: void
+integracoes:
+  internas:
+  - Autenticacao JWT
+  - Multi-Tenancy (FornecedorId)
+  - Auditoria (CreatedAt, CreatedBy, LastModifiedAt, LastModifiedBy)
+  - Internacionalização (i18n - pt-BR, en-US, es-ES)
+  - Central de Funcionalidades (AST.GRUPOS_TRONCOS)
+  externas:
+  - sistema: PABX (Asterisk, FreeSWITCH)
+    tipo: API REST + Webhooks
+    obrigatoria: true
+  - sistema: SIP Trunk Providers
+    tipo: API REST + SIP OPTIONS
+    obrigatoria: true
+  - sistema: Serviço de Notificação (E-mail + SMS)
+    tipo: API REST
+    obrigatoria: true
+  - sistema: SignalR (Monitoramento Real-Time)
+    tipo: WebSocket
+    obrigatoria: true
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  row_level_security: true
+  validacao_entrada: true
+  protecao_sql_injection: true
+  criptografia_em_repouso: true
+rastreabilidade:
+  ucs_esperados:
+  - UC00-listar
+  - UC01-criar
+  - UC02-visualizar
+  - UC03-editar
+  - UC04-inativar
+  - UC05-configurar-roteamento
+  - UC06-monitorar-saude
+  - UC07-executar-failover
+  artefatos_derivados:
+  - MD-RF046.md (5 tabelas principais)
+  - WF-RF046.md (dashboard, formulários)
+  - TC-RF046-BACKEND.yaml (50+ casos de teste)
+  - TC-RF046-FRONTEND.yaml (30+ casos de teste)
+  - TC-RF046-SEGURANCA.yaml (20+ casos de teste)
+  - TC-RF046-E2E.yaml (10+ cenários E2E)
+catalog:
+  crud:
+  - id: RF046-CRUD-01
+    title: Criar grupo de troncos
+    required: true
+  - id: RF046-CRUD-02
+    title: Listar grupos de troncos
+    required: true
+  - id: RF046-CRUD-03
+    title: Visualizar grupo de troncos
+    required: true
+  - id: RF046-CRUD-04
+    title: Atualizar grupo de troncos
+    required: true
+  - id: RF046-CRUD-05
+    title: Inativar grupo de troncos
+    required: true
+  validacoes:
+  - id: RF046-VAL-01
+    title: Validar grupo tem pelo menos 1 tronco ativo
+    required: true
+  - id: RF046-VAL-02
+    title: Validar prioridade única no grupo
+    required: true
+  - id: RF046-VAL-03
+    title: Validar soma de pesos = 100% (se WEIGHTED)
+    required: true
+  - id: RF046-VAL-04
+    title: Validar health check ≥ 10s
+    required: true
+  - id: RF046-VAL-05
+    title: Validar LCR tem custo em todos os troncos
+    required: true
+  seguranca:
+  - id: RF046-SEC-01
+    title: Isolamento multi-tenant por FornecedorId
+    required: true
+  - id: RF046-SEC-02
+    title: Permissões RBAC em todos os endpoints
+    required: true
+  - id: RF046-SEC-03
+    title: Criptografia de endpoints com credenciais
+    required: true
+  - id: RF046-SEC-04
+    title: Auditoria de failovers e alterações críticas
+    required: true
+  regras_negocio_criticas:
+  - id: RF046-RN-01
+    title: Failover automático em < 5 segundos
+    required: true
+  - id: RF046-RN-02
+    title: Health checks a cada 30s sem consumir > 1% banda
+    required: true
+  - id: RF046-RN-03
+    title: Alerta quando uso > 80% capacidade
+    required: true
+  - id: RF046-RN-04
+    title: Notificação imediata em failover (< 30s)
+    required: true
+  - id: RF046-RN-05
+    title: LCR com qualidade mínima MOS ≥ 3.0
+    required: true
+exclusions:
+  documentacao_items:
+  - id: EX-RF046-01
+    justificativa: Configuração de hardware PABX (fora do escopo)
+  - id: EX-RF046-02
+    justificativa: Gerenciamento de ramais (outro RF)
+  - id: EX-RF046-03
+    justificativa: Tarifação detalhada (outro módulo)
+  - id: EX-RF046-04
+    justificativa: Gravação de chamadas (outro módulo)
+historico:
+- versao: '2.0'
+  data: '2025-12-30'
+  autor: Agência ALC - alc.dev.br
+  descricao: Migração v1.0 → v2.0 (separação RF/RL completa). YAML estruturado 100% sincronizado com RF046.md
+- versao: '1.0'
+  data: '2025-01-14'
+  autor: '-'
+  descricao: Versão inicial

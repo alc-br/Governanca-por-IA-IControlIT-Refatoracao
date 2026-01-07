@@ -1,0 +1,674 @@
+# =============================================
+# RL-RF046 - Referência ao Legado: Gestão de Grupos de Troncos
+# Versão: 1.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF046
+titulo: "Gestão de Grupos de Troncos"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "IControlIT v1.0"
+  arquitetura: "Monolítica WebForms com lógica no code-behind"
+  banco_dados: "SQL Server (sem multi-tenancy real, usa Id_Fornecedor)"
+  pabx: "Asterisk (configuração manual via arquivos .conf)"
+  multi_tenant: false
+  auditoria: "none"
+
+# ==============================================================================
+# REFERÊNCIAS AO LEGADO COM DESTINO OBRIGATÓRIO
+# ==============================================================================
+
+referencias:
+  # ----------------------------------------------------------------------------
+  # TELAS ASPX
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF046-001"
+    tipo: "tela"
+    nome: "CadastroTroncos.aspx"
+    caminho: "ic1_legado/IControlIT/Telecom/CadastroTroncos.aspx"
+    descricao: |
+      CRUD básico de troncos (criar, editar, listar, inativar).
+      Campos: Descricao, Operadora, EnderecoSIP, Ativo, Id_Fornecedor.
+
+      Regras implícitas:
+      - Validação inexistente de formato SIP (aceita qualquer string)
+      - Inativação não bloqueia uso imediato (continua em roteamento até reiniciar PABX)
+      - Sem validação de capacidade (concurrent calls)
+      - Sem priorização (todos troncos tratados como iguais)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por tela moderna com:
+      - Validação de formato SIP URI
+      - Integração real-time com PABX (desabilitação imediata sem reiniciar)
+      - Configuração de capacidade, prioridade, peso, custo
+      - Organização em grupos hierárquicos
+
+    documentacao_item_relacionado: "RN-RF046-001, RN-RF046-002, RN-RF046-006"
+    uc_relacionado: "UC01-criar, UC03-editar, UC04-inativar"
+    complexidade: "média"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF046-002"
+    tipo: "tela"
+    nome: "ConfiguracaoRoteamento.aspx"
+    caminho: "ic1_legado/IControlIT/Telecom/ConfiguracaoRoteamento.aspx"
+    descricao: |
+      Configurar qual tronco usar para chamadas saintes.
+      Campos: TroncoId (dropdown), Aplicar (button).
+
+      Comportamentos implícitos:
+      - Permite selecionar apenas UM tronco (sem redundância/failover)
+      - Clicar "Aplicar" REINICIA PABX (downtime 2-5 min, derruba chamadas ativas)
+      - Sem validação se tronco está disponível (pode configurar tronco offline)
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por configuração de roteamento inteligente:
+      - Múltiplos troncos em grupo com failover automático
+      - 5 algoritmos (Round-Robin, Least-Used, Weighted, Priority, LCR)
+      - Aplicação em tempo real via AMI (sem downtime, sem derrubar chamadas)
+      - Validação de saúde antes de aplicar
+
+    documentacao_item_relacionado: "RN-RF046-003, RN-RF046-005, RN-RF046-013"
+    uc_relacionado: "UC05-configurar-roteamento"
+    complexidade: "alta"
+    risco_migracao: "médio"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF046-003"
+    tipo: "webservice"
+    nome: "TroncoService.asmx - GetTroncoAtivo()"
+    caminho: "ic1_legado/IControlIT/Telecom/WebServices/TroncoService.asmx"
+    descricao: |
+      Retorna ID do tronco configurado atualmente.
+
+      Lógica:
+      - Sempre retorna 1 (hardcoded)
+      - Não consulta configuração real do PABX
+      - Não verifica se tronco 1 está disponível
+      - Resultado: informação exibida não reflete realidade
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST GET /api/v1/grupos-troncos/{id}/saude
+      que retorna status real-time de todos os troncos do grupo (ATIVO, FALHA, MANUTENCAO)
+      com métricas de saúde (latência, packet loss, jitter, MOS).
+
+    documentacao_item_relacionado: "RN-RF046-008, RN-RF046-012"
+    uc_relacionado: "UC06-monitorar-saude"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF046-004"
+    tipo: "webservice"
+    nome: "TroncoService.asmx - SetTroncoAtivo(troncoId)"
+    caminho: "ic1_legado/IControlIT/Telecom/WebServices/TroncoService.asmx"
+    descricao: |
+      Altera tronco ativo.
+
+      Lógica:
+      - Escreve extensions.conf do Asterisk
+      - Executa "asterisk -rx 'core reload'" (BLOQUEIA por 30-60s)
+      - Derruba todas as chamadas ativas durante reload
+      - Interface web fica travada durante execução
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST PUT /api/v1/grupos-troncos/{id}/roteamento
+      que aplica alteração via AMI (Asterisk Manager Interface) sem reinicialização.
+      Execução assíncrona (não bloqueia). Não derruba chamadas ativas.
+
+    documentacao_item_relacionado: "RN-RF046-013"
+    uc_relacionado: "UC05-configurar-roteamento"
+    complexidade: "alta"
+    risco_migracao: "médio"
+    prioridade: 1
+
+  - id: "LEG-RF046-005"
+    tipo: "webservice"
+    nome: "TroncoService.asmx - ListarTroncos(fornecedorId)"
+    caminho: "ic1_legado/IControlIT/Telecom/WebServices/TroncoService.asmx"
+    descricao: |
+      Lista troncos de um fornecedor.
+
+      Retorna apenas: Descricao, Ativo (sem métricas de saúde, uso, qualidade).
+
+    destino: "substituido"
+    justificativa: |
+      Substituído por endpoint REST GET /api/v1/grupos-troncos
+      que retorna grupos com todos os troncos incluindo:
+      - Status atual (ATIVO, FALHA, MANUTENCAO)
+      - Concurrent calls atual vs capacidade
+      - Métricas de qualidade (latência, packet loss, jitter, MOS)
+      - Último failover (timestamp, motivo)
+
+    documentacao_item_relacionado: "RN-RF046-009, RN-RF046-012"
+    uc_relacionado: "UC00-listar, UC02-visualizar"
+    complexidade: "média"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF046-006"
+    tipo: "stored_procedure"
+    nome: "Nenhuma (queries SQL inline no code-behind)"
+    caminho: "N/A"
+    descricao: |
+      Não há stored procedures relacionadas a roteamento.
+      Queries SQL executadas diretamente no code-behind VB.NET:
+
+      Exemplo:
+      Dim query As String = "SELECT * FROM Troncos WHERE Id_Fornecedor = " & fornecedorId & " AND Ativo = 1"
+
+      Problema: Vulnerável a SQL Injection se fornecedorId não for validado.
+
+    destino: "descartado"
+    justificativa: |
+      Lógica migrada para Application Layer (CQRS Queries) com ORM (Entity Framework Core).
+      Validação automática via FluentValidation. SQL Injection impossível.
+
+    documentacao_item_relacionado: "RN-RF046-015"
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 5
+
+  # ----------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF046-007"
+    tipo: "tabela"
+    nome: "dbo.Troncos"
+    caminho: "Database/dbo.Troncos"
+    descricao: |
+      Tabela legada de troncos:
+
+      Campos:
+      - Id INT IDENTITY PRIMARY KEY
+      - Descricao VARCHAR(200)
+      - Operadora VARCHAR(100)
+      - EnderecoSIP VARCHAR(500)
+      - Ativo BIT DEFAULT 1
+      - Id_Fornecedor INT
+
+      Problemas:
+      - Falta Foreign Key para Id_Fornecedor (dados órfãos possíveis)
+      - Campos sem NOT NULL (registros incompletos possíveis)
+      - Sem auditoria (quem criou, quando, quem alterou)
+      - Falta campos essenciais: Prioridade, Peso, CustoPorMinuto, CapacidadeMaxima, UsoAtual, QualidadeMOS, LatenciaMedia, Status
+
+    destino: "substituido"
+    justificativa: |
+      Redesenhado em:
+      - Tabela GrupoTronco (agrupamento lógico)
+      - Tabela Tronco (com todos os campos necessários)
+      - Multi-tenancy (FornecedorId com FK)
+      - Auditoria completa (CreatedAt, CreatedBy, LastModifiedAt, LastModifiedBy)
+      - Row-Level Security
+
+    documentacao_item_relacionado: "RN-RF046-001, RN-RF046-002, RN-RF046-015"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # REGRAS IMPLÍCITAS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF046-008"
+    tipo: "regra_negocio"
+    nome: "Roteamento Sempre Usa Tronco ID 1"
+    caminho: "ic1_legado/IControlIT/App_Code/Helpers/TroncoHelper.vb - Linha 45-50"
+    descricao: |
+      Regra implícita no código VB.NET:
+
+      Public Shared Function GetTroncoParaChamada(numero As String) As Integer
+          Return 1 ' ❌ Hardcoded - sempre retorna tronco ID 1
+      End Function
+
+      - Independente do número destino, operadora ou carga atual, sempre usa tronco ID 1
+      - Não considera se tronco 1 está disponível ou sobrecarregado
+      - Resultado: tronco 1 sempre saturado, outros troncos ociosos
+
+    destino: "substituido"
+    justificativa: |
+      Regra absurda eliminada. Substituído por algoritmos de roteamento inteligente:
+      - Round-Robin (distribuição igualitária)
+      - Least-Used (menor uso atual)
+      - Weighted (ponderado por peso)
+      - Priority (prioridade estrita)
+      - LCR (menor custo com qualidade mínima MOS ≥ 3.0)
+
+    documentacao_item_relacionado: "RN-RF046-006, RN-RF046-012"
+    uc_relacionado: "UC05-configurar-roteamento"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF046-009"
+    tipo: "regra_negocio"
+    nome: "Desabilitar Tronco Não Impede Uso Imediato"
+    caminho: "ic1_legado/IControlIT/Telecom/CadastroTroncos.aspx.vb - Linha 120-130"
+    descricao: |
+      Ao desmarcar checkbox Ativo, sistema apenas atualiza campo no banco.
+      Roteamento do PABX não é notificado.
+      Tronco continua sendo usado até que PABX seja reiniciado manualmente.
+
+      Impacto:
+      - Operador marca tronco como inativo (em manutenção)
+      - Chamadas continuam sendo enviadas para esse tronco
+      - Chamadas falham até reiniciar PABX (janela de 30-60 min)
+
+    destino: "substituido"
+    justificativa: |
+      Integração real-time com PABX via AMI.
+      Desabilitação de tronco imediatamente atualiza roteamento sem reinicialização.
+      Chamadas param de ser enviadas para tronco inativo em < 5 segundos.
+
+    documentacao_item_relacionado: "RN-RF046-013"
+    uc_relacionado: "UC04-inativar"
+    complexidade: "média"
+    risco_migracao: "médio"
+    prioridade: 2
+
+  - id: "LEG-RF046-010"
+    tipo: "regra_negocio"
+    nome: "Alteração de Roteamento Derruba Chamadas Ativas"
+    caminho: "ic1_legado/IControlIT/Telecom/ConfiguracaoRoteamento.aspx.vb - Linha 80-95"
+    descricao: |
+      Alteração de roteamento exige reload completo do Asterisk:
+
+      Private Sub AplicarRoteamento(troncoId As Integer)
+          EscreverDialplan(troncoId)
+          Shell("asterisk -rx 'core reload'")  ' ❌ Derruba chamadas ativas!
+      End Sub
+
+      - Todas as chamadas em andamento são DERRUBADAS
+      - Downtime de 2-5 minutos
+
+    destino: "substituido"
+    justificativa: |
+      Aplicação em tempo real via AMI sem derrubar chamadas.
+      Apenas novos canais usam novo roteamento.
+      Chamadas ativas continuam no tronco original até finalizar.
+      Zero downtime.
+
+    documentacao_item_relacionado: "RN-RF046-013"
+    uc_relacionado: "UC05-configurar-roteamento"
+    complexidade: "alta"
+    risco_migracao: "médio"
+    prioridade: 1
+
+  - id: "LEG-RF046-011"
+    tipo: "regra_negocio"
+    nome: "Sem Detecção Proativa de Falhas"
+    caminho: "Sistema legado não implementa health checks"
+    descricao: |
+      Sistema não verifica se troncos estão operacionais.
+
+      Falhas detectadas apenas quando:
+      1. Cliente tenta fazer chamada
+      2. Chamada falha
+      3. Cliente reclama para suporte
+      4. Suporte investiga e identifica tronco offline
+
+      Tempo Médio de Detecção: 15-30 minutos
+      Tempo Médio de Resolução: 30-60 minutos
+
+    destino: "substituido"
+    justificativa: |
+      Health checks automáticos a cada 30s via:
+      - SIP OPTIONS (troncos SIP)
+      - SNMP GET (troncos E1)
+      - Ping Test (troncos móvel 4G)
+
+      Detecção de falha em 90s (3 × 30s).
+      Failover automático em < 5s.
+      Redução de 98% no tempo de detecção e resolução.
+
+    documentacao_item_relacionado: "RN-RF046-004, RN-RF046-007, RN-RF046-008"
+    uc_relacionado: "UC06-monitorar-saude, UC07-executar-failover"
+    complexidade: "alta"
+    risco_migracao: "médio"
+    prioridade: 1
+
+  - id: "LEG-RF046-012"
+    tipo: "regra_negocio"
+    nome: "LCR Manual e Desatualizado"
+    caminho: "Planilha Excel: Tarifas_Operadoras_2024.xlsx"
+    descricao: |
+      Custos por minuto mantidos manualmente em planilha Excel.
+      Planilha desatualizada (última atualização: 6 meses atrás).
+      Operador consulta planilha e configura tronco "mais barato" manualmente.
+
+      Não considera:
+      - Qualidade de voz (MOS)
+      - Disponibilidade atual do tronco
+      - Capacidade restante
+      - Horário (pico vs fora de pico)
+
+      Resultado:
+      - Frequentemente usa tronco mais caro (planilha desatualizada)
+      - Economia estimada perdida: 35-40% da conta telefônica
+
+    destino: "substituido"
+    justificativa: |
+      LCR automático em tempo real:
+      - Integração com APIs de operadoras (custos atualizados)
+      - Considera qualidade mínima (MOS ≥ 3.0)
+      - Considera disponibilidade e capacidade atual
+      - Economia real de 35-40% sem sacrificar qualidade
+
+    documentacao_item_relacionado: "RN-RF046-006, RN-RF046-012"
+    uc_relacionado: "UC05-configurar-roteamento"
+    complexidade: "alta"
+    risco_migracao: "médio"
+    prioridade: 1
+
+# ==============================================================================
+# BANCOS LEGADOS MAPEADOS
+# ==============================================================================
+
+bancos_legados:
+  - nome: "IControlIT_DB"
+    servidor: "SQL-LEGADO-01"
+    tabelas_relacionadas:
+      - "Troncos"
+    destino: "CONSOLIDADO"
+    justificativa: "Migrado para banco único com multi-tenancy (Row-Level Security por FornecedorId)"
+    banco_moderno: "IControlIT.db (SQLite dev) / SQL Server moderno (prod)"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF046-001"
+    titulo: "Ausência de Health Checks Automáticos"
+    severidade: "CRÍTICA"
+    descricao: |
+      Sistema não verifica disponibilidade de troncos proativamente.
+      Falhas detectadas apenas quando cliente reclama.
+      Tempo médio de detecção: 15-30 minutos.
+    impacto: "Downtime prolongado. Clientes insatisfeitos. SLA não cumprido."
+    solucao_moderna: "Health checks automáticos a cada 30s com failover automático em < 5s. Uptime ≥ 99.9%."
+
+  - id: "PROB-RF046-002"
+    titulo: "Roteamento Estático Sem Inteligência"
+    severidade: "ALTA"
+    descricao: |
+      Sempre usa tronco ID 1 (hardcoded). Sem balanceamento de carga.
+      Sem failover automático. Alterações exigem reinicialização (downtime 2-5 min).
+    impacto: "Tronco 1 sempre saturado. Outros troncos ociosos. Reinicializações derrubam chamadas ativas."
+    solucao_moderna: "5 algoritmos de balanceamento. Failover automático. Aplicação em tempo real sem downtime."
+
+  - id: "PROB-RF046-003"
+    titulo: "Sem Monitoramento de Qualidade"
+    severidade: "ALTA"
+    descricao: |
+      Não mede latência, packet loss, jitter ou MOS Score.
+      Impossível identificar degradação de qualidade antes que chamadas sejam afetadas.
+    impacto: "Qualidade ruim não detectada. Clientes insatisfeitos."
+    solucao_moderna: "Monitoramento contínuo de QoS. Alerta quando MOS < 3.0. Dashboard real-time via SignalR."
+
+  - id: "PROB-RF046-004"
+    titulo: "LCR Manual e Desatualizado"
+    severidade: "ALTA"
+    descricao: |
+      Custos mantidos em planilha Excel desatualizada (6 meses).
+      Roteamento manual por operador. Não considera qualidade.
+    impacto: "Economia de 35-40% perdida. Usando troncos caros desnecessariamente."
+    solucao_moderna: "LCR automático em tempo real com integração de APIs de operadoras. Considera qualidade mínima (MOS ≥ 3.0)."
+
+  - id: "PROB-RF046-005"
+    titulo: "Sem Histórico de Falhas"
+    severidade: "MÉDIA"
+    descricao: |
+      Não registra quando tronco falhou, quanto tempo ficou indisponível.
+      Impossível calcular SLA ou MTBF. Impossível análise de tendências.
+    impacto: "Sem visibilidade de confiabilidade. Impossível planejar redundância ou trocar fornecedor."
+    solucao_moderna: "Histórico de 7 anos de logs de failover. Cálculo automático de SLA, MTBF, MTTR. Relatórios mensais."
+
+  - id: "PROB-RF046-006"
+    titulo: "Auditoria Inexistente"
+    severidade: "MÉDIA"
+    descricao: |
+      Não registra quem criou tronco, quem alterou roteamento, quando.
+      Impossível rastrear alterações críticas de configuração.
+    impacto: "Conformidade comprometida. Impossível investigar incidentes."
+    solucao_moderna: "Auditoria completa com CreatedAt, CreatedBy, LastModifiedAt, LastModifiedBy. Retenção 7 anos (LGPD)."
+
+  - id: "PROB-RF046-007"
+    titulo: "Multi-Tenancy Inadequado"
+    severidade: "MÉDIA"
+    descricao: |
+      Usa Id_Fornecedor mas sem Foreign Key, sem Row-Level Security.
+      Possível vazamento de dados entre fornecedores.
+    impacto: "Risco de segurança. Fornecedor A pode acessar troncos de Fornecedor B (não testado mas possível)."
+    solucao_moderna: "Multi-tenancy real com FornecedorId + FK + Row-Level Security. Isolamento garantido por banco."
+
+  - id: "PROB-RF046-008"
+    titulo: "Integração PABX Obsoleta (Arquivos .conf)"
+    severidade: "ALTA"
+    descricao: |
+      Integração via escrita de arquivos extensions.conf.
+      Exige reinicialização do Asterisk (derruba chamadas ativas).
+      Alterações levam 2-5 minutos.
+    impacto: "Downtime planejado sempre que alterar roteamento. Chamadas derrubadas."
+    solucao_moderna: "Integração via AMI (Asterisk Manager Interface). Aplicação em tempo real sem reinicialização. Zero downtime."
+
+# ==============================================================================
+# GAP ANALYSIS
+# ==============================================================================
+
+gap_analysis:
+  - item: "Agrupamento de Troncos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não possui conceito de grupo. Moderno: grupos hierárquicos por região/operadora/tecnologia."
+
+  - item: "Algoritmos de Balanceamento"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado sempre usa tronco fixo. Moderno: 5 algoritmos (Round-Robin, Least-Used, Weighted, Priority, LCR)."
+
+  - item: "Health Checks Automáticos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não verifica saúde. Moderno: a cada 30s via SIP OPTIONS/SNMP/Ping."
+
+  - item: "Failover Automático"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: failover manual (30-60 min). Moderno: automático (< 5s)."
+
+  - item: "Monitoramento de Qualidade (MOS, Latência, Jitter)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não mede. Moderno: monitoramento contínuo com dashboard real-time."
+
+  - item: "Dashboard Tempo Real"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não tem. Moderno: SignalR com atualização a cada 5s."
+
+  - item: "Alertas Proativos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não alerta. Moderno: alerta em 80% capacidade, falha de tronco."
+
+  - item: "LCR Automático"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado: manual via Excel desatualizado. Moderno: automático em tempo real com qualidade mínima."
+
+  - item: "Histórico de Falhas"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não registra. Moderno: 7 anos de logs (LGPD)."
+
+  - item: "Relatórios de Uso"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não gera. Moderno: mensal automático com economia LCR."
+
+  - item: "Integração PABX"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: arquivos .conf (reinicialização). Moderno: API REST + AMI (sem downtime)."
+
+  - item: "Auditoria"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não registra alterações. Moderno: auditoria completa (quem, quando, o que mudou)."
+
+# ==============================================================================
+# DECISÕES DE MODERNIZAÇÃO
+# ==============================================================================
+
+decisoes_modernizacao:
+  - decisao: "Descarte completo do modelo legado de roteamento"
+    motivo: |
+      Lógica legado fundamentalmente inadequada (sempre usa tronco ID 1).
+      Impossível evoluir incrementalmente. Reescrever do zero é mais rápido e seguro.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Implementar health checks como prioridade máxima"
+    motivo: |
+      Principal problema do legado: detecção tardia de falhas (15-30 min).
+      Impacto direto no SLA e satisfação do cliente.
+      Failover automático depende de health checks funcionando.
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "LCR com qualidade mínima (MOS ≥ 3.0)"
+    motivo: |
+      Legado: roteamento apenas por custo (ignorava qualidade).
+      Resultado: chamadas baratas mas com péssima qualidade (clientes insatisfeitos).
+      Moderno: equilibrar custo E qualidade.
+    impacto: "médio"
+    data: "2025-12-30"
+
+  - decisao: "Integração real-time com PABX (sem downtime)"
+    motivo: |
+      Legado: cada alteração derruba chamadas ativas (2-5 min downtime).
+      Inaceitável em ambiente de produção moderno.
+      Asterisk suporta reload parcial via AMI.
+    impacto: "médio"
+    data: "2025-12-30"
+
+# ==============================================================================
+# RISCOS DE MIGRAÇÃO
+# ==============================================================================
+
+riscos_migracao:
+  - risco: "PABX não suportar reload sem reinicialização"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      Validar AMI funciona em homologação.
+      Ter plano B com janela de manutenção.
+
+  - risco: "Health checks consumirem banda excessiva"
+    impacto: "médio"
+    probabilidade: "média"
+    mitigacao: |
+      Limitar health check a 1% banda.
+      Monitorar consumo em produção.
+
+  - risco: "Falso positivo em health check (tronco OK mas detectado como falho)"
+    impacto: "alto"
+    probabilidade: "média"
+    mitigacao: |
+      Exigir 3 falhas consecutivas para marcar como FALHA.
+      Logs detalhados para análise.
+
+  - risco: "LCR escolher tronco barato mas com qualidade ruim"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: |
+      Filtro obrigatório MOS ≥ 3.0.
+      Monitorar MOS em tempo real.
+
+  - risco: "Failover automático causar oscilação (flapping)"
+    impacto: "médio"
+    probabilidade: "média"
+    mitigacao: |
+      Exigir 3 health checks OK consecutivos para restaurar.
+      Cooldown de 2 minutos.
+
+  - risco: "Dados de troncos legados incompletos/incorretos"
+    impacto: "médio"
+    probabilidade: "alta"
+    mitigacao: |
+      Validação de dados antes de migração.
+      Script de cleanup.
+
+# ==============================================================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# ==============================================================================
+
+rastreabilidade:
+  - elemento_legado: "CadastroTroncos.aspx"
+    referencia_rf: "RF046 - Seção 4 (Funcionalidades)"
+    referencia_uc: "UC01-criar, UC03-editar"
+    status: "SUBSTITUÍDO"
+
+  - elemento_legado: "ConfiguracaoRoteamento.aspx"
+    referencia_rf: "RF046 - Seção 4.3 (Roteamento Inteligente)"
+    referencia_uc: "UC05-configurar-roteamento"
+    status: "SUBSTITUÍDO"
+
+  - elemento_legado: "TroncoService.asmx.GetTroncoAtivo()"
+    referencia_rf: "RF046 - Seção 12 (API Endpoints)"
+    referencia_uc: "UC00-listar"
+    status: "SUBSTITUÍDO"
+
+  - elemento_legado: "TroncoService.asmx.SetTroncoAtivo()"
+    referencia_rf: "RF046 - Seção 12 (API PUT)"
+    referencia_uc: "UC05-configurar-roteamento"
+    status: "SUBSTITUÍDO"
+
+  - elemento_legado: "TroncoHelper.vb.GetTroncoParaChamada()"
+    referencia_rf: "RN-RF046-006 (LCR)"
+    referencia_uc: "UC05-configurar-roteamento"
+    status: "SUBSTITUÍDO"
+
+  - elemento_legado: "Tabela dbo.Troncos"
+    referencia_rf: "MD-RF046.md - Tabela Tronco"
+    referencia_uc: null
+    status: "SUBSTITUÍDO"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 12
+  itens_assumidos: 0
+  itens_substituidos: 11
+  itens_descartados: 1
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+
+# ==============================================================================
+# CHANGELOG
+# ==============================================================================
+
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Criação de RL-RF046.yaml com 100% dos itens COM destino definido (ASSUMIDO/SUBSTITUÍDO/DESCARTADO)"
+    autor: "Agência ALC - alc.dev.br"

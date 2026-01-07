@@ -347,7 +347,7 @@ Contrato: [MANUTENCAO/EXECUCAO-BACKEND/EXECUCAO-FRONTEND]
 3. Usar este checklist como guia
 4. Identificar gaps
 5. Gerar relatório GAPS-RFXXX-*.md
-6. Salvar em rf/<fase>/<epic>/<RF>/
+6. Salvar em documentacao/<fase>/<epic>/<RF>/
 7. Declarar status: CONFORME / NÃO CONFORME / CONFORME COM RESSALVAS
 8. Se gaps críticos existirem → Executar correções sob outro contrato
 9. Re-auditar após correções

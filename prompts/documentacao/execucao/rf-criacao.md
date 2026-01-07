@@ -11,11 +11,11 @@ Seguir D:\IC2\CLAUDE.md.
 ## PRE-REQUISITOS BLOQUEANTES:
 
 1. RF DEVE ser NOVO (sem legado ASPX/WebServices/SQL)
-2. Pasta rf/[Fase]/[EPIC]/RFXXX/ DEVE existir
+2. Pasta documentacao/[Fase]/[EPIC]/RFXXX/ DEVE existir
 3. Templates RF.md e RF.yaml DEVEM estar acessiveis
 4. STATUS.yaml NAO deve existir (RF novo)
 
-**Se RF tem legado:** Usar rf-rl-criacao.md (cria RF + RL juntos)
+**Se RF tem legado:** Usar documentacao-rl-criacao.md (cria RF + RL juntos)
 
 ---
 
@@ -42,7 +42,7 @@ Seguir D:\IC2\CLAUDE.md.
    - Secao 11: Integracoes Obrigatorias (i18n, auditoria, RBAC, Central)
 
 3. **Gerar RFXXX.yaml:**
-   - rf: { id, nome, versao, data, fase, epic, status, tipo_rf }
+   - documentacao: { id, nome, versao, data, fase, epic, status, tipo_rf }
    - descricao
    - escopo
    - entidades
@@ -129,5 +129,5 @@ Seguir D:\IC2\CLAUDE.md.
 ## IMPORTANTE:
 
 - Este prompt cria RF NOVO (sem legado)
-- Se RF tem legado (ASPX/WebServices/SQL), usar rf-rl-criacao.md
+- Se RF tem legado (ASPX/WebServices/SQL), usar documentacao-rl-criacao.md
 - Commit e push: responsabilidade do usuario (nao automatizado)

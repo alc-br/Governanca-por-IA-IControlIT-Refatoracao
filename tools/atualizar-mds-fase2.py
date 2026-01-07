@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 # Diretório base
-BASE_DIR = Path("d:/IC2/docs/rf/Fase-2-Servicos-Essenciais")
+BASE_DIR = Path("d:/IC2/docs/documentacao/Fase-2-Servicos-Essenciais")
 
 # Contadores
 arquivos_processados = 0

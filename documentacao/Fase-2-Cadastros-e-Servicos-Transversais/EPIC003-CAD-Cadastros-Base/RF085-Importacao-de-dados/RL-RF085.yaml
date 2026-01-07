@@ -1,0 +1,536 @@
+rf_id: RF085
+rf_title: "Importação de Dados"
+versao_governanca: "2.0"
+data_migracao: "2025-12-31"
+
+# ==============================================================================
+# ITENS LEGADO RASTREADOS
+# ==============================================================================
+
+referencias:
+  # ------------------------------------------------------------------------------
+  # TELAS ASPX
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF085-001"
+    tipo: "tela"
+    nome: "ImportacaoDados.aspx"
+    caminho: "ic1_legado/IControlIT/Importacao/ImportacaoDados.aspx"
+    descricao: |
+      Tela principal de importação manual com upload de arquivo, seleção de tipo,
+      execução síncrona e grid de resultados.
+    regras_implicitas:
+      - "Arquivo limitado a 50MB (hard-coded)"
+      - "Apenas extensões .csv e .xls permitidas"
+      - "Processamento síncrono na thread da requisição HTTP"
+      - "Resultado salvo em Session para exibir em modal"
+    destino: "substituido"
+    justificativa: "Tela completamente redesenhada em Angular 19 com upload drag-and-drop, validação assíncrona e preview"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 2 (Funcionalidades F01, F11)"
+      uc_moderno: "UC02-RF085 (Executar importação manual)"
+    migracao_moderna:
+      componente_angular: "imports-create.component.ts"
+      rota_frontend: "/configuracoes/importacao/manual"
+
+  - id: "LEG-RF085-002"
+    tipo: "tela"
+    nome: "ListaImportacoes.aspx"
+    caminho: "ic1_legado/IControlIT/Importacao/ListaImportacoes.aspx"
+    descricao: |
+      Grid com histórico de importações, filtros por data e tipo,
+      paginação server-side 50 registros/página.
+    regras_implicitas:
+      - "Query SQL direta sem ORM"
+      - "Ordenação fixa por Data_Importacao DESC"
+      - "Link 'Ver Erros' abre popup"
+    destino: "substituido"
+    justificativa: "Lista moderna com Angular Material Table, paginação client-side, ordenação customizável"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 2 (Funcionalidade F08)"
+      uc_moderno: "UC03-RF085 (Visualizar histórico)"
+    migracao_moderna:
+      componente_angular: "imports-history.component.ts"
+      rota_frontend: "/configuracoes/importacao/historico"
+      endpoint_moderno: "GET /api/imports/history"
+
+  - id: "LEG-RF085-003"
+    tipo: "tela"
+    nome: "DetalheImportacao.aspx"
+    caminho: "ic1_legado/IControlIT/Importacao/DetalheImportacao.aspx"
+    descricao: |
+      Detalhes de importação específica com grid de erros linha a linha
+      e botão de rollback sem confirmação adicional.
+    regras_implicitas:
+      - "Rollback via sp_DesfazerImportacao (DELETE direto)"
+      - "Sem validação de tempo para rollback"
+      - "Botão executa DELETE sem confirmação"
+    destino: "substituido"
+    justificativa: "Tela moderna com tabs, confirmação antes de rollback, validação de tempo máximo"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 2 (Funcionalidades F08, F09, F10)"
+      uc_moderno: "UC03-RF085 (Visualizar histórico com detalhes)"
+    migracao_moderna:
+      componente_angular: "imports-detail.component.ts"
+      rota_frontend: "/configuracoes/importacao/{id}"
+      endpoint_moderno: "GET /api/imports/{id}, POST /api/imports/{id}/rollback"
+
+  - id: "LEG-RF085-004"
+    tipo: "tela"
+    nome: "ConfiguracaoImportacao.aspx"
+    caminho: "ic1_legado/IControlIT/Importacao/ConfiguracaoImportacao.aspx"
+    descricao: |
+      Configuração rudimentar de mapeamento com grid editável,
+      sem suporte a transformações ou validações customizadas.
+    regras_implicitas:
+      - "Mapeamento salvo como XML em tb_ConfiguracaoImportacao"
+      - "Nenhuma validação de tipo de dados"
+      - "Sem preview de aplicação do mapeamento"
+    destino: "substituido"
+    justificativa: "Sistema moderno de templates com editor visual, transformações e preview em tempo real"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 2 (Funcionalidade F01)"
+      uc_moderno: "UC01-RF085 (Criar/editar template)"
+    migracao_moderna:
+      componente_angular: "import-template-form.component.ts"
+      rota_frontend: "/configuracoes/importacao/templates"
+      endpoint_moderno: "POST /api/imports/templates, PUT /api/imports/templates/{id}"
+
+  # ------------------------------------------------------------------------------
+  # WEBSERVICES
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF085-005"
+    tipo: "webservice"
+    nome: "WSImportacao.asmx - ImportarArquivo"
+    caminho: "ic1_legado/IControlIT/WebService/WSImportacao.asmx.vb"
+    metodos:
+      - nome: "ImportarArquivo"
+        parametros: "arquivo As Byte(), tipo As String"
+        retorno: "Integer (ID da importação ou -1)"
+    descricao: |
+      Salva arquivo temporário em disco, chama stored procedure conforme tipo,
+      registra resultado e deleta arquivo temporário.
+    destino: "substituido"
+    justificativa: "Substituído por REST API moderna com autenticação JWT, upload multipart/form-data, processamento assíncrono"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 6 (API Endpoints)"
+      endpoint_moderno: "POST /api/imports"
+    migracao_moderna:
+      command_cqrs: "ExecuteImportCommand"
+      handler: "ExecuteImportCommandHandler"
+      validacao: "ExecuteImportCommandValidator"
+
+  - id: "LEG-RF085-006"
+    tipo: "webservice"
+    nome: "WSImportacao.asmx - ListarImportacoes"
+    caminho: "ic1_legado/IControlIT/WebService/WSImportacao.asmx.vb"
+    metodos:
+      - nome: "ListarImportacoes"
+        parametros: "clienteId As Integer"
+        retorno: "DataTable"
+    descricao: |
+      Query SQL direta sem paginação, retorna todas as linhas de tb_ImportacaoDados.
+    destino: "substituido"
+    justificativa: "Substituído por Query CQRS com paginação, filtros e ordenação"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 6 (API Endpoints)"
+      endpoint_moderno: "GET /api/imports/history"
+    migracao_moderna:
+      query_cqrs: "GetImportHistoryQuery"
+      handler: "GetImportHistoryQueryHandler"
+
+  - id: "LEG-RF085-007"
+    tipo: "webservice"
+    nome: "WSImportacao.asmx - DesfazerImportacao"
+    caminho: "ic1_legado/IControlIT/WebService/WSImportacao.asmx.vb"
+    metodos:
+      - nome: "DesfazerImportacao"
+        parametros: "idImportacao As Integer"
+        retorno: "Boolean"
+    descricao: |
+      Executa sp_DesfazerImportacao que deleta registros sem validações.
+    destino: "substituido"
+    justificativa: "Substituído por endpoint REST com validação de CanRollback, transação e auditoria"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 6 (API Endpoints)"
+      endpoint_moderno: "POST /api/imports/{id}/rollback"
+    migracao_moderna:
+      command_cqrs: "RollbackImportCommand"
+      handler: "RollbackImportCommandHandler"
+
+  - id: "LEG-RF085-008"
+    tipo: "webservice"
+    nome: "WSImportacao.asmx - ValidarMapeamento"
+    caminho: "ic1_legado/IControlIT/WebService/WSImportacao.asmx.vb"
+    metodos:
+      - nome: "ValidarMapeamento"
+        parametros: "templateId As Integer, primeirasLinhas As DataTable"
+        retorno: "DataTable (Status OK/ERRO por linha)"
+    descricao: |
+      Aplica conversões básicas de tipo e valida campos obrigatórios nas primeiras 10 linhas.
+    destino: "substituido"
+    justificativa: "Substituído por endpoint de preview com validações multi-camadas e sugestões"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 6 (API Endpoints)"
+      endpoint_moderno: "POST /api/imports/preview"
+    migracao_moderna:
+      command_cqrs: "PreviewImportCommand"
+      handler: "PreviewImportCommandHandler"
+
+  - id: "LEG-RF085-009"
+    tipo: "webservice"
+    nome: "WSImportacao.asmx - ObterErrosImportacao"
+    caminho: "ic1_legado/IControlIT/WebService/WSImportacao.asmx.vb"
+    metodos:
+      - nome: "ObterErrosImportacao"
+        parametros: "idImportacao As Integer"
+        retorno: "DataTable (Erros com Numero_Linha, Campo_Erro, Descricao_Erro)"
+    descricao: |
+      Query SQL em tb_ImportacaoDados_Detalhe, sem sugestões de correção.
+    destino: "substituido"
+    justificativa: "Substituído por endpoint que retorna relatório detalhado com sugestões automáticas"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 6 (API Endpoints)"
+      endpoint_moderno: "GET /api/imports/{id}/errors"
+    migracao_moderna:
+      query_cqrs: "GetImportErrorsQuery"
+      handler: "GetImportErrorsQueryHandler"
+
+  # ------------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF085-010"
+    tipo: "stored_procedure"
+    nome: "sp_ImportarClientes"
+    caminho: "ic1_legado/Database/Procedures/sp_ImportarClientes.sql"
+    parametros_entrada:
+      - "@Id_Cliente INT"
+      - "@Caminho_Arquivo VARCHAR(500)"
+      - "@Id_Usuario INT"
+    parametros_saida:
+      - "@Total_Registros INT OUTPUT"
+      - "@Registros_Sucesso INT OUTPUT"
+      - "@Registros_Erro INT OUTPUT"
+    descricao: |
+      Usa BULK INSERT para carregar CSV em tabela temporária, valida duplicatas por CPF/CNPJ,
+      INSERT em tb_Clientes se não existir (estratégia IGNORE hard-coded).
+    destino: "substituido"
+    justificativa: "Lógica movida para Application Layer com múltiplas estratégias de duplicata (IGNORE, REPLACE, REJECT)"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 3 (RN-RF085-004)"
+      regra_moderna: "RN-RF085-004 (Detecção de Duplicatas por Chave Natural)"
+    migracao_moderna:
+      handler: "ExecuteImportCommandHandler"
+      validacao: "FluentValidation + Custom Validators"
+      duplicatas: "DuplicateDetector class com múltiplas estratégias"
+
+  - id: "LEG-RF085-011"
+    tipo: "stored_procedure"
+    nome: "sp_ImportarFornecedores"
+    caminho: "ic1_legado/Database/Procedures/sp_ImportarFornecedores.sql"
+    parametros_entrada:
+      - "@Id_Cliente INT"
+      - "@Caminho_Arquivo VARCHAR(500)"
+      - "@Id_Usuario INT"
+    descricao: |
+      Similar a sp_ImportarClientes mas para tb_Fornecedores, com validação adicional
+      de Tipo_Fornecedor (enum hard-coded) e regex de email.
+    destino: "substituido"
+    justificativa: "Validações movidas para FluentValidation com regras configuráveis por template"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 3 (RN-RF085-003)"
+      validador_moderno: "FieldMapping.ValidationRule (regex configurável)"
+    migracao_moderna:
+      validator: "CreateFornecedorCommandValidator com RuleFor(x => x.Email).EmailAddress()"
+
+  - id: "LEG-RF085-012"
+    tipo: "stored_procedure"
+    nome: "sp_ValidarDadosImportacao"
+    caminho: "ic1_legado/Database/Procedures/sp_ValidarDadosImportacao.sql"
+    parametros_entrada:
+      - "@Tabela_Temp VARCHAR(100)"
+      - "@Tipo_Entidade VARCHAR(50)"
+    parametros_saida:
+      - "@Total_Erros INT OUTPUT"
+    descricao: |
+      Valida campos obrigatórios (NOT NULL), ranges (valores >= 0), foreign keys.
+      Insere erros em tabela temporária #Erros.
+    destino: "substituido"
+    justificativa: "Pipeline de validação moderno com múltiplas camadas (estrutural, semântica, referencial, negócio)"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 3 (RN-RF085-003)"
+      validador_moderno: "DataValidator class"
+    migracao_moderna:
+      validator: "FluentValidation + ValidationRule entity"
+      pipeline: "Validação antes de qualquer INSERT (fail-fast)"
+
+  - id: "LEG-RF085-013"
+    tipo: "stored_procedure"
+    nome: "sp_DesfazerImportacao"
+    caminho: "ic1_legado/Database/Procedures/sp_DesfazerImportacao.sql"
+    parametros_entrada:
+      - "@Id_Importacao INT"
+    descricao: |
+      Verifica se importação existe e status é 'Sucesso', executa DELETE na tabela
+      correspondente usando IDs de tb_ImportacaoDados_Detalhe, marca importação como "Revertida".
+    destino: "substituido"
+    justificativa: "Rollback transacional moderno com backup dos dados deletados, validação de tempo máximo"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 3 (RN-RF085-007)"
+      handler_moderno: "RollbackImportCommandHandler"
+    migracao_moderna:
+      handler: "RollbackImportCommandHandler"
+      validacao: "CanRollback flag, validação de tempo máximo (7 dias)"
+      auditoria: "Registro completo em AuditLog"
+
+  - id: "LEG-RF085-014"
+    tipo: "stored_procedure"
+    nome: "sp_ListarImportacoes"
+    caminho: "ic1_legado/Database/Procedures/sp_ListarImportacoes.sql"
+    parametros_entrada:
+      - "@Id_Cliente INT"
+      - "@Data_Inicio DATE"
+      - "@Data_Fim DATE"
+    descricao: |
+      Query simples em tb_ImportacaoDados com filtros por cliente e intervalo de datas,
+      ordenação fixa por Data_Importacao DESC.
+    destino: "substituido"
+    justificativa: "Query CQRS moderna com paginação, filtros dinâmicos e ordenação customizável"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 6 (API Endpoints)"
+      endpoint_moderno: "GET /api/imports/history"
+    migracao_moderna:
+      query: "GetImportHistoryQuery com PaginationParams"
+      handler: "GetImportHistoryQueryHandler"
+
+  # ------------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF085-015"
+    tipo: "tabela"
+    nome: "tb_ImportacaoDados"
+    caminho: "ic1_legado/Database/Tables/tb_ImportacaoDados.sql"
+    descricao: "Tabela principal de registros de importação sem multi-tenancy, sem auditoria, com Tipo_Importacao como string livre"
+    schema_legado: "[dbo].[tb_ImportacaoDados]"
+    problemas_identificados:
+      - "Falta Foreign Key para Id_Cliente"
+      - "Tipo_Importacao é string livre sem ENUM ou CHECK constraint"
+      - "Usuario_Importacao é VARCHAR sem FK para tb_Usuarios"
+      - "Caminho_Arquivo expõe path físico do servidor"
+      - "Sem campos de auditoria (Created, CreatedBy, LastModified, LastModifiedBy)"
+    destino: "substituido"
+    justificativa: "Tabela redesenhada com multi-tenancy, auditoria, FKs obrigatórias e ENUMs tipados"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 7 (Modelo de Dados)"
+      md_moderno: "MD-RF085 - Tabela Import"
+    migracao_moderna:
+      tabela_moderna: "Import"
+      migration_ef_core: "20251231_CreateImportTable.cs"
+
+  - id: "LEG-RF085-016"
+    tipo: "tabela"
+    nome: "tb_ImportacaoDados_Detalhe"
+    caminho: "ic1_legado/Database/Tables/tb_ImportacaoDados_Detalhe.sql"
+    descricao: "Tabela de erros de importação com linha inteira como string, sem suporte a múltiplos erros por linha"
+    schema_legado: "[dbo].[tb_ImportacaoDados_Detalhe]"
+    problemas_identificados:
+      - "Dados_Original armazena linha inteira como string (difícil parsear depois)"
+      - "Campo_Erro só armazena 1 campo, mas linha pode ter múltiplos erros"
+      - "Sem sugestão de correção"
+    destino: "substituido"
+    justificativa: "Tabela ImportError moderna com estrutura JSON para erros múltiplos, sugestões automáticas"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 7 (Modelo de Dados)"
+      md_moderno: "MD-RF085 - Tabela ImportError"
+    migracao_moderna:
+      tabela_moderna: "ImportError"
+      migration_ef_core: "20251231_CreateImportErrorTable.cs"
+
+  - id: "LEG-RF085-017"
+    tipo: "tabela"
+    nome: "tb_ConfiguracaoImportacao"
+    caminho: "ic1_legado/Database/Tables/tb_ConfiguracaoImportacao.sql"
+    descricao: "Tabela de configuração de mapeamento com XML não versionado, sem suporte a transformações"
+    schema_legado: "[dbo].[tb_ConfiguracaoImportacao]"
+    problemas_identificados:
+      - "Xml_Mapeamento difícil de query e validar"
+      - "Sem versionamento (alterações sobrescrevem configuração anterior)"
+      - "Sem suporte a transformações (apenas coluna → campo)"
+    destino: "substituido"
+    justificativa: "Tabelas ImportTemplate e FieldMapping modernas com estrutura relacional normalizada"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 7 (Modelo de Dados)"
+      md_moderno: "MD-RF085 - Tabelas ImportTemplate, FieldMapping, ValidationRule"
+    migracao_moderna:
+      tabelas_modernas: "ImportTemplate (1) → (N) FieldMapping, (1) → (N) ValidationRule"
+      migration_ef_core: "20251231_CreateImportTemplateTable.cs"
+
+  # ------------------------------------------------------------------------------
+  # REGRAS IMPLÍCITAS
+  # ------------------------------------------------------------------------------
+  - id: "LEG-RF085-018"
+    tipo: "regra_negocio"
+    nome: "Limite de Tamanho de Arquivo (50MB Hard-coded)"
+    caminho: "ic1_legado/IControlIT/Importacao/ImportacaoDados.aspx.vb"
+    localizacao_codigo: "ImportacaoDados.aspx.vb - Linha 47"
+    descricao: |
+      Arquivos de importação devem ter no máximo 50MB.
+      Se arquivo for maior, importação é rejeitada com erro "Arquivo muito grande".
+    destino: "assumido"
+    justificativa: "Regra mantida mas configurável via appsettings.json (não mais hard-coded, padrão 500MB)"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 3 (RN-RF085-012)"
+      regra_moderna: "RN-RF085-012 (Validação de Tamanho e Tipo de Arquivo)"
+    migracao_moderna:
+      configuracao: "MaxFileSizeImportacaoMB em appsettings.json (padrão: 500MB)"
+      validador: "ExecuteImportCommandValidator com RuleFor(x => x.File.Length).LessThanOrEqualTo(maxSize)"
+
+  - id: "LEG-RF085-019"
+    tipo: "regra_negocio"
+    nome: "Extensões Permitidas (Whitelist .csv, .xls)"
+    caminho: "ic1_legado/IControlIT/Importacao/ImportacaoDados.aspx.vb"
+    localizacao_codigo: "ImportacaoDados.aspx.vb - Linha 52"
+    descricao: |
+      Apenas arquivos com extensão .csv ou .xls são aceitos.
+      Outras extensões são rejeitadas com erro.
+    destino: "assumido"
+    justificativa: "Regra mantida mas expandida para suportar .xlsx, .xml, .json, .edi"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 3 (RN-RF085-012)"
+      regra_moderna: "RN-RF085-012 (Validação de Tamanho e Tipo de Arquivo)"
+    migracao_moderna:
+      validacao: "Whitelist de extensões em FileValidationService"
+      extensoes: ".csv, .xls, .xlsx, .xml, .json, .edi"
+
+  - id: "LEG-RF085-020"
+    tipo: "regra_negocio"
+    nome: "Estratégia de Duplicata IGNORE (Default)"
+    caminho: "ic1_legado/Database/Procedures/sp_ImportarClientes.sql"
+    localizacao_codigo: "sp_ImportarClientes.sql - Linha 35"
+    descricao: |
+      Se registro com mesma chave natural (CPF/CNPJ) já existe, importação IGNORA silenciosamente.
+      Nenhum UPDATE é executado, nenhum erro é gerado.
+    destino: "assumido"
+    justificativa: "Estratégia IGNORE mantida como padrão mas sistema moderno permite escolher entre IGNORE, REPLACE, REJECT"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 3 (RN-RF085-004)"
+      regra_moderna: "RN-RF085-004 (Detecção de Duplicatas por Chave Natural)"
+    migracao_moderna:
+      enum: "DuplicateStrategy { Ignore, Replace, Reject, MarkAsUpdate }"
+      configuracao: "Template possui campo DuplicateStrategy (padrão: Ignore)"
+      implementacao: "DuplicateDetector class"
+
+  - id: "LEG-RF085-021"
+    tipo: "regra_negocio"
+    nome: "Validação de Email via Regex Simples"
+    caminho: "ic1_legado/Database/Procedures/sp_ImportarFornecedores.sql"
+    localizacao_codigo: "sp_ImportarFornecedores.sql - Linha 42"
+    descricao: |
+      Email deve conter @ e pelo menos um . após o @.
+      Validação rudimentar (aceita emails inválidos como a@b.c).
+    destino: "assumido"
+    justificativa: "Validação de email mantida mas com regex RFC 5322 mais robusto"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 3 (RN-RF085-003)"
+      regra_moderna: "RN-RF085-003 (Validação de Dados Contra Regras de Negócio)"
+    migracao_moderna:
+      validador: "FluentValidation com EmailAddress() (regex RFC 5322)"
+      regex: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+
+  - id: "LEG-RF085-022"
+    tipo: "regra_negocio"
+    nome: "Timeout HTTP de 300 Segundos"
+    caminho: "ic1_legado/IControlIT/Web.config"
+    localizacao_codigo: "Web.config - Linha 78"
+    descricao: |
+      Requisições HTTP (incluindo importações) têm timeout de 300 segundos (5 minutos).
+      Se processamento demorar mais, conexão é abortada e dados são perdidos.
+    destino: "descartado"
+    justificativa: "Importações modernas são assíncronas via Hangfire, sem limite de tempo HTTP"
+    rastreabilidade:
+      documentacao_moderno: "RF085 - Seção 2 (Funcionalidade F12)"
+      solucao_moderna: "Processamento assíncrono com SignalR para notificações"
+    migracao_moderna:
+      hangfire: "Jobs em background sem timeout HTTP"
+      signalr: "Notificações em tempo real para o cliente"
+      api: "Endpoint retorna 202 Accepted com job ID"
+
+# ==============================================================================
+# PROBLEMAS LEGADO IDENTIFICADOS
+# ==============================================================================
+
+problemas_legado:
+  - id: "PROB-RF085-001"
+    nome: "Timeout em Importações Grandes"
+    severidade: "CRÍTICA"
+    descricao: |
+      Importações com mais de 10.000 registros causavam timeout HTTP (300 segundos),
+      perdendo todo o processamento já realizado sem possibilidade de recuperação.
+    impacto: "Usuários não conseguiam importar arquivos grandes, forçando quebra manual em múltiplos arquivos pequenos"
+    solucao_moderna: "Processamento assíncrono via Hangfire sem limite de tempo, com SignalR para acompanhamento em tempo real"
+
+  - id: "PROB-RF085-002"
+    nome: "Falta de Validação Estruturada"
+    severidade: "ALTA"
+    descricao: |
+      Validações hard-coded em VB.NET e stored procedures, sem possibilidade de
+      configuração por template ou adaptação a novos requisitos.
+    impacto: "Alteração de regras de validação exigia deploy de código e stored procedure"
+    solucao_moderna: "Pipeline de validações configuráveis via ValidationRule entity, sem necessidade de deploy"
+
+  - id: "PROB-RF085-003"
+    nome: "Nenhuma Detecção de Duplicatas"
+    severidade: "ALTA"
+    descricao: |
+      Registros duplicados eram inseridos silenciosamente, causando inconsistências
+      no banco de dados e dificuldade posterior de limpeza.
+    impacto: "Dados duplicados comprometiam integridade do sistema e relatórios"
+    solucao_moderna: "DuplicateDetector automático com múltiplas estratégias (IGNORE, REPLACE, REJECT)"
+
+  - id: "PROB-RF085-004"
+    nome: "Histórico Rudimentar"
+    severidade: "MÉDIA"
+    descricao: |
+      Apenas log em arquivo texto, sem capacidade de rollback estruturado
+      ou análise detalhada de importações passadas.
+    impacto: "Dificuldade de auditoria e impossibilidade de reverter importações incorretas"
+    solucao_moderna: "ImportHistory completo com rollback transacional e backup dos dados deletados"
+
+  - id: "PROB-RF085-005"
+    nome: "Sem Transformação de Dados"
+    severidade: "MÉDIA"
+    descricao: |
+      Conversões de tipo feitas manualmente em stored procedures,
+      difíceis de manter e sem documentação.
+    impacto: "Alterações em transformações exigiam modificação de SQL e deploy em banco"
+    solucao_moderna: "Pipeline de transformações configuráveis (UPPER, TRIM, FORMAT_DATE, LOOKUP) via FieldMapping"
+
+  - id: "PROB-RF085-006"
+    nome: "Concorrência Bloqueada"
+    severidade: "MÉDIA"
+    descricao: |
+      Apenas 1 importação por vez permitida, causando fila de espera
+      quando múltiplos usuários tentavam importar simultaneamente.
+    impacto: "Perda de produtividade, usuários aguardando liberação do sistema"
+    solucao_moderna: "Múltiplas importações paralelas via Hangfire com isolamento por tenant"
+
+  - id: "PROB-RF085-007"
+    nome: "Erro 500 Genérico"
+    severidade: "BAIXA"
+    descricao: |
+      Erros de validação retornavam apenas "Erro ao importar",
+      sem detalhes sobre qual linha ou campo estava incorreto.
+    impacto: "Usuários não sabiam como corrigir dados para re-importar com sucesso"
+    solucao_moderna: "Relatório detalhado de erros com número da linha, campo, valor atual e sugestão de correção"
+
+# ==============================================================================
+# METADADOS
+# ==============================================================================
+
+metadados:
+  total_itens_legado: 22
+  itens_assumidos: 5
+  itens_substituidos: 16
+  itens_descartados: 1
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"
+  total_problemas_legado: 7

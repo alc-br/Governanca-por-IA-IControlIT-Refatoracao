@@ -1,0 +1,1134 @@
+# =============================================
+# UC - Casos de Uso (Contrato Comportamental)
+# Versão: 2.0
+# Autor padrão: Agência ALC - alc.dev.br
+# =============================================
+
+uc:
+  documentacao: "RF038"
+  versao: "2.0"
+  data: "2025-12-31"
+
+casos_de_uso:
+
+  - id: "UC00"
+    nome: "Listar Configurações de SLA"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RF-CRUD-02"
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa a funcionalidade Configuração de SLA pelo menu"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema valida permissão do usuário"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Sistema carrega configurações de SLA do tenant"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Sistema aplica paginação padrão (20 registros por página)"
+          required: true
+        - id: "FP-UC00-005"
+          title: "Sistema aplica ordenação padrão (Tipo Solicitação ASC, Prioridade ASC)"
+          required: true
+        - id: "FP-UC00-006"
+          title: "Sistema exibe lista com colunas"
+          required: true
+        - id: "FA-UC00-001"
+          title: "Filtrar por tipo de solicitação"
+          required: false
+        - id: "FA-UC00-002"
+          title: "Filtrar por prioridade"
+          required: false
+        - id: "FA-UC00-003"
+          title: "Filtrar por status (ativo/inativo)"
+          required: false
+        - id: "FA-UC00-004"
+          title: "Ordenar por qualquer coluna"
+          required: false
+        - id: "FE-UC00-001"
+          title: "Usuário sem permissão → HTTP 403"
+          required: true
+        - id: "FE-UC00-002"
+          title: "Nenhuma configuração cadastrada → estado vazio"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.config.view_any"
+
+    gatilho: "Usuario acessa Configuração de SLA pelo menu"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_configuracao_sla"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao"
+      - passo: 3
+        ator: "sistema"
+        acao: "listar_configuracoes_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "aplicar_paginacao_ordenacao"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_lista"
+
+    fluxos_alternativos:
+      - id: "FA-UC00-01"
+        condicao: "usuario_aplica_filtro"
+        resultado: "lista_filtrada"
+
+    fluxos_excecao:
+      - id: "FE-UC00-01"
+        condicao: "sem_permissao"
+        resultado: "acesso_negado_403"
+
+    regras_aplicadas:
+      - "RN-RF038-001"
+
+    resultado_final:
+      estado: "lista_configuracoes_exibida"
+
+  - id: "UC01"
+    nome: "Criar Configuração de SLA"
+    ator_principal: "supervisor_gerente"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-CRUD-01"
+        - "RF-VAL-01"
+        - "RF-VAL-02"
+        - "RF-FUNC-01"
+      uc_items:
+        - id: "FP-UC01-001"
+          title: "Usuário clica em Nova Configuração SLA"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Sistema exibe formulário"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Usuário preenche os campos"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Usuário clica em Salvar"
+          required: true
+        - id: "FP-UC01-006"
+          title: "Sistema valida dados"
+          required: true
+        - id: "FP-UC01-007"
+          title: "Sistema verifica duplicação (tipo + prioridade)"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Sistema cria registro no banco"
+          required: true
+        - id: "FP-UC01-009"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FP-UC01-010"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FP-UC01-011"
+          title: "Sistema redireciona para lista de configurações"
+          required: true
+        - id: "FA-UC01-001"
+          title: "Cancelar criação"
+          required: false
+        - id: "FA-UC01-002"
+          title: "Salvar e criar outra"
+          required: false
+        - id: "FE-UC01-001"
+          title: "Campos obrigatórios vazios → erro inline"
+          required: true
+        - id: "FE-UC01-002"
+          title: "Prazo fora dos limites → erro validação"
+          required: true
+        - id: "FE-UC01-003"
+          title: "Duplicação (tipo + prioridade já existe)"
+          required: true
+        - id: "FE-UC01-004"
+          title: "Erro inesperado"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.config.create"
+
+    gatilho: "Usuario clica em Nova Configuração SLA"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "exibir_formulario"
+      - passo: 2
+        ator: "usuario"
+        acao: "preencher_campos"
+      - passo: 3
+        ator: "usuario"
+        acao: "salvar"
+      - passo: 4
+        ator: "sistema"
+        acao: "validar_dados"
+      - passo: 5
+        ator: "sistema"
+        acao: "persistir_registro"
+      - passo: 6
+        ator: "sistema"
+        acao: "registrar_auditoria"
+
+    fluxos_excecao:
+      - id: "FE-UC01-01"
+        condicao: "validacao_falhou"
+        resultado: "exibir_erros"
+      - id: "FE-UC01-02"
+        condicao: "duplicacao_detectada"
+        resultado: "erro_duplicacao"
+
+    regras_aplicadas:
+      - "RN-RF038-001"
+      - "RN-RF038-002"
+      - "RN-RF038-005"
+
+    resultado_final:
+      estado: "configuracao_sla_criada"
+
+  - id: "UC02"
+    nome: "Editar Configuração de SLA"
+    ator_principal: "supervisor_gerente"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-CRUD-04"
+        - "RF-FUNC-01"
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Usuário clica em Editar em uma configuração"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema valida que registro pertence ao tenant"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Sistema carrega dados atuais no formulário"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Usuário altera campos permitidos"
+          required: true
+        - id: "FP-UC02-006"
+          title: "Usuário clica em Salvar"
+          required: true
+        - id: "FP-UC02-007"
+          title: "Sistema valida alterações"
+          required: true
+        - id: "FP-UC02-008"
+          title: "Sistema persiste alterações"
+          required: true
+        - id: "FP-UC02-009"
+          title: "Sistema registra auditoria com snapshot anterior e novo"
+          required: true
+        - id: "FP-UC02-010"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FA-UC02-001"
+          title: "Cancelar edição"
+          required: false
+        - id: "FE-UC02-001"
+          title: "Erro de validação"
+          required: true
+        - id: "FE-UC02-002"
+          title: "Tentativa de editar configuração de outro tenant → 404"
+          required: true
+        - id: "FE-UC02-003"
+          title: "Configuração já excluída → 404"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.config.update"
+
+    gatilho: "Usuario clica em Editar configuração"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "carregar_dados_atuais"
+      - passo: 2
+        ator: "usuario"
+        acao: "alterar_campos"
+      - passo: 3
+        ator: "usuario"
+        acao: "salvar"
+      - passo: 4
+        ator: "sistema"
+        acao: "validar_alteracoes"
+      - passo: 5
+        ator: "sistema"
+        acao: "persistir_alteracoes"
+      - passo: 6
+        ator: "sistema"
+        acao: "registrar_auditoria"
+
+    fluxos_excecao:
+      - id: "FE-UC02-01"
+        condicao: "validacao_falhou"
+        resultado: "exibir_erros"
+      - id: "FE-UC02-02"
+        condicao: "registro_outro_tenant"
+        resultado: "http_404"
+
+    regras_aplicadas:
+      - "RN-RF038-004"
+
+    resultado_final:
+      estado: "configuracao_atualizada"
+
+  - id: "UC03"
+    nome: "Inativar Configuração de SLA"
+    ator_principal: "gerente_administrador"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-CRUD-05"
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Usuário clica em Inativar em uma configuração ativa"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Sistema verifica se há solicitações ativas vinculadas"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Sistema exibe modal de confirmação"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Usuário confirma"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Sistema marca Status = Inativo"
+          required: true
+        - id: "FP-UC03-007"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FP-UC03-008"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FA-UC03-001"
+          title: "Cancelar inativação"
+          required: false
+        - id: "FE-UC03-001"
+          title: "Configuração com solicitações ativas vinculadas"
+          required: true
+        - id: "FE-UC03-002"
+          title: "Tentativa de inativar configuração de outro tenant → 404"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.config.delete"
+
+    gatilho: "Usuario clica em Inativar configuração"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "verificar_solicitacoes_ativas"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_confirmacao"
+      - passo: 3
+        ator: "usuario"
+        acao: "confirmar"
+      - passo: 4
+        ator: "sistema"
+        acao: "marcar_inativo"
+      - passo: 5
+        ator: "sistema"
+        acao: "registrar_auditoria"
+
+    fluxos_excecao:
+      - id: "FE-UC03-01"
+        condicao: "solicitacoes_ativas_existem"
+        resultado: "bloqueio_inativacao"
+
+    regras_aplicadas:
+      - "RN-RF038-005"
+
+    resultado_final:
+      estado: "configuracao_inativada"
+
+  - id: "UC04"
+    nome: "Pausar SLA de Solicitação"
+    ator_principal: "supervisor_gerente"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-FUNC-04"
+        - "RF-VAL-03"
+      uc_items:
+        - id: "FP-UC04-001"
+          title: "Usuário acessa solicitação em aberto"
+          required: true
+        - id: "FP-UC04-002"
+          title: "Usuário clica em Pausar SLA"
+          required: true
+        - id: "FP-UC04-003"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC04-004"
+          title: "Sistema verifica que solicitação não está finalizada"
+          required: true
+        - id: "FP-UC04-005"
+          title: "Sistema verifica que SLA não está já pausado"
+          required: true
+        - id: "FP-UC04-006"
+          title: "Sistema exibe modal com campo Motivo da Pausa"
+          required: true
+        - id: "FP-UC04-007"
+          title: "Usuário informa motivo"
+          required: true
+        - id: "FP-UC04-008"
+          title: "Usuário confirma"
+          required: true
+        - id: "FP-UC04-009"
+          title: "Sistema valida motivo (mín. 10 caracteres)"
+          required: true
+        - id: "FP-UC04-010"
+          title: "Sistema marca Status_SLA = Pausado"
+          required: true
+        - id: "FP-UC04-011"
+          title: "Sistema registra Data_Pausa, Usuario_Pausa, Motivo_Pausa"
+          required: true
+        - id: "FP-UC04-012"
+          title: "Sistema para contabilização de tempo"
+          required: true
+        - id: "FP-UC04-013"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FP-UC04-014"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FA-UC04-001"
+          title: "Cancelar pausa"
+          required: false
+        - id: "FE-UC04-001"
+          title: "Motivo com menos de 10 caracteres"
+          required: true
+        - id: "FE-UC04-002"
+          title: "Solicitação já finalizada"
+          required: true
+        - id: "FE-UC04-003"
+          title: "SLA já pausado"
+          required: true
+        - id: "FE-UC04-004"
+          title: "Usuário sem permissão → 403"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.pausar"
+
+    gatilho: "Usuario clica em Pausar SLA"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "validar_precondicoes"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_modal_motivo"
+      - passo: 3
+        ator: "usuario"
+        acao: "informar_motivo_confirmar"
+      - passo: 4
+        ator: "sistema"
+        acao: "pausar_sla"
+      - passo: 5
+        ator: "sistema"
+        acao: "registrar_auditoria"
+
+    fluxos_excecao:
+      - id: "FE-UC04-01"
+        condicao: "motivo_invalido"
+        resultado: "erro_validacao"
+      - id: "FE-UC04-02"
+        condicao: "solicitacao_finalizada"
+        resultado: "bloqueio_pausa"
+
+    regras_aplicadas:
+      - "RN-RF038-004"
+
+    resultado_final:
+      estado: "sla_pausado"
+
+  - id: "UC05"
+    nome: "Retomar SLA de Solicitação"
+    ator_principal: "supervisor_gerente"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-FUNC-04"
+      uc_items:
+        - id: "FP-UC05-001"
+          title: "Usuário acessa solicitação com SLA pausado"
+          required: true
+        - id: "FP-UC05-002"
+          title: "Usuário clica em Retomar SLA"
+          required: true
+        - id: "FP-UC05-003"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC05-004"
+          title: "Sistema verifica que SLA está pausado"
+          required: true
+        - id: "FP-UC05-005"
+          title: "Sistema calcula tempo decorrido antes da pausa"
+          required: true
+        - id: "FP-UC05-006"
+          title: "Sistema calcula tempo restante"
+          required: true
+        - id: "FP-UC05-007"
+          title: "Sistema recalcula nova data limite"
+          required: true
+        - id: "FP-UC05-008"
+          title: "Sistema marca Status_SLA = estado anterior à pausa"
+          required: true
+        - id: "FP-UC05-009"
+          title: "Sistema registra Data_Retomada, Usuario_Retomada"
+          required: true
+        - id: "FP-UC05-010"
+          title: "Sistema retoma contabilização de tempo"
+          required: true
+        - id: "FP-UC05-011"
+          title: "Sistema recalcula alertas pendentes"
+          required: true
+        - id: "FP-UC05-012"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FP-UC05-013"
+          title: "Sistema exibe mensagem com nova data limite"
+          required: true
+        - id: "FA-UC05-001"
+          title: "Cancelar retomada"
+          required: false
+        - id: "FE-UC05-001"
+          title: "SLA não está pausado"
+          required: true
+        - id: "FE-UC05-002"
+          title: "Usuário sem permissão → 403"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.retomar"
+
+    gatilho: "Usuario clica em Retomar SLA"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "verificar_sla_pausado"
+      - passo: 2
+        ator: "sistema"
+        acao: "calcular_tempo_restante"
+      - passo: 3
+        ator: "sistema"
+        acao: "recalcular_data_limite"
+      - passo: 4
+        ator: "sistema"
+        acao: "retomar_sla"
+      - passo: 5
+        ator: "sistema"
+        acao: "registrar_auditoria"
+
+    fluxos_excecao:
+      - id: "FE-UC05-01"
+        condicao: "sla_nao_pausado"
+        resultado: "erro_estado_invalido"
+
+    regras_aplicadas:
+      - "RN-RF038-004"
+
+    resultado_final:
+      estado: "sla_retomado"
+
+  - id: "UC06"
+    nome: "Solicitar Extensão de Prazo"
+    ator_principal: "supervisor_gerente"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-FUNC-05"
+        - "RF-VAL-04"
+        - "RF-VAL-05"
+      uc_items:
+        - id: "FP-UC06-001"
+          title: "Usuário acessa solicitação em aberto"
+          required: true
+        - id: "FP-UC06-002"
+          title: "Usuário clica em Solicitar Extensão de Prazo"
+          required: true
+        - id: "FP-UC06-003"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC06-004"
+          title: "Sistema verifica que não há extensão pendente"
+          required: true
+        - id: "FP-UC06-005"
+          title: "Sistema verifica que não atingiu limite de 2 extensões"
+          required: true
+        - id: "FP-UC06-006"
+          title: "Sistema exibe modal com campos"
+          required: true
+        - id: "FP-UC06-007"
+          title: "Usuário preenche campos"
+          required: true
+        - id: "FP-UC06-008"
+          title: "Usuário confirma"
+          required: true
+        - id: "FP-UC06-009"
+          title: "Sistema valida dados"
+          required: true
+        - id: "FP-UC06-010"
+          title: "Sistema cria registro de extensão com Status = Pendente"
+          required: true
+        - id: "FP-UC06-011"
+          title: "Sistema envia notificação para aprovador"
+          required: true
+        - id: "FP-UC06-012"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FP-UC06-013"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FA-UC06-001"
+          title: "Cancelar solicitação"
+          required: false
+        - id: "FE-UC06-001"
+          title: "Novo prazo menor ou igual ao atual"
+          required: true
+        - id: "FE-UC06-002"
+          title: "Justificativa com menos de 20 caracteres"
+          required: true
+        - id: "FE-UC06-003"
+          title: "Já existe extensão pendente"
+          required: true
+        - id: "FE-UC06-004"
+          title: "Limite de 2 extensões atingido"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.extensao.solicitar"
+
+    gatilho: "Usuario clica em Solicitar Extensão de Prazo"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "validar_precondicoes_extensao"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_formulario_extensao"
+      - passo: 3
+        ator: "usuario"
+        acao: "preencher_dados_extensao"
+      - passo: 4
+        ator: "sistema"
+        acao: "criar_solicitacao_extensao"
+      - passo: 5
+        ator: "sistema"
+        acao: "notificar_aprovador"
+
+    fluxos_excecao:
+      - id: "FE-UC06-01"
+        condicao: "validacao_falhou"
+        resultado: "exibir_erros"
+      - id: "FE-UC06-02"
+        condicao: "limite_extensoes_atingido"
+        resultado: "bloqueio_extensao"
+
+    regras_aplicadas:
+      - "RN-RF038-007"
+
+    resultado_final:
+      estado: "extensao_solicitada"
+
+  - id: "UC07"
+    nome: "Aprovar/Rejeitar Extensão de Prazo"
+    ator_principal: "gerente_diretor"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-FUNC-05"
+      uc_items:
+        - id: "FP-UC07-001"
+          title: "Aprovador acessa lista de extensões pendentes"
+          required: true
+        - id: "FP-UC07-002"
+          title: "Aprovador clica em Visualizar em uma extensão"
+          required: true
+        - id: "FP-UC07-003"
+          title: "Sistema valida que usuário é o aprovador designado"
+          required: true
+        - id: "FP-UC07-004"
+          title: "Sistema exibe detalhes da extensão"
+          required: true
+        - id: "FP-UC07-005"
+          title: "Aprovador clica em Aprovar ou Rejeitar"
+          required: true
+        - id: "FP-UC07-006"
+          title: "Se Aprovar: aplica novo prazo e recalcula alertas"
+          required: true
+        - id: "FP-UC07-007"
+          title: "Se Rejeitar: solicita motivo e mantém prazo original"
+          required: true
+        - id: "FA-UC07-001"
+          title: "Cancelar"
+          required: false
+        - id: "FE-UC07-001"
+          title: "Usuário não é o aprovador designado → 403"
+          required: true
+        - id: "FE-UC07-002"
+          title: "Extensão já foi aprovada/rejeitada"
+          required: true
+        - id: "FE-UC07-003"
+          title: "Motivo de rejeição com menos de 10 caracteres"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.extensao.aprovar"
+
+    gatilho: "Aprovador acessa extensão pendente"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "validar_aprovador"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_detalhes_extensao"
+      - passo: 3
+        ator: "aprovador"
+        acao: "decidir_aprovar_rejeitar"
+      - passo: 4
+        ator: "sistema"
+        acao: "processar_decisao"
+      - passo: 5
+        ator: "sistema"
+        acao: "notificar_solicitante"
+
+    fluxos_excecao:
+      - id: "FE-UC07-01"
+        condicao: "usuario_nao_autorizado"
+        resultado: "http_403"
+      - id: "FE-UC07-02"
+        condicao: "extensao_ja_processada"
+        resultado: "erro_estado_invalido"
+
+    regras_aplicadas:
+      - "RN-RF038-007"
+
+    resultado_final:
+      estado: "extensao_processada"
+
+  - id: "UC08"
+    nome: "Visualizar Dashboard de Monitoramento SLA"
+    ator_principal: "supervisor_gerente"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RF-FUNC-06"
+        - "RF-FUNC-10"
+      uc_items:
+        - id: "FP-UC08-001"
+          title: "Usuário acessa Dashboard SLA pelo menu"
+          required: true
+        - id: "FP-UC08-002"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC08-003"
+          title: "Sistema carrega solicitações em aberto do tenant"
+          required: true
+        - id: "FP-UC08-004"
+          title: "Sistema calcula percentual decorrido de cada solicitação"
+          required: true
+        - id: "FP-UC08-005"
+          title: "Sistema aplica cor conforme proximidade"
+          required: true
+        - id: "FP-UC08-006"
+          title: "Sistema exibe grid com colunas"
+          required: true
+        - id: "FP-UC08-007"
+          title: "Sistema ordena por prazo mais próximo primeiro"
+          required: true
+        - id: "FP-UC08-008"
+          title: "Sistema ativa auto-refresh a cada 60 segundos (SignalR)"
+          required: true
+        - id: "FA-UC08-001"
+          title: "Filtrar por prioridade"
+          required: false
+        - id: "FA-UC08-002"
+          title: "Filtrar por tipo de solicitação"
+          required: false
+        - id: "FA-UC08-003"
+          title: "Filtrar por atendente"
+          required: false
+        - id: "FA-UC08-004"
+          title: "Filtrar por status (verde/amarelo/vermelho/preto)"
+          required: false
+        - id: "FE-UC08-001"
+          title: "Usuário sem permissão → 403"
+          required: true
+        - id: "FE-UC08-002"
+          title: "Nenhuma solicitação ativa → estado vazio"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.dashboard.view"
+
+    gatilho: "Usuario acessa Dashboard SLA"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "carregar_solicitacoes_ativas"
+      - passo: 2
+        ator: "sistema"
+        acao: "calcular_percentuais"
+      - passo: 3
+        ator: "sistema"
+        acao: "aplicar_cores_indicadores"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibir_dashboard"
+      - passo: 5
+        ator: "sistema"
+        acao: "ativar_auto_refresh_signalr"
+
+    fluxos_alternativos:
+      - id: "FA-UC08-01"
+        condicao: "usuario_aplica_filtro"
+        resultado: "dashboard_filtrado"
+
+    fluxos_excecao:
+      - id: "FE-UC08-01"
+        condicao: "sem_permissao"
+        resultado: "acesso_negado_403"
+
+    regras_aplicadas:
+      - "RN-RF038-008"
+      - "RN-RF038-010"
+
+    resultado_final:
+      estado: "dashboard_exibido"
+
+  - id: "UC09"
+    nome: "Gerar Relatório de Compliance SLA"
+    ator_principal: "supervisor_gerente_diretor"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RF-FUNC-07"
+      uc_items:
+        - id: "FP-UC09-001"
+          title: "Usuário acessa Relatórios SLA pelo menu"
+          required: true
+        - id: "FP-UC09-002"
+          title: "Usuário clica em Relatório de Compliance"
+          required: true
+        - id: "FP-UC09-003"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC09-004"
+          title: "Sistema exibe filtros"
+          required: true
+        - id: "FP-UC09-005"
+          title: "Usuário define filtros e clica em Gerar"
+          required: true
+        - id: "FP-UC09-006"
+          title: "Sistema valida período"
+          required: true
+        - id: "FP-UC09-007"
+          title: "Sistema calcula métricas de compliance"
+          required: true
+        - id: "FP-UC09-008"
+          title: "Sistema exibe relatório com gráficos"
+          required: true
+        - id: "FP-UC09-009"
+          title: "Sistema oferece botões de exportação"
+          required: true
+        - id: "FA-UC09-001"
+          title: "Exportar para PDF"
+          required: false
+        - id: "FA-UC09-002"
+          title: "Exportar para Excel"
+          required: false
+        - id: "FA-UC09-003"
+          title: "Exportar para CSV"
+          required: false
+        - id: "FE-UC09-001"
+          title: "Período inválido"
+          required: true
+        - id: "FE-UC09-002"
+          title: "Período maior que 24 meses"
+          required: true
+        - id: "FE-UC09-003"
+          title: "Nenhum dado no período selecionado"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.relatorios.gerar"
+
+    gatilho: "Usuario clica em Relatório de Compliance"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "exibir_filtros_relatorio"
+      - passo: 2
+        ator: "usuario"
+        acao: "definir_filtros"
+      - passo: 3
+        ator: "sistema"
+        acao: "validar_periodo"
+      - passo: 4
+        ator: "sistema"
+        acao: "calcular_metricas"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_relatorio"
+
+    fluxos_alternativos:
+      - id: "FA-UC09-01"
+        condicao: "usuario_exporta"
+        resultado: "arquivo_gerado"
+
+    fluxos_excecao:
+      - id: "FE-UC09-01"
+        condicao: "periodo_invalido"
+        resultado: "erro_validacao"
+      - id: "FE-UC09-02"
+        condicao: "sem_dados"
+        resultado: "estado_vazio"
+
+    regras_aplicadas:
+      - "RN-RF038-009"
+      - "RN-RF038-015"
+
+    resultado_final:
+      estado: "relatorio_gerado"
+
+  - id: "UC10"
+    nome: "Visualizar Não-Conformidades de SLA"
+    ator_principal: "supervisor_gerente_diretor"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RF-FUNC-08"
+      uc_items:
+        - id: "FP-UC10-001"
+          title: "Usuário acessa Não-Conformidades SLA pelo menu"
+          required: true
+        - id: "FP-UC10-002"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC10-003"
+          title: "Sistema carrega não-conformidades do tenant"
+          required: true
+        - id: "FP-UC10-004"
+          title: "Sistema aplica filtros padrão (últimos 30 dias)"
+          required: true
+        - id: "FP-UC10-005"
+          title: "Sistema exibe grid com colunas"
+          required: true
+        - id: "FP-UC10-006"
+          title: "Sistema ordena por data breach DESC"
+          required: true
+        - id: "FA-UC10-001"
+          title: "Filtrar por período"
+          required: false
+        - id: "FA-UC10-002"
+          title: "Filtrar por status tratamento"
+          required: false
+        - id: "FA-UC10-003"
+          title: "Filtrar por atendente"
+          required: false
+        - id: "FA-UC10-004"
+          title: "Filtrar por supervisor"
+          required: false
+        - id: "FA-UC10-005"
+          title: "Exportar lista para Excel"
+          required: false
+        - id: "FE-UC10-001"
+          title: "Usuário sem permissão → 403"
+          required: true
+        - id: "FE-UC10-002"
+          title: "Nenhuma não-conformidade no período"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.nao_conformidade.view"
+
+    gatilho: "Usuario acessa Não-Conformidades SLA"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "carregar_nao_conformidades"
+      - passo: 2
+        ator: "sistema"
+        acao: "aplicar_filtros_padrao"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_lista"
+
+    fluxos_alternativos:
+      - id: "FA-UC10-01"
+        condicao: "usuario_aplica_filtro"
+        resultado: "lista_filtrada"
+
+    fluxos_excecao:
+      - id: "FE-UC10-01"
+        condicao: "sem_permissao"
+        resultado: "acesso_negado_403"
+
+    regras_aplicadas:
+      - "RN-RF038-014"
+
+    resultado_final:
+      estado: "lista_nao_conformidades_exibida"
+
+  - id: "UC11"
+    nome: "Tratar Não-Conformidade (Análise de Causa Raiz)"
+    ator_principal: "supervisor_gerente"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RF-FUNC-08"
+      uc_items:
+        - id: "FP-UC11-001"
+          title: "Usuário acessa lista de não-conformidades"
+          required: true
+        - id: "FP-UC11-002"
+          title: "Usuário clica em Tratar em uma NC pendente"
+          required: true
+        - id: "FP-UC11-003"
+          title: "Sistema valida permissão"
+          required: true
+        - id: "FP-UC11-004"
+          title: "Sistema exibe formulário com campos"
+          required: true
+        - id: "FP-UC11-005"
+          title: "Usuário preenche campos"
+          required: true
+        - id: "FP-UC11-006"
+          title: "Usuário clica em Salvar Tratamento"
+          required: true
+        - id: "FP-UC11-007"
+          title: "Sistema valida dados"
+          required: true
+        - id: "FP-UC11-008"
+          title: "Sistema atualiza NC"
+          required: true
+        - id: "FP-UC11-009"
+          title: "Sistema envia notificação para gerência"
+          required: true
+        - id: "FP-UC11-010"
+          title: "Sistema registra auditoria"
+          required: true
+        - id: "FP-UC11-011"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+        - id: "FA-UC11-001"
+          title: "Cancelar tratamento"
+          required: false
+        - id: "FE-UC11-001"
+          title: "Análise de causa raiz com menos de 50 caracteres"
+          required: true
+        - id: "FE-UC11-002"
+          title: "Plano de ação com menos de 30 caracteres"
+          required: true
+        - id: "FE-UC11-003"
+          title: "Prazo de implementação > 30 dias"
+          required: true
+        - id: "FE-UC11-004"
+          title: "NC já tratada"
+          required: true
+
+    precondicoes:
+      - permissao: "sla.nao_conformidade.tratar"
+
+    gatilho: "Usuario clica em Tratar NC"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "exibir_formulario_tratamento"
+      - passo: 2
+        ator: "usuario"
+        acao: "preencher_analise_plano"
+      - passo: 3
+        ator: "sistema"
+        acao: "validar_dados"
+      - passo: 4
+        ator: "sistema"
+        acao: "atualizar_nao_conformidade"
+      - passo: 5
+        ator: "sistema"
+        acao: "notificar_gerencia"
+
+    fluxos_excecao:
+      - id: "FE-UC11-01"
+        condicao: "validacao_falhou"
+        resultado: "exibir_erros"
+      - id: "FE-UC11-02"
+        condicao: "nc_ja_tratada"
+        resultado: "erro_estado_invalido"
+
+    regras_aplicadas:
+      - "RN-RF038-014"
+
+    resultado_final:
+      estado: "nao_conformidade_tratada"
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão canônica com 12 UCs completos (UC00-UC11), estrutura conforme template UC.yaml, cobertura 100% do RF038"
+  - versao: "1.0"
+    data: "2025-12-18"
+    autor: "Architect Agent"
+    descricao: "Versão inicial resumida com 9 UCs básicos"

@@ -7,20 +7,20 @@ Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 
 ORDEM DE EXECUCAO (BLOQUEANTE):
 1. PRIMEIRO: Executar CONTRATO-GERACAO-DOCS-MT
-   - Criar D:\IC2\rf\[FASE]\[EPIC]\[RFXXX]\MT-RF[XXX].yaml (Massa de Teste)
+   - Criar D:\IC2\documentacao\[FASE]\[EPIC]\[RFXXX]\MT-RF[XXX].yaml (Massa de Teste)
    - Validar via checklist-documentacao-mt.yaml
    - Atualizar STATUS.yaml
    - SOMENTE prosseguir se aprovado 100%
 
 2. SEGUNDO: Executar CONTRATO-GERACAO-DOCS-TC
-   - Criar D:\IC2\rf\[FASE]\[EPIC]\[RFXXX]\TC-RF[XXX].yaml (Casos de Teste)
+   - Criar D:\IC2\documentacao\[FASE]\[EPIC]\[RFXXX]\TC-RF[XXX].yaml (Casos de Teste)
    - Validar via checklist-documentacao-tc.yaml
    - Atualizar STATUS.yaml
    - SOMENTE prosseguir se aprovado 100%
 
 ESTRUTURA DE ARQUIVOS (OBRIGATORIA):
 ```
-docs\rf\[FASE]\[EPIC]\[RFXXX]\
+docs\documentacao\[FASE]\[EPIC]\[RFXXX]\
 ├── RF[XXX].yaml                  (Requisito Funcional)
 ├── UC-RF[XXX].md                 (Casos de Uso)
 ├── UC-RF[XXX].yaml               (Casos de Uso estruturado)
@@ -34,7 +34,7 @@ docs\rf\[FASE]\[EPIC]\[RFXXX]\
 
 Exemplo para RF006:
 ```
-docs\rf\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF006-Gestao-de-Clientes\
+docs\documentacao\Fase-1-Sistema-Base\EPIC001-SYS-Sistema-Infraestrutura\RF006-Gestao-de-Clientes\
 ├── RF006.yaml
 ├── UC-RF006.md
 ├── UC-RF006.yaml

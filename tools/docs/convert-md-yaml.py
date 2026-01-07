@@ -30,7 +30,7 @@ class ConverterMDYaml:
     def __init__(self, base_path: str = "D:\\IC2\\docs\\rf"):
         self.base_path = Path(base_path)
 
-    def encontrar_rf(self, rf_id: str) -> Path:
+    def encontrar_rf(self, documentacao_id: str) -> Path:
         """Encontra a pasta do RF (tolerante a diferentes padrões de estrutura)"""
         # Tentar múltiplos padrões de EPIC
         epic_patterns = ["EPIC*", "EPIC-*", "EPIC[0-9]*"]
@@ -39,12 +39,12 @@ class ConverterMDYaml:
             for epic_pattern in epic_patterns:
                 for epic_dir in fase_dir.glob(epic_pattern):
                     # Procurar RF com diferentes padrões
-                    rf_patterns = [f"{rf_id}-*", f"{rf_id}"]
-                    for rf_pattern in rf_patterns:
-                        for rf_dir in epic_dir.glob(rf_pattern):
+                    documentacao_patterns = [f"{rf_id}-*", f"{rf_id}"]
+                    for documentacao_pattern in documentacao_patterns:
+                        for documentacao_dir in epic_dir.glob(rf_pattern):
                             # Verificar se é realmente a pasta do RF
-                            if rf_dir.is_dir() and rf_dir.name.startswith(rf_id):
-                                return rf_dir
+                            if documentacao_dir.is_dir() and documentacao_dir.name.startswith(rf_id):
+                                return documentacao_dir
 
         raise FileNotFoundError(f"RF {rf_id} não encontrado em {self.base_path}")
 
@@ -61,9 +61,9 @@ class ConverterMDYaml:
             "seed": {"ddl": ""}
         }
 
-    def converter(self, rf_id: str) -> dict:
-        rf_path = self.encontrar_rf(rf_id)
-        md_md = rf_path / f"MD-{rf_id}.md"
+    def converter(self, documentacao_id: str) -> dict:
+        documentacao_path = self.encontrar_rf(rf_id)
+        md_md = documentacao_path / f"MD-{rf_id}.md"
 
         if not md_md.exists():
             raise FileNotFoundError(f"MD-{rf_id}.md não encontrado")
@@ -72,7 +72,7 @@ class ConverterMDYaml:
 
         return {
             "md": {
-                "rf": rf_id,
+                "rf": documentacao_id,
                 "versao": "1.0",
                 "data": datetime.now().strftime("%Y-%m-%d")
             },
@@ -85,9 +85,9 @@ class ConverterMDYaml:
             }]
         }
 
-    def salvar_yaml(self, rf_id: str, data: dict):
-        rf_path = self.encontrar_rf(rf_id)
-        output = rf_path / f"MD-{rf_id}.yaml"
+    def salvar_yaml(self, documentacao_id: str, data: dict):
+        documentacao_path = self.encontrar_rf(rf_id)
+        output = documentacao_path / f"MD-{rf_id}.yaml"
 
         header = f"""# =============================================
 # MD-{rf_id} - Modelo de Dados
@@ -101,12 +101,12 @@ class ConverterMDYaml:
         print(f" MD-{rf_id}.yaml criado")
 
         # Remover MD.md após conversão
-        md_md = rf_path / f"MD-{rf_id}.md"
+        md_md = documentacao_path / f"MD-{rf_id}.md"
         if md_md.exists():
             md_md.unlink()
             print(f"   MD-{rf_id}.md removido")
 
-    def processar_rf(self, rf_id: str) -> bool:
+    def processar_rf(self, documentacao_id: str) -> bool:
         try:
             data = self.converter(rf_id)
             self.salvar_yaml(rf_id, data)
@@ -127,8 +127,8 @@ def main():
         total = 0
         for fase in sorted(Path("D:\\IC2\\docs\\rf").glob("Fase-*")):
             for epic in sorted(fase.glob("EPIC-*")):
-                for rf_dir in sorted(epic.glob("RF*")):
-                    rf_id = rf_dir.name.split('-')[0]
+                for documentacao_dir in sorted(epic.glob("RF*")):
+                    documentacao_id = documentacao_dir.name.split('-')[0]
                     if converter.processar_rf(rf_id):
                         total += 1
         print(f"\n {total} arquivos MD.yaml criados")

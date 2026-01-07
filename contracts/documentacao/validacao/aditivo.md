@@ -283,8 +283,8 @@ wfs_planejados = extrair_lista_plano(plano_content, "### 2.3. WF", "**WFs a cria
 rf_md = ler_arquivo(f"{rf_path}/RF{rf_id}.md")
 rf_old_md = ler_arquivo(f"{rf_path}/RF{rf_id}_old.md")
 
-rns_atual = set(re.findall(r'RN-[A-Z]+-\d+-\d+', rf_md))
-rns_old = set(re.findall(r'RN-[A-Z]+-\d+-\d+', rf_old_md))
+rns_atual = set(re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_md))
+rns_old = set(re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_old_md))
 rns_criadas = rns_atual - rns_old
 
 # Comparar com plano
@@ -506,10 +506,10 @@ else:
 **Como verificar:**
 ```python
 # Extrair RNs de RFXXX.md
-rns_atual = set(re.findall(r'RN-[A-Z]+-\d+-\d+', rf_md_content))
+rns_atual = set(re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_md_content))
 
 # Extrair RNs de RFXXX_old.md
-rns_old = set(re.findall(r'RN-[A-Z]+-\d+-\d+', rf_old_md_content))
+rns_old = set(re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_old_md_content))
 
 # Delta (RNs novas)
 rns_novas = rns_atual - rns_old
@@ -636,10 +636,10 @@ else:
 **Como verificar:**
 ```python
 # RNs em MD
-rns_md = set(re.findall(r'RN-[A-Z]+-\d+-\d+', rf_md_content))
+rns_md = set(re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_md_content))
 
 # RNs em YAML
-rns_yaml = set([rn['id'] for rn in rf_yaml['regras_negocio']])
+rns_yaml = set([rn['id'] for rn in documentacao_yaml['regras_negocio']])
 
 # Gaps
 rns_md_only = rns_md - rns_yaml
@@ -768,9 +768,9 @@ if not md_old_existe:
     PASS("N/A - RF original sem baseline de MD")
 else:
     # Verificar se RF documenta mudanças no MD
-    rf_documenta_mudancas_md = verificar_secao_9_md_mudancas(rf_md_content)
+    documentacao_documenta_mudancas_md = verificar_secao_9_md_mudancas(rf_md_content)
 
-    if rf_documenta_mudancas_md:
+    if documentacao_documenta_mudancas_md:
         md_foi_atualizado = comparar_md(md_atual, md_old)
         if md_foi_atualizado:
             PASS("MD atualizado conforme documentado no RF")

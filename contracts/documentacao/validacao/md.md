@@ -54,7 +54,7 @@ rf_entities = extract_entities_from_rf(rf_content)
 md_tables = extract_tables_from_md(md_content)
 
 # Comparar
-gaps = rf_entities - md_tables
+gaps = documentacao_entities - md_tables
 ```
 
 **Critério de aprovação:**
@@ -250,7 +250,7 @@ for table in md_tables:
    metadata:
      versao: "2.0"
      data: "YYYY-MM-DD"
-     rf_relacionado:
+     documentacao_relacionado:
        id: "RFXXX"
      padroes:
        multi_tenancy: true

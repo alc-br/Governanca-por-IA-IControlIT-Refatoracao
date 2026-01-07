@@ -54,7 +54,7 @@ Adequar documentação de RFs existentes (v1.0) para o padrão de **Governança 
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 | **LEGACY_PATH** | `D:\IC2\ic1_legado\IControlIT\` |
 
@@ -62,11 +62,11 @@ Adequar documentação de RFs existentes (v1.0) para o padrão de **Governança 
 
 O agente PODE escrever **APENAS** em:
 ```
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\RFXXX.md
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\RFXXX.yaml
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.md
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.yaml
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\RFXXX.md
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\RFXXX.yaml
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\RL-RFXXX.md
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\RL-RFXXX.yaml
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
@@ -405,7 +405,7 @@ itens_legado:
     destino: "SUBSTITUÍDO"  # ASSUMIDO | SUBSTITUÍDO | DESCARTADO | A_REVISAR
     justificativa: "[Por que esta decisão foi tomada]"
     rastreabilidade:
-      rf_moderno: "RFXXX - Seção 2 (Funcionalidades)"
+      documentacao_moderno: "RFXXX - Seção 2 (Funcionalidades)"
       uc_moderno: "UC01-RFXXX (Criar)"
     migracao_moderna:
       componente_angular: "empresas-create.component.ts"
@@ -427,7 +427,7 @@ itens_legado:
     destino: "SUBSTITUÍDO"
     justificativa: "Substituído por REST API com autenticação JWT"
     rastreabilidade:
-      rf_moderno: "RFXXX - Seção 6 (API Endpoints)"
+      documentacao_moderno: "RFXXX - Seção 6 (API Endpoints)"
       endpoint_moderno: "POST /api/empresas"
     migracao_moderna:
       command_cqrs: "CreateEmpresaCommand"
@@ -450,7 +450,7 @@ itens_legado:
     destino: "SUBSTITUÍDO"
     justificativa: "Lógica movida para Application Layer (CQRS Handler)"
     rastreabilidade:
-      rf_moderno: "RFXXX - Seção 3 (Regras de Negócio)"
+      documentacao_moderno: "RFXXX - Seção 3 (Regras de Negócio)"
       regra_moderna: "RN-RFXXX-005"
     migracao_moderna:
       handler: "CreateEmpresaCommandHandler"
@@ -470,7 +470,7 @@ itens_legado:
     destino: "SUBSTITUÍDO"
     justificativa: "Tabela redesenhada com multi-tenancy e auditoria"
     rastreabilidade:
-      rf_moderno: "RFXXX - Seção 7 (Modelo de Dados)"
+      documentacao_moderno: "RFXXX - Seção 7 (Modelo de Dados)"
       md_moderno: "MD-RFXXX.md - Tabela Empresa"
     migracao_moderna:
       tabela_moderna: "Empresa"
@@ -488,7 +488,7 @@ itens_legado:
     destino: "ASSUMIDO"
     justificativa: "Regra documentada e mantida no sistema moderno"
     rastreabilidade:
-      rf_moderno: "RFXXX - Seção 3 (Regras de Negócio)"
+      documentacao_moderno: "RFXXX - Seção 3 (Regras de Negócio)"
       regra_moderna: "RN-RFXXX-008"
     migracao_moderna:
       validador: "CreateEmpresaCommandValidator"
@@ -578,8 +578,8 @@ python D:\IC2_Governanca\tools\docs\validator-rl.py RFXXX
 documentacao:
   versao: "2.0"
   data_migracao: "2025-12-30"
-  rf: true                # RFXXX.md v2.0 criado (contrato moderno)
-  rf_yaml: true           # RFXXX.yaml criado (estruturado)
+  documentacao: true                # RFXXX.md v2.0 criado (contrato moderno)
+  documentacao_yaml: true           # RFXXX.yaml criado (estruturado)
   rl: true                # RL-RFXXX.md criado (memória legado)
   rl_yaml: true           # RL-RFXXX.yaml criado (rastreabilidade)
   uc: false               # Aguardando criação (próximo contrato)
@@ -595,7 +595,7 @@ documentacao:
 # ==============================================================================
 
 separacao_rf_rl:
-  rf_limpo: true                # RF não contém conteúdo legado
+  documentacao_limpo: true                # RF não contém conteúdo legado
   rl_completo: true             # RL contém TODA memória legado
   itens_com_destino: true       # 100% itens RL têm campo destino
   validador_executado: true     # validator-rl.py passou (exit code 0)
@@ -614,8 +614,8 @@ estatisticas:
   problemas_legado_identificados: 5  # Problemas documentados
 
   linhas_documentacao:
-    rf_md: 1200
-    rf_yaml: 550
+    documentacao_md: 1200
+    documentacao_yaml: 550
     rl_md: 480
     rl_yaml: 420
     total: 2650
@@ -629,11 +629,11 @@ Atenção: essa atividade pode ser feita diretamente no branch dev local e comit
 
 ```bash
 # Commit dos 4 arquivos migrados + STATUS.yaml
-git add rf/**/RFXXX.md
-git add rf/**/RFXXX.yaml
-git add rf/**/RL-RFXXX.md
-git add rf/**/RL-RFXXX.yaml
-git add rf/**/STATUS.yaml
+git add documentacao/**/RFXXX.md
+git add documentacao/**/RFXXX.yaml
+git add documentacao/**/RL-RFXXX.md
+git add documentacao/**/RL-RFXXX.yaml
+git add documentacao/**/STATUS.yaml
 git commit -m "docs(RFXXX): migração v1.0 → v2.0 (separação RF/RL completa)"
 ```
 
@@ -731,7 +731,7 @@ O contrato só é considerado CONCLUÍDO quando:
 - [ ] validator-rl.py executado (exit code 0)
 - [ ] RFXXX.md ↔ RFXXX.yaml sincronizados
 - [ ] RL-RFXXX.md ↔ RL-RFXXX.yaml sincronizados
-- [ ] STATUS.yaml atualizado (documentacao.rf=true, rl=true, rf_yaml=true, rl_yaml=true)
+- [ ] STATUS.yaml atualizado (documentacao.rf=true, rl=true, documentacao_yaml=true, rl_yaml=true)
 - [ ] STATUS.yaml atualizado (separacao_rf_rl = all true)
 - [ ] Commit realizado (4 arquivos + STATUS.yaml)
 

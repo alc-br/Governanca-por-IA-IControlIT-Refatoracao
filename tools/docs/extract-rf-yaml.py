@@ -40,7 +40,7 @@ class ExtractorRFYaml:
     def __init__(self, base_path: str = "D:\\IC2\\docs\\rf"):
         self.base_path = Path(base_path)
 
-    def encontrar_rf(self, rf_id: str) -> Path:
+    def encontrar_rf(self, documentacao_id: str) -> Path:
         """Encontra a pasta do RF (tolerante a diferentes padrões de estrutura)"""
         # Tentar múltiplos padrões de EPIC
         epic_patterns = ["EPIC*", "EPIC-*", "EPIC[0-9]*"]
@@ -49,24 +49,24 @@ class ExtractorRFYaml:
             for epic_pattern in epic_patterns:
                 for epic_dir in fase_dir.glob(epic_pattern):
                     # Procurar RF com diferentes padrões
-                    rf_patterns = [f"{rf_id}-*", f"{rf_id}"]
-                    for rf_pattern in rf_patterns:
-                        for rf_dir in epic_dir.glob(rf_pattern):
+                    documentacao_patterns = [f"{rf_id}-*", f"{rf_id}"]
+                    for documentacao_pattern in documentacao_patterns:
+                        for documentacao_dir in epic_dir.glob(rf_pattern):
                             # Verificar se é realmente a pasta do RF
-                            if rf_dir.is_dir() and rf_dir.name.startswith(rf_id):
-                                return rf_dir
+                            if documentacao_dir.is_dir() and documentacao_dir.name.startswith(rf_id):
+                                return documentacao_dir
 
         raise FileNotFoundError(f"RF {rf_id} não encontrado em {self.base_path}")
 
-    def extrair_metadados(self, content: str, rf_id: str, rf_path: Path) -> Dict:
+    def extrair_metadados(self, content: str, documentacao_id: str, documentacao_path: Path) -> Dict:
         """Extrai metadados básicos do RF"""
         # Tentar extrair título da primeira linha (# RF-XXX  Título)
         title_match = re.search(r'^#\s+' + re.escape(rf_id) + r'\s+[-]\s+(.+)$', content, re.MULTILINE)
         nome = title_match.group(1).strip() if title_match else "Sem título"
 
         # Extrair fase e epic do caminho
-        fase = rf_path.parent.parent.name  # Fase-X-Nome
-        epic = rf_path.parent.name  # EPIC-XXX-YYY
+        fase = documentacao_path.parent.parent.name  # Fase-X-Nome
+        epic = documentacao_path.parent.name  # EPIC-XXX-YYY
 
         # Extrair versão e data se existir seção "Histórico de Versões"
         versao = "1.0"
@@ -82,7 +82,7 @@ class ExtractorRFYaml:
                 data = primeira_linha.group(2)
 
         return {
-            "id": rf_id,
+            "id": documentacao_id,
             "nome": nome,
             "versao": versao,
             "data": data,
@@ -189,7 +189,7 @@ class ExtractorRFYaml:
 
         return regras
 
-    def extrair_entidades(self, content: str, rf_id: str) -> List[Dict]:
+    def extrair_entidades(self, content: str, documentacao_id: str) -> List[Dict]:
         """Extrai entidades principais (da seção MD ou nome do RF)"""
         entidades = []
 
@@ -252,21 +252,21 @@ class ExtractorRFYaml:
         # Lista padrão
         return ["UC00", "UC01", "UC02", "UC03", "UC04"]
 
-    def gerar_rf_yaml(self, rf_id: str) -> Dict:
+    def gerar_rf_yaml(self, documentacao_id: str) -> Dict:
         """Gera estrutura YAML completa do RF"""
-        rf_path = self.encontrar_rf(rf_id)
-        rf_md = rf_path / f"{rf_id}.md"
+        documentacao_path = self.encontrar_rf(rf_id)
+        documentacao_md = documentacao_path / f"{rf_id}.md"
 
-        if not rf_md.exists():
+        if not documentacao_md.exists():
             raise FileNotFoundError(f"Arquivo {rf_md} não encontrado")
 
-        content = rf_md.read_text(encoding='utf-8')
+        content = documentacao_md.read_text(encoding='utf-8')
 
         # Extrair todas as seções
-        metadados = self.extrair_metadados(content, rf_id, rf_path)
+        metadados = self.extrair_metadados(content, documentacao_id, documentacao_path)
         descricao = self.extrair_descricao(content)
         escopo = self.extrair_escopo(content)
-        entidades = self.extrair_entidades(content, rf_id)
+        entidades = self.extrair_entidades(content, documentacao_id)
         regras = self.extrair_regras_negocio(content)
         ucs = self.extrair_ucs_esperados(content)
 
@@ -275,7 +275,7 @@ class ExtractorRFYaml:
         permissoes = self.extrair_permissoes(content, entidade_nome)
 
         # Montar estrutura YAML
-        rf_yaml = {
+        documentacao_yaml = {
             "rf": metadados,
             "descricao": descricao,
             "escopo": escopo,
@@ -339,13 +339,13 @@ class ExtractorRFYaml:
             ]
         }
 
-        return rf_yaml
+        return documentacao_yaml
 
-    def salvar_yaml(self, rf_id: str, data: Dict, output_path: Path = None):
+    def salvar_yaml(self, documentacao_id: str, data: Dict, output_path: Path = None):
         """Salva YAML em arquivo"""
         if output_path is None:
-            rf_path = self.encontrar_rf(rf_id)
-            output_path = rf_path / f"{rf_id}.yaml"
+            documentacao_path = self.encontrar_rf(rf_id)
+            output_path = documentacao_path / f"{rf_id}.yaml"
 
         # Criar comentário de cabeçalho
         header = f"""# =============================================
@@ -364,7 +364,7 @@ class ExtractorRFYaml:
         output_path.write_text(header + yaml_content, encoding='utf-8')
         print(f" {output_path.name} criado com sucesso")
 
-    def extrair_rf(self, rf_id: str) -> bool:
+    def extrair_rf(self, documentacao_id: str) -> bool:
         """Extrai um RF completo"""
         try:
             print(f"Extraindo {rf_id}.md  {rf_id}.yaml...")
@@ -386,8 +386,8 @@ class ExtractorRFYaml:
         sucesso = 0
 
         for epic_dir in sorted(fase_dir.glob("EPIC-*")):
-            for rf_dir in sorted(epic_dir.glob("RF*")):
-                rf_id = rf_dir.name.split('-')[0]
+            for documentacao_dir in sorted(epic_dir.glob("RF*")):
+                documentacao_id = documentacao_dir.name.split('-')[0]
                 if self.extrair_rf(rf_id):
                     sucesso += 1
 
@@ -436,7 +436,7 @@ def main():
         print(f"\n {total} arquivos RF.yaml gerados com sucesso")
 
     else:
-        rf_id = arg
+        documentacao_id = arg
         if extractor.extrair_rf(rf_id):
             print("\n Extração concluída!")
         else:

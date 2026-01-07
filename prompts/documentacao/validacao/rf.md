@@ -1,6 +1,6 @@
 # Validação RFXXX - Validação de Adequação RF
 
-Ele fica nesse endereço D:\IC2\rf\Fase*\EPIC*\RF*
+Ele fica nesse endereço D:\IC2\documentacao\Fase*\EPIC*\RF*
 
 **Instruções:** Altere RFXXX acima para o RF desejado (ex: RF001, RF025, RF028).
 
@@ -147,7 +147,7 @@ secoes_obrigatorias = [
 ]
 
 for secao in secoes_obrigatorias:
-    if secao not in rf_md_content:
+    if secao not in documentacao_md_content:
         GAP(f"Seção ausente: {secao}")
 ```
 
@@ -155,7 +155,7 @@ for secao in secoes_obrigatorias:
 
 ```python
 # Extrair RNs do RF.md
-rns_md = re.findall(r'RN-[A-Z]+-\d+-\d+', rf_md_content)
+rns_md = re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_md_content)
 
 if len(rns_md) < 10:
     GAP(f"CRÍTICO: Apenas {len(rns_md)} RNs encontradas. Mínimo: 10")
@@ -168,7 +168,7 @@ if len(rns_md) < 10:
 integracoes_obrigatorias = ["i18n", "Auditoria", "RBAC", "Central de Funcionalidades"]
 
 for integracao in integracoes_obrigatorias:
-    if integracao not in rf_md_content:
+    if integracao not in documentacao_md_content:
         GAP(f"CRÍTICO: Integração ausente: {integracao}")
 ```
 
@@ -179,7 +179,7 @@ for integracao in integracoes_obrigatorias:
 legado_keywords = ["ASPX", "WebServices", "SQL legado", ".aspx", "WebService"]
 
 for keyword in legado_keywords:
-    if keyword in rf_md_content:
+    if keyword in documentacao_md_content:
         GAP(f"CRÍTICO: Referência a legado encontrada: {keyword}")
 ```
 
@@ -187,10 +187,10 @@ for keyword in legado_keywords:
 
 ```python
 # RNs em MD
-rns_md = set(re.findall(r'RN-[A-Z]+-\d+-\d+', rf_md_content))
+rns_md = set(re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_md_content))
 
 # RNs em YAML
-rns_yaml = set([rn['id'] for rn in rf_yaml['regras_negocio']])
+rns_yaml = set([rn['id'] for rn in documentacao_yaml['regras_negocio']])
 
 # Gaps
 rns_md_only = rns_md - rns_yaml

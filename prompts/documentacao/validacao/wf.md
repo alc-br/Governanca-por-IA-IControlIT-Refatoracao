@@ -1,6 +1,6 @@
 # Validação de WF do RFXXX - Validação de Wireframes
 
-Ele fica nesse endereço D:\IC2\rf\Fase*\EPIC*\RF*
+Ele fica nesse endereço D:\IC2\documentacao\Fase*\EPIC*\RF*
 
 ---
 

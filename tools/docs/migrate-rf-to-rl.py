@@ -81,12 +81,12 @@ class MigradorRF:
         self.converter_md = ConverterMDYaml(base_path)
         self.validador_rl = ValidadorRL(base_path)
 
-    def encontrar_rf(self, rf_id: str) -> Path:
+    def encontrar_rf(self, documentacao_id: str) -> Path:
         """Encontra a pasta do RF"""
         for fase_dir in self.base_path.glob("Fase-*"):
             for epic_dir in fase_dir.glob("EPIC*"):
-                for rf_dir in epic_dir.glob(f"{rf_id}-*"):
-                    return rf_dir
+                for documentacao_dir in epic_dir.glob(f"{rf_id}-*"):
+                    return documentacao_dir
         raise FileNotFoundError(f"RF {rf_id} nao encontrado")
 
     def criar_backup(self, arquivo: Path) -> Path:
@@ -155,14 +155,14 @@ class MigradorRF:
 
         return sorted(secoes_unicas, key=lambda x: x["inicio"])
 
-    def separar_rf_limpo(self, rf_path: Path, rf_id: str) -> Tuple[str, str]:
+    def separar_rf_limpo(self, documentacao_path: Path, documentacao_id: str) -> Tuple[str, str]:
         """Separa RF.md em conteúdo limpo + conteúdo legado"""
-        rf_md = rf_path / f"{rf_id}.md"
+        documentacao_md = documentacao_path / f"{rf_id}.md"
 
-        if not rf_md.exists():
+        if not documentacao_md.exists():
             raise FileNotFoundError(f"{rf_md} não encontrado")
 
-        content_original = rf_md.read_text(encoding='utf-8')
+        content_original = documentacao_md.read_text(encoding='utf-8')
         secoes_legado = self.detectar_secoes_legado(content_original)
 
         if not secoes_legado:
@@ -191,7 +191,7 @@ class MigradorRF:
 
         return content_limpo.strip(), conteudo_legado.strip()
 
-    def gerar_rl_md(self, rf_id: str, conteudo_legado: str, rf_path: Path) -> str:
+    def gerar_rl_md(self, documentacao_id: str, conteudo_legado: str, documentacao_path: Path) -> str:
         """Gera RL-RFXXX.md estruturado"""
         template = f"""# RL-{rf_id}  Referência ao Legado
 
@@ -279,7 +279,7 @@ class MigradorRF:
 """
         return template
 
-    def gerar_rl_yaml(self, rf_id: str, conteudo_legado: str) -> Dict:
+    def gerar_rl_yaml(self, documentacao_id: str, conteudo_legado: str) -> Dict:
         """Gera RL-RFXXX.yaml estruturado"""
         # Analisar conteúdo legado para gerar items
         items = []
@@ -302,7 +302,7 @@ class MigradorRF:
             })
 
         return {
-            "rf_id": rf_id,
+            "rf_id": documentacao_id,
             "titulo": f"Referência ao Legado - {rf_id}",
             "legado": {
                 "sistema": "VB.NET + ASP.NET Web Forms",
@@ -331,10 +331,10 @@ class MigradorRF:
             ]
         }
 
-    def migrar_rf(self, rf_id: str) -> Dict:
+    def migrar_rf(self, documentacao_id: str) -> Dict:
         """Migra um RF completo"""
         resultado = {
-            "rf_id": rf_id,
+            "rf_id": documentacao_id,
             "sucesso": False,
             "arquivos_criados": [],
             "arquivos_modificados": [],
@@ -344,25 +344,25 @@ class MigradorRF:
         }
 
         try:
-            rf_path = self.encontrar_rf(rf_id)
+            documentacao_path = self.encontrar_rf(rf_id)
             print(f"\n{'='*60}")
             print(f"Migrando {rf_id}...")
             print('='*60)
 
             # 1. Backup do RF.md original
-            rf_md = rf_path / f"{rf_id}.md"
+            documentacao_md = documentacao_path / f"{rf_id}.md"
             backup = self.criar_backup(rf_md)
             if backup:
                 resultado["backups"].append(str(backup))
 
             # 2. Separar RF limpo + conteúdo legado
             print(f"1. Separando conteúdo RF/RL...")
-            rf_limpo, conteudo_legado = self.separar_rf_limpo(rf_path, rf_id)
+            documentacao_limpo, conteudo_legado = self.separar_rf_limpo(rf_path, documentacao_id)
 
             # 3. Criar RL-RFXXX.md
             print(f"2. Criando RL-{rf_id}.md...")
-            rl_md_content = self.gerar_rl_md(rf_id, conteudo_legado, rf_path)
-            rl_md_path = rf_path / f"RL-{rf_id}.md"
+            rl_md_content = self.gerar_rl_md(rf_id, conteudo_legado, documentacao_path)
+            rl_md_path = documentacao_path / f"RL-{rf_id}.md"
 
             if not self.dry_run:
                 rl_md_path.write_text(rl_md_content, encoding='utf-8')
@@ -372,7 +372,7 @@ class MigradorRF:
             # 4. Criar RL-RFXXX.yaml
             print(f"3. Criando RL-{rf_id}.yaml...")
             rl_yaml_data = self.gerar_rl_yaml(rf_id, conteudo_legado)
-            rl_yaml_path = rf_path / f"RL-{rf_id}.yaml"
+            rl_yaml_path = documentacao_path / f"RL-{rf_id}.yaml"
 
             if not self.dry_run:
                 rl_yaml_content = yaml.dump(rl_yaml_data, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
@@ -390,7 +390,7 @@ class MigradorRF:
             # 5. Atualizar RF.md limpo
             print(f"4. Atualizando {rf_id}.md (sem legado)...")
             if not self.dry_run:
-                rf_md.write_text(rf_limpo, encoding='utf-8')
+                documentacao_md.write_text(rf_limpo, encoding='utf-8')
                 resultado["arquivos_modificados"].append(str(rf_md))
                 print(f"    {rf_id}.md atualizado")
 
@@ -407,8 +407,8 @@ class MigradorRF:
                 resultado["erros"].append(f"RF.yaml: {e}")
 
             # 7. Gerar UC-RFXXX.yaml (se UC.md existir)
-            uc_md = rf_path / f"UC-{rf_id}.md"
-            uc_md_alt = rf_path / "Casos de Uso" / f"UC-{rf_id}.md"
+            uc_md = documentacao_path / f"UC-{rf_id}.md"
+            uc_md_alt = documentacao_path / "Casos de Uso" / f"UC-{rf_id}.md"
 
             if uc_md.exists() or uc_md_alt.exists():
                 print(f"6. Gerando UC-{rf_id}.yaml...")
@@ -425,7 +425,7 @@ class MigradorRF:
                 print(f"6. UC-{rf_id}.md não encontrado - pulando UC.yaml")
 
             # 8. Converter MD.md  MD.yaml (se existir)
-            md_md = rf_path / f"MD-{rf_id}.md"
+            md_md = documentacao_path / f"MD-{rf_id}.md"
 
             if md_md.exists():
                 print(f"7. Convertendo MD-{rf_id}.md  MD-{rf_id}.yaml...")
@@ -478,8 +478,8 @@ class MigradorRF:
         resultados = {"sucesso": 0, "falhas": 0, "total": 0, "detalhes": []}
 
         for epic_dir in sorted(fase_dir.glob("EPIC-*")):
-            for rf_dir in sorted(epic_dir.glob("RF*")):
-                rf_id = rf_dir.name.split('-')[0]
+            for documentacao_dir in sorted(epic_dir.glob("RF*")):
+                documentacao_id = documentacao_dir.name.split('-')[0]
                 resultado = self.migrar_rf(rf_id)
                 resultados["detalhes"].append(resultado)
                 resultados["total"] += 1
@@ -593,7 +593,7 @@ def main():
         print('='*60)
 
     else:
-        rf_id = arg
+        documentacao_id = arg
         resultado = migrador.migrar_rf(rf_id)
 
         if resultado["sucesso"]:

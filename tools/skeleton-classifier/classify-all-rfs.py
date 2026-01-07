@@ -218,8 +218,8 @@ def classify_rf(status_yaml_path):
     Classifica um RF como Skeleton ou Completo.
     Retorna: (classification, details)
     """
-    rf_num = extract_rf_number(status_yaml_path)
-    if not rf_num:
+    documentacao_num = extract_rf_number(status_yaml_path)
+    if not documentacao_num:
         return "ERROR", "Não foi possível extrair número do RF"
 
     # Ler STATUS.yaml
@@ -426,7 +426,7 @@ def main():
 
     # Analisar cada RF
     for i, status_yaml_path in enumerate(sorted(status_files), 1):
-        rf_num = extract_rf_number(status_yaml_path)
+        documentacao_num = extract_rf_number(status_yaml_path)
         print(f"[{i}/{stats['total']}] Analisando {rf_num}...", end=" ")
 
         # Ler título do RF
@@ -461,7 +461,7 @@ def main():
 
         # Armazenar resultado
         results.append({
-            'rf': rf_num,
+            'rf': documentacao_num,
             'titulo': titulo,
             'classification': classification,
             'details': details,

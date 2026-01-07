@@ -358,7 +358,7 @@ Durante adequação de UC:
 ```yaml
 # NO RF.yaml - CAUSA ERRO!
 exclusions:
-  rf_items:
+  documentacao_items:
     - "SSO com provedores OAuth2/SAML (planejado para fase futura)"
     - "Biometria (não previsto)"
 ```
@@ -374,7 +374,7 @@ AttributeError: 'str' object has no attribute 'get'
 ```yaml
 # NO RF.yaml - CORRETO
 exclusions:
-  rf_items:
+  documentacao_items:
     - id: "EX-RF012-01"
       justificativa: "SSO com provedores OAuth2/SAML (planejado para fase futura)"
 
@@ -476,15 +476,15 @@ fi
 ```bash
 # Backup UC.yaml (se existir)
 if [ "$MODO" = "ADEQUACAO" ]; then
-    cp rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml \
-       rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml.backup-$(date +%Y%m%d-%H%M%S)
+    cp documentacao/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml \
+       documentacao/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml.backup-$(date +%Y%m%d-%H%M%S)
     echo "✅ Backup criado: UC.yaml.backup"
 fi
 
 # Backup UC.md (se existir)
 if [ -f "rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md" ]; then
-    cp rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md \
-       rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md.backup-$(date +%Y%m%d-%H%M%S)
+    cp documentacao/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md \
+       documentacao/[FASE]/[EPIC]/RFXXX/UC-RFXXX.md.backup-$(date +%Y%m%d-%H%M%S)
     echo "✅ Backup criado: UC.md.backup"
 fi
 ```
@@ -585,8 +585,8 @@ md_file = Path('rf/.../MD-RFXXX.md')
 
 # Ler RF
 with open(rf_file) as f:
-    rf_content = f.read()
-    rns_rf = set(re.findall(r'RN-RF\d{3}-\d{2}', rf_content))
+    documentacao_content = f.read()
+    rns_rf = set(re.findall(r'RN-RF\d{3}-\d{2}', documentacao_content))
 
 # Ler UC
 with open(uc_file) as f:
@@ -662,7 +662,7 @@ if md_file.exists():
 keywords_jobs = ['hangfire', 'job', 'scheduler', 'cron', 'background', 'recorrente', 'periódico']
 jobs_detected = []
 for keyword in keywords_jobs:
-    if keyword in rf_content.lower():
+    if keyword in documentacao_content.lower():
         jobs_detected.append(keyword)
 
 if jobs_detected:
@@ -674,7 +674,7 @@ else:
 keywords_integracoes = ['api', 'smtp', 'sendgrid', 'aws ses', 'azure', 'graph', 'brasil api', 'via cep', 'externo', 'third-party']
 integracoes_detected = []
 for keyword in keywords_integracoes:
-    if keyword in rf_content.lower():
+    if keyword in documentacao_content.lower():
         integracoes_detected.append(keyword)
 
 if integracoes_detected:
@@ -811,7 +811,7 @@ for entity in orphan_entities:
 ```python
 import re
 
-def migrate_nomenclature(file_path, rf_num):
+def migrate_nomenclature(file_path, documentacao_num):
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
@@ -1009,14 +1009,14 @@ grep -c -E '\*\*FE-UC\d{2}-\d{3}:\*\*' UC-RFXXX.md
 ```yaml
 # ANTES (ERRADO)
 covers:
-  rf_items:
+  documentacao_items:
     - "RF023-CRUD-01"  # ❌ Código de catálogo
     - "RF023-VAL-01"   # ❌ Código de catálogo
     - "RN-RF023-001"   # ✅ RN real
 
 # DEPOIS (CORRETO)
 covers:
-  rf_items:
+  documentacao_items:
     - "RN-RF023-001"
     - "RN-RF023-002"
     - "RN-RF023-003"
@@ -1027,7 +1027,7 @@ covers:
 
 **Script de limpeza:**
 ```python
-def clean_catalog_codes(uc_file, rf_file):
+def clean_catalog_codes(uc_file, documentacao_file):
     # Ler RNs válidas do RF
     with open(rf_file) as f:
         valid_rns = set(re.findall(r'"(RN-RF\d{3}-\d{2})"', f.read()))
@@ -1072,7 +1072,7 @@ def clean_catalog_codes(uc_file, rf_file):
    # =============================================
 
    uc:
-     rf: "RFXXX"
+     documentacao: "RFXXX"
      versao: "2.0"
      data: "AAAA-MM-DD"
    ```
@@ -1087,7 +1087,7 @@ def clean_catalog_codes(uc_file, rf_file):
        impacta_dados: true | false
 
        covers:
-         rf_items:
+         documentacao_items:
            - "RN-RFXXX-NN"  # Apenas RNs válidas
          uc_items:
            - id: "FP-UC00-001"
@@ -1297,7 +1297,7 @@ def validate_uc_yaml_md_sync(yaml_file, md_file):
     - "RN-RFXXX-0Y"  # ← RN que este UC cobre
 
   covers:
-    rf_items:
+    documentacao_items:
       - "RN-RFXXX-0Y"  # ← MESMO valor de regras_aplicadas
 
   pos_conditions:
@@ -1363,7 +1363,7 @@ regras_negocio:
     - "RN-RF024-003"
 
   covers:
-    rf_items:
+    documentacao_items:
       - "RN-RF024-003"
 
   criterios_aceite:
@@ -1376,8 +1376,8 @@ regras_negocio:
 **Validação:** Após criar todos os UCs, executar:
 ```bash
 python tools/docs/validator-rf-uc.py \
-  --rf rf/.../RFXXX.yaml \
-  --uc rf/.../UC-RFXXX.yaml
+  --rf documentacao/.../RFXXX.yaml \
+  --uc documentacao/.../UC-RFXXX.yaml
 ```
 
 Deve retornar: `✅ Cobertura: 15/15 (100%)`
@@ -1432,7 +1432,7 @@ Deve retornar: `✅ Cobertura: 15/15 (100%)`
     - "RN-RFXXX-0Y"
 
   covers:
-    rf_items:
+    documentacao_items:
       - "RN-RFXXX-0Y"
 
   configuracao_job:
@@ -1507,7 +1507,7 @@ Deve retornar: `✅ Cobertura: 15/15 (100%)`
     - "RN-RF023-04"
 
   covers:
-    rf_items:
+    documentacao_items:
       - "RN-RF023-04"
 
   configuracao_job:
@@ -1717,7 +1717,7 @@ Deve retornar: `✅ Cobertura: 15/15 (100%)`
     - "RN-RF024-006"
 
   covers:
-    rf_items:
+    documentacao_items:
       - "RN-RF024-006"
 
   criterios_aceite:
@@ -1914,7 +1914,7 @@ Deve retornar: `✅ Cobertura: 15/15 (100%)`
     - "RN-RF024-005"
 
   covers:
-    rf_items:
+    documentacao_items:
       - "RN-RF024-005"
 
   mapeamento_dados:
@@ -1957,8 +1957,8 @@ Executar validador e corrigir até exit code 0:
 
 ```bash
 python tools/docs/validator-rf-uc.py \
-  --rf rf/.../RFXXX.yaml \
-  --uc rf/.../UC-RFXXX.yaml
+  --rf documentacao/.../RFXXX.yaml \
+  --uc documentacao/.../UC-RFXXX.yaml
 
 # Exit code DEVE ser 0
 echo $?  # Deve imprimir: 0
@@ -1989,14 +1989,14 @@ Após validação aprovada (exit code 0), atualizar `STATUS.yaml`:
 ```yaml
 # STATUS.yaml
 documentacao:
-  rf: true
+  documentacao: true
   uc: true  # ← Atualizar para true
   md: [existente]
   wf: [existente]
   user_stories: [existente]
 
 validacoes:
-  rf_uc_cobertura_total: true  # ← Atualizar para true
+  documentacao_uc_cobertura_total: true  # ← Atualizar para true
   uc_nomenclatura_padrao: true  # ← Adicionar
   uc_catalogo_limpo: true       # ← Adicionar
   uc_jobs_documentados: true    # ← Adicionar se aplicável
@@ -2044,7 +2044,7 @@ adequacao_uc:
       cobre_rns: ["RN-RFXXX-04", "RN-RFXXX-13"]
 
   validacoes:
-    rf_uc_cobertura: "100% (N/N)"
+    documentacao_uc_cobertura: "100% (N/N)"
     nomenclatura_padrao: "100%"
     catalogo_limpo: true
     uc_yaml_uc_md_sincronizados: true
@@ -2189,8 +2189,8 @@ Criar `.temp_ia/adequacao-uc-RFXXX-relatorio.md`:
 
 ```bash
 $ python tools/docs/validator-rf-uc.py \
-    --rf rf/.../RFXXX.yaml \
-    --uc rf/.../UC-RFXXX.yaml
+    --rf documentacao/.../RFXXX.yaml \
+    --uc documentacao/.../UC-RFXXX.yaml
 
 ✅ Nomenclatura: 15/15 RNs no padrão RN-RFXXX-NNN
 ✅ Cobertura: 15/15 RNs (100%)

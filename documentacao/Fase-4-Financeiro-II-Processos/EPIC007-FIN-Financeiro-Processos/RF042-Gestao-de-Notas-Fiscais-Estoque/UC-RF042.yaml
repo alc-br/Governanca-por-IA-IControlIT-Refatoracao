@@ -1,0 +1,820 @@
+uc:
+  documentacao: "RF042"
+  titulo: "Gestão de Notas Fiscais de Estoque"
+  versao: "2.0"
+  data: "2025-12-31"
+  autor: "Agência ALC - alc.dev.br"
+  epic: "EPIC007-FIN - Financeiro Processos"
+  fase: "Fase 4 - Financeiro II - Processos"
+
+casos_de_uso:
+  - id: "UC00"
+    nome: "Listar Notas Fiscais Estoque"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      documentacao_items:
+        - "RN-RF042-001"  # Multi-tenancy por EmpresaId
+        - "RN-RF042-013"  # Soft Delete (FlExcluido = FALSE)
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa menu 'Estoque' → 'Notas Fiscais'"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema carrega grid com NFs da empresa (multi-tenancy)"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Grid exibe: Número, Série, Fornecedor, Data Emissão, Valor Total, Qtd Itens, Status"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Usuário aplica filtros: Fornecedor, Período, Status (Pendente, Processada, Cancelada)"
+          required: false
+        - id: "FP-UC00-005"
+          title: "Sistema atualiza grid conforme filtros aplicados"
+          required: false
+        - id: "FP-UC00-006"
+          title: "Usuário clica em NF para visualizar detalhes (UC02)"
+          required: false
+    precondicoes:
+      - permissao: "nf_estoque.view_any"
+      - estado: "usuario_autenticado"
+    gatilho: "Usuario acessa menu Estoque > Notas Fiscais"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_nf_estoque"
+        descricao: "Usuário navega para Estoque → Notas Fiscais"
+      - passo: 2
+        ator: "sistema"
+        acao: "carrega_nfs_empresa"
+        descricao: "Sistema carrega NFs da empresa (multi-tenancy por EmpresaId, apenas FlExcluido = FALSE)"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibe_grid"
+        descricao: "Grid exibe: Número, Série, Fornecedor, Data Emissão, Valor Total, Qtd Itens, Status"
+      - passo: 4
+        ator: "usuario"
+        acao: "aplica_filtros"
+        descricao: "Usuário filtra por Fornecedor, Período, Status (opcional)"
+      - passo: 5
+        ator: "sistema"
+        acao: "atualiza_grid"
+        descricao: "Sistema atualiza grid conforme filtros"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC00-001"
+        descricao: "Nenhuma NF encontrada"
+        passos:
+          - "Sistema exibe mensagem: 'Nenhuma Nota Fiscal encontrada para os critérios selecionados'"
+    regras_aplicadas:
+      - "RN-RF042-001"
+      - "RN-RF042-013"
+    resultado_final:
+      estado: "grid_nfs_exibido"
+      mensagem: "Grid de Notas Fiscais exibido com filtros aplicáveis"
+
+  - id: "UC01"
+    nome: "Criar Nota Fiscal Estoque"
+    ator_principal: "estoquista"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      documentacao_items:
+        - "RN-RF042-001"  # Multi-tenancy por EmpresaId
+        - "RN-RF042-002"  # Chave de Acesso única (44 dígitos)
+        - "RN-RF042-004"  # Importação automática XML NF-e via e-mail
+        - "RN-RF042-005"  # Validação XML contra Schema XSD SEFAZ
+        - "RN-RF042-011"  # Auditoria completa (5 campos)
+      uc_items:
+        - id: "FP-UC01-001"
+          title: "Usuário clica em 'Nova Nota Fiscal'"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema exibe formulário: Número*, Série*, Chave Acesso* (44 dígitos), Fornecedor*, Data Emissão*, Valor Total*, Anexo XML (upload)"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Usuário preenche campos obrigatórios e faz upload do XML"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Sistema valida formato Chave Acesso (44 dígitos numéricos)"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Sistema valida unicidade de Chave Acesso (RN-RF042-002)"
+          required: true
+        - id: "FP-UC01-006"
+          title: "Sistema valida XML contra Schema XSD SEFAZ (RN-RF042-005)"
+          required: true
+        - id: "FP-UC01-007"
+          title: "Sistema salva NF com EmpresaId (multi-tenancy), Status = 'Pendente', auditoria completa"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Sistema armazena XML em Blob Storage criptografado AES-256"
+          required: true
+        - id: "FP-UC01-009"
+          title: "Sistema envia notificação SignalR para dashboard"
+          required: false
+    precondicoes:
+      - permissao: "nf_estoque.create"
+      - estado: "fornecedor_cadastrado"
+    gatilho: "Usuario clica em 'Nova Nota Fiscal'"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_nova_nf"
+        descricao: "Estoquista clica em botão 'Nova Nota Fiscal'"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibe_formulario"
+        descricao: "Sistema exibe formulário com campos obrigatórios"
+      - passo: 3
+        ator: "usuario"
+        acao: "preenche_formulario"
+        descricao: "Usuário preenche Número, Série, Chave Acesso, Fornecedor, Data Emissão, Valor Total e anexa XML"
+      - passo: 4
+        ator: "sistema"
+        acao: "valida_chave_acesso"
+        descricao: "Sistema valida formato (44 dígitos) e unicidade da Chave Acesso"
+      - passo: 5
+        ator: "sistema"
+        acao: "valida_xml"
+        descricao: "Sistema valida XML contra Schema XSD SEFAZ"
+      - passo: 6
+        ator: "sistema"
+        acao: "salva_nf"
+        descricao: "Sistema salva NF com EmpresaId, Status = 'Pendente', auditoria (5 campos)"
+      - passo: 7
+        ator: "sistema"
+        acao: "armazena_xml_blob"
+        descricao: "Sistema armazena XML em Blob Storage criptografado AES-256"
+      - passo: 8
+        ator: "sistema"
+        acao: "notifica_dashboard"
+        descricao: "Sistema envia notificação SignalR para atualização dashboard"
+    fluxos_alternativos:
+      - id: "FA-UC01-001"
+        descricao: "Upload XML NF-e para auto-preenchimento"
+        passos:
+          - "Usuário faz upload do XML antes de preencher formulário"
+          - "Sistema faz parse do XML e extrai: Número, Série, Chave Acesso, Fornecedor (CNPJ), Data Emissão, Valor Total"
+          - "Sistema pré-preenche formulário com dados extraídos"
+          - "Usuário confirma ou ajusta dados"
+          - "Retorna ao passo 4 do fluxo principal"
+    fluxos_excecao:
+      - id: "FE-UC01-001"
+        descricao: "Chave de Acesso já existe"
+        passos:
+          - "Sistema exibe erro: 'Chave de Acesso já cadastrada no sistema' (RN-RF042-002)"
+          - "Usuário corrige e resubmete"
+      - id: "FE-UC01-002"
+        descricao: "Formato Chave Acesso inválido"
+        passos:
+          - "Sistema exibe erro: 'Chave de Acesso deve conter 44 dígitos numéricos'"
+          - "Usuário corrige e resubmete"
+      - id: "FE-UC01-003"
+        descricao: "XML inválido (Schema XSD)"
+        passos:
+          - "Sistema exibe erro: 'XML não conforme com Schema SEFAZ' (RN-RF042-005)"
+          - "Usuário corrige XML e resubmete"
+    regras_aplicadas:
+      - "RN-RF042-001"
+      - "RN-RF042-002"
+      - "RN-RF042-004"
+      - "RN-RF042-005"
+      - "RN-RF042-011"
+    resultado_final:
+      estado: "nf_criada_pendente"
+      mensagem: "Nota Fiscal criada com sucesso (Status: Pendente)"
+
+  - id: "UC02"
+    nome: "Visualizar Nota Fiscal Estoque"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      documentacao_items:
+        - "RN-RF042-001"  # Multi-tenancy por EmpresaId
+        - "RN-RF042-007"  # Geração automática DANFE PDF/A-1b
+        - "RN-RF042-010"  # Armazenamento XML/DANFE Blob Storage 7 anos
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Usuário clica em NF no grid (UC00)"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema exibe detalhes da NF: Cabeçalho (Número, Série, Fornecedor, Data, Valor)"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema exibe lista de itens vinculados ao estoque (se houver)"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Sistema exibe histórico de recebimentos/movimentações estoque geradas"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Sistema exibe XML parseado (árvore de dados estruturados)"
+          required: true
+        - id: "FP-UC02-006"
+          title: "Sistema gera e exibe preview do DANFE PDF/A-1b com QR Code"
+          required: true
+        - id: "FP-UC02-007"
+          title: "Usuário pode baixar XML ou DANFE PDF"
+          required: false
+    precondicoes:
+      - permissao: "nf_estoque.view"
+      - estado: "nf_existe"
+    gatilho: "Usuario clica em NF no grid"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_nf"
+        descricao: "Usuário seleciona NF no grid"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibe_detalhes"
+        descricao: "Sistema exibe cabeçalho NF (Número, Série, Fornecedor, Data, Valor, Status)"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibe_itens"
+        descricao: "Sistema lista itens vinculados ao estoque (se houver)"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibe_historico"
+        descricao: "Sistema exibe histórico de recebimentos/movimentações estoque"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibe_xml_parseado"
+        descricao: "Sistema exibe XML parseado em árvore estruturada"
+      - passo: 6
+        ator: "sistema"
+        acao: "gera_danfe_preview"
+        descricao: "Sistema gera DANFE PDF/A-1b com QR Code e exibe preview"
+      - passo: 7
+        ator: "usuario"
+        acao: "baixa_xml_ou_danfe"
+        descricao: "Usuário pode baixar XML ou DANFE PDF (opcional)"
+    fluxos_alternativos: []
+    fluxos_excecao: []
+    regras_aplicadas:
+      - "RN-RF042-001"
+      - "RN-RF042-007"
+      - "RN-RF042-010"
+    resultado_final:
+      estado: "nf_visualizada"
+      mensagem: "Detalhes completos da NF exibidos"
+
+  - id: "UC03"
+    nome: "Editar Nota Fiscal Estoque"
+    ator_principal: "estoquista"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      documentacao_items:
+        - "RN-RF042-001"  # Multi-tenancy por EmpresaId
+        - "RN-RF042-003"  # NF apenas editável se Status = 'Pendente'
+        - "RN-RF042-011"  # Auditoria completa (5 campos)
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Usuário clica em 'Editar' na visualização da NF (UC02)"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema valida se Status = 'Pendente' (RN-RF042-003)"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Sistema exibe formulário com dados atuais (Valor, Data Emissão, Fornecedor editáveis)"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Usuário altera campos permitidos"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Sistema salva alterações e atualiza auditoria (DataAlteracao, UsuarioAlteracao)"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+    precondicoes:
+      - permissao: "nf_estoque.update"
+      - estado: "status_pendente"
+    gatilho: "Usuario clica em 'Editar' NF"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_editar"
+        descricao: "Estoquista clica em botão 'Editar' na visualização da NF"
+      - passo: 2
+        ator: "sistema"
+        acao: "valida_status"
+        descricao: "Sistema verifica se Status = 'Pendente' (RN-RF042-003)"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibe_formulario"
+        descricao: "Sistema exibe formulário editável (Valor, Data Emissão, Fornecedor)"
+      - passo: 4
+        ator: "usuario"
+        acao: "altera_campos"
+        descricao: "Usuário modifica Valor, Data Emissão ou Fornecedor"
+      - passo: 5
+        ator: "sistema"
+        acao: "salva_alteracoes"
+        descricao: "Sistema salva alterações e atualiza auditoria (DataAlteracao, UsuarioAlteracao)"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibe_sucesso"
+        descricao: "Sistema exibe mensagem: 'Nota Fiscal atualizada com sucesso'"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC03-001"
+        descricao: "Status diferente de 'Pendente'"
+        passos:
+          - "Sistema exibe erro: 'Apenas Notas Fiscais com Status Pendente podem ser editadas' (RN-RF042-003)"
+          - "Sistema bloqueia edição"
+      - id: "FE-UC03-002"
+        descricao: "NF possui itens já recebidos no estoque"
+        passos:
+          - "Sistema exibe erro: 'Nota Fiscal com itens recebidos não pode ser editada'"
+          - "Sistema bloqueia edição"
+    regras_aplicadas:
+      - "RN-RF042-001"
+      - "RN-RF042-003"
+      - "RN-RF042-011"
+    resultado_final:
+      estado: "nf_editada"
+      mensagem: "Nota Fiscal atualizada com auditoria registrada"
+
+  - id: "UC04"
+    nome: "Cancelar Nota Fiscal Estoque"
+    ator_principal: "controller"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      documentacao_items:
+        - "RN-RF042-001"  # Multi-tenancy por EmpresaId
+        - "RN-RF042-008"  # Cancelamento com estorno automático de movimentações
+        - "RN-RF042-011"  # Auditoria completa (5 campos)
+        - "RN-RF042-013"  # Soft Delete (FlExcluido = TRUE)
+      uc_items:
+        - id: "FP-UC04-001"
+          title: "Usuário clica em 'Cancelar' na visualização da NF (UC02)"
+          required: true
+        - id: "FP-UC04-002"
+          title: "Sistema solicita justificativa obrigatória"
+          required: true
+        - id: "FP-UC04-003"
+          title: "Usuário informa justificativa"
+          required: true
+        - id: "FP-UC04-004"
+          title: "Sistema marca NF como FlExcluido = TRUE (soft delete)"
+          required: true
+        - id: "FP-UC04-005"
+          title: "Sistema estorna movimentações de estoque vinculadas (RN-RF042-008)"
+          required: true
+        - id: "FP-UC04-006"
+          title: "Sistema registra auditoria (DataExclusao, UsuarioExclusao, Justificativa)"
+          required: true
+        - id: "FP-UC04-007"
+          title: "Sistema exibe mensagem de sucesso"
+          required: true
+    precondicoes:
+      - permissao: "nf_estoque.delete"
+      - estado: "nf_existe"
+    gatilho: "Usuario clica em 'Cancelar' NF"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_cancelar"
+        descricao: "Controller clica em botão 'Cancelar' na visualização da NF"
+      - passo: 2
+        ator: "sistema"
+        acao: "solicita_justificativa"
+        descricao: "Sistema exibe modal solicitando justificativa obrigatória"
+      - passo: 3
+        ator: "usuario"
+        acao: "informa_justificativa"
+        descricao: "Usuário preenche justificativa do cancelamento"
+      - passo: 4
+        ator: "sistema"
+        acao: "marca_excluido"
+        descricao: "Sistema marca FlExcluido = TRUE (soft delete, RN-RF042-013)"
+      - passo: 5
+        ator: "sistema"
+        acao: "estorna_movimentacoes"
+        descricao: "Sistema estorna movimentações de estoque vinculadas (RN-RF042-008)"
+      - passo: 6
+        ator: "sistema"
+        acao: "registra_auditoria"
+        descricao: "Sistema registra DataExclusao, UsuarioExclusao, Justificativa"
+      - passo: 7
+        ator: "sistema"
+        acao: "exibe_sucesso"
+        descricao: "Sistema exibe mensagem: 'Nota Fiscal cancelada com sucesso'"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC04-001"
+        descricao: "Justificativa não informada"
+        passos:
+          - "Sistema exibe erro: 'Justificativa é obrigatória para cancelamento'"
+          - "Usuário informa justificativa e resubmete"
+    regras_aplicadas:
+      - "RN-RF042-001"
+      - "RN-RF042-008"
+      - "RN-RF042-011"
+      - "RN-RF042-013"
+    resultado_final:
+      estado: "nf_cancelada_estornada"
+      mensagem: "Nota Fiscal cancelada e movimentações estornadas"
+
+  - id: "UC05"
+    nome: "Vincular Itens ao Estoque"
+    ator_principal: "estoquista"
+    tipo: "escrita"
+    impacta_dados: true
+    covers:
+      documentacao_items:
+        - "RN-RF042-001"  # Multi-tenancy por EmpresaId
+        - "RN-RF042-006"  # Conciliação NF ↔ Pedido Compra (tolerâncias configuráveis)
+        - "RN-RF042-009"  # Lançamento automático estoque (custo médio ponderado)
+        - "RN-RF042-011"  # Auditoria completa (5 campos)
+      uc_items:
+        - id: "FP-UC05-001"
+          title: "Usuário clica em 'Vincular Itens' na visualização da NF (UC02)"
+          required: true
+        - id: "FP-UC05-002"
+          title: "Sistema exibe lista de itens extraídos do XML NF-e"
+          required: true
+        - id: "FP-UC05-003"
+          title: "Sistema sugere mapeamento automático (produtos cadastrados com EAN/SKU)"
+          required: true
+        - id: "FP-UC05-004"
+          title: "Usuário confirma ou ajusta mapeamento manualmente"
+          required: true
+        - id: "FP-UC05-005"
+          title: "Sistema valida quantidade (XML vs estoque físico)"
+          required: true
+        - id: "FP-UC05-006"
+          title: "Sistema verifica conciliação com Pedido de Compra (RN-RF042-006)"
+          required: false
+        - id: "FP-UC05-007"
+          title: "Sistema gera entradas de estoque (custo médio ponderado, RN-RF042-009)"
+          required: true
+        - id: "FP-UC05-008"
+          title: "Sistema atualiza Status NF para 'Processada'"
+          required: true
+        - id: "FP-UC05-009"
+          title: "Sistema registra auditoria completa"
+          required: true
+    precondicoes:
+      - permissao: "nf_estoque.link_items"
+      - estado: "status_pendente"
+      - estado: "xml_parseado"
+    gatilho: "Usuario clica em 'Vincular Itens'"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clica_vincular_itens"
+        descricao: "Estoquista clica em botão 'Vincular Itens' na visualização da NF"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibe_itens_xml"
+        descricao: "Sistema exibe lista de itens extraídos do XML (Descrição, Qtd, Valor Unitário)"
+      - passo: 3
+        ator: "sistema"
+        acao: "sugere_mapeamento"
+        descricao: "Sistema sugere produtos cadastrados (match por EAN, SKU ou descrição similar)"
+      - passo: 4
+        ator: "usuario"
+        acao: "confirma_ou_ajusta"
+        descricao: "Usuário confirma mapeamento sugerido ou seleciona produto manualmente"
+      - passo: 5
+        ator: "sistema"
+        acao: "valida_quantidade"
+        descricao: "Sistema valida quantidade (XML vs estoque físico, tolerância configurável)"
+      - passo: 6
+        ator: "sistema"
+        acao: "verifica_conciliacao_pedido"
+        descricao: "Sistema verifica conciliação com Pedido de Compra (RN-RF042-006)"
+      - passo: 7
+        ator: "sistema"
+        acao: "gera_entradas_estoque"
+        descricao: "Sistema gera entradas de estoque com custo médio ponderado (RN-RF042-009)"
+      - passo: 8
+        ator: "sistema"
+        acao: "atualiza_status_processada"
+        descricao: "Sistema atualiza Status NF para 'Processada'"
+      - passo: 9
+        ator: "sistema"
+        acao: "registra_auditoria"
+        descricao: "Sistema registra auditoria completa (DataAlteracao, UsuarioAlteracao)"
+    fluxos_alternativos:
+      - id: "FA-UC05-001"
+        descricao: "Conciliação com Pedido de Compra aprovada"
+        passos:
+          - "Sistema identifica Pedido de Compra vinculado"
+          - "Sistema compara itens NF vs Pedido (qtd, valores, tolerâncias configuráveis)"
+          - "Sistema marca conciliação como 'Aprovada'"
+          - "Retorna ao passo 7 do fluxo principal"
+    fluxos_excecao:
+      - id: "FE-UC05-001"
+        descricao: "Divergência quantidade (fora tolerância)"
+        passos:
+          - "Sistema exibe alerta: 'Divergência de quantidade detectada (fora da tolerância configurada)'"
+          - "Sistema solicita confirmação ou ajuste manual"
+          - "Usuário confirma ou corrige quantidade"
+      - id: "FE-UC05-002"
+        descricao: "Produto não encontrado"
+        passos:
+          - "Sistema exibe erro: 'Produto não encontrado no cadastro'"
+          - "Sistema sugere: 'Cadastrar novo produto' ou 'Selecionar produto existente'"
+          - "Usuário resolve e retorna ao passo 4"
+    regras_aplicadas:
+      - "RN-RF042-001"
+      - "RN-RF042-006"
+      - "RN-RF042-009"
+      - "RN-RF042-011"
+    resultado_final:
+      estado: "itens_vinculados_estoque_atualizado"
+      mensagem: "Itens vinculados ao estoque e NF processada"
+
+  - id: "UC06"
+    nome: "Validar XML NF-e"
+    ator_principal: "sistema"
+    tipo: "processamento"
+    impacta_dados: true
+    covers:
+      documentacao_items:
+        - "RN-RF042-004"  # Importação automática XML NF-e via e-mail
+        - "RN-RF042-005"  # Validação XML contra Schema XSD SEFAZ
+        - "RN-RF042-012"  # OCR automático PDFs (Tesseract + Azure Form Recognizer, >95% precisão)
+        - "RN-RF042-014"  # Notificações tempo real (SignalR)
+      uc_items:
+        - id: "FP-UC06-001"
+          title: "Sistema monitora e-mail (IMAP/Exchange) configurado (RN-RF042-004)"
+          required: true
+        - id: "FP-UC06-002"
+          title: "Sistema detecta novo e-mail com anexo XML NF-e"
+          required: true
+        - id: "FP-UC06-003"
+          title: "Sistema faz download do XML e valida formato (44 dígitos chave)"
+          required: true
+        - id: "FP-UC06-004"
+          title: "Sistema valida XML contra Schema XSD SEFAZ (RN-RF042-005)"
+          required: true
+        - id: "FP-UC06-005"
+          title: "Sistema faz parse do XML e extrai dados estruturados"
+          required: true
+        - id: "FP-UC06-006"
+          title: "Sistema valida assinatura digital (certificado SEFAZ)"
+          required: true
+        - id: "FP-UC06-007"
+          title: "Sistema cria NF automaticamente (Status = 'Pendente Validação')"
+          required: true
+        - id: "FP-UC06-008"
+          title: "Sistema envia notificação SignalR para dashboard (RN-RF042-014)"
+          required: true
+        - id: "FP-UC06-009"
+          title: "Se anexo for PDF (sem XML), aplica OCR (Tesseract + Azure, RN-RF042-012)"
+          required: false
+    precondicoes:
+      - estado: "email_configurado"
+      - estado: "schema_sefaz_atualizado"
+    gatilho: "Sistema detecta novo e-mail com XML NF-e"
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "monitora_email"
+        descricao: "Sistema monitora e-mail (IMAP/Exchange) configurado para receber XML NF-e"
+      - passo: 2
+        ator: "sistema"
+        acao: "detecta_xml"
+        descricao: "Sistema detecta novo e-mail com anexo XML (extensão .xml)"
+      - passo: 3
+        ator: "sistema"
+        acao: "valida_formato_chave"
+        descricao: "Sistema faz download do XML e valida chave de acesso (44 dígitos)"
+      - passo: 4
+        ator: "sistema"
+        acao: "valida_schema_xsd"
+        descricao: "Sistema valida XML contra Schema XSD SEFAZ (RN-RF042-005)"
+      - passo: 5
+        ator: "sistema"
+        acao: "parse_xml"
+        descricao: "Sistema faz parse e extrai: Número, Série, Fornecedor, Itens, Valores"
+      - passo: 6
+        ator: "sistema"
+        acao: "valida_assinatura"
+        descricao: "Sistema valida assinatura digital (certificado SEFAZ)"
+      - passo: 7
+        ator: "sistema"
+        acao: "cria_nf_automatica"
+        descricao: "Sistema cria NF automaticamente (Status = 'Pendente Validação')"
+      - passo: 8
+        ator: "sistema"
+        acao: "notifica_dashboard"
+        descricao: "Sistema envia notificação SignalR para atualização dashboard (RN-RF042-014)"
+    fluxos_alternativos:
+      - id: "FA-UC06-001"
+        descricao: "Anexo é PDF (sem XML)"
+        passos:
+          - "Sistema detecta anexo PDF"
+          - "Sistema aplica OCR (Tesseract + Azure Form Recognizer, RN-RF042-012)"
+          - "Sistema extrai dados com precisão >95%"
+          - "Sistema cria NF com dados extraídos (Status = 'Pendente Validação OCR')"
+          - "Sistema solicita revisão humana (notificação SignalR)"
+    fluxos_excecao:
+      - id: "FE-UC06-001"
+        descricao: "XML inválido (Schema XSD)"
+        passos:
+          - "Sistema registra erro: 'XML não conforme com Schema SEFAZ'"
+          - "Sistema move e-mail para pasta 'Erros'"
+          - "Sistema envia notificação SignalR: 'Validação XML falhou'"
+      - id: "FE-UC06-002"
+        descricao: "Assinatura digital inválida"
+        passos:
+          - "Sistema registra erro: 'Assinatura digital inválida'"
+          - "Sistema move e-mail para pasta 'Erros'"
+          - "Sistema envia notificação SignalR: 'Validação assinatura falhou'"
+      - id: "FE-UC06-003"
+        descricao: "OCR falhou (precisão <95%)"
+        passos:
+          - "Sistema registra erro: 'OCR não atingiu precisão mínima (95%)'"
+          - "Sistema cria NF parcial com dados incompletos"
+          - "Sistema solicita revisão humana (notificação SignalR prioritária)"
+    regras_aplicadas:
+      - "RN-RF042-004"
+      - "RN-RF042-005"
+      - "RN-RF042-012"
+      - "RN-RF042-014"
+    resultado_final:
+      estado: "xml_validado_nf_criada_automatica"
+      mensagem: "XML validado e NF criada automaticamente (ou com OCR se PDF)"
+
+  - id: "UC07"
+    nome: "Relatório de Entradas"
+    ator_principal: "controller"
+    tipo: "leitura"
+    impacta_dados: false
+    covers:
+      documentacao_items:
+        - "RN-RF042-001"  # Multi-tenancy por EmpresaId
+        - "RN-RF042-015"  # Workflow aprovação multi-nível (<R$500, R$500-5k, >R$5k)
+      uc_items:
+        - id: "FP-UC07-001"
+          title: "Usuário acessa menu 'Estoque' → 'Relatórios' → 'Entradas'"
+          required: true
+        - id: "FP-UC07-002"
+          title: "Sistema solicita filtros: Período* (Data Início, Data Fim), Fornecedor, Categoria"
+          required: true
+        - id: "FP-UC07-003"
+          title: "Usuário informa período obrigatório e filtros opcionais"
+          required: true
+        - id: "FP-UC07-004"
+          title: "Sistema calcula métricas: Total NFs, Valor Total Entradas, Qtd Total Itens"
+          required: true
+        - id: "FP-UC07-005"
+          title: "Sistema gera breakdown: Por Fornecedor, Por Categoria Produto"
+          required: true
+        - id: "FP-UC07-006"
+          title: "Sistema exibe gráficos: Evolução Temporal, Top 5 Fornecedores, Top 5 Categorias"
+          required: true
+        - id: "FP-UC07-007"
+          title: "Usuário seleciona formato de exportação: PDF ou Excel"
+          required: true
+        - id: "FP-UC07-008"
+          title: "Sistema gera arquivo e disponibiliza para download"
+          required: true
+    precondicoes:
+      - permissao: "nf_estoque.reports"
+      - estado: "usuario_autenticado"
+    gatilho: "Usuario acessa menu Relatorios > Entradas"
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_relatorios"
+        descricao: "Controller acessa menu Estoque → Relatórios → Entradas"
+      - passo: 2
+        ator: "sistema"
+        acao: "solicita_filtros"
+        descricao: "Sistema exibe formulário com filtros: Período* (obrigatório), Fornecedor, Categoria"
+      - passo: 3
+        ator: "usuario"
+        acao: "informa_filtros"
+        descricao: "Usuário preenche período e filtros opcionais"
+      - passo: 4
+        ator: "sistema"
+        acao: "calcula_metricas"
+        descricao: "Sistema calcula: Total NFs, Valor Total Entradas, Qtd Total Itens (multi-tenancy)"
+      - passo: 5
+        ator: "sistema"
+        acao: "gera_breakdown"
+        descricao: "Sistema gera breakdown por Fornecedor e por Categoria Produto"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibe_graficos"
+        descricao: "Sistema exibe gráficos: Evolução Temporal, Top 5 Fornecedores, Top 5 Categorias"
+      - passo: 7
+        ator: "usuario"
+        acao: "seleciona_formato"
+        descricao: "Usuário seleciona formato: PDF ou Excel"
+      - passo: 8
+        ator: "sistema"
+        acao: "gera_arquivo"
+        descricao: "Sistema gera arquivo conforme formato selecionado e disponibiliza download"
+    fluxos_alternativos: []
+    fluxos_excecao:
+      - id: "FE-UC07-001"
+        descricao: "Nenhuma entrada no período"
+        passos:
+          - "Sistema exibe mensagem: 'Nenhuma entrada de estoque encontrada no período selecionado'"
+          - "Sistema sugere ampliar intervalo de datas"
+    regras_aplicadas:
+      - "RN-RF042-001"
+      - "RN-RF042-015"
+    resultado_final:
+      estado: "relatorio_gerado_exportado"
+      mensagem: "Relatório de Entradas gerado e exportado (PDF ou Excel)"
+
+rastreabilidade:
+  cobertura_total: "100%"
+  detalhamento:
+    - documentacao_item: "RN-RF042-001"
+      descricao: "Multi-tenancy por EmpresaId"
+      coberto_por:
+        - "UC00"
+        - "UC01"
+        - "UC02"
+        - "UC03"
+        - "UC04"
+        - "UC05"
+        - "UC07"
+    - documentacao_item: "RN-RF042-002"
+      descricao: "Chave de Acesso única (44 dígitos)"
+      coberto_por:
+        - "UC01"
+    - documentacao_item: "RN-RF042-003"
+      descricao: "NF editável apenas se Status = 'Pendente'"
+      coberto_por:
+        - "UC03"
+    - documentacao_item: "RN-RF042-004"
+      descricao: "Importação automática XML NF-e via e-mail (IMAP/Exchange)"
+      coberto_por:
+        - "UC01"
+        - "UC06"
+    - documentacao_item: "RN-RF042-005"
+      descricao: "Validação XML contra Schema XSD SEFAZ"
+      coberto_por:
+        - "UC01"
+        - "UC06"
+    - documentacao_item: "RN-RF042-006"
+      descricao: "Conciliação NF ↔ Pedido Compra (tolerâncias configuráveis)"
+      coberto_por:
+        - "UC05"
+    - documentacao_item: "RN-RF042-007"
+      descricao: "Geração automática DANFE PDF/A-1b com QR Code"
+      coberto_por:
+        - "UC02"
+    - documentacao_item: "RN-RF042-008"
+      descricao: "Cancelamento com estorno automático de movimentações"
+      coberto_por:
+        - "UC04"
+    - documentacao_item: "RN-RF042-009"
+      descricao: "Lançamento automático estoque (custo médio ponderado)"
+      coberto_por:
+        - "UC05"
+    - documentacao_item: "RN-RF042-010"
+      descricao: "Armazenamento XML/DANFE Blob Storage criptografado AES-256 (7 anos)"
+      coberto_por:
+        - "UC02"
+    - documentacao_item: "RN-RF042-011"
+      descricao: "Auditoria completa (5 campos)"
+      coberto_por:
+        - "UC01"
+        - "UC03"
+        - "UC04"
+        - "UC05"
+    - documentacao_item: "RN-RF042-012"
+      descricao: "OCR automático PDFs (Tesseract + Azure Form Recognizer, >95% precisão)"
+      coberto_por:
+        - "UC06"
+    - documentacao_item: "RN-RF042-013"
+      descricao: "Soft Delete (FlExcluido = TRUE)"
+      coberto_por:
+        - "UC00"
+        - "UC04"
+    - documentacao_item: "RN-RF042-014"
+      descricao: "Notificações tempo real (SignalR)"
+      coberto_por:
+        - "UC06"
+    - documentacao_item: "RN-RF042-015"
+      descricao: "Workflow aprovação multi-nível (<R$500 → R$500-5k → >R$5k)"
+      coberto_por:
+        - "UC07"
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-18"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Criação inicial - 8 UCs (UC00-UC07)"
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Atualização para Governança v2.0 - Adição de metadados completos e estrutura YAML canônica"

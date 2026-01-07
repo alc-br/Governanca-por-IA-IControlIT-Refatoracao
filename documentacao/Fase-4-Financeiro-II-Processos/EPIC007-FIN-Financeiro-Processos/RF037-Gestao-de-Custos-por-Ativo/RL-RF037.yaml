@@ -1,0 +1,435 @@
+# Template de Referência ao Legado (RL-RF037.yaml)
+# Versão: 1.0
+# Data: 2025-12-30
+
+rf_id: RF037
+titulo: "Gestão de Custos por Ativo (TCO)"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "Não versionado"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server"
+  multi_tenant: false
+  auditoria: "none"
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+referencias:
+  - id: "LEG-RF037-001"
+    tipo: "tela"
+    nome: "Ativo.aspx"
+    caminho: "ic1_legado/IControlIT/Ativo.aspx"
+    descricao: |
+      Cadastro de ativos com campo único de custo: ValorAquisicao.
+      Não permite registro de custos operacionais (OPEX).
+      Não possui campos de TCO total, TCO por categoria ou depreciação.
+      Custo de aquisição é imutável após cadastro inicial.
+    destino: "substituido"
+    justificativa: |
+      RF037 substitui completamente a lógica de custos:
+      - Campo ValorAquisicao vira primeira entrada de CustoAtivo com Categoria=Aquisicao
+      - Permite múltiplos custos de aquisição (frete, instalação, configuração)
+      - Adiciona custos operacionais (OPEX) que não existiam no legado
+      - Calcula TCO automaticamente agregando todos os custos
+    documentacao_item_relacionado: "RN-RF037-01"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF037-002"
+    tipo: "tela"
+    nome: "OrdemServico.aspx"
+    caminho: "ic1_legado/IControlIT/OrdemServico.aspx"
+    descricao: |
+      Registro de ordens de serviço com custos de manutenção.
+      Campo ValorTotal inclui mão de obra + peças.
+      FK AtivoId existe mas sem agregação de custos por ativo.
+      Gestores não conseguem saber quanto gastaram em manutenção de um ativo ao longo do tempo.
+    destino: "assumido"
+    justificativa: |
+      RF037 assume o conceito de custos de manutenção vinculados a OS:
+      - RN-RF037-06 obriga custos de categoria Manutenção a ter OrdemServicoId
+      - Adiciona agregação automática no TCO do ativo
+      - Permite consulta histórica de todos os custos de manutenção
+      Melhoria: visibilidade total de custos de manutenção por ativo
+    documentacao_item_relacionado: "RN-RF037-06"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF037-003"
+    tipo: "tela"
+    nome: "Contrato.aspx"
+    caminho: "ic1_legado/IControlIT/Contrato.aspx"
+    descricao: |
+      Cadastro de contratos de licenças e suporte.
+      Custos de licenças sem link explícito com ativo beneficiado.
+      Impossível saber quanto um ativo específico custa em licenciamento.
+    destino: "assumido"
+    justificativa: |
+      RF037 assume custos de contratos mas melhora rastreabilidade:
+      - RN-RF037-06 obriga custos de categoria Licenças a ter ContratoId
+      - Adiciona FK para ativo beneficiado (não existia no legado)
+      - Agrega custos de licenciamento no TCO do ativo
+      Melhoria: rastreabilidade completa de custos de licenças por ativo
+    documentacao_item_relacionado: "RN-RF037-06"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF037-004"
+    tipo: "regra_negocio"
+    nome: "Custo de aquisição único e imutável"
+    caminho: "ic1_legado/IControlIT/Ativo.aspx (campo ValorAquisicao)"
+    descricao: |
+      Ativo tinha apenas um campo ValorAquisicao registrado no cadastro inicial.
+      Não permitia adicionar custos complementares de aquisição (frete, instalação, configuração).
+      Valor não era atualizado após cadastro.
+    destino: "substituido"
+    justificativa: |
+      RF037 substitui por modelo flexível:
+      - Múltiplos custos de categoria Aquisicao permitidos
+      - Cada custo tem data de ocorrência independente
+      - Soma automática de todos os custos de aquisição no TCO
+      Melhoria: visibilidade completa de todos os custos de aquisição
+    documentacao_item_relacionado: "RN-RF037-01"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF037-005"
+    tipo: "regra_negocio"
+    nome: "Ausência de categorização CAPEX vs. OPEX"
+    caminho: "ic1_legado/IControlIT/ (ausente em todo o sistema)"
+    descricao: |
+      Sistema não diferenciava investimento (CAPEX) de despesa operacional (OPEX).
+      Impossível gerar relatórios contábeis corretos separando investimentos de despesas.
+      Gestão financeira prejudicada.
+    destino: "substituido"
+    justificativa: |
+      RF037 implementa categorização obrigatória:
+      - RN-RF037-07: enum CustoCategoriaEnum (Aquisicao=CAPEX, demais=OPEX)
+      - Campo calculado TipoCusto retornado em todas as consultas
+      - Relatórios podem separar CAPEX de OPEX automaticamente
+      Melhoria crítica: compliance contábil e relatórios gerenciais corretos
+    documentacao_item_relacionado: "RN-RF037-07"
+    uc_relacionado: "UC05"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF037-006"
+    tipo: "regra_negocio"
+    nome: "Depreciação manual e desconectada"
+    caminho: "Processo manual do setor contábil (fora do sistema)"
+    descricao: |
+      Depreciação era calculada manualmente pelo setor contábil em planilhas Excel.
+      Sem integração com sistema de ativos.
+      Valor contábil do ativo no sistema não refletia depreciação acumulada.
+      Risco de inconsistência entre contabilidade e sistema de ativos.
+    destino: "substituido"
+    justificativa: |
+      RF037 automatiza completamente a depreciação:
+      - RN-RF037-03: job mensal automático no dia 1 às 02:00 UTC
+      - Cálculo (ValorAquisicao - ValorResidual) / (VidaUtilAnos * 12)
+      - Registro automático como custo categoria Depreciacao
+      - Campo FlDepreciadoTotalmente quando atingir vida útil
+      Melhoria crítica: consistência garantida, compliance contábil
+    documentacao_item_relacionado: "RN-RF037-03"
+    uc_relacionado: "UC08"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF037-007"
+    tipo: "regra_negocio"
+    nome: "Decisões de substituição baseadas em intuição"
+    caminho: "Processo informal de gestão (não documentado)"
+    descricao: |
+      Gestores decidiam substituir ativos baseados em "tempo de uso" genérico.
+      Exemplo: "notebook com 3 anos substitui automaticamente"
+      Sem análise de custo real (TCO vs. valor de ativo novo).
+      Resultava em substituições prematuras (desperdício) ou tardias (custos excessivos).
+    destino: "substituido"
+    justificativa: |
+      RF037 implementa recomendação baseada em dados:
+      - RN-RF037-14: recomendação automática quando TCO anual > 50% valor novo
+      - Cálculo de TCO dos últimos 12 meses
+      - Comparação com TipoAtivo.ValorMedioMercado
+      - Níveis de recomendação: Substituir urgentemente / Considerar / Monitorar / Manter
+      Melhoria crítica: decisões baseadas em dados, otimização de gastos
+    documentacao_item_relacionado: "RN-RF037-14"
+    uc_relacionado: "UC12"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF037-008"
+    tipo: "regra_negocio"
+    nome: "Ausência de análise de ROI"
+    caminho: "Não existia no sistema legado"
+    descricao: |
+      Sistema não calculava ROI de ativos.
+      Impossível saber se benefícios gerados compensavam custos totais.
+      Decisões de investimento baseadas em feeling ao invés de retorno financeiro.
+    destino: "substituido"
+    justificativa: |
+      RF037 implementa análise completa de ROI:
+      - RN-RF037-04: ROI (%) = ((Benefícios - Custos) / Custos) * 100
+      - Payback Period em meses
+      - Status: Positivo / Negativo
+      - Recomendação automática baseada em faixas de ROI
+      Melhoria crítica: visibilidade de retorno sobre investimento
+    documentacao_item_relacionado: "RN-RF037-04"
+    uc_relacionado: "UC06"
+    complexidade: "alta"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF037-009"
+    tipo: "regra_negocio"
+    nome: "Consolidação de custos em planilhas manuais"
+    caminho: "Planilhas Excel externas ao sistema"
+    descricao: |
+      Gestores consolidavam custos de ativos manualmente em planilhas.
+      Processo propenso a erros (valores desatualizados, custos esquecidos).
+      Sem histórico de evolução de custos.
+      Sem comparação entre ativos.
+    destino: "substituido"
+    justificativa: |
+      RF037 substitui planilhas por sistema automatizado:
+      - RN-RF037-02: recálculo automático de TCO em tempo real
+      - RN-RF037-12: agregação por período (mensal, trimestral, anual)
+      - RN-RF037-09: comparação automática entre ativos
+      - RN-RF037-13: exportação de relatórios padronizados
+      Melhoria crítica: automação total, eliminação de planilhas
+    documentacao_item_relacionado: "RN-RF037-02"
+    uc_relacionado: "UC05"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+# Tabelas Legadas
+tabelas:
+  - nome: "Ativo"
+    finalidade: "Cadastro de ativos com valor de aquisição"
+    problemas:
+      - "Apenas campo ValorAquisicao - sem custos operacionais"
+      - "Sem campos de TCO total ou por categoria"
+      - "Sem campo de depreciação acumulada"
+      - "Sem auditoria de alterações de custo"
+
+  - nome: "Ordem_Servico"
+    finalidade: "Ordens de serviço com custos de manutenção"
+    problemas:
+      - "FK AtivoId existe mas sem agregação"
+      - "Impossível consultar total gasto em manutenção de um ativo"
+      - "Sem classificação CAPEX vs. OPEX"
+
+  - nome: "Contrato"
+    finalidade: "Contratos de licenças e suporte"
+    problemas:
+      - "Sem FK direta para ativo beneficiado"
+      - "Impossível saber custo de licenciamento de um ativo específico"
+
+  - nome: "Custo_Ativo"
+    finalidade: "(possível) Tabela de custos por ativo"
+    problemas:
+      - "NÃO LOCALIZADA - pode não existir no legado"
+      - "Se existe, não estava sendo usada"
+
+# Regras de Negócio Implícitas (não documentadas no legado)
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      Custo de aquisição único e imutável (campo ValorAquisicao do ativo)
+    fonte: "Ativo.aspx - análise de código VB.NET"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Custos de manutenção registrados em OS mas sem agregação por ativo
+    fonte: "OrdemServico.aspx - FK AtivoId sem uso analítico"
+
+  - id: "RL-RN-003"
+    descricao: |
+      Ausência de categorização CAPEX vs. OPEX em todas as tabelas
+    fonte: "Análise completa do schema - campo inexistente"
+
+  - id: "RL-RN-004"
+    descricao: |
+      Depreciação calculada manualmente pelo setor contábil fora do sistema
+    fonte: "Processo manual - entrevistas com usuários"
+
+  - id: "RL-RN-005"
+    descricao: |
+      Decisões de substituição baseadas em tempo de uso genérico ("3 anos = trocar")
+    fonte: "Observação de processos de gestão"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Registro de custos por ativo"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade completamente nova - legado só tinha ValorAquisicao único"
+
+  - item: "Cálculo automático de TCO"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado fazia consolidação manual em planilhas Excel"
+
+  - item: "Depreciação automática"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado calculava depreciação manualmente no setor contábil"
+
+  - item: "Análise de ROI"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade completamente nova"
+
+  - item: "Projeção de custos futuros"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade completamente nova"
+
+  - item: "Comparação entre ativos (benchmarking)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade completamente nova"
+
+  - item: "Alertas de custos anormais"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade completamente nova"
+
+  - item: "Recomendação de substituição baseada em TCO"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado usava regra genérica de tempo de uso"
+
+  - item: "Dashboard de TCO com gráficos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade completamente nova"
+
+  - item: "Auditoria de custos"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Legado não auditava alterações de custos"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Criar módulo de TCO do zero (não migrar lógica legada)"
+    motivo: |
+      Sistema legado não possui módulo de custos de ativos.
+      Controle era feito em planilhas manuais.
+      Ausência de dados históricos estruturados.
+      Oportunidade de implementar best practices desde o início.
+    impacto: "baixo"
+    data: "2025-12-30"
+
+  - decisao: "Implementar depreciação automática via job mensal"
+    motivo: |
+      Depreciação manual é propensa a erros.
+      Desconexão entre valor contábil e valor no sistema de ativos.
+      Compliance contábil exige depreciação consistente.
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Usar Domain Events para recálculo de TCO"
+    motivo: |
+      Garantir que TCO esteja sempre sincronizado com custos individuais.
+      Evitar inconsistências.
+      Padrão moderno de Clean Architecture.
+    impacto: "baixo"
+    data: "2025-12-30"
+
+  - decisao: "Não migrar dados históricos de custos"
+    motivo: |
+      Não existem dados estruturados no legado.
+      Custos históricos estão em planilhas não padronizadas.
+      Custo de consolidação manual seria alto vs. benefício.
+      Alternativa: permitir importação opcional via CSV.
+    impacto: "baixo"
+    data: "2025-12-30"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Resistência por mudança de processo (depreciação automática)"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Treinamento do setor contábil.
+      Demonstrar benefícios de automação.
+      Período de validação paralela (1 mês).
+
+  - risco: "Expectativa de dados históricos de custos"
+    impacto: "baixo"
+    probabilidade: "baixa"
+    mitigacao: |
+      Comunicar claramente que é funcionalidade nova.
+      Permitir importação manual via CSV se usuário tiver dados organizados.
+
+  - risco: "Curva de aprendizado (múltiplas categorias de custo)"
+    impacto: "baixo"
+    probabilidade: "media"
+    mitigacao: |
+      Tooltips explicativos na interface.
+      Exemplos de categorização.
+      Documentação clara de cada categoria.
+
+  - risco: "Integração com módulos existentes (Ativos, OS, Contratos)"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: |
+      Testes de integração E2E.
+      Validar FKs em todos os módulos.
+      Garantir que módulos dependentes estão funcionais.
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "Ativo.ValorAquisicao"
+    referencia_rf: "RN-RF037-01"
+    referencia_uc: "UC01"
+    status: "migrado"
+
+  - elemento_legado: "OrdemServico.ValorTotal"
+    referencia_rf: "RN-RF037-06"
+    referencia_uc: "UC01"
+    status: "migrado"
+
+  - elemento_legado: "Planilhas manuais de TCO"
+    referencia_rf: "RN-RF037-02"
+    referencia_uc: "UC05"
+    status: "substituido"
+
+  - elemento_legado: "Processo manual de depreciação"
+    referencia_rf: "RN-RF037-03"
+    referencia_uc: "UC08"
+    status: "substituido"
+
+  - elemento_legado: "Decisões de substituição intuitivas"
+    referencia_rf: "RN-RF037-14"
+    referencia_uc: "UC12"
+    status: "substituido"
+
+# Metadados de Cobertura (calculados automaticamente)
+metadados:
+  total_referencias: 9
+  destinos:
+    assumido: 2
+    substituido: 7
+    descartado: 0
+    a_revisar: 0
+  cobertura_destinos: 100.0 # percentual de itens com destino definido
+
+# Changelog
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Documentação inicial de referência ao legado - análise completa revelou ausência de módulo TCO no legado"
+    autor: "Agência ALC - alc.dev.br"

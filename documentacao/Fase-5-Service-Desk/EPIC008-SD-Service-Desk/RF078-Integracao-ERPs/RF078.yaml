@@ -1,0 +1,517 @@
+rf:
+  id: RF078
+  nome: Integração com ERPs
+  versao: '2.0'
+  data: '2025-12-30'
+  fase: Fase 5 - Service Desk
+  epic: EPIC008-SD-Service-Desk
+  status: em_desenvolvimento
+descricao:
+  objetivo: Estabelecer comunicação bidirecional e em tempo real entre o IControlIT e sistemas ERP (SAP, TOTVS Protheus, Oracle
+    EBS), permitindo sincronização automática de dados mestres, operações transacionais e auditoria completa de conformidade
+    fiscal.
+  problema_resolvido: Eliminar silos de dados entre sistemas, garantir conformidade com legislação contábil/fiscal (SOX, NF-e)
+    e implementar fluxos de negócio integrados entre TI e gestão financeira.
+  publico_afetado: Gestores de TI, Gerentes Financeiros, Analistas de Custos, Administradores de Integrações
+escopo:
+  incluso:
+  - Integração com múltiplos ERPs simultaneamente (SAP, TOTVS Protheus, Oracle EBS)
+  - Sincronização bidirecional de Centros de Custo
+  - Sincronização bidirecional de Departamentos e Colaboradores
+  - Exportação automática de custos de TI para contabilização no ERP
+  - Importação de ordens de compra e notas fiscais do ERP
+  - Reconciliação automática de faturas telecom com contas a pagar do ERP
+  - Webhooks para eventos em tempo real
+  - Retry automático com backoff exponencial
+  - Transformação de dados entre JSON, XML e EDI
+  - Dashboard de monitoramento em tempo real
+  - Dead Letter Queue (DLQ) para mensagens com falha
+  - Auditoria estruturada com retenção de 7 anos
+  - Validação de assinatura HMAC-SHA256 em webhooks
+  - Criptografia de credenciais em Azure Key Vault
+  fora:
+  - Implementação técnica específica (RFC ABAP, SOAP vs REST)
+  - Interface visual específica (layout, UX, identidade visual)
+  - Tecnologia, framework ou linguagem de programação
+  - Estratégia de deploy ou infraestrutura
+  - Migração de dados históricos de ERPs antigos
+  - Integração com ERPs além de SAP, TOTVS Protheus e Oracle EBS
+entidades:
+- nome: integration_message
+  descricao: Mensagem de integração com ERP (inbound ou outbound)
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: integration_audit
+  descricao: Auditoria completa de operações de integração
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: erp_credential
+  descricao: Credenciais de acesso aos ERPs (criptografadas em Key Vault)
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+- nome: reconciliation_match
+  descricao: Matching entre faturas telecom e contas a pagar do ERP
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+regras_negocio:
+- id: RN-RF078-001
+  descricao: Sincronização de Centros de Custo deve ser bidirecional
+  tipo: regra_negocio
+  campos_afetados:
+  - centro_custo
+  - codigo_erp
+  - data_alteracao
+  obrigatorio: true
+  criterios_aceite:
+  - Centro de Custo criado no SAP → importado automaticamente para IControlIT
+  - Centro de Custo desativado em IControlIT → marcado como inativo no ERP
+  - Conflitos de atualização → resolvidos com timestamp (última atualização prevalece)
+  - Auditoria registra origem da mudança (IControlIT ou ERP)
+- id: RN-RF078-002
+  descricao: Credenciais de ERP devem ser armazenadas em Azure Key Vault com rotação automática
+  tipo: seguranca
+  campos_afetados:
+  - senha
+  - token_api
+  - certificado_rfc
+  obrigatorio: true
+  criterios_aceite:
+  - Credenciais nunca aparecem em código-fonte ou appsettings.json
+  - Busca em Key Vault sempre que necessário usar credencial
+  - Rotação automática 7 dias antes do vencimento
+  - Alerta disparado se rotação falhar
+  - Auditoria registra todas as leituras de credenciais
+- id: RN-RF078-003
+  descricao: Integrações com falha devem registrar na DLQ e notificar administrador
+  tipo: regra_negocio
+  campos_afetados:
+  - status_integracao
+  - tentativa_retry
+  - mensagem_dlq
+  obrigatorio: true
+  criterios_aceite:
+  - 'Tentativas: 2s, 4s, 8s, 16s, 32s (máximo 5 tentativas)'
+  - Após 5 falhas → mover para DLQ
+  - Notificação enviada para ADMIN_INTEGRACAO via email e Slack
+  - Auditoria registra todas as tentativas com timestamps
+  - Dashboard exibe quantidade de mensagens em DLQ
+- id: RN-RF078-004
+  descricao: Exportação de custos de TI deve respeitar centro de custo e período contábil
+  tipo: validacao
+  campos_afetados:
+  - id_centro_custo
+  - mes_competencia
+  - ano_competencia
+  - periodo_aberto
+  obrigatorio: true
+  criterios_aceite:
+  - Validar período está aberto no ERP antes de exportar
+  - Validar CodigoERP preenchido para cada centro de custo
+  - Validar código existe no ERP (consulta prévia)
+  - Centros sem mapeamento → skip com registro em log
+  - Período fechado → erro 400 com mensagem clara
+- id: RN-RF078-005
+  descricao: Cada mensagem integrada deve ter identificador único (UUID) para deduplicação
+  tipo: unicidade
+  campos_afetados:
+  - message_id
+  obrigatorio: true
+  criterios_aceite:
+  - Gerar UUID antes de processar mensagem
+  - Verificar se MessageId já existe em IntegrationAudit
+  - Duplicata detectada → registrar em log, ignorar processamento
+  - Mensagem nova → processar, marcar MessageId como processada
+  - UUID deve seguir padrão RFC 4122
+- id: RN-RF078-006
+  descricao: Transformação de dados deve validar schema e tipo de campo antes de processar
+  tipo: validacao
+  campos_afetados:
+  - payload_json
+  - payload_xml
+  - payload_edi
+  obrigatorio: true
+  criterios_aceite:
+  - Carregar schema apropriado (JSON Schema v7 ou XSD)
+  - Validar estrutura do payload recebido
+  - Validação falhou → erro 400 com lista de campos inválidos
+  - Validação OK → aplicar transformação e processar
+  - Auditoria registra resultado da validação
+- id: RN-RF078-007
+  descricao: Logs de integração devem registrar entrada, saída e erro em tabela estruturada com retenção de 7 anos
+  tipo: regra_negocio
+  campos_afetados:
+  - integration_audit
+  - dados_entrada
+  - dados_saida
+  - mensagem_erro
+  - data_retencao
+  obrigatorio: true
+  criterios_aceite:
+  - Registrar MessageId, TipoIntegracao, DirecaoFluxo (INBOUND/OUTBOUND)
+  - Registrar StatusExecucao (SUCESSO/ERRO/DLQ)
+  - Registrar payload de entrada e saída em JSON
+  - Registrar mensagem de erro se aplicável
+  - Registrar usuário, data/hora, tempo de execução
+  - Retenção automática de 7 anos (2555 dias)
+- id: RN-RF078-008
+  descricao: Webhooks de ERP devem validar assinatura HMAC-SHA256 antes de processar
+  tipo: seguranca
+  campos_afetados:
+  - x_hub_signature
+  - webhook_secret
+  obrigatorio: true
+  criterios_aceite:
+  - Header X-Hub-Signature obrigatório
+  - Computar HMAC-SHA256 do body com chave do Key Vault
+  - Comparar assinatura recebida com computada
+  - Assinatura inválida → rejeitar com 403 Forbidden
+  - Assinatura válida → processar webhook
+  - Auditoria registra tentativas de webhook inválido
+- id: RN-RF078-009
+  descricao: Dados sensíveis (salários, valores de contrato) devem ser criptografados em campo específico na auditoria
+  tipo: seguranca
+  campos_afetados:
+  - salario_colaborador
+  - valor_contrato
+  - dados_sensiveis_criptografados
+  obrigatorio: true
+  criterios_aceite:
+  - Valores sensíveis criptografados com AES-256
+  - Chave de criptografia armazenada em Key Vault
+  - IV (Initialization Vector) gerado único por registro
+  - Descriptografia apenas com permissão ADMIN_AUDITORIA
+  - Dados sensíveis nunca aparecem em logs de texto
+- id: RN-RF078-010
+  descricao: Reconciliação de faturas telecom com contas a pagar do ERP deve considerar tolerância de diferença de 0,5%
+  tipo: regra_negocio
+  campos_afetados:
+  - valor_fatura
+  - valor_conta_pagar
+  - percentual_diferenca
+  - tolerancia
+  obrigatorio: true
+  criterios_aceite:
+  - 'Calcular diferença percentual: |Fatura - ContaPagar| / Fatura * 100'
+  - Diferença ≤ 0,5% → reconciliar automaticamente
+  - Diferença > 0,5% → marcar como REQUER_MANUAL
+  - Notificar financeiro para faturas que requerem reconciliação manual
+  - Auditoria registra percentual de diferença encontrado
+estados:
+  integracao:
+  - id: PENDENTE
+    descricao: Mensagem criada, aguardando processamento
+  - id: EM_PROCESSAMENTO
+    descricao: Processamento em andamento
+  - id: SUCESSO
+    descricao: Processada com sucesso
+  - id: ERRO_TEMPORARIO
+    descricao: Falha temporária, aguardando retry
+  - id: ERRO_PERMANENTE
+    descricao: Falha permanente após 5 tentativas
+  - id: NA_DLQ
+    descricao: Movida para Dead Letter Queue
+  - id: DUPLICATA
+    descricao: Detectada como duplicata, ignorada
+  reconciliacao:
+  - id: PENDENTE_RECONCILIACAO
+    descricao: Fatura importada, aguardando matching
+  - id: RECONCILIADO
+    descricao: Matching automático realizado com sucesso
+  - id: REQUER_MANUAL
+    descricao: Diferença > 0,5%, requer intervenção
+  - id: RECONCILIADO_MANUAL
+    descricao: Reconciliado manualmente pelo financeiro
+  - id: NAO_RECONCILIAVEL
+    descricao: Sem correspondência no ERP
+transicoes:
+  permitidas:
+  - de: PENDENTE
+    para: EM_PROCESSAMENTO
+    evento: Mensagem retirada da fila
+  - de: EM_PROCESSAMENTO
+    para: SUCESSO
+    evento: Processamento concluído sem erros
+  - de: EM_PROCESSAMENTO
+    para: ERRO_TEMPORARIO
+    evento: Falha temporária (timeout, indisponibilidade)
+  - de: ERRO_TEMPORARIO
+    para: EM_PROCESSAMENTO
+    evento: Retry automático
+  - de: ERRO_TEMPORARIO
+    para: ERRO_PERMANENTE
+    evento: 5 tentativas esgotadas
+  - de: ERRO_PERMANENTE
+    para: NA_DLQ
+    evento: Movida para DLQ
+  - de: EM_PROCESSAMENTO
+    para: DUPLICATA
+    evento: MessageId já processado
+  - de: PENDENTE_RECONCILIACAO
+    para: RECONCILIADO
+    evento: Matching automático (diferença ≤ 0,5%)
+  - de: PENDENTE_RECONCILIACAO
+    para: REQUER_MANUAL
+    evento: Diferença > 0,5%
+  - de: REQUER_MANUAL
+    para: RECONCILIADO_MANUAL
+    evento: Usuário reconciliou manualmente
+  proibidas:
+  - de: SUCESSO
+    para: ERRO_TEMPORARIO
+    motivo: Mensagem já processada com sucesso não pode falhar
+  - de: DUPLICATA
+    para: EM_PROCESSAMENTO
+    motivo: Duplicatas não devem ser reprocessadas
+  - de: RECONCILIADO
+    para: PENDENTE_RECONCILIACAO
+    motivo: Reconciliação concluída não pode voltar para pendente
+eventos_dominio:
+- evento: CentroCustoSincronizado
+  quando: Após sincronização bem-sucedida de centro de custo
+- evento: CustoExportado
+  quando: Após exportação de custos para ERP
+- evento: NotaFiscalImportada
+  quando: Após importação de nota fiscal do ERP
+- evento: FaturaReconciliada
+  quando: Após reconciliação automática ou manual
+- evento: IntegracaoFalhou
+  quando: Após falha permanente (movida para DLQ)
+- evento: CredencialRotacionada
+  quando: Após rotação automática de credencial no Key Vault
+- evento: WebhookRecebido
+  quando: Após recebimento e validação de webhook
+- evento: DuplicataDetectada
+  quando: Quando MessageId duplicado é detectado
+permissoes:
+- codigo: integracao.view_any
+  descricao: Visualizar dashboard e logs de integrações
+  roles:
+  - GERENTE_TI
+  - GERENTE_FINANCEIRO
+  - ADMIN
+- codigo: integracao.view
+  descricao: Visualizar detalhes de uma integração específica
+  roles:
+  - GERENTE_TI
+  - GERENTE_FINANCEIRO
+  - ADMIN
+  - ANALISTA_FINANCEIRO
+- codigo: integracao.configuracao
+  descricao: Alterar credenciais e endpoints do ERP
+  roles:
+  - ADMIN_INTEGRACAO
+- codigo: integracao.export_custos
+  descricao: Executar exportação de custos para ERP
+  roles:
+  - GERENTE_FINANCEIRO
+  - ADMIN
+- codigo: integracao.reconciliacao_manual
+  descricao: Executar reconciliação manual de faturas
+  roles:
+  - ANALISTA_FINANCEIRO
+  - GERENTE_FINANCEIRO
+  - ADMIN
+- codigo: integracao.retry_dlq
+  descricao: Reprocessar mensagens da Dead Letter Queue
+  roles:
+  - ADMIN_INTEGRACAO
+- codigo: integracao.delete_logs
+  descricao: Deletar logs de integração (compliance)
+  roles:
+  - ADMIN
+integracoes:
+  internas:
+  - Autenticacao (JWT Bearer Token)
+  - Multi-Tenancy (isolamento por EmpresaId)
+  - Auditoria (IntegrationAudit com retenção 7 anos)
+  - Azure Key Vault (credenciais e chaves de criptografia)
+  externas:
+  - sistema: SAP
+    tipo: RFC + OAuth 2.0
+    obrigatoria: true
+  - sistema: TOTVS Protheus
+    tipo: REST API + Webhooks
+    obrigatoria: true
+  - sistema: Oracle EBS
+    tipo: REST API + Polling
+    obrigatoria: true
+  - sistema: Azure Service Bus
+    tipo: Message Queue (Retry + DLQ)
+    obrigatoria: true
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: false
+  validacao_hmac_webhook: true
+  criptografia_credenciais: true
+  criptografia_dados_sensiveis: true
+  rate_limiting: 100 req/min por client
+  rotacao_automatica_credenciais: 90 dias
+rastreabilidade:
+  ucs_esperados:
+  - UC00-listar-integracoes
+  - UC01-sincronizar-centro-custo
+  - UC02-exportar-custos
+  - UC03-reconciliar-faturas
+  - UC04-processar-webhook
+catalog:
+  crud:
+  - id: RF078-CRUD-01
+    title: Listar integrações com filtros
+    required: true
+  - id: RF078-CRUD-02
+    title: Visualizar detalhes de integração
+    required: true
+  - id: RF078-CRUD-03
+    title: Sincronizar dados com ERP
+    required: true
+  - id: RF078-CRUD-04
+    title: Exportar custos para ERP
+    required: true
+  - id: RF078-CRUD-05
+    title: Reconciliar faturas manualmente
+    required: true
+  validacoes:
+  - id: RF078-VAL-01
+    title: Validar assinatura HMAC-SHA256 de webhook
+    required: true
+  - id: RF078-VAL-02
+    title: Validar schema JSON/XML antes de processar
+    required: true
+  - id: RF078-VAL-03
+    title: Validar período contábil está aberto no ERP
+    required: true
+  - id: RF078-VAL-04
+    title: Validar centro de custo existe no ERP
+    required: true
+  - id: RF078-VAL-05
+    title: Detectar mensagem duplicada por MessageId
+    required: true
+  seguranca:
+  - id: RF078-SEC-01
+    title: Isolamento multi-tenant em integrações
+    required: true
+  - id: RF078-SEC-02
+    title: Permissões RBAC em todos os endpoints
+    required: true
+  - id: RF078-SEC-03
+    title: Criptografia de credenciais em Key Vault
+    required: true
+  - id: RF078-SEC-04
+    title: Criptografia de dados sensíveis em auditoria
+    required: true
+  - id: RF078-SEC-05
+    title: Rate limiting de 100 req/min
+    required: true
+exclusions:
+  documentacao_items:
+  - id: EX-RF078-01
+    justificativa: Implementação técnica específica (RFC ABAP, SOAP vs REST)
+  - id: EX-RF078-02
+    justificativa: Interface visual específica (layout, UX)
+  - id: EX-RF078-03
+    justificativa: Migração de dados históricos de ERPs antigos
+  - id: EX-RF078-04
+    justificativa: Integração com ERPs além de SAP, TOTVS, Oracle
+kpis:
+- nome: Disponibilidade de Integrações
+  meta: 99,5%
+  descricao: Uptime total / tempo total
+  log_obrigatorio: true
+- nome: Latência de Sincronização
+  meta: < 5 min
+  descricao: Tempo webhook → processamento completo
+  log_obrigatorio: true
+- nome: Taxa de Sucesso
+  meta: '> 99%'
+  descricao: (Total sucesso / total tentativas) × 100
+  log_obrigatorio: true
+- nome: Tempo de Resolução de Erro
+  meta: < 24h
+  descricao: Tempo alerta → investigação → correção
+  log_obrigatorio: true
+- nome: Reconciliação Automática
+  meta: '> 95%'
+  descricao: (Faturas auto-reconciliadas / total) × 100
+  log_obrigatorio: true
+- nome: DLQ Backlog
+  meta: < 10 mensagens
+  descricao: Mensagens pendentes na Dead Letter Queue
+  log_obrigatorio: true
+- nome: Tempo de Retry
+  meta: < 2 min total
+  descricao: Backoff exponencial não deve ultrapassar 2 min
+  log_obrigatorio: false
+- nome: Conformidade de Auditoria
+  meta: 100%
+  descricao: Operações registradas / total operações
+  log_obrigatorio: true
+- nome: Taxa de Deduplicação
+  meta: '> 0,1%'
+  descricao: Duplicatas detectadas evitam reprocessamento
+  log_obrigatorio: true
+- nome: Cobertura de Testes
+  meta: '> 90%'
+  descricao: Linhas de código cobertas por testes
+  log_obrigatorio: false
+alertas:
+- evento: Integração Indisponível
+  threshold: ERP não responde por > 5 min
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: DLQ Crescendo
+  threshold: '> 50 mensagens na DLQ'
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+- evento: Taxa de Erro Alta
+  threshold: '> 5% de falhas em 1h'
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: Latência Excessiva
+  threshold: Sincronização > 10 min
+  severidade: MÉDIA
+  canal_notificacao:
+  - email
+- evento: Credencial Vencendo
+  threshold: < 7 dias para vencimento
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: Reconciliação Manual Pendente
+  threshold: '> 20 faturas > 7 dias'
+  severidade: MÉDIA
+  canal_notificacao:
+  - email
+- evento: Período Fechado Erro
+  threshold: Tentativa export em período fechado
+  severidade: BAIXA
+  canal_notificacao:
+  - email
+- evento: Webhook Assinatura Inválida
+  threshold: Webhook sem/com assinatura inválida
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+historico:
+- versao: '2.0'
+  data: '2025-12-30'
+  autor: Agência ALC - alc.dev.br
+  descricao: Migração para Governança v2.0 - Separação completa RF/RL, sincronização 100% com RF.md
+- versao: '1.0'
+  data: '2025-12-28'
+  autor: Claude Code
+  descricao: Versão inicial com 10 regras de negócio, 13 endpoints, 3 fluxos

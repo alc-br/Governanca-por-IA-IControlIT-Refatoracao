@@ -143,7 +143,7 @@ Caso contrário, retorna **exit code 1 (FAIL)**.
 casos_de_uso:
   - id: "UC01"
     covers:
-      rf_items:
+      documentacao_items:
         - "FUNC-01"  # Esta funcionalidade está coberta por UC01
         - "FUNC-02"
 ```
@@ -329,7 +329,7 @@ ucs_minimos_logs = {'UC00', 'UC01', 'UC02', 'UC03', 'UC04', 'UC05', 'UC06', 'UC0
 **Solução:**
 ```bash
 # Listar RFs disponíveis
-ls rf/**/RF*
+ls documentacao/**/RF*
 
 # Executar com RF ID correto
 python validator-rf-uc-coverage.py --rf RF001

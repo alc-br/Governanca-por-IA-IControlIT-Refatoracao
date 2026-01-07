@@ -68,7 +68,7 @@ class GapCobertura:
 @dataclass
 class ResultadoCobertura:
     """Resultado completo da análise de cobertura"""
-    rf_id: str
+    documentacao_id: str
     total_funcionalidades: int
     funcionalidades_cobertas: int
     total_rns: int
@@ -93,10 +93,10 @@ class ResultadoCobertura:
 class ExtratorRF:
     """Extrai funcionalidades e RNs do RF"""
 
-    def __init__(self, rf_path: str):
+    def __init__(self, documentacao_path: str):
         self.rf_path = Path(rf_path)
         # Extrair RF ID do nome da pasta (ex: RF001-Parametros-... → RF001)
-        rf_id = self.rf_path.name.split('-')[0]
+        documentacao_id = self.rf_path.name.split('-')[0]
         self.rf_md = self.rf_path / f"{rf_id}.md"
         self.rf_yaml = self.rf_path / f"{rf_id}.yaml"
 
@@ -262,10 +262,10 @@ class ExtratorUC:
                 for caso in casos:
                     if isinstance(caso, dict):
                         uc_id = caso.get('id')
-                        rf_items = caso.get('covers', {}).get('rf_items', [])
+                        documentacao_items = caso.get('covers', {}).get('rf_items', [])
 
-                        for rf_item in rf_items:
-                            if rf_item not in cobertura:
+                        for documentacao_item in documentacao_items:
+                            if documentacao_item not in cobertura:
                                 cobertura[rf_item] = []
                             cobertura[rf_item].append(uc_id)
 
@@ -303,7 +303,7 @@ class ExtratorUC:
 class AnalisadorCobertura:
     """Analisa cobertura RF → UC"""
 
-    def __init__(self, rf_path: str):
+    def __init__(self, documentacao_path: str):
         self.rf_path = Path(rf_path)
         self.rf_id = self.rf_path.name.split('-')[0]  # Ex: RF001
         self.extrator_rf = ExtratorRF(rf_path)
@@ -349,7 +349,7 @@ class AnalisadorCobertura:
         conforme = (cobertura_pct == 100.0) and (len(gaps) == 0)
 
         return ResultadoCobertura(
-            rf_id=self.rf_id,
+            documentacao_id=self.rf_id,
             total_funcionalidades=len(funcionalidades),
             funcionalidades_cobertas=func_cobertas,
             total_rns=len(rns_rf),
@@ -490,12 +490,12 @@ def main():
     if args.all:
         # Validar todos os RFs
         rfs = sorted(base_path.glob('**/RF*'))
-        rfs = [rf for rf in rfs if rf.is_dir() and re.match(r'RF\d{3}', rf.name)]
+        rfs = [rf for documentacao in rfs if rf.is_dir() and re.match(r'RF\d{3}', rf.name)]
 
         resultados = []
         total_conformes = 0
 
-        for rf_path in rfs:
+        for documentacao_path in rfs:
             analisador = AnalisadorCobertura(str(rf_path))
             resultado = analisador.analisar()
             resultados.append(resultado)
@@ -536,17 +536,17 @@ def main():
 
     elif args.rf:
         # Validar RF específico
-        rf_id = args.rf if args.rf.startswith('RF') else f'RF{args.rf}'
+        documentacao_id = args.rf if args.rf.startswith('RF') else f'RF{args.rf}'
 
         # Encontrar pasta do RF
-        rf_paths = list(base_path.glob(f'**/{rf_id}*'))
-        rf_paths = [p for p in rf_paths if p.is_dir()]
+        documentacao_paths = list(base_path.glob(f'**/{rf_id}*'))
+        documentacao_paths = [p for p in documentacao_paths if p.is_dir()]
 
-        if not rf_paths:
+        if not documentacao_paths:
             print(f"❌ RF '{rf_id}' não encontrado", file=sys.stderr)
             sys.exit(1)
 
-        rf_path = rf_paths[0]
+        documentacao_path = documentacao_paths[0]
 
         # Analisar
         analisador = AnalisadorCobertura(str(rf_path))

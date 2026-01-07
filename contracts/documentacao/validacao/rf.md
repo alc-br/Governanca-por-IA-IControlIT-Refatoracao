@@ -121,7 +121,7 @@ secoes_obrigatorias = [
 ]
 
 for secao in secoes_obrigatorias:
-    if secao not in rf_md_content:
+    if secao not in documentacao_md_content:
         GAP(f"Seção faltando: {secao}")
 ```
 
@@ -142,7 +142,7 @@ Seção 5 (Regras de Negócio) DEVE conter pelo menos 10 regras (RN-MOD-XXX-01, 
 import re
 
 # Contar RNs em RF.md
-rns_md = re.findall(r'RN-[A-Z]+-\d+-\d+', rf_md_content)
+rns_md = re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_md_content)
 
 # Contar RNs em RF.yaml
 rns_yaml = len(rf_yaml['regras_negocio'])
@@ -181,7 +181,7 @@ integracoes_obrigatorias = [
 ]
 
 for integracao in integracoes_obrigatorias:
-    if integracao not in rf_md_content:
+    if integracao not in documentacao_md_content:
         GAP(f"Integração faltando: {integracao}")
 ```
 
@@ -218,7 +218,7 @@ referencias_legado = [
 ]
 
 for ref in referencias_legado:
-    if ref in rf_md_content:
+    if ref in documentacao_md_content:
         GAP(f"Referência a legado encontrada: {ref}")
 ```
 
@@ -241,7 +241,7 @@ Seção 4 (Funcionalidades) DEVE conter catálogo completo conforme tipo de RF:
 
 **Verificação:**
 ```python
-tipo_rf = rf_yaml['rf']['tipo_rf']
+tipo_rf = documentacao_yaml['rf']['tipo_rf']
 
 if tipo_rf == "crud":
     funcionalidades_esperadas = [
@@ -257,7 +257,7 @@ if tipo_rf == "crud":
     ]
 
     for func in funcionalidades_esperadas:
-        if func not in rf_md_content:
+        if func not in documentacao_md_content:
             GAP(f"Funcionalidade faltando: {func}")
 ```
 
@@ -290,7 +290,7 @@ permissoes_esperadas = [
 ]
 
 for perm in permissoes_esperadas:
-    if perm not in rf_md_content:
+    if perm not in documentacao_md_content:
         GAP(f"Permissão faltando: {perm}")
 ```
 
@@ -313,7 +313,7 @@ Seção 8 (Endpoints da API) DEVE documentar endpoints conforme tipo de RF:
 
 **Verificação:**
 ```python
-tipo_rf = rf_yaml['rf']['tipo_rf']
+tipo_rf = documentacao_yaml['rf']['tipo_rf']
 
 if tipo_rf == "crud":
     endpoints_esperados = [
@@ -325,7 +325,7 @@ if tipo_rf == "crud":
     ]
 
     for endpoint in endpoints_esperados:
-        if endpoint not in rf_md_content:
+        if endpoint not in documentacao_md_content:
             GAP(f"Endpoint faltando: {endpoint}")
 ```
 
@@ -359,7 +359,7 @@ campos_obrigatorios = [
 ]
 
 for campo in campos_obrigatorios:
-    if campo not in rf_md_content and "empresa_id" not in rf_md_content:
+    if campo not in documentacao_md_content and "empresa_id" not in documentacao_md_content:
         GAP(f"Campo obrigatório faltando: {campo}")
 ```
 
@@ -424,7 +424,7 @@ campos_obrigatorios = [
 ]
 
 for campo in campos_obrigatorios:
-    if campo not in rf_yaml:
+    if campo not in documentacao_yaml:
         GAP(f"Campo faltando em YAML: {campo}")
 ```
 
@@ -443,10 +443,10 @@ TODAS as regras de negócio em RF.md DEVEM estar em RF.yaml e vice-versa.
 **Verificação:**
 ```python
 # RNs em MD
-rns_md = set(re.findall(r'RN-[A-Z]+-\d+-\d+', rf_md_content))
+rns_md = set(re.findall(r'RN-[A-Z]+-\d+-\d+', documentacao_md_content))
 
 # RNs em YAML
-rns_yaml = set([rn['id'] for rn in rf_yaml['regras_negocio']])
+rns_yaml = set([rn['id'] for rn in documentacao_yaml['regras_negocio']])
 
 # Gaps
 rns_md_only = rns_md - rns_yaml
@@ -477,10 +477,10 @@ Seção 11.1 (i18n) DEVE listar chaves de tradução:
 
 **Verificação:**
 ```python
-if "rf." not in rf_md_content:
+if "rf." not in documentacao_md_content:
     GAP("Chaves i18n (rf.xxx) não documentadas")
 
-if "pt-BR" not in rf_md_content or "en-US" not in rf_md_content or "es-ES" not in rf_md_content:
+if "pt-BR" not in documentacao_md_content or "en-US" not in documentacao_md_content or "es-ES" not in documentacao_md_content:
     GAP("Idiomas incompletos (esperado: pt-BR, en-US, es-ES)")
 ```
 
@@ -513,7 +513,7 @@ campos_auditoria = [
 ]
 
 for campo in campos_auditoria:
-    if campo not in rf_md_content:
+    if campo not in documentacao_md_content:
         GAP(f"Campo de auditoria faltando: {campo}")
 ```
 
@@ -536,7 +536,7 @@ Seção 11.3 (RBAC) DEVE definir escopo:
 
 **Verificação:**
 ```python
-if "escopo" not in rf_md_content and "Developer" not in rf_md_content:
+if "escopo" not in documentacao_md_content and "Developer" not in documentacao_md_content:
     GAP("Escopo RBAC não documentado")
 ```
 
@@ -562,7 +562,7 @@ Seção 11.4 (Central de Funcionalidades) DEVE definir:
 central_campos = ["Ícone", "Ordem", "Menu pai", "Permissões"]
 
 for campo in central_campos:
-    if campo not in rf_md_content:
+    if campo not in documentacao_md_content:
         GAP(f"Central - campo faltando: {campo}")
 ```
 

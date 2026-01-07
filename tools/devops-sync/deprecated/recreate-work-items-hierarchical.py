@@ -94,7 +94,7 @@ def parse_yaml_simple(content):
 
 def load_all_status_files():
     """Carrega todos os STATUS.yaml e organiza por Fase e EPIC"""
-    pattern = "D:/IC2/docs/rf/**/STATUS.yaml"
+    pattern = "D:/IC2/docs/documentacao/**/STATUS.yaml"
     files = glob.glob(pattern, recursive=True)
 
     # Estrutura: {fase: {epic: [rfs]}}
@@ -108,8 +108,8 @@ def load_all_status_files():
             data = parse_yaml_simple(content)
 
             if data and 'rf' in data:
-                rf_raw = str(data['rf']).replace('RF', '').replace('RF-', '').zfill(3)
-                rf_id = f"RF-{rf_raw}"
+                documentacao_raw = str(data['rf']).replace('RF', '').replace('RF-', '').zfill(3)
+                documentacao_id = f"RF-{rf_raw}"
 
                 fase = data.get('fase', 'UNKNOWN')
                 epic = data.get('epic', 'UNKNOWN')
@@ -121,7 +121,7 @@ def load_all_status_files():
 
                 structure[fase]['_nome'] = fase_nome
                 structure[fase][epic].append({
-                    'rf_id': rf_id,
+                    'rf_id': documentacao_id,
                     'titulo': titulo,
                     'data': data,
                     'file_path': f,
@@ -134,7 +134,7 @@ def load_all_status_files():
 
 def extract_fase_nome_from_path(file_path, fase_code):
     """Extrai nome completo da Fase do caminho"""
-    # Exemplo:  D:\IC2\rf\Fase-1-Fundacao-e-Cadastros-Base\...
+    # Exemplo:  D:\IC2\documentacao\Fase-1-Fundacao-e-Cadastros-Base\...
     parts = file_path.replace('\\', '/').split('/')
 
     for part in parts:
@@ -181,7 +181,7 @@ def create_epic_work_item(epic_code, epic_nome, area_path):
         print(f"[!!] Excecao ao criar EPIC {epic_code}: {e}")
         return None
 
-def create_rf_work_item(rf_id, titulo, area_path, parent_epic_id, rf_data):
+def create_rf_work_item(rf_id, titulo, area_path, parent_epic_id, documentacao_data):
     """Cria Work Item Feature (RF) como filho do EPIC"""
     url = f"{ORG_URL}/{PROJECT}/_apis/wit/workitems/$Feature?api-version=7.0"
 
@@ -224,7 +224,7 @@ def create_rf_work_item(rf_id, titulo, area_path, parent_epic_id, rf_data):
 
 def generate_description(rf_data):
     """Gera HTML description padronizado"""
-    data = rf_data.get('data', {})
+    data = documentacao_data.get('data', {})
 
     # Status desenvolvimento
     dev = data.get('desenvolvimento', {})
@@ -244,7 +244,7 @@ def generate_description(rf_data):
 
     # Documentacao
     docs = data.get('documentacao', {})
-    rf_icon = '✅' if docs.get('rf') else '⬜'
+    documentacao_icon = '✅' if docs.get('rf') else '⬜'
     uc_icon = '✅' if docs.get('uc') else '⬜'
     md_icon = '✅' if docs.get('md') else '⬜'
     wf_icon = '✅' if docs.get('wf') else '⬜'
@@ -369,21 +369,21 @@ def main():
                 epics_created += 1
 
                 # Criar RFs filhos
-                for rf_info in sorted(rfs, key=lambda x: x['rf_id']):
-                    rf_id = rf_info['rf_id']
-                    titulo = rf_info['titulo']
+                for documentacao_info in sorted(rfs, key=lambda x: x['rf_id']):
+                    documentacao_id = documentacao_info['rf_id']
+                    titulo = documentacao_info['titulo']
 
                     print(f"    [+] Criando RF: {rf_id}")
-                    rf_wi_id = create_rf_work_item(
-                        rf_id, titulo, area_path, epic_id, rf_info
+                    documentacao_wi_id = create_rf_work_item(
+                        documentacao_id, titulo, area_path, epic_id, documentacao_info
                     )
 
-                    if rf_wi_id:
+                    if documentacao_wi_id:
                         print(f"        [OK] RF criado: ID {rf_wi_id}")
                         rfs_created += 1
 
                         # Atualizar STATUS.yaml
-                        update_status_yaml(rf_info['file_path'], rf_wi_id)
+                        update_status_yaml(rf_info['file_path'], documentacao_wi_id)
                     else:
                         errors += 1
             else:

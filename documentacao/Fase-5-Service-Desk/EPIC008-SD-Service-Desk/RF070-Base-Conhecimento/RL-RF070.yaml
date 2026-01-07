@@ -1,0 +1,675 @@
+# Template de Referência ao Legado (RL-RF070.yaml)
+# Versão: 1.0
+# Data: 2025-12-30
+
+rf_id: RF070
+titulo: "Base de Conhecimento"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "4.5 (2012-2020)"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server 2012"
+  multi_tenant: false
+  auditoria: "partial"
+
+# SEÇÃO CRÍTICA: Referencias ao Legado com Destino Obrigatório
+referencias:
+  - id: "LEG-RF070-001"
+    tipo: "tela"
+    nome: "BaseConhecimento.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/BaseConhecimento.aspx"
+    descricao: |
+      Tela de listagem de artigos com busca simples via LIKE '%termo%'.
+      Ordenação fixa por Total_Acessos DESC.
+      Paginação manual via ViewState (10 por página).
+      Filtro por única categoria via dropdown.
+    destino: "substituido"
+    justificativa: |
+      Busca LIKE substituída por ElasticSearch full-text (RN-RF070-11).
+      Interface WebForms substituída por Angular Standalone Components.
+      Paginação server-side com lazy loading.
+      Filtros facetados múltiplos (categorias, tags, data, autor).
+    documentacao_item_relacionado: "RN-RF070-11"
+    uc_relacionado: "UC00"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF070-002"
+    tipo: "tela"
+    nome: "ArtigoDetalhe.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/ArtigoDetalhe.aspx"
+    descricao: |
+      Visualização completa de artigo com HTML não sanitizado (vulnerável a XSS).
+      Contador de acessos incrementado via UPDATE direto (sem auditoria).
+      Sem sistema de votação, artigos relacionados ou histórico de versões.
+    destino: "substituido"
+    justificativa: |
+      HTML sanitizado com DOMPurify (proteção XSS).
+      Contador de acessos substituído por evento ArtigoAcessadoEvent (RN-RF070-12).
+      Adicionado sistema de votação (RN-RF070-05), artigos relacionados (ML) e histórico versionado (RN-RF070-07).
+    documentacao_item_relacionado: "RN-RF070-12"
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF070-003"
+    tipo: "tela"
+    nome: "ArtigoNovo.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/ArtigoNovo.aspx"
+    descricao: |
+      Formulário de criação com validação apenas no frontend (bypassável).
+      INSERT direto via ADO.NET sem validação de regras de negócio.
+      Publicação direta sem workflow de aprovação.
+      Anexos salvos em file system local (D:\IControlIT\Anexos\KB\).
+      Vinculação a apenas 1 categoria (FK Id_Categoria).
+    destino: "substituido"
+    justificativa: |
+      Validação obrigatória no backend via FluentValidation (RN-RF070-02).
+      Workflow de aprovação configurável por categoria (RN-RF070-04).
+      Anexos migrados para Azure Blob Storage (RN-RF070-09).
+      Categorização many-to-many (limite 5 categorias) via RN-RF070-03.
+    documentacao_item_relacionado: "RN-RF070-02, RN-RF070-04"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF070-004"
+    tipo: "tela"
+    nome: "ArtigoEditar.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/ArtigoEditar.aspx"
+    descricao: |
+      UPDATE direto sobrescreve todos os campos sem versionamento.
+      Sem registro de auditoria (impossível saber quem alterou, quando, o quê).
+      Edição simultânea causava "last write wins" (perda de dados).
+    destino: "substituido"
+    justificativa: |
+      Versionamento automático via Temporal Tables (RN-RF070-07).
+      Auditoria completa com before/after, 7 anos retenção (RN-RF070-12).
+      Controle de concorrência otimista (RowVersion/Timestamp).
+    documentacao_item_relacionado: "RN-RF070-07, RN-RF070-12"
+    uc_relacionado: "UC03"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF070-005"
+    tipo: "tela"
+    nome: "Categorias.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/Categorias.aspx"
+    descricao: |
+      TreeView com hierarquia limitada a 3 níveis (hard-coded).
+      Sem validação de nome duplicado.
+      Exclusão de categoria sem verificar artigos vinculados (erro FK).
+      Reordenação manual (sem drag-and-drop).
+    destino: "substituido"
+    justificativa: |
+      Hierarquia N níveis ilimitada (auto-referência).
+      Validação unicidade de nome por nível hierárquico.
+      Soft delete com verificação de artigos vinculados.
+      Interface drag-and-drop para reordenação.
+    documentacao_item_relacionado: "RN-RF070-01"
+    uc_relacionado: "UC09"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF070-006"
+    tipo: "webservice"
+    nome: "WSBaseConhecimento.BuscarArtigos"
+    caminho: "ic1_legado/IControlIT/WebServices/WSBaseConhecimento.asmx.vb"
+    descricao: |
+      WebMethod SOAP que retorna DataSet com busca via LIKE '%termo%'.
+      Sem paginação, autenticação, rate limiting ou versionamento de API.
+      Performance degrada com base > 10.000 artigos (timeout 30s+).
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/base-conhecimento/artigos?q={termo}.
+      REST com paginação, filtros facetados, autenticação JWT.
+      Busca via ElasticSearch (< 500ms P95) - RN-RF070-11.
+      Rate limiting 100 req/min (RN-RF070-11).
+    documentacao_item_relacionado: "RN-RF070-11"
+    uc_relacionado: "UC05"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF070-007"
+    tipo: "webservice"
+    nome: "WSBaseConhecimento.ObterArtigo"
+    caminho: "ic1_legado/IControlIT/WebServices/WSBaseConhecimento.asmx.vb"
+    descricao: |
+      WebMethod SOAP que retorna artigo por ID como DataSet.
+      Sem autenticação (qualquer um na rede podia chamar).
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/base-conhecimento/artigos/{id}.
+      REST com autenticação JWT, permissão kb:artigos:read.
+      Retorna DTO estruturado (não DataSet).
+    documentacao_item_relacionado: "RN-RF070-06"
+    uc_relacionado: "UC02"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF070-008"
+    tipo: "webservice"
+    nome: "WSBaseConhecimento.CriarArtigo"
+    caminho: "ic1_legado/IControlIT/WebServices/WSBaseConhecimento.asmx.vb"
+    descricao: |
+      WebMethod SOAP que cria artigo sem validação de regras de negócio.
+      INSERT direto via ADO.NET.
+    destino: "substituido"
+    justificativa: |
+      Substituído por POST /api/base-conhecimento/artigos.
+      Validação via FluentValidation (RN-RF070-02).
+      Command/Handler pattern (Clean Architecture).
+    documentacao_item_relacionado: "RN-RF070-02"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF070-009"
+    tipo: "webservice"
+    nome: "WSBaseConhecimento.IncrementarAcessos"
+    caminho: "ic1_legado/IControlIT/WebServices/WSBaseConhecimento.asmx.vb"
+    descricao: |
+      WebMethod que executa UPDATE direto incrementando Total_Acessos.
+      Sem auditoria (não registra quem acessou, quando, de onde).
+      Contador desnormalizado (pode divergir da realidade).
+    destino: "substituido"
+    justificativa: |
+      Substituído por evento ArtigoAcessadoEvent.
+      Auditoria completa: UsuarioId, IP, UserAgent, OrigemAcesso, TempoLeitura.
+      Total_Acessos calculado dinamicamente de tabela de eventos.
+    documentacao_item_relacionado: "RN-RF070-12"
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF070-010"
+    tipo: "stored_procedure"
+    nome: "pa_BuscarArtigos"
+    caminho: "Database/dbo.pa_BuscarArtigos"
+    descricao: |
+      SP com busca via LIKE '%termo%' em 3 campos (Titulo, Descricao_Problema, Solucao).
+      Não usa índices (table scan completo).
+      TOP 50 fixo (sem paginação customizável).
+      Sem ranking por relevância (apenas Total_Acessos DESC).
+    destino: "substituido"
+    justificativa: |
+      Substituído por ElasticSearch full-text indexing.
+      Algoritmos TF-IDF + BM25 para ranking por relevância.
+      Paginação customizável, filtros facetados, correção ortográfica.
+    documentacao_item_relacionado: "RN-RF070-11"
+    uc_relacionado: "UC05"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF070-011"
+    tipo: "stored_procedure"
+    nome: "pa_IncrementarAcessos"
+    caminho: "Database/dbo.pa_IncrementarAcessos"
+    descricao: |
+      SP que executa UPDATE direto: Total_Acessos = Total_Acessos + 1.
+      Sem auditoria, sem registro individual de acessos.
+    destino: "descartado"
+    justificativa: |
+      Lógica de incremento substituída por evento ArtigoAcessadoEvent.
+      Contador desnormalizado Total_Acessos mantido via materialized view ou job noturno.
+      SP não será migrada (lógica no domain event handler).
+    documentacao_item_relacionado: "RN-RF070-12"
+    uc_relacionado: "UC02"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF070-012"
+    tipo: "stored_procedure"
+    nome: "pa_ListarArtigosPorCategoria"
+    caminho: "Database/dbo.pa_ListarArtigosPorCategoria"
+    descricao: |
+      SP que lista artigos de 1 categoria (relacionamento 1:1).
+      Não lista artigos de subcategorias (hierarquia ignorada).
+    destino: "substituido"
+    justificativa: |
+      Substituído por Query LINQ com navegação many-to-many.
+      Suporte a listagem recursiva de subcategorias.
+      Paginação server-side, filtros adicionais (tags, data, autor).
+    documentacao_item_relacionado: "RN-RF070-03"
+    uc_relacionado: "UC00"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF070-013"
+    tipo: "tabela"
+    nome: "tbl_BaseConhecimento"
+    caminho: "Database/dbo.tbl_BaseConhecimento"
+    descricao: |
+      Tabela principal de artigos.
+      Problemas: sem ClienteId (multi-tenancy manual), tipo TEXT deprecated,
+      sem campos auditoria, sem versionamento, Total_Acessos desnormalizado,
+      FK Id_Categoria (relacionamento 1:1).
+    destino: "assumido"
+    justificativa: |
+      Estrutura base migrada para entidade Artigo com melhorias:
+      - Adicionado ClienteId (multi-tenancy nativo)
+      - TEXT → nvarchar(max)
+      - Campos auditoria: Id_Usuario_Criacao, Dt_Criacao, Id_Usuario_Atualizacao, Dt_Atualizacao, IP_Origem
+      - Temporal Tables para versionamento automático
+      - Total_Acessos calculado (não armazenado)
+      - FK Id_Categoria substituído por tabela associativa ArtigoCategoria (many-to-many)
+    documentacao_item_relacionado: "RN-RF070-06, RN-RF070-07, RN-RF070-12"
+    uc_relacionado: "UC01, UC02, UC03"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF070-014"
+    tipo: "tabela"
+    nome: "tbl_Categorias_Conhecimento"
+    caminho: "Database/dbo.tbl_Categorias_Conhecimento"
+    descricao: |
+      Tabela de categorias hierárquicas (auto-referência via Id_Categoria_Pai).
+      Problemas: sem ClienteId, sem validação unicidade nome, sem auditoria.
+    destino: "assumido"
+    justificativa: |
+      Estrutura base migrada para entidade Categoria com melhorias:
+      - Adicionado ClienteId (multi-tenancy)
+      - Constraint unique (ClienteId, Nome_Categoria, Id_Categoria_Pai)
+      - Campos auditoria completos
+      - Soft delete auditado
+    documentacao_item_relacionado: "RN-RF070-01, RN-RF070-06"
+    uc_relacionado: "UC09"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF070-015"
+    tipo: "tabela"
+    nome: "tbl_Anexos_Conhecimento"
+    caminho: "Database/dbo.tbl_Anexos_Conhecimento"
+    descricao: |
+      Tabela de anexos com caminho absoluto local (D:\IControlIT\Anexos\).
+      Problemas: sem versionamento, sem tipo MIME, sem controle acesso,
+      ON DELETE CASCADE perigoso.
+    destino: "substituido"
+    justificativa: |
+      Estrutura migrada para entidade Anexo com mudanças críticas:
+      - Caminho_Arquivo → BlobUri (Azure Blob Storage)
+      - Adicionado TipoMIME, Hash_SHA256 (validação integridade)
+      - Adicionado Versao (controle versionamento anexos)
+      - ON DELETE CASCADE → Soft delete (Fl_Excluido)
+      - Controle acesso via permissão kb:anexos:upload
+      Migração: script PowerShell para upload de ~500GB para Azure Blob Storage.
+    documentacao_item_relacionado: "RN-RF070-09"
+    uc_relacionado: "UC10"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF070-016"
+    tipo: "regra_negocio"
+    nome: "Publicação Direta Sem Aprovação"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/ArtigoNovo.aspx.vb - btnPublicar_Click"
+    descricao: |
+      Qualquer usuário com permissão de criar artigos podia publicá-los diretamente,
+      sem revisão ou aprovação.
+      Artigos com erros ou informações incorretas eram publicados sem validação.
+    destino: "substituido"
+    justificativa: |
+      Implementado workflow de aprovação configurável por categoria (RN-RF070-04).
+      Artigos em categorias críticas (Segurança, Compliance, LGPD) SEMPRE requerem aprovação.
+      Estados: Rascunho → Aguardando Revisão → Em Revisão → Aprovado → Publicado.
+    documentacao_item_relacionado: "RN-RF070-04"
+    uc_relacionado: "UC07"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF070-017"
+    tipo: "regra_negocio"
+    nome: "Edição Exclusiva Sem Controle de Concorrência"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/ArtigoEditar.aspx.vb - Page_Load"
+    descricao: |
+      Sistema não implementava lock otimista ou pessimista.
+      Edições simultâneas causavam "last write wins" (perda de dados).
+    destino: "substituido"
+    justificativa: |
+      Implementado controle de concorrência otimista via RowVersion (Timestamp).
+      Erro HTTP 409 Conflict se versão não corresponder.
+      Entity Framework Core detecta automaticamente conflitos de concorrência.
+    documentacao_item_relacionado: "RN-RF070-07"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF070-018"
+    tipo: "regra_negocio"
+    nome: "Busca Case-Sensitive"
+    caminho: "Database/dbo.pa_BuscarArtigos"
+    descricao: |
+      Busca SQL padrão era case-sensitive (dependia de collation do banco).
+      Buscar "VPN" não encontrava "vpn" ou "Vpn".
+    destino: "substituido"
+    justificativa: |
+      ElasticSearch é case-insensitive por padrão.
+      Tokenização e normalização automática (lowercase, stemming).
+      Busca por "VPN" encontra "vpn", "Vpn", "V.P.N.", etc.
+    documentacao_item_relacionado: "RN-RF070-11"
+    uc_relacionado: "UC05"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF070-019"
+    tipo: "regra_negocio"
+    nome: "Contador de Acessos Não Auditado"
+    caminho: "Database/dbo.pa_IncrementarAcessos"
+    descricao: |
+      Contador incrementado sem registrar quem acessou, quando, de onde.
+      Impossível analytics detalhado (usuários mais ativos, origem tráfego, tempo leitura).
+    destino: "substituido"
+    justificativa: |
+      Substituído por evento ArtigoAcessadoEvent com auditoria completa (RN-RF070-12).
+      Registro: ArtigoId, UsuarioId, IP, UserAgent, OrigemAcesso, TempoLeitura.
+      Analytics detalhado: heatmap de acessos, tempo médio leitura, origem (busca/link/chamado).
+    documentacao_item_relacionado: "RN-RF070-12"
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF070-020"
+    tipo: "regra_negocio"
+    nome: "Anexos Sem Limite de Quantidade"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/ArtigoNovo.aspx.vb - fuAnexos_Upload"
+    descricao: |
+      Não havia limite de quantidade de anexos por artigo.
+      Alguns artigos tinham 50+ anexos, degradando performance.
+    destino: "assumido"
+    justificativa: |
+      Implementado limite soft de 20 anexos por artigo (validação frontend warning).
+      Limite hard de 50 anexos (validação backend).
+      Tamanho total de anexos limitado a 2GB por artigo (RN-RF070-09).
+    documentacao_item_relacionado: "RN-RF070-09"
+    uc_relacionado: "UC10"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF070-021"
+    tipo: "regra_negocio"
+    nome: "Categoria Opcional"
+    caminho: "Database/dbo.tbl_BaseConhecimento - Id_Categoria NULL"
+    descricao: |
+      Campo Id_Categoria era tecnicamente opcional (NULL permitido).
+      Artigos sem categoria ficavam "órfãos", impossíveis de encontrar via navegação.
+    destino: "substituido"
+    justificativa: |
+      Categoria agora OBRIGATÓRIA (RN-RF070-02).
+      Mínimo 1 categoria, máximo 5 categorias por artigo (RN-RF070-03).
+      Validação tanto no frontend quanto backend (FluentValidation).
+    documentacao_item_relacionado: "RN-RF070-02, RN-RF070-03"
+    uc_relacionado: "UC01, UC03"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+# Telas Legadas (estrutura detalhada)
+telas:
+  - id: "LEG-RF070-001"
+    nome: "BaseConhecimento.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/BaseConhecimento.aspx"
+    responsabilidade: "Listagem de artigos com busca simples"
+    campos:
+      - nome: "txtBusca"
+        tipo: "TextBox"
+        obrigatorio: false
+        validacao: "Busca LIKE '%termo%'"
+      - nome: "ddlCategoria"
+        tipo: "DropDownList"
+        obrigatorio: false
+        validacao: "Filtro categoria única"
+      - nome: "gvArtigos"
+        tipo: "GridView"
+        obrigatorio: false
+        validacao: "Paginação manual 10/página"
+    comportamentos_implicitos:
+      - "Busca via pa_BuscarArtigos (timeout frequente)"
+      - "Ordenação fixa Total_Acessos DESC"
+      - "Sem ranking de relevância"
+
+  - id: "LEG-RF070-002"
+    nome: "ArtigoDetalhe.aspx"
+    caminho: "ic1_legado/IControlIT/ServiceDesk/ArtigoDetalhe.aspx"
+    responsabilidade: "Visualização completa de artigo"
+    campos:
+      - nome: "lblTitulo"
+        tipo: "Label"
+        obrigatorio: false
+        validacao: "Display only"
+      - nome: "lblSolucao"
+        tipo: "Literal"
+        obrigatorio: false
+        validacao: "Renderiza HTML (XSS vulnerability)"
+    comportamentos_implicitos:
+      - "Contador incrementado via pa_IncrementarAcessos"
+      - "HTML não sanitizado (XSS)"
+      - "Sem votação, artigos relacionados ou versionamento"
+
+# WebServices Legados
+servicos:
+  - id: "LEG-RF070-006"
+    nome: "WSBaseConhecimento.BuscarArtigos"
+    localizacao: "WSBaseConhecimento.asmx.vb"
+    responsabilidade: "Busca de artigos via SOAP"
+    notas: "Retorna DataSet, sem paginação, LIKE lento"
+
+  - id: "LEG-RF070-007"
+    nome: "WSBaseConhecimento.ObterArtigo"
+    localizacao: "WSBaseConhecimento.asmx.vb"
+    responsabilidade: "Obter artigo por ID via SOAP"
+    notas: "Sem autenticação, retorna DataSet"
+
+# Tabelas Legadas com Problemas
+tabelas:
+  - nome: "tbl_BaseConhecimento"
+    finalidade: "Armazenar artigos de conhecimento"
+    problemas:
+      - "Sem ClienteId (multi-tenancy manual)"
+      - "Tipo TEXT deprecated"
+      - "Sem auditoria completa"
+      - "Sem versionamento"
+      - "Total_Acessos desnormalizado"
+      - "FK Id_Categoria (relacionamento 1:1)"
+
+  - nome: "tbl_Categorias_Conhecimento"
+    finalidade: "Categorias hierárquicas"
+    problemas:
+      - "Sem ClienteId"
+      - "Sem validação unicidade nome"
+      - "Sem auditoria"
+
+  - nome: "tbl_Anexos_Conhecimento"
+    finalidade: "Anexos de artigos"
+    problemas:
+      - "Caminho absoluto local (D:\\...)"
+      - "Sem versionamento"
+      - "Sem tipo MIME"
+      - "Sem controle acesso"
+      - "ON DELETE CASCADE perigoso"
+
+# Regras de Negócio Implícitas
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: "Publicação direta sem aprovação"
+    fonte: "ArtigoNovo.aspx.vb - btnPublicar_Click"
+
+  - id: "RL-RN-002"
+    descricao: "Edição exclusiva sem controle de concorrência (last write wins)"
+    fonte: "ArtigoEditar.aspx.vb - Page_Load"
+
+  - id: "RL-RN-003"
+    descricao: "Busca case-sensitive (dependia de collation)"
+    fonte: "pa_BuscarArtigos"
+
+  - id: "RL-RN-004"
+    descricao: "Contador de acessos não auditado"
+    fonte: "pa_IncrementarAcessos"
+
+  - id: "RL-RN-005"
+    descricao: "Anexos sem limite de quantidade"
+    fonte: "ArtigoNovo.aspx.vb - fuAnexos_Upload"
+
+  - id: "RL-RN-006"
+    descricao: "Categoria opcional (NULL permitido)"
+    fonte: "tbl_BaseConhecimento - Id_Categoria"
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: "Busca"
+    existe_legado: true
+    existe_moderno: true
+    notas: "LIKE lento → ElasticSearch full-text (< 500ms)"
+
+  - item: "Categorização"
+    existe_legado: true
+    existe_moderno: true
+    notas: "1:1 (1 categoria) → N:N (até 5 categorias)"
+
+  - item: "Versionamento"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Não existia → Temporal Tables (histórico completo)"
+
+  - item: "Workflow Aprovação"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Não existia → Configurável por categoria"
+
+  - item: "Votação/Feedback"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Não existia → Útil/Não Útil + comentários"
+
+  - item: "Anexos Storage"
+    existe_legado: true
+    existe_moderno: true
+    notas: "File System local → Azure Blob Storage"
+
+  - item: "Multi-Tenancy"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Manual (filtro) → Nativo (ClienteId)"
+
+  - item: "Auditoria"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Parcial → Completa (before/after, 7 anos)"
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: "Substituir LIKE por ElasticSearch"
+    motivo: "Performance inaceitável (30s timeout em bases > 10k artigos)"
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Implementar Versionamento via Temporal Tables"
+    motivo: "Perda de dados críticos em auditorias"
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Migrar Anexos para Azure Blob Storage"
+    motivo: "File System não escalável, sem redundância, inacessível em cloud"
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Categorização Many-to-Many (Limite 5)"
+    motivo: "Artigos pertencem a múltiplos domínios"
+    impacto: "baixo"
+    data: "2025-12-30"
+
+  - decisao: "Workflow de Aprovação Configurável"
+    motivo: "Artigos críticos requerem revisão dupla"
+    impacto: "medio"
+    data: "2025-12-30"
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: "Perda de Dados Durante Migração"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: "Backup completo, migração em staging, validação automática pós-migração, rollback plan"
+
+  - risco: "Performance de Busca Degradada"
+    impacto: "alto"
+    probabilidade: "baixa"
+    mitigacao: "Testes de carga com base real (50k artigos), tuning índices ElasticSearch, cache Redis"
+
+  - risco: "Anexos Inacessíveis Após Migração"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: "Migração gradual (5% → 25% → 100%), validação checksums, fallback file system por 60 dias"
+
+  - risco: "Custo Azure Storage Acima do Previsto"
+    impacto: "medio"
+    probabilidade: "media"
+    mitigacao: "Lifecycle policies (Cool Tier), compressão imagens, monitoramento diário"
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: "tbl_BaseConhecimento"
+    referencia_rf: "Entidade Artigo"
+    referencia_uc: "UC01, UC02, UC03"
+    status: "migrado"
+
+  - elemento_legado: "tbl_Categorias_Conhecimento"
+    referencia_rf: "Entidade Categoria"
+    referencia_uc: "UC09"
+    status: "migrado"
+
+  - elemento_legado: "tbl_Anexos_Conhecimento"
+    referencia_rf: "Entidade Anexo"
+    referencia_uc: "UC10"
+    status: "migrado"
+
+  - elemento_legado: "pa_BuscarArtigos"
+    referencia_rf: "RN-RF070-11"
+    referencia_uc: "UC05"
+    status: "descartado"
+
+  - elemento_legado: "pa_IncrementarAcessos"
+    referencia_rf: "RN-RF070-12 (ArtigoAcessadoEvent)"
+    referencia_uc: "UC02"
+    status: "descartado"
+
+  - elemento_legado: "WSBaseConhecimento.BuscarArtigos"
+    referencia_rf: "GET /api/base-conhecimento/artigos"
+    referencia_uc: "UC05"
+    status: "migrado"
+
+  - elemento_legado: "BaseConhecimento.aspx"
+    referencia_rf: "/base-conhecimento (Angular)"
+    referencia_uc: "UC00"
+    status: "migrado"
+
+  - elemento_legado: "ArtigoDetalhe.aspx"
+    referencia_rf: "/base-conhecimento/artigos/:id (Angular)"
+    referencia_uc: "UC02"
+    status: "migrado"
+
+# Changelog
+changelog:
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Extração completa da memória técnica do legado VB.NET/ASPX com rastreabilidade 100% (todos itens com campo destino preenchido)"
+    autor: "Agência ALC - alc.dev.br"

@@ -1,6 +1,6 @@
 # Adequação UC do RFXXX - Adequação Completa de UC
 
-O RF fica no endereço `\docs\rf\Fase*\EPIC*\RF*`
+O RF fica no endereço `\docs\documentacao\Fase*\EPIC*\RF*`
 
 ---
 

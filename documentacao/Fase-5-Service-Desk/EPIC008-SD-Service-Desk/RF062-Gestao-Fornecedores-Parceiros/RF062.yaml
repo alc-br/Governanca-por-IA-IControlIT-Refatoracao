@@ -1,0 +1,486 @@
+# =============================================
+# RF062 - Gestão de Fornecedores e Parceiros
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF062"
+  nome: "Gestão de Fornecedores e Parceiros"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 5 - Service Desk"
+  epic: "EPIC008-SD-Service-Desk"
+  status: "em_desenvolvimento" # draft | aprovado | em_desenvolvimento | concluido
+
+descricao:
+  objetivo: "Fornecer sistema completo de cadastro e gestão de fornecedores e parceiros de TI e Telecom, incluindo controle de documentação obrigatória, gestão de contratos e SLAs, avaliação de performance, homologação e integração com processos de compras e solicitações."
+  problema_resolvido: "Centralizar informações de fornecedores, garantir compliance documental, monitorar performance contratual, automatizar alertas de vencimentos e fornecer dados para decisões de contratação."
+  publico_afetado: "Gestores de compras, gestores de contratos, equipe de compliance, solicitantes de serviços, gestores financeiros."
+
+escopo:
+  incluso:
+    - "Cadastro completo de fornecedores com classificação por categoria"
+    - "Upload e controle de documentação obrigatória"
+    - "Gestão de múltiplos contatos por fornecedor"
+    - "Cadastro e controle de contratos vinculados"
+    - "Definição e monitoramento de SLAs por tipo de serviço"
+    - "Processo de homologação de fornecedores"
+    - "Sistema de avaliação periódica"
+    - "Ranking automático de fornecedores"
+    - "Alertas de vencimentos (documentos e contratos)"
+    - "Bloqueio automático por documentação vencida"
+    - "Dashboard de performance"
+    - "Exportação de relatórios de compliance"
+    - "Histórico de atendimentos"
+    - "Integração com solicitações e OSs"
+  fora:
+    - "Interface visual específica (responsabilidade do frontend)"
+    - "Integração com sistemas de pagamento"
+    - "Gestão financeira de pagamentos"
+
+entidades:
+  - nome: "Fornecedor"
+    descricao: "Entidade principal do fornecedor/parceiro"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "DocumentoFornecedor"
+    descricao: "Documentação obrigatória do fornecedor"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "ContratoFornecedor"
+    descricao: "Contratos vinculados ao fornecedor"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "ContatoFornecedor"
+    descricao: "Contatos do fornecedor por departamento"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "SLAFornecedor"
+    descricao: "SLAs definidos por tipo de serviço"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "AvaliacaoFornecedor"
+    descricao: "Avaliações periódicas de performance"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "HomologacaoFornecedor"
+    descricao: "Processo de homologação"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF062-001"
+    titulo: "Categorias de Fornecedores"
+    descricao: "Fornecedores devem ser classificados em uma das categorias disponíveis: Operadora, Fabricante, Revenda, Prestador de Serviço, Software House ou Transportadora."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "campo_obrigatorio"
+      mensagem_erro: "Categoria é obrigatória para cadastro de fornecedor."
+      http_code: 400
+
+  - id: "RN-RF062-002"
+    titulo: "Documentação Obrigatória"
+    descricao: "Fornecedores pessoa jurídica devem manter certidões válidas: CNPJ, CND Federal, CND Estadual e CND Municipal."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "documentacao_completa"
+      mensagem_erro: "Documentação obrigatória incompleta. Fornecedor não pode ser homologado."
+      http_code: 400
+
+  - id: "RN-RF062-003"
+    titulo: "Alertas de Vencimento de Documentos"
+    descricao: "Sistema deve notificar responsáveis 30, 15 e 7 dias antes do vencimento de cada certidão."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "job_diario"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF062-004"
+    titulo: "Bloqueio por Documentação Vencida"
+    descricao: "Fornecedor com qualquer certidão obrigatória vencida é automaticamente bloqueado para novas solicitações."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "bloqueio_automatico"
+      mensagem_erro: "Fornecedor bloqueado por documentação vencida."
+      http_code: 403
+
+  - id: "RN-RF062-005"
+    titulo: "Contratos Vinculados"
+    descricao: "Cada fornecedor pode ter múltiplos contratos com vigências, valores e renovação automática."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "relacionamento"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF062-006"
+    titulo: "SLA por Fornecedor"
+    descricao: "Cada fornecedor pode ter SLAs definidos por tipo de serviço (Reparo, Instalação, Suporte) com tempos de resposta e resolução."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "sla_compliance"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF062-007"
+    titulo: "Avaliações Periódicas"
+    descricao: "Fornecedores devem ser avaliados trimestralmente em quatro dimensões: Qualidade, Prazo, Custo e Atendimento."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "range"
+      mensagem_erro: "Notas devem estar entre 1 e 5."
+      http_code: 400
+
+  - id: "RN-RF062-008"
+    titulo: "Ranking de Fornecedores"
+    descricao: "Sistema gera ranking automático de fornecedores por categoria, combinando nota média de avaliações (peso 60%) e SLA compliance (peso 40%)."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "calculo_automatico"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF062-009"
+    titulo: "Contatos Múltiplos"
+    descricao: "Cada fornecedor pode ter múltiplos contatos cadastrados, classificados por departamento (Comercial, Técnico, Financeiro)."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "formato"
+      mensagem_erro: "Email inválido ou telefone fora do padrão brasileiro."
+      http_code: 400
+
+  - id: "RN-RF062-010"
+    titulo: "Integração com Solicitações"
+    descricao: "Fornecedor deve ser vinculado automaticamente a solicitações e ordens de serviço que atender."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "vinculo_automatico"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF062-011"
+    titulo: "Histórico de Atendimentos"
+    descricao: "Sistema mantém registro completo de todos os atendimentos realizados por cada fornecedor."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "read_only"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF062-012"
+    titulo: "Dashboard de Performance"
+    descricao: "Painel executivo exibe métricas em tempo real: SLA compliance, nota média de avaliações, contratos ativos, documentos vencidos."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "dashboard"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF062-013"
+    titulo: "Alertas de Renovação de Contratos"
+    descricao: "Sistema notifica responsáveis 90, 60 e 30 dias antes do vencimento de contratos."
+    criticidade: "ALTA"
+    implementacao:
+      backend: true
+      frontend: false
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "job_diario"
+      mensagem_erro: null
+      http_code: null
+
+  - id: "RN-RF062-014"
+    titulo: "Homologação de Fornecedores"
+    descricao: "Fornecedor passa por processo de aprovação formal antes de poder receber ordens de serviço."
+    criticidade: "CRÍTICA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: true
+      validacao_ui: true
+    validacao:
+      tipo: "workflow"
+      mensagem_erro: "Fornecedor não homologado não pode receber ordens de serviço."
+      http_code: 403
+
+  - id: "RN-RF062-015"
+    titulo: "Export para Compliance"
+    descricao: "Sistema permite exportar relatório consolidado de fornecedores ativos com status de documentação para auditorias."
+    criticidade: "MÉDIA"
+    implementacao:
+      backend: true
+      frontend: true
+      validacao_api: false
+      validacao_ui: false
+    validacao:
+      tipo: "export"
+      mensagem_erro: null
+      http_code: null
+
+estados:
+  - id: "rascunho"
+    descricao: "Fornecedor criado, cadastro incompleto"
+  - id: "em_analise"
+    descricao: "Aguardando homologação"
+  - id: "ativo"
+    descricao: "Homologado e habilitado para receber OSs"
+  - id: "bloqueado"
+    descricao: "Bloqueado por documentação vencida ou desempenho insatisfatório"
+  - id: "inativo"
+    descricao: "Desativado permanentemente (soft delete)"
+
+transicoes:
+  permitidas:
+    - de: "rascunho"
+      para: "em_analise"
+      condicao: "Cadastro completo e documentação enviada"
+    - de: "em_analise"
+      para: "ativo"
+      condicao: "Aprovação da homologação"
+    - de: "em_analise"
+      para: "rascunho"
+      condicao: "Rejeição com solicitação de correção"
+    - de: "ativo"
+      para: "bloqueado"
+      condicao: "Documentação vencida ou avaliação crítica"
+    - de: "bloqueado"
+      para: "ativo"
+      condicao: "Documentação atualizada ou plano de melhoria aprovado"
+    - de: "ativo"
+      para: "inativo"
+      condicao: "Solicitação de inativação"
+    - de: "bloqueado"
+      para: "inativo"
+      condicao: "Solicitação de inativação"
+  proibidas:
+    - de: "inativo"
+      para: "ativo"
+      motivo: "Fornecedor inativo não pode ser reativado, criar novo registro"
+
+permissoes:
+  - codigo: "SD.FORNECEDORES.VIEW_ANY"
+    descricao: "Listar fornecedores"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Gestor Compras"
+      - "Gestor Contratos"
+  - codigo: "SD.FORNECEDORES.VIEW"
+    descricao: "Visualizar detalhes de fornecedor"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Gestor Compras"
+      - "Gestor Contratos"
+      - "Solicitante"
+  - codigo: "SD.FORNECEDORES.CREATE"
+    descricao: "Criar novo fornecedor"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Gestor Compras"
+  - codigo: "SD.FORNECEDORES.UPDATE"
+    descricao: "Atualizar dados de fornecedor"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Gestor Compras"
+  - codigo: "SD.FORNECEDORES.DELETE"
+    descricao: "Inativar fornecedor"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Gestor Compras"
+  - codigo: "SD.FORNECEDORES.HOMOLOGAR"
+    descricao: "Aprovar ou rejeitar homologação"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Gestor Compras"
+  - codigo: "SD.FORNECEDORES.AVALIAR"
+    descricao: "Registrar avaliação periódica"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Gestor Compras"
+      - "Gestor Contratos"
+  - codigo: "SD.FORNECEDORES.EXPORT"
+    descricao: "Exportar relatórios de compliance"
+    roles_autorizadas:
+      - "Super Admin"
+      - "Gestor Compras"
+      - "Compliance"
+      - "Auditor"
+
+integracoes:
+  internas:
+    - "Autenticação (JWT)"
+    - "Multi-Tenancy (EmpresaId)"
+    - "Auditoria (todas operações críticas)"
+    - "Central de Funcionalidades"
+    - "i18n (pt-BR, en, es)"
+    - "Sistema de Solicitações (RF021)"
+    - "Sistema de Ordens de Serviço"
+  externas: []
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  criptografia_documentos: true
+  validacao_cnpj: true
+  rate_limiting: "100 requests/minuto por usuário"
+  upload_whitelist: ["PDF", "JPEG", "PNG"]
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00 - Listar Fornecedores"
+    - "UC01 - Criar Fornecedor"
+    - "UC02 - Visualizar Fornecedor"
+    - "UC03 - Editar Fornecedor"
+    - "UC04 - Inativar Fornecedor"
+    - "UC05 - Upload de Documentação"
+    - "UC06 - Gerenciar Contatos"
+    - "UC07 - Gerenciar Contratos"
+    - "UC08 - Definir SLAs"
+    - "UC09 - Homologar Fornecedor"
+    - "UC10 - Avaliar Fornecedor"
+    - "UC11 - Visualizar Ranking"
+    - "UC12 - Dashboard de Performance"
+    - "UC13 - Exportar Relatório"
+    - "UC14 - Consultar Histórico de Atendimentos"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar fornecedor"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar fornecedores"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar fornecedor"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar fornecedor"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Inativar fornecedor"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar campos obrigatórios"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar CNPJ (formato e dígitos)"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar email de contatos"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar telefone padrão brasileiro"
+      required: true
+    - id: "RF-VAL-05"
+      title: "Validar documentação obrigatória completa"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Criptografia de documentos"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Proteção upload de arquivos maliciosos"
+      required: true
+    - id: "RF-SEC-05"
+      title: "Rate limiting em APIs"
+      required: true
+
+exclusions:
+  documentacao_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0 - Separação RF/RL completa"
+  - versao: "1.0"
+    data: "2025-01-14"
+    autor: "Equipe IControlIT"
+    descricao: "Versão inicial"

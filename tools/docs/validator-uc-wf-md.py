@@ -43,7 +43,7 @@ from datetime import datetime
 @dataclass
 class ValidationResult:
     """Resultado da validacao de conformidade com templates"""
-    rf_id: str
+    documentacao_id: str
     uc_md_conforme: bool
     uc_yaml_conforme: bool
     wf_md_conforme: bool
@@ -134,13 +134,13 @@ class ValidadorUCWFMD:
         self.base_path = Path(base_path)
         self.templates_path = Path(templates_path)
 
-    def encontrar_rf(self, rf_id: str) -> Path:
+    def encontrar_rf(self, documentacao_id: str) -> Path:
         """Encontra a pasta do RF"""
         for fase_dir in self.base_path.glob("Fase-*"):
             for epic_dir in fase_dir.glob("EPIC*"):
-                for rf_dir in epic_dir.glob(f"{rf_id}*"):
-                    if rf_dir.is_dir() and rf_dir.name.startswith(rf_id):
-                        return rf_dir
+                for documentacao_dir in epic_dir.glob(f"{rf_id}*"):
+                    if documentacao_dir.is_dir() and documentacao_dir.name.startswith(rf_id):
+                        return documentacao_dir
 
         raise FileNotFoundError(f"RF {rf_id} nao encontrado em {self.base_path}")
 
@@ -263,10 +263,10 @@ class ValidadorUCWFMD:
 
         return len([g for g in gaps if g['tipo'] == 'CRITICO']) == 0, data, gaps
 
-    def validar_uc_md(self, rf_path: Path) -> Tuple[bool, List[Dict[str, str]]]:
+    def validar_uc_md(self, documentacao_path: Path) -> Tuple[bool, List[Dict[str, str]]]:
         """Valida UC-RFXXX.md conforme template UC.md"""
-        rf_id = rf_path.name.split('-')[0]
-        uc_md = rf_path / f"UC-{rf_id}.md"
+        documentacao_id = documentacao_path.name.split('-')[0]
+        uc_md = documentacao_path / f"UC-{rf_id}.md"
 
         return self.validar_secoes_md(
             uc_md,
@@ -274,10 +274,10 @@ class ValidadorUCWFMD:
             tipo="UC"
         )
 
-    def validar_uc_yaml(self, rf_path: Path) -> Tuple[bool, Dict, List[Dict[str, str]]]:
+    def validar_uc_yaml(self, documentacao_path: Path) -> Tuple[bool, Dict, List[Dict[str, str]]]:
         """Valida UC-RFXXX.yaml conforme template UC.yaml"""
-        rf_id = rf_path.name.split('-')[0]
-        uc_yaml = rf_path / f"UC-{rf_id}.yaml"
+        documentacao_id = documentacao_path.name.split('-')[0]
+        uc_yaml = documentacao_path / f"UC-{rf_id}.yaml"
 
         conforme, data, gaps = self.validar_campos_yaml(
             uc_yaml,
@@ -304,10 +304,10 @@ class ValidadorUCWFMD:
 
         return conforme, data, gaps
 
-    def validar_wf_md(self, rf_path: Path) -> Tuple[bool, List[Dict[str, str]]]:
+    def validar_wf_md(self, documentacao_path: Path) -> Tuple[bool, List[Dict[str, str]]]:
         """Valida WF-RFXXX.md conforme template WF.md"""
-        rf_id = rf_path.name.split('-')[0]
-        wf_md = rf_path / f"WF-{rf_id}.md"
+        documentacao_id = documentacao_path.name.split('-')[0]
+        wf_md = documentacao_path / f"WF-{rf_id}.md"
 
         return self.validar_secoes_md(
             wf_md,
@@ -315,9 +315,9 @@ class ValidadorUCWFMD:
             tipo="WF"
         )
 
-    def validar_md_yaml(self, rf_path: Path) -> Tuple[bool, Dict, List[Dict[str, str]]]:
+    def validar_md_yaml(self, documentacao_path: Path) -> Tuple[bool, Dict, List[Dict[str, str]]]:
         """Valida MD-RFXXX.yaml conforme template MD.yaml"""
-        rf_id = rf_path.name.split('-')[0]
+        documentacao_id = documentacao_path.name.split('-')[0]
 
         # MD pode ter multiplos arquivos (MD-XXX-*.yaml)
         # Vamos buscar o primeiro MD-*.yaml
@@ -358,13 +358,13 @@ class ValidadorUCWFMD:
 
         return conforme, data, gaps
 
-    def validar_rf(self, rf_id: str) -> ValidationResult:
+    def validar_rf(self, documentacao_id: str) -> ValidationResult:
         """Valida conformidade completa de UC/WF/MD com templates"""
         try:
-            rf_path = self.encontrar_rf(rf_id)
+            documentacao_path = self.encontrar_rf(rf_id)
         except FileNotFoundError as e:
             return ValidationResult(
-                rf_id=rf_id,
+                documentacao_id=rf_id,
                 uc_md_conforme=False,
                 uc_yaml_conforme=False,
                 wf_md_conforme=False,
@@ -377,9 +377,9 @@ class ValidadorUCWFMD:
         arquivos_ausentes = []
 
         # Verificar arquivos obrigatorios
-        uc_md_path = rf_path / f"UC-{rf_id}.md"
-        uc_yaml_path = rf_path / f"UC-{rf_id}.yaml"
-        wf_md_path = rf_path / f"WF-{rf_id}.md"
+        uc_md_path = documentacao_path / f"UC-{rf_id}.md"
+        uc_yaml_path = documentacao_path / f"UC-{rf_id}.yaml"
+        wf_md_path = documentacao_path / f"WF-{rf_id}.md"
         md_yaml_files = list(rf_path.glob("MD-*.yaml"))
 
         if not uc_md_path.exists():
@@ -408,7 +408,7 @@ class ValidadorUCWFMD:
         all_gaps.extend(gaps_md_yaml)
 
         return ValidationResult(
-            rf_id=rf_id,
+            documentacao_id=rf_id,
             uc_md_conforme=uc_md_conforme,
             uc_yaml_conforme=uc_yaml_conforme,
             wf_md_conforme=wf_md_conforme,
@@ -427,8 +427,8 @@ class ValidadorUCWFMD:
             return results
 
         for epic_dir in sorted(fase_dir.glob("EPIC-*")):
-            for rf_dir in sorted(epic_dir.glob("RF*")):
-                rf_id = rf_dir.name.split('-')[0]
+            for documentacao_dir in sorted(epic_dir.glob("RF*")):
+                documentacao_id = documentacao_dir.name.split('-')[0]
                 print(f"Validando {rf_id}...")
                 result = self.validar_rf(rf_id)
                 results.append(result)
@@ -561,7 +561,7 @@ def main():
 
     else:
         # Validar RF unico
-        rf_id = arg
+        documentacao_id = arg
         print(f"Validando {rf_id}...")
         result = validador.validar_rf(rf_id)
         results = [result]

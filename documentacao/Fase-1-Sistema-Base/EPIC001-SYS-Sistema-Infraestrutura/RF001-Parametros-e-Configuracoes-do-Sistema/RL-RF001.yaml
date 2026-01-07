@@ -1,0 +1,450 @@
+# =============================================
+# RL-RF001 - Referência ao Legado
+# Gerado manualmente via análise de IA
+# Data: 2025-12-29 16:55:00
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf_id: RF001
+titulo: Sistema de Parâmetros e Configurações Centralizadas
+
+legado:
+  sistema: VB.NET + ASP.NET Web Forms
+  versao: N/A
+  arquitetura: Monolítica WebForms
+  banco_dados: SQL Server
+  multi_tenant: false
+  auditoria: partial
+
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+referencias:
+  - id: LEG-RF001-001
+    tipo: tela
+    nome: Edição Manual de Web.config
+    caminho: ic1_legado/IControlIT/Web.config
+    descricao: |
+      No legado, alguns parâmetros eram editados manualmente no arquivo Web.config.
+      Requer acesso ao servidor, restart da aplicação, sem auditoria e sem versionamento.
+    destino: descartado
+    justificativa: |
+      Prática insegura e não escalável. Substituído por UI administrativa com auditoria completa,
+      hot reload, validação e controle de acesso RBAC. Não há razão para manter esta prática.
+    documentacao_item_relacionado: null
+    uc_relacionado: null
+    complexidade: baixa
+    risco_migracao: baixo
+    prioridade: 5
+
+  - id: LEG-RF001-002
+    tipo: regra_negocio
+    nome: Parâmetros Hard-coded no Código VB.NET
+    caminho: ic1_legado/IControlIT/*.vb
+    descricao: |
+      Alguns parâmetros estavam fixos no código VB.NET (ex: Const TIMEOUT_SEGUNDOS = 30).
+      Impossível alterar sem recompilação. Diferentes valores por ambiente requer branches de código.
+    destino: descartado
+    justificativa: |
+      Anti-pattern. Substituído por sistema de parâmetros gerenciável via UI ou API,
+      sem necessidade de deploy. Todos os valores configuráveis devem estar no banco de dados.
+    documentacao_item_relacionado: RN-SYS-001-06
+    uc_relacionado: UC01
+    complexidade: media
+    risco_migracao: baixo
+    prioridade: 4
+
+  - id: LEG-RF001-003
+    tipo: stored_procedure
+    nome: Leitura Direta de tbl_Parametros
+    caminho: Database/dbo.sp_GetParametro
+    descricao: |
+      Código legado consulta tabela tbl_Parametros diretamente via SELECT.
+      Sem cache, alto impacto de performance, load desnecessário no SQL Server.
+    destino: substituido
+    justificativa: |
+      Substituído por API moderna com cache Redis (invalidação automática).
+      Reduz latência de 50ms → 2ms. VIEW tbl_Parametros criada temporariamente
+      para compatibilidade com código legado durante período de transição (6 meses).
+    documentacao_item_relacionado: RN-SYS-001-02
+    uc_relacionado: UC00
+    complexidade: alta
+    risco_migracao: alto
+    prioridade: 1
+
+  - id: LEG-RF001-004
+    tipo: componente
+    nome: Armazenamento de Senhas em Texto Plano
+    caminho: Database/tbl_Parametros (campo Vl_Parametro)
+    descricao: |
+      Dados sensíveis (senhas, API keys) armazenados em texto plano.
+      VULNERABILIDADE CRÍTICA DE SEGURANÇA. Exposição de credenciais.
+    destino: substituido
+    justificativa: |
+      CRÍTICO: Substituído por criptografia AES-256 transparente.
+      Valor criptografado ao salvar, descriptografado apenas quando necessário.
+      Valores mascarados (*****) na interface. Acesso descriptografado apenas para
+      Super Admin com permissão SYS.PARAMETROS.VIEW_SENSITIVE. Conformidade LGPD.
+    documentacao_item_relacionado: RN-SYS-001-04
+    uc_relacionado: UC02
+    complexidade: alta
+    risco_migracao: alto
+    prioridade: 1
+
+  - id: LEG-RF001-005
+    tipo: regra_negocio
+    nome: Tudo Armazenado como String (sem Validação de Tipo)
+    caminho: Database/tbl_Parametros (campo Vl_Parametro varchar(MAX))
+    descricao: |
+      Todos os valores armazenados como string (varchar). Sem validação de tipo.
+      Conversão implícita no código. Erros de conversão em runtime (ex: "ABC" para Integer).
+    destino: substituido
+    justificativa: |
+      Substituído por tipos de dados tipados (String, Integer, Decimal, Boolean, Date, JSON).
+      Validação ANTES de persistir (fail-fast). Mensagens de erro claras por tipo.
+      Campos separados: Vl_String, Vl_Inteiro, Vl_Decimal, Vl_Boolean, Vl_Data, Vl_Json.
+      Elimina erros de conversão e garante integridade dos dados.
+    documentacao_item_relacionado: RN-SYS-001-02
+    uc_relacionado: UC01
+    complexidade: alta
+    risco_migracao: medio
+    prioridade: 2
+
+  - id: LEG-RF001-006
+    tipo: tela
+    nome: Feature Flags Inexistentes
+    caminho: N/A
+    descricao: |
+      Funcionalidade inexistente no legado. Ativação/desativação de features requeria
+      deploy de nova versão completa da aplicação. Impossível rollout gradual.
+    destino: assumido
+    justificativa: |
+      NOVA FUNCIONALIDADE no sistema moderno. Sistema completo de Feature Flags com:
+      - Rollout gradual (por % usuários, lista específica, período)
+      - Ativação/desativação em runtime (sem restart)
+      - Multi-tenant (flags globais ou específicas por Fornecedor)
+      Essencial para SaaS moderno e deploy contínuo.
+    documentacao_item_relacionado: RN-SYS-001-08
+    uc_relacionado: null
+    complexidade: alta
+    risco_migracao: baixo
+    prioridade: 2
+
+  - id: LEG-RF001-007
+    tipo: componente
+    nome: Limites de Uso Inexistentes
+    caminho: N/A
+    descricao: |
+      Funcionalidade inexistente no legado. Sem controle de quantidades máximas por cliente.
+      Impossível limitar usuários, ativos, storage ou API calls por Fornecedor.
+    destino: assumido
+    justificativa: |
+      NOVA FUNCIONALIDADE no sistema moderno. Essencial para SaaS multi-tenant.
+      Limites configuráveis: MAX_USUARIOS, MAX_ATIVOS, MAX_STORAGE_MB, MAX_API_CALLS_DIA.
+      Monitoramento em tempo real (Uso_Atual). Alertas automáticos (Percentual_Alerta).
+      Bloqueio de operações ao atingir 100% do limite. Job Hangfire verifica a cada 1h.
+    documentacao_item_relacionado: RN-SYS-001-12
+    uc_relacionado: null
+    complexidade: alta
+    risco_migracao: baixo
+    prioridade: 2
+
+  - id: LEG-RF001-008
+    tipo: stored_procedure
+    nome: Auditoria Parcial (tbl_Parametros_Log)
+    caminho: Database/tbl_Parametros_Log
+    descricao: |
+      Auditoria parcial no legado. Registra apenas valor anterior e novo.
+      SEM: IP do cliente, User-Agent, motivo da alteração, diff JSON estruturado.
+    destino: substituido
+    justificativa: |
+      Substituído por sistema de auditoria completo (Sistema_Parametro_Historico).
+      Registra: usuário, data/hora, IP, User-Agent, motivo, diff JSON (UPDATE).
+      Retenção de 7 anos (conforme LGPD). Rastreabilidade total.
+      Visualização de parâmetro sensível gera registro tipo ACCESS.
+    documentacao_item_relacionado: RN-SYS-001-07
+    uc_relacionado: UC02
+    complexidade: media
+    risco_migracao: baixo
+    prioridade: 3
+
+  - id: LEG-RF001-009
+    tipo: tela
+    nome: Configuração de E-mail SMTP Apenas
+    caminho: ic1_legado/IControlIT/Admin/ConfigEmail.aspx
+    descricao: |
+      Legado suporta APENAS SMTP customizado. Sem suporte para SendGrid, AWS SES.
+      Senha armazenada em texto plano (vulnerabilidade). Sem teste de envio.
+    destino: substituido
+    justificativa: |
+      Substituído por sistema multi-provider (SMTP, SendGrid, AWS SES).
+      Senha criptografada AES-256. Teste de envio antes de salvar (timeout 10s).
+      Flag Fl_Principal para marcar configuração padrão do Fornecedor.
+      Suporte a múltiplas configurações (failover automático).
+    documentacao_item_relacionado: RN-SYS-001-10
+    uc_relacionado: null
+    complexidade: media
+    risco_migracao: medio
+    prioridade: 2
+
+  - id: LEG-RF001-010
+    tipo: componente
+    nome: Sem Cache de Parâmetros
+    caminho: ic1_legado/IControlIT/*.vb (leitura via SELECT direto)
+    descricao: |
+      Legado SEM cache. Consulta banco de dados a cada acesso ao parâmetro.
+      Alto impacto de performance. Load desnecessário no SQL Server.
+      Latência média: 50ms por leitura de parâmetro.
+    destino: substituido
+    justificativa: |
+      Substituído por cache distribuído Redis com invalidação automática.
+      Cache padrão: 1 hora. Invalidação ao alterar parâmetro (INSERT/UPDATE/DELETE).
+      Reduz latência de 50ms → 2ms (melhoria de 25x).
+      Reduz carga no SQL Server em 90% (parâmetros lidos frequentemente).
+    documentacao_item_relacionado: RN-SYS-001-02
+    uc_relacionado: UC00
+    complexidade: media
+    risco_migracao: baixo
+    prioridade: 3
+
+  - id: LEG-RF001-011
+    tipo: regra_negocio
+    nome: Sem Validação de Regex, Min/Max, Opções Válidas
+    caminho: ic1_legado/IControlIT/*.vb
+    descricao: |
+      Legado não possui validações robustas. Aceita qualquer valor em Vl_Parametro.
+      Sem regex para validação de formato (ex: e-mail, URL, CPF).
+      Sem validação de min/max para valores numéricos.
+      Sem validação de opções válidas (enum).
+    destino: substituido
+    justificativa: |
+      Substituído por sistema de validação robusta.
+      Regex_Validacao: valida formato (aplicado antes de salvar).
+      Valor_Minimo/Valor_Maximo: valida range para Integer/Decimal.
+      Opcoes_Validas: lista separada por vírgula, valor deve estar na lista.
+      Fl_Obrigatorio: valor não pode ser nulo. Fail-fast (validação antes de persistir).
+    documentacao_item_relacionado: RN-SYS-001-05
+    uc_relacionado: UC01
+    complexidade: media
+    risco_migracao: baixo
+    prioridade: 3
+
+  - id: LEG-RF001-012
+    tipo: componente
+    nome: Sem Multi-tenancy em Parâmetros
+    caminho: Database/tbl_Parametros (sem campo Id_Fornecedor)
+    descricao: |
+      Legado NÃO é multi-tenant. Parâmetros globais para toda a aplicação.
+      Impossível ter configuração diferente por Fornecedor/cliente.
+    destino: substituido
+    justificativa: |
+      Substituído por arquitetura multi-tenant completa.
+      Campo Id_Fornecedor em Sistema_Parametro (NULL = global, valor = específico).
+      Isolamento garantido: usuário só acessa dados do próprio Fornecedor.
+      Validação cross-tenant: tentativa de acesso → HTTP 403.
+      Super Admin pode bypassar filtro (acesso a todos os Fornecedores).
+    documentacao_item_relacionado: RN-SYS-001-14
+    uc_relacionado: UC00
+    complexidade: alta
+    risco_migracao: alto
+    prioridade: 1
+
+# Tabelas Legadas (estrutura detalhada)
+tabelas:
+  - nome: tbl_Parametros
+    finalidade: Armazenar parâmetros de configuração do sistema (apenas strings)
+    problemas:
+      - Falta de tipagem (tudo varchar)
+      - Senhas em texto plano
+      - Sem cache
+      - Sem multi-tenancy
+      - Validação parcial
+
+  - nome: tbl_Config_Email
+    finalidade: Armazenar configurações de e-mail SMTP
+    problemas:
+      - Apenas SMTP (sem SendGrid, AWS SES)
+      - Senha em texto plano
+      - Sem teste de envio
+      - Sem flag de configuração principal
+
+  - nome: tbl_Parametros_Log
+    finalidade: Auditoria parcial de alterações em parâmetros
+    problemas:
+      - Sem IP do cliente
+      - Sem User-Agent
+      - Sem motivo da alteração
+      - Sem diff JSON estruturado
+      - Retenção indefinida (sem LGPD)
+
+# Regras de Negócio Implícitas (não documentadas no legado)
+regras_implicitas:
+  - id: RL-RN-001
+    descricao: |
+      Parâmetros sensíveis eram identificados manualmente por convenção de nomenclatura
+      (ex: Cd_Parametro contendo "PASSWORD", "API_KEY", "SECRET").
+      Sem flag formal Fl_Sensivel. Risco de exposição se convenção não fosse seguida.
+    fonte: ic1_legado/IControlIT/Helpers/ParametroHelper.vb (linhas 45-60)
+
+  - id: RL-RN-002
+    descricao: |
+      Conversão de tipos era feita manualmente no código VB.NET
+      (ex: CInt(valor), CDec(valor), CBool(valor)).
+      Erros de conversão causavam exceções não tratadas (aplicação travava).
+    fonte: ic1_legado/IControlIT/Business/*.vb (múltiplos arquivos)
+
+  - id: RL-RN-003
+    descricao: |
+      Cache manual implementado em Application State (in-memory, não distribuído).
+      Cache perdido a cada restart da aplicação. Sem invalidação automática
+      (exigia restart manual para atualizar parâmetros).
+    fonte: ic1_legado/IControlIT/Global.asax.vb (Application_Start, linhas 100-120)
+
+# Gap Analysis (Legado x Moderno)
+gap_analysis:
+  - item: Feature Flags
+    existe_legado: false
+    existe_moderno: true
+    notas: Nova funcionalidade essencial para SaaS e deploy contínuo
+
+  - item: Limites de Uso
+    existe_legado: false
+    existe_moderno: true
+    notas: Nova funcionalidade essencial para SaaS multi-tenant
+
+  - item: Criptografia AES-256
+    existe_legado: false
+    existe_moderno: true
+    notas: Conformidade LGPD e segurança crítica
+
+  - item: Multi-tenancy
+    existe_legado: false
+    existe_moderno: true
+    notas: Arquitetura SaaS completa
+
+  - item: Cache Distribuído (Redis)
+    existe_legado: false
+    existe_moderno: true
+    notas: Performance crítica (50ms → 2ms)
+
+  - item: Validação Tipada
+    existe_legado: false
+    existe_moderno: true
+    notas: Integridade de dados e fail-fast
+
+  - item: Auditoria Completa
+    existe_legado: false
+    existe_moderno: true
+    notas: Rastreabilidade total e conformidade LGPD
+
+  - item: Provedores de E-mail (SendGrid, AWS SES)
+    existe_legado: false
+    existe_moderno: true
+    notas: Escalabilidade e failover automático
+
+# Decisões de Modernização
+decisoes_modernizacao:
+  - decisao: Criptografar TODOS os dados sensíveis com AES-256
+    motivo: |
+      Conformidade LGPD. Segurança crítica. Legado tinha senhas em texto plano
+      (vulnerabilidade inaceitável). Criptografia transparente (sem impacto no código).
+    impacto: alto
+    data: 2025-12-29
+
+  - decisao: Implementar Feature Flags com rollout gradual
+    motivo: |
+      Possibilitar deploy contínuo sem downtime. Rollout gradual reduz risco
+      de bugs em produção (canary deployment). Essencial para SaaS moderno.
+    impacto: alto
+    data: 2025-12-29
+
+  - decisao: Implementar Limites de Uso por Fornecedor
+    motivo: |
+      Controle de custos e escalabilidade. Evitar abuso (um cliente consumir
+      recursos excessivos). Alertas preventivos (Percentual_Alerta).
+    impacto: alto
+    data: 2025-12-29
+
+  - decisao: Criar VIEW tbl_Parametros para compatibilidade temporária
+    motivo: |
+      Código legado ainda consulta tbl_Parametros diretamente. VIEW permite
+      migração gradual sem quebrar código existente. Tempo de transição: 6 meses.
+    impacto: medio
+    data: 2025-12-29
+
+  - decisao: Descontinuar edição manual de Web.config
+    motivo: |
+      Prática insegura (acesso ao servidor). Sem auditoria. Sem versionamento.
+      Substituído por UI administrativa com controle total.
+    impacto: baixo
+    data: 2025-12-29
+
+# Riscos de Migração
+riscos_migracao:
+  - risco: Dados sensíveis expostos durante migração
+    impacto: alto
+    probabilidade: media
+    mitigacao: |
+      1. Executar migração em ambiente isolado
+      2. Criptografar valores ANTES de INSERT no banco moderno
+      3. Validar que NENHUM valor sensível ficou descriptografado
+      4. Deletar dados sensíveis do banco legado após confirmação
+
+  - risco: Parâmetros legado com valores inválidos para tipo declarado
+    impacto: medio
+    probabilidade: alta
+    mitigacao: |
+      1. Executar script de validação pré-migração
+      2. Identificar valores incompatíveis (ex: "ABC" para Integer)
+      3. Corrigir manualmente ou fallback para Tipo_Dado = String
+      4. Re-validar pós-migração
+
+  - risco: Código legado quebrar após migração (consultas tbl_Parametros)
+    impacto: alto
+    probabilidade: alta
+    mitigacao: |
+      1. Criar VIEW tbl_Parametros AS SELECT * FROM Sistema_Parametro
+      2. Testar código legado em staging
+      3. Manter VIEW por 6 meses
+      4. Refatorar código gradualmente para API moderna
+
+  - risco: Performance degradada por falta de cache
+    impacto: medio
+    probabilidade: baixa
+    mitigacao: |
+      1. Configurar Redis antes da migração
+      2. Testar invalidação de cache
+      3. Monitorar latência pós-migração (< 5ms)
+      4. Rollback imediato se latência > 50ms
+
+# Rastreabilidade (Legado → Moderno)
+rastreabilidade:
+  - elemento_legado: tbl_Parametros
+    referencia_rf: RN-SYS-001-01
+    referencia_uc: UC00
+    status: migrado
+
+  - elemento_legado: tbl_Config_Email
+    referencia_rf: RN-SYS-001-10
+    referencia_uc: null
+    status: migrado
+
+  - elemento_legado: tbl_Parametros_Log
+    referencia_rf: RN-SYS-001-07
+    referencia_uc: UC02
+    status: migrado
+
+  - elemento_legado: Edição manual Web.config
+    referencia_rf: null
+    referencia_uc: null
+    status: descartado
+
+  - elemento_legado: Parâmetros hard-coded
+    referencia_rf: RN-SYS-001-06
+    referencia_uc: UC01
+    status: descartado
+
+# Changelog
+changelog:
+  - versao: '1.0'
+    data: '2025-12-29'
+    descricao: Criação completa da referência ao legado durante migração manual para nova governança
+    autor: Agência ALC - alc.dev.br

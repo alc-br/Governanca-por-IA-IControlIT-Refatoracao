@@ -1,0 +1,618 @@
+rf:
+  id: RF019
+  nome: Gestão de Tipos de Ativos
+  versao: '2.0'
+  data: '2025-12-30'
+  fase: Fase 2 - Cadastros e Serviços Transversais
+  epic: EPIC003-CAD-Cadastros-Base
+  status: concluido
+descricao:
+  objetivo: Permitir a categorização, classificação e padronização de todos os ativos de TI e Telecom através de um sistema
+    hierárquico de tipos de ativos.
+  problema_resolvido: Falta de padronização na taxonomia de ativos, dificultando organização, inventário, depreciação e relatórios.
+  publico_afetado: Gestores de TI, analistas de ativos, equipe contábil, inventário físico.
+escopo:
+  incluso:
+  - CRUD completo de tipos de ativos
+  - Hierarquia de tipos (até 5 níveis)
+  - Campos customizados por tipo
+  - Configuração de depreciação por tipo
+  - Ícones e cores para identificação visual
+  - Importação em massa via CSV
+  - Validações e integridade referencial
+  - Auditoria completa de alterações
+  - Soft delete com restauração
+  fora:
+  - Interface visual específica
+  - Gestão de inventário físico
+  - Cálculo de depreciação contábil
+  - Importação de padrões UNSPSC
+entidades:
+- nome: Ativo_Tipo
+  descricao: Tipo de ativo com hierarquia, depreciação, ícone e cor
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: Ativo_Tipo_Campo_Customizado
+  descricao: Campos dinâmicos configuráveis por tipo
+  multi_tenant: false
+  soft_delete: true
+  auditoria: false
+- nome: Ativo_Tipo_Auditoria
+  descricao: Histórico completo de alterações em tipos
+  multi_tenant: false
+  soft_delete: false
+  auditoria: false
+regras_negocio:
+- id: RN-RF019-001
+  titulo: Código Único por Fornecedor
+  descricao: O código do tipo de ativo deve ser único dentro do Fornecedor.
+  tipo: unicidade
+  campos_afetados:
+  - Id_Fornecedor
+  - Cd_Tipo
+  obrigatorio: true
+  criticidade: CRÍTICA
+  implementacao:
+    backend: true
+    frontend: true
+    validacao_api: true
+    validacao_ui: true
+  validacao:
+    tipo: unicidade
+    mensagem_erro: Já existe um tipo de ativo com este código
+    http_code: 400
+- id: RN-RF019-002
+  titulo: Hierarquia de Tipos (Até 5 Níveis)
+  descricao: Tipos podem ter hierarquia pai-filho com no máximo 5 níveis de profundidade.
+  tipo: regra_negocio
+  campos_afetados:
+  - Id_Tipo_Pai
+  - Nivel_Hierarquia
+  - Caminho_Hierarquia
+  obrigatorio: true
+  criticidade: ALTA
+  implementacao:
+    backend: true
+    frontend: true
+    validacao_api: true
+    validacao_ui: true
+  validacao:
+    tipo: range
+    mensagem_erro: Hierarquia não pode ter mais de 5 níveis
+    http_code: 400
+- id: RN-RF019-003
+  titulo: Categoria Principal Válida
+  descricao: 'Categoria principal deve ser um dos valores permitidos: Hardware, Software, LinhaMovel, LinhaFixa, Servico,
+    Licenca, Acessorio, Outro.'
+  tipo: validacao
+  campos_afetados:
+  - Categoria_Principal
+  obrigatorio: true
+  criticidade: CRÍTICA
+  implementacao:
+    backend: true
+    frontend: true
+    validacao_api: true
+    validacao_ui: true
+  validacao:
+    tipo: enum
+    mensagem_erro: Categoria inválida
+    http_code: 400
+- id: RN-RF019-004
+  titulo: Depreciação Obrigatória para Hardware
+  descricao: Tipos de categoria 'Hardware' devem obrigatoriamente ter taxa de depreciação e vida útil definidas.
+  tipo: regra_negocio
+  campos_afetados:
+  - Categoria_Principal
+  - Taxa_Depreciacao_Anual
+  - Vida_Util_Anos
+  obrigatorio: true
+  criticidade: ALTA
+  implementacao:
+    backend: true
+    frontend: true
+    validacao_api: true
+    validacao_ui: true
+  validacao:
+    tipo: condicional
+    mensagem_erro: Tipos Hardware devem ter depreciação e vida útil definidas
+    http_code: 400
+- id: RN-RF019-005
+  titulo: Não Permitir Exclusão com Ativos Associados
+  descricao: Tipo de ativo não pode ser excluído se houver ativos cadastrados usando este tipo.
+  tipo: integridade_referencial
+  campos_afetados:
+  - Id_Ativo_Tipo
+  obrigatorio: true
+  criticidade: CRÍTICA
+  implementacao:
+    backend: true
+    frontend: false
+    validacao_api: true
+    validacao_ui: false
+  validacao:
+    tipo: foreign_key_check
+    mensagem_erro: Não é possível excluir tipo com ativos associados
+    http_code: 400
+- id: RN-RF019-006
+  titulo: Não Permitir Exclusão com Subtipos
+  descricao: Tipo de ativo não pode ser excluído se houver subtipos (filhos na hierarquia) ativos.
+  tipo: integridade_referencial
+  campos_afetados:
+  - Id_Tipo_Pai
+  obrigatorio: true
+  criticidade: ALTA
+  implementacao:
+    backend: true
+    frontend: false
+    validacao_api: true
+    validacao_ui: false
+  validacao:
+    tipo: foreign_key_check
+    mensagem_erro: Não é possível excluir tipo com subtipos associados
+    http_code: 400
+- id: RN-RF019-007
+  titulo: Taxa de Depreciação Válida
+  descricao: Taxa de depreciação anual deve estar entre 0% e 100%.
+  tipo: validacao
+  campos_afetados:
+  - Taxa_Depreciacao_Anual
+  obrigatorio: true
+  criticidade: MÉDIA
+  implementacao:
+    backend: true
+    frontend: true
+    validacao_api: true
+    validacao_ui: true
+  validacao:
+    tipo: range
+    mensagem_erro: Taxa de depreciação deve estar entre 0 e 100
+    http_code: 400
+- id: RN-RF019-008
+  titulo: Tipos de Sistema Não Editáveis
+  descricao: Tipos marcados com Fl_Sistema = 1 não podem ser editados ou excluídos.
+  tipo: seguranca
+  campos_afetados:
+  - Fl_Sistema
+  obrigatorio: true
+  criticidade: CRÍTICA
+  implementacao:
+    backend: true
+    frontend: true
+    validacao_api: true
+    validacao_ui: true
+  validacao:
+    tipo: business_rule
+    mensagem_erro: Tipo de sistema não pode ser editado ou excluído
+    http_code: 403
+- id: RN-RF019-009
+  titulo: Recalcular Hierarquia ao Mudar Pai
+  descricao: Ao alterar o tipo pai de um tipo, recalcular automaticamente Nivel_Hierarquia e Caminho_Hierarquia de todos os
+    descendentes.
+  tipo: regra_negocio
+  campos_afetados:
+  - Id_Tipo_Pai
+  - Nivel_Hierarquia
+  - Caminho_Hierarquia
+  obrigatorio: true
+  criticidade: ALTA
+  implementacao:
+    backend: true
+    frontend: false
+    validacao_api: true
+    validacao_ui: false
+  validacao:
+    tipo: business_rule
+    mensagem_erro: null
+    http_code: null
+- id: RN-RF019-010
+  titulo: Auditoria Completa de Alterações
+  descricao: Todas as operações (INSERT, UPDATE, DELETE) devem ser auditadas com dados antes/depois.
+  tipo: auditoria
+  campos_afetados:
+  - '*'
+  obrigatorio: true
+  criticidade: CRÍTICA
+  implementacao:
+    backend: true
+    frontend: false
+    validacao_api: false
+    validacao_ui: false
+  validacao:
+    tipo: business_rule
+    mensagem_erro: null
+    http_code: null
+- id: RN-RF019-011
+  titulo: Ícone e Cor para Identificação Visual
+  descricao: Cada tipo deve ter ícone (Font Awesome) e cor hexadecimal para exibição visual em interfaces.
+  tipo: validacao
+  campos_afetados:
+  - Icone
+  - Cor_Identificacao
+  obrigatorio: false
+  criticidade: BAIXA
+  implementacao:
+    backend: true
+    frontend: true
+    validacao_api: true
+    validacao_ui: true
+  validacao:
+    tipo: formato
+    mensagem_erro: 'Formato de cor inválido (use #RRGGBB)'
+    http_code: 400
+- id: RN-RF019-012
+  titulo: Ordem de Exibição Customizável
+  descricao: Tipos devem ser ordenáveis via campo Ordem_Exibicao para controle de listagens.
+  tipo: regra_negocio
+  campos_afetados:
+  - Ordem_Exibicao
+  obrigatorio: false
+  criticidade: BAIXA
+  implementacao:
+    backend: true
+    frontend: true
+    validacao_api: false
+    validacao_ui: true
+  validacao:
+    tipo: null
+    mensagem_erro: null
+    http_code: null
+- id: RN-RF019-013
+  titulo: Não Permitir Loop Hierárquico
+  descricao: 'Ao definir tipo pai, validar que não cria loop (ex: A → B → C → A).'
+  tipo: integridade_referencial
+  campos_afetados:
+  - Id_Tipo_Pai
+  obrigatorio: true
+  criticidade: CRÍTICA
+  implementacao:
+    backend: true
+    frontend: false
+    validacao_api: true
+    validacao_ui: false
+  validacao:
+    tipo: business_rule
+    mensagem_erro: Loop hierárquico detectado
+    http_code: 400
+- id: RN-RF019-014
+  titulo: Importação em Massa com Validação
+  descricao: Permitir importação de tipos via CSV/Excel com validação de duplicidades, hierarquia e regras de negócio.
+  tipo: regra_negocio
+  campos_afetados:
+  - '*'
+  obrigatorio: false
+  criticidade: MÉDIA
+  implementacao:
+    backend: true
+    frontend: true
+    validacao_api: true
+    validacao_ui: true
+  validacao:
+    tipo: business_rule
+    mensagem_erro: Erros de validação na importação (ver relatório detalhado)
+    http_code: 200
+- id: RN-RF019-015
+  titulo: Soft Delete com Possibilidade de Restauração
+  descricao: Exclusão lógica (Fl_Ativo = 0) com possibilidade de restauração posterior.
+  tipo: regra_negocio
+  campos_afetados:
+  - Fl_Ativo
+  obrigatorio: true
+  criticidade: ALTA
+  implementacao:
+    backend: true
+    frontend: true
+    validacao_api: false
+    validacao_ui: false
+  validacao:
+    tipo: null
+    mensagem_erro: null
+    http_code: null
+estados:
+- id: ativo
+  descricao: Tipo disponível para uso, aparece em listagens e pode ser associado a ativos
+  fl_ativo_value: 1
+- id: inativo
+  descricao: Tipo desativado, não aparece em listagens, não pode ser associado a novos ativos
+  fl_ativo_value: 0
+transicoes:
+  permitidas:
+  - de: ativo
+    para: inativo
+    operacao: DELETE (soft)
+  - de: inativo
+    para: ativo
+    operacao: PUT /tipos/{id}/restaurar (Super Admin)
+  proibidas: []
+permissoes:
+- codigo: CAD.ATIVOS.TIPOS.CREATE
+  descricao: Criar tipo de ativo
+  roles_autorizadas:
+  - Super Admin
+  - Admin
+  - Gestor de Ativos
+  endpoint: POST /api/ativos/tipos
+- codigo: CAD.ATIVOS.TIPOS.READ
+  descricao: Consultar tipo por ID
+  roles_autorizadas:
+  - Super Admin
+  - Admin
+  - Gestor de Ativos
+  - Analista
+  endpoint: GET /api/ativos/tipos/{id}
+- codigo: CAD.ATIVOS.TIPOS.READ_ANY
+  descricao: Listar tipos
+  roles_autorizadas:
+  - Super Admin
+  - Admin
+  - Gestor de Ativos
+  - Analista
+  endpoint: GET /api/ativos/tipos
+- codigo: CAD.ATIVOS.TIPOS.UPDATE
+  descricao: Atualizar tipo
+  roles_autorizadas:
+  - Super Admin
+  - Admin
+  - Gestor de Ativos
+  endpoint: PUT /api/ativos/tipos/{id}
+- codigo: CAD.ATIVOS.TIPOS.DELETE
+  descricao: Excluir tipo
+  roles_autorizadas:
+  - Super Admin
+  - Admin
+  endpoint: DELETE /api/ativos/tipos/{id}
+- codigo: CAD.ATIVOS.TIPOS.IMPORT
+  descricao: Importar tipos em massa
+  roles_autorizadas:
+  - Super Admin
+  - Admin
+  endpoint: POST /api/ativos/tipos/importar
+- codigo: CAD.ATIVOS.TIPOS.RESTORE
+  descricao: Restaurar tipo inativo
+  roles_autorizadas:
+  - Super Admin
+  endpoint: PUT /api/ativos/tipos/{id}/restaurar
+- codigo: CAD.ATIVOS.TIPOS.CAMPOS.MANAGE
+  descricao: Gerenciar campos customizados
+  roles_autorizadas:
+  - Super Admin
+  - Admin
+  - Gestor de Ativos
+  endpoint: POST /api/ativos/tipos/{id}/campos-customizados
+endpoints:
+- method: GET
+  route: /api/ativos/tipos
+  descricao: Listar tipos de ativos com paginação e filtros
+  autenticacao: true
+  authorization_policy: CAD.ATIVOS.TIPOS.READ_ANY
+  request_dto: null
+  response_dto: PaginatedListDto<AtivoTipoDto>
+  query_params:
+  - nome: idFornecedor
+    tipo: Guid
+    obrigatorio: true
+  - nome: categoria
+    tipo: string
+    obrigatorio: false
+  - nome: apenasAtivos
+    tipo: bool
+    obrigatorio: false
+  - nome: pageNumber
+    tipo: int
+    obrigatorio: false
+  - nome: pageSize
+    tipo: int
+    obrigatorio: false
+- method: GET
+  route: /api/ativos/tipos/{id}
+  descricao: Buscar tipo de ativo por ID
+  autenticacao: true
+  authorization_policy: CAD.ATIVOS.TIPOS.READ
+  request_dto: null
+  response_dto: AtivoTipoDetalhadoDto
+  query_params: []
+- method: POST
+  route: /api/ativos/tipos
+  descricao: Criar novo tipo de ativo
+  autenticacao: true
+  authorization_policy: CAD.ATIVOS.TIPOS.CREATE
+  request_dto: CreateAtivoTipoCommand
+  response_dto: OperacaoResult
+  query_params: []
+- method: PUT
+  route: /api/ativos/tipos/{id}
+  descricao: Atualizar tipo de ativo existente
+  autenticacao: true
+  authorization_policy: CAD.ATIVOS.TIPOS.UPDATE
+  request_dto: UpdateAtivoTipoCommand
+  response_dto: OperacaoResult
+  query_params: []
+- method: DELETE
+  route: /api/ativos/tipos/{id}
+  descricao: Excluir tipo de ativo (soft delete)
+  autenticacao: true
+  authorization_policy: CAD.ATIVOS.TIPOS.DELETE
+  request_dto: null
+  response_dto: OperacaoResult
+  query_params: []
+- method: GET
+  route: /api/ativos/tipos/hierarquia
+  descricao: Listar hierarquia de tipos (árvore)
+  autenticacao: true
+  authorization_policy: CAD.ATIVOS.TIPOS.READ_ANY
+  request_dto: null
+  response_dto: List<AtivoTipoHierarquiaDto>
+  query_params:
+  - nome: idFornecedor
+    tipo: Guid
+    obrigatorio: true
+- method: POST
+  route: /api/ativos/tipos/importar
+  descricao: Importar tipos em massa via CSV
+  autenticacao: true
+  authorization_policy: CAD.ATIVOS.TIPOS.IMPORT
+  request_dto: IFormFile
+  response_dto: ImportacaoResult
+  query_params:
+  - nome: idFornecedor
+    tipo: Guid
+    obrigatorio: true
+- method: POST
+  route: /api/ativos/tipos/{id}/campos-customizados
+  descricao: Adicionar campo customizado a um tipo
+  autenticacao: true
+  authorization_policy: CAD.ATIVOS.TIPOS.CAMPOS.MANAGE
+  request_dto: AdicionarCampoCustomizadoCommand
+  response_dto: OperacaoResult
+  query_params: []
+integracoes:
+  internas:
+  - Autenticacao (JWT)
+  - Multi-Tenancy (Id_Fornecedor)
+  - Auditoria (Ativo_Tipo_Auditoria)
+  - RBAC (Permission-based)
+  - Central de Funcionalidades
+  - i18n (Transloco)
+  externas: []
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_entrada_obrigatoria: true
+kpis:
+- nome: Taxa de Sucesso de Criação
+  descricao: Percentual de tipos criados com sucesso
+  meta: '>= 95%'
+  log_obrigatorio: true
+- nome: Tempo Médio de Resposta (GET /tipos)
+  descricao: Latência de listagem de tipos
+  meta: <= 200ms
+  log_obrigatorio: true
+- nome: Taxa de Erros de Validação
+  descricao: Percentual de requests rejeitados por validação
+  meta: <= 10%
+  log_obrigatorio: true
+- nome: Tipos com Ativos Órfãos
+  descricao: Tipos inativos com ativos associados
+  meta: = 0
+  log_obrigatorio: true
+alertas:
+- evento: Falha ao criar tipo
+  threshold: '> 5% em 1 hora'
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: Tentativa de acesso sem permissão
+  threshold: '> 10 em 5 minutos'
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+- evento: Loop hierárquico detectado
+  threshold: 1 ocorrência
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+- evento: Tipo de sistema alterado
+  threshold: 1 ocorrência
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+rastreabilidade:
+  ucs_esperados:
+  - UC00-RF019 (Listar)
+  - UC01-RF019 (Criar)
+  - UC02-RF019 (Visualizar)
+  - UC03-RF019 (Editar)
+  - UC04-RF019 (Excluir)
+  dependencias_upstream:
+  - RF-SYS-001 (Autenticação e RBAC)
+  - RF-SYS-002 (Multi-Tenancy)
+  - RF-SYS-003 (Auditoria)
+  dependencias_downstream:
+  - RF-CAD-001 (Gestão de Ativos)
+  - RF-FIN-005 (Depreciação)
+  - RF-INV-002 (Inventário Físico)
+catalog:
+  crud:
+  - id: RF-CRUD-01
+    title: Criar tipo de ativo
+    required: true
+  - id: RF-CRUD-02
+    title: Listar tipos de ativos
+    required: true
+  - id: RF-CRUD-03
+    title: Visualizar tipo por ID
+    required: true
+  - id: RF-CRUD-04
+    title: Atualizar tipo de ativo
+    required: true
+  - id: RF-CRUD-05
+    title: Excluir tipo de ativo (soft delete)
+    required: true
+  funcionalidades_especificas:
+  - id: RF-FUNC-01
+    title: Listar hierarquia de tipos (árvore)
+    required: true
+  - id: RF-FUNC-02
+    title: Importar tipos em massa via CSV
+    required: true
+  - id: RF-FUNC-03
+    title: Gerenciar campos customizados por tipo
+    required: true
+  - id: RF-FUNC-04
+    title: Restaurar tipo inativo
+    required: true
+  validacoes:
+  - id: RF-VAL-01
+    title: Validar código único por Fornecedor
+    required: true
+  - id: RF-VAL-02
+    title: Validar hierarquia máxima (5 níveis)
+    required: true
+  - id: RF-VAL-03
+    title: Validar depreciação obrigatória para Hardware
+    required: true
+  - id: RF-VAL-04
+    title: Validar não permitir exclusão com ativos associados
+    required: true
+  - id: RF-VAL-05
+    title: Validar não permitir loops hierárquicos
+    required: true
+  seguranca:
+  - id: RF-SEC-01
+    title: Isolamento de tenant (multi-tenancy)
+    required: true
+  - id: RF-SEC-02
+    title: Permissões RBAC (8 permissões)
+    required: true
+  - id: RF-SEC-03
+    title: Auditoria completa (INSERT, UPDATE, DELETE)
+    required: true
+  - id: RF-SEC-04
+    title: Tipos de sistema protegidos (não editáveis)
+    required: true
+exclusions:
+  documentacao_items:
+  - id: EX-RF019-01
+    justificativa: Interface visual específica (design/layout)
+  - id: EX-RF019-02
+    justificativa: Gestão de inventário físico
+  - id: EX-RF019-03
+    justificativa: Cálculo de depreciação contábil
+  - id: EX-RF019-04
+    justificativa: Importação de padrões UNSPSC
+historico:
+- versao: '2.0'
+  data: '2025-12-30'
+  autor: Agência ALC - alc.dev.br
+  descricao: 'Migração v1.0 → v2.0: separação RF/RL, estruturação completa em YAML'
+- versao: '1.0'
+  data: '2025-12-28'
+  autor: Equipe IControlIT + Claude AI
+  descricao: Versão inicial (mista com legado)

@@ -108,7 +108,7 @@ def fix_governanca_contrato(file_path: Path) -> bool:
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(new_content)
 
-    rf_name = file_path.parent.name
+    documentacao_name = file_path.parent.name
     print(f"[OK] {rf_name} - Contrato alterado: {info['contrato_ativo']} -> {correct_contrato}")
     return True
 

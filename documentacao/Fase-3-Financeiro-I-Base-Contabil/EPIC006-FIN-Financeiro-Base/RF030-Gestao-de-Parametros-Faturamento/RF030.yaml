@@ -1,0 +1,522 @@
+rf:
+  id: RF030
+  nome: Gestão de Parâmetros de Faturamento
+  versao: '2.0'
+  data: '2025-12-30'
+  fase: Fase 3 - Financeiro I - Base Contábil
+  epic: EPIC006-FIN
+  status: aprovado
+descricao:
+  objetivo: 'Estabelecer o sistema de configuração centralizada de parâmetros, regras e templates
+
+    para o processo de faturamento, permitindo a gestão de layouts de importação, regras de
+
+    auditoria automática, templates de rateio e parâmetros fiscais com versionamento completo
+
+    e rastreabilidade.
+
+    '
+  problema_resolvido: 'Eliminar configurações hardcoded, possibilitar flexibilidade na importação de múltiplos
+
+    formatos de arquivo e fornecedores, detectar erros antes do processamento e garantir
+
+    compliance fiscal e auditoria completa.
+
+    '
+  publico_afetado: Gestores financeiros, analistas de faturamento, fornecedores (via API) e sistemas integrados
+escopo:
+  incluso:
+  - Gerenciamento de layouts de importação (CRUD)
+  - Motor de validação pré-importação com regras configuráveis
+  - Biblioteca de regras de auditoria (50+ regras)
+  - Templates de rateio (percentual, fixo, proporcional, escalonado)
+  - Simulador de importação (sandbox)
+  - Versionamento de configurações com rastreabilidade completa
+  - Parâmetros fiscais e tributários com vigência temporal
+  - Gestão de fornecedores homologados
+  - Dashboard de qualidade de dados
+  - API REST/GraphQL para integrações externas
+  fora:
+  - Processo de importação de faturas em si (coberto por RF026)
+  - Integração com sistemas externos de fornecedores (coberto por RF específico)
+  - Interface visual específica (design system)
+  - Infraestrutura de deploy e hosting
+  - Motor de workflow de aprovação (coberto por RF de Workflow)
+entidades:
+- nome: LayoutImportacao
+  descricao: Configuração que define estrutura, colunas, validações e transformações de arquivos para importação de faturas
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: RegraAuditoria
+  descricao: Expressão booleana configurável que valida faturas segundo critérios de negócio
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: TemplateRateio
+  descricao: Modelo reutilizável que define distribuição de custos entre centros de custo
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: ParametroFiscal
+  descricao: Configuração de alíquotas, CFOP, NCM, CST, regime tributário com vigência temporal
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+- nome: FornecedorHomologacao
+  descricao: Fornecedor aprovado para faturamento com documentação fiscal válida
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+regras_negocio:
+- id: RN-RF030-001
+  descricao: Todo layout de importação deve validar no mínimo 5 campos obrigatórios (CNPJ fornecedor, número fatura, data
+    vencimento, valor total, descrição)
+  tipo: validacao
+  campos_afetados:
+  - Fornecedor_CNPJ
+  - Numero_Fatura
+  - Data_Vencimento
+  - Valor_Total
+  - Descricao
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-002
+  descricao: Sistema deve validar 100% das linhas ANTES de gravar qualquer registro (modo transacional all-or-nothing)
+  tipo: regra_negocio
+  campos_afetados:
+  - '*'
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-003
+  descricao: Alterações em layouts, regras ou parâmetros críticos devem criar nova versão com justificativa obrigatória (mínimo
+    50 caracteres)
+  tipo: versionamento
+  campos_afetados:
+  - Configuracao_JSON
+  - Hash_Configuracao
+  - Justificativa_Mudanca
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-004
+  descricao: Toda regra de auditoria deve ter severidade definida (Informativa, Alerta, Bloqueante)
+  tipo: validacao
+  campos_afetados:
+  - Severidade
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-005
+  descricao: Templates de rateio com distribuição percentual devem ter soma exata de 100% (tolerância ±0.01%)
+  tipo: validacao
+  campos_afetados:
+  - Percentual
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-006
+  descricao: Layouts novos devem ser testados em sandbox com arquivo exemplo (mínimo 10 linhas) antes de ativação
+  tipo: regra_negocio
+  campos_afetados:
+  - Fl_Testado_Sandbox
+  - Fl_Ativo
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-007
+  descricao: Alíquotas e parâmetros fiscais devem ter data de vigência (início/fim) sem sobreposição
+  tipo: validacao
+  campos_afetados:
+  - Data_Vigencia_Inicio
+  - Data_Vigencia_Fim
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-008
+  descricao: Mudanças em parâmetros críticos devem gerar auditoria automática com before/after e notificar gestor fiscal
+  tipo: auditoria
+  campos_afetados:
+  - Fl_Critico
+  obrigatorio: true
+  severidade: alta
+- id: RN-RF030-009
+  descricao: Importação de faturas deve validar se fornecedor está homologado e ativo com documentação atualizada (certidões
+    < 90 dias)
+  tipo: validacao
+  campos_afetados:
+  - Fl_Homologado
+  - Fl_Ativo
+  - Data_Validade_Certidoes
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-010
+  descricao: Templates de rateio com valores fixos devem ter soma igual ao total da fatura (tolerância ±R$ 0.01)
+  tipo: validacao
+  campos_afetados:
+  - Valor_Fixo
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-011
+  descricao: Regras de auditoria configuradas como expressões devem ser validadas sintaticamente antes de salvar
+  tipo: validacao
+  campos_afetados:
+  - Expressao
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-012
+  descricao: Logs de importação devem ser retidos por 7 anos (compliance LGPD + fiscal) com soft delete
+  tipo: retencao
+  campos_afetados:
+  - Fl_Excluido
+  - Data_Exclusao
+  obrigatorio: true
+  severidade: alta
+- id: RN-RF030-013
+  descricao: Falhas em importações automáticas devem notificar responsável em até 5 minutos via in-app/e-mail/SMS
+  tipo: notificacao
+  campos_afetados:
+  - Resultado
+  - Tipo_Importacao
+  obrigatorio: true
+  severidade: alta
+- id: RN-RF030-014
+  descricao: 'Importações via upload manual devem ter limite configurável por perfil (Admin: 100k, Manager: 50k, Analyst:
+    10k)'
+  tipo: validacao
+  campos_afetados:
+  - Total_Linhas
+  obrigatorio: true
+  severidade: bloqueante
+- id: RN-RF030-015
+  descricao: Dashboard de qualidade deve atualizar em tempo real via SignalR (latência máxima 5 segundos)
+  tipo: performance
+  campos_afetados:
+  - '*'
+  obrigatorio: true
+  severidade: media
+estados:
+- id: draft
+  descricao: Criado, não testado
+  aplicavel_a: LayoutImportacao
+- id: sandbox_tested
+  descricao: Testado em sandbox com sucesso
+  aplicavel_a: LayoutImportacao
+- id: active
+  descricao: Ativo para uso em produção
+  aplicavel_a:
+  - LayoutImportacao
+  - RegraAuditoria
+  - TemplateRateio
+  - ParametroFiscal
+- id: inactive
+  descricao: Inativo (não pode ser usado)
+  aplicavel_a:
+  - LayoutImportacao
+  - RegraAuditoria
+  - TemplateRateio
+- id: archived
+  descricao: Arquivado (histórico)
+  aplicavel_a: LayoutImportacao
+transicoes:
+  permitidas:
+  - de: draft
+    para: sandbox_tested
+    condicao: Após teste sandbox com sucesso
+    entidade: LayoutImportacao
+  - de: sandbox_tested
+    para: active
+    condicao: Aprovação manual
+    entidade: LayoutImportacao
+  - de: active
+    para: inactive
+    condicao: Inativação manual
+    entidade:
+    - LayoutImportacao
+    - RegraAuditoria
+    - TemplateRateio
+  - de: inactive
+    para: active
+    condicao: Reativação manual
+    entidade:
+    - LayoutImportacao
+    - RegraAuditoria
+    - TemplateRateio
+  - de: active
+    para: archived
+    condicao: Substituição por nova versão
+    entidade: LayoutImportacao
+  proibidas:
+  - de: draft
+    para: active
+    motivo: Layout deve ser testado em sandbox antes de ativação
+  - de: archived
+    para: active
+    motivo: Layout arquivado não pode ser reativado
+eventos_dominio:
+- evento: layout.criado
+  quando: Após criação de layout
+  acao: Registrar auditoria
+- evento: layout.testado_sandbox
+  quando: Após teste sandbox
+  acao: Marcar flag Fl_Testado_Sandbox = true, gerar relatório
+- evento: layout.ativado
+  quando: Após ativação
+  acao: Notificar usuários, registrar auditoria
+- evento: layout.versao_criada
+  quando: Mudança em layout
+  acao: Criar snapshot before/after, notificar gestor
+- evento: regra_auditoria.criada
+  quando: Criação de regra
+  acao: Registrar auditoria
+- evento: regra_auditoria.violada
+  quando: Violação de regra
+  acao: Log, notificação ou bloqueio (conforme severidade)
+- evento: template_rateio.criado
+  quando: Criação de template
+  acao: Registrar auditoria
+- evento: parametro_fiscal.alterado
+  quando: Mudança em parâmetro crítico
+  acao: Auditoria especial, notificar gestor fiscal via e-mail
+- evento: fornecedor.homologado
+  quando: Homologação aprovada
+  acao: Notificar fornecedor, ativar faturamento
+- evento: fornecedor.suspenso
+  quando: Homologação suspensa
+  acao: Bloquear novas faturas, notificar responsável
+- evento: importacao.falhou
+  quando: Falha em importação agendada
+  acao: Notificação urgente em até 5 minutos
+permissoes:
+- codigo: Parametros.View
+  descricao: Visualizar parâmetros
+  roles_autorizadas:
+  - Operator
+  - Analyst
+  - Manager
+  - Admin
+- codigo: Parametros.Layout.Create
+  descricao: Criar layout
+  roles_autorizadas:
+  - Analyst
+  - Manager
+  - Admin
+- codigo: Parametros.Layout.Update
+  descricao: Atualizar layout
+  roles_autorizadas:
+  - Analyst
+  - Manager
+  - Admin
+- codigo: Parametros.Layout.Activate
+  descricao: Ativar layout
+  roles_autorizadas:
+  - Manager
+  - Admin
+- codigo: Parametros.Regra.Create
+  descricao: Criar regra auditoria
+  roles_autorizadas:
+  - Analyst
+  - Manager
+  - Admin
+- codigo: Parametros.Regra.Update
+  descricao: Atualizar regra
+  roles_autorizadas:
+  - Analyst
+  - Manager
+  - Admin
+- codigo: Parametros.Template.Create
+  descricao: Criar template rateio
+  roles_autorizadas:
+  - Analyst
+  - Manager
+  - Admin
+- codigo: Parametros.Fiscal.Update
+  descricao: Atualizar parâmetro fiscal
+  roles_autorizadas:
+  - Manager
+  - Admin
+- codigo: Parametros.Fornecedor.Homologar
+  descricao: Homologar fornecedor
+  roles_autorizadas:
+  - Manager
+  - Admin
+- codigo: Parametros.Dashboard.View
+  descricao: Visualizar dashboard qualidade
+  roles_autorizadas:
+  - Analyst
+  - Manager
+  - Admin
+integracoes:
+  internas:
+  - Autenticacao (JWT Bearer)
+  - Multi-Tenancy (EmpresaId / FornecedorId)
+  - Auditoria (AuditLog completo)
+  - Permissões RBAC
+  - Notificações (in-app, e-mail, SMS)
+  - SignalR (dashboard real-time)
+  externas:
+  - sistema: SEFAZ
+    tipo: API
+    obrigatoria: false
+    finalidade: Atualização automática de alíquotas e parâmetros fiscais
+  - sistema: Fornecedores (via API REST/GraphQL)
+    tipo: API
+    obrigatoria: false
+    finalidade: Consulta de layouts e regras vigentes para integrações B2B
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacao_entrada: true
+  protecao_injecao:
+  - SQL Injection
+  - XSS
+  - Expression Injection (NCalc)
+  rbac: true
+  criptografia:
+  - Dados em trânsito (TLS 1.3)
+  - Dados em repouso (campos sensíveis)
+  rate_limiting:
+  - APIs públicas
+  api_key_obrigatoria: true
+rastreabilidade:
+  dependencias_upstream:
+  - documentacao_id: RF005
+    descricao: Gestão de Empresas
+    tipo: Dados de empresas/Fornecedores
+  - documentacao_id: RF007
+    descricao: Gestão de Usuários
+    tipo: Autenticação e permissões
+  - documentacao_id: RF019
+    descricao: Gestão de Fornecedores
+    tipo: Dados de fornecedores
+  - documentacao_id: RF026
+    descricao: Processo de Faturamento
+    tipo: Consumidor dos parâmetros
+  dependencias_downstream:
+  - documentacao_id: RF026
+    descricao: Processo de Faturamento
+    tipo: Utiliza layouts e regras
+  - documentacao_id: RF031
+    descricao: Relatórios de Faturamento
+    tipo: Utiliza parâmetros fiscais
+  - documentacao_id: RF032
+    descricao: Dashboard Financeiro
+    tipo: Consome métricas de qualidade
+  ucs_esperados:
+  - UC00 - Listar layouts de importação
+  - UC01 - Criar layout de importação
+  - UC02 - Visualizar detalhes layout
+  - UC03 - Editar layout existente
+  - UC04 - Inativar layout
+  - UC05 - Testar layout em sandbox
+  - UC06 - Ativar layout para produção
+  - UC07 - Criar regra de auditoria
+  - UC08 - Testar regra com dados fictícios
+  - UC09 - Criar template de rateio
+  - UC10 - Simular rateio
+  - UC11 - Criar parâmetro fiscal
+  - UC12 - Atualizar parâmetro fiscal (versionamento)
+  - UC13 - Homologar fornecedor
+  - UC14 - Dashboard de qualidade
+catalog:
+  crud:
+  - id: RF030-CRUD-01
+    title: Criar layout de importação
+    required: true
+  - id: RF030-CRUD-02
+    title: Listar layouts de importação
+    required: true
+  - id: RF030-CRUD-03
+    title: Visualizar detalhes layout
+    required: true
+  - id: RF030-CRUD-04
+    title: Atualizar layout existente
+    required: true
+  - id: RF030-CRUD-05
+    title: Inativar layout
+    required: true
+  validacoes:
+  - id: RF030-VAL-01
+    title: Validar campos obrigatórios em layout
+    required: true
+  - id: RF030-VAL-02
+    title: Validar pré-importação all-or-nothing
+    required: true
+  - id: RF030-VAL-03
+    title: Validar versionamento obrigatório
+    required: true
+  - id: RF030-VAL-04
+    title: Validar soma percentuais = 100%
+    required: true
+  - id: RF030-VAL-05
+    title: Validar sintaxe expressões (NCalc)
+    required: true
+  seguranca:
+  - id: RF030-SEC-01
+    title: Isolamento multi-tenant
+    required: true
+  - id: RF030-SEC-02
+    title: Permissões RBAC em todas operações
+    required: true
+  - id: RF030-SEC-03
+    title: Auditoria completa parâmetros críticos
+    required: true
+  - id: RF030-SEC-04
+    title: Proteção contra Expression Injection
+    required: true
+  funcionalidades_especiais:
+  - id: RF030-ESP-01
+    title: Sandbox para teste layouts
+    required: true
+  - id: RF030-ESP-02
+    title: Versionamento configurações
+    required: true
+  - id: RF030-ESP-03
+    title: Dashboard real-time (SignalR)
+    required: true
+  - id: RF030-ESP-04
+    title: Notificações automáticas falhas (5min)
+    required: true
+exclusions:
+  documentacao_items:
+  - id: EX-RF030-01
+    justificativa: Processo de importação de faturas (RF026)
+  - id: EX-RF030-02
+    justificativa: Integração com sistemas fornecedores (RF específico)
+  - id: EX-RF030-03
+    justificativa: Interface visual específica (design system)
+  - id: EX-RF030-04
+    justificativa: Motor de workflow de aprovação (RF Workflow)
+criterios_globais_aceite:
+- Nenhuma operação pode violar isolamento multi-tenant
+- Nenhuma regra de negócio pode ser ignorada silenciosamente
+- Erros devem ser previsíveis, rastreáveis e com mensagens claras
+- Auditoria deve registrar quem, quando, o quê e por quê (before/after)
+- Versionamento obrigatório em mudanças críticas
+- Soft delete obrigatório (retenção 7 anos)
+- Validação pré-importação 100% (all-or-nothing)
+- Dashboard deve ter latência máxima de 5 segundos
+- Notificações de falha em até 5 minutos
+metricas:
+  performance:
+  - nome: Tempo médio importação 1000 linhas
+    meta: <= 30 segundos
+  - nome: Latência dashboard
+    meta: <= 5 segundos
+  - nome: Tempo resposta API endpoints
+    meta: <= 200ms (p95)
+  qualidade:
+  - nome: Taxa sucesso importação
+    meta: '>= 95%'
+  - nome: Taxa detecção erros pré-importação
+    meta: '>= 99%'
+  auditoria:
+  - nome: Cobertura auditoria parâmetros críticos
+    meta: 100%
+  - nome: Retenção logs
+    meta: 7 anos (LGPD + fiscal)
+historico:
+- versao: '2.0'
+  data: '2025-12-30'
+  autor: Agência ALC - alc.dev.br
+  descricao: 'Migração v1.0 → v2.0: separação RF/RL, adequação a templates v2.0, sincronização com RF030.md'
+- versao: '1.0'
+  data: '2025-01-14'
+  autor: Agente Architect - IControlIT
+  descricao: Versão inicial com análise legado integrada

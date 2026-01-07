@@ -129,7 +129,7 @@ Em **RL-RFXXX.yaml** (para cada item):
   tipo: "stored_procedure"
   nome: "sp_ValidarEmailUnico"
   destino: "assumido"
-  rf_item_relacionado: "RN-RFXXX-05"  # OBRIGATÓRIO
+  documentacao_item_relacionado: "RN-RFXXX-05"  # OBRIGATÓRIO
   uc_relacionado: "UC01"
 ```
 
@@ -144,7 +144,7 @@ Em **RL-RFXXX.yaml** (para cada item):
 | Variável | Caminho |
 |----------|---------|
 | **PROJECT_ROOT** | `D:\IC2\` |
-| **RF_BASE_PATH** | ` D:\IC2\rf\Fase-*\EPIC*\RFXXX\` |
+| **RF_BASE_PATH** | ` D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\` |
 | **TEMPLATES_PATH** | `D:\IC2\docs\templates\` |
 | **LEGACY_PATH** | `D:\IC2\ic1_legado\IControlIT\` |
 
@@ -152,11 +152,11 @@ Em **RL-RFXXX.yaml** (para cada item):
 
 O agente PODE escrever **APENAS** em:
 ```
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\RFXXX.md
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\RFXXX.yaml
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.md
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\RL-RFXXX.yaml
- D:\IC2\rf\Fase-*\EPIC*\RFXXX\STATUS.yaml
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\RFXXX.md
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\RFXXX.yaml
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\RL-RFXXX.md
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\RL-RFXXX.yaml
+ D:\IC2\documentacao\Fase-*\EPIC*\RFXXX\STATUS.yaml
 ```
 
 **PROIBIDO** escrever em:
@@ -177,7 +177,7 @@ O contrato TRAVA se qualquer condição falhar:
 | Pasta do RF | Pasta já criada em `rf/[Fase]/[EPIC]/RFXXX/` | Sim |
 | Templates acessíveis | Templates em `D:\IC2\docs\templates\` disponíveis | Sim |
 | Legado acessível | Código legado em `D:\IC2\ic1_legado\` disponível | Sim |
-| Documentação funcional | ` D:\IC2\rf\documentacao-funcional.md` acessível (referência) | Não* |
+| Documentação funcional | ` D:\IC2\documentacao\documentacao-funcional.md` acessível (referência) | Não* |
 
 **PARAR se qualquer item falhar.**
 
@@ -636,7 +636,7 @@ referencias:
       [Impacto da decisão]
 
     # Rastreabilidade (opcional mas recomendado)
-    rf_item_relacionado: "RN-RFXXX-01"  # Regra de negócio no RF moderno
+    documentacao_item_relacionado: "RN-RFXXX-01"  # Regra de negócio no RF moderno
     uc_relacionado: "UC01"  # Caso de uso que implementa
 
     # Metadados adicionais (opcional)
@@ -783,7 +783,7 @@ python D:\IC2_Governanca\tools\docs\validator-rl.py RFXXX
 
 Antes de iniciar a análise do legado, o agente DEVE:
 
-1. **Ler** o arquivo ` D:\IC2\rf\documentacao-funcional.md`
+1. **Ler** o arquivo ` D:\IC2\documentacao\documentacao-funcional.md`
 2. **Verificar** se o RFXXX já está documentado nele
 3. **Usar** como referência inicial (se existir)
 
@@ -833,8 +833,8 @@ skeleton:
 # 2. DOCUMENTACAO (CONTRATOS)
 # ============================================================
 documentacao:
-  rf: True                # RFXXX.md criado (contrato moderno)
-  rf_yaml: True           # RFXXX.yaml criado (estruturado)
+  documentacao: True                # RFXXX.md criado (contrato moderno)
+  documentacao_yaml: True           # RFXXX.yaml criado (estruturado)
   rl: True                # RL-RFXXX.md criado (memória legado)
   rl_yaml: True           # RL-RFXXX.yaml criado (rastreabilidade)
   uc: False               # UC-RFXXX.md ainda não criado
@@ -852,7 +852,7 @@ documentacao:
 # ==============================================================================
 
 separacao_rf_rl:
-  rf_limpo: True                # RF não contém conteúdo legado
+  documentacao_limpo: True                # RF não contém conteúdo legado
   rl_completo: True             # RL contém TODA memória legado
   itens_com_destino: True       # 100% itens RL têm campo destino
   validador_executado: True     # validator-rl.py passou (exit code 0)
@@ -946,10 +946,10 @@ observacoes:
   - "Próximo passo: Criar UC (CONTRATO-DOCUMENTACAO-ESSENCIAL)."
 
 validacoes:
-  rf_uc_cobertura_total: False
+  documentacao_uc_cobertura_total: False
   uc_md_consistente: False
   uc_wf_consistente: False
-  rf_yaml_sincronizado: True
+  documentacao_yaml_sincronizado: True
   uc_yaml_sincronizado: False
 ```
 
@@ -1043,7 +1043,7 @@ O agente DEVE PARAR se:
 
 Após criar os 4 arquivos (RF.md, RF.yaml, RL.md, RL.yaml) e validar com `validator-rl.py`, o agente DEVE:
 
-1. **Abrir** o arquivo ` D:\IC2\rf\documentacao-funcional.md`
+1. **Abrir** o arquivo ` D:\IC2\documentacao\documentacao-funcional.md`
 2. **Localizar** a seção do RFXXX (se já existir)
 3. **Atualizar** ou **criar** a seção com as seguintes informações:
 
@@ -1104,7 +1104,7 @@ Após criar os 4 arquivos (RF.md, RF.yaml, RL.md, RL.yaml) e validar com `valida
 - ✅ Se seção RFXXX já existe → **SUBSTITUIR** completamente (sobrescrever)
 - ✅ Se seção RFXXX NÃO existe → **ADICIONAR** ao final do arquivo
 - ✅ Manter ordem numérica dos RFs (RF001, RF002, RF003...)
-- ✅ Links devem ser relativos a partir de ` D:\IC2\rf\`
+- ✅ Links devem ser relativos a partir de ` D:\IC2\documentacao\`
 
 **Critério de completude:**
 - ✅ Seção RFXXX criada/atualizada no documentacao-funcional.md
@@ -1199,7 +1199,7 @@ O contrato só é considerado CONCLUÍDO quando:
 - [ ] validator-rl.py executado (exit code 0)
 - [ ] RFXXX.md ↔ RFXXX.yaml sincronizados 100%
 - [ ] RL-RFXXX.md ↔ RL-RFXXX.yaml sincronizados 100%
-- [ ] STATUS.yaml atualizado (documentacao.rf=True, rl=True, rf_yaml=True, rl_yaml=True)
+- [ ] STATUS.yaml atualizado (documentacao.rf=True, rl=True, documentacao_yaml=True, rl_yaml=True)
 - [ ] STATUS.yaml atualizado (separacao_rf_rl = all True)
 - [ ] Estatísticas calculadas corretamente no STATUS.yaml
 
@@ -1246,7 +1246,7 @@ Este contrato gerará os arquivos UC-RFXXX.md, MD-RFXXX.md, WF-RFXXX.md.
 | `templates/RL.yaml` | Template RL estruturado |
 | `templates/STATUS.yaml` | Template STATUS estruturado |
 | `tools/docs/validator-rl.py` | Validador de separação RF/RL |
-| `/rf/documentacao-funcional.md` | **Documentação funcional centralizada (atualizada ao final)** |
+| `/documentacao/documentacao-funcional.md` | **Documentação funcional centralizada (atualizada ao final)** |
 
 ---
 
@@ -1277,7 +1277,7 @@ ENTÃO:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ FASE 0: Consulta documentacao-funcional.md (OPCIONAL)          │
-│ ├─ Ler  D:\IC2\rf\documentacao-funcional.md                │
+│ ├─ Ler  D:\IC2\documentacao\documentacao-funcional.md                │
 │ ├─ Verificar se RFXXX já está documentado                      │
 │ ├─ Usar como referência inicial (se existir)                   │
 │ └─ SE NÃO EXISTIR → Fazer análise completa do legado           │
@@ -1356,7 +1356,7 @@ ENTÃO:
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ FASE 9: Atualizar documentacao-funcional.md (OBRIGATÓRIO)      │
-│ ├─ Abrir  D:\IC2\rf\documentacao-funcional.md              │
+│ ├─ Abrir  D:\IC2\documentacao\documentacao-funcional.md              │
 │ ├─ Criar/Atualizar seção RFXXX                                 │
 │ ├─ Incluir resumo, funcionalidades, RNs críticas               │
 │ ├─ Incluir estatísticas (legado mapeado)                       │
@@ -1421,7 +1421,7 @@ referencias:
       Lógica movida para CreateEmpresaCommandValidator.
       Multi-tenancy adicionado (validação por ClienteId).
 
-    rf_item_relacionado: "RN-RF060-05"
+    documentacao_item_relacionado: "RN-RF060-05"
     uc_relacionado: "UC01"
 
     complexidade: "baixa"
@@ -1494,7 +1494,7 @@ LEG-RF060-003                             RN-RF060-05
    └─ Retorna 0/1                            └─ Async validator (frontend)
 
    DESTINO: substituido                      ORIGEM: LEG-RF060-003
-   rf_item_relacionado: RN-RF060-05 ────────┘
+   documentacao_item_relacionado: RN-RF060-05 ────────┘
 ```
 
 **Benefícios desta rastreabilidade:**

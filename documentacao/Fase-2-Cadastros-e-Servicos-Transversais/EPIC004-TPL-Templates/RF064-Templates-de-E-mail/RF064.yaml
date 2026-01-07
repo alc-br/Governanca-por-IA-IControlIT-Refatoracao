@@ -1,0 +1,677 @@
+rf:
+  id: RF064
+  nome: Gestão de Templates de E-mail
+  versao: '2.0'
+  data: '2025-01-14'
+  fase: Fase 2 - Cadastros e Serviços Transversais
+  epic: EPIC004-TPL-Templates
+  status: em_desenvolvimento
+descricao:
+  objetivo: 'Permitir que o sistema gerencie templates de e-mail responsivos, personalizáveis e rastreáveis,
+
+    com teste A/B automático, compatibilidade multi-cliente (Gmail/Outlook/Apple/Yahoo),
+
+    métricas de engajamento (open rate, CTR) e conformidade legal (LGPD/CAN-SPAM).
+
+    '
+  problema_resolvido: 'Sistema legado possui templates hardcoded no código VB.NET, sem design responsivo,
+
+    sem rastreamento de abertura/cliques, sem branding customizado e sem conformidade legal.
+
+    Alteração de templates exige recompilação e deploy da aplicação.
+
+    '
+  publico_afetado: '- Usuários finais (recebem e-mails responsivos e rastreáveis)
+
+    - Administradores de marketing (gerenciam templates, métricas, testes A/B)
+
+    - Desenvolvedores (não precisam mais alterar código para templates)
+
+    '
+escopo:
+  incluso:
+  - Biblioteca de templates de e-mail gerenciáveis via UI
+  - Design responsivo obrigatório (desktop >=600px, mobile <600px)
+  - Rastreamento de abertura via pixel invisível (1x1)
+  - Rastreamento de cliques via URL wrapping (redirect tracking)
+  - Branding customizado por empresa (logo, cores, rodapé)
+  - Teste A/B automático (10% teste, 90% winner)
+  - Compatibilidade testada em Gmail, Outlook, Apple Mail, Yahoo
+  - Fila assíncrona de envio via Hangfire
+  - Versionamento de templates (v1.0 → v1.1 → v2.0)
+  - Preview multi-dispositivo em tempo real (desktop/tablet/mobile)
+  - Cálculo de anti-spam score (SpamAssassin)
+  - Link de unsubscribe obrigatório (LGPD/CAN-SPAM)
+  - Métricas de engajamento (open rate, CTR, conversão)
+  - Agendamento de envios via Hangfire
+  - Biblioteca de 20+ templates padrão pré-configurados
+  fora:
+  - Editor WYSIWYG visual de templates (usar editor de código HTML/CSS)
+  - Integração com serviços de envio em massa (SendGrid, Mailchimp) nesta fase
+  - Gestão de listas de contatos (implementar em RF separado)
+  - Automação de e-mails (drip campaigns, marketing automation)
+entidades:
+- nome: TemplateEmail
+  descricao: Template de e-mail responsivo gerenciável
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+  campos_principais:
+  - Id (Guid)
+  - Nome (string, max 100)
+  - Assunto (string, max 200)
+  - PreHeader (string, max 150)
+  - CorpoHtml (string, ilimitado)
+  - CorpoCssInline (string, ilimitado - CSS convertido para inline)
+  - Ativo (bool)
+  - 'Versao (string, ex: v1.0)'
+  - TemplateBase (bool - se é template padrão do sistema)
+  - EmpresaId (Guid - multi-tenancy)
+- nome: BrandingEmail
+  descricao: Configuração de branding customizado por empresa
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+  campos_principais:
+  - Id (Guid)
+  - LogoUrl (string, max 500)
+  - 'CorPrimaria (string, hex color, ex: #FF5733)'
+  - CorSecundaria (string, hex color)
+  - RodapeTexto (string, max 500)
+  - RodapeHtml (string, max 2000)
+  - EmpresaId (Guid)
+- nome: EnvioEmail
+  descricao: Registro de envio de e-mail (auditoria + rastreamento)
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+  campos_principais:
+  - Id (Guid)
+  - TemplateEmailId (Guid)
+  - Destinatario (string, max 200)
+  - Assunto (string, max 200)
+  - CorpoHtmlFinal (string - template renderizado com variáveis)
+  - DataAgendamento (DateTime? - null = envio imediato)
+  - DataEnvio (DateTime?)
+  - 'StatusEnvio (enum: Pendente, Enviado, Falha)'
+  - MensagemErro (string, max 1000)
+  - PixelRastreamentoUrl (string, max 500)
+  - Aberto (bool)
+  - DataAbertura (DateTime?)
+  - TesteAB (bool - se é envio de teste A/B)
+  - VariacaoAB (string? - 'A', 'B', 'C', etc)
+  - EmpresaId (Guid)
+- nome: MetricasTemplate
+  descricao: Métricas agregadas de engajamento por template
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+  campos_principais:
+  - Id (Guid)
+  - TemplateEmailId (Guid)
+  - TotalEnviado (int)
+  - TotalAberto (int)
+  - TotalClicado (int)
+  - TotalConversao (int)
+  - TaxaAbertura (decimal - percentual)
+  - TaxaClique (decimal - percentual)
+  - TaxaConversao (decimal - percentual)
+  - AntiSpamScore (decimal - 0.0 a 10.0, quanto menor melhor)
+  - DataUltimaAtualizacao (DateTime)
+  - EmpresaId (Guid)
+- nome: ClickRastreamento
+  descricao: Registro de cliques em links de e-mails
+  multi_tenant: true
+  soft_delete: false
+  auditoria: true
+  campos_principais:
+  - Id (Guid)
+  - EnvioEmailId (Guid)
+  - UrlOriginal (string, max 2000)
+  - UrlRastreamento (string, max 2000 - URL wrapeada)
+  - DataClique (DateTime)
+  - IpAddress (string, max 50)
+  - UserAgent (string, max 500)
+  - EmpresaId (Guid)
+- nome: TesteAB
+  descricao: Configuração de teste A/B entre variações de templates
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+  campos_principais:
+  - Id (Guid)
+  - Nome (string, max 100)
+  - TemplateAId (Guid)
+  - TemplateBId (Guid)
+  - PercentualTeste (int - default 10, range 5-20)
+  - 'StatusTeste (enum: EmAndamento, Concluido, Cancelado)'
+  - VencedorId (Guid? - template vencedor)
+  - DataInicio (DateTime)
+  - DataFim (DateTime?)
+  - EmpresaId (Guid)
+- nome: ConfiguracaoSMTP
+  descricao: Configuração de servidor SMTP por empresa (migrado de Web.config legado)
+  multi_tenant: true
+  soft_delete: true
+  auditoria: true
+  campos_principais:
+  - Id (Guid)
+  - ServidorSMTP (string, max 200)
+  - Porta (int - default 587)
+  - UsuarioSMTP (string, max 200)
+  - SenhaSMTP (string, max 500 - encrypted)
+  - EmailRemetente (string, max 200)
+  - NomeRemetente (string, max 100)
+  - UsarSSL (bool)
+  - ValidadoSPF (bool)
+  - ValidadoDKIM (bool)
+  - ValidadoDMARC (bool)
+  - EmpresaId (Guid)
+regras_negocio:
+- id: RN-RF064-001
+  descricao: 'Design responsivo obrigatório com media queries: desktop (>=600px) vs mobile (<600px)'
+  tipo: validacao
+  campos_afetados:
+  - CorpoHtml
+  - CorpoCssInline
+  obrigatorio: true
+- id: RN-RF064-002
+  descricao: 'Compatibilidade testada em 4 clientes: Gmail (web + app), Outlook (desktop + web), Apple Mail (macOS + iOS),
+    Yahoo Mail'
+  tipo: validacao
+  campos_afetados:
+  - CorpoHtml
+  obrigatorio: true
+- id: RN-RF064-003
+  descricao: Rastreamento de abertura via pixel invisível (1x1) com URL única por envio
+  tipo: regra_negocio
+  campos_afetados:
+  - PixelRastreamentoUrl
+  - Aberto
+  - DataAbertura
+  obrigatorio: true
+- id: RN-RF064-004
+  descricao: Rastreamento de cliques via URL wrapping (redirect tracking) para todos os links do template
+  tipo: regra_negocio
+  campos_afetados:
+  - UrlOriginal
+  - UrlRastreamento
+  obrigatorio: true
+- id: RN-RF064-005
+  descricao: 'Branding customizado por empresa: logo, cores primárias/secundárias, rodapé customizado'
+  tipo: regra_negocio
+  campos_afetados:
+  - BrandingEmail.LogoUrl
+  - BrandingEmail.CorPrimaria
+  - BrandingEmail.CorSecundaria
+  obrigatorio: true
+- id: RN-RF064-006
+  descricao: 'Teste A/B automático: 10% teste (50% A + 50% B), 90% winner após 100 envios mínimos ou 24h'
+  tipo: regra_negocio
+  campos_afetados:
+  - TesteAB.PercentualTeste
+  - TesteAB.VencedorId
+  obrigatorio: false
+- id: RN-RF064-007
+  descricao: Link de unsubscribe obrigatório em todos os templates (LGPD/CAN-SPAM)
+  tipo: seguranca
+  campos_afetados:
+  - CorpoHtml
+  obrigatorio: true
+- id: RN-RF064-008
+  descricao: Pre-header text obrigatório (max 150 caracteres) para melhorar preview em clientes de e-mail
+  tipo: validacao
+  campos_afetados:
+  - PreHeader
+  obrigatorio: true
+- id: RN-RF064-009
+  descricao: Conversão automática de CSS para inline (Outlook compatibility) antes de envio
+  tipo: regra_negocio
+  campos_afetados:
+  - CorpoHtml
+  - CorpoCssInline
+  obrigatorio: true
+- id: RN-RF064-010
+  descricao: 'Cálculo de anti-spam score via SpamAssassin: score < 5.0 para ativar template'
+  tipo: validacao
+  campos_afetados:
+  - MetricasTemplate.AntiSpamScore
+  obrigatorio: true
+- id: RN-RF064-011
+  descricao: Biblioteca de 20+ templates padrão pré-configurados (boas-vindas, recuperação senha, notificação, etc)
+  tipo: regra_negocio
+  campos_afetados:
+  - TemplateEmail.TemplateBase
+  obrigatorio: true
+- id: RN-RF064-012
+  descricao: 'Versionamento de templates: v1.0 → v1.1 → v2.0 (histórico de alterações)'
+  tipo: regra_negocio
+  campos_afetados:
+  - TemplateEmail.Versao
+  obrigatorio: true
+- id: RN-RF064-013
+  descricao: 'Preview multi-dispositivo em tempo real: desktop (1024px), tablet (768px), mobile (375px)'
+  tipo: regra_negocio
+  campos_afetados:
+  - CorpoHtml
+  obrigatorio: false
+- id: RN-RF064-014
+  descricao: 'Métricas de engajamento: open rate, CTR, taxa de conversão por template'
+  tipo: regra_negocio
+  campos_afetados:
+  - MetricasTemplate.TaxaAbertura
+  - MetricasTemplate.TaxaClique
+  - MetricasTemplate.TaxaConversao
+  obrigatorio: true
+- id: RN-RF064-015
+  descricao: 'Agendamento de envios via Hangfire: envio imediato ou agendado (DataAgendamento)'
+  tipo: regra_negocio
+  campos_afetados:
+  - EnvioEmail.DataAgendamento
+  obrigatorio: true
+- id: RN-RF064-016
+  descricao: Unicidade de Nome de template por empresa (multi-tenancy)
+  tipo: unicidade
+  campos_afetados:
+  - TemplateEmail.Nome
+  - EmpresaId
+  obrigatorio: true
+- id: RN-RF064-017
+  descricao: Validação de SPF/DKIM/DMARC antes de ativar configuração SMTP
+  tipo: validacao
+  campos_afetados:
+  - ConfiguracaoSMTP.ValidadoSPF
+  - ConfiguracaoSMTP.ValidadoDKIM
+  - ConfiguracaoSMTP.ValidadoDMARC
+  obrigatorio: true
+- id: RN-RF064-018
+  descricao: Fila assíncrona de envio via Hangfire (retry automático 3x em caso de falha)
+  tipo: regra_negocio
+  campos_afetados:
+  - EnvioEmail.StatusEnvio
+  - EnvioEmail.MensagemErro
+  obrigatorio: true
+estados:
+- id: Rascunho
+  descricao: Template criado mas não ativado
+- id: Ativo
+  descricao: Template ativo e disponível para envio
+- id: Inativo
+  descricao: Template desativado temporariamente
+- id: Arquivado
+  descricao: Template arquivado (não pode ser editado)
+transicoes:
+  permitidas:
+  - de: Rascunho
+    para: Ativo
+    condicao: Anti-spam score < 5.0 e compatibilidade validada
+  - de: Ativo
+    para: Inativo
+  - de: Inativo
+    para: Ativo
+  - de: Ativo
+    para: Arquivado
+  proibidas:
+  - de: Arquivado
+    para: Ativo
+    motivo: Templates arquivados não podem ser reativados (criar nova versão)
+permissoes:
+- codigo: TPL.EMAIL.VIEW_ANY
+  descricao: Listar templates de e-mail
+- codigo: TPL.EMAIL.VIEW
+  descricao: Visualizar template de e-mail
+- codigo: TPL.EMAIL.CREATE
+  descricao: Criar template de e-mail
+- codigo: TPL.EMAIL.UPDATE
+  descricao: Atualizar template de e-mail
+- codigo: TPL.EMAIL.DELETE
+  descricao: Excluir template de e-mail (soft delete)
+- codigo: TPL.EMAIL.ENVIAR
+  descricao: Enviar e-mail usando template
+- codigo: TPL.EMAIL.METRICAS
+  descricao: Visualizar métricas de templates
+- codigo: TPL.EMAIL.TESTE_AB
+  descricao: Criar e gerenciar testes A/B
+- codigo: TPL.EMAIL.BRANDING
+  descricao: Configurar branding de e-mails
+- codigo: TPL.EMAIL.SMTP_CONFIG
+  descricao: Configurar servidor SMTP
+integracoes:
+  internas:
+  - Autenticação (JWT Bearer)
+  - Multi-Tenancy (EmpresaId)
+  - Auditoria (AuditableEntity)
+  - RBAC (Permissões TPL.EMAIL.*)
+  - i18n (Transloco - pt-BR, en, es)
+  - 'Central de Funcionalidades (chave: TPL.EMAIL)'
+  - Hangfire (Fila assíncrona de envio)
+  externas:
+  - sistema: SpamAssassin API
+    tipo: API REST
+    obrigatoria: true
+    finalidade: Cálculo de anti-spam score
+  - sistema: Litmus / Email on Acid
+    tipo: API REST
+    obrigatoria: false
+    finalidade: Teste de compatibilidade multi-cliente
+  - sistema: MXToolbox / Postmark
+    tipo: API REST
+    obrigatoria: true
+    finalidade: Validação SPF/DKIM/DMARC
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacoes_especificas:
+  - SQL Injection em variáveis de template
+  - XSS em corpo HTML de template
+  - CSRF em endpoints de envio de e-mail
+  - Rate limiting em envio de e-mails (100/hora por empresa)
+rastreabilidade:
+  ucs_esperados:
+  - UC00 - Gerenciar Templates de E-mail (CRUD)
+  - UC01 - Enviar E-mail com Template
+  - UC02 - Rastrear Métricas de Engajamento
+  - UC03 - Configurar Branding de E-mails
+  - UC04 - Executar Teste A/B de Templates
+  rl_relacionado: RL-RF064.md
+  md_relacionado: MD-RF064.md
+  wf_relacionado: WF-RF064.md
+catalog:
+  crud:
+  - id: RF-CRUD-01
+    title: Criar template de e-mail
+    required: true
+  - id: RF-CRUD-02
+    title: Listar templates de e-mail
+    required: true
+  - id: RF-CRUD-03
+    title: Visualizar template de e-mail
+    required: true
+  - id: RF-CRUD-04
+    title: Atualizar template de e-mail
+    required: true
+  - id: RF-CRUD-05
+    title: Excluir template de e-mail (soft delete)
+    required: true
+  - id: RF-CRUD-06
+    title: Ativar/Desativar template
+    required: true
+  - id: RF-CRUD-07
+    title: Arquivar template
+    required: true
+  validacoes:
+  - id: RF-VAL-01
+    title: Validar campos obrigatórios (Nome, Assunto, PreHeader, CorpoHtml)
+    required: true
+  - id: RF-VAL-02
+    title: Validar unicidade de Nome por empresa
+    required: true
+  - id: RF-VAL-03
+    title: Validar anti-spam score < 5.0
+    required: true
+  - id: RF-VAL-04
+    title: Validar compatibilidade multi-cliente (Gmail/Outlook/Apple/Yahoo)
+    required: true
+  - id: RF-VAL-05
+    title: Validar presença de link de unsubscribe
+    required: true
+  - id: RF-VAL-06
+    title: Validar SPF/DKIM/DMARC em configuração SMTP
+    required: true
+  seguranca:
+  - id: RF-SEC-01
+    title: Isolamento de tenant (EmpresaId)
+    required: true
+  - id: RF-SEC-02
+    title: Permissões RBAC (TPL.EMAIL.*)
+    required: true
+  - id: RF-SEC-03
+    title: Auditoria de criação/alteração de templates
+    required: true
+  - id: RF-SEC-04
+    title: Proteção contra SQL Injection em variáveis de template
+    required: true
+  - id: RF-SEC-05
+    title: Proteção contra XSS em corpo HTML de template
+    required: true
+  - id: RF-SEC-06
+    title: Rate limiting em envio de e-mails (100/hora por empresa)
+    required: true
+  funcionalidades_especificas:
+  - id: RF-FUNC-01
+    title: Rastreamento de abertura via pixel invisível
+    required: true
+  - id: RF-FUNC-02
+    title: Rastreamento de cliques via URL wrapping
+    required: true
+  - id: RF-FUNC-03
+    title: Branding customizado por empresa
+    required: true
+  - id: RF-FUNC-04
+    title: Teste A/B automático (10% teste, 90% winner)
+    required: false
+  - id: RF-FUNC-05
+    title: Preview multi-dispositivo (desktop/tablet/mobile)
+    required: false
+  - id: RF-FUNC-06
+    title: Biblioteca de templates padrão (20+)
+    required: true
+  - id: RF-FUNC-07
+    title: Versionamento de templates
+    required: true
+  - id: RF-FUNC-08
+    title: Métricas de engajamento (open rate, CTR, conversão)
+    required: true
+  - id: RF-FUNC-09
+    title: Agendamento de envios via Hangfire
+    required: true
+  - id: RF-FUNC-10
+    title: Conversão CSS para inline (Outlook compatibility)
+    required: true
+exclusions:
+  documentacao_items:
+  - id: EX-RF064-01
+    justificativa: Editor WYSIWYG visual de templates (usar editor de código HTML/CSS)
+  - id: EX-RF064-02
+    justificativa: Integração com SendGrid/Mailchimp nesta fase
+  - id: EX-RF064-03
+    justificativa: Gestão de listas de contatos (RF separado)
+  - id: EX-RF064-04
+    justificativa: Automação de e-mails (drip campaigns, marketing automation)
+kpis:
+- nome: Taxa de Abertura (Open Rate)
+  descricao: Percentual de e-mails abertos em relação ao total enviado
+  meta: '>= 25%'
+  log_obrigatorio: true
+- nome: Taxa de Cliques (CTR)
+  descricao: Percentual de cliques em links em relação ao total enviado
+  meta: '>= 3%'
+  log_obrigatorio: true
+- nome: Taxa de Conversão
+  descricao: Percentual de ações completadas após clicar em link
+  meta: '>= 2%'
+  log_obrigatorio: true
+- nome: Taxa de Deliverability
+  descricao: Percentual de e-mails entregues com sucesso (não retornados)
+  meta: '>= 98%'
+  log_obrigatorio: true
+- nome: Taxa de Unsubscribe
+  descricao: Percentual de descadastramentos em relação ao total enviado
+  meta: <= 0.5%
+  log_obrigatorio: true
+- nome: Taxa de Spam Complaint
+  descricao: Percentual de e-mails marcados como spam pelos usuários
+  meta: <= 0.1%
+  log_obrigatorio: true
+- nome: Anti-Spam Score
+  descricao: Score calculado via SpamAssassin (0.0 = perfeito, 10.0 = pior)
+  meta: <= 3.0
+  log_obrigatorio: true
+- nome: Compatibilidade Multi-Cliente
+  descricao: Percentual de renderização correta em Gmail/Outlook/Apple/Yahoo
+  meta: 100%
+  log_obrigatorio: true
+- nome: Tempo Médio de Envio
+  descricao: Tempo médio entre enfileiramento e envio efetivo (Hangfire)
+  meta: <= 5s
+  log_obrigatorio: true
+- nome: Taxa de Sucesso de Envio
+  descricao: Percentual de e-mails enviados com sucesso (sem erro SMTP)
+  meta: '>= 99.5%'
+  log_obrigatorio: true
+- nome: Tempo de Resposta API (GET)
+  descricao: Tempo médio de resposta dos endpoints de leitura
+  meta: <= 200ms
+  log_obrigatorio: true
+- nome: Tempo de Resposta API (POST/PUT)
+  descricao: Tempo médio de resposta dos endpoints de escrita
+  meta: <= 500ms
+  log_obrigatorio: true
+- nome: Taxa de Erro 4xx
+  descricao: Percentual de erros de cliente (validação, autorização)
+  meta: <= 1%
+  log_obrigatorio: true
+- nome: Taxa de Erro 5xx
+  descricao: Percentual de erros de servidor (exceções não tratadas)
+  meta: <= 0.1%
+  log_obrigatorio: true
+- nome: Lift de Conversão (Winner vs Loser)
+  descricao: Melhoria percentual do template vencedor sobre perdedor (Teste A/B)
+  meta: '>= 10%'
+  log_obrigatorio: true
+- nome: Confiança Estatística (Teste A/B)
+  descricao: Nível de confiança estatística do resultado do teste A/B
+  meta: '>= 95%'
+  log_obrigatorio: true
+- nome: Tempo Médio de Teste A/B
+  descricao: Tempo médio para declarar vencedor (mínimo 100 envios ou 24h)
+  meta: <= 7 dias
+  log_obrigatorio: true
+alertas:
+- evento: Taxa de deliverability abaixo do normal
+  threshold: < 95% em 1 hora
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: Taxa de spam complaint alta
+  threshold: '> 0.2% em 1 hora'
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+- evento: Blacklist de IP detectada
+  threshold: IP em qualquer blacklist pública
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+- evento: Falha de autenticação SPF/DKIM/DMARC
+  threshold: Falha detectada na validação
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: Taxa de bounce alta (hard bounce)
+  threshold: '> 5% em 1 hora'
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: Tempo de envio alto
+  threshold: '> 10s por e-mail (média 1 hora)'
+  severidade: MÉDIA
+  canal_notificacao:
+  - email
+- evento: Fila de envio congestionada
+  threshold: '> 1000 e-mails pendentes por 30 min'
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: Taxa de erro 5xx alta
+  threshold: '> 1% em 15 minutos'
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+- evento: Tempo de resposta API alto
+  threshold: '> 1s (média 5 minutos)'
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: Worker Hangfire parado
+  threshold: Nenhum job processado em 5 min
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+- evento: Tentativas de acesso não autorizado
+  threshold: '> 10 em 5 minutos (mesmo usuário)'
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: Tentativa de SQL Injection detectada
+  threshold: Qualquer tentativa
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+- evento: Tentativa de XSS detectada
+  threshold: Qualquer tentativa
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+- evento: Rate limit excedido
+  threshold: '> 150 envios/hora por empresa'
+  severidade: MÉDIA
+  canal_notificacao:
+  - email
+- evento: Criação massiva de templates
+  threshold: '> 50 templates em 1 hora (mesma empresa)'
+  severidade: MÉDIA
+  canal_notificacao:
+  - email
+- evento: Template com anti-spam score alto ativado
+  threshold: Score > 5.0
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+- evento: Incompatibilidade de renderização detectada
+  threshold: Falha em qualquer cliente (Gmail/Outlook/Apple/Yahoo)
+  severidade: MÉDIA
+  canal_notificacao:
+  - email
+- evento: Template sem link de unsubscribe ativado
+  threshold: Violação de LGPD/CAN-SPAM
+  severidade: CRÍTICA
+  canal_notificacao:
+  - email
+  - slack
+  - sms
+- evento: Taxa de unsubscribe alta
+  threshold: '> 1% em 1 dia (mesmo template)'
+  severidade: ALTA
+  canal_notificacao:
+  - email
+  - slack
+historico:
+- versao: '2.0'
+  data: '2025-01-14'
+  autor: Agência ALC - alc.dev.br
+  descricao: Migração para Governança v2.0 - Separação estrita RF/RL, remoção de código, expansão de regras de negócio
+- versao: '1.0'
+  data: 2024-XX-XX
+  autor: Agência ALC - alc.dev.br
+  descricao: Versão inicial (continha código HTML e C# misturado com regras de negócio)

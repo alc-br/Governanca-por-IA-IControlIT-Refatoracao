@@ -210,7 +210,7 @@ def main():
         print("  python apply_tests_to_deploy_transition.py RF001")
         sys.exit(1)
 
-    rf = sys.argv[1]
+    documentacao = sys.argv[1]
 
     print(f"[INFO] Iniciando transição TESTES → DEPLOY para {rf}")
     print(f"[INFO] Contrato: CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY")

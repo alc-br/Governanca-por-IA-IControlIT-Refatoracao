@@ -1,0 +1,390 @@
+# Template de Referência ao Legado (RL-RF063.yaml)
+# Versão: 2.0
+# Data: 2025-12-30
+
+rf_id: RF063
+titulo: "Motor de Templates (Template Engine)"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: "Sistema Legado IControlIT v1.0"
+  arquitetura: "Monolítica WebForms"
+  banco_dados: "SQL Server"
+  multi_tenant: false
+  auditoria: "none"
+
+# ==============================================================================
+# CRÍTICO: NOMENCLATURA CORRETA É "referencias:" (NÃO "itens_legado:")
+# ==============================================================================
+referencias:
+  # ----------------------------------------------------------------------------
+  # E-MAIL HARDCODED (APROVAÇÃO)
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF063-001"
+    tipo: "regra_negocio"
+    nome: "E-mail de Aprovação de Solicitação (Hardcoded)"
+    caminho: "ic1_legado/IControlIT/Solicitacoes/Aprovar.aspx.vb - Linha 145"
+    descricao: |
+      Ao aprovar solicitação, enviar e-mail com assunto "Solicitação #[NUMERO] - Aprovada".
+      Corpo contém: nome do solicitante, número da solicitação, data de aprovação, aprovador.
+      Conteúdo hardcoded diretamente em código VB.NET (string concatenada).
+
+    destino: "assumido"
+    justificativa: |
+      Regra migrada para template Liquid (email-aprovacao-solicitacao.liquid) com variáveis dinâmicas.
+      Template moderno permite customização por cliente sem alterar código.
+
+    documentacao_item_relacionado: "RN-RF063-001, RN-RF063-002"
+    uc_relacionado: "UC05"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # FORMATAÇÃO DE VALORES MONETÁRIOS
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF063-002"
+    tipo: "regra_negocio"
+    nome: "Formatação de Valores Monetários (Helper VB.NET)"
+    caminho: "ic1_legado/IControlIT/Helpers/FormatHelper.vb - Linha 23"
+    descricao: |
+      Valores monetários formatados como "R$ 1.234,56" (cultura pt-BR).
+      Função helper FormatCurrency(valor As Decimal) As String.
+
+    destino: "assumido"
+    justificativa: |
+      Migrado para filtro Liquid customizado {{ valor | currency }}.
+      Funcionalidade preservada, sintaxe modernizada.
+
+    documentacao_item_relacionado: "RN-RF063-003"
+    uc_relacionado: "UC05"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # ----------------------------------------------------------------------------
+  # ASSINATURA PADRÃO (CÓDIGO DUPLICADO)
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF063-003"
+    tipo: "regra_negocio"
+    nome: "Assinatura Padrão de E-mails (Código Duplicado)"
+    caminho: "Múltiplos arquivos: Aprovar.aspx.vb, Rejeitar.aspx.vb, Notificar.aspx.vb"
+    descricao: |
+      Todo e-mail contém assinatura padrão:
+      - Atenciosamente,
+      - Equipe [NOME_EMPRESA]
+      - [ENDERECO]
+      - [TELEFONE]
+
+      Código duplicado em 15+ arquivos VB.NET.
+
+    destino: "substituido"
+    justificativa: |
+      Código duplicado eliminado.
+      Migrado para parcial reutilizável: {% include 'email-footer' %}.
+      Manutenção centralizada, consistência garantida.
+
+    documentacao_item_relacionado: "RN-RF063-009"
+    uc_relacionado: "UC05"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # TEXTO MULTI-IDIOMA (ARQUIVOS .resx)
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF063-004"
+    tipo: "componente"
+    nome: "Texto Multi-idioma (Arquivos .resx)"
+    caminho: "ic1_legado/IControlIT/Resources/Messages.pt-BR.resx"
+    descricao: |
+      Textos de interface suportam pt-BR, en-US, es-ES via arquivos .resx.
+      Tradução estática em tempo de compilação.
+
+    destino: "substituido"
+    justificativa: |
+      Arquivos .resx funcionam apenas em código compilado.
+      Migrado para helper Liquid {{ 't' "chave" }} com integração ao sistema i18n moderno (Transloco).
+      Permite tradução dinâmica sem recompilação.
+
+    documentacao_item_relacionado: "RN-RF063-010"
+    uc_relacionado: "UC05"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  # ----------------------------------------------------------------------------
+  # WEBSERVICE ENVIAR E-MAIL
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF063-005"
+    tipo: "webservice"
+    nome: "EnviarEmailSolicitacao"
+    caminho: "ic1_legado/IControlIT/WebService/Email.asmx"
+    descricao: |
+      Webservice que envia e-mail de notificação de solicitação.
+      Conteúdo do e-mail hardcoded dentro do método.
+
+    destino: "substituido"
+    justificativa: |
+      Webservice substituído por REST API moderna.
+      Conteúdo migrado para template Liquid gerenciado pelo RF063.
+
+    documentacao_item_relacionado: "RN-RF063-001, RN-RF063-014"
+    uc_relacionado: "UC05"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # ----------------------------------------------------------------------------
+  # TABELA CONFIGURACAOSISTEMA (TEXT)
+  # ----------------------------------------------------------------------------
+  - id: "LEG-RF063-006"
+    tipo: "tabela"
+    nome: "ConfiguracaoSistema (campo TEXT para templates)"
+    caminho: "Database/dbo.ConfiguracaoSistema"
+    descricao: |
+      Alguns templates armazenados como texto puro em campo TEXT.
+      Sem versionamento, sem auditoria, sem multi-tenant, sem validação.
+
+    destino: "descartado"
+    justificativa: |
+      Tabela legada inadequada para gestão de templates.
+      Nova tabela Template criada com versionamento, auditoria, multi-tenant e validação Liquid.
+
+    documentacao_item_relacionado: "RN-RF063-005, RN-RF063-015"
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 4
+
+# ==============================================================================
+# TELAS LEGADAS (NÃO EXISTE EQUIVALENTE)
+# ==============================================================================
+telas: []
+
+# ==============================================================================
+# WEBSERVICES LEGADOS
+# ==============================================================================
+servicos:
+  - id: "LEG-RF063-005"
+    nome: "EnviarEmailSolicitacao"
+    localizacao: "WebService/Email.asmx"
+    responsabilidade: "Enviar e-mail de notificação de solicitação"
+    notas: "Conteúdo hardcoded, sem template dinâmico"
+
+  - id: "LEG-RF063-007"
+    nome: "EnviarRelatorio"
+    localizacao: "WebService/Relatorios.asmx"
+    responsabilidade: "Gerar e enviar relatório por e-mail"
+    notas: "Conteúdo hardcoded, sem template dinâmico"
+
+# ==============================================================================
+# TABELAS LEGADAS
+# ==============================================================================
+tabelas:
+  - nome: "ConfiguracaoSistema"
+    finalidade: "Armazenar configurações do sistema (alguns templates como TEXT)"
+    problemas:
+      - "Sem versionamento de templates"
+      - "Sem auditoria de alterações"
+      - "Sem multi-tenant"
+      - "Sem validação de sintaxe"
+      - "Campo TEXT genérico (sem estrutura)"
+
+# ==============================================================================
+# REGRAS DE NEGÓCIO IMPLÍCITAS (NÃO DOCUMENTADAS)
+# ==============================================================================
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: |
+      E-mail de aprovação deve conter assunto "Solicitação #[NUMERO] - Aprovada"
+      e corpo com nome, número, data, aprovador.
+    fonte: "ic1_legado/IControlIT/Solicitacoes/Aprovar.aspx.vb - Linha 145"
+
+  - id: "RL-RN-002"
+    descricao: |
+      Valores monetários formatados como "R$ 1.234,56" (cultura pt-BR).
+    fonte: "ic1_legado/IControlIT/Helpers/FormatHelper.vb - Linha 23"
+
+  - id: "RL-RN-003"
+    descricao: |
+      Todo e-mail contém assinatura padrão com nome da empresa, endereço e telefone.
+    fonte: "Múltiplos arquivos .aspx.vb (código duplicado)"
+
+  - id: "RL-RN-004"
+    descricao: |
+      Textos de interface suportam pt-BR, en-US, es-ES via arquivos .resx.
+    fonte: "ic1_legado/IControlIT/Resources/Messages.pt-BR.resx"
+
+# ==============================================================================
+# GAP ANALYSIS (LEGADO x MODERNO)
+# ==============================================================================
+gap_analysis:
+  - item: "Motor de Templates Unificado"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Funcionalidade completamente nova - não existia no legado"
+
+  - item: "Versionamento de Templates"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Permite rollback, auditoria e histórico completo"
+
+  - item: "Preview de Templates"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Reduz erros em produção ao validar template antes de salvar"
+
+  - item: "Testes A/B de Templates"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Experimentação de conteúdo sem riscos"
+
+  - item: "Herança de Templates (Layout Base)"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Evita duplicação de código"
+
+  - item: "Parciais Reutilizáveis"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Código legado tinha assinatura duplicada em 15+ arquivos"
+
+  - item: "Multi-idioma em Templates"
+    existe_legado: true
+    existe_moderno: true
+    notas: "Legado: .resx (estático). Moderno: helper {{ 't' }} (dinâmico)"
+
+  - item: "Sanitização XSS"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Segurança - escape automático de variáveis"
+
+  - item: "Cache de Templates"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Performance - Redis reduz parsing de 200ms para <10ms"
+
+  - item: "Auditoria de Uso"
+    existe_legado: false
+    existe_moderno: true
+    notas: "Compliance - rastreamento de quando e onde template foi usado"
+
+# ==============================================================================
+# DECISÕES DE MODERNIZAÇÃO
+# ==============================================================================
+decisoes_modernizacao:
+  - decisao: "Adotar Liquid como Sintaxe Padrão"
+    motivo: |
+      Liquid é amplamente adotado (Shopify, Jekyll), maduro, seguro (sandbox) e possui biblioteca .NET oficial.
+      Alternativas avaliadas: Handlebars.NET (menos seguro), Razor (acoplado a MVC), Scriban (menos adoção).
+    impacto: "alto"
+    data: "2025-01-14"
+
+  - decisao: "Versionamento Obrigatório de Templates"
+    motivo: |
+      No legado, alterações causavam problemas sem rollback.
+      Versionamento garante rastreabilidade e auditoria.
+    impacto: "medio"
+    data: "2025-01-14"
+
+  - decisao: "Cache Redis de Templates Compilados"
+    motivo: |
+      Parsing a cada renderização é custoso (200-500ms).
+      Cache reduz para <10ms.
+    impacto: "alto"
+    data: "2025-01-14"
+
+  - decisao: "Sanitização Automática Contra XSS"
+    motivo: |
+      Templates podem ser criados por usuários.
+      Sanitização automática previne injeção de scripts.
+    impacto: "critico"
+    data: "2025-01-14"
+
+# ==============================================================================
+# RISCOS DE MIGRAÇÃO
+# ==============================================================================
+riscos_migracao:
+  - risco: "Templates legados hardcoded não identificados"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      Busca em todo código VB.NET por padrões de concatenação de strings.
+      Criar inventário completo antes de migração.
+
+  - risco: "Resistência de usuários a nova sintaxe Liquid"
+    impacto: "medio"
+    probabilidade: "baixa"
+    mitigacao: |
+      Treinamento + documentação detalhada + editor com autocomplete.
+
+  - risco: "Performance de renderização em massa"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      Cache Redis + testes de carga antes de produção.
+
+  - risco: "Quebra de templates existentes ao migrar"
+    impacto: "alto"
+    probabilidade: "media"
+    mitigacao: |
+      Conversão automatizada + testes paralelos (legado vs moderno).
+
+# ==============================================================================
+# RASTREABILIDADE (LEGADO → MODERNO)
+# ==============================================================================
+rastreabilidade:
+  - elemento_legado: "E-mail hardcoded (Aprovação)"
+    referencia_rf: "RN-RF063-001, RN-RF063-002"
+    referencia_uc: "UC05"
+    status: "migrado"
+
+  - elemento_legado: "Formatação de valores (FormatHelper.vb)"
+    referencia_rf: "RN-RF063-003"
+    referencia_uc: "UC05"
+    status: "migrado"
+
+  - elemento_legado: "Assinatura duplicada"
+    referencia_rf: "RN-RF063-009"
+    referencia_uc: "UC05"
+    status: "migrado"
+
+  - elemento_legado: "Tradução .resx"
+    referencia_rf: "RN-RF063-010"
+    referencia_uc: "UC05"
+    status: "migrado"
+
+  - elemento_legado: "Nenhuma sanitização XSS"
+    referencia_rf: "RN-RF063-011"
+    referencia_uc: "UC05"
+    status: "migrado"
+
+  - elemento_legado: "Nenhum versionamento"
+    referencia_rf: "RN-RF063-005"
+    referencia_uc: "UC07"
+    status: "migrado"
+
+  - elemento_legado: "Nenhum cache"
+    referencia_rf: "RN-RF063-012"
+    referencia_uc: "UC05"
+    status: "migrado"
+
+  - elemento_legado: "Nenhuma auditoria"
+    referencia_rf: "RN-RF063-014"
+    referencia_uc: "UC05"
+    status: "migrado"
+
+# ==============================================================================
+# CHANGELOG
+# ==============================================================================
+changelog:
+  - versao: "2.0"
+    data: "2025-12-30"
+    descricao: "Migração v1.0 → v2.0 - Separação RF/RL completa, nomenclatura correta (referencias:)"
+    autor: "Agência ALC - alc.dev.br"
+
+  - versao: "1.0"
+    data: "2025-12-30"
+    descricao: "Referência ao legado - Motor de Templates é funcionalidade NOVA"
+    autor: "Agência ALC - alc.dev.br"

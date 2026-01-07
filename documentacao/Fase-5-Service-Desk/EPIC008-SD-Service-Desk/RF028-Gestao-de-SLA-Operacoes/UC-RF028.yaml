@@ -1,0 +1,1571 @@
+# =============================================
+# UC - Casos de Uso (Contrato Comportamental)
+# RF028 - Gestão de SLA - Operações
+# Versão: 2.0
+# Data: 2025-12-31
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+uc:
+  documentacao: "RF028"
+  versao: "2.0"
+  data: "2025-12-31"
+
+casos_de_uso:
+
+  - id: "UC00"
+    nome: "Listar SLAs Operações"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-10" # Multi-tenancy
+        - "RN-RF028-11" # Soft delete
+      uc_items:
+        - id: "FP-UC00-001"
+          title: "Usuário acessa menu SLA → SLA Operações"
+          required: true
+        - id: "FP-UC00-002"
+          title: "Sistema valida permissão sla:operacoes:read"
+          required: true
+        - id: "FP-UC00-003"
+          title: "Sistema carrega registros do tenant (WHERE ClienteId = [usuário])"
+          required: true
+        - id: "FP-UC00-004"
+          title: "Sistema filtra SLAs ativos (WHERE IsDeleted = false)"
+          required: true
+        - id: "FP-UC00-005"
+          title: "Sistema aplica paginação (padrão: 20 registros/página) e ordenação"
+          required: true
+        - id: "FP-UC00-006"
+          title: "Sistema exibe colunas: Nome SLA, Tipo Operação, Calendário, Prioridade, Status, Compliance %, Ações"
+          required: true
+        - id: "FA-UC00-001"
+          title: "Buscar por nome/descrição de SLA"
+          required: false
+        - id: "FA-UC00-002"
+          title: "Ordenar por coluna"
+          required: false
+        - id: "FA-UC00-003"
+          title: "Filtrar por status (Ativo/Inativo)"
+          required: false
+        - id: "FA-UC00-004"
+          title: "Filtrar por prioridade (P1, P2, P3, P4)"
+          required: false
+        - id: "FA-UC00-005"
+          title: "Filtrar por tipo de operação"
+          required: false
+        - id: "FA-UC00-006"
+          title: "Exportar lista para Excel"
+          required: false
+        - id: "FE-UC00-001"
+          title: "Usuário sem permissão → HTTP 403 Forbidden"
+          required: true
+        - id: "FE-UC00-002"
+          title: "Nenhum registro encontrado → estado vazio"
+          required: true
+        - id: "FE-UC00-003"
+          title: "Tentativa de acesso a SLA de outro tenant → HTTP 403"
+          required: true
+
+    precondicoes:
+      - permissao: "sla:operacoes:read"
+
+    gatilho: "Usuario acessa menu SLA → SLA Operações"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_sla_operacoes"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_read"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_registros_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "filtrar_slas_ativos"
+      - passo: 5
+        ator: "sistema"
+        acao: "aplicar_paginacao_ordenacao"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibir_lista"
+
+    fluxos_alternativos:
+      - id: "FA-UC00-01"
+        condicao: "usuario_aplica_filtro_busca"
+        resultado: "lista_filtrada"
+      - id: "FA-UC00-02"
+        condicao: "usuario_solicita_ordenacao"
+        resultado: "lista_reordenada"
+      - id: "FA-UC00-03"
+        condicao: "usuario_exporta_excel"
+        resultado: "arquivo_excel_gerado"
+
+    fluxos_excecao:
+      - id: "FE-UC00-01"
+        condicao: "sem_permissao"
+        resultado: "acesso_negado_403"
+      - id: "FE-UC00-02"
+        condicao: "nenhum_registro"
+        resultado: "estado_vazio_exibido"
+      - id: "FE-UC00-03"
+        condicao: "acesso_tenant_cruzado"
+        resultado: "acesso_negado_403"
+
+    regras_aplicadas:
+      - "RN-RF028-10"
+      - "RN-RF028-11"
+
+    resultado_final:
+      estado: "lista_exibida_com_isolamento_tenant"
+
+  - id: "UC01"
+    nome: "Criar SLA Operação"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-01" # Hierarquia tempos
+        - "RN-RF028-06" # Metas P1
+        - "RN-RF028-07" # Metas P2
+        - "RN-RF028-08" # Metas P3
+        - "RN-RF028-09" # Metas P4
+        - "RN-RF028-10" # Multi-tenancy
+      uc_items:
+        - id: "FP-UC01-001"
+          title: "Usuário clica em Novo SLA Operação"
+          required: true
+        - id: "FP-UC01-002"
+          title: "Sistema valida permissão sla:operacoes:create"
+          required: true
+        - id: "FP-UC01-003"
+          title: "Sistema exibe formulário com campos obrigatórios"
+          required: true
+        - id: "FP-UC01-004"
+          title: "Usuário informa dados básicos (nome, descrição, calendário)"
+          required: true
+        - id: "FP-UC01-005"
+          title: "Usuário define metas por prioridade (P1, P2, P3, P4)"
+          required: true
+        - id: "FP-UC01-006"
+          title: "Sistema valida hierarquia de tempos (RN-RF028-01)"
+          required: true
+        - id: "FP-UC01-007"
+          title: "Sistema valida metas específicas por prioridade (RN-RF028-06 a RN-RF028-09)"
+          required: true
+        - id: "FP-UC01-008"
+          title: "Sistema preenche ClienteId automaticamente"
+          required: true
+        - id: "FP-UC01-009"
+          title: "Sistema cria registro com IsDeleted = false"
+          required: true
+        - id: "FP-UC01-010"
+          title: "Sistema registra auditoria completa"
+          required: true
+        - id: "FP-UC01-011"
+          title: "Sistema inicia motor de cálculo (Hangfire)"
+          required: true
+        - id: "FP-UC01-012"
+          title: "Sistema confirma sucesso com mensagem"
+          required: true
+        - id: "FA-UC01-001"
+          title: "Usar template pré-configurado"
+          required: false
+        - id: "FA-UC01-002"
+          title: "Salvar como rascunho (IsAtivo = false)"
+          required: false
+        - id: "FA-UC01-003"
+          title: "Cancelar criação"
+          required: false
+        - id: "FE-UC01-001"
+          title: "Erro validação hierarquia tempos → HTTP 400"
+          required: true
+        - id: "FE-UC01-002"
+          title: "Meta P1 fora dos limites → HTTP 400"
+          required: true
+        - id: "FE-UC01-003"
+          title: "Meta P2 fora dos limites → HTTP 400"
+          required: true
+        - id: "FE-UC01-004"
+          title: "Meta P3 fora dos limites → HTTP 400"
+          required: true
+        - id: "FE-UC01-005"
+          title: "Meta P4 fora dos limites → HTTP 400"
+          required: true
+        - id: "FE-UC01-006"
+          title: "SLA duplicado (mesmo nome no tenant) → HTTP 400"
+          required: true
+        - id: "FE-UC01-007"
+          title: "Erro inesperado → HTTP 500"
+          required: true
+
+    precondicoes:
+      - permissao: "sla:operacoes:create"
+
+    gatilho: "Usuario clica em Novo SLA Operação"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_novo_sla"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_create"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_formulario"
+      - passo: 4
+        ator: "usuario"
+        acao: "preencher_dados_basicos"
+      - passo: 5
+        ator: "usuario"
+        acao: "definir_metas_prioridades"
+      - passo: 6
+        ator: "sistema"
+        acao: "validar_hierarquia_tempos"
+      - passo: 7
+        ator: "sistema"
+        acao: "validar_metas_prioridades"
+      - passo: 8
+        ator: "sistema"
+        acao: "preencher_clienteid_automatico"
+      - passo: 9
+        ator: "sistema"
+        acao: "criar_registro_isdeleted_false"
+      - passo: 10
+        ator: "sistema"
+        acao: "registrar_auditoria"
+      - passo: 11
+        ator: "sistema"
+        acao: "iniciar_motor_calculo_hangfire"
+      - passo: 12
+        ator: "sistema"
+        acao: "confirmar_sucesso"
+
+    fluxos_alternativos:
+      - id: "FA-UC01-01"
+        condicao: "usuario_usa_template"
+        resultado: "formulario_preenchido_template"
+      - id: "FA-UC01-02"
+        condicao: "usuario_salva_rascunho"
+        resultado: "sla_salvo_isativo_false"
+      - id: "FA-UC01-03"
+        condicao: "usuario_cancela_criacao"
+        resultado: "retorna_listagem"
+
+    fluxos_excecao:
+      - id: "FE-UC01-01"
+        condicao: "hierarquia_invalida"
+        resultado: "erro_400_hierarquia"
+      - id: "FE-UC01-02"
+        condicao: "meta_p1_invalida"
+        resultado: "erro_400_meta_p1"
+      - id: "FE-UC01-03"
+        condicao: "meta_p2_invalida"
+        resultado: "erro_400_meta_p2"
+      - id: "FE-UC01-04"
+        condicao: "meta_p3_invalida"
+        resultado: "erro_400_meta_p3"
+      - id: "FE-UC01-05"
+        condicao: "meta_p4_invalida"
+        resultado: "erro_400_meta_p4"
+      - id: "FE-UC01-06"
+        condicao: "sla_duplicado"
+        resultado: "erro_400_duplicado"
+
+    regras_aplicadas:
+      - "RN-RF028-01"
+      - "RN-RF028-06"
+      - "RN-RF028-07"
+      - "RN-RF028-08"
+      - "RN-RF028-09"
+      - "RN-RF028-10"
+
+    resultado_final:
+      estado: "sla_criado_motor_iniciado"
+
+  - id: "UC02"
+    nome: "Visualizar SLA Operação"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-10" # Multi-tenancy
+      uc_items:
+        - id: "FP-UC02-001"
+          title: "Usuário clica em SLA na listagem"
+          required: true
+        - id: "FP-UC02-002"
+          title: "Sistema valida permissão sla:operacoes:read"
+          required: true
+        - id: "FP-UC02-003"
+          title: "Sistema valida tenant (WHERE ClienteId = [usuário])"
+          required: true
+        - id: "FP-UC02-004"
+          title: "Sistema carrega dados completos do SLA"
+          required: true
+        - id: "FP-UC02-005"
+          title: "Sistema exibe tela com abas: Resumo, Métricas, Violações, Histórico"
+          required: true
+        - id: "FA-UC02-001"
+          title: "Editar SLA (se permissão sla:operacoes:update)"
+          required: false
+        - id: "FA-UC02-002"
+          title: "Excluir SLA (se permissão sla:operacoes:delete)"
+          required: false
+        - id: "FA-UC02-003"
+          title: "Exportar métricas para Excel"
+          required: false
+        - id: "FE-UC02-001"
+          title: "SLA não encontrado → HTTP 404"
+          required: true
+        - id: "FE-UC02-002"
+          title: "SLA de outro tenant → HTTP 403 Forbidden"
+          required: true
+        - id: "FE-UC02-003"
+          title: "SLA deletado (IsDeleted = true) → HTTP 404"
+          required: true
+
+    precondicoes:
+      - permissao: "sla:operacoes:read"
+
+    gatilho: "Usuario clica em SLA na listagem"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_sla"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_read"
+      - passo: 3
+        ator: "sistema"
+        acao: "validar_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "carregar_dados_completos"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_tela_abas"
+
+    fluxos_alternativos:
+      - id: "FA-UC02-01"
+        condicao: "usuario_edita_sla"
+        resultado: "redireciona_uc03"
+      - id: "FA-UC02-02"
+        condicao: "usuario_exclui_sla"
+        resultado: "redireciona_uc04"
+      - id: "FA-UC02-03"
+        condicao: "usuario_exporta_metricas"
+        resultado: "arquivo_excel_gerado"
+
+    fluxos_excecao:
+      - id: "FE-UC02-01"
+        condicao: "sla_nao_encontrado"
+        resultado: "erro_404"
+      - id: "FE-UC02-02"
+        condicao: "sla_outro_tenant"
+        resultado: "erro_403"
+      - id: "FE-UC02-03"
+        condicao: "sla_deletado"
+        resultado: "erro_404"
+
+    regras_aplicadas:
+      - "RN-RF028-10"
+
+    resultado_final:
+      estado: "dados_exibidos_com_isolamento_tenant"
+
+  - id: "UC03"
+    nome: "Editar SLA Operação"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-01" # Hierarquia tempos
+        - "RN-RF028-10" # Multi-tenancy
+      uc_items:
+        - id: "FP-UC03-001"
+          title: "Usuário clica em Editar no SLA"
+          required: true
+        - id: "FP-UC03-002"
+          title: "Sistema valida permissão sla:operacoes:update"
+          required: true
+        - id: "FP-UC03-003"
+          title: "Sistema valida tenant"
+          required: true
+        - id: "FP-UC03-004"
+          title: "Sistema carrega formulário com dados preenchidos"
+          required: true
+        - id: "FP-UC03-005"
+          title: "Usuário altera campos desejados"
+          required: true
+        - id: "FP-UC03-006"
+          title: "Sistema valida hierarquia de tempos (RN-RF028-01)"
+          required: true
+        - id: "FP-UC03-007"
+          title: "Sistema persiste alterações"
+          required: true
+        - id: "FP-UC03-008"
+          title: "Sistema cria nova versão (versionamento)"
+          required: true
+        - id: "FP-UC03-009"
+          title: "Sistema registra auditoria completa (before/after)"
+          required: true
+        - id: "FP-UC03-010"
+          title: "Sistema confirma sucesso"
+          required: true
+        - id: "FA-UC03-001"
+          title: "Cancelar edição (descarta alterações)"
+          required: false
+        - id: "FA-UC03-002"
+          title: "Visualizar histórico de versões"
+          required: false
+        - id: "FE-UC03-001"
+          title: "Erro validação hierarquia → HTTP 400"
+          required: true
+        - id: "FE-UC03-002"
+          title: "SLA de outro tenant → HTTP 403"
+          required: true
+        - id: "FE-UC03-003"
+          title: "SLA em uso por operações ativas → Alerta"
+          required: true
+        - id: "FE-UC03-004"
+          title: "Conflito de edição concorrente → HTTP 409"
+          required: true
+
+    precondicoes:
+      - permissao: "sla:operacoes:update"
+
+    gatilho: "Usuario clica em Editar no SLA"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_editar"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_update"
+      - passo: 3
+        ator: "sistema"
+        acao: "validar_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "carregar_formulario"
+      - passo: 5
+        ator: "usuario"
+        acao: "alterar_campos"
+      - passo: 6
+        ator: "sistema"
+        acao: "validar_hierarquia_tempos"
+      - passo: 7
+        ator: "sistema"
+        acao: "persistir_alteracoes"
+      - passo: 8
+        ator: "sistema"
+        acao: "criar_nova_versao"
+      - passo: 9
+        ator: "sistema"
+        acao: "registrar_auditoria_before_after"
+      - passo: 10
+        ator: "sistema"
+        acao: "confirmar_sucesso"
+
+    fluxos_alternativos:
+      - id: "FA-UC03-01"
+        condicao: "usuario_cancela_edicao"
+        resultado: "alteracoes_descartadas"
+      - id: "FA-UC03-02"
+        condicao: "usuario_visualiza_historico_versoes"
+        resultado: "timeline_versionamento_exibida"
+
+    fluxos_excecao:
+      - id: "FE-UC03-01"
+        condicao: "hierarquia_invalida"
+        resultado: "erro_400_hierarquia"
+      - id: "FE-UC03-02"
+        condicao: "sla_outro_tenant"
+        resultado: "erro_403"
+      - id: "FE-UC03-03"
+        condicao: "sla_em_uso"
+        resultado: "alerta_sla_em_uso"
+      - id: "FE-UC03-04"
+        condicao: "conflito_concorrencia"
+        resultado: "erro_409_conflict"
+
+    regras_aplicadas:
+      - "RN-RF028-01"
+      - "RN-RF028-10"
+
+    resultado_final:
+      estado: "sla_atualizado_versionado"
+
+  - id: "UC04"
+    nome: "Excluir SLA Operação"
+    ator_principal: "usuario_autenticado"
+    tipo: "crud"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-10" # Multi-tenancy
+        - "RN-RF028-11" # Soft delete
+      uc_items:
+        - id: "FP-UC04-001"
+          title: "Usuário clica em Excluir no SLA"
+          required: true
+        - id: "FP-UC04-002"
+          title: "Sistema confirma ação: Deseja realmente excluir este SLA?"
+          required: true
+        - id: "FP-UC04-003"
+          title: "Usuário confirma exclusão"
+          required: true
+        - id: "FP-UC04-004"
+          title: "Sistema valida permissão sla:operacoes:delete"
+          required: true
+        - id: "FP-UC04-005"
+          title: "Sistema valida tenant"
+          required: true
+        - id: "FP-UC04-006"
+          title: "Sistema verifica dependências (operações ativas)"
+          required: true
+        - id: "FP-UC04-007"
+          title: "Sistema marca IsDeleted = true, preenche DataDelecao, UsuarioDeletouId"
+          required: true
+        - id: "FP-UC04-008"
+          title: "Sistema cancela Hangfire jobs de cálculo"
+          required: true
+        - id: "FP-UC04-009"
+          title: "Sistema registra auditoria completa"
+          required: true
+        - id: "FP-UC04-010"
+          title: "Sistema confirma sucesso"
+          required: true
+        - id: "FA-UC04-001"
+          title: "Cancelar exclusão (fecha diálogo, mantém SLA ativo)"
+          required: false
+        - id: "FE-UC04-001"
+          title: "SLA com operações ativas → HTTP 400"
+          required: true
+        - id: "FE-UC04-002"
+          title: "SLA já excluído → HTTP 400"
+          required: true
+        - id: "FE-UC04-003"
+          title: "SLA de outro tenant → HTTP 403"
+          required: true
+
+    precondicoes:
+      - permissao: "sla:operacoes:delete"
+
+    gatilho: "Usuario clica em Excluir no SLA"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_excluir"
+      - passo: 2
+        ator: "sistema"
+        acao: "exibir_confirmacao"
+      - passo: 3
+        ator: "usuario"
+        acao: "confirmar_exclusao"
+      - passo: 4
+        ator: "sistema"
+        acao: "validar_permissao_delete"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_tenant"
+      - passo: 6
+        ator: "sistema"
+        acao: "verificar_dependencias"
+      - passo: 7
+        ator: "sistema"
+        acao: "marcar_isdeleted_true"
+      - passo: 8
+        ator: "sistema"
+        acao: "cancelar_hangfire_jobs"
+      - passo: 9
+        ator: "sistema"
+        acao: "registrar_auditoria"
+      - passo: 10
+        ator: "sistema"
+        acao: "confirmar_sucesso"
+
+    fluxos_alternativos:
+      - id: "FA-UC04-01"
+        condicao: "usuario_cancela_exclusao"
+        resultado: "sla_mantido_ativo"
+
+    fluxos_excecao:
+      - id: "FE-UC04-01"
+        condicao: "operacoes_ativas"
+        resultado: "erro_400_dependencias"
+      - id: "FE-UC04-02"
+        condicao: "sla_ja_excluido"
+        resultado: "erro_400_ja_excluido"
+      - id: "FE-UC04-03"
+        condicao: "sla_outro_tenant"
+        resultado: "erro_403"
+
+    regras_aplicadas:
+      - "RN-RF028-10"
+      - "RN-RF028-11"
+
+    resultado_final:
+      estado: "sla_excluido_logicamente_historico_preservado"
+
+  - id: "UC05"
+    nome: "Calcular SLA de Operação"
+    ator_principal: "sistema"
+    tipo: "acao"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-02" # Cálculo exclui pausas e feriados
+        - "RN-RF028-12" # Integração BrasilAPI feriados
+      uc_items:
+        - id: "FP-UC05-001"
+          title: "Sistema executa job de cálculo (Hangfire, a cada 15 minutos)"
+          required: true
+        - id: "FP-UC05-002"
+          title: "Sistema identifica operações ativas"
+          required: true
+        - id: "FP-UC05-003"
+          title: "Sistema obtém SLA correspondente (por prioridade)"
+          required: true
+        - id: "FP-UC05-004"
+          title: "Sistema calcula tempo total decorrido (DataAtual - DataAbertura)"
+          required: true
+        - id: "FP-UC05-005"
+          title: "Sistema identifica pausas ativas (PausaSLA)"
+          required: true
+        - id: "FP-UC05-006"
+          title: "Sistema deduz duração de pausas do tempo total"
+          required: true
+        - id: "FP-UC05-007"
+          title: "Sistema consulta BrasilAPI para obter feriados do ano"
+          required: true
+        - id: "FP-UC05-008"
+          title: "Sistema exclui feriados nacionais do cálculo"
+          required: true
+        - id: "FP-UC05-009"
+          title: "Sistema exclui fins de semana (se calendário não for 24x7)"
+          required: true
+        - id: "FP-UC05-010"
+          title: "Sistema calcula percentual consumido: (TempoConsumido / TempoMeta) * 100"
+          required: true
+        - id: "FP-UC05-011"
+          title: "Sistema registra cálculo em log (código: SLA_OP_CALC)"
+          required: true
+        - id: "FP-UC05-012"
+          title: "Sistema retorna resultado (TempoConsumido, TempoDisponível, PercentualConsumido)"
+          required: true
+        - id: "FA-UC05-001"
+          title: "Consulta manual via endpoint GET /api/sla-operacoes/{id}/calcular"
+          required: false
+        - id: "FA-UC05-002"
+          title: "Feriado estadual (consulta por UF na BrasilAPI)"
+          required: false
+        - id: "FE-UC05-001"
+          title: "BrasilAPI indisponível → Usar cache de feriados do ano anterior"
+          required: true
+        - id: "FE-UC05-002"
+          title: "Calendário não encontrado → Usar 24x7 como fallback"
+          required: true
+        - id: "FE-UC05-003"
+          title: "Pausas inconsistentes (DataFim < DataInicio) → Ignorar pausa e registrar erro"
+          required: true
+
+    precondicoes:
+      - operacao_ativa: true
+      - sla_configurado: true
+
+    gatilho: "Job Hangfire executado a cada 15 minutos"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "executar_job_hangfire"
+      - passo: 2
+        ator: "sistema"
+        acao: "identificar_operacoes_ativas"
+      - passo: 3
+        ator: "sistema"
+        acao: "obter_sla_prioridade"
+      - passo: 4
+        ator: "sistema"
+        acao: "calcular_tempo_total_decorrido"
+      - passo: 5
+        ator: "sistema"
+        acao: "identificar_pausas_ativas"
+      - passo: 6
+        ator: "sistema"
+        acao: "deduzir_duracao_pausas"
+      - passo: 7
+        ator: "sistema"
+        acao: "consultar_brasilapi_feriados"
+      - passo: 8
+        ator: "sistema"
+        acao: "excluir_feriados_nacionais"
+      - passo: 9
+        ator: "sistema"
+        acao: "excluir_fins_semana_se_necessario"
+      - passo: 10
+        ator: "sistema"
+        acao: "calcular_percentual_consumido"
+      - passo: 11
+        ator: "sistema"
+        acao: "registrar_log_calculo"
+      - passo: 12
+        ator: "sistema"
+        acao: "retornar_resultado"
+
+    fluxos_alternativos:
+      - id: "FA-UC05-01"
+        condicao: "consulta_manual_endpoint"
+        resultado: "calculo_executado_sob_demanda"
+      - id: "FA-UC05-02"
+        condicao: "feriado_estadual_uf"
+        resultado: "feriado_estadual_excluido"
+
+    fluxos_excecao:
+      - id: "FE-UC05-01"
+        condicao: "brasilapi_indisponivel"
+        resultado: "usa_cache_feriados"
+      - id: "FE-UC05-02"
+        condicao: "calendario_nao_encontrado"
+        resultado: "usa_24x7_fallback"
+      - id: "FE-UC05-03"
+        condicao: "pausas_inconsistentes"
+        resultado: "ignora_pausa_registra_erro"
+
+    regras_aplicadas:
+      - "RN-RF028-02"
+      - "RN-RF028-12"
+
+    resultado_final:
+      estado: "percentual_sla_calculado_pausas_feriados_excluidos"
+
+  - id: "UC06"
+    nome: "Pausar SLA Manualmente"
+    ator_principal: "usuario_autenticado"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-03" # Pausa automática fora de horário
+      uc_items:
+        - id: "FP-UC06-001"
+          title: "Usuário clica em Pausar SLA na operação"
+          required: true
+        - id: "FP-UC06-002"
+          title: "Sistema valida permissão sla:operacoes:pause"
+          required: true
+        - id: "FP-UC06-003"
+          title: "Sistema exibe modal com campos: Tipo Pausa, Motivo"
+          required: true
+        - id: "FP-UC06-004"
+          title: "Usuário seleciona Tipo Pausa (Aguardando Cliente, Aguardando Terceiro, Fora Horário)"
+          required: true
+        - id: "FP-UC06-005"
+          title: "Usuário informa Motivo (textarea obrigatória, min 20 caracteres)"
+          required: true
+        - id: "FP-UC06-006"
+          title: "Sistema cria PausaSLA com DataInicio = Agora, DataFim = null"
+          required: true
+        - id: "FP-UC06-007"
+          title: "Sistema registra auditoria completa"
+          required: true
+        - id: "FP-UC06-008"
+          title: "Sistema notifica responsável (opcional)"
+          required: false
+        - id: "FP-UC06-009"
+          title: "Sistema confirma sucesso"
+          required: true
+        - id: "FA-UC06-001"
+          title: "Cancelar pausa (fecha modal)"
+          required: false
+        - id: "FE-UC06-001"
+          title: "SLA já pausado → HTTP 400"
+          required: true
+        - id: "FE-UC06-002"
+          title: "Motivo insuficiente → HTTP 400"
+          required: true
+
+    precondicoes:
+      - permissao: "sla:operacoes:pause"
+
+    gatilho: "Usuario clica em Pausar SLA na operação"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_pausar_sla"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_pause"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_modal_pausa"
+      - passo: 4
+        ator: "usuario"
+        acao: "selecionar_tipo_pausa"
+      - passo: 5
+        ator: "usuario"
+        acao: "informar_motivo"
+      - passo: 6
+        ator: "sistema"
+        acao: "criar_pausasla_datainicio_agora"
+      - passo: 7
+        ator: "sistema"
+        acao: "registrar_auditoria"
+      - passo: 8
+        ator: "sistema"
+        acao: "confirmar_sucesso"
+
+    fluxos_alternativos:
+      - id: "FA-UC06-01"
+        condicao: "usuario_cancela_pausa"
+        resultado: "modal_fechado"
+
+    fluxos_excecao:
+      - id: "FE-UC06-01"
+        condicao: "sla_ja_pausado"
+        resultado: "erro_400_sla_pausado"
+      - id: "FE-UC06-02"
+        condicao: "motivo_insuficiente"
+        resultado: "erro_400_motivo_min_20_caracteres"
+
+    regras_aplicadas:
+      - "RN-RF028-03"
+
+    resultado_final:
+      estado: "sla_pausado_contador_parado"
+
+  - id: "UC07"
+    nome: "Retomar SLA Pausado"
+    ator_principal: "usuario_autenticado"
+    tipo: "acao"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-03" # Pausa automática fora de horário
+      uc_items:
+        - id: "FP-UC07-001"
+          title: "Usuário clica em Retomar SLA na operação pausada"
+          required: true
+        - id: "FP-UC07-002"
+          title: "Sistema valida permissão sla:operacoes:resume"
+          required: true
+        - id: "FP-UC07-003"
+          title: "Sistema identifica PausaSLA ativa (DataFim = null)"
+          required: true
+        - id: "FP-UC07-004"
+          title: "Sistema preenche DataFim = Agora"
+          required: true
+        - id: "FP-UC07-005"
+          title: "Sistema calcula duração da pausa (DataFim - DataInicio)"
+          required: true
+        - id: "FP-UC07-006"
+          title: "Sistema registra auditoria completa"
+          required: true
+        - id: "FP-UC07-007"
+          title: "Sistema notifica responsável (opcional)"
+          required: false
+        - id: "FP-UC07-008"
+          title: "Sistema confirma sucesso"
+          required: true
+        - id: "FE-UC07-001"
+          title: "SLA não pausado → HTTP 400"
+          required: true
+        - id: "FE-UC07-002"
+          title: "Múltiplas pausas ativas → Fecha apenas a mais recente"
+          required: true
+
+    precondicoes:
+      - permissao: "sla:operacoes:resume"
+
+    gatilho: "Usuario clica em Retomar SLA na operação pausada"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "clicar_retomar_sla"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_resume"
+      - passo: 3
+        ator: "sistema"
+        acao: "identificar_pausasla_ativa"
+      - passo: 4
+        ator: "sistema"
+        acao: "preencher_datafim_agora"
+      - passo: 5
+        ator: "sistema"
+        acao: "calcular_duracao_pausa"
+      - passo: 6
+        ator: "sistema"
+        acao: "registrar_auditoria"
+      - passo: 7
+        ator: "sistema"
+        acao: "confirmar_sucesso"
+
+    fluxos_alternativos: []
+
+    fluxos_excecao:
+      - id: "FE-UC07-01"
+        condicao: "sla_nao_pausado"
+        resultado: "erro_400_sla_nao_pausado"
+      - id: "FE-UC07-02"
+        condicao: "multiplas_pausas_ativas"
+        resultado: "fecha_mais_recente"
+
+    regras_aplicadas:
+      - "RN-RF028-03"
+
+    resultado_final:
+      estado: "sla_retomado_contador_reiniciado"
+
+  - id: "UC08"
+    nome: "Visualizar Dashboard Compliance"
+    ator_principal: "usuario_autenticado"
+    tipo: "leitura"
+    impacta_dados: false
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-04" # Alertas em cascata
+        - "RN-RF028-05" # Escalação automática
+      uc_items:
+        - id: "FP-UC08-001"
+          title: "Usuário acessa Dashboard SLA Operações"
+          required: true
+        - id: "FP-UC08-002"
+          title: "Sistema valida permissão sla:operacoes:metrics"
+          required: true
+        - id: "FP-UC08-003"
+          title: "Sistema carrega dados via SignalR (tempo real)"
+          required: true
+        - id: "FP-UC08-004"
+          title: "Sistema exibe cards principais: Total SLAs Ativos, % Compliance Geral, Operações em Risco (75%+), Violações Ativas (100%+)"
+          required: true
+        - id: "FP-UC08-005"
+          title: "Sistema exibe gráficos: Linha (evolução compliance 30d), Pizza (distribuição alertas), Barra (Top 5 operações em risco)"
+          required: true
+        - id: "FP-UC08-006"
+          title: "Sistema exibe lista de alertas ativos com severidade"
+          required: true
+        - id: "FP-UC08-007"
+          title: "Sistema atualiza dashboard automaticamente a cada 30 segundos"
+          required: true
+        - id: "FA-UC08-001"
+          title: "Drill-down em operação específica (redireciona para detalhes)"
+          required: false
+        - id: "FA-UC08-002"
+          title: "Filtrar por prioridade (P1, P2, P3, P4)"
+          required: false
+        - id: "FA-UC08-003"
+          title: "Filtrar por período (hoje, semana, mês)"
+          required: false
+        - id: "FA-UC08-004"
+          title: "Exportar dashboard para PDF"
+          required: false
+        - id: "FE-UC08-001"
+          title: "Nenhum SLA ativo → Exibe mensagem"
+          required: true
+        - id: "FE-UC08-002"
+          title: "SignalR desconectado → Exibe banner reconectando"
+          required: true
+
+    precondicoes:
+      - permissao: "sla:operacoes:metrics"
+
+    gatilho: "Usuario acessa Dashboard SLA Operações"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessar_dashboard"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_metrics"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_dados_signalr"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibir_cards_principais"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_graficos"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibir_lista_alertas"
+      - passo: 7
+        ator: "sistema"
+        acao: "atualizar_automaticamente_30s"
+
+    fluxos_alternativos:
+      - id: "FA-UC08-01"
+        condicao: "usuario_drill_down_operacao"
+        resultado: "redireciona_detalhes_operacao"
+      - id: "FA-UC08-02"
+        condicao: "usuario_filtra_prioridade"
+        resultado: "dashboard_filtrado_prioridade"
+      - id: "FA-UC08-03"
+        condicao: "usuario_filtra_periodo"
+        resultado: "dashboard_filtrado_periodo"
+      - id: "FA-UC08-04"
+        condicao: "usuario_exporta_pdf"
+        resultado: "arquivo_pdf_gerado"
+
+    fluxos_excecao:
+      - id: "FE-UC08-01"
+        condicao: "nenhum_sla_ativo"
+        resultado: "mensagem_nenhum_sla"
+      - id: "FE-UC08-02"
+        condicao: "signalr_desconectado"
+        resultado: "banner_reconectando"
+
+    regras_aplicadas:
+      - "RN-RF028-04"
+      - "RN-RF028-05"
+
+    resultado_final:
+      estado: "dashboard_tempo_real_alertas_escalacao_exibidos"
+
+  - id: "UC09"
+    nome: "Job Background - Pausa/Retomada Automática Fora do Horário"
+    ator_principal: "sistema"
+    tipo: "background_job"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-03" # Pausa automática fora horário
+      uc_items:
+        - id: "FP-UC09-001"
+          title: "Job Hangfire executado a cada 15 minutos"
+          required: true
+        - id: "FP-UC09-002"
+          title: "Sistema identifica operações ativas (status != Fechada/Cancelada)"
+          required: true
+        - id: "FP-UC09-003"
+          title: "Sistema obtém SLA e calendário de atendimento da operação"
+          required: true
+        - id: "FP-UC09-004"
+          title: "Sistema verifica horário atual vs horário de atendimento do calendário"
+          required: true
+        - id: "FP-UC09-005"
+          title: "Se fora do horário E operação NÃO pausada → Criar PausaSLA (TipoPausa=ForaHorario, DataInicio=Agora, DataFim=null)"
+          required: true
+        - id: "FP-UC09-006"
+          title: "Se dentro do horário E operação pausada (PausaSLA ativa com TipoPausa=ForaHorario) → Fechar PausaSLA (DataFim=Agora)"
+          required: true
+        - id: "FP-UC09-007"
+          title: "Sistema registra auditoria para cada pausa criada/fechada (código: SLA_OP_PAUSA_AUTO)"
+          required: true
+        - id: "FP-UC09-008"
+          title: "Sistema notifica técnico responsável via SignalR (opcional)"
+          required: false
+        - id: "FA-UC09-001"
+          title: "Calendário 24x7 → Nunca pausa (horário sempre dentro)"
+          required: false
+        - id: "FA-UC09-002"
+          title: "Feriado nacional/estadual → Considera fora do horário (mesmo se dia útil)"
+          required: false
+        - id: "FA-UC09-003"
+          title: "Pausa manual ativa (TipoPausa != ForaHorario) → Não interfere"
+          required: false
+        - id: "FE-UC09-001"
+          title: "Calendário não encontrado → Usa 24x7 como fallback (nunca pausa)"
+          required: true
+        - id: "FE-UC09-002"
+          title: "Múltiplas pausas ForaHorario abertas → Fecha apenas a mais recente"
+          required: true
+        - id: "FE-UC09-003"
+          title: "Falha ao criar PausaSLA → Registra erro e continua próxima operação"
+          required: true
+
+    precondicoes:
+      - job_hangfire_ativo: true
+      - operacoes_ativas_existem: true
+
+    gatilho: "Hangfire executa job a cada 15 minutos"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "executar_job_hangfire_15min"
+      - passo: 2
+        ator: "sistema"
+        acao: "identificar_operacoes_ativas"
+      - passo: 3
+        ator: "sistema"
+        acao: "obter_sla_calendario"
+      - passo: 4
+        ator: "sistema"
+        acao: "verificar_horario_atual_vs_calendario"
+      - passo: 5
+        ator: "sistema"
+        acao: "pausar_se_fora_horario"
+      - passo: 6
+        ator: "sistema"
+        acao: "retomar_se_dentro_horario"
+      - passo: 7
+        ator: "sistema"
+        acao: "registrar_auditoria_sla_op_pausa_auto"
+
+    fluxos_alternativos:
+      - id: "FA-UC09-01"
+        condicao: "calendario_24x7"
+        resultado: "nunca_pausa_horario_sempre_dentro"
+      - id: "FA-UC09-02"
+        condicao: "feriado_nacional_estadual"
+        resultado: "considera_fora_horario"
+      - id: "FA-UC09-03"
+        condicao: "pausa_manual_ativa"
+        resultado: "nao_interfere_pausa_manual"
+
+    fluxos_excecao:
+      - id: "FE-UC09-01"
+        condicao: "calendario_nao_encontrado"
+        resultado: "usa_24x7_fallback_nunca_pausa"
+      - id: "FE-UC09-02"
+        condicao: "multiplas_pausas_fora_horario_abertas"
+        resultado: "fecha_apenas_mais_recente"
+      - id: "FE-UC09-03"
+        condicao: "falha_criar_pausasla"
+        resultado: "registra_erro_continua_proxima_operacao"
+
+    regras_aplicadas:
+      - "RN-RF028-03"
+
+    resultado_final:
+      estado: "operacoes_pausadas_fora_horario_retomadas_dentro_horario"
+
+    configuracao_job:
+      expressao_cron: "*/15 * * * *"  # A cada 15 minutos
+      timezone: "America/Sao_Paulo"
+      retry_policy: "none"
+      max_retries: 0
+      timeout_seconds: 300
+
+  - id: "UC10"
+    nome: "Job Background - Geração Automática de Alertas em Cascata"
+    ator_principal: "sistema"
+    tipo: "background_job"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-04" # Alertas em cascata 50%/75%/90%/100%
+      uc_items:
+        - id: "FP-UC10-001"
+          title: "Job executado junto com cálculo SLA (a cada 15 minutos)"
+          required: true
+        - id: "FP-UC10-002"
+          title: "Sistema obtém percentual consumido recém calculado"
+          required: true
+        - id: "FP-UC10-003"
+          title: "Sistema verifica thresholds cruzados: 50%, 75%, 90%, 100%"
+          required: true
+        - id: "FP-UC10-004"
+          title: "Para cada threshold cruzado, verifica se já foi gerado AlertaSLA correspondente"
+          required: true
+        - id: "FP-UC10-005"
+          title: "Se threshold cruzado E alerta NÃO gerado → Criar AlertaSLA com severidade apropriada"
+          required: true
+        - id: "FP-UC10-006"
+          title: "Severidade: 50%=Informativo, 75%=Aviso, 90%=Crítico, 100%=Violação"
+          required: true
+        - id: "FP-UC10-007"
+          title: "Sistema envia notificação por e-mail ao responsável"
+          required: true
+        - id: "FP-UC10-008"
+          title: "Sistema envia notificação SignalR em tempo real"
+          required: true
+        - id: "FP-UC10-009"
+          title: "Sistema registra auditoria (código: SLA_OP_ALERTA_GERADO)"
+          required: true
+        - id: "FA-UC10-001"
+          title: "Alerta 100% → Marca operação como VioladaSLA = true"
+          required: false
+        - id: "FA-UC10-002"
+          title: "Alerta 90% → Dispara UC11 (Escalação Automática)"
+          required: false
+        - id: "FE-UC10-001"
+          title: "Falha ao enviar e-mail → Retry 3x com backoff exponencial (1min, 5min, 15min)"
+          required: true
+        - id: "FE-UC10-002"
+          title: "E-mail falha após 3 retries → Dead Letter Queue + log ERROR"
+          required: true
+        - id: "FE-UC10-003"
+          title: "SignalR desconectado → Registra falha mas não bloqueia criação do alerta"
+          required: true
+
+    precondicoes:
+      - job_calculo_sla_executado: true
+      - percentual_consumido_disponivel: true
+
+    gatilho: "Cálculo SLA identifica threshold cruzado"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "executar_junto_calculo_sla_15min"
+      - passo: 2
+        ator: "sistema"
+        acao: "obter_percentual_consumido"
+      - passo: 3
+        ator: "sistema"
+        acao: "verificar_thresholds_50_75_90_100"
+      - passo: 4
+        ator: "sistema"
+        acao: "verificar_alerta_ja_gerado"
+      - passo: 5
+        ator: "sistema"
+        acao: "criar_alertasla_severidade"
+      - passo: 6
+        ator: "sistema"
+        acao: "definir_severidade_threshold"
+      - passo: 7
+        ator: "sistema"
+        acao: "enviar_email_responsavel"
+      - passo: 8
+        ator: "sistema"
+        acao: "enviar_signalr_tempo_real"
+      - passo: 9
+        ator: "sistema"
+        acao: "registrar_auditoria_sla_op_alerta_gerado"
+
+    fluxos_alternativos:
+      - id: "FA-UC10-01"
+        condicao: "threshold_100"
+        resultado: "marca_violadasla_true"
+      - id: "FA-UC10-02"
+        condicao: "threshold_90"
+        resultado: "dispara_uc11_escalacao_automatica"
+
+    fluxos_excecao:
+      - id: "FE-UC10-01"
+        condicao: "falha_enviar_email"
+        resultado: "retry_3x_backoff_exponencial"
+      - id: "FE-UC10-02"
+        condicao: "email_falha_apos_3_retries"
+        resultado: "dead_letter_queue_log_error"
+      - id: "FE-UC10-03"
+        condicao: "signalr_desconectado"
+        resultado: "registra_falha_nao_bloqueia_alerta"
+
+    regras_aplicadas:
+      - "RN-RF028-04"
+
+    resultado_final:
+      estado: "alertas_cascata_gerados_notificacoes_enviadas"
+
+    configuracao_job:
+      expressao_cron: "*/15 * * * *"  # A cada 15 minutos (junto com cálculo SLA)
+      timezone: "America/Sao_Paulo"
+      retry_policy: "exponential_backoff"
+      max_retries: 3
+      timeout_seconds: 300
+
+  - id: "UC11"
+    nome: "Job Background - Escalação Automática de SLA"
+    ator_principal: "sistema"
+    tipo: "background_job"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-05" # Escalação automática 90%/100%
+      uc_items:
+        - id: "FP-UC11-001"
+          title: "Job executado após geração de alertas 90% ou 100%"
+          required: true
+        - id: "FP-UC11-002"
+          title: "Sistema identifica operações com alerta >= 90%"
+          required: true
+        - id: "FP-UC11-003"
+          title: "Sistema obtém nível atual do técnico responsável (L1, L2, L3)"
+          required: true
+        - id: "FP-UC11-004"
+          title: "Se 90% E nível < L2 → Escalar para L2"
+          required: true
+        - id: "FP-UC11-005"
+          title: "Se 100% E nível < L3 → Escalar para L3 ou Manager"
+          required: true
+        - id: "FP-UC11-006"
+          title: "Sistema busca técnico disponível no nível alvo (query: WHERE Nivel = [alvo] AND Disponivel = true)"
+          required: true
+        - id: "FP-UC11-007"
+          title: "Sistema atualiza ResponsavelId da operação"
+          required: true
+        - id: "FP-UC11-008"
+          title: "Sistema cria registro EscalacaoSLA (OperacaoId, NivelOrigem, NivelDestino, TecnicoOrigemId, TecnicoDestinoId, Motivo='SLA Crítico >= 90%')"
+          required: true
+        - id: "FP-UC11-009"
+          title: "Sistema envia e-mail ao novo responsável"
+          required: true
+        - id: "FP-UC11-010"
+          title: "Sistema envia SMS ao novo responsável (se percentual = 100%)"
+          required: true
+        - id: "FP-UC11-011"
+          title: "Sistema notifica técnico original via SignalR (operação escalada)"
+          required: true
+        - id: "FP-UC11-012"
+          title: "Sistema registra auditoria (código: SLA_OP_ESCALADO)"
+          required: true
+        - id: "FA-UC11-001"
+          title: "Nenhum técnico disponível no nível alvo → Escalar para nível superior (L2 → L3 → Manager)"
+          required: false
+        - id: "FA-UC11-002"
+          title: "Operação já no nível máximo (Manager) → Criar alerta crítico mas não escalar"
+          required: false
+        - id: "FE-UC11-001"
+          title: "Nenhum técnico disponível em nenhum nível → Dead Letter Queue + alerta DevOps"
+          required: true
+        - id: "FE-UC11-002"
+          title: "Falha ao enviar e-mail → Retry 3x, se falhar registra erro mas conclui escalação"
+          required: true
+        - id: "FE-UC11-003"
+          title: "Falha ao enviar SMS → Registra erro mas não bloqueia escalação"
+          required: true
+
+    precondicoes:
+      - alertas_gerados: true
+      - percentual_consumido_gte_90: true
+
+    gatilho: "Alerta de SLA >= 90% gerado"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "executar_apos_alertas_90_100"
+      - passo: 2
+        ator: "sistema"
+        acao: "identificar_operacoes_alerta_gte_90"
+      - passo: 3
+        ator: "sistema"
+        acao: "obter_nivel_tecnico_atual"
+      - passo: 4
+        ator: "sistema"
+        acao: "determinar_nivel_alvo_90_l2_100_l3"
+      - passo: 5
+        ator: "sistema"
+        acao: "buscar_tecnico_disponivel_nivel_alvo"
+      - passo: 6
+        ator: "sistema"
+        acao: "atualizar_responsavelid"
+      - passo: 7
+        ator: "sistema"
+        acao: "criar_escalacaosla"
+      - passo: 8
+        ator: "sistema"
+        acao: "enviar_email_novo_responsavel"
+      - passo: 9
+        ator: "sistema"
+        acao: "enviar_sms_se_100"
+      - passo: 10
+        ator: "sistema"
+        acao: "notificar_tecnico_original_signalr"
+      - passo: 11
+        ator: "sistema"
+        acao: "registrar_auditoria_sla_op_escalado"
+
+    fluxos_alternativos:
+      - id: "FA-UC11-01"
+        condicao: "nenhum_tecnico_nivel_alvo"
+        resultado: "escalar_nivel_superior_l2_l3_manager"
+      - id: "FA-UC11-02"
+        condicao: "operacao_nivel_maximo_manager"
+        resultado: "cria_alerta_critico_nao_escala"
+
+    fluxos_excecao:
+      - id: "FE-UC11-01"
+        condicao: "nenhum_tecnico_disponivel_nenhum_nivel"
+        resultado: "dead_letter_queue_alerta_devops"
+      - id: "FE-UC11-02"
+        condicao: "falha_email"
+        resultado: "retry_3x_registra_erro_conclui_escalacao"
+      - id: "FE-UC11-03"
+        condicao: "falha_sms"
+        resultado: "registra_erro_nao_bloqueia_escalacao"
+
+    regras_aplicadas:
+      - "RN-RF028-05"
+
+    resultado_final:
+      estado: "operacao_escalada_novo_responsavel_notificado"
+
+    configuracao_job:
+      expressao_cron: "*/15 * * * *"  # A cada 15 minutos (após alertas)
+      timezone: "America/Sao_Paulo"
+      retry_policy: "exponential_backoff"
+      max_retries: 3
+      timeout_seconds: 300
+
+  - id: "UC12"
+    nome: "Job Background - Sincronização Anual BrasilAPI Feriados"
+    ator_principal: "sistema"
+    tipo: "background_job"
+    impacta_dados: true
+
+    covers:
+      documentacao_items:
+        - "RN-RF028-12" # Integração BrasilAPI feriados
+      uc_items:
+        - id: "FP-UC12-001"
+          title: "Job executado anualmente em 1º de janeiro às 00:00 BRT"
+          required: true
+        - id: "FP-UC12-002"
+          title: "Sistema consulta BrasilAPI GET https://brasilapi.com.br/api/feriados/v1/{ano}"
+          required: true
+        - id: "FP-UC12-003"
+          title: "Sistema obtém lista de feriados nacionais do ano"
+          required: true
+        - id: "FP-UC12-004"
+          title: "Sistema persiste feriados em tabela Feriados (Ano, Data, Nome, Tipo=Nacional)"
+          required: true
+        - id: "FP-UC12-005"
+          title: "Sistema limpa cache de feriados anterior"
+          required: true
+        - id: "FP-UC12-006"
+          title: "Sistema cacheia novos feriados em memória (Redis ou IMemoryCache)"
+          required: true
+        - id: "FP-UC12-007"
+          title: "Sistema registra auditoria (código: SLA_OP_FERIADOS_SYNC, total sincronizado)"
+          required: true
+        - id: "FA-UC12-001"
+          title: "Consultar feriados estaduais por UF: GET /feriados/v1/{ano}/{uf}"
+          required: false
+        - id: "FA-UC12-002"
+          title: "Sincronização manual via endpoint POST /api/sla-operacoes/sync-feriados"
+          required: false
+        - id: "FE-UC12-001"
+          title: "BrasilAPI indisponível (timeout >30s ou HTTP 5xx) → Usar cache do ano anterior + alerta DevOps"
+          required: true
+        - id: "FE-UC12-002"
+          title: "BrasilAPI retorna HTTP 404 (ano inválido) → Log ERROR + retry após 1 hora"
+          required: true
+        - id: "FE-UC12-003"
+          title: "Falha ao salvar no banco → Rollback + retry após 15 minutos"
+          required: true
+        - id: "FE-UC12-004"
+          title: "Cache Redis indisponível → Usa IMemoryCache como fallback"
+          required: true
+
+    precondicoes:
+      - data_atual: "01-01-YYYY 00:00 BRT"
+
+    gatilho: "Hangfire dispara job anualmente (1º de janeiro 00:00 BRT)"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "sistema"
+        acao: "executar_job_anual_01_jan_0000_brt"
+      - passo: 2
+        ator: "sistema"
+        acao: "consultar_brasilapi_feriados_ano"
+      - passo: 3
+        ator: "sistema"
+        acao: "obter_lista_feriados_nacionais"
+      - passo: 4
+        ator: "sistema"
+        acao: "persistir_tabela_feriados"
+      - passo: 5
+        ator: "sistema"
+        acao: "limpar_cache_feriados_anterior"
+      - passo: 6
+        ator: "sistema"
+        acao: "cachear_novos_feriados_memoria"
+      - passo: 7
+        ator: "sistema"
+        acao: "registrar_auditoria_sla_op_feriados_sync"
+
+    fluxos_alternativos:
+      - id: "FA-UC12-01"
+        condicao: "consultar_feriados_estaduais_uf"
+        resultado: "get_feriados_v1_ano_uf"
+      - id: "FA-UC12-02"
+        condicao: "sincronizacao_manual"
+        resultado: "post_api_sla_operacoes_sync_feriados"
+
+    fluxos_excecao:
+      - id: "FE-UC12-01"
+        condicao: "brasilapi_indisponivel_timeout_5xx"
+        resultado: "usa_cache_ano_anterior_alerta_devops"
+      - id: "FE-UC12-02"
+        condicao: "brasilapi_404_ano_invalido"
+        resultado: "log_error_retry_apos_1hora"
+      - id: "FE-UC12-03"
+        condicao: "falha_salvar_banco"
+        resultado: "rollback_retry_apos_15min"
+      - id: "FE-UC12-04"
+        condicao: "cache_redis_indisponivel"
+        resultado: "usa_imemorycache_fallback"
+
+    regras_aplicadas:
+      - "RN-RF028-12"
+
+    resultado_final:
+      estado: "feriados_sincronizados_cacheados_disponiveis_calculo_sla"
+
+    sistema_externo:
+      nome: "BrasilAPI"
+      tipo: "REST API"
+      autenticacao: "Pública (sem autenticação)"
+      endpoint_base: "https://brasilapi.com.br/api"
+      documentacao: "https://brasilapi.com.br/docs"
+
+    mapeamento_dados:
+      direcao: "BrasilAPI → IControlIT (unidirecional)"
+      transformacoes:
+        - campo_externo: "date (string ISO8601)"
+          campo_local: "Data (DateTime)"
+          transformacao: "Parse ISO8601 para DateTime"
+        - campo_externo: "name (string)"
+          campo_local: "Nome (string)"
+          transformacao: "Cópia direta"
+        - campo_externo: "type (string: 'national')"
+          campo_local: "Tipo (string)"
+          transformacao: "Mapeamento: 'national' → 'Nacional'"
+
+    configuracao_job:
+      expressao_cron: "0 0 1 1 *"  # 1º de janeiro às 00:00
+      timezone: "America/Sao_Paulo"
+      retry_policy: "exponential_backoff"
+      max_retries: 3
+      timeout_seconds: 60
+
+exclusions:
+  uc_items: []
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-17"
+    autor: "Architect Agent"
+    descricao: "Versão inicial com 8 casos de uso"
+  - versao: "2.0"
+    data: "2025-12-31"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Recriação completa conforme template v2.0 com 9 UCs cobrindo 100% das 12 RNs do RF028"
+  - versao: "3.0"
+    data: "2025-12-31"
+    autor: "Claude Sonnet 4.5 (CONTRATO-ADEQUACAO-COMPLETA-UC v1.0)"
+    descricao: "Adequação completa: Migração nomenclatura RN-SLA-028-XX → RN-RF028-XX + Criação de 4 UCs de jobs background (UC09, UC10, UC11, UC12) cobrindo funcionalidades críticas não documentadas"

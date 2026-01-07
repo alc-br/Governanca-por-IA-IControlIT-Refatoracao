@@ -1,0 +1,374 @@
+# =============================================
+# RF067 - Central de E-mails
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF067"
+  nome: "Central de E-mails"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 2 - Cadastros e Serviços Transversais"
+  epic: "EPIC005-NOT"
+  status: "aprovado"
+
+descricao:
+  objetivo: "Prover sistema centralizado de gestão de envio de e-mails transacionais e marketing com deliverability garantido"
+  problema_resolvido: "Envio de e-mails sem controle de fila, sem rastreamento, sem retry e sem conformidade com leis anti-spam"
+  publico_afetado: "Todos os módulos que enviam notificações por e-mail (reset senha, aprovações, campanhas)"
+
+escopo:
+  incluso:
+    - "Enfileiramento de e-mails com priorização"
+    - "Envio através de múltiplos servidores SMTP"
+    - "Retry automático com backoff exponencial"
+    - "Rastreamento completo de eventos"
+    - "Gestão de blacklist"
+    - "Rate limiting por domínio"
+    - "Warmup de IPs novos"
+    - "Validação de e-mail (sintaxe e MX record)"
+    - "Unsubscribe com um clique"
+    - "Monitoramento de saúde SMTP"
+    - "Configuração SPF, DKIM, DMARC"
+    - "Integração com templates (RF064)"
+    - "Supressão de duplicatas"
+    - "Relatórios de deliverability"
+    - "Suporte a múltiplos provedores"
+  fora:
+    - "Interface visual de criação de templates"
+    - "Envio de SMS ou notificações push"
+    - "Gerenciamento de campanhas de marketing"
+    - "Análise de conteúdo (anti-phishing)"
+
+entidades:
+  - nome: "Email"
+    descricao: "Solicitação de envio de e-mail com rastreamento completo"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "SMTPServer"
+    descricao: "Servidor SMTP configurado para envio"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "EventoEmail"
+    descricao: "Evento do ciclo de vida de um e-mail"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: false
+
+  - nome: "Blacklist"
+    descricao: "E-mails bloqueados para envio"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+  - nome: "ConfiguracaoSMTP"
+    descricao: "Configuração de autenticação de e-mail (SPF, DKIM, DMARC)"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF067-01"
+    descricao: "E-mails devem ser processados por ordem de prioridade"
+    tipo: "regra_negocio"
+    campos_afetados: ["Prioridade", "DataCriacao"]
+    obrigatorio: true
+
+  - id: "RN-RF067-02"
+    descricao: "Sistema deve suportar múltiplos servidores SMTP com balanceamento"
+    tipo: "regra_negocio"
+    campos_afetados: ["SMTPServerId", "Estrategia"]
+    obrigatorio: true
+
+  - id: "RN-RF067-03"
+    descricao: "Retry automático até 5 vezes com backoff exponencial"
+    tipo: "regra_negocio"
+    campos_afetados: ["TentativasEnvio", "Status"]
+    obrigatorio: true
+
+  - id: "RN-RF067-04"
+    descricao: "Rastrear todos os eventos do ciclo de vida"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "Eventos"]
+    obrigatorio: true
+
+  - id: "RN-RF067-05"
+    descricao: "Hard bounce deve adicionar automaticamente à blacklist"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "Destinatario"]
+    obrigatorio: true
+
+  - id: "RN-RF067-06"
+    descricao: "Limitar envios por domínio (100/hora padrão)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Destinatario"]
+    obrigatorio: true
+
+  - id: "RN-RF067-07"
+    descricao: "Warmup de IPs novos com aumento gradual (15 dias)"
+    tipo: "regra_negocio"
+    campos_afetados: ["IP", "DiaWarmup"]
+    obrigatorio: true
+
+  - id: "RN-RF067-08"
+    descricao: "Validar sintaxe e MX record antes de enviar"
+    tipo: "validacao"
+    campos_afetados: ["Destinatario"]
+    obrigatorio: true
+
+  - id: "RN-RF067-09"
+    descricao: "Unsubscribe com um clique (sem login)"
+    tipo: "regra_negocio"
+    campos_afetados: ["TokenUnsubscribe"]
+    obrigatorio: true
+
+  - id: "RN-RF067-10"
+    descricao: "Health check SMTP a cada 5 minutos"
+    tipo: "regra_negocio"
+    campos_afetados: ["SaudeOK", "UltimoCheckSucesso"]
+    obrigatorio: true
+
+  - id: "RN-RF067-11"
+    descricao: "Configurar e validar SPF, DKIM, DMARC"
+    tipo: "regra_negocio"
+    campos_afetados: ["RegistroSPF", "ChaveDKIM", "PoliticaDMARC"]
+    obrigatorio: true
+
+  - id: "RN-RF067-12"
+    descricao: "Integração com templates de e-mail (RF064)"
+    tipo: "regra_negocio"
+    campos_afetados: ["TemplateId"]
+    obrigatorio: false
+
+  - id: "RN-RF067-13"
+    descricao: "Não enviar mesmo e-mail 2x em 24h"
+    tipo: "regra_negocio"
+    campos_afetados: ["Destinatario", "Assunto", "DataEnvio"]
+    obrigatorio: true
+
+  - id: "RN-RF067-14"
+    descricao: "Gerar relatórios de deliverability"
+    tipo: "regra_negocio"
+    campos_afetados: ["Status", "DataEnvio"]
+    obrigatorio: true
+
+  - id: "RN-RF067-15"
+    descricao: "Suportar múltiplos provedores (SendGrid, Mailgun, SES, SMTP)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Provedor"]
+    obrigatorio: true
+
+  - id: "RN-RF067-16"
+    descricao: "Isolamento multi-tenant"
+    tipo: "seguranca"
+    campos_afetados: ["EmpresaId"]
+    obrigatorio: true
+
+  - id: "RN-RF067-17"
+    descricao: "Auditoria de operações críticas"
+    tipo: "seguranca"
+    campos_afetados: ["*"]
+    obrigatorio: true
+
+  - id: "RN-RF067-18"
+    descricao: "Permissões RBAC"
+    tipo: "seguranca"
+    campos_afetados: ["*"]
+    obrigatorio: true
+
+  - id: "RN-RF067-19"
+    descricao: "Limites de performance (10k/min)"
+    tipo: "regra_negocio"
+    campos_afetados: ["Prioridade"]
+    obrigatorio: true
+
+  - id: "RN-RF067-20"
+    descricao: "Disponibilidade e SLA (99.95% uptime, 98% deliverability)"
+    tipo: "regra_negocio"
+    campos_afetados: ["*"]
+    obrigatorio: true
+
+estados:
+  - id: "FILA"
+    descricao: "Criado, aguardando processamento"
+  - id: "ENVIANDO"
+    descricao: "Em processo de envio"
+  - id: "ENVIADO"
+    descricao: "Aceito pelo servidor SMTP"
+  - id: "ENTREGUE"
+    descricao: "Confirmado entrega na caixa do destinatário"
+  - id: "ABERTO"
+    descricao: "Destinatário abriu o e-mail"
+  - id: "CLICADO"
+    descricao: "Destinatário clicou em link"
+  - id: "BOUNCE"
+    descricao: "Retornou (hard ou soft bounce)"
+  - id: "SPAM"
+    descricao: "Marcado como spam"
+  - id: "FALHA_PERMANENTE"
+    descricao: "Falhou após todas as tentativas"
+
+transicoes:
+  permitidas:
+    - de: "FILA"
+      para: "ENVIANDO"
+    - de: "ENVIANDO"
+      para: "ENVIADO"
+    - de: "ENVIANDO"
+      para: "BOUNCE"
+    - de: "ENVIANDO"
+      para: "FALHA_PERMANENTE"
+    - de: "ENVIADO"
+      para: "ENTREGUE"
+    - de: "ENVIADO"
+      para: "BOUNCE"
+    - de: "ENTREGUE"
+      para: "ABERTO"
+    - de: "ENTREGUE"
+      para: "SPAM"
+    - de: "ABERTO"
+      para: "CLICADO"
+  proibidas:
+    - de: "FALHA_PERMANENTE"
+      para: "*"
+    - de: "SPAM"
+      para: "ABERTO"
+
+permissoes:
+  - codigo: "NOT.EMAILS.SEND"
+    descricao: "Enviar e-mail"
+  - codigo: "NOT.EMAILS.VIEW_ALL"
+    descricao: "Visualizar todos os e-mails"
+  - codigo: "NOT.EMAILS.MANAGE_SMTP"
+    descricao: "Gerenciar servidores SMTP"
+  - codigo: "NOT.EMAILS.MANAGE_BLACKLIST"
+    descricao: "Gerenciar blacklist"
+  - codigo: "NOT.EMAILS.VIEW_REPORTS"
+    descricao: "Visualizar relatórios de deliverability"
+
+integracoes:
+  internas:
+    - "Autenticacao"
+    - "Multi-Tenancy"
+    - "Auditoria"
+    - "RF064 - Templates de E-mail"
+  externas:
+    - sistema: "SendGrid"
+      tipo: "API"
+      obrigatoria: false
+    - sistema: "Mailgun"
+      tipo: "API"
+      obrigatoria: false
+    - sistema: "Amazon SES"
+      tipo: "API"
+      obrigatoria: false
+    - sistema: "SMTP"
+      tipo: "Protocolo"
+      obrigatoria: true
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: false
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00" # Listar e-mails
+    - "UC01" # Enviar e-mail
+    - "UC02" # Visualizar e-mail
+    - "UC03" # Rastrear eventos
+    - "UC04" # Gerenciar blacklist
+    - "UC05" # Configurar SMTP
+    - "UC06" # Relatórios de deliverability
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Enviar e-mail"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar e-mails"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar e-mail"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Rastrear eventos"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Gerenciar blacklist"
+      required: true
+    - id: "RF-CRUD-06"
+      title: "Configurar SMTP"
+      required: true
+    - id: "RF-CRUD-07"
+      title: "Relatórios de deliverability"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar sintaxe de e-mail"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Verificar MX record"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Verificar blacklist"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar rate limiting"
+      required: true
+    - id: "RF-VAL-05"
+      title: "Validar warmup de IP"
+      required: true
+    - id: "RF-VAL-06"
+      title: "Validar duplicatas 24h"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Criptografia de credenciais SMTP"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Token criptografado para unsubscribe"
+      required: true
+
+  performance:
+    - id: "RF-PERF-01"
+      title: "10.000 e-mails por minuto"
+      required: true
+    - id: "RF-PERF-02"
+      title: "E-mail crítico enviado em < 5s"
+      required: true
+    - id: "RF-PERF-03"
+      title: "Health check a cada 5 minutos"
+      required: true
+    - id: "RF-PERF-04"
+      title: "Retry com backoff exponencial"
+      required: true
+
+exclusions:
+  documentacao_items: []
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0 - Separação RF/RL completa - 20 regras de negócio"
+
+  - versao: "1.0"
+    data: "2025-01-14"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial"

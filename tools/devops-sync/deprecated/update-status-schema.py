@@ -87,8 +87,8 @@ def main():
     for filepath in files:
         result = update_status_file(filepath)
         if result:
-            rf_match = re.search(r'(RF\d+)', filepath)
-            rf = rf_match.group(1) if rf_match else filepath
+            documentacao_match = re.search(r'(RF\d+)', filepath)
+            documentacao = documentacao_match.group(1) if documentacao_match else filepath
             print(f"[OK] {rf}: Schema atualizado")
             updated += 1
         elif result is False:

@@ -1,0 +1,858 @@
+# =============================================
+# UC-RF004 - Casos de Uso: Sistema de Auditoria e Logs do Sistema
+# Versão: 2.0
+# Data: 2025-12-29
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+uc:
+  documentacao: "RF004"
+  versao: "2.0"
+  data: "2025-12-29"
+  descricao: "Sistema de Auditoria e Logs do Sistema (append-only)"
+  cobertura_rn: "15/15"
+  cobertura_percentual: "100%"
+
+casos_de_uso:
+
+  - id: "UC00"
+    nome: "Listar Registros de Auditoria"
+    ator_principal: "Auditor, Super Admin"
+    tipo: "consulta"
+
+    covers:
+      documentacao_items:
+        - "RN-RF004-001"
+        - "RN-RF004-010"
+      uc_items:
+        - id: "UC00-FP-01"
+          title: "Listar com paginação (50 registros)"
+          required: true
+        - id: "UC00-FA-01"
+          title: "Buscar por termo"
+          required: true
+        - id: "UC00-FA-02"
+          title: "Ordenar por coluna"
+          required: true
+        - id: "UC00-FA-03"
+          title: "Filtrar por categoria"
+          required: true
+        - id: "UC00-FA-04"
+          title: "Alterar tamanho de página"
+          required: false
+        - id: "UC00-FE-01"
+          title: "Usuário sem permissão SYS.AUDITORIA.READ"
+          required: true
+        - id: "UC00-FE-02"
+          title: "Nenhum registro encontrado"
+          required: true
+        - id: "UC00-FE-03"
+          title: "Erro de conexão com banco"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.AUDITORIA.READ"
+      - contexto: "Tenant_Id válido"
+
+    gatilho: "Usuário acessa menu Auditoria"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_menu_auditoria"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_SYS_AUDITORIA_READ"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_registros_WHERE_Tenant_Id"
+      - passo: 4
+        ator: "sistema"
+        acao: "aplicar_paginacao_50_registros"
+      - passo: 5
+        ator: "sistema"
+        acao: "ordenar_Timestamp_DESC"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibir_lista"
+
+    fluxos_alternativos:
+      - id: "FA-UC00-001"
+        condicao: "usuario_busca_termo"
+        resultado: "filtro_LIKE_aplicado"
+      - id: "FA-UC00-002"
+        condicao: "usuario_ordena_coluna"
+        resultado: "ordenacao_ASC_DESC_alternada"
+      - id: "FA-UC00-003"
+        condicao: "usuario_filtra_categoria"
+        resultado: "WHERE_Tipo_aplicado"
+
+    fluxos_excecao:
+      - id: "FE-UC00-001"
+        condicao: "sem_permissao"
+        resultado: "HTTP_403_Forbidden"
+      - id: "FE-UC00-002"
+        condicao: "nenhum_registro"
+        resultado: "estado_vazio_exibido"
+      - id: "FE-UC00-003"
+        condicao: "erro_conexao"
+        resultado: "mensagem_generica_e_log_tecnico"
+
+    regras_aplicadas:
+      - "RN-RF004-001"
+      - "RN-RF004-010"
+      - "RN-UC00-001"
+      - "RN-UC00-002"
+      - "RN-UC00-003"
+
+    resultado_final:
+      estado: "lista_auditoria_exibida"
+
+  - id: "UC01"
+    nome: "Buscar com Filtros Avançados"
+    ator_principal: "Auditor, Super Admin"
+    tipo: "consulta_complexa"
+
+    covers:
+      documentacao_items:
+        - "RN-RF004-003"
+        - "RN-RF004-010"
+        - "RN-RF004-014"
+      uc_items:
+        - id: "UC01-FP-01"
+          title: "Busca com múltiplos critérios"
+          required: true
+        - id: "UC01-FA-01"
+          title: "Salvar busca favorita"
+          required: false
+        - id: "UC01-FA-02"
+          title: "Carregar busca salva"
+          required: false
+        - id: "UC01-FA-03"
+          title: "Exportar resultados (redireciona UC03)"
+          required: false
+        - id: "UC01-FE-01"
+          title: "Critérios inválidos (Data Final < Data Inicial)"
+          required: true
+        - id: "UC01-FE-02"
+          title: "Timeout (query > 30s)"
+          required: true
+        - id: "UC01-FE-03"
+          title: "Nenhum resultado encontrado"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.AUDITORIA.SEARCH"
+      - contexto: "Tenant_Id válido"
+
+    gatilho: "Usuário acessa Busca Avançada"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_busca_avancada"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_SYS_AUDITORIA_SEARCH"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_formulario_filtros"
+      - passo: 4
+        ator: "usuario"
+        acao: "preencher_criterios"
+      - passo: 5
+        ator: "usuario"
+        acao: "clicar_buscar"
+      - passo: 6
+        ator: "sistema"
+        acao: "validar_criterios"
+      - passo: 7
+        ator: "sistema"
+        acao: "executar_query_otimizada_full_text"
+      - passo: 8
+        ator: "sistema"
+        acao: "exibir_resultados_paginados"
+
+    fluxos_alternativos:
+      - id: "FA-UC01-001"
+        condicao: "usuario_salva_busca"
+        resultado: "criterios_salvos_para_reuso"
+      - id: "FA-UC01-002"
+        condicao: "usuario_carrega_busca_salva"
+        resultado: "formulario_preenchido_automaticamente"
+
+    fluxos_excecao:
+      - id: "FE-UC01-001"
+        condicao: "Data_Final_menor_Data_Inicial"
+        resultado: "mensagem_validacao_exibida"
+      - id: "FE-UC01-002"
+        condicao: "query_timeout_30s"
+        resultado: "interrompe_sugere_refinar"
+      - id: "FE-UC01-003"
+        condicao: "nenhum_resultado"
+        resultado: "mensagem_nenhum_registro"
+
+    regras_aplicadas:
+      - "RN-RF004-003"
+      - "RN-RF004-010"
+      - "RN-RF004-014"
+      - "RN-UC01-001"
+      - "RN-UC01-002"
+      - "RN-UC01-003"
+
+    resultado_final:
+      estado: "resultados_busca_avancada_exibidos"
+
+  - id: "UC02"
+    nome: "Visualizar Timeline de Entidade"
+    ator_principal: "Auditor, Super Admin"
+    tipo: "visualizacao"
+
+    covers:
+      documentacao_items:
+        - "RN-RF004-002"
+        - "RN-RF004-003"
+        - "RN-RF004-009"
+      uc_items:
+        - id: "UC02-FP-01"
+          title: "Timeline cronológica completa"
+          required: true
+        - id: "UC02-FA-01"
+          title: "Filtrar por tipo de operação"
+          required: false
+        - id: "UC02-FA-02"
+          title: "Filtrar por período"
+          required: false
+        - id: "UC02-FA-03"
+          title: "Comparar duas versões (diff lado a lado)"
+          required: false
+        - id: "UC02-FE-01"
+          title: "Entidade não encontrada ou outro tenant"
+          required: true
+        - id: "UC02-FE-02"
+          title: "Nenhum registro de auditoria"
+          required: true
+        - id: "UC02-FE-03"
+          title: "Erro ao carregar JSON"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.AUDITORIA.TIMELINE"
+      - contexto: "Tenant_Id válido, EntidadeId informado"
+
+    gatilho: "Usuário clica Histórico de Auditoria em detalhes de entidade"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_detalhes_entidade"
+      - passo: 2
+        ator: "usuario"
+        acao: "clica_Historico_Auditoria"
+      - passo: 3
+        ator: "sistema"
+        acao: "validar_permissao_SYS_AUDITORIA_TIMELINE"
+      - passo: 4
+        ator: "sistema"
+        acao: "buscar_WHERE_Entidade_EntidadeId_TenantId"
+      - passo: 5
+        ator: "sistema"
+        acao: "ordenar_Timestamp_ASC"
+      - passo: 6
+        ator: "sistema"
+        acao: "exibir_timeline_visual"
+      - passo: 7
+        ator: "sistema"
+        acao: "destacar_campos_modificados"
+
+    fluxos_alternativos:
+      - id: "FA-UC02-001"
+        condicao: "usuario_filtra_tipo_operacao"
+        resultado: "timeline_filtrada_CREATE_UPDATE_DELETE"
+      - id: "FA-UC02-002"
+        condicao: "usuario_filtra_periodo"
+        resultado: "WHERE_Timestamp_BETWEEN_aplicado"
+      - id: "FA-UC02-003"
+        condicao: "usuario_compara_versoes"
+        resultado: "diff_lado_a_lado_exibido"
+
+    fluxos_excecao:
+      - id: "FE-UC02-001"
+        condicao: "entidade_nao_encontrada"
+        resultado: "HTTP_404"
+      - id: "FE-UC02-002"
+        condicao: "nenhum_registro_auditoria"
+        resultado: "mensagem_sem_historico"
+      - id: "FE-UC02-003"
+        condicao: "erro_carregar_JSON"
+        resultado: "mensagem_generica_e_log_tecnico"
+
+    regras_aplicadas:
+      - "RN-RF004-002"
+      - "RN-RF004-003"
+      - "RN-RF004-009"
+      - "RN-UC02-001"
+      - "RN-UC02-002"
+      - "RN-UC02-003"
+
+    resultado_final:
+      estado: "timeline_entidade_exibida"
+
+  - id: "UC03"
+    nome: "Exportar Relatórios de Compliance"
+    ator_principal: "Auditor, Super Admin"
+    tipo: "exportacao"
+
+    covers:
+      documentacao_items:
+        - "RN-RF004-004"
+        - "RN-RF004-008"
+      uc_items:
+        - id: "UC03-FP-01"
+          title: "Exportar relatório LGPD/SOX/ISO/Personalizado"
+          required: true
+        - id: "UC03-FA-01"
+          title: "Agendar exportação recorrente"
+          required: false
+        - id: "UC03-FA-02"
+          title: "Incluir hash SHA-256"
+          required: true
+        - id: "UC03-FE-01"
+          title: "Período excede 1 ano"
+          required: true
+        - id: "UC03-FE-02"
+          title: "Volume muito grande (timeout)"
+          required: true
+        - id: "UC03-FE-03"
+          title: "Erro ao gerar arquivo"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.AUDITORIA.EXPORT"
+      - contexto: "Tenant_Id válido"
+
+    gatilho: "Usuário clica Exportar Relatórios"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_exportar_relatorios"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_SYS_AUDITORIA_EXPORT"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_formulario_tipo_periodo_formato"
+      - passo: 4
+        ator: "usuario"
+        acao: "selecionar_opcoes_e_gerar"
+      - passo: 5
+        ator: "sistema"
+        acao: "validar_criterios_periodo_maximo_1_ano"
+      - passo: 6
+        ator: "sistema"
+        acao: "executar_query_filtrada_por_categoria"
+      - passo: 7
+        ator: "sistema"
+        acao: "gerar_relatorio_formato_solicitado"
+      - passo: 8
+        ator: "sistema"
+        acao: "registrar_auditoria_EXPORT_com_hash_SHA256"
+      - passo: 9
+        ator: "sistema"
+        acao: "exibir_link_download"
+
+    fluxos_alternativos:
+      - id: "FA-UC03-001"
+        condicao: "usuario_agenda_recorrencia"
+        resultado: "agendamento_salvo_email_automatico"
+      - id: "FA-UC03-002"
+        condicao: "usuario_marca_incluir_hash"
+        resultado: "hash_SHA256_calculado_e_incluido"
+
+    fluxos_excecao:
+      - id: "FE-UC03-001"
+        condicao: "periodo_maior_1_ano"
+        resultado: "erro_validacao_exibido"
+      - id: "FE-UC03-002"
+        condicao: "volume_grande_timeout"
+        resultado: "sugestao_refinar_periodo"
+      - id: "FE-UC03-003"
+        condicao: "erro_gerar_arquivo"
+        resultado: "log_tecnico_mensagem_generica"
+
+    regras_aplicadas:
+      - "RN-RF004-004"
+      - "RN-RF004-008"
+      - "RN-UC03-001"
+      - "RN-UC03-002"
+      - "RN-UC03-003"
+
+    resultado_final:
+      estado: "relatorio_compliance_gerado_e_auditado"
+
+  - id: "UC04"
+    nome: "Visualizar Dashboards Analíticos"
+    ator_principal: "Gerente Operações, Super Admin"
+    tipo: "visualizacao_agregada"
+
+    covers:
+      documentacao_items:
+        - "RN-RF004-004"
+      uc_items:
+        - id: "UC04-FP-01"
+          title: "Exibir 5 gráficos com métricas agregadas"
+          required: true
+        - id: "UC04-FA-01"
+          title: "Filtrar por período personalizado"
+          required: false
+        - id: "UC04-FA-02"
+          title: "Drill-down em categoria"
+          required: false
+        - id: "UC04-FA-03"
+          title: "Exportar gráfico"
+          required: false
+        - id: "UC04-FE-01"
+          title: "Erro ao calcular métricas"
+          required: true
+        - id: "UC04-FE-02"
+          title: "Cache expirado"
+          required: false
+
+    precondicoes:
+      - permissao: "SYS.AUDITORIA.ANALYTICS"
+      - contexto: "Tenant_Id válido"
+
+    gatilho: "Usuário acessa Dashboards Analíticos"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_dashboards_analiticos"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_SYS_AUDITORIA_ANALYTICS"
+      - passo: 3
+        ator: "sistema"
+        acao: "carregar_metricas_agregadas_tenant"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibir_5_graficos_pizza_linha_barra"
+      - passo: 5
+        ator: "sistema"
+        acao: "atualizar_cache_5_minutos"
+
+    fluxos_alternativos:
+      - id: "FA-UC04-001"
+        condicao: "usuario_filtra_periodo"
+        resultado: "metricas_recalculadas_exibidas"
+      - id: "FA-UC04-002"
+        condicao: "usuario_clica_fatia_grafico"
+        resultado: "redireciona_UC01_filtro_pre_aplicado"
+      - id: "FA-UC04-003"
+        condicao: "usuario_exporta_grafico"
+        resultado: "PNG_ou_PDF_gerado"
+
+    fluxos_excecao:
+      - id: "FE-UC04-001"
+        condicao: "erro_calcular_metricas"
+        resultado: "mensagem_generica_log_tecnico"
+      - id: "FE-UC04-002"
+        condicao: "cache_expirado"
+        resultado: "recarrega_automaticamente_loading_spinner"
+
+    regras_aplicadas:
+      - "RN-RF004-004"
+      - "RN-UC04-001"
+      - "RN-UC04-002"
+      - "RN-UC04-003"
+
+    resultado_final:
+      estado: "dashboards_analiticos_exibidos"
+
+  - id: "UC05"
+    nome: "Detectar e Visualizar Anomalias"
+    ator_principal: "Analista Segurança, Super Admin"
+    tipo: "deteccao_automatizada"
+
+    covers:
+      documentacao_items:
+        - "RN-RF004-007"
+        - "RN-RF004-012"
+        - "RN-RF004-013"
+      uc_items:
+        - id: "UC05-FP-01"
+          title: "Detectar 5 tipos de anomalias automaticamente"
+          required: true
+        - id: "UC05-FA-01"
+          title: "Marcar anomalia como falso positivo"
+          required: false
+        - id: "UC05-FA-02"
+          title: "Escalar anomalia para segurança"
+          required: false
+        - id: "UC05-FA-03"
+          title: "Configurar thresholds de detecção"
+          required: true
+        - id: "UC05-FE-01"
+          title: "Nenhuma anomalia detectada"
+          required: true
+        - id: "UC05-FE-02"
+          title: "Erro ao executar detecção"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.AUDITORIA.ANOMALIES"
+      - contexto: "Tenant_Id válido"
+
+    gatilho: "Usuário acessa Detecção de Anomalias"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_deteccao_anomalias"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_SYS_AUDITORIA_ANOMALIES"
+      - passo: 3
+        ator: "sistema"
+        acao: "executar_deteccao_5_tipos_anomalias"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibir_lista_Tipo_Severidade_Usuario_Timestamp_Detalhes"
+      - passo: 5
+        ator: "sistema"
+        acao: "permitir_investigacao_detalhada_UC01"
+
+    fluxos_alternativos:
+      - id: "FA-UC05-001"
+        condicao: "usuario_marca_falso_positivo"
+        resultado: "decisao_registrada_anomalia_oculta"
+      - id: "FA-UC05-002"
+        condicao: "usuario_escala_seguranca"
+        resultado: "ticket_criado_escalacao_auditada"
+      - id: "FA-UC05-003"
+        condicao: "usuario_configura_thresholds"
+        resultado: "valores_ajustados_salvos_ADMIN_category"
+
+    fluxos_excecao:
+      - id: "FE-UC05-001"
+        condicao: "nenhuma_anomalia"
+        resultado: "mensagem_nenhuma_anomalia"
+      - id: "FE-UC05-002"
+        condicao: "erro_executar_deteccao"
+        resultado: "log_tecnico_mensagem_generica"
+
+    regras_aplicadas:
+      - "RN-RF004-007"
+      - "RN-RF004-012"
+      - "RN-RF004-013"
+      - "RN-UC05-001"
+      - "RN-UC05-002"
+      - "RN-UC05-003"
+
+    resultado_final:
+      estado: "anomalias_detectadas_e_exibidas"
+
+  - id: "UC06"
+    nome: "Validar Integridade (Hash SHA-256)"
+    ator_principal: "Auditor, Super Admin"
+    tipo: "validacao_criptografica"
+
+    covers:
+      documentacao_items:
+        - "RN-RF004-005"
+        - "RN-RF004-006"
+      uc_items:
+        - id: "UC06-FP-01"
+          title: "Validar integridade individual ou lote"
+          required: true
+        - id: "UC06-FA-01"
+          title: "Exportar relatório de integridade"
+          required: false
+        - id: "UC06-FA-02"
+          title: "Validação automática agendada"
+          required: true
+        - id: "UC06-FE-01"
+          title: "Registro corrompido detectado"
+          required: true
+        - id: "UC06-FE-02"
+          title: "Erro ao recalcular hash"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.AUDITORIA.INTEGRITY"
+      - contexto: "Tenant_Id válido"
+
+    gatilho: "Usuário acessa Validação de Integridade"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_validacao_integridade"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_SYS_AUDITORIA_INTEGRITY"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_opcoes_registro_especifico_ou_periodo"
+      - passo: 4
+        ator: "usuario"
+        acao: "selecionar_e_clicar_validar"
+      - passo: 5
+        ator: "sistema"
+        acao: "recalcular_hash_SHA256_concatenacao_campos"
+      - passo: 6
+        ator: "sistema"
+        acao: "comparar_com_Hash_SHA256_armazenado"
+      - passo: 7
+        ator: "sistema"
+        acao: "exibir_Integro_ou_Corrompido"
+
+    fluxos_alternativos:
+      - id: "FA-UC06-001"
+        condicao: "usuario_exporta_relatorio"
+        resultado: "PDF_Excel_gerado_com_resultado"
+      - id: "FA-UC06-002"
+        condicao: "administrador_agenda_validacao"
+        resultado: "Hangfire_job_email_automatico"
+
+    fluxos_excecao:
+      - id: "FE-UC06-001"
+        condicao: "hash_divergente_detectado"
+        resultado: "alerta_critico_SECURITY_category"
+      - id: "FE-UC06-002"
+        condicao: "erro_recalcular_hash"
+        resultado: "log_tecnico_mensagem_generica"
+
+    regras_aplicadas:
+      - "RN-RF004-005"
+      - "RN-RF004-006"
+      - "RN-UC06-001"
+      - "RN-UC06-002"
+      - "RN-UC06-003"
+
+    resultado_final:
+      estado: "integridade_validada_e_exibida"
+
+  - id: "UC07"
+    nome: "Visualizar Detalhes de Registro"
+    ator_principal: "Auditor, Super Admin"
+    tipo: "visualizacao_detalhada"
+
+    covers:
+      documentacao_items:
+        - "RN-RF004-001"
+        - "RN-RF004-002"
+        - "RN-RF004-010"
+        - "RN-RF004-011"
+      uc_items:
+        - id: "UC07-FP-01"
+          title: "Exibir 5 painéis com todos os detalhes"
+          required: true
+        - id: "UC07-FA-01"
+          title: "Copiar CorrelationId"
+          required: false
+        - id: "UC07-FA-02"
+          title: "Rastrear CorrelationId (filtro UC01)"
+          required: true
+        - id: "UC07-FA-03"
+          title: "Exportar registro como JSON"
+          required: false
+        - id: "UC07-FE-01"
+          title: "Registro não encontrado ou outro tenant"
+          required: true
+        - id: "UC07-FE-02"
+          title: "Erro ao renderizar JSON"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.AUDITORIA.READ"
+      - contexto: "Tenant_Id válido, Id registro informado"
+
+    gatilho: "Usuário clica Ver Detalhes em registro"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "seleciona_registro_UC00_ou_UC01"
+      - passo: 2
+        ator: "usuario"
+        acao: "clica_Ver_Detalhes"
+      - passo: 3
+        ator: "sistema"
+        acao: "validar_permissao_SYS_AUDITORIA_READ"
+      - passo: 4
+        ator: "sistema"
+        acao: "carregar_WHERE_Id_AND_TenantId"
+      - passo: 5
+        ator: "sistema"
+        acao: "exibir_5_paineis_completos"
+
+    fluxos_alternativos:
+      - id: "FA-UC07-001"
+        condicao: "usuario_copia_CorrelationId"
+        resultado: "valor_copiado_clipboard"
+      - id: "FA-UC07-002"
+        condicao: "usuario_rastreia_CorrelationId"
+        resultado: "redireciona_UC01_filtro_CorrelationId"
+      - id: "FA-UC07-003"
+        condicao: "usuario_exporta_JSON"
+        resultado: "arquivo_JSON_gerado"
+
+    fluxos_excecao:
+      - id: "FE-UC07-001"
+        condicao: "registro_nao_encontrado"
+        resultado: "HTTP_404"
+      - id: "FE-UC07-002"
+        condicao: "erro_renderizar_JSON"
+        resultado: "exibe_JSON_bruto_log_tecnico"
+
+    regras_aplicadas:
+      - "RN-RF004-001"
+      - "RN-RF004-002"
+      - "RN-RF004-010"
+      - "RN-RF004-011"
+      - "RN-UC07-001"
+      - "RN-UC07-002"
+
+    resultado_final:
+      estado: "detalhes_registro_completos_exibidos"
+
+  - id: "UC08"
+    nome: "Gerenciar Retenção e Alertas"
+    ator_principal: "Administrador Sistema, Super Admin"
+    tipo: "gestao_retencao"
+
+    covers:
+      documentacao_items:
+        - "RN-RF004-015"
+      uc_items:
+        - id: "UC08-FP-01"
+          title: "Gerenciar políticas e alertas de retenção"
+          required: true
+        - id: "UC08-FA-01"
+          title: "Arquivar registros vencidos (Azure Blob)"
+          required: true
+        - id: "UC08-FA-02"
+          title: "Restaurar registros arquivados"
+          required: false
+        - id: "UC08-FA-03"
+          title: "Excluir vencidos não-compliance"
+          required: true
+        - id: "UC08-FE-01"
+          title: "Tentativa alterar compliance (BLOQUEIO)"
+          required: true
+        - id: "UC08-FE-02"
+          title: "Tentativa excluir compliance (BLOQUEIO)"
+          required: true
+        - id: "UC08-FE-03"
+          title: "Erro Azure Blob"
+          required: true
+
+    precondicoes:
+      - permissao: "SYS.AUDITORIA.ADMIN"
+      - contexto: "Tenant_Id válido"
+
+    gatilho: "Usuário acessa Gerenciar Retenção"
+
+    fluxo_principal:
+      - passo: 1
+        ator: "usuario"
+        acao: "acessa_gerenciar_retencao"
+      - passo: 2
+        ator: "sistema"
+        acao: "validar_permissao_SYS_AUDITORIA_ADMIN"
+      - passo: 3
+        ator: "sistema"
+        acao: "exibir_configuracao_atual_10_categorias"
+      - passo: 4
+        ator: "sistema"
+        acao: "exibir_alertas_RetentionDate_30_dias"
+      - passo: 5
+        ator: "usuario"
+        acao: "ajustar_politicas_nao_compliance"
+      - passo: 6
+        ator: "sistema"
+        acao: "validar_e_salvar_alteracoes"
+
+    fluxos_alternativos:
+      - id: "FA-UC08-001"
+        condicao: "usuario_arquiva_vencidos"
+        resultado: "Azure_Blob_cold_Arquivado_TRUE_AzureBlobUri"
+      - id: "FA-UC08-002"
+        condicao: "usuario_restaura_arquivados"
+        resultado: "copia_Blob_para_banco_Arquivado_FALSE"
+      - id: "FA-UC08-003"
+        condicao: "usuario_exclui_vencidos_nao_compliance"
+        resultado: "DELETE_confirmacao_irreversivel_ADMIN_category"
+
+    fluxos_excecao:
+      - id: "FE-UC08-001"
+        condicao: "tentativa_alterar_FINANCIAL_LGPD_SECURITY"
+        resultado: "bloqueio_mensagem_retencao_fixa_legal"
+      - id: "FE-UC08-002"
+        condicao: "tentativa_excluir_FINANCIAL_LGPD_SECURITY"
+        resultado: "bloqueio_apenas_arquivamento_permitido"
+      - id: "FE-UC08-003"
+        condicao: "erro_Azure_Blob"
+        resultado: "log_tecnico_mensagem_generica"
+
+    regras_aplicadas:
+      - "RN-RF004-015"
+      - "RN-UC08-001"
+      - "RN-UC08-002"
+      - "RN-UC08-003"
+      - "RN-UC08-004"
+      - "RN-UC08-005"
+
+    resultado_final:
+      estado: "retencao_gerenciada_alertas_exibidos"
+
+exclusions:
+  uc_items: []
+
+rastreabilidade:
+  total_rns: 15
+  rns_cobertas: 15
+  percentual_cobertura: "100%"
+  matriz:
+    - rn: "RN-RF004-001"
+      ucs: ["UC00", "UC07"]
+    - rn: "RN-RF004-002"
+      ucs: ["UC02", "UC07"]
+    - rn: "RN-RF004-003"
+      ucs: ["UC01", "UC02", "UC07"]
+    - rn: "RN-RF004-004"
+      ucs: ["UC00", "UC03", "UC04"]
+    - rn: "RN-RF004-005"
+      ucs: ["UC06"]
+    - rn: "RN-RF004-006"
+      ucs: ["UC06"]
+    - rn: "RN-RF004-007"
+      ucs: ["UC05"]
+    - rn: "RN-RF004-008"
+      ucs: ["UC03"]
+    - rn: "RN-RF004-009"
+      ucs: ["UC02"]
+    - rn: "RN-RF004-010"
+      ucs: ["UC00", "UC01", "UC07"]
+    - rn: "RN-RF004-011"
+      ucs: ["UC07"]
+    - rn: "RN-RF004-012"
+      ucs: ["UC05"]
+    - rn: "RN-RF004-013"
+      ucs: ["UC05"]
+    - rn: "RN-RF004-014"
+      ucs: ["UC01"]
+    - rn: "RN-RF004-015"
+      ucs: ["UC08"]
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-29"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão completa com 9 UCs cobrindo 100% das 15 RNs (v2.0 Governance)"
+  - versao: "1.0"
+    data: "2025-12-17"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial com 3 UCs (DEPRECIADA)"

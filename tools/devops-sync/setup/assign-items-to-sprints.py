@@ -101,7 +101,7 @@ def update_iteration(iteration_name, start_date, finish_date):
 
 def load_all_status_files():
     """Carrega todos os STATUS.yaml e mapeia work_item_id -> Fase"""
-    pattern = "D:/IC2/docs/rf/**/STATUS.yaml"
+    pattern = "D:/IC2/docs/documentacao/**/STATUS.yaml"
     files = glob.glob(pattern, recursive=True)
 
     work_item_to_fase = {}

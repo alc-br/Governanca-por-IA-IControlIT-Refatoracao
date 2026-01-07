@@ -7,7 +7,7 @@ Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
 
 ESTRUTURA DE ARQUIVOS (OBRIGATORIA):
 ```
-docs\rf\[FASE]\[EPIC]\[RFXXX]\
+docs\documentacao\[FASE]\[EPIC]\[RFXXX]\
 ├── RF[XXX].yaml
 ├── UC-RF[XXX].md
 ├── UC-RF[XXX].yaml

@@ -1,0 +1,747 @@
+# =============================================
+# RL-RF007 - Referência ao Legado: Login e Autenticação (YAML estruturado)
+# Versão: 2.0
+# Autor: Agência ALC - alc.dev.br
+# Data: 2025-12-30
+# =============================================
+
+rf_id: RF007
+titulo: "Login e Autenticação"
+
+legado:
+  sistema: "VB.NET + ASP.NET Web Forms"
+  versao: ".NET Framework 4.x"
+  arquitetura: "Monolítica WebForms (Cliente-Servidor)"
+  banco_dados: "SQL Server"
+  servidor: "IIS (Internet Information Services)"
+  multi_tenant: false
+  auditoria: "partial"  # none | partial | full
+  multi_base: true
+  quantidade_bases: 18
+  base_autenticacao: "Ativvus_Login"
+
+# ========================================
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+# ========================================
+
+referencias:
+  # --- TELAS ASPX ---
+  - id: "LEG-RF007-001"
+    tipo: "tela"
+    nome: "Login.aspx"
+    caminho: "ic1_legado/IControlIT/Login.aspx"
+    descricao: |
+      Tela principal de login do sistema legado.
+      Campos: txtNmUsuario, txtSenha, ddlEmpresa, chkLembrar.
+      Validação apenas no cliente (JavaScript).
+      Cookie "Lembrar-me" armazenava senha em texto plano (CRÍTICO).
+      Mensagens de erro específicas revelavam se usuário/senha estava errado.
+    destino: "substituido"
+    justificativa: |
+      Substituído por tela Angular moderna com validação backend obrigatória.
+      Cookie "Lembrar-me" foi DESCARTADO (inseguro).
+      Mensagens genéricas para impedir enumeração de usuários.
+    documentacao_item_relacionado: "RN-AUTH-001"
+    uc_relacionado: "UC01"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF007-002"
+    tipo: "tela"
+    nome: "EsqueciSenha.aspx"
+    caminho: "ic1_legado/IControlIT/EsqueciSenha.aspx"
+    descricao: |
+      Solicitação de recuperação de senha.
+      Gerava nova senha aleatória e enviava por email em texto plano.
+      Sem confirmação de identidade (qualquer pessoa podia resetar senha de outro).
+      Senha alterada imediatamente no banco sem expiração de link/token.
+    destino: "substituido"
+    justificativa: |
+      Substituído por fluxo moderno com token temporário de 24 horas.
+      Email contém link com token, não senha em texto plano.
+      Token expira e é marcado como utilizado após uso.
+    documentacao_item_relacionado: "RN-AUTH-006"
+    uc_relacionado: "UC02"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF007-003"
+    tipo: "tela"
+    nome: "NovaSenha.aspx"
+    caminho: "ic1_legado/IControlIT/NovaSenha.aspx"
+    descricao: |
+      Troca de senha (primeiro acesso ou manual).
+      Sem validação de requisitos mínimos (aceitava "123", "abc").
+      Sem histórico de senhas (reutilização indefinida).
+      Flag Senha_Segura não era verificada corretamente.
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação rigorosa de senha (8+ caracteres, maiúscula, minúscula, número, especial).
+      Histórico das últimas 5 senhas para impedir reutilização.
+      Flag PrimeiroAcesso forçada obrigatoriamente.
+    documentacao_item_relacionado: "RN-AUTH-004, RN-AUTH-007, RN-AUTH-008"
+    uc_relacionado: "UC03"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  # --- FUNÇÕES E STORED PROCEDURES ---
+  - id: "LEG-RF007-004"
+    tipo: "sql_function"
+    nome: "Fu_Criptografa"
+    caminho: "Ativvus_Login.dbo.Fu_Criptografa"
+    descricao: |
+      Função SQL customizada de criptografia de senha.
+      Usava chave fixa 'GUA@123' (hard-coded).
+      Algoritmo proprietário baseado em manipulação ASCII.
+      Sem salt individual (mesma senha = mesmo resultado).
+      Reversível (conhecendo algoritmo, descriptografa).
+      CRÍTICO: Vulnerável a rainbow tables.
+    destino: "descartado"
+    justificativa: |
+      DESCARTADO completamente. Substituído por BCrypt hash com salt aleatório.
+      BCrypt é padrão OWASP, irreversível, cada senha tem salt único.
+      Senhas legadas precisam ser re-hashadas ou forçar troca no primeiro login.
+    documentacao_item_relacionado: "RN-AUTH-005"
+    uc_relacionado: null
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF007-005"
+    tipo: "stored_procedure"
+    nome: "pa_si_Validacao_Global"
+    caminho: "Ativvus_Login.dbo.pa_si_Validacao_Global"
+    descricao: |
+      Stored procedure de validação de login.
+      Recebia Nm_Usuario e Senha (criptografada).
+      Retornava mensagens específicas: "Usuário não encontrado" ou "Senha incorreta".
+      VULNERABILIDADE: Permitia enumeração de usuários.
+      Atualizava campo Token (GUID) mas não era usado pelo sistema.
+    destino: "substituido"
+    justificativa: |
+      Substituído por LoginCommandHandler (.NET) com validação unificada.
+      Mensagem genérica: "Email ou senha incorretos" (sempre HTTP 401).
+      Token substituído por JWT assinado com RS256.
+    documentacao_item_relacionado: "RN-AUTH-001, RN-AUTH-011"
+    uc_relacionado: "UC01"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF007-006"
+    tipo: "componente"
+    nome: "Sd_SF_ValidaPrimeiroAcesso"
+    caminho: "VB.NET Package (code-behind)"
+    descricao: |
+      Verificava flag Senha_Segura para primeiro acesso.
+      Lógica implementada mas não executada corretamente.
+      Usuários com senha temporária podiam usar indefinidamente.
+    destino: "assumido"
+    justificativa: |
+      Conceito ASSUMIDO mas corrigido.
+      Flag renomeada para PrimeiroAcesso (boolean).
+      Validação obrigatória no JWT claim + Guard no frontend.
+      Usuário não acessa outras funcionalidades até trocar senha.
+    documentacao_item_relacionado: "RN-AUTH-008"
+    uc_relacionado: "UC03"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # --- TABELAS ---
+  - id: "LEG-RF007-007"
+    tipo: "tabela"
+    nome: "Usuario_Global"
+    caminho: "Ativvus_Login.dbo.Usuario_Global"
+    descricao: |
+      Tabela central de usuários e credenciais.
+      Campos: Id_Usuario, Nm_Usuario, Senha, Empresa, EMail, Token, Token_Validade, Senha_Segura.
+      PROBLEMAS:
+      - Senha criptografada (reversível), não hash
+      - Sem salt individual
+      - Nm_Usuario não é email (nomes duplicados entre clientes)
+      - EMail pode ser NULL
+      - Token/Token_Validade não eram usados
+      - Senha_Segura (flag) ignorada
+      - Sem auditoria de tentativas
+    destino: "substituido"
+    justificativa: |
+      Substituído por tabela Usuario moderna:
+      - Email obrigatório e único (login)
+      - SenhaHash com BCrypt
+      - EmpresaId (FK) para multi-tenancy
+      - PrimeiroAcesso (boolean) forçado
+      - Auditoria via AuditLog separada
+      Script de migração necessário (ver seção 9.1 do RL.md).
+    documentacao_item_relacionado: "RN-AUTH-001, RN-AUTH-005, RN-AUTH-008"
+    uc_relacionado: null
+    complexidade: "muito_alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF007-008"
+    tipo: "tabela"
+    nome: "Config_Geral"
+    caminho: "Cliente_XXXX.dbo.Config_Geral"
+    descricao: |
+      Configurações gerais do sistema por cliente.
+      Campos: Tempo_Sessao, Senha_Minima, Validade_Senha.
+      PROBLEMA: Campos existiam mas não eram lidos pelo código.
+      Cada cliente tinha configuração independente (difícil padronizar).
+    destino: "descartado"
+    justificativa: |
+      DESCARTADO. Configurações movidas para:
+      - appsettings.json (globais)
+      - SistemaConfiguracaoGeral (banco, multi-tenant)
+      Valores padronizados: JWT 8h, Timeout 30 min, Senha 8+ caracteres.
+    documentacao_item_relacionado: "RN-AUTH-002, RN-AUTH-004, RN-AUTH-009"
+    uc_relacionado: null
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 4
+
+  # --- REGRAS DE NEGÓCIO IMPLÍCITAS ---
+  - id: "LEG-RF007-009"
+    tipo: "regra_negocio"
+    nome: "Sessão Compartilhada Entre Abas"
+    caminho: "Login.aspx.vb (ausência de validação)"
+    descricao: |
+      Sistema permitia múltiplas sessões simultâneas do mesmo usuário em abas/dispositivos.
+      Não havia validação de sessão única.
+    destino: "assumido"
+    justificativa: |
+      ASSUMIDO mas rastreado. Sistema moderno permite sessões múltiplas.
+      Diferença: sessões são rastreadas em tabela SessaoAtiva.
+      Admin pode listar e invalidar sessões específicas.
+    documentacao_item_relacionado: "Endpoints /api/auth/sessions"
+    uc_relacionado: "UC04"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF007-010"
+    tipo: "regra_negocio"
+    nome: "Logout Não Invalidava Cookie 'Lembrar-me'"
+    caminho: "Logout.aspx.vb (Session.Abandon() apenas)"
+    descricao: |
+      Fazer logout apenas executava Session.Abandon().
+      Cookie persistente "Lembrar-me" não era deletado.
+      Permitia login automático mesmo após logout.
+      RISCO: Acesso não autorizado em computadores compartilhados.
+    destino: "descartado"
+    justificativa: |
+      Cookie "Lembrar-me" foi DESCARTADO (inseguro).
+      Logout moderno invalida token JWT + limpa localStorage/sessionStorage.
+      Refresh Token em HttpOnly Cookie é revogado no backend.
+    documentacao_item_relacionado: "Endpoint POST /api/auth/logout"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF007-011"
+    tipo: "regra_negocio"
+    nome: "Banco de Dados Separado Por Cliente"
+    caminho: "Arquitetura de infra (18 bases SQL Server)"
+    descricao: |
+      Cada cliente tinha banco SQL Server físico separado.
+      PROBLEMAS:
+      - Gestão complexa (18 backups diários)
+      - Queries cross-client impossíveis
+      - Custo alto de licenças SQL Server
+      - Dificuldade de migração
+    destino: "substituido"
+    justificativa: |
+      Substituído por Row-Level Security (RLS) em banco único.
+      EmpresaId em todas as tabelas + filtro automático via repositórios.
+      RISCO: Vazamento de dados entre clientes se RLS falhar.
+      MITIGAÇÃO: Testes exaustivos, code review, queries via repositórios.
+    documentacao_item_relacionado: "Multi-tenancy (seção 8 do RF)"
+    uc_relacionado: null
+    complexidade: "muito_alta"
+    risco_migracao: "critico"
+    prioridade: 1
+
+  - id: "LEG-RF007-012"
+    tipo: "regra_negocio"
+    nome: "Validação de Email Apenas Frontend"
+    caminho: "Login.aspx (RegularExpressionValidator)"
+    descricao: |
+      Validação de formato de email apenas em JavaScript (client-side).
+      Backend aceitava emails inválidos se JS fosse desabilitado.
+      VULNERABILIDADE: Ataques automatizados podiam burlar validação.
+    destino: "substituido"
+    justificativa: |
+      Substituído por validação obrigatória no backend (FluentValidation).
+      Frontend valida (UX), mas backend SEMPRE valida (segurança).
+      Emails inválidos retornam HTTP 400 com detalhes do erro.
+    documentacao_item_relacionado: "RN-AUTH-001"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF007-013"
+    tipo: "regra_negocio"
+    nome: "Mensagens de Erro Específicas"
+    caminho: "pa_si_Validacao_Global (mensagens distintas)"
+    descricao: |
+      Sistema revelava se problema estava no usuário ou senha:
+      - "Usuário não encontrado" (email inválido)
+      - "Senha incorreta" (email válido, senha errada)
+      VULNERABILIDADE: Ataque de enumeração de usuários (descobrir emails válidos).
+    destino: "substituido"
+    justificativa: |
+      Substituído por mensagem genérica obrigatória:
+      "Email ou senha incorretos" (sempre HTTP 401).
+      Sistema NUNCA revela se email existe ou não.
+    documentacao_item_relacionado: "RN-AUTH-011"
+    uc_relacionado: "UC01"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+  - id: "LEG-RF007-014"
+    tipo: "regra_negocio"
+    nome: "Sem Bloqueio Por Tentativas Falhas"
+    caminho: "Ausência de lógica de bloqueio no código"
+    descricao: |
+      Usuário podia tentar login infinitas vezes sem bloqueio.
+      VULNERABILIDADE: Ataques de força bruta (brute-force).
+      Não havia contador de tentativas ou proteção anti-bot.
+    destino: "substituido"
+    justificativa: |
+      Substituído por bloqueio anti brute-force:
+      - 5 tentativas falhas em 15 minutos = bloqueio de 30 minutos
+      - Contador resetado após login bem-sucedido
+      - Admin pode desbloquear manualmente
+      - Logs de bloqueio para análise
+    documentacao_item_relacionado: "RN-AUTH-003"
+    uc_relacionado: "UC04"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 1
+
+# --- TELAS LEGADAS (estrutura detalhada) ---
+telas:
+  - id: "LEG-RF007-001"
+    nome: "Login.aspx"
+    caminho: "ic1_legado/IControlIT/Login.aspx"
+    responsabilidade: "Tela principal de login do sistema"
+    campos:
+      - nome: "txtNmUsuario"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Nenhuma (code-behind)"
+        observacao: "Nome de usuário (não era email)"
+
+      - nome: "txtSenha"
+        tipo: "TextBox (PasswordChar)"
+        obrigatorio: true
+        validacao: "Nenhuma"
+        observacao: "Senha criptografada via Fu_Criptografa"
+
+      - nome: "ddlEmpresa"
+        tipo: "DropDownList"
+        obrigatorio: true
+        validacao: "Preenchido dinamicamente"
+        observacao: "Lista de clientes disponíveis"
+
+      - nome: "chkLembrar"
+        tipo: "CheckBox"
+        obrigatorio: false
+        validacao: "-"
+        observacao: "Cookie não seguro (senha em texto plano)"
+
+    comportamentos_implicitos:
+      - "Validação apenas no cliente (JavaScript - burlável)"
+      - "Senha criptografada com Fu_Criptografa (chave fixa)"
+      - "Cookie 'Lembrar-me' armazenava senha em texto plano"
+      - "Mensagens específicas revelavam se usuário/senha estava errado"
+      - "Sem bloqueio por tentativas falhas"
+
+  - id: "LEG-RF007-002"
+    nome: "EsqueciSenha.aspx"
+    caminho: "ic1_legado/IControlIT/EsqueciSenha.aspx"
+    responsabilidade: "Solicitação de recuperação de senha"
+    campos:
+      - nome: "txtEmail"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Regex básico (apenas @)"
+        observacao: "Email do usuário"
+
+      - nome: "btnEnviar"
+        tipo: "Button"
+        obrigatorio: false
+        validacao: "-"
+        observacao: "Envia email com nova senha"
+
+    comportamentos_implicitos:
+      - "Gerava nova senha aleatória (8 caracteres)"
+      - "Enviava senha em texto plano por email (INSEGURO)"
+      - "Sem confirmação de identidade (qualquer pessoa podia resetar)"
+      - "Senha alterada imediatamente no banco"
+      - "Sem expiração de link/token"
+
+  - id: "LEG-RF007-003"
+    nome: "NovaSenha.aspx"
+    caminho: "ic1_legado/IControlIT/NovaSenha.aspx"
+    responsabilidade: "Troca de senha (primeiro acesso ou manual)"
+    campos:
+      - nome: "txtSenhaAtual"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Apenas se não for primeiro acesso"
+        observacao: "Senha atual do usuário"
+
+      - nome: "txtNovaSenha"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Nenhuma (aceitava senhas fracas)"
+        observacao: "Nova senha sem requisitos mínimos"
+
+      - nome: "txtConfirmaSenha"
+        tipo: "TextBox"
+        obrigatorio: true
+        validacao: "Apenas igualdade com txtNovaSenha"
+        observacao: "Confirmação da nova senha"
+
+    comportamentos_implicitos:
+      - "Sem validação de requisitos mínimos (aceitava '123', 'abc')"
+      - "Sem histórico de senhas (reutilização indefinida)"
+      - "Flag Senha_Segura não verificada corretamente"
+      - "Primeiro acesso não era forçado"
+
+# --- WEBSERVICES / MÉTODOS LEGADOS ---
+servicos:
+  - id: "LEG-RF007-004"
+    nome: "Fu_Criptografa"
+    localizacao: "Ativvus_Login.dbo.Fu_Criptografa (SQL Function)"
+    responsabilidade: "Criptografia de senha"
+    notas: "Chave fixa 'GUA@123', algoritmo proprietário, reversível"
+
+  - id: "LEG-RF007-005"
+    nome: "pa_si_Validacao_Global"
+    localizacao: "Ativvus_Login.dbo.pa_si_Validacao_Global (Stored Procedure)"
+    responsabilidade: "Validação de login"
+    notas: "Mensagens específicas, vulnerável a enumeração de usuários"
+
+  - id: "LEG-RF007-006"
+    nome: "Sd_SF_ValidaPrimeiroAcesso"
+    localizacao: "VB.NET Package (code-behind)"
+    responsabilidade: "Verificar flag primeiro acesso"
+    notas: "Lógica implementada mas não executada corretamente"
+
+# --- TABELAS LEGADAS COM PROBLEMAS ---
+tabelas:
+  - nome: "Usuario_Global"
+    finalidade: "Armazenamento centralizado de usuários e credenciais"
+    problemas:
+      - "Senha criptografada (reversível), não hash"
+      - "Sem salt individual (rainbow tables)"
+      - "Nm_Usuario não é email (duplicados entre clientes)"
+      - "EMail pode ser NULL (recuperação inviável)"
+      - "Token/Token_Validade não usados (funcionalidade incompleta)"
+      - "Senha_Segura (flag) ignorada"
+      - "Sem auditoria de tentativas"
+      - "Índice único em [Nm_Usuario, Senha] permite senha duplicada"
+
+  - nome: "Config_Geral"
+    finalidade: "Configurações gerais do sistema por cliente"
+    problemas:
+      - "Campos existiam mas não eram lidos pelo código"
+      - "Cada cliente tinha configuração independente (difícil padronizar)"
+      - "Sem valores default (NULL permitido)"
+
+# --- REGRAS DE NEGÓCIO IMPLÍCITAS (não documentadas) ---
+regras_implicitas:
+  - id: "RL-RN-001"
+    descricao: "Sessão compartilhada entre abas/dispositivos (sem validação de sessão única)"
+    fonte: "Login.aspx.vb (ausência de validação)"
+    destino: "assumido"
+
+  - id: "RL-RN-002"
+    descricao: "Logout não invalidava cookie 'Lembrar-me' (risco em computadores compartilhados)"
+    fonte: "Logout.aspx.vb (Session.Abandon() apenas)"
+    destino: "descartado"
+
+  - id: "RL-RN-003"
+    descricao: "Criptografia reversível de senha (Fu_Criptografa com chave fixa)"
+    fonte: "dbo.Fu_Criptografa"
+    destino: "descartado"
+
+  - id: "RL-RN-004"
+    descricao: "Banco de dados separado por cliente (18 bases SQL Server)"
+    fonte: "Arquitetura de infra"
+    destino: "substituido"
+
+  - id: "RL-RN-005"
+    descricao: "Validação de email apenas frontend (JavaScript burlável)"
+    fonte: "Login.aspx (RegularExpressionValidator)"
+    destino: "substituido"
+
+  - id: "RL-RN-006"
+    descricao: "Mensagens de erro específicas (enumeração de usuários)"
+    fonte: "pa_si_Validacao_Global"
+    destino: "substituido"
+
+  - id: "RL-RN-007"
+    descricao: "Sem bloqueio por tentativas falhas (vulnerável a brute-force)"
+    fonte: "Ausência de lógica de bloqueio"
+    destino: "substituido"
+
+# --- GAP ANALYSIS (LEGADO x MODERNO) ---
+gap_analysis:
+  - item: "Autenticação"
+    existe_legado: true
+    existe_moderno: true
+    tecnologia_legado: "Session-based (ASP.NET Session)"
+    tecnologia_moderno: "JWT Bearer Token"
+    notas: "Substituído completamente (stateless vs stateful)"
+
+  - item: "Login"
+    existe_legado: true
+    existe_moderno: true
+    tecnologia_legado: "Nm_Usuario + Senha"
+    tecnologia_moderno: "Email + Senha"
+    notas: "Conceito assumido, mas email obrigatório como login"
+
+  - item: "Criptografia de Senha"
+    existe_legado: true
+    existe_moderno: true
+    tecnologia_legado: "Fu_Criptografa (chave fixa, reversível)"
+    tecnologia_moderno: "BCrypt + SHA-256 (hash irreversível, salt aleatório)"
+    notas: "Substituído - senhas legadas precisam ser re-hashadas"
+
+  - item: "Timeout"
+    existe_legado: true
+    existe_moderno: true
+    tecnologia_legado: "20 min (IIS global)"
+    tecnologia_moderno: "8h JWT + 30 min inatividade"
+    notas: "Substituído - timeout duplo (token + inatividade)"
+
+  - item: "Recuperação de Senha"
+    existe_legado: true
+    existe_moderno: true
+    tecnologia_legado: "Email com senha nova em texto plano"
+    tecnologia_moderno: "Link com token temporário (24 horas)"
+    notas: "Substituído - token seguro, não revela senha"
+
+  - item: "Bloqueio por Tentativas"
+    existe_legado: false
+    existe_moderno: true
+    tecnologia_legado: "Não existe"
+    tecnologia_moderno: "5 tentativas = 30 min bloqueio"
+    notas: "NOVO - proteção anti brute-force"
+
+  - item: "Auditoria"
+    existe_legado: true
+    existe_moderno: true
+    tecnologia_legado: "Log manual (parcial)"
+    tecnologia_moderno: "Automática via Middleware (100% coverage)"
+    notas: "Substituído - auditoria completa obrigatória"
+
+  - item: "Primeiro Acesso"
+    existe_legado: true
+    existe_moderno: true
+    tecnologia_legado: "Flag Senha_Segura (ignorada)"
+    tecnologia_moderno: "Flag PrimeiroAcesso (forçada)"
+    notas: "Assumido mas corrigido - forçamento obrigatório"
+
+  - item: "Mensagem de Erro"
+    existe_legado: true
+    existe_moderno: true
+    tecnologia_legado: "Específica (revela usuário)"
+    tecnologia_moderno: "Genérica ('Email ou senha incorretos')"
+    notas: "Substituído - proteção contra enumeração"
+
+  - item: "Histórico de Senhas"
+    existe_legado: false
+    existe_moderno: true
+    tecnologia_legado: "Não existe"
+    tecnologia_moderno: "Últimas 5 senhas (HistoricoSenhas)"
+    notas: "NOVO - impede reutilização"
+
+  - item: "Notificação Novo Dispositivo"
+    existe_legado: false
+    existe_moderno: true
+    tecnologia_legado: "Não existe"
+    tecnologia_moderno: "Email assíncrono (Hangfire)"
+    notas: "NOVO - alerta de segurança"
+
+  - item: "Multi-tenant"
+    existe_legado: true
+    existe_moderno: true
+    tecnologia_legado: "18 bases SQL Server separadas"
+    tecnologia_moderno: "Row-Level Security (1 base)"
+    notas: "Substituído - simplifica gestão, reduz custo"
+
+# --- DECISÕES DE MODERNIZAÇÃO ---
+decisoes_modernizacao:
+  - decisao: "Migrar de Session para JWT"
+    motivo: |
+      Session é stateful (requer armazenamento no servidor).
+      JWT é stateless (escalável, permite microserviços).
+      Suporte nativo a APIs RESTful (frontend Angular separado).
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "BCrypt Hash em vez de Fu_Criptografa"
+    motivo: |
+      BCrypt é padrão da indústria (OWASP recomendado).
+      Salt aleatório por senha (impossível rainbow tables).
+      Irreversível (mesmo DBA não consegue 'ver' senha).
+    impacto: "alto"
+    data: "2025-12-30"
+
+  - decisao: "Banco Único com Row-Level Security"
+    motivo: |
+      Simplifica backup (1 base vs 18).
+      Facilita queries cross-client (relatórios consolidados).
+      Reduz custo de infra (licenças SQL Server).
+    impacto: "muito_alto"
+    data: "2025-12-30"
+
+  - decisao: "Email como Login (em vez de Nm_Usuario)"
+    motivo: |
+      Email é globalmente único (não precisa prefixo de cliente).
+      Facilita recuperação de senha.
+      Padrão moderno (Gmail, Office 365).
+    impacto: "medio"
+    data: "2025-12-30"
+
+  - decisao: "Implementar Bloqueio Anti Brute-Force"
+    motivo: |
+      Sistema legado era vulnerável a ataques automatizados.
+      Conformidade com OWASP Top 10 (A07 - Identification and Authentication Failures).
+    impacto: "baixo"
+    data: "2025-12-30"
+
+# --- RISCOS DE MIGRAÇÃO ---
+riscos_migracao:
+  - risco: "Vazamento de dados entre tenants (RLS)"
+    impacto: "critico"
+    probabilidade: "media"
+    mitigacao: |
+      - Testes exaustivos de isolamento de tenant
+      - Code review obrigatório em queries
+      - Queries via repositórios (não permitir SQL direto)
+      - Auditoria de acesso cross-tenant
+
+  - risco: "Senhas legadas incompatíveis com BCrypt"
+    impacto: "alto"
+    probabilidade: "alta"
+    mitigacao: |
+      - Opção A: Script de re-hash one-time (descriptografar + BCrypt)
+      - Opção B: Forçar troca de senha no primeiro login após migração
+      - Comunicação prévia com usuários
+
+  - risco: "Usuários sem email cadastrado"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      - Levantamento prévio (SELECT * WHERE EMail IS NULL)
+      - Cadastro manual antes da migração
+      - Email temporário {Nm_Usuario}@legado.local como fallback
+
+  - risco: "Sessões ativas perdidas no deploy"
+    impacto: "medio"
+    probabilidade: "alta"
+    mitigacao: |
+      - Comunicação prévia (email para usuários)
+      - Deploy em horário de baixa demanda (madrugada/final de semana)
+      - Mensagem no sistema alertando sobre manutenção
+
+  - risco: "Bloqueio indevido de usuários legítimos"
+    impacto: "baixo"
+    probabilidade: "media"
+    mitigacao: |
+      - Mensagem clara com tempo restante de bloqueio
+      - Admin pode desbloquear via painel
+      - Logs de bloqueio para análise de falsos positivos
+
+  - risco: "Perda de histórico de logins antigos"
+    impacto: "baixo"
+    probabilidade: "baixa"
+    mitigacao: |
+      - Exportar logs de Usuario_Global antes da migração
+      - Armazenar em arquivo CSV para consulta histórica
+      - Auditoria nova (AuditLog) substitui logs antigos
+
+# --- RASTREABILIDADE (LEGADO → MODERNO) ---
+rastreabilidade:
+  - elemento_legado: "Login.aspx"
+    referencia_rf: "RN-AUTH-001"
+    referencia_uc: "UC01"
+    status: "migrado"
+
+  - elemento_legado: "EsqueciSenha.aspx"
+    referencia_rf: "RN-AUTH-006"
+    referencia_uc: "UC02"
+    status: "migrado"
+
+  - elemento_legado: "NovaSenha.aspx"
+    referencia_rf: "RN-AUTH-004, RN-AUTH-007, RN-AUTH-008"
+    referencia_uc: "UC03"
+    status: "migrado"
+
+  - elemento_legado: "Fu_Criptografa"
+    referencia_rf: "RN-AUTH-005"
+    referencia_uc: null
+    status: "descartado"
+
+  - elemento_legado: "Usuario_Global.Nm_Usuario"
+    referencia_rf: "RN-AUTH-001"
+    referencia_uc: "UC01"
+    status: "substituido"
+
+  - elemento_legado: "Usuario_Global.Senha"
+    referencia_rf: "RN-AUTH-005"
+    referencia_uc: null
+    status: "substituido"
+
+  - elemento_legado: "Usuario_Global.Token"
+    referencia_rf: "RN-AUTH-002"
+    referencia_uc: null
+    status: "substituido"
+
+  - elemento_legado: "pa_si_Validacao_Global"
+    referencia_rf: "RN-AUTH-001, RN-AUTH-011"
+    referencia_uc: "UC01"
+    status: "substituido"
+
+  - elemento_legado: "ASP.NET Session"
+    referencia_rf: "RN-AUTH-002"
+    referencia_uc: null
+    status: "substituido"
+
+  - elemento_legado: "Sem bloqueio brute-force"
+    referencia_rf: "RN-AUTH-003"
+    referencia_uc: "UC04"
+    status: "novo"
+
+  - elemento_legado: "Sem histórico de senhas"
+    referencia_rf: "RN-AUTH-007"
+    referencia_uc: "UC03"
+    status: "novo"
+
+  - elemento_legado: "Sem auditoria estruturada"
+    referencia_rf: "RN-AUTH-010"
+    referencia_uc: null
+    status: "novo"
+
+# --- CHANGELOG ---
+changelog:
+  - versao: "2.0"
+    data: "2025-12-30"
+    descricao: "Criação do RL-RF007.yaml estruturado - Sincronizado 100% com RL-RF007.md"
+    autor: "Agência ALC - alc.dev.br"
+
+  - versao: "1.0"
+    data: "2025-11-19"
+    descricao: "Conteúdo legado estava mesclado no RF-007.md v1.0 (sem YAML separado)"
+    autor: "Claude Code (Architect Agent)"

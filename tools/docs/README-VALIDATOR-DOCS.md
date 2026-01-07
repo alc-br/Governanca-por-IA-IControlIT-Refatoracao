@@ -158,7 +158,7 @@ python tools/docs/validator-docs.py --all \
   "rfs": [
     {
       "rf_id": "RF001",
-      "pasta": "D:\\IC2\\docs\\rf\\...",
+      "pasta": "D:\\IC2\\docs\\documentacao\\...",
       "arquivos_esperados": {
         "RF001.md": {
           "arquivo": "RF001.md",
@@ -198,7 +198,7 @@ python tools/docs/validator-docs.py --all \
     {
       "rf_id": "RF015",
       "arquivo": "RF015.md.backup-20251230",
-      "caminho": "D:\\IC2\\docs\\rf\\..."
+      "caminho": "D:\\IC2\\docs\\documentacao\\..."
     }
   ],
   "rfs_criticos": ["RF001", "RF002", "..."]
@@ -256,7 +256,7 @@ data = json.load(open('relatorios/validacao-docs.json', encoding='utf-8'))
 rfs_sorted = sorted(data['rfs'],
     key=lambda x: sum(len(v['gaps']) for v in x['arquivos_esperados'].values()),
     reverse=True)
-for rf in rfs_sorted[:10]:
+for documentacao in rfs_sorted[:10]:
     total_gaps = sum(len(v['gaps']) for v in rf['arquivos_esperados'].values())
     print(f\"{rf['rf_id']}: {total_gaps} gaps\")
 "
@@ -279,7 +279,7 @@ for dup in data['arquivos_duplicados_global']:
 python -c "
 import json
 data = json.load(open('relatorios/validacao-docs.json', encoding='utf-8'))
-for rf in data['rfs']:
+for documentacao in data['rfs']:
     md_files = [k for k in rf['arquivos_esperados'].keys() if k.startswith('MD-')]
     if md_files and not rf['arquivos_esperados'][md_files[0]]['existe']:
         print(rf['rf_id'])

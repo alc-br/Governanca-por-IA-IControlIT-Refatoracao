@@ -149,9 +149,9 @@ O agente DEVE, OBRIGATORIAMENTE:
 1. Executar o validador de cobertura RF → UC → TC:
 ```bash
 python tools/docs/validator-rf-uc.py \
-  --rf rf/[FASE]/[EPIC]/RFXXX/RFXXX.yaml \
-  --uc rf/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml \
-  --tc rf/[FASE]/[EPIC]/RFXXX/TC-RFXXX.yaml
+  --rf documentacao/[FASE]/[EPIC]/RFXXX/RFXXX.yaml \
+  --uc documentacao/[FASE]/[EPIC]/RFXXX/UC-RFXXX.yaml \
+  --tc documentacao/[FASE]/[EPIC]/RFXXX/TC-RFXXX.yaml
 ```
 
 2. Interpretar o EXIT CODE retornado:
@@ -167,10 +167,10 @@ python tools/docs/validator-rf-uc.py \
 4. Registrar no STATUS.yaml:
 ```yaml
 validacoes:
-  rf_uc_cobertura_total: true
+  documentacao_uc_cobertura_total: true
   uc_md_consistente: true
   uc_wf_consistente: true
-  rf_yaml_sincronizado: true
+  documentacao_yaml_sincronizado: true
   uc_yaml_sincronizado: true
 ```
 

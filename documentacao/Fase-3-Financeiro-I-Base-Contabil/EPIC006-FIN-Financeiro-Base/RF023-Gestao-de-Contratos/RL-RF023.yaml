@@ -1,0 +1,526 @@
+# Referência ao Legado - RF-023: Gestão de Contratos
+# Versão: 2.0 (Separação RF/RL Completa)
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+
+rf_id: RF023
+titulo: "Gestão de Contratos"
+
+legado:
+  sistema: "IC1_Sistema_Producao - ASP.NET Web Forms + VB.NET"
+  versao: ".NET Framework 4.5"
+  arquitetura: "Monolítica WebForms com ASMX WebServices"
+  banco_dados: "SQL Server 2012"
+  multi_tenant: false
+  auditoria: "partial"  # Logs textuais em arquivo text.log (sem estrutura)
+
+# ============================================================================
+# SEÇÃO CRÍTICA: Referências ao Legado com Destino Obrigatório
+# Cada item DEVE ter campo "destino" preenchido (100%)
+# ============================================================================
+
+referencias:
+  # --------------------------------------------------------------------------
+  # TELAS ASPX
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF023-001"
+    tipo: "tela"
+    nome: "Contrato.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/Contratos/Contrato.aspx"
+    descricao: |
+      Formulário de criação/edição de contrato (Server-Side Rendering).
+      Campos: NumeroContrato, Fornecedor, TipoContrato, Descrição, DataInicio, DataFim, ValorTotal, ValorMensal, Status, RenovacaoAutomatica.
+      Comportamentos implícitos:
+      - Cálculo de ValorMensal manual (usuário digitava, podendo haver inconsistência)
+      - Não validava se DataFim >= DataInicio
+      - Upload de anexos salvava em pasta compartilhada (\\server\contratos) sem versionamento
+      - Auditoria gravava log textual em text.log
+    destino: "substituido"
+    justificativa: |
+      Tela ASPX substituída por componente Angular SPA com validações robustas no frontend e backend.
+      Sistema moderno valida todas as regras de negócio (RN-CTR-023-01 até RN-CTR-023-10) antes de persistir.
+    documentacao_item_relacionado: "RF-023 - Seção 4 (Funcionalidades Cobertas)"
+    uc_relacionado: "UC01-RF023, UC02-RF023"
+    componente_angular: "contratos-form.component.ts"
+    rota_frontend: "/contratos/novo, /contratos/{id}/editar"
+    endpoint_backend: "POST /api/contratos, PUT /api/contratos/{id}"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF023-002"
+    tipo: "tela"
+    nome: "ContratoLista.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/Contratos/ContratoLista.aspx"
+    descricao: |
+      Listagem e busca de contratos com GridView (paginação server-side no ViewState, lenta).
+      Problemas: ViewState gigante (>500KB), paginação ineficiente (carrega TODOS os registros), filtros muito limitados, sem exportação inline.
+    destino: "substituido"
+    justificativa: |
+      Substituído por SPA Angular com DataTable/Grid moderno, filtros dinâmicos, paginação server-side eficiente e exportação inline.
+    documentacao_item_relacionado: "RF-023 - Seção 4 (Funcionalidades: Listagem de Contratos)"
+    uc_relacionado: "UC03-RF023"
+    componente_angular: "contratos-list.component.ts"
+    rota_frontend: "/contratos"
+    endpoint_backend: "GET /api/contratos?page=1&pageSize=50"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF023-003"
+    tipo: "tela"
+    nome: "ContratoDetalhes.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/Contratos/ContratoDetalhes.aspx"
+    descricao: |
+      Visualização de detalhes do contrato (read-only) com FormView databinding direto do banco.
+      Problemas: Sem histórico completo (apenas status), anexos sem metadata (versão, tamanho, CRC32).
+    destino: "substituido"
+    justificativa: |
+      Substituído por Card View Angular com tabs (Dados, Fornecedor, Histórico, Anexos) e preview de documentos.
+    documentacao_item_relacionado: "RF-023 - Seção 4 (Funcionalidades: Consulta de Contrato)"
+    uc_relacionado: "UC03-RF023"
+    componente_angular: "contratos-detail.component.ts"
+    rota_frontend: "/contratos/{id}"
+    endpoint_backend: "GET /api/contratos/{id}, GET /api/contratos/{id}/historico"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF023-004"
+    tipo: "tela"
+    nome: "ContratoAnexos.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/Contratos/ContratoAnexos.aspx"
+    descricao: |
+      Gestão de anexos contratuais (upload/download/delete) com FileUpload control + GridView.
+      Problemas: Sem versionamento (reuploar sobrescreve), sem hash CRC32 para integridade, sem controle de acesso granular (link direto da rede).
+    destino: "substituido"
+    justificativa: |
+      Substituído por componente Angular com Azure Blob Storage, versionamento automático, hash CRC32 e controle de acesso granular.
+    documentacao_item_relacionado: "RF-023 - Seção 4 (Funcionalidades: Gestão de Anexos)"
+    uc_relacionado: "UC06-RF023"
+    componente_angular: "contratos-anexos.component.ts"
+    rota_frontend: "/contratos/{id}/anexos"
+    endpoint_backend: "POST /api/contratos/{id}/anexos, GET /api/contratos/{id}/anexos/{anexoId}"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF023-005"
+    tipo: "tela"
+    nome: "ContratoRelatorio.aspx"
+    caminho: "ic1_legado/IControlIT/Financeiro/Contratos/ContratoRelatorio.aspx"
+    descricao: |
+      Geração de relatórios em Excel/PDF com Crystal Reports (lento, pode levar minutos).
+      Problemas: Lentidão, parâmetros fixos (sem filtros dinâmicos), sem gráficos interativos.
+    destino: "substituido"
+    justificativa: |
+      Substituído por BI integrado no Angular com filtros dinâmicos, gráficos interativos (ApexCharts) e exportação rápida em Excel/PDF.
+    documentacao_item_relacionado: "RF-023 - Seção 4 (Funcionalidades: Relatórios Gerenciais)"
+    uc_relacionado: "UC03-RF023"
+    componente_angular: "relatorios-contratos.component.ts"
+    rota_frontend: "/relatorios/contratos"
+    endpoint_backend: "GET /api/contratos/export?formato=excel, GET /api/contratos/metricas"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # --------------------------------------------------------------------------
+  # WEBSERVICES ASMX
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF023-006"
+    tipo: "webservice"
+    nome: "WSContrato.asmx - ListarContratos()"
+    caminho: "ic1_legado/IControlIT/WebService/WSContrato.asmx.vb"
+    descricao: |
+      Método que retorna lista de todos os contratos sem paginação, sem multi-tenancy.
+      SQL: SELECT * FROM dbo.Contrato WHERE Ativo = 1
+      Problemas: Sem paginação (timeout com >1000 registros), sem isolamento por cliente.
+    destino: "substituido"
+    justificativa: |
+      Webservice ASMX substituído por REST API GET /api/contratos com paginação (?page=1&pageSize=50), multi-tenancy (ClienteId obrigatório) e autenticação JWT.
+    documentacao_item_relacionado: "RF-023 - Seção 8 (API Endpoints: GET /api/contratos)"
+    uc_relacionado: "UC03-RF023"
+    endpoint_moderno: "GET /api/contratos"
+    query_cqrs: "GetContratosQuery"
+    handler_cqrs: "GetContratosQueryHandler"
+    complexidade: "media"
+    risco_migracao: "baixo"
+    prioridade: 2
+
+  - id: "LEG-RF023-007"
+    tipo: "webservice"
+    nome: "WSContrato.asmx - Inserir(contrato)"
+    caminho: "ic1_legado/IControlIT/WebService/WSContrato.asmx.vb"
+    descricao: |
+      Método que cria novo contrato com validações mínimas (confia no frontend).
+      Não validava DataFim >= DataInicio, CNPJ do fornecedor, multi-tenancy.
+    destino: "substituido"
+    justificativa: |
+      Substituído por POST /api/contratos (CriarContratoCommand) com 10 RNs de validação rigorosa (RN-CTR-023-01 até RN-CTR-023-10).
+    documentacao_item_relacionado: "RF-023 - Seção 8 (API Endpoints: POST /api/contratos)"
+    uc_relacionado: "UC01-RF023"
+    endpoint_moderno: "POST /api/contratos"
+    command_cqrs: "CriarContratoCommand"
+    handler_cqrs: "CriarContratoCommandHandler"
+    validador_cqrs: "CriarContratoCommandValidator (FluentValidation)"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF023-008"
+    tipo: "webservice"
+    nome: "WSContrato.asmx - Deletar(idContrato)"
+    caminho: "ic1_legado/IControlIT/WebService/WSContrato.asmx.vb"
+    descricao: |
+      Método que deleta contrato com hard delete (DELETE FROM dbo.Contrato).
+      Sem verificação de dependências (FK em Medicao, Garantia), sem auditoria estruturada.
+    destino: "substituido"
+    justificativa: |
+      Hard delete substituído por Soft Delete (RN-CTR-023-10) com bloqueio de exclusão se houver medições associadas (RN-CTR-023-06).
+    documentacao_item_relacionado: "RF-023 - Seção 8 (API Endpoints: DELETE /api/contratos/{id})"
+    uc_relacionado: "UC04-RF023"
+    endpoint_moderno: "DELETE /api/contratos/{id}"
+    command_cqrs: "ExcluirContratoCommand"
+    handler_cqrs: "ExcluirContratoCommandHandler"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF023-009"
+    tipo: "webservice"
+    nome: "WSContrato.asmx - BuscarVencimentos(diasAntecipacao)"
+    caminho: "ic1_legado/IControlIT/WebService/WSContrato.asmx.vb"
+    descricao: |
+      Método que busca contratos próximos de vencer.
+      SQL: SELECT * WHERE DataFim BETWEEN @hoje AND @hoje + @dias
+      Problemas: Sem multi-tenancy, sem paginação.
+    destino: "substituido"
+    justificativa: |
+      Substituído por GET /api/contratos/vencimentos?dias=30 com multi-tenancy e paginação.
+    documentacao_item_relacionado: "RF-023 - Seção 8 (API Endpoints: GET /api/contratos/vencimentos)"
+    uc_relacionado: "UC03-RF023"
+    endpoint_moderno: "GET /api/contratos/vencimentos"
+    query_cqrs: "GetContratosVencimentosQuery"
+    handler_cqrs: "GetContratosVencimentosQueryHandler"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # --------------------------------------------------------------------------
+  # STORED PROCEDURES
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF023-010"
+    tipo: "stored_procedure"
+    nome: "pa_ContratoBuscarTodos"
+    caminho: "ic1_legado/Database/Procedures/pa_ContratoBuscarTodos.sql"
+    descricao: |
+      Stored procedure que lista todos os contratos ativos.
+      Lógica: SELECT * FROM dbo.Contrato WHERE Ativo = 1 ORDER BY DataCriacao DESC
+      Problemas: Sem paginação, sem filtros dinâmicos, sem multi-tenancy.
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Application Layer (GetContratosQuery + Handler) com paginação, filtros dinâmicos e multi-tenancy (RN-CTR-023-09).
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-09 (Multi-tenancy)"
+    uc_relacionado: "UC03-RF023"
+    query_cqrs: "GetContratosQuery"
+    handler_cqrs: "GetContratosQueryHandler"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF023-011"
+    tipo: "stored_procedure"
+    nome: "pa_ContratoInserir"
+    caminho: "ic1_legado/Database/Procedures/pa_ContratoInserir.sql"
+    descricao: |
+      Stored procedure que insere novo contrato no banco.
+      Validações: ❌ Não valida DataFim >= DataInicio, ❌ Não valida CNPJ do fornecedor, ❌ Não valida multi-tenancy.
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Application Layer (CriarContratoCommand + Handler) com validações rigorosas (RN-CTR-023-01, RN-CTR-023-02, RN-CTR-023-08).
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-01, RN-CTR-023-02, RN-CTR-023-08"
+    uc_relacionado: "UC01-RF023"
+    command_cqrs: "CriarContratoCommand"
+    handler_cqrs: "CriarContratoCommandHandler"
+    validador_cqrs: "CriarContratoCommandValidator"
+    complexidade: "alta"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF023-012"
+    tipo: "stored_procedure"
+    nome: "pa_ContratoDeletar"
+    caminho: "ic1_legado/Database/Procedures/pa_ContratoDeletar.sql"
+    descricao: |
+      Stored procedure que deleta contrato (hard delete).
+      Lógica: DELETE FROM dbo.Contrato WHERE idContrato = @id
+      Problemas: Hard delete (perda de dados), sem verificação de dependências, sem auditoria.
+    destino: "substituido"
+    justificativa: |
+      Hard delete substituído por Soft Delete com auditoria (RN-CTR-023-10) e bloqueio se houver medições (RN-CTR-023-06).
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-06, RN-CTR-023-10"
+    uc_relacionado: "UC04-RF023"
+    command_cqrs: "ExcluirContratoCommand"
+    handler_cqrs: "ExcluirContratoCommandHandler"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF023-013"
+    tipo: "stored_procedure"
+    nome: "pa_ContratoVencimentos"
+    caminho: "ic1_legado/Database/Procedures/pa_ContratoVencimentos.sql"
+    descricao: |
+      Stored procedure que busca contratos próximos de vencer.
+      Lógica: SELECT * WHERE DataFim BETWEEN GETDATE() AND DATEADD(DAY, @dias, GETDATE()) AND Status = 'Ativo'
+      Problemas: Sem multi-tenancy, sem paginação.
+    destino: "substituido"
+    justificativa: |
+      Lógica movida para Application Layer (GetContratosVencimentosQuery) com multi-tenancy e paginação.
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-04 (Alertas de Vencimento)"
+    uc_relacionado: "UC03-RF023"
+    query_cqrs: "GetContratosVencimentosQuery"
+    handler_cqrs: "GetContratosVencimentosQueryHandler"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  # --------------------------------------------------------------------------
+  # TABELAS LEGADAS
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF023-014"
+    tipo: "stored_procedure"
+    nome: "dbo.Contrato"
+    caminho: "IC1_Sistema_Producao.dbo.Contrato"
+    descricao: |
+      Tabela principal de contratos no SQL Server legado.
+      Problemas identificados: Sem ClienteId (multi-tenancy), Sem IsDeleted (soft delete), Auditoria incompleta (apenas DataCriacao), Status varchar(20) (não ENUM), Sem índices secundários, Sem campos IndiceReajuste e RenovacaoAutomatica.
+    destino: "substituido"
+    justificativa: |
+      Tabela redesenhada com multi-tenancy (ClienteId), auditoria integrada, soft delete (IsDeleted), índices otimizados e novos campos (IndiceReajuste, RenovacaoAutomatica).
+    documentacao_item_relacionado: "RF-023 - Seção 7 (Modelo de Dados)"
+    md_moderno: "MD-RF023.md - Tabela Contrato"
+    migration_ef_core: "20251230_CreateContratoTable.cs"
+    tabela_moderna: "Contrato"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF023-015"
+    tipo: "stored_procedure"
+    nome: "dbo.ContratoAnexo"
+    caminho: "IC1_Sistema_Producao.dbo.ContratoAnexo"
+    descricao: |
+      Tabela de anexos contratuais no SQL Server legado.
+      Problemas: Sem CRC32 (hash para integridade), Sem versionamento, CaminhoArquivo hardcoded (\\server\contratos), Sem validação de tamanho/tipo.
+    destino: "substituido"
+    justificativa: |
+      Substituído por Azure Blob Storage com versionamento automático, CRC32, metadata e controle de acesso granular.
+    documentacao_item_relacionado: "RF-023 - Seção 4 (Funcionalidades: Gestão de Anexos)"
+    md_moderno: "MD-RF023.md - Tabela ContratoAnexo"
+    tabela_moderna: "ContratoAnexo (com BlobUrl, CRC32, Tamanho, TipoMime, Versao)"
+    storage_moderno: "Azure Blob Storage (container: contratos-anexos)"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  # --------------------------------------------------------------------------
+  # REGRAS DE NEGÓCIO IMPLÍCITAS
+  # --------------------------------------------------------------------------
+  - id: "LEG-RF023-016"
+    tipo: "regra_negocio"
+    nome: "Número de Contrato Único Globalmente (sem multi-tenancy)"
+    caminho: "IC1_Sistema_Producao.dbo.Contrato - Constraint UQ_Contrato_NumeroContrato"
+    descricao: |
+      Campo NumeroContrato é unique no banco, mas sem isolamento por cliente. Dois clientes diferentes não podiam ter o mesmo número de contrato.
+    destino: "assumido"
+    justificativa: |
+      Regra mantida, mas ajustada para Unique composto (ClienteId + NumeroContrato) para permitir que cada cliente tenha seu próprio controle de numeração.
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-09 (Multi-tenancy)"
+    uc_relacionado: "UC01-RF023"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF023-017"
+    tipo: "regra_negocio"
+    nome: "Reajuste Manual via DBA"
+    caminho: "Script manual executado mensalmente pelo DBA"
+    descricao: |
+      Não havia sistema automático de reajuste. Todo mês de aniversário do contrato, um DBA executava UPDATE manual para aplicar IGPM/IPCA.
+      SQL: UPDATE dbo.Contrato SET ValorMensal = ValorMensal * 1.005 WHERE ...
+    destino: "substituido"
+    justificativa: |
+      Substituído por job background automático (RN-CTR-023-07) com índices configuráveis (IGPM, IPCA, INPC), histórico de reajustes em auditoria e rastreabilidade completa.
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-07 (Reajuste Automático)"
+    uc_relacionado: "UC08-RF023"
+    job_moderno: "AplicarReajusteContratoJob (BackgroundService .NET)"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF023-018"
+    tipo: "regra_negocio"
+    nome: "Renovação Automática via Job SQL"
+    caminho: "SQL Server Agent Job: ContratoRenovacaoAutomatica"
+    descricao: |
+      Job SQL Server agendado verificava contratos com DataFim próxima e RenovacaoAutomatica = 1, criando novo registro de contrato.
+      Problema: Se job falhasse, renovação era perdida (sem retry, sem notificação de falha).
+    destino: "substituido"
+    justificativa: |
+      Substituído por job background .NET (RN-CTR-023-03) com retry automático, notificação de falha para admin, auditoria completa e rastreamento de renovações.
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-03 (Renovação Automática)"
+    uc_relacionado: "UC07-RF023"
+    job_moderno: "RenovarContratoAutomaticoJob (BackgroundService .NET)"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF023-019"
+    tipo: "regra_negocio"
+    nome: "Alertas de Vencimento via Job SQL"
+    caminho: "SQL Server Agent Job: ContratoAlertasVencimento"
+    descricao: |
+      Job SQL Server enviava e-mails de alerta para contratos vencendo em 30/60/90 dias via sp_send_dbmail.
+      Problemas: Sem notificação em tempo real, sem SignalR, sem rastreamento de alertas enviados (podiam duplicar).
+    destino: "substituido"
+    justificativa: |
+      Substituído por job background .NET + SignalR para notificação em tempo real + tabela AuditoriaAlerta para evitar duplicatas (RN-CTR-023-04).
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-04 (Alertas Automáticos)"
+    uc_relacionado: "UC03-RF023"
+    job_moderno: "GerarAlertasVencimentoContratoJob (BackgroundService .NET)"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+  - id: "LEG-RF023-020"
+    tipo: "regra_negocio"
+    nome: "Workflow de Aprovação Simplificado (4 estados)"
+    caminho: "Campo Status varchar(20) na tabela dbo.Contrato"
+    descricao: |
+      Workflow tinha apenas 4 estados fixos: Rascunho → Ativo → Vencido → Renovado.
+      Não havia aprovação formal, apenas mudança de status manual (sem controle de alçadas, sem rastreamento).
+    destino: "substituido"
+    justificativa: |
+      Substituído por State Machine com 10 estados, workflow de aprovação por alçadas de valor (RN-CTR-023-05), auditoria de transições (quem, quando, por que).
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-05 (Workflow por Alçada)"
+    uc_relacionado: "UC05-RF023"
+    complexidade: "alta"
+    risco_migracao: "alto"
+    prioridade: 1
+
+  - id: "LEG-RF023-021"
+    tipo: "regra_negocio"
+    nome: "Exclusão Sem Validação de Dependências"
+    caminho: "pa_ContratoDeletar.sql - linha 5"
+    descricao: |
+      Procedure executava hard delete sem verificar se contrato tinha medições, garantias ou anexos associados.
+      SQL: DELETE FROM dbo.Contrato WHERE idContrato = @id
+    destino: "substituido"
+    justificativa: |
+      Substituído por soft delete (RN-CTR-023-10) + validação de dependências (RN-CTR-023-06), bloqueio de exclusão se houver medições associadas.
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-06, RN-CTR-023-10"
+    uc_relacionado: "UC04-RF023"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 1
+
+  - id: "LEG-RF023-022"
+    tipo: "regra_negocio"
+    nome: "Cálculo de Valor Mensal Manual (inconsistências)"
+    caminho: "Contrato.aspx - Campo txtValorMensal (não calculado automaticamente)"
+    descricao: |
+      Usuário digitava ValorMensal manualmente. Sistema não validava consistência com ValorTotal.
+      Resultado: Contratos com ValorMensal * 12 ≠ ValorTotal (dados inconsistentes).
+    destino: "substituido"
+    justificativa: |
+      Substituído por cálculo automático (RN-CTR-023-02) com recálculo bidirecional (ValorTotal ↔ ValorMensal) para garantir consistência.
+    documentacao_item_relacionado: "RF-023 - RN-CTR-023-02 (Cálculo Automático)"
+    uc_relacionado: "UC01-RF023, UC02-RF023"
+    complexidade: "baixa"
+    risco_migracao: "baixo"
+    prioridade: 3
+
+  - id: "LEG-RF023-023"
+    tipo: "regra_negocio"
+    nome: "Anexos Sem Versionamento (sobrescreve arquivo)"
+    caminho: "ContratoAnexos.aspx.vb - linha 45"
+    descricao: |
+      Reuploar arquivo com mesmo nome sobrescreve o anterior sem manter histórico.
+      Code: File.Copy(uploadedFile, destPath, overwrite:=True)
+    destino: "substituido"
+    justificativa: |
+      Substituído por Azure Blob Storage com versionamento automático. Cada upload cria nova versão preservando versões antigas.
+    documentacao_item_relacionado: "RF-023 - Seção 4 (Funcionalidades: Gestão de Anexos)"
+    uc_relacionado: "UC06-RF023"
+    storage_moderno: "Azure Blob Storage (versionamento automático)"
+    complexidade: "media"
+    risco_migracao: "medio"
+    prioridade: 2
+
+# ============================================================================
+# METADADOS DE MIGRAÇÃO
+# ============================================================================
+
+metadados:
+  total_itens_legado: 23
+  itens_assumidos: 1  # LEG-RF023-016
+  itens_substituidos: 22  # Todos os outros
+  itens_descartados: 0
+  itens_a_revisar: 0
+  cobertura_destinos: "100%"  # 23/23 itens com campo destino preenchido
+
+problemas_legado_identificados:
+  - id: "PROB-RF023-001"
+    titulo: "Falta de Multi-tenancy (dados de clientes misturados)"
+    severidade: "CRITICA"
+    impacto: "Todos os dados visíveis a todos os usuários, violação de confidencialidade e LGPD"
+    solucao_moderna: "ClienteId obrigatório em todas as queries, Row-Level Security no banco, middleware de validação (RN-CTR-023-09)"
+
+  - id: "PROB-RF023-002"
+    titulo: "Hard Delete (perda de dados permanente)"
+    severidade: "ALTA"
+    impacto: "Dados excluídos permanentemente sem possibilidade de recuperação ou auditoria"
+    solucao_moderna: "Soft delete com IsDeleted + DataDelecao + auditoria completa (RN-CTR-023-10)"
+
+  - id: "PROB-RF023-003"
+    titulo: "Auditoria Inadequada (logs textuais sem estrutura)"
+    severidade: "ALTA"
+    impacto: "Logs difíceis de consultar, sem rastreamento de alterações (before/after)"
+    solucao_moderna: "Tabela de auditoria estruturada com JSON de mudanças, hash de integridade, retenção de 7 anos"
+
+  - id: "PROB-RF023-004"
+    titulo: "Workflow Simplificado (sem alçadas, sem rastreamento)"
+    severidade: "ALTA"
+    impacto: "Qualquer usuário pode aprovar qualquer contrato, sem controle gerencial"
+    solucao_moderna: "State Machine 10 estados + workflow por alçadas de valor (RN-CTR-023-05) + auditoria de transições"
+
+  - id: "PROB-RF023-005"
+    titulo: "Anexos Sem Versionamento e Sem Integridade"
+    severidade: "MEDIA"
+    impacto: "Perda de versões anteriores de documentos importantes, sem validação de corrupção"
+    solucao_moderna: "Azure Blob Storage + versionamento automático + CRC32 + ACL granular"
+
+  - id: "PROB-RF023-006"
+    titulo: "Reajustes Manuais (suscetível a erros humanos)"
+    severidade: "ALTA"
+    impacto: "DBA executa UPDATE manual todo mês, sem histórico, sem rastreabilidade"
+    solucao_moderna: "Job background automático (RN-CTR-023-07) + índices configuráveis + histórico de reajustes"
+
+  - id: "PROB-RF023-007"
+    titulo: "Validações Fracas (confia no frontend)"
+    severidade: "MEDIA"
+    impacto: "Dados inconsistentes no banco (DataFim < DataInicio, ValorMensal incorreto, etc.)"
+    solucao_moderna: "10 RNs rigorosas no backend (RN-CTR-023-01 a 10) + FluentValidation"
+
+  - id: "PROB-RF023-008"
+    titulo: "Performance Ruim (ViewState gigante, sem paginação)"
+    severidade: "MEDIA"
+    impacto: "Telas lentas, timeout ao listar muitos contratos"
+    solucao_moderna: "SPA Angular + paginação server-side eficiente + lazy loading"
+
+historico:
+  - versao: "1.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Criação do RL-RF023 com separação completa RF/RL, 23 itens legados rastreados, 100% com destinos definidos"

@@ -1,0 +1,383 @@
+# =============================================
+# RF055 - Gestão de Rateio de Custos
+# Versão: 2.0
+# Data: 2025-12-30
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF055"
+  nome: "Gestão de Rateio de Custos"
+  versao: "2.0"
+  data: "2025-12-30"
+  fase: "Fase 4 - Financeiro II - Processos"
+  epic: "EPIC007-FIN-Financeiro-Processos"
+  status: "em_desenvolvimento"
+
+descricao:
+  objetivo: "Prover sistema de rateio automático e manual de custos de telecom/TI entre centros de custo, departamentos, projetos e filiais, suportando múltiplas regras de rateio, simulação, histórico completo e integração com ERPs contábeis."
+  problema_resolvido: "Eliminar rateios manuais mensais, garantir transparência de custos por área, cobrar proporcionalmente ao uso real, reduzir custos com visibilidade."
+  publico_afetado: "Gestores financeiros, controllers, departamentos consumidores de recursos, TI, contabilidade."
+
+escopo:
+  incluso:
+    - "Criação e configuração de regras de rateio"
+    - "Processamento automático mensal de rateios"
+    - "Simulação de cenários de rateio"
+    - "Aprovação de rateios processados"
+    - "Export para sistemas contábeis (SAP, TOTVS, Conta Azul, CSV)"
+    - "Validações de totalização e consistência"
+    - "Histórico completo de rateios e alterações"
+    - "Dashboard executivo de rateios"
+    - "Comparativos mensais com alertas automáticos"
+    - "Rateio multinível (empresa → diretoria → departamento → projeto)"
+    - "Controle de acesso por permissões RBAC"
+    - "Isolamento multi-tenant"
+  fora:
+    - "Interface visual específica (definida em WF-RF055)"
+    - "Integração com sistemas externos não listados"
+    - "Análise preditiva ou machine learning"
+    - "Otimização de custos (apenas distribuição)"
+
+entidades:
+  - nome: "rateio"
+    descricao: "Rateio processado para um período específico"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "regra_rateio"
+    descricao: "Configuração de regra de distribuição de custos"
+    multi_tenant: true
+    soft_delete: true
+    auditoria: true
+
+  - nome: "rateio_item"
+    descricao: "Item de rateio por centro de custo"
+    multi_tenant: true
+    soft_delete: false
+    auditoria: true
+
+regras_negocio:
+  - id: "RN-RF055-01"
+    descricao: "Sistema deve suportar 4 tipos de rateio configuráveis: fixo, proporcional por headcount, uso real e por projeto"
+    tipo: "regra_negocio"
+    campos_afetados: ["tipo_rateio"]
+    obrigatorio: true
+
+  - id: "RN-RF055-02"
+    descricao: "Soma dos percentuais de rateio fixo deve ser exatamente 100% (tolerância 0,01%)"
+    tipo: "validacao"
+    campos_afetados: ["percentuais"]
+    obrigatorio: true
+
+  - id: "RN-RF055-03"
+    descricao: "Todo dia 5 de cada mês às 03:00, processar automaticamente rateio do mês anterior"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+
+  - id: "RN-RF055-04"
+    descricao: "Distribuir custos proporcionalmente ao número de funcionários ativos por centro de custo"
+    tipo: "regra_negocio"
+    campos_afetados: ["headcount"]
+    obrigatorio: true
+
+  - id: "RN-RF055-05"
+    descricao: "Distribuir custos baseado em consumo medido (minutos, MB dados, licenças)"
+    tipo: "regra_negocio"
+    campos_afetados: ["tipo_consumo", "consumo"]
+    obrigatorio: true
+
+  - id: "RN-RF055-06"
+    descricao: "Permitir simular rateio com diferentes regras antes de aplicar definitivamente (sem persistência)"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+
+  - id: "RN-RF055-07"
+    descricao: "Rateio processado deve ser aprovado por gestor antes de export para ERP"
+    tipo: "regra_negocio"
+    campos_afetados: ["status", "aprovador_id"]
+    obrigatorio: true
+
+  - id: "RN-RF055-08"
+    descricao: "Todas as mudanças em regras de rateio devem ser versionadas com vigência"
+    tipo: "regra_negocio"
+    campos_afetados: ["versao", "data_inicio_vigencia", "data_fim_vigencia"]
+    obrigatorio: true
+
+  - id: "RN-RF055-09"
+    descricao: "Projetos temporários podem ter rateio específico com data início/fim"
+    tipo: "regra_negocio"
+    campos_afetados: ["projeto_id", "data_inicio", "data_fim", "percentual_alocado"]
+    obrigatorio: true
+
+  - id: "RN-RF055-10"
+    descricao: "Gerar relatório comparando rateio do mês atual vs mês anterior"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+
+  - id: "RN-RF055-11"
+    descricao: "Exportar rateios aprovados para SAP via interface padronizada"
+    tipo: "integracao"
+    campos_afetados: ["status", "data_exportacao", "documento_sap_id"]
+    obrigatorio: true
+
+  - id: "RN-RF055-12"
+    descricao: "Suportar rateio em cascata (empresa → diretoria → departamento → projeto)"
+    tipo: "regra_negocio"
+    campos_afetados: ["niveis"]
+    obrigatorio: false
+
+  - id: "RN-RF055-13"
+    descricao: "Notificar automaticamente se rateio de um centro de custo variar > 30% vs mês anterior"
+    tipo: "regra_negocio"
+    campos_afetados: ["percentual_variacao", "threshold"]
+    obrigatorio: true
+
+  - id: "RN-RF055-14"
+    descricao: "Ajustes, créditos e descontos devem ser rateados proporcionalmente"
+    tipo: "regra_negocio"
+    campos_afetados: ["ajustes"]
+    obrigatorio: true
+
+  - id: "RN-RF055-15"
+    descricao: "Dashboard executivo com gráficos de evolução mensal, top centros de custo, distribuição"
+    tipo: "regra_negocio"
+    campos_afetados: []
+    obrigatorio: true
+
+  - id: "RN-RF055-16"
+    descricao: "Rateios de um tenant não podem ser visualizados ou alterados por outro tenant"
+    tipo: "seguranca"
+    campos_afetados: ["empresa_id"]
+    obrigatorio: true
+
+  - id: "RN-RF055-17"
+    descricao: "Todas as operações de rateio devem ser auditadas com usuário, data, ação e valores antes/depois"
+    tipo: "seguranca"
+    campos_afetados: []
+    obrigatorio: true
+
+  - id: "RN-RF055-18"
+    descricao: "Antes de processar rateio, validar que existem custos no período"
+    tipo: "validacao"
+    campos_afetados: ["valor_total"]
+    obrigatorio: true
+
+  - id: "RN-RF055-19"
+    descricao: "Permitir reprocessar rateio de período anterior com regra atual ou histórica"
+    tipo: "regra_negocio"
+    campos_afetados: ["reprocessamento"]
+    obrigatorio: true
+
+  - id: "RN-RF055-20"
+    descricao: "Permitir cancelar rateio aprovado mas ainda não exportado"
+    tipo: "regra_negocio"
+    campos_afetados: ["status", "motivo_cancelamento"]
+    obrigatorio: true
+
+estados:
+  rateio:
+    - id: "PROCESSADO"
+      descricao: "Rateio calculado automaticamente, aguardando aprovação"
+    - id: "APROVADO"
+      descricao: "Rateio aprovado por gestor, pronto para export"
+    - id: "EXPORTADO"
+      descricao: "Rateio enviado para sistema contábil"
+    - id: "CANCELADO"
+      descricao: "Rateio cancelado antes de exportar"
+    - id: "ERRO"
+      descricao: "Falha no processamento ou export"
+
+  regra_rateio:
+    - id: "ATIVA"
+      descricao: "Regra vigente, sendo aplicada"
+    - id: "INATIVA"
+      descricao: "Regra desativada, não aplicada"
+    - id: "EXPIRADA"
+      descricao: "Regra fora do período de vigência"
+    - id: "ARQUIVADA"
+      descricao: "Regra histórica versionada"
+
+transicoes:
+  rateio:
+    permitidas:
+      - de: "PROCESSADO"
+        para: "APROVADO"
+        condicao: "Usuário com permissão APPROVE"
+      - de: "APROVADO"
+        para: "EXPORTADO"
+        condicao: "Export bem-sucedido"
+      - de: "APROVADO"
+        para: "CANCELADO"
+        condicao: "Antes de exportar, com justificativa"
+      - de: "PROCESSADO"
+        para: "ERRO"
+        condicao: "Falha na validação"
+    proibidas:
+      - de: "EXPORTADO"
+        para: "CANCELADO"
+        motivo: "Rateios exportados não podem ser cancelados"
+      - de: "CANCELADO"
+        para: "APROVADO"
+        motivo: "Rateios cancelados não podem ser reativados"
+
+permissoes:
+  - codigo: "rateio.view_any"
+    descricao: "Listar rateios"
+  - codigo: "rateio.view"
+    descricao: "Visualizar rateio específico"
+  - codigo: "rateio.create"
+    descricao: "Criar regra de rateio"
+  - codigo: "rateio.update"
+    descricao: "Atualizar regra de rateio"
+  - codigo: "rateio.approve"
+    descricao: "Aprovar rateio processado"
+  - codigo: "rateio.export"
+    descricao: "Exportar para ERP"
+  - codigo: "rateio.cancel"
+    descricao: "Cancelar rateio aprovado"
+  - codigo: "rateio.simulate"
+    descricao: "Simular cenários"
+  - codigo: "rateio.reprocess"
+    descricao: "Reprocessar períodos anteriores"
+
+integracoes:
+  internas:
+    - "i18n - Tradução de mensagens e labels"
+    - "Auditoria - Registro de operações"
+    - "RBAC - Controle de permissões"
+    - "Central de Funcionalidades - Registro de feature"
+  externas:
+    - sistema: "SAP"
+      tipo: "BAPI"
+      obrigatoria: false
+      finalidade: "Export contábil"
+    - sistema: "TOTVS Protheus"
+      tipo: "REST API"
+      obrigatoria: false
+      finalidade: "Export contábil"
+    - sistema: "Conta Azul"
+      tipo: "REST API"
+      obrigatoria: false
+      finalidade: "Export contábil"
+
+seguranca:
+  isolamento_tenant: true
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacoes:
+    - "Validação de entrada obrigatória em todos os campos"
+    - "Proteção contra SQL Injection (parameterização)"
+    - "Proteção contra valores negativos indevidos"
+    - "Isolamento multi-tenant em todas as queries"
+    - "Rate limiting em APIs de export"
+    - "Logs de acesso para auditoria"
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00-listar-rateios"
+    - "UC01-criar-regra-rateio"
+    - "UC02-visualizar-rateio"
+    - "UC03-editar-regra-rateio"
+    - "UC04-aprovar-rateio"
+    - "UC05-exportar-rateio"
+    - "UC06-simular-rateio"
+    - "UC07-dashboard-rateios"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar regra de rateio"
+      required: true
+    - id: "RF-CRUD-02"
+      title: "Listar regras de rateio"
+      required: true
+    - id: "RF-CRUD-03"
+      title: "Visualizar rateio processado"
+      required: true
+    - id: "RF-CRUD-04"
+      title: "Atualizar regra de rateio"
+      required: true
+    - id: "RF-CRUD-05"
+      title: "Aprovar rateio"
+      required: true
+    - id: "RF-CRUD-06"
+      title: "Exportar rateio"
+      required: true
+    - id: "RF-CRUD-07"
+      title: "Simular rateio"
+      required: true
+    - id: "RF-CRUD-08"
+      title: "Cancelar rateio"
+      required: true
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar totalização 100%"
+      required: true
+    - id: "RF-VAL-02"
+      title: "Validar existência de custos no período"
+      required: true
+    - id: "RF-VAL-03"
+      title: "Validar vigência de regra"
+      required: true
+    - id: "RF-VAL-04"
+      title: "Validar status para transições"
+      required: true
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento de tenant"
+      required: true
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC"
+      required: true
+    - id: "RF-SEC-03"
+      title: "Auditoria completa"
+      required: true
+    - id: "RF-SEC-04"
+      title: "Validação de entrada"
+      required: true
+
+exclusions:
+  documentacao_items: []
+
+metricas:
+  performance: "Processar 10.000 centros de custo em < 5 minutos"
+  precisao: "Cálculos com 4 casas decimais, arredondamento final para 2"
+  retencao: "Histórico de 7 anos (LGPD)"
+  disponibilidade: "99.5% uptime"
+
+eventos_dominio:
+  - evento: "RateioProcessado"
+    quando: "Após processamento automático"
+    payload: "RateioId, Periodo, ValorTotal"
+  - evento: "RateioAprovado"
+    quando: "Após aprovação"
+    payload: "RateioId, AprovadorId"
+  - evento: "RateioExportado"
+    quando: "Após export para ERP"
+    payload: "RateioId, Sistema, DocumentoId"
+  - evento: "RateioCancelado"
+    quando: "Após cancelamento"
+    payload: "RateioId, Motivo"
+  - evento: "RegraRateioAlterada"
+    quando: "Após versionamento de regra"
+    payload: "RegraId, VersaoAntiga, VersaoNova"
+  - evento: "AlertaVariacao"
+    quando: "Variação > threshold"
+    payload: "CentroCusto, Percentual"
+
+historico:
+  - versao: "2.0"
+    data: "2025-12-30"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Migração v1.0 → v2.0: separação RF/RL, remoção de código legado, foco em contrato funcional"
+  - versao: "1.0"
+    data: "2025-01-14"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial com regras de negócio implementadas"
