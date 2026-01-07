@@ -366,7 +366,7 @@ metadata:
   versao: "2.0"
   data: "2025-12-31"
   autor: "Agencia ALC - alc.dev.br"
-  documentacao_relacionado:
+  documentacao_relacionada:
     id: "RF001"  # ← Adicionar este campo
     nome: "Parametros e Configuracoes do Sistema"
 ```

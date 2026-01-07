@@ -190,7 +190,7 @@ metadata:
   data: "YYYY-MM-DD"
   autor: "Agência ALC - alc.dev.br"
 
-  documentacao_relacionado:
+  documentacao_relacionada:
     id: "RFXXX"
     nome: "[Nome do RF]"
 

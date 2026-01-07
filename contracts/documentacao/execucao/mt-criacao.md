@@ -335,7 +335,7 @@ Antes de criar qualquer massa de teste, o agente DEVE:
 
 **Estrutura obrigatória derivada do template:**
 
-- **metadata**: versao, data, autor, documentacao_relacionado
+- **metadata**: versao, data, autor, documentacao_relacionada
 - **defaults**: locale, timezone, currency, tenant_padrao, usuario_padrao, formatos
 - **data_sets**: MT001-MT999 organizados por categoria
 - **reusable_data**: usuarios, tenants

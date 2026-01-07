@@ -592,7 +592,7 @@ for table in md_tables:
    metadata:
      versao: "2.0"
      data: "YYYY-MM-DD"
-     documentacao_relacionado:
+     documentacao_relacionada:
        id: "RFXXX"
      padroes:
        multi_tenancy: true

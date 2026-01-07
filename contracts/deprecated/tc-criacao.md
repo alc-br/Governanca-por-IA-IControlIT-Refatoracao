@@ -337,7 +337,7 @@ Antes de criar qualquer caso de teste, o agente DEVE:
 
 **Estrutura obrigatória derivada do template:**
 
-- **metadata**: versao, data, autor, documentacao_relacionado, arquivo_uc_referencia, arquivo_massa_teste, tipo_teste, executor_padrao
+- **metadata**: versao, data, autor, documentacao_relacionada, arquivo_uc_referencia, arquivo_massa_teste, tipo_teste, executor_padrao
 - **estrategia**: objetivo_geral, abordagem
 - **conventions**: nomenclatura_tc, categorias, prioridades
 - **test_cases**: TC-[CATEGORIA]-[NUMERO] organizados por categoria
