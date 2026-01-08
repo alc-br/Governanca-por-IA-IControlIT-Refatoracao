@@ -375,6 +375,73 @@ Move-Item "D:\IC2\backend\IControlIT.API\src\Web\IControlIT.db" "D:\IC2\.temp_ia
 
 ---
 
+### FASE 8: EXPORTAR SCHEMA.SQL (PARA TESTES)
+
+**Passo 8.0: Validar Branch (OBRIGATÓRIO)**
+```bash
+git branch --show-current
+# Esperado: migration/azure-sql-complete
+```
+**Se falhar:** BLOQUEIO TOTAL
+
+**Passo 8.1: Exportar Schema do Azure SQL DEV**
+
+```bash
+# Opção A: SqlPackage (recomendado)
+sqlpackage /Action:Extract \
+  /SourceConnectionString:"Server=tcp:sql-icontrolit-dev-XXXX.database.windows.net,1433;Initial Catalog=IControlIT_DEV;User ID=sqladmin;Password=YourStrong@Passw0rd123;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;" \
+  /TargetFile:"D:\IC2\backend\IControlIT.API\tests\schema.sql"
+
+# Opção B: SSMS (manual)
+# Botão direito no banco → "Generate Scripts"
+# Incluir: Tabelas, Índices, Foreign Keys
+# Excluir: USE, GO, dados (apenas DDL)
+```
+
+**Passo 8.2: Validar Schema.sql**
+
+```bash
+# Verificar que arquivo foi criado
+ls D:\IC2\backend\IControlIT.API\tests\schema.sql
+
+# Verificar tamanho (deve ser > 10KB para 212 tabelas)
+# Se < 10KB: exportação incompleta, repetir
+```
+
+**Passo 8.3: Documentar Schema.sql**
+
+Criar arquivo `.temp_ia/SCHEMA-SQL-EXPORT.md`:
+
+```markdown
+# Exportação de Schema.sql
+
+**Data:** [DATA]
+**Fonte:** Azure SQL DEV (sql-icontrolit-dev-XXXX)
+**Destino:** D:\IC2\backend\IControlIT.API\tests\schema.sql
+
+**Tabelas exportadas:** 212
+**Tamanho:** [TAMANHO_KB] KB
+
+**Método:** SqlPackage /Action:Extract
+
+**Próximo passo:**
+- Modificar SqlTestcontainersTestDatabase.cs para usar schema.sql
+- Atualizar schema.sql quando schema mudar (manual)
+```
+
+**Commit:** `feat(infra): exportar schema.sql do Azure SQL DEV para testes`
+
+---
+
+**CRITÉRIO DE PRONTO (FASE 8):**
+- [ ] schema.sql existe em `tests/`
+- [ ] schema.sql tem > 10KB
+- [ ] schema.sql contém 212 tabelas
+- [ ] Documentação criada em `.temp_ia/`
+- [ ] Commit realizado
+
+---
+
 ## 5. ROLLBACK (SE FALHAR)
 
 | Fase | Rollback |
@@ -386,6 +453,7 @@ Move-Item "D:\IC2\backend\IControlIT.API\src\Web\IControlIT.db" "D:\IC2\.temp_ia
 | FASE 4 | Reverter FASE 3 + deletar database |
 | FASE 6 | `git reset --hard HEAD~2` |
 | FASE 7 | `git reset --hard HEAD~1` |
+| FASE 8 | Deletar `tests/schema.sql` + `git reset --hard HEAD~1` |
 
 **Rollback Completo:**
 ```bash
@@ -413,7 +481,8 @@ az group delete --name rg-icontrolit-dev --yes
 - [ ] Aplicação funcional
 - [ ] DECISIONS.md atualizado
 - [ ] AZURE-SQL-MIGRATION.md criado
-- [ ] 7 commits atômicos
+- [ ] schema.sql exportado para testes
+- [ ] 8 commits atômicos
 - [ ] SQLite em backup
 
 ---

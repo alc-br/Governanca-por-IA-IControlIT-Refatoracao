@@ -309,6 +309,35 @@ git branch --show-current
 # - D:\IC2\frontend\icontrolit-app/package.json existe
 # - documentacao/.../MT-RFXXX.yaml existe
 # - documentacao/.../TC-RFXXX.yaml existe
+
+# NOVO: Verificar schema.sql (OBRIGATÓRIO para testes funcionais backend)
+# - D:\IC2\backend\IControlIT.API\tests\schema.sql existe
+# - schema.sql tamanho > 10KB
+```
+
+**Se schema.sql NÃO existir:**
+```
+⚠️ BLOQUEIO PARCIAL: schema.sql não encontrado
+
+IMPACTO:
+- ❌ Testes funcionais backend BLOQUEADOS (23 testes - Testcontainers dependency)
+- ✅ Testes unitários backend PROSSEGUIRÃO normalmente (31 testes)
+- ✅ Testes frontend PROSSEGUIRÃO normalmente
+- ✅ Testes E2E PROSSEGUIRÃO normalmente
+
+CONTEXTO TÉCNICO:
+- Schema-First Testing: Testcontainers usa schema.sql em vez de EnsureCreatedAsync()
+- Arquivo: tests/Application.FunctionalTests/SqlTestcontainersTestDatabase.cs
+- Decisão arquitetural: ADR-005 (DECISIONS.md)
+
+AÇÃO NECESSÁRIA (USUÁRIO - ANTES DE RE-EXECUTAR):
+1. Exportar schema do Azure SQL DEV:
+   sqlpackage /Action:Extract /SourceConnectionString:"..." /TargetFile:tests/schema.sql
+2. Validar: arquivo > 10KB
+3. Re-executar testes: prompts/testes/execucao-completa.md
+
+RESPONSABILIDADE: INFRAESTRUTURA (não é erro de código)
+TIPO: BLOQUEIO DE AMBIENTE (não gera prompt de correção)
 ```
 
 **Se qualquer validação FALHAR:** BLOQUEIO TOTAL

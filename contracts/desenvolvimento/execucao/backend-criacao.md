@@ -396,6 +396,9 @@ TODO LIST - Backend RFXXX
   |     |-- [pending] Verificar se endpoint existe
   |     |-- [pending] Testar CRUD basico
   |     +-- [pending] Se FALHAR: criar RELATORIO-ERROS-RFXXX.md
+  |-- [pending] NOVO: Verificar schema.sql existe (para testes funcionais)
+  |     |-- [pending] Caminho: D:\IC2\backend\IControlIT.API\tests\schema.sql
+  |     +-- [pending] Se NAO existe: reportar bloqueio (testes funcionais pulados)
   +-- [pending] Se todas OK: prosseguir para testes do RF atual
 
 [pending] Testes Automatizados (OBRIGATORIO)

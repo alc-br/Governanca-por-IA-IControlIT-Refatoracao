@@ -24,7 +24,10 @@ PRE-REQUISITOS OBRIGATORIOS (BLOQUEANTES):
 2. Frontend DEVE estar aprovado (validacao frontend = 100%)
 3. MT-RFXXX.yaml DEVE existir e estar validado
 4. TC-RFXXX.yaml DEVE existir e estar validado
-5. STATUS.yaml DEVE ter:
+5. Schema.sql DEVE existir (para testes funcionais backend)
+   - Caminho: D:\IC2\backend\IControlIT.API\tests\schema.sql
+   - Validacao: Checklist checklists/testes/schema-first-testing.yaml
+6. STATUS.yaml DEVE ter:
    - execucao.backend = done
    - execucao.frontend = done
    - documentacao.mt = true

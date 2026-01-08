@@ -222,4 +222,51 @@ Modelos de Dados (MDs) especificam `FlExcluido` (padrão SQL tradicional).
 
 ---
 
+### ADR-005: Schema-First Testing (Temporário)
+
+**Data:** 2026-01-07
+**Status:** Aceito (temporário)
+**RF Relacionado:** Infraestrutura (todos os RFs)
+
+**Contexto:**
+- EF Core Migrations com FK cycles impedem criação de banco de testes
+- Azure SQL DEV (212 tabelas) funciona perfeitamente
+- Testcontainers usa `EnsureCreatedAsync()` que falha devido a FK cycles
+- Sistema está em desenvolvimento ativo, schema muda frequentemente
+- Corrigir FK cycles agora = 2-8h + retrabalho futuro
+
+**Decisão:**
+Testcontainers usará `schema.sql` exportado do Azure SQL DEV em vez de `EnsureCreatedAsync()`.
+
+**Implementação:**
+1. Exportar schema do Azure SQL DEV via SqlPackage ou SSMS
+2. Salvar em `D:\IC2\backend\IControlIT.API\tests\schema.sql`
+3. Modificar `SqlTestcontainersTestDatabase.cs` linha 47
+4. Executar script SQL em vez de `EnsureCreatedAsync()`
+
+**Alternativas Consideradas:**
+- **Corrigir FK cycles no EF Core**: Rejeitada (retrabalho, schema muda frequentemente)
+- **Usar migrations em testes**: Rejeitada (migrations têm FK cycles)
+- **Usar backup .bacpac**: Rejeitada (mais lento, arquivo grande)
+- **SQL Server persistente**: Rejeitada (perde isolamento de testes)
+
+**Consequências:**
+- ✅ Testes funcionam imediatamente
+- ✅ Schema de testes = Schema de produção (100% fidelidade)
+- ✅ Sem dependência de migrations em testes
+- ⚠️ schema.sql precisa ser atualizado manualmente quando schema mudar
+- ⚠️ Duas fontes de verdade (schema.sql vs migrations)
+
+**Trade-off Aceito:**
+- Sincronização manual de schema.sql quando schema mudar
+- Em troca: testes funcionam, desenvolvimento não trava
+
+**Critério de Revisão Futura:**
+- Quando schema estabilizar (após EPIC-001 concluído)
+- Avaliar se vale corrigir FK cycles ou manter schema.sql permanentemente
+
+**Responsável:** Equipe de Arquitetura IControlIT
+
+---
+
 (Novas decisoes devem ser adicionadas acima desta linha)
