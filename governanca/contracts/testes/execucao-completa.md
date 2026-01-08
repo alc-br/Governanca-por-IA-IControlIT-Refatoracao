@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.4
+**Versão:** 1.5
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (CORREÇÃO: removido PASSO 1.4 - run.py já mata processos)
+**Última Atualização:** 2026-01-08 (CORREÇÃO: validação de frontend com retry até 120s)
 **Changelog:**
+- v1.5 (2026-01-08): CORREÇÃO CRÍTICA: validação de frontend com retry (120s) - Angular demora mais
 - v1.4 (2026-01-08): CORREÇÃO CRÍTICA: removido PASSO 1.4 (matar processos) - run.py já cuida disso
 - v1.3 (2026-01-08): CORREÇÃO CRÍTICA: health checks movidos para PASSO 1.3 (ANTES de matar processos)
 - v1.2 (2026-01-08): Adicionada verificação inteligente de ambiente (health checks antes de iniciar)
@@ -660,17 +661,61 @@ Start-Process -NoNewWindow -FilePath "npm" -ArgumentList "start"
 
 ---
 
-#### PASSO 2.4: Validação de Health
+#### PASSO 2.4: Validação de Health (OBRIGATÓRIO COM RETRY)
 
-Após iniciar backend (via run.py OU manual), SEMPRE validar:
+**🚨 REGRA CRÍTICA: AGUARDAR AMBIENTE ESTAR 100% PRONTO**
+
+Após executar `python run.py` (ou inicialização manual), **SEMPRE validar COM RETRY**:
+
+**1. Validar Backend (timeout: 60s, retry: a cada 5s)**
 
 ```bash
-# Tentar 3 vezes com intervalo de 5s
-curl http://localhost:5000/health
-# Esperado: Status 200 OK (Healthy)
+# Loop de validação (até 12 tentativas × 5s = 60s total)
+for i in {1..12}; do
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health 2>/dev/null || echo "000")
+  if [ "$STATUS" = "200" ]; then
+    echo "✅ Backend pronto (tentativa $i)"
+    break
+  fi
+  echo "⏳ Backend não pronto ($STATUS), aguardando... (tentativa $i/12)"
+  sleep 5
+done
 ```
 
-**Se timeout após 15s total:** Backend TRAVADO (erro CRÍTICO)
+**Se backend NÃO responder 200 após 60s:** ❌ Backend TRAVADO (erro CRÍTICO)
+
+---
+
+**2. Validar Frontend (timeout: 120s, retry: a cada 10s)**
+
+**⚠️ IMPORTANTE: Angular demora mais que backend (compilação + bundle)**
+
+```bash
+# Loop de validação (até 12 tentativas × 10s = 120s total)
+for i in {1..12}; do
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4200 2>/dev/null || echo "000")
+  if [ "$STATUS" = "200" ]; then
+    echo "✅ Frontend pronto (tentativa $i)"
+    break
+  fi
+  echo "⏳ Frontend não pronto ($STATUS), aguardando... (tentativa $i/12)"
+  sleep 10
+done
+```
+
+**Se frontend NÃO responder 200 após 120s:** ❌ Frontend TRAVADO (erro CRÍTICO)
+
+---
+
+**PROIBIDO:**
+- ❌ Assumir que ambiente está pronto após tempo fixo (60s)
+- ❌ Executar testes E2E sem validar frontend 200 OK
+- ❌ Marcar como "BLOQUEADO" sem esperar timeout completo
+
+**REGRA FINAL:**
+- ✅ Backend DEVE estar 200 OK (até 60s de espera)
+- ✅ Frontend DEVE estar 200 OK (até 120s de espera)
+- ✅ Somente após AMBOS 200 OK: prosseguir para testes
 
 ---
 
