@@ -1,9 +1,9 @@
 # CONTRATO DE MANUTENÇÃO CONTROLADA (CIRÚRGICA)
 
-**Versão:** 1.1
+**Versão:** 1.2
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (Adicionadas seções 4, 5 e 10)
+**Última Atualização:** 2026-01-08 (Adicionadas escalação automática, validação incremental rigorosa e troubleshooting expandido)
 
 ---
 
@@ -183,21 +183,70 @@ cd /d/IC2/frontend
 ```bash
 # 1. Quantos arquivos serão afetados?
 #    - Se <= 3 arquivos: ✅ CONTINUAR
-#    - Se > 3 arquivos: ❌ BLOQUEAR → usar manutencao-completa.md
+#    - Se > 3 arquivos: ❌ ESCALAR → usar manutencao-completa.md
 
 # 2. Quantas camadas serão afetadas?
 #    - Se 1 camada: ✅ CONTINUAR
-#    - Se 2+ camadas: ❌ BLOQUEAR → usar manutencao-completa.md
+#    - Se 2+ camadas: ❌ ESCALAR → usar manutencao-completa.md
 
 # 3. Refatoração necessária?
 #    - Se NÃO: ✅ CONTINUAR
-#    - Se SIM: ❌ BLOQUEAR → usar manutencao-completa.md
+#    - Se SIM: ❌ ESCALAR → usar manutencao-completa.md
+
+# 4. Todos os arquivos mencionados no prompt podem ser corrigidos?
+#    - Ler prompt e listar TODOS os arquivos mencionados
+#    - Validar que TODOS estão dentro do escopo (1-3 arquivos, 1 camada)
 ```
 
+**🚨 REGRA CRÍTICA: ESCALAÇÃO AUTOMÁTICA DE CONTRATO**
+
 **SE qualquer validação falhar:**
-- ❌ **PARAR IMEDIATAMENTE**
-- Informar ao usuário que o escopo ultrapassou o contrato
-- Recomendar `manutencao-completa.md`
+
+1. ❌ **NÃO PARAR** a execução
+2. ✅ **ESCALAR automaticamente** para contrato adequado:
+   - 4-10 arquivos OU múltiplas camadas → `manutencao-completa.md`
+   - > 10 arquivos OU refatoração complexa → `manutencao-avancada.md`
+3. ✅ Documentar escalação em `.temp_ia/ESCALACAO-CONTRATO-[DATA].md`
+4. ✅ Continuar execução com novo contrato
+5. ✅ Informar no commit final qual contrato foi utilizado
+
+**PROIBIDO:**
+- ❌ Parar execução e pedir permissão ao usuário
+- ❌ Tentar forçar escopo cirúrgico quando inadequado
+- ❌ Fazer commit sem informar escalação
+
+**🚨 REGRA CRÍTICA: LISTA DE ARQUIVOS DO PROMPT**
+
+O agente DEVE criar lista explícita de TODOS os arquivos que o prompt solicita corrigir:
+
+```markdown
+**ARQUIVOS DO PROMPT (TODOS devem ser corrigidos):**
+1. [ ] Arquivo 1: [caminho completo]
+2. [ ] Arquivo 2: [caminho completo]
+...
+
+**CRITÉRIO DE CONCLUSÃO:**
+- ✅ TODOS os arquivos da lista acima devem estar marcados como [x]
+- ✅ TODOS os testes relacionados ao problema do escopo devem passar (100%)
+- ❌ NÃO fazer commit se algum arquivo não foi corrigido completamente
+- ❌ NÃO considerar "escopo parcialmente concluído"
+```
+
+**Exemplo de escalação:**
+
+```markdown
+# ESCALAÇÃO DE CONTRATO DETECTADA
+
+**Contrato inicial:** manutencao-controlada.md (1-3 arquivos, 1 camada)
+
+**Motivo da escalação:**
+- Prompt solicita correção em 5 arquivos
+- Limite cirúrgico: 3 arquivos
+- Decisão: ESCALAR para manutencao-completa.md
+
+**Novo contrato:** manutencao-completa.md
+**Execução:** Prosseguindo automaticamente
+```
 
 #### PASSO 1.2: Criar Análise de Impacto Mínima
 
@@ -248,9 +297,99 @@ Criar arquivo em `.temp_ia/ANALISE-IMPACTO-[PROBLEMA].md`:
 1. ✅ Ler arquivo completo
 2. ✅ Aplicar correção pontual
 3. ✅ Validar sintaxe (lint/build)
-4. ✅ Marcar como concluído no checklist
+4. ✅ **OBRIGATÓRIO:** Executar testes APENAS deste arquivo
+5. ✅ **OBRIGATÓRIO:** Validar que correção RESOLVEU o problema
+6. ✅ Marcar como concluído no checklist SOMENTE se validação passou
 
-**REGRA CRÍTICA:** NÃO prosseguir para próximo arquivo se compilação falhar.
+**🚨 REGRA CRÍTICA: VALIDAÇÃO INCREMENTAL OBRIGATÓRIA**
+
+Após corrigir CADA arquivo, executar testes específicos:
+
+```bash
+# Frontend (exemplo)
+cd /d/IC2/frontend/icontrolit-app && timeout 300 npm run test -- --watch=false --include='**/*[nome-do-arquivo].spec.ts' 2>&1 | tail -80
+
+# Backend (exemplo)
+cd /d/IC2/backend/IControlIT.API && timeout 600 dotnet test --filter "FullyQualifiedName~[NomeDoArquivo]" 2>&1 | tail-50
+```
+
+**INTERPRETAÇÃO DO RESULTADO:**
+
+**Cenário A: Testes melhoraram (problema resolvido)**
+```
+Antes: 20/27 testes falhando por [PROBLEMA DO ESCOPO]
+Depois: 27/27 testes passando (100%)
+```
+✅ **AÇÃO:** Marcar arquivo como [x] concluído e prosseguir para próximo arquivo
+
+---
+
+**Cenário B: Testes melhoraram parcialmente**
+```
+Antes: 20/27 testes falhando por [PROBLEMA DO ESCOPO]
+Depois: 10/27 testes ainda falhando por [PROBLEMA DO ESCOPO]
+```
+⚠️ **AÇÃO:**
+1. Revisar correção aplicada
+2. Identificar o que ainda falta
+3. Aplicar correção adicional
+4. Re-executar testes
+5. Só marcar como concluído quando 100% do problema do escopo estiver resolvido
+
+---
+
+**Cenário C: Testes NÃO melhoraram (erro DIFERENTE está bloqueando)**
+```
+Antes: 20/27 testes falhando por [PROBLEMA DO ESCOPO]
+Depois: 27/27 testes falhando por [ERRO DIFERENTE] (ex: FUSE_APP_CONFIG, NullInjectorError)
+```
+🔴 **AÇÃO OBRIGATÓRIA:**
+
+1. ❌ **NÃO** marcar arquivo como concluído
+2. ❌ **NÃO** prosseguir para próximo arquivo ainda
+3. ✅ Identificar se [ERRO DIFERENTE] impede validação do problema do escopo
+4. ✅ Avaliar se correção de [ERRO DIFERENTE] está dentro do escopo cirúrgico:
+
+```bash
+# Perguntas críticas:
+# - Correção de [ERRO DIFERENTE] afeta quantos arquivos? (≤ 3?)
+# - Correção de [ERRO DIFERENTE] afeta quantas camadas? (= 1?)
+# - Correção de [ERRO DIFERENTE] exige refatoração? (NÃO?)
+```
+
+**SE correção de [ERRO DIFERENTE] está DENTRO do escopo cirúrgico:**
+- ✅ Corrigir [ERRO DIFERENTE] no mesmo arquivo
+- ✅ Re-executar testes
+- ✅ Validar que problema do escopo original foi resolvido
+- ✅ Marcar arquivo como concluído
+
+**SE correção de [ERRO DIFERENTE] está FORA do escopo cirúrgico:**
+- ❌ **ESCALAR automaticamente** para `manutencao-completa.md` ou `manutencao-avancada.md`
+- ✅ Documentar escalação em `.temp_ia/ESCALACAO-CONTRATO-[DATA].md`
+- ✅ Continuar execução com novo contrato
+- ✅ Informar escalação no commit final
+
+---
+
+**Cenário D: Testes PIORARAM**
+```
+Antes: 20/27 testes falhando
+Depois: 25/27 testes falhando
+```
+🔴 **AÇÃO:**
+1. ❌ REVERTER correção aplicada
+2. Revisar abordagem (pode estar corrigindo coisa errada)
+3. Re-ler prompt original para confirmar escopo
+4. Aplicar correção revisada
+5. Re-executar testes
+
+---
+
+**PROIBIDO:**
+- ❌ Marcar arquivo como "concluído" sem executar testes
+- ❌ Prosseguir para próximo arquivo se correção não funcionou
+- ❌ Ignorar erros bloqueantes sem tentar corrigir ou escalar
+- ❌ Assumir que "adicionei o código" = "problema resolvido"
 
 #### PASSO 2.2: Validação Contínua
 
@@ -430,6 +569,43 @@ O contrato só é considerado CONCLUÍDO quando:
 - [ ] Testes afetados: **100% passando**
 - [ ] Nenhum warning bloqueante
 
+**🚨 DEFINIÇÃO RIGOROSA DE "100% PASSANDO":**
+
+**"Testes afetados"** significa:
+- ✅ **TODOS** os testes que falhavam pelo problema do escopo DEVEM estar passando
+- ✅ **TODOS** os arquivos mencionados no prompt DEVEM ter seus testes passando
+- ❌ **NÃO** significa "alguns testes passaram"
+- ❌ **NÃO** significa "melhorou de 0/27 para 31/33"
+
+**Exemplo Correto:**
+```
+PROMPT: Corrigir Transloco em AuthSignInComponent.spec.ts (31 testes) e UsersListComponent.spec.ts (27 testes)
+
+ANTES: 0/58 testes passando (31+27 falhando por NullInjectorError: TranslocoService)
+DEPOIS: 58/58 testes passando (31+27 resolvidos)
+
+✅ CRITÉRIO ATENDIDO: 100% dos testes afetados pelo problema do escopo
+```
+
+**Exemplo Incorreto:**
+```
+PROMPT: Corrigir Transloco em AuthSignInComponent.spec.ts (31 testes) e UsersListComponent.spec.ts (27 testes)
+
+ANTES: 0/58 testes passando (31+27 falhando por NullInjectorError: TranslocoService)
+DEPOIS: 31/58 testes passando (31 AuthSignIn OK, 27 UsersList falhando por FUSE_APP_CONFIG)
+
+❌ CRITÉRIO NÃO ATENDIDO: Apenas 53% dos testes afetados passando
+❌ UsersListComponent.spec.ts ainda está no escopo do prompt e deve ser corrigido
+```
+
+**REGRA FINAL:**
+
+- **SE** todos os arquivos mencionados no prompt estão 100% passando: ✅ PRONTO
+- **SE** algum arquivo do prompt ainda tem testes falhando:
+  - **SE** erro bloqueante está dentro do escopo cirúrgico: ✅ Corrigir
+  - **SE** erro bloqueante está fora do escopo cirúrgico: ✅ Escalar automaticamente para `manutencao-completa.md`
+- **NUNCA** considerar "pronto" com arquivos do prompt falhando por qualquer motivo
+
 ### 9.3. Documentação
 
 - [ ] Commit estruturado com contexto completo
@@ -538,6 +714,61 @@ rm -rf node_modules/.cache
 npm run build
 npm run test -- --watch=false
 ```
+
+---
+
+### Problema: Correção aplicada mas testes ainda falhando por erro DIFERENTE
+
+**Cenário Real (Execução 8 RF006):**
+```
+PROMPT: Corrigir Transloco em AuthSignInComponent.spec.ts e UsersListComponent.spec.ts
+
+PASSO 1: Corrigir AuthSignInComponent
+- ANTES: 0/31 testes (NullInjectorError: TranslocoService)
+- DEPOIS: 31/31 testes (✅ RESOLVIDO)
+
+PASSO 2: Corrigir UsersListComponent
+- ANTES: 0/27 testes (NullInjectorError: TranslocoService)
+- CORREÇÃO APLICADA: Adicionado getTranslocoModule()
+- DEPOIS: 0/27 testes (NullInjectorError: FUSE_APP_CONFIG) ← ERRO DIFERENTE
+
+❌ ERRO: Agente marcou como "pronto" porque "problema do Transloco foi resolvido"
+✅ CORRETO: Agente deveria ter escalado para manutencao-completa.md
+```
+
+**Causa:** Correção do problema original (Transloco) revelou erro bloqueante diferente (FUSE_APP_CONFIG) que impede validação.
+
+**Diagnóstico:**
+
+1. **Identificar se erro diferente está dentro do escopo cirúrgico:**
+   - ✅ DENTRO: Erro pode ser resolvido no mesmo arquivo sem refatoração (ex: adicionar mais um provider)
+   - ❌ FORA: Erro requer alterações em múltiplos arquivos ou camadas (ex: criar mock global de FUSE_APP_CONFIG)
+
+2. **Aplicar regra de decisão:**
+
+**SE erro diferente está DENTRO do escopo:**
+```bash
+# Corrigir no mesmo arquivo e re-executar testes
+# Exemplo: FUSE_APP_CONFIG pode ser mockado localmente
+```
+✅ **AÇÃO:** Corrigir e validar que arquivo está 100% passando.
+
+**SE erro diferente está FORA do escopo:**
+```bash
+# Exemplo: FUSE_APP_CONFIG requer mock global em test-setup.ts (múltiplos arquivos)
+```
+❌ **AÇÃO:** ESCALAR automaticamente para `manutencao-completa.md` ou `manutencao-avancada.md`.
+
+**Solução Geral:**
+
+1. ✅ **NUNCA** marcar arquivo como "pronto" se testes ainda falhando
+2. ✅ Validar que correção EFETIVAMENTE resolveu o problema (testes 100% passando)
+3. ✅ Se erro bloqueante diferente impede validação:
+   - **SE** dentro do escopo cirúrgico: Corrigir
+   - **SE** fora do escopo cirúrgico: Escalar automaticamente
+4. ❌ **NUNCA** considerar "problema do escopo resolvido" se testes não passam
+
+**Referência:** Seção 6 (PASSO 2.1 - Validação Incremental), Seção 9.2 (Definição de "100% Passando")
 
 ---
 
