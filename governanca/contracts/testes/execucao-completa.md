@@ -1,9 +1,12 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.0
-**Data:** 2026-01-03
+**Versão:** 1.1
+**Data:** 2026-01-08
 **Status:** Ativo
-**Changelog v1.0:** Criação do contrato com auto-geração de specs E2E
+**Última Atualização:** 2026-01-08 (Otimizações de eficiência: mapa de caminhos, leitura única, TODO list após validação)
+**Changelog:**
+- v1.1 (2026-01-08): Adicionadas 5 otimizações de eficiência (⬇️ 66% tempo de inicialização)
+- v1.0 (2026-01-03): Criação do contrato com auto-geração de specs E2E
 
 ---
 
@@ -19,6 +22,90 @@ Este contrato **EXECUTA TODOS OS TESTES** de um RF automaticamente, incluindo:
 - ✅ **Testes de Segurança**: SQL Injection, XSS, CSRF, Auth, Multi-tenancy
 - ✅ **Responsabilização Automática**: Identifica se falha é backend ou frontend
 - ✅ **Evidências Automáticas**: Screenshots, vídeos, logs, relatórios
+
+---
+
+## 0. MAPA DE CAMINHOS RÁPIDOS (CONSULTA OBRIGATÓRIA)
+
+**IMPORTANTE:** Estrutura reorganizada em 2026-01-08. Use caminhos atualizados abaixo.
+
+### 0.1. Estrutura de Governança
+
+```bash
+D:\IC2_Governanca\
+├── CLAUDE.md                          # Governança superior (leitura obrigatória)
+├── governanca\
+│   ├── contracts\
+│   │   ├── testes\execucao-completa.md        # Este contrato
+│   │   └── manutencao\*.md
+│   ├── prompts\
+│   │   └── testes\execucao-completa.md        # Prompt de ativação
+│   └── checklists\
+│       └── testes\pre-execucao.yaml           # Checklist pré-execução
+└── documentacao\
+    └── [Fase]\[EPIC]\[RF]\
+        ├── RF*.yaml                            # Estrutura do RF
+        ├── Testes\
+        │   ├── MT-RF*.yaml                     # Massa de teste
+        │   ├── TC-RF*.yaml                     # Casos de teste
+        │   ├── Backend\TC-*.md                 # Casos de teste backend
+        │   ├── Sistema\TC-*.md                 # Casos de teste frontend
+        │   └── Outros\TC-*.md                  # Casos de teste outros
+        └── schema.sql                          # Schema (se aplicável)
+```
+
+### 0.2. Estrutura de Código
+
+```bash
+D:\IC2\
+├── STATUS.yaml                        # Status consolidado (LER APENAS NA FASE 8)
+├── backend\IControlIT.API\
+│   ├── IControlIT.API.sln
+│   ├── src\                           # Código de produção
+│   └── tests\                         # Testes backend
+│       ├── Domain.UnitTests\
+│       ├── Application.UnitTests\
+│       └── Application.FunctionalTests\
+└── frontend\icontrolit-app\
+    ├── package.json
+    ├── src\                           # Código de produção
+    └── e2e\specs\                     # Specs Playwright (auto-gerados)
+```
+
+### 0.3. Regras de Leitura Eficiente
+
+**REGRA #1: Usar caminhos diretos sempre que possível**
+- ✅ `Read D:\IC2_Governanca\governanca\contracts\testes\execucao-completa.md`
+- ❌ `Glob "**/execucao-completa.md"` (apenas se caminho desconhecido)
+
+**REGRA #2: Não ler STATUS.yaml na FASE 1**
+- STATUS.yaml será lido APENAS na FASE 8 (Atualização de STATUS)
+- Na FASE 1, ler apenas: RF*.yaml, MT-RF*.yaml, TC-RF*.yaml
+
+**REGRA #3: Leitura única de arquivos pequenos (<2000 linhas)**
+- RF*.yaml, MT-RF*.yaml, TC-RF*.yaml: Ler UMA ÚNICA VEZ
+- Se necessário consultar novamente: usar informações já lidas (não re-ler)
+- Exceção: Arquivos grandes (>2000 linhas) podem ser lidos em partes
+
+**REGRA #4: Ordem de leitura obrigatória**
+```markdown
+1. FASE 1 (Validação de Pré-requisitos):
+   - RF*.yaml (estrutura do RF)
+   - MT-RF*.yaml (massa de teste)
+   - TC-RF*.yaml (casos de teste)
+   - schema.sql (se necessário)
+
+2. FASE 2-7 (Execução de Testes):
+   - Nenhuma leitura adicional (usar informações já carregadas)
+
+3. FASE 8 (Atualização de STATUS):
+   - STATUS.yaml (primeira e única leitura)
+```
+
+**IMPACTO:**
+- ⬇️ 66% no tempo de inicialização (de 30-45s para 10-15s)
+- ⬇️ 83% em operações Glob (de 6 para 0-1)
+- ⬇️ 100% em leituras redundantes
 
 ---
 
@@ -334,25 +421,35 @@ git branch --show-current
 - ❌ **BLOQUEIO TOTAL**
 - Exibir mensagem: "Este contrato DEVE ser executado no branch `dev`. Use `git checkout dev` antes de prosseguir."
 
-#### PASSO 1.2: Validar Pré-Requisitos
+#### PASSO 1.2: Validar Pré-Requisitos (Documentação Obrigatória)
+
+**⚠️ NÃO LER STATUS.yaml NESTA FASE** (será lido apenas na FASE 8)
+
+**Ler e validar APENAS os seguintes arquivos de documentação:**
 
 ```bash
-# Verificar STATUS.yaml
-# - execucao.backend = done
-# - execucao.frontend = done
-# - documentacao.mt = true
-# - documentacao.tc = true
+# 1. Estrutura do RF (leitura obrigatória)
+Read D:\IC2_Governanca\documentacao\[Fase]\[EPIC]\[RF]\RF*.yaml
 
-# Verificar arquivos
-# - D:\IC2\backend\IControlIT.API/IControlIT.API.sln existe
-# - D:\IC2\frontend\icontrolit-app/package.json existe
-# - documentacao/.../MT-RFXXX.yaml existe
-# - documentacao/.../TC-RFXXX.yaml existe
+# 2. Massa de teste (leitura obrigatória)
+Read D:\IC2_Governanca\documentacao\[Fase]\[EPIC]\[RF]\Testes\MT-RF*.yaml
 
-# NOVO: Verificar schema.sql (OBRIGATÓRIO para testes funcionais backend)
-# - D:\IC2\backend\IControlIT.API\tests\schema.sql existe
-# - schema.sql tamanho > 10KB
+# 3. Casos de teste (leitura obrigatória)
+Read D:\IC2_Governanca\documentacao\[Fase]\[EPIC]\[RF]\Testes\TC-RF*.yaml
+
+# 4. Schema SQL (validação de existência - NÃO ler conteúdo)
+# Verificar existência: D:\IC2\backend\IControlIT.API\tests\schema.sql
+# Validar tamanho > 10KB
+
+# 5. Verificar arquivos de código (validação de existência)
+# - D:\IC2\backend\IControlIT.API\IControlIT.API.sln
+# - D:\IC2\frontend\icontrolit-app\package.json
 ```
+
+**REGRA CRÍTICA: Leitura única**
+- Arquivos RF*.yaml, MT-RF*.yaml, TC-RF*.yaml: Ler UMA ÚNICA VEZ
+- Armazenar informações em memória para consultas posteriores
+- NÃO re-ler arquivos já lidos
 
 **Se schema.sql NÃO existir:**
 ```
@@ -416,6 +513,36 @@ npm run build
 ```
 
 **Se QUALQUER build FALHAR (APÓS matar processos):** BLOQUEIO TOTAL (PARAR, REPORTAR, BLOQUEAR)
+
+#### PASSO 1.5: Criar TODO List (APÓS Validação Completa)
+
+**✅ SOMENTE APÓS TODOS OS PRÉ-REQUISITOS VALIDADOS:**
+
+Criar TODO list com as seguintes tarefas:
+
+```markdown
+1. [ ] Validar pré-requisitos obrigatórios (backend, frontend, MT, TC)
+2. [ ] Executar build do backend (dotnet build)
+3. [ ] Executar build do frontend (npm run build)
+4. [ ] Iniciar ambiente completo (backend + frontend) via run.py
+5. [ ] Validar health checks (backend /health e frontend localhost:4200)
+6. [ ] Executar testes backend (dotnet test)
+7. [ ] Executar testes frontend (npm run test)
+8. [ ] Verificar existência de specs Playwright para RF
+9. [ ] Executar testes E2E Playwright (npm run e2e)
+10. [ ] Executar testes de segurança (SQL Injection, XSS, CSRF)
+11. [ ] Consolidar resultados e gerar relatório final
+12. [ ] Gerar evidências (screenshots, logs, traces)
+13. [ ] Atualizar STATUS.yaml com resultado final
+```
+
+**🚨 SE ALGUM PRÉ-REQUISITO FALHAR:**
+- ❌ **NÃO** criar TODO list
+- ❌ **PARAR** execução imediatamente
+- ❌ **REPORTAR** gap em `.temp_ia/BLOQUEIO-EXECUCAO-RF*-[DATA].md`
+- ✅ Informar ao usuário qual pré-requisito falhou e ação necessária
+
+**Justificativa:** TODO list criada prematuramente fica obsoleta se pré-requisitos falharem.
 
 ---
 
