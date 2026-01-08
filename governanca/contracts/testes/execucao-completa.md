@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.3
+**Versão:** 1.4
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (CORREÇÃO: health checks movidos para FASE 1 ANTES de matar processos)
+**Última Atualização:** 2026-01-08 (CORREÇÃO: removido PASSO 1.4 - run.py já mata processos)
 **Changelog:**
+- v1.4 (2026-01-08): CORREÇÃO CRÍTICA: removido PASSO 1.4 (matar processos) - run.py já cuida disso
 - v1.3 (2026-01-08): CORREÇÃO CRÍTICA: health checks movidos para PASSO 1.3 (ANTES de matar processos)
 - v1.2 (2026-01-08): Adicionada verificação inteligente de ambiente (health checks antes de iniciar)
 - v1.1.1 (2026-01-08): Correção de estrutura de caminhos (MT-RF*.yaml e TC-RF*.yaml estão na raiz do RF)
@@ -500,37 +501,23 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:4200
 **Cenário A: Ambos saudáveis (200 OK)**
 - ✅ Backend: Status 200
 - ✅ Frontend: Status 200
-- ✅ **PULAR** PASSO 1.4 (não matar processos)
-- ✅ Seguir direto para PASSO 1.5 (validar builds)
+- ✅ **PULAR** PASSO 2.1 (não inicializar ambiente)
+- ✅ Seguir direto para PASSO 1.4 (validar builds)
 
 **Cenário B: Qualquer um falhou (não-200, timeout, connection refused)**
 - ❌ Backend: Status != 200 OU timeout OU connection refused
 - ❌ Frontend: Status != 200 OU timeout OU connection refused
-- ✅ **EXECUTAR** PASSO 1.4 (matar processos travados)
+- ✅ **MARCAR** para execução do PASSO 2.1 (inicializar ambiente com run.py)
+- ✅ **NÃO matar processos manualmente** (run.py cuida disso automaticamente)
 
-**Justificativa:** Economiza ~60 segundos quando ambiente já está rodando e saudável.
-
----
-
-#### PASSO 1.4: Matar Processos Travados (CONDICIONAL)
-
-**Executar SOMENTE se PASSO 1.3 Cenário B (ambiente não está saudável):**
-
-```bash
-# Usar taskkill diretamente (MAIS CONFIÁVEL que run.py)
-taskkill //F //IM "dotnet.exe" 2>/dev/null || true
-taskkill //F //IM "node.exe" 2>/dev/null || true
-```
-
-**IMPORTANTE:**
-- Esta etapa é **CONDICIONAL** (somente se health checks falharem)
-- Processos travados são **NORMAIS** em desenvolvimento
-- **NÃO gerar prompt de correção** para processos travados
-- Apenas matar automaticamente e prosseguir
+**Justificativa:**
+- Economiza ~60 segundos quando ambiente já está rodando
+- Evita duplicação (run.py já mata processos antes de iniciar)
+- Evita matar backend saudável desnecessariamente
 
 ---
 
-#### PASSO 1.5: Validar Builds
+#### PASSO 1.4: Validar Builds
 
 ```bash
 # Backend
@@ -542,11 +529,11 @@ cd frontend/icontrolit-app
 npm run build
 ```
 
-**Se QUALQUER build FALHAR (APÓS matar processos):** BLOQUEIO TOTAL (PARAR, REPORTAR, BLOQUEAR)
+**Se QUALQUER build FALHAR:** BLOQUEIO TOTAL (PARAR, REPORTAR, BLOQUEAR)
 
 ---
 
-#### PASSO 1.6: Criar TODO List (APÓS Validação Completa)
+#### PASSO 1.5: Criar TODO List (APÓS Validação Completa)
 
 **✅ SOMENTE APÓS TODOS OS PRÉ-REQUISITOS VALIDADOS:**
 
