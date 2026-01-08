@@ -1,0 +1,261 @@
+# CHECKLIST PRÉ-DEBUG COM PLAYWRIGHT
+
+versao: 1.0
+data: 2026-01-08
+status: ativo
+contrato_relacionado: governanca/contracts/debug/debug-playwright.md
+
+---
+
+## IDENTIFICAÇÃO
+
+agente: Agente de Debug com Playwright
+escopo: Validar pré-requisitos antes de iniciar debug
+modo: Validação obrigatória
+
+---
+
+## VALIDAÇÕES OBRIGATÓRIAS
+
+### 1. AMBIENTE DE DESENVOLVIMENTO
+
+validacoes:
+  - id: ENV-01
+    item: Backend está rodando
+    comando: curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health
+    criterio_sucesso: Status 200
+    bloqueante: true
+    acao_se_falhar: Iniciar ambiente com 'python D:\IC2\run.py' (mata processos anteriores e inicia backend + frontend)
+
+  - id: ENV-02
+    item: Frontend está rodando
+    comando: curl -s -o /dev/null -w "%{http_code}" http://localhost:4200
+    criterio_sucesso: Status 200
+    bloqueante: true
+    acao_se_falhar: Iniciar ambiente com 'python D:\IC2\run.py' ou aguardar compilação Angular (até 120s)
+
+  - id: ENV-03
+    item: Backend health endpoint funcional
+    comando: curl http://localhost:5000/health
+    criterio_sucesso: JSON válido retornado
+    bloqueante: true
+    acao_se_falhar: Verificar logs do backend, confirmar que API está funcionando
+
+---
+
+### 2. FERRAMENTAS DE DEBUG
+
+validacoes:
+  - id: TOOL-01
+    item: Playwright está instalado
+    comando: npx playwright --version
+    criterio_sucesso: Versão exibida (ex Version 1.40.0)
+    bloqueante: true
+    acao_se_falhar: Executar 'npm install -D @playwright/test' no frontend
+
+  - id: TOOL-02
+    item: Browsers do Playwright estão instalados
+    comando: npx playwright install --dry-run
+    criterio_sucesso: Nenhum browser pendente de instalação
+    bloqueante: true
+    acao_se_falhar: Executar 'npx playwright install' para instalar browsers
+
+  - id: TOOL-03
+    item: Node.js está disponível
+    comando: node --version
+    criterio_sucesso: Versão exibida (ex v18.x.x)
+    bloqueante: true
+    acao_se_falhar: Instalar Node.js LTS
+
+---
+
+### 3. INFORMAÇÕES DO PROBLEMA
+
+validacoes:
+  - id: INFO-01
+    item: Descrição do problema foi fornecida
+    comando: manual
+    criterio_sucesso: Usuário descreveu o problema claramente
+    bloqueante: true
+    acao_se_falhar: Solicitar ao usuário descrição detalhada do problema
+
+  - id: INFO-02
+    item: Rota/tela afetada foi identificada
+    comando: manual
+    criterio_sucesso: Usuário informou qual rota ou tela apresenta o problema (ex /sign-in)
+    bloqueante: false
+    acao_se_falhar: Perguntar ao usuário qual tela/rota está com problema
+
+  - id: INFO-03
+    item: RF afetado foi identificado (se aplicável)
+    comando: manual
+    criterio_sucesso: RF relacionado ao problema foi identificado (ex RF006)
+    bloqueante: false
+    acao_se_falhar: Continuar sem RF específico (problema pode ser geral)
+
+---
+
+### 4. ESTRUTURA DE ARQUIVOS
+
+validacoes:
+  - id: FILE-01
+    item: Pasta .temp_ia existe
+    comando: ls D:\IC2\.temp_ia
+    criterio_sucesso: Pasta existe e é acessível
+    bloqueante: true
+    acao_se_falhar: Criar pasta 'mkdir D:\IC2\.temp_ia'
+
+  - id: FILE-02
+    item: Frontend está acessível
+    comando: ls D:\IC2\frontend\icontrolit-app
+    criterio_sucesso: Pasta existe e contém package.json
+    bloqueante: true
+    acao_se_falhar: Verificar estrutura do projeto, confirmar caminho correto
+
+  - id: FILE-03
+    item: Playwright config existe no frontend
+    comando: ls D:\IC2\frontend\icontrolit-app\playwright.config.ts
+    criterio_sucesso: Arquivo existe
+    bloqueante: true
+    acao_se_falhar: Criar playwright.config.ts básico ou verificar se Playwright foi configurado
+
+---
+
+### 5. PERMISSÕES E ACESSO
+
+validacoes:
+  - id: PERM-01
+    item: Permissão de escrita em .temp_ia
+    comando: echo "test" > D:\IC2\.temp_ia\test-write.txt && rm D:\IC2\.temp_ia\test-write.txt
+    criterio_sucesso: Arquivo criado e deletado com sucesso
+    bloqueante: true
+    acao_se_falhar: Verificar permissões da pasta .temp_ia
+
+  - id: PERM-02
+    item: Permissão de leitura em frontend
+    comando: ls D:\IC2\frontend\icontrolit-app\src
+    criterio_sucesso: Conteúdo da pasta exibido
+    bloqueante: true
+    acao_se_falhar: Verificar permissões da pasta frontend
+
+---
+
+## FLUXO DE VALIDAÇÃO
+
+ordem_execucao:
+  1. Validar AMBIENTE DE DESENVOLVIMENTO (ENV-01, ENV-02, ENV-03)
+  2. Validar FERRAMENTAS DE DEBUG (TOOL-01, TOOL-02, TOOL-03)
+  3. Validar INFORMAÇÕES DO PROBLEMA (INFO-01, INFO-02, INFO-03)
+  4. Validar ESTRUTURA DE ARQUIVOS (FILE-01, FILE-02, FILE-03)
+  5. Validar PERMISSÕES E ACESSO (PERM-01, PERM-02)
+
+regras:
+  - Se qualquer validação BLOQUEANTE falhar: PARAR imediatamente
+  - Informar ao usuário qual validação falhou
+  - Exibir acao_se_falhar correspondente
+  - AGUARDAR correção antes de prosseguir
+  - Se validação NÃO BLOQUEANTE falhar: Avisar mas continuar
+
+---
+
+## CRITÉRIOS DE APROVAÇÃO
+
+checklist_completo:
+  - todas_bloqueantes_passaram: true
+  - ambiente_pronto: true
+  - ferramentas_instaladas: true
+  - informacoes_suficientes: true
+
+acao_apos_aprovacao:
+  - Prosseguir para FASE 1 do contrato de debug
+  - Criar script de debug em .temp_ia
+  - Executar debug conforme contrato
+
+acao_se_reprovado:
+  - PARAR execução do debug
+  - Listar validações que falharam
+  - Exibir ações corretivas necessárias
+  - AGUARDAR usuário corrigir pré-requisitos
+  - Revalidar após correções
+
+---
+
+exemplo_saida_aprovado: |
+  ========================================
+  CHECKLIST PRE-DEBUG - VALIDACAO
+  ========================================
+
+  [OK] ENV-01: Backend esta rodando (200 OK)
+  [OK] ENV-02: Frontend esta rodando (200 OK)
+  [OK] ENV-03: Backend health endpoint funcional
+  [OK] TOOL-01: Playwright instalado (Version 1.40.0)
+  [OK] TOOL-02: Browsers instalados (chromium, firefox, webkit)
+  [OK] TOOL-03: Node.js disponivel (v18.19.0)
+  [OK] INFO-01: Problema descrito pelo usuario
+  [OK] INFO-02: Rota identificada (/sign-in)
+  [AVISO] INFO-03: RF nao identificado (nao bloqueante)
+  [OK] FILE-01: Pasta .temp_ia existe
+  [OK] FILE-02: Frontend acessivel
+  [OK] FILE-03: Playwright config existe
+  [OK] PERM-01: Permissao de escrita OK
+  [OK] PERM-02: Permissao de leitura OK
+
+  ========================================
+  RESULTADO: APROVADO
+  ========================================
+
+  Todas as validacoes bloqueantes passaram.
+  Prosseguindo para FASE 1 do debug...
+
+exemplo_saida_reprovado: |
+  ========================================
+  CHECKLIST PRE-DEBUG - VALIDACAO
+  ========================================
+
+  [OK] ENV-01: Backend esta rodando (200 OK)
+  [FALHOU] ENV-02: Frontend NAO esta rodando (000 Connection Refused)
+  [BLOQUEANTE]
+
+  ========================================
+  RESULTADO: REPROVADO
+  ========================================
+
+  Validacao bloqueante falhou: ENV-02
+
+  ACAO CORRETIVA:
+  Iniciar ambiente com 'python D:\IC2\run.py' ou aguardar compilacao Angular (ate 120s)
+
+  AGUARDANDO correcao do pre-requisito...
+
+---
+
+## REFERÊNCIAS
+
+documentos_relacionados:
+  - D:\IC2\CLAUDE.md: Governança superior
+  - governanca/contracts/debug/debug-playwright.md: Contrato de debug
+  - governanca/prompts/debug/debug-playwright.md: Prompt de ativação
+
+comandos_uteis:
+  iniciar_ambiente: python D:\IC2\run.py
+  validar_backend: curl http://localhost:5000/health
+  validar_frontend: curl http://localhost:4200
+  instalar_playwright: npm install -D @playwright/test
+  instalar_browsers: npx playwright install
+
+---
+
+# Changelog
+
+## v1.0 (2026-01-08)
+- Criação do checklist de pré-debug
+- 15 validações organizadas em 5 categorias
+- Identificação de validações bloqueantes vs não-bloqueantes
+- Ações corretivas para cada validação
+- Exemplos de saída (aprovado e reprovado)
+
+---
+
+mantido_por: Time de Arquitetura IControlIT
+ultima_atualizacao: 2026-01-08
+versao: 1.0
