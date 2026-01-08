@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.6
+**Versão:** 1.7
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (NOVA FASE: Auditoria de Conformidade Funcional e UX)
+**Última Atualização:** 2026-01-08 (MUDANÇA: Executa no branch ativo, sem validação de branch)
 **Changelog:**
+- v1.7 (2026-01-08): MUDANÇA CRÍTICA: Executa no branch ativo (não valida, não faz checkout)
 - v1.6 (2026-01-08): NOVA FASE 6.5: Auditoria de Conformidade Funcional e UX (incongruências, funcionalidades duplicadas, UX)
 - v1.5 (2026-01-08): CORREÇÃO CRÍTICA: validação de frontend com retry (120s) - Angular demora mais
 - v1.4 (2026-01-08): CORREÇÃO CRÍTICA: removido PASSO 1.4 (matar processos) - run.py já cuida disso
@@ -399,9 +400,17 @@ Get-Process -Name "*IControlIT*","node" -ErrorAction SilentlyContinue | Stop-Pro
 ### 🚨 REGRAS CRÍTICAS DE GIT E COMMITS
 
 **BRANCH:**
-- ✅ **SEMPRE executar em `dev`** (branch principal de desenvolvimento)
+- ✅ **Executar no branch ativo** (qualquer branch: `main`, `dev`, `correcao/RF006`, etc.)
+- ✅ **NÃO validar branch** (testes executam onde estiver)
+- ✅ **NÃO fazer checkout** (manter branch atual)
 - ❌ **NUNCA criar branches** para testes (ex: `feature/RFXXX-testes-completos`)
-- ❌ **NUNCA fazer checkout** para outros branches
+
+**JUSTIFICATIVA:**
+- Testes devem validar o código NO ESTADO ATUAL do branch ativo
+- Se em `main`: testa produção
+- Se em `dev`: testa desenvolvimento
+- Se em `correcao/RF006`: testa correção antes de merge
+- Usuário é responsável por estar no branch correto
 
 **COMMITS:**
 - ❌ **NUNCA fazer commits** de código durante execução de testes
@@ -418,17 +427,25 @@ Get-Process -Name "*IControlIT*","node" -ErrorAction SilentlyContinue | Stop-Pro
 
 ### FASE 1: VALIDAÇÃO INICIAL (BLOQUEANTE)
 
-#### PASSO 1.1: Validar Branch Atual
+#### PASSO 1.1: Identificar Branch Ativo (Informativo)
 
 ```bash
-# Verificar se está em dev
-git branch --show-current
-# Esperado: dev
+# Apenas identificar branch atual (não validar)
+CURRENT_BRANCH=$(git branch --show-current)
+echo "ℹ️ Executando testes no branch: $CURRENT_BRANCH"
 ```
 
-**Se NÃO estiver em dev:**
-- ❌ **BLOQUEIO TOTAL**
-- Exibir mensagem: "Este contrato DEVE ser executado no branch `dev`. Use `git checkout dev` antes de prosseguir."
+**IMPORTANTE:**
+- ✅ Exibir branch ativo no início da execução
+- ✅ Incluir branch no relatório final
+- ❌ NÃO bloquear execução por causa do branch
+- ❌ NÃO fazer checkout para outro branch
+
+**Exemplos válidos:**
+- `main` → Testa código em produção
+- `dev` → Testa código em desenvolvimento
+- `correcao/RF006` → Testa correção antes de merge
+- `feature/RF010` → Testa nova funcionalidade
 
 #### PASSO 1.2: Validar Pré-Requisitos (Documentação Obrigatória)
 

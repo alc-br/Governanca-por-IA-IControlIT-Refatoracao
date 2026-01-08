@@ -1,9 +1,9 @@
 # CONTRATO DE MANUTENÇÃO CONTROLADA (CIRÚRGICA)
 
-**Versão:** 1.2
+**Versão:** 1.3
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (Adicionadas escalação automática, validação incremental rigorosa e troubleshooting expandido)
+**Última Atualização:** 2026-01-08 (NOVA FASE 0: Criação automática de branch de correção)
 
 ---
 
@@ -173,6 +173,118 @@ cd /d/IC2/frontend
 ---
 
 ## 6. WORKFLOW OBRIGATÓRIO
+
+### FASE 0: PREPARAÇÃO DO BRANCH (OBRIGATÓRIA)
+
+**🚨 REGRA CRÍTICA: Branch de Correção Dedicado**
+
+Toda manutenção/correção **DEVE** ser executada em um branch dedicado criado automaticamente.
+
+#### PASSO 0.1: Extrair RF do Prompt
+
+**Analisar o prompt e extrair RF afetado:**
+
+```bash
+# Padrão no prompt: "**RF Afetado:** RF006" ou "RF006 - Gestão de Clientes"
+# Extrair apenas o número (ex: RF006 → 006 ou RF006)
+```
+
+**SE RF não identificado no prompt:**
+- Usar `correcao/GENERIC-{timestamp}` como nome do branch
+- Exemplo: `correcao/GENERIC-20260108173045`
+
+#### PASSO 0.2: Criar e Fazer Checkout do Branch
+
+**Executar OBRIGATORIAMENTE:**
+
+```bash
+# 1. Ir para raiz do projeto de código (D:\IC2)
+cd /d/IC2
+
+# 2. Verificar branch atual
+CURRENT_BRANCH=$(git branch --show-current)
+echo "Branch atual: $CURRENT_BRANCH"
+
+# 3. Extrair número do RF do prompt (ex: RF006)
+RF_NUMBER="RF006"  # Extrair do prompt
+
+# 4. Criar branch de correção
+BRANCH_NAME="correcao/${RF_NUMBER}"
+echo "Criando branch: $BRANCH_NAME"
+
+# 5. Criar branch a partir do branch atual
+git checkout -b "$BRANCH_NAME"
+
+# 6. Validar que estamos no branch correto
+NEW_BRANCH=$(git branch --show-current)
+if [ "$NEW_BRANCH" != "$BRANCH_NAME" ]; then
+  echo "❌ ERRO: Branch não criado corretamente"
+  echo "Esperado: $BRANCH_NAME"
+  echo "Atual: $NEW_BRANCH"
+  exit 1
+fi
+
+echo "✅ Branch $BRANCH_NAME criado e ativo"
+echo "✅ Base: $CURRENT_BRANCH"
+```
+
+**Saída esperada:**
+```
+Branch atual: main
+Criando branch: correcao/RF006
+Switched to a new branch 'correcao/RF006'
+✅ Branch correcao/RF006 criado e ativo
+✅ Base: main
+```
+
+#### PASSO 0.3: Documentar Branch em .temp_ia
+
+**Criar arquivo de rastreamento:**
+
+```bash
+cat > /d/IC2/.temp_ia/BRANCH-CORRECAO-${RF_NUMBER}.md <<EOF
+# BRANCH DE CORREÇÃO: ${BRANCH_NAME}
+
+**Data:** $(date +"%Y-%m-%d %H:%M:%S")
+**RF Afetado:** ${RF_NUMBER}
+**Branch Base:** ${CURRENT_BRANCH}
+**Branch Correção:** ${BRANCH_NAME}
+
+## Prompt Original
+${PROMPT_COMPLETO}
+
+## Status
+- [ ] Correção em andamento
+- [ ] Testes executados
+- [ ] Validação completa
+- [ ] Pronto para merge
+
+## Commits Realizados
+(Serão adicionados durante execução)
+EOF
+```
+
+**IMPORTANTE:**
+- Branch permanece ativo para TODAS as correções do RF
+- Não fazer checkout de volta para `main` ou `dev`
+- Apenas ao final (após validação completa) fazer merge
+
+#### PASSO 0.4: Validação de Sucesso
+
+**Critérios de aprovação FASE 0:**
+- [x] RF extraído do prompt (ou GENERIC usado)
+- [x] Branch `correcao/RF{ID}` criado
+- [x] Checkout realizado para o novo branch
+- [x] Branch ativo confirmado com `git branch --show-current`
+- [x] Arquivo de rastreamento criado em `.temp_ia/`
+
+**SE qualquer validação falhar:**
+- ❌ PARAR execução imediatamente
+- ❌ NÃO prosseguir para FASE 1
+- ✅ Reportar erro ao usuário
+- ✅ Aguardar correção manual
+
+---
 
 ### FASE 1: VALIDAÇÃO DE PRÉ-REQUISITOS (OBRIGATÓRIA)
 
