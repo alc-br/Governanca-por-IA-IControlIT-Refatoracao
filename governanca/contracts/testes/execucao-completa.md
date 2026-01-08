@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.5
+**Versão:** 1.6
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (CORREÇÃO: validação de frontend com retry até 120s)
+**Última Atualização:** 2026-01-08 (NOVA FASE: Auditoria de Conformidade Funcional e UX)
 **Changelog:**
+- v1.6 (2026-01-08): NOVA FASE 6.5: Auditoria de Conformidade Funcional e UX (incongruências, funcionalidades duplicadas, UX)
 - v1.5 (2026-01-08): CORREÇÃO CRÍTICA: validação de frontend com retry (120s) - Angular demora mais
 - v1.4 (2026-01-08): CORREÇÃO CRÍTICA: removido PASSO 1.4 (matar processos) - run.py já cuida disso
 - v1.3 (2026-01-08): CORREÇÃO CRÍTICA: health checks movidos para PASSO 1.3 (ANTES de matar processos)
@@ -25,6 +26,7 @@ Este contrato **EXECUTA TODOS OS TESTES** de um RF automaticamente, incluindo:
 - ✅ **Testes Frontend**: Unitários, componentes, serviços
 - ✅ **Testes E2E**: Playwright (com auto-geração se necessário)
 - ✅ **Testes de Segurança**: SQL Injection, XSS, CSRF, Auth, Multi-tenancy
+- ✅ **Auditoria de Conformidade**: Incongruências funcionais, UX, funcionalidades duplicadas
 - ✅ **Responsabilização Automática**: Identifica se falha é backend ou frontend
 - ✅ **Evidências Automáticas**: Screenshots, vídeos, logs, relatórios
 
@@ -946,6 +948,207 @@ npm run e2e
 - ✅ Multi-tenancy (isolamento entre tenants)
 
 **Resultado:** PASS/FAIL
+
+---
+
+### FASE 6.5: AUDITORIA DE CONFORMIDADE FUNCIONAL E UX
+
+**🎯 OBJETIVO:** Detectar incongruências funcionais e problemas de UX que testes automatizados não capturam.
+
+#### PASSO 6.5.1: Validações de Conformidade Funcional
+
+**EXECUTAR OBRIGATORIAMENTE:**
+
+**1. Validação de Regras de Negócio vs Hierarquia**
+
+```typescript
+// Exemplo: Desativar cliente
+test('Não deve permitir desativar cliente superior na hierarquia (tenancy)', async ({ page }) => {
+  // 1. Logar como usuário de tenant filho
+  await loginAs('usuario@tenantfilho.com');
+
+  // 2. Tentar desativar tenant pai (superior na hierarquia)
+  const result = await page.click('[data-test="btn-desativar-tenant-pai"]');
+
+  // 3. DEVE SER BLOQUEADO
+  expect(result).toContain('Não autorizado');
+  expect(result).toContain('403'); // Forbidden
+});
+```
+
+**Validações obrigatórias:**
+- [ ] Usuário NÃO pode desativar/editar/deletar registros de tenants superiores
+- [ ] Usuário NÃO pode acessar dados fora de seu tenant (multi-tenancy)
+- [ ] Usuário NÃO pode executar ações sem permissão RBAC correspondente
+- [ ] Soft delete vs Hard delete estão corretos (não há ações duplicadas)
+- [ ] Estados mutuamente exclusivos não coexistem (ex: Ativo vs Desativado vs Restaurado)
+
+**2. Validação de Funcionalidades Duplicadas ou Ambíguas**
+
+```typescript
+test('Ativar vs Restaurar: não deve haver ambiguidade', async ({ page }) => {
+  // 1. Desativar um cliente
+  await page.click('[data-test="btn-desativar"]');
+
+  // 2. Verificar ações disponíveis
+  const actions = await page.locator('[data-test^="btn-"]').allTextContents();
+
+  // 3. Validar que há APENAS uma forma de reverter
+  const revertActions = actions.filter(a =>
+    a.includes('Ativar') || a.includes('Restaurar') || a.includes('Reativar')
+  );
+
+  // DEVE haver EXATAMENTE 1 ação de reversão
+  expect(revertActions.length).toBe(1);
+
+  // 4. Validar semântica correta
+  if (actions.includes('Ativar')) {
+    // "Ativar" reverte "Desativar" (soft delete)
+    expect(actions).not.toContain('Restaurar'); // Restaurar é para hard delete (lixeira)
+  }
+});
+```
+
+**Validações obrigatórias:**
+- [ ] Não há funcionalidades duplicadas com nomes diferentes (ex: Ativar + Restaurar fazendo a mesma coisa)
+- [ ] Semântica clara: Ativar (soft delete) vs Restaurar (hard delete/lixeira)
+- [ ] Ações contextuais corretas (botões aparecem apenas quando aplicáveis)
+- [ ] Ações destrutivas têm confirmação obrigatória
+
+**3. Validação de Feedback Visual e UX**
+
+```typescript
+test('Upload de imagem: preview e persistência', async ({ page }) => {
+  // 1. Fazer upload de logo
+  await page.setInputFiles('[data-test="input-logo"]', 'logo-test.png');
+
+  // 2. DEVE mostrar preview IMEDIATAMENTE
+  const preview = await page.locator('[data-test="img-preview-logo"]');
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute('src', /blob:|data:image/);
+
+  // 3. Salvar formulário
+  await page.click('[data-test="btn-salvar"]');
+
+  // 4. DEVE persistir a imagem
+  await page.reload();
+  const persistedLogo = await page.locator('[data-test="img-logo"]');
+  await expect(persistedLogo).toBeVisible();
+  await expect(persistedLogo).toHaveAttribute('src', /^(http|\/)/); // URL persistida
+});
+
+test('Alinhamento de botões e campos', async ({ page }) => {
+  // Validar que campos relacionados estão alinhados
+  const btnConsultarCNPJ = await page.locator('[data-test="btn-consultar-cnpj"]').boundingBox();
+  const inputCNPJ = await page.locator('[data-test="input-cnpj"]').boundingBox();
+
+  // Botão deve estar alinhado com o campo (mesma linha ou próximo)
+  const verticalDistance = Math.abs(btnConsultarCNPJ.y - inputCNPJ.y);
+  expect(verticalDistance).toBeLessThan(50); // Menos de 50px de diferença
+});
+```
+
+**Validações obrigatórias:**
+- [ ] Upload de arquivo mostra preview ANTES de salvar
+- [ ] Upload de arquivo persiste APÓS salvar (validar com reload)
+- [ ] Botões relacionados a campos estão visualmente próximos/alinhados
+- [ ] Loading states visíveis durante operações assíncronas
+- [ ] Mensagens de sucesso/erro aparecem após ações
+- [ ] Formulários com erros destacam campos problemáticos
+
+**4. Validação de Congruência de Estado**
+
+```typescript
+test('Estado ativo/inativo refletido corretamente na UI', async ({ page }) => {
+  // 1. Criar cliente ativo
+  await createClient({ nome: 'Test', ativo: true });
+
+  // 2. Navegar para lista
+  await page.goto('/clientes');
+
+  // 3. Badge/indicador deve mostrar "Ativo"
+  const badge = await page.locator('[data-test="badge-status"]').first();
+  await expect(badge).toHaveText('Ativo');
+  await expect(badge).toHaveClass(/bg-green/); // Badge verde
+
+  // 4. Desativar
+  await page.click('[data-test="btn-desativar"]').first();
+  await page.click('[data-test="btn-confirmar"]');
+
+  // 5. Badge DEVE atualizar IMEDIATAMENTE
+  await expect(badge).toHaveText('Inativo');
+  await expect(badge).toHaveClass(/bg-red/); // Badge vermelho
+});
+```
+
+**Validações obrigatórias:**
+- [ ] Estado no backend === Estado na UI (não há dessincronização)
+- [ ] Ações que alteram estado atualizam UI em tempo real
+- [ ] Indicadores visuais (badges, ícones) correspondem ao estado real
+- [ ] Filtros e buscas respeitam estado atual (ex: "Mostrar inativos" funciona)
+
+---
+
+#### PASSO 6.5.2: Relatório de Incongruências
+
+**Estrutura obrigatória do relatório:**
+
+```markdown
+## INCONGRUÊNCIAS DETECTADAS
+
+### 1. Violação de Hierarquia (CRÍTICO)
+**Descrição:** Usuário de tenant filho consegue desativar tenant pai
+**Arquivo:** {COMPONENTE}.component.ts
+**Linha:** {LINHA}
+**Impacto:** CRÍTICO - Quebra de segurança multi-tenancy
+**Correção:** Adicionar validação de hierarquia antes de permitir ação
+
+### 2. Funcionalidades Duplicadas (ALTO)
+**Descrição:** "Ativar" e "Restaurar" fazem a mesma coisa
+**Arquivos:**
+- {COMPONENTE}-list.component.html (linha {X})
+- {COMPONENTE}.service.ts (linha {Y})
+**Impacto:** ALTO - Confusão do usuário, manutenção duplicada
+**Correção:**
+- Remover "Restaurar" se não houver hard delete
+- OU: Diferenciar "Ativar" (soft delete) de "Restaurar" (lixeira)
+
+### 3. Preview de Imagem Ausente (MÉDIO)
+**Descrição:** Upload de logo não mostra preview antes de salvar
+**Arquivo:** {COMPONENTE}-form.component.ts (linha {X})
+**Impacto:** MÉDIO - UX ruim, usuário não vê o que está enviando
+**Correção:** Adicionar FileReader para preview local antes de enviar ao backend
+
+### 4. Desalinhamento Visual (BAIXO)
+**Descrição:** Botão "Consultar CNPJ" desalinhado do campo CNPJ
+**Arquivo:** {COMPONENTE}-form.component.html (linha {X})
+**Impacto:** BAIXO - Problema estético, não funcional
+**Correção:** Ajustar classes CSS para alinhar verticalmente com input
+```
+
+**Critérios de Severidade:**
+- **CRÍTICO:** Quebra de segurança, violação de regras de negócio
+- **ALTO:** Funcionalidade duplicada, estado inconsistente
+- **MÉDIO:** UX ruim, falta de feedback
+- **BAIXO:** Problemas estéticos, alinhamento
+
+---
+
+#### PASSO 6.5.3: Critérios de Aprovação
+
+**FASE 6.5 é APROVADA quando:**
+- [ ] Zero incongruências CRÍTICAS detectadas
+- [ ] Incongruências ALTAS documentadas com prompt de correção
+- [ ] Incongruências MÉDIAS documentadas (podem ser corrigidas depois)
+- [ ] Incongruências BAIXAS documentadas (backlog de melhorias)
+
+**FASE 6.5 REPROVA o RF quando:**
+- [ ] Há pelo menos 1 incongruência CRÍTICA (segurança ou regra de negócio violada)
+- [ ] Há 3+ incongruências ALTAS (funcionalidades duplicadas, estado inconsistente)
+
+**Ação se REPROVADO:**
+- Gerar prompt de correção para cada incongruência CRÍTICA ou ALTA
+- Bloquear RF de ir para produção até correção
 
 ---
 
