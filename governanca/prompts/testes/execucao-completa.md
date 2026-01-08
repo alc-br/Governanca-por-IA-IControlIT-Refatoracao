@@ -1,9 +1,10 @@
-Executar testes automatizados do RFXXX conforme D:/IC2_Governanca/contracts/testes/execucao-completa.md.
+Executar testes automatizados do RFXXX conforme D:\IC2_Governanca\governanca\contracts\testes\execucao-completa.md.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 Seguir D:\IC2\CLAUDE.md.
 
-Preste MUITA atencao ao checklist obrigatorio, pois e essencial que voce o siga.
+CHECKLIST OBRIGATÓRIO:
+Validar todos os itens de D:\IC2_Governanca\governanca\checklists\testes\pre-execucao.yaml antes de prosseguir.
 
 MODO AUTONOMIA TOTAL (OBRIGATORIO):
 - NAO perguntar permissoes ao usuario
@@ -26,7 +27,7 @@ PRE-REQUISITOS OBRIGATORIOS (BLOQUEANTES):
 4. TC-RFXXX.yaml DEVE existir e estar validado
 5. Schema.sql DEVE existir (para testes funcionais backend)
    - Caminho: D:\IC2\backend\IControlIT.API\tests\schema.sql
-   - Validacao: Checklist checklists/testes/schema-first-testing.yaml
+   - Validacao: Checklist D:\IC2_Governanca\governanca\checklists\testes\pre-execucao.yaml
 6. STATUS.yaml DEVE ter:
    - execucao.backend = done
    - execucao.frontend = done

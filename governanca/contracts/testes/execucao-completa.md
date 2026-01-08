@@ -259,7 +259,46 @@ TIPO: BLOQUEIO DE AMBIENTE (não gera prompt de correção)
 
 ---
 
-## 5. FLUXO DE EXECUÇÃO (ORDEM OBRIGATÓRIA)
+## 5. COMANDOS PRÉ-VALIDADOS
+
+### Windows (Git Bash)
+
+```bash
+# Verificar branch
+git -C /d/IC2 branch --show-current
+
+# Build backend
+cd /d/IC2/backend/IControlIT.API && dotnet build --no-incremental 2>&1 | tail -30
+
+# Build frontend
+cd /d/IC2/frontend/icontrolit-app && npm run build 2>&1 | tail -50
+
+# Testes backend
+cd /d/IC2/backend/IControlIT.API && dotnet test --verbosity normal
+```
+
+### PowerShell
+
+```powershell
+# Matar processos
+Get-Process -Name "*IControlIT*","node" -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+---
+
+## 6. TIMEOUTS OBRIGATÓRIOS
+
+| Fase | Timeout | Ação se Exceder |
+|------|---------|-----------------|
+| dotnet build | 3 minutos | ABORTAR (build travado) |
+| npm run build | 5 minutos | ABORTAR (build travado) |
+| dotnet test | 10 minutos | ABORTAR (testes travados) |
+| npm run test | 5 minutos | ABORTAR (testes travados) |
+| npm run e2e | 15 minutos | ABORTAR (E2E travado) |
+
+---
+
+## 7. FLUXO DE EXECUÇÃO (ORDEM OBRIGATÓRIA)
 
 ### 🚨 REGRAS CRÍTICAS DE GIT E COMMITS
 
@@ -467,12 +506,24 @@ curl http://localhost:5000/health
 
 ### FASE 3: TESTES BACKEND (Prioridade 1)
 
+#### 🚨 REGRA CRÍTICA: NÃO PARAR NA PRIMEIRA FALHA
+
+**OBRIGATÓRIO:** Executar TODOS os testes backend, mesmo se alguns falharem.
+**PROIBIDO:** Abortar após primeira falha.
+**OBJETIVO:** Identificar TODOS os erros de uma vez para correção única.
+
 #### PASSO 3.1: Executar Testes Backend
 
 ```bash
 cd backend/IControlIT.API
 dotnet test --verbosity normal
 ```
+
+**Comportamento esperado:**
+- ✅ Executar TODOS os projetos de teste (Domain.UnitTests, Application.UnitTests, Application.FunctionalTests)
+- ✅ Registrar TODOS os testes que falharam
+- ✅ NÃO abortar se alguns testes falharem
+- ✅ Continuar para FASE 4 (frontend) independentemente do resultado
 
 #### ℹ️ CONTEXTO: Comportamento Esperado dos Testes Funcionais
 
@@ -520,12 +571,24 @@ Total: 31/54 testes (23 bloqueados por infraestrutura)
 
 ### FASE 4: TESTES FRONTEND (Prioridade 2)
 
+#### 🚨 REGRA CRÍTICA: NÃO PARAR NA PRIMEIRA FALHA
+
+**OBRIGATÓRIO:** Executar TODOS os testes frontend, mesmo se alguns falharem.
+**PROIBIDO:** Abortar após primeira falha.
+**OBJETIVO:** Identificar TODOS os erros de uma vez para correção única.
+
 #### PASSO 4.1: Executar Testes Frontend
 
 ```bash
 cd frontend/icontrolit-app
 npm run test
 ```
+
+**Comportamento esperado:**
+- ✅ Executar TODOS os specs (.spec.ts)
+- ✅ Registrar TODOS os testes que falharam
+- ✅ NÃO abortar se alguns testes falharem
+- ✅ Continuar para FASE 5 (E2E) independentemente do resultado
 
 #### PASSO 4.2: Registrar Resultados
 
@@ -608,10 +671,22 @@ D:\IC2\frontend\icontrolit-app/e2e/specs/RF006/
 
 #### PASSO 5.3: Executar Testes E2E
 
+#### 🚨 REGRA CRÍTICA: NÃO PARAR NA PRIMEIRA FALHA
+
+**OBRIGATÓRIO:** Executar TODOS os testes E2E, mesmo se alguns falharem.
+**PROIBIDO:** Abortar após primeira falha.
+**OBJETIVO:** Identificar TODOS os erros de uma vez para correção única.
+
 ```bash
 cd frontend/icontrolit-app
 npm run e2e
 ```
+
+**Comportamento esperado:**
+- ✅ Executar TODAS as specs Playwright
+- ✅ Registrar TODOS os testes que falharam
+- ✅ NÃO abortar se alguns testes falharem
+- ✅ Continuar para FASE 6 (Segurança) independentemente do resultado
 
 #### PASSO 5.4: Validar Fluxos Completos
 
@@ -863,31 +938,126 @@ CONTRATO: manutencao-completa.md (cross-layer)
 
 **SE taxa de aprovação < 100% E houver ERROS DE CÓDIGO:**
 
+#### 🚨 REGRA CRÍTICA: IDENTIFICAR **TODOS** OS ERROS ANTES DE GERAR PROMPT
+
+**OBRIGATÓRIO:** O agente DEVE executar **TODAS** as baterias de testes, mesmo se alguma falhar, para identificar o **MÁXIMO de erros possível** antes de gerar o prompt de correção.
+
+**PROIBIDO:**
+- ❌ Parar na primeira falha
+- ❌ Gerar prompt após identificar apenas 1 erro
+- ❌ "Descobrir erros aos poucos" (isso gera retrabalho para o usuário)
+- ❌ Pular testes que ainda não foram executados
+
+**OBRIGATÓRIO:**
+- ✅ Executar TODOS os testes backend (mesmo se alguns falharem)
+- ✅ Executar TODOS os testes frontend (mesmo se alguns falharem)
+- ✅ Executar TODOS os testes E2E (mesmo se alguns falharem)
+- ✅ Executar TODOS os testes de segurança (mesmo se alguns falharem)
+- ✅ AGREGAR todos os erros identificados em um ÚNICO prompt de correção
+- ✅ Listar TODOS os arquivos afetados de uma vez
+- ✅ Priorizar erros (bloqueantes primeiro, depois alta, média, baixa)
+
+**Exemplo Correto:**
+```
+ERROS IDENTIFICADOS (TODOS DE UMA VEZ):
+- ERRO #1 (BLOQUEANTE): Backend compilation failed (5 arquivos)
+- ERRO #2 (ALTA): Frontend unit tests failing (11 arquivos)
+- ERRO #3 (ALTA): E2E tests failing (3 specs)
+- ERRO #4 (MÉDIA): Security test SQL Injection (1 endpoint)
+
+ARQUIVOS AFETADOS TOTAIS: 20 arquivos
+CONTRATO: manutencao-completa.md (> 3 arquivos)
+```
+
+**Exemplo Incorreto (NÃO FAZER):**
+```
+❌ ERRO #1 identificado: Frontend unit tests failing (2 arquivos)
+   → Gerar prompt agora...
+   → [usuário corrige]
+   → Re-executar testes...
+   → ❌ ERRO #2 identificado: E2E tests failing (3 specs)
+   → Gerar outro prompt...
+   → [usuário corrige novamente]
+   → Re-executar testes...
+   → ❌ ERRO #3 identificado: Security test failing...
+   → [RETRABALHO - PROIBIDO!]
+```
+
+---
+
+#### 🚨 OBRIGAÇÃO CRÍTICA: O agente DEVE executar TODOS os passos abaixo
+
 1. ✅ **Filtrar apenas erros de código** (excluir bloqueios de infraestrutura)
-2. ✅ **Gerar prompt de correção completo e descritivo**
-3. ✅ **Salvar em `.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md`**
-4. ✅ **Exibir prompt completo na tela**
-5. ✅ **Informar ao usuário:**
+   - **IMPORTANTE:** Mas AGREGAR erros de TODAS as baterias executadas
+
+2. ✅ **DECIDIR O CONTRATO DE MANUTENÇÃO CORRETO:**
+
+   **REGRA AUTOMÁTICA:**
    ```
-   📋 PROMPT DE CORREÇÃO GERADO
+   SE (número de arquivos afetados <= 3):
+       contrato = "D:\IC2_Governanca\governanca\contracts\manutencao\manutencao-controlada.md"
+   SENÃO:
+       contrato = "D:\IC2_Governanca\governanca\contracts\manutencao\manutencao-completa.md"
+   ```
+
+   **Contagem de arquivos:**
+   - Listar TODOS os arquivos que precisam ser corrigidos
+   - Se <= 3 arquivos: manutencao-controlada.md
+   - Se > 3 arquivos: manutencao-completa.md
+
+3. ✅ **Gerar prompt de correção completo e descritivo**
+   - **OBRIGATÓRIO:** Usar o template da seção "Template de Prompt de Correção" abaixo
+   - **OBRIGATÓRIO:** Substituir [TIPO] pelo contrato decidido no passo 2
+   - **OBRIGATÓRIO:** Incluir caminho absoluto do contrato
+   - **OBRIGATÓRIO:** Listar TODOS os arquivos que precisam correção
+
+4. ✅ **Salvar em `.temp_ia/PROMPT-CORRECAO-RFXXX-[DATA]-EXECUCAO-[N].md`**
+   - **OBRIGATÓRIO:** Nome de arquivo com data real (não placeholder)
+   - **OBRIGATÓRIO:** Conteúdo completo (> 100 linhas)
+
+5. ✅ **Exibir prompt completo na tela**
+   - **OBRIGATÓRIO:** Mostrar TODO o conteúdo do arquivo gerado
+   - **OBRIGATÓRIO:** Incluir linha inicial "Execute D:\IC2_Governanca\governanca\contracts\manutencao\[TIPO].md..."
+
+6. ✅ **Informar ao usuário:**
+   ```
+   📋 PROMPT DE CORREÇÃO GERADO E PRONTO PARA USO
 
    Arquivo: .temp_ia/PROMPT-CORRECAO-RFXXX-2026-01-06-EXECUCAO-1.md
+   Contrato: D:\IC2_Governanca\governanca\contracts\manutencao\[TIPO].md
 
    ERROS DE CÓDIGO IDENTIFICADOS:
    - ERRO #1: Frontend Unit Tests (11 erros TypeScript)
    - (lista apenas erros que exigem correção de código)
 
-   BLOQUEIOS DE INFRAESTRUTURA (AÇÃO DO USUÁRIO):
-   - Docker não está rodando (iniciar Docker Desktop)
+   ARQUIVOS AFETADOS: [N] arquivos
+   CONTRATO ESCOLHIDO: [manutencao-controlada.md OU manutencao-completa.md]
+   JUSTIFICATIVA: [N arquivos <= 3 OU N arquivos > 3]
 
-   Para corrigir os ERROS DE CÓDIGO, COPIE o conteúdo do arquivo acima
-   e COLE em uma NOVA CONVERSA com o Claude Code.
+   ══════════════════════════════════════════════════════════════
+   📋 PROMPT COMPLETO PARA COPIAR (INÍCIO)
+   ══════════════════════════════════════════════════════════════
+
+   [EXIBIR CONTEÚDO COMPLETO DO ARQUIVO .temp_ia/PROMPT-CORRECAO-RFXXX...]
+
+   ══════════════════════════════════════════════════════════════
+   📋 PROMPT COMPLETO PARA COPIAR (FIM)
+   ══════════════════════════════════════════════════════════════
+
+   ➡️ COPIE o prompt acima (entre as linhas ═══) e COLE em uma NOVA CONVERSA.
+
+   BLOQUEIOS DE INFRAESTRUTURA (SE HOUVER):
+   - Docker não está rodando (iniciar Docker Desktop)
 
    Para resolver BLOQUEIOS DE INFRAESTRUTURA, execute as ações indicadas
    e RE-EXECUTE os testes.
    ```
-6. ❌ **NUNCA tentar corrigir código** durante execução de testes
-7. ❌ **NUNCA fazer commits** de correções
+
+7. ❌ **PROIBIDO:**
+   - Apenas "recomendar" ação
+   - Dizer "será necessário gerar prompt"
+   - Omitir o conteúdo completo do prompt
+   - Deixar o usuário "criar o prompt sozinho"
 
 ---
 
@@ -934,12 +1104,25 @@ O prompt de correção **DEVE** conter:
 
 **IMPORTANTE:** Este template é usado APENAS quando houver **ERROS DE CÓDIGO** (não bloqueios de infraestrutura).
 
+**OBRIGATÓRIO:** O agente DEVE:
+1. Decidir o contrato correto (passo 2 acima)
+2. Substituir `[TIPO]` pelo contrato decidido
+3. Gerar o prompt COMPLETO
+4. Salvar em `.temp_ia/`
+5. Exibir o prompt COMPLETO na tela
+
 ```markdown
-Execute D:\IC2_Governanca\prompts\desenvolvimento\manutencao\[TIPO].md para corrigir os seguintes erros CRÍTICOS identificados na Execução [N] de testes do RFXXX:
+Execute D:\IC2_Governanca\governanca\contracts\manutencao\[TIPO].md para corrigir os seguintes erros CRÍTICOS identificados na Execução [N] de testes do RFXXX:
 
-[TIPO] = manutencao-controlada.md (se <= 3 arquivos) OU manutencao-completa.md (se > 3 arquivos)
+**CONTRATO ESCOLHIDO AUTOMATICAMENTE:**
+- [TIPO] = manutencao-controlada.md (arquivos afetados <= 3)
+  OU
+- [TIPO] = manutencao-completa.md (arquivos afetados > 3)
 
-**REGRA CRÍTICA:** Sempre usar caminho absoluto (D:\IC2_Governanca\prompts\...) no prompt gerado
+**ARQUIVOS AFETADOS:** [N] arquivos
+**JUSTIFICATIVA:** [Explicar por que este contrato foi escolhido]
+
+**REGRA CRÍTICA:** Sempre usar caminho absoluto (D:\IC2_Governanca\governanca\contracts\...) no prompt gerado
 
 ## CONTEXTO DA EXECUÇÃO
 
@@ -1111,24 +1294,38 @@ Seguir D:\IC2\CLAUDE.md e contracts/desenvolvimento/execucao/manutencao/manutenc
 1. ✅ Verificar que arquivo foi criado
 2. ✅ Verificar que arquivo tem > 100 linhas (prompt completo, não vago)
 3. ✅ Verificar que NÃO contém placeholders não substituídos:
-   - Buscar por `[YYYY-MM-DD]`, `[N]`, `[Lista...]`, `[RFXXX]`
+   - Buscar por `[YYYY-MM-DD]`, `[N]`, `[Lista...]`, `[RFXXX]`, `[TIPO]`
    - Se encontrar qualquer placeholder → **BLOQUEIO TOTAL**
 4. ✅ Verificar que seções obrigatórias estão presentes:
    - "## CONTEXTO DA EXECUÇÃO"
+   - "**CONTRATO ESCOLHIDO AUTOMATICAMENTE:**"
+   - "**ARQUIVOS AFETADOS:**"
+   - "**JUSTIFICATIVA:**"
    - "## ERROS IDENTIFICADOS"
    - "### ERRO [N] - [CATEGORIA]"
    - "#### Descrição do Erro"
    - "#### Evidências"
-   - "#### Comandos Tentados" (NOVO)
+   - "#### Comandos Tentados"
    - "#### Contexto Técnico" (com "Fase do erro:")
    - "#### Responsabilidade"
    - "#### Solução Esperada"
-5. ✅ Exibir prompt completo na tela ANTES de salvar arquivo
+5. ✅ **VALIDAÇÃO CRÍTICA:** Verificar linha inicial do prompt:
+   - DEVE começar com: `Execute D:\IC2_Governanca\governanca\contracts\manutencao\[manutencao-controlada.md OU manutencao-completa.md]...`
+   - **NÃO PODE** ter `[TIPO]` não substituído
+   - **NÃO PODE** estar vago ("será necessário", "recomendado")
+6. ✅ Exibir prompt completo na tela (entre linhas ═══)
 
 **SE qualquer validação FALHAR:**
 - ❌ **BLOQUEIO TOTAL**
 - Exibir mensagem: "Prompt de correção incompleto ou vago. Refazer FASE 7.4 com captura completa de contexto."
 - **NÃO prosseguir para FASE 8**
+
+**PROIBIÇÕES ABSOLUTAS:**
+- ❌ Dizer "será necessário gerar prompt"
+- ❌ Dizer "próxima ação recomendada"
+- ❌ Deixar `[TIPO]` não substituído
+- ❌ Não exibir o prompt completo
+- ❌ Não decidir o contrato automaticamente
 
 ---
 
@@ -1361,7 +1558,46 @@ O contrato só é considerado CONCLUÍDO quando:
 
 ---
 
-## 9. REGRA DE NEGAÇÃO ZERO
+## 9. TROUBLESHOOTING
+
+### Problema: "schema.sql NOT FOUND"
+**Causa:** ADR-005 (Schema-First Testing) não implementado.
+
+**Solução:**
+1. Executar `/fix-schema-sql RF{NNN}` (se skill existir)
+2. OU reportar gap em STATUS.yaml:
+   ```yaml
+   gaps:
+     - tipo: "infrastructure"
+       descricao: "schema.sql ausente (ADR-005 Schema-First Testing)"
+       impacto: "23 testes funcionais backend bloqueados"
+       acao: "Criar D:\\IC2\\backend\\IControlIT.API\\tests\\schema.sql"
+   ```
+
+### Problema: "cd: too many arguments"
+**Causa:** Sintaxe bash incorreta para Windows.
+
+**Solução:** Usar `cd /d/IC2` em vez de `cd /d D:\IC2`.
+
+### Problema: "Get-Process: command not found"
+**Causa:** PowerShell cmdlet executado em bash.
+
+**Solução:** Executar diretamente no PowerShell (sem bash wrapper).
+
+### Problema: "Docker not found" durante testes
+**Causa:** Docker Desktop não está rodando.
+
+**Solução:**
+1. Iniciar Docker Desktop manualmente
+2. Aguardar Docker estar pronto (ícone verde na bandeja)
+3. Validar: `docker ps`
+4. Re-executar testes
+
+**Impacto:** 23 testes funcionais backend bloqueados (não é erro de código).
+
+---
+
+## 10. REGRA DE NEGAÇÃO ZERO
 
 Se uma solicitação:
 - não estiver explicitamente prevista no contrato ativo, ou

@@ -1,0 +1,133 @@
+nome: "Checklist Pré-Execução de Testes"
+versao: "1.0"
+data_criacao: "2026-01-08"
+aplicavel_a: "Execução completa de testes (RF)"
+responsavel: "Agente de Testes (qa-tester)"
+
+validacoes:
+  - item: "Branch atual verificado (dev)"
+    comando: "git -C /d/IC2 branch --show-current"
+    resultado_esperado: "dev"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (testes devem rodar em dev)"
+
+  - item: "Docker rodando"
+    comando: "docker ps"
+    resultado_esperado: "Container headers sem erro (CONTAINER ID   IMAGE ...)"
+    bloqueante: false
+    impacto_se_falhar: "23 testes funcionais backend bloqueados (Testcontainers dependency)"
+    acao_se_falhar: "Bloquear Application.FunctionalTests e Infrastructure.IntegrationTests, prosseguir com testes unitários"
+
+  - item: "schema.sql existe"
+    comando: "test -f /d/IC2/backend/IControlIT.API/tests/schema.sql && echo EXISTS || echo NOT_FOUND"
+    resultado_esperado: "EXISTS"
+    bloqueante: false
+    impacto_se_falhar: "23 testes funcionais backend bloqueados (ADR-005 Schema-First Testing)"
+    acao_se_falhar: "Reportar gap em STATUS.yaml, prosseguir com testes unitários"
+    contexto: "ADR-005 (Schema-First Testing) - Testcontainers usa schema.sql em vez de EnsureCreatedAsync()"
+    arquivo_esperado: "D:\\IC2\\backend\\IControlIT.API\\tests\\schema.sql"
+    tamanho_minimo: "10KB"
+
+  - item: "Backend compilável"
+    comando: "cd /d/IC2/backend/IControlIT.API && dotnet build --no-incremental 2>&1 | tail -5"
+    resultado_esperado: "0 Erro(s)"
+    bloqueante: true
+    timeout: "180s"  # 3 minutos
+    acao_se_falhar: "ABORTAR execução, gerar relatório de erro de compilação"
+
+  - item: "Frontend compilável"
+    comando: "cd /d/IC2/frontend/icontrolit-app && npm run build 2>&1 | tail -10"
+    resultado_esperado: "Output location: D:\\IC2\\frontend\\icontrolit-app\\dist\\fuse"
+    bloqueante: true
+    timeout: "300s"  # 5 minutos
+    acao_se_falhar: "ABORTAR execução, gerar relatório de erro de compilação"
+
+  - item: "MT-RFXXX.yaml existe"
+    comando: "test -f D:/IC2_Governanca/documentacao/Fase-*/*/*/MT-RFXXX.yaml"
+    resultado_esperado: "Arquivo encontrado"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (massa de teste obrigatória)"
+
+  - item: "TC-RFXXX.yaml existe"
+    comando: "test -f D:/IC2_Governanca/documentacao/Fase-*/*/*/TC-RFXXX.yaml"
+    resultado_esperado: "Arquivo encontrado"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (casos de teste obrigatórios)"
+
+observacoes:
+  - "Substituir RFXXX pelo RF real durante execução (ex: RF006)"
+  - "Validações bloqueantes (bloqueante: true) param execução completamente"
+  - "Validações não-bloqueantes (bloqueante: false) apenas reportam gap e prosseguem parcialmente"
+  - "Processos travados são mortos AUTOMATICAMENTE antes de validar builds (não é bloqueante)"
+
+comandos_pre_validados:
+  matar_processos_windows:
+    powershell: "Get-Process -Name '*IControlIT*','node' -ErrorAction SilentlyContinue | Stop-Process -Force"
+    bash_alternativo: "python /d/IC2/run.py --kill-only"
+
+  verificar_branch:
+    comando: "git -C /d/IC2 branch --show-current"
+    esperado: "dev"
+
+  build_backend:
+    comando: "cd /d/IC2/backend/IControlIT.API && dotnet build --no-incremental 2>&1 | tail -30"
+    sucesso: "0 Erro(s)"
+    timeout: "3 minutos"
+
+  build_frontend:
+    comando: "cd /d/IC2/frontend/icontrolit-app && npm run build 2>&1 | tail -50"
+    sucesso: "Output location:"
+    timeout: "5 minutos"
+
+matriz_decisao_bloqueios:
+  - pre_requisito: "schema.sql ausente"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "BLOQUEAR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "PROSSEGUIR"
+    decisao_final: "PARCIAL (reportar gap)"
+
+  - pre_requisito: "MT-RFXXX.yaml ausente"
+    testes_backend_unit: "BLOQUEAR"
+    testes_backend_functional: "BLOQUEAR"
+    testes_frontend: "BLOQUEAR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "TOTAL (abortar)"
+
+  - pre_requisito: "TC-RFXXX.yaml ausente"
+    testes_backend_unit: "BLOQUEAR"
+    testes_backend_functional: "BLOQUEAR"
+    testes_frontend: "BLOQUEAR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "TOTAL (abortar)"
+
+  - pre_requisito: "Docker não rodando"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "BLOQUEAR (Testcontainers)"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "PARCIAL (reportar gap)"
+
+  - pre_requisito: "Backend não compila"
+    testes_backend_unit: "BLOQUEAR"
+    testes_backend_functional: "BLOQUEAR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "PARCIAL (backend inválido)"
+
+  - pre_requisito: "Frontend não compila"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "BLOQUEAR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "PARCIAL (frontend inválido)"
+
+changelog:
+  - versao: "1.0"
+    data: "2026-01-08"
+    mudancas:
+      - "Criação do checklist pré-execução de testes"
+      - "Validações bloqueantes vs não-bloqueantes"
+      - "Comandos pré-validados para Windows (Git Bash + PowerShell)"
+      - "Matriz de decisão para bloqueios"
+      - "Timeouts obrigatórios para builds"
