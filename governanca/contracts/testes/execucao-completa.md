@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.1
+**Versão:** 1.1.1
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (Otimizações de eficiência: mapa de caminhos, leitura única, TODO list após validação)
+**Última Atualização:** 2026-01-08 (Correção de estrutura de caminhos: MT/TC na raiz do RF, não em Testes/)
 **Changelog:**
+- v1.1.1 (2026-01-08): Correção de estrutura de caminhos (MT-RF*.yaml e TC-RF*.yaml estão na raiz do RF)
 - v1.1 (2026-01-08): Adicionadas 5 otimizações de eficiência (⬇️ 66% tempo de inicialização)
 - v1.0 (2026-01-03): Criação do contrato com auto-geração de specs E2E
 
@@ -45,9 +46,11 @@ D:\IC2_Governanca\
 └── documentacao\
     └── [Fase]\[EPIC]\[RF]\
         ├── RF*.yaml                            # Estrutura do RF
-        ├── Testes\
-        │   ├── MT-RF*.yaml                     # Massa de teste
-        │   ├── TC-RF*.yaml                     # Casos de teste
+        ├── MT-RF*.yaml                         # Massa de teste (raiz do RF)
+        ├── TC-RF*.yaml                         # Casos de teste (raiz do RF)
+        ├── UC-RF*.yaml                         # Casos de uso (raiz do RF)
+        ├── MD-RF*.yaml                         # Modelo de dados (raiz do RF)
+        ├── Testes\                             # Casos de teste detalhados
         │   ├── Backend\TC-*.md                 # Casos de teste backend
         │   ├── Sistema\TC-*.md                 # Casos de teste frontend
         │   └── Outros\TC-*.md                  # Casos de teste outros
@@ -431,11 +434,11 @@ git branch --show-current
 # 1. Estrutura do RF (leitura obrigatória)
 Read D:\IC2_Governanca\documentacao\[Fase]\[EPIC]\[RF]\RF*.yaml
 
-# 2. Massa de teste (leitura obrigatória)
-Read D:\IC2_Governanca\documentacao\[Fase]\[EPIC]\[RF]\Testes\MT-RF*.yaml
+# 2. Massa de teste (leitura obrigatória - RAIZ DO RF)
+Read D:\IC2_Governanca\documentacao\[Fase]\[EPIC]\[RF]\MT-RF*.yaml
 
-# 3. Casos de teste (leitura obrigatória)
-Read D:\IC2_Governanca\documentacao\[Fase]\[EPIC]\[RF]\Testes\TC-RF*.yaml
+# 3. Casos de teste (leitura obrigatória - RAIZ DO RF)
+Read D:\IC2_Governanca\documentacao\[Fase]\[EPIC]\[RF]\TC-RF*.yaml
 
 # 4. Schema SQL (validação de existência - NÃO ler conteúdo)
 # Verificar existência: D:\IC2\backend\IControlIT.API\tests\schema.sql
