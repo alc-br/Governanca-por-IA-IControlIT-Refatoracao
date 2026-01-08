@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.2
+**Versão:** 1.3
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (Verificação inteligente de ambiente: economiza ~60s quando já está rodando)
+**Última Atualização:** 2026-01-08 (CORREÇÃO: health checks movidos para FASE 1 ANTES de matar processos)
 **Changelog:**
+- v1.3 (2026-01-08): CORREÇÃO CRÍTICA: health checks movidos para PASSO 1.3 (ANTES de matar processos)
 - v1.2 (2026-01-08): Adicionada verificação inteligente de ambiente (health checks antes de iniciar)
 - v1.1.1 (2026-01-08): Correção de estrutura de caminhos (MT-RF*.yaml e TC-RF*.yaml estão na raiz do RF)
 - v1.1 (2026-01-08): Adicionadas 5 otimizações de eficiência (⬇️ 66% tempo de inicialização)
@@ -482,29 +483,54 @@ TIPO: BLOQUEIO DE AMBIENTE (não gera prompt de correção)
 
 **Se qualquer validação FALHAR:** BLOQUEIO TOTAL
 
-#### PASSO 1.3: Matar Processos Travados (AUTOMÁTICO)
+#### PASSO 1.3: Verificar Ambiente (HEALTH CHECKS)
 
-**ANTES de validar builds, o agente DEVE AUTOMATICAMENTE matar processos travados:**
+**🚨 REGRA CRÍTICA: VERIFICAR ANTES DE MATAR PROCESSOS**
+
+**SEMPRE verificar se ambiente já está rodando ANTES de matar processos:**
 
 ```bash
-# Usar run.py para matar processos (RECOMENDADO)
-python run.py --kill-only
+# 1. Verificar backend
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health
+
+# 2. Verificar frontend
+curl -s -o /dev/null -w "%{http_code}" http://localhost:4200
 ```
 
-**OU (se --kill-only não disponível, usar PowerShell/Bash):**
+**Cenário A: Ambos saudáveis (200 OK)**
+- ✅ Backend: Status 200
+- ✅ Frontend: Status 200
+- ✅ **PULAR** PASSO 1.4 (não matar processos)
+- ✅ Seguir direto para PASSO 1.5 (validar builds)
 
-```powershell
-# Windows
-powershell.exe -ExecutionPolicy Bypass -Command "Get-Process | Where-Object { $_.ProcessName -like '*IControlIT*' -or $_.ProcessName -like '*node*' } | Stop-Process -Force"
+**Cenário B: Qualquer um falhou (não-200, timeout, connection refused)**
+- ❌ Backend: Status != 200 OU timeout OU connection refused
+- ❌ Frontend: Status != 200 OU timeout OU connection refused
+- ✅ **EXECUTAR** PASSO 1.4 (matar processos travados)
+
+**Justificativa:** Economiza ~60 segundos quando ambiente já está rodando e saudável.
+
+---
+
+#### PASSO 1.4: Matar Processos Travados (CONDICIONAL)
+
+**Executar SOMENTE se PASSO 1.3 Cenário B (ambiente não está saudável):**
+
+```bash
+# Usar taskkill diretamente (MAIS CONFIÁVEL que run.py)
+taskkill //F //IM "dotnet.exe" 2>/dev/null || true
+taskkill //F //IM "node.exe" 2>/dev/null || true
 ```
 
 **IMPORTANTE:**
-- Esta etapa é **OBRIGATÓRIA** antes de builds
-- Processos travados (PID bloqueando DLLs) são **NORMAIS** em desenvolvimento
+- Esta etapa é **CONDICIONAL** (somente se health checks falharem)
+- Processos travados são **NORMAIS** em desenvolvimento
 - **NÃO gerar prompt de correção** para processos travados
 - Apenas matar automaticamente e prosseguir
 
-#### PASSO 1.4: Validar Builds
+---
+
+#### PASSO 1.5: Validar Builds
 
 ```bash
 # Backend
@@ -518,7 +544,9 @@ npm run build
 
 **Se QUALQUER build FALHAR (APÓS matar processos):** BLOQUEIO TOTAL (PARAR, REPORTAR, BLOQUEAR)
 
-#### PASSO 1.5: Criar TODO List (APÓS Validação Completa)
+---
+
+#### PASSO 1.6: Criar TODO List (APÓS Validação Completa)
 
 **✅ SOMENTE APÓS TODOS OS PRÉ-REQUISITOS VALIDADOS:**
 
@@ -552,32 +580,13 @@ Criar TODO list com as seguintes tarefas:
 
 ### FASE 2: SETUP DE AMBIENTE (AUTOMÁTICO)
 
-#### PASSO 2.1: Verificação Inteligente de Ambiente (OBRIGATÓRIO)
+#### PASSO 2.1: Inicializar Ambiente (CONDICIONAL)
 
-**🚨 REGRA CRÍTICA: VERIFICAR ANTES DE INICIAR**
+**REGRA:** Verificação de ambiente já foi feita no PASSO 1.3 (FASE 1)
 
-**SEMPRE verificar health checks ANTES de iniciar ambiente:**
-
-```bash
-# 1. Verificar backend
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health
-
-# 2. Verificar frontend
-curl -s -o /dev/null -w "%{http_code}" http://localhost:4200
-```
-
-**Cenário A: Ambos saudáveis (200 OK)**
-- ✅ Backend: Status 200
-- ✅ Frontend: Status 200
-- ✅ **PULAR** inicialização (ambiente já está pronto)
-- ✅ Seguir direto para PASSO 2.3 (credenciais)
-
-**Cenário B: Qualquer um falhou (não-200, timeout, erro de conexão)**
-- ❌ Backend: Status != 200 OU timeout OU connection refused
-- ❌ Frontend: Status != 200 OU timeout OU connection refused
-- ✅ **EXECUTAR** inicialização completa (PASSO 2.2)
-
-**Cenário C: Health checks passaram MAS testes falham com erros de ambiente**
+**Executar inicialização SOMENTE se:**
+- PASSO 1.3 Cenário B foi detectado (health checks falharam), OU
+- Testes subsequentes (FASE 3/4/5) falharem com erros de ambiente
 
 **SE durante FASE 3/4/5 ocorrerem erros que CLARAMENTE indicam problema de ambiente:**
 - ❌ Conexão recusada (backend/frontend)
@@ -587,17 +596,11 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:4200
 - ❌ Erros de autenticação que não existiam antes
 
 **ENTÃO:**
-- ✅ **REINICIAR** ambiente completo (PASSO 2.2)
+- ✅ **REINICIAR** ambiente completo (executar PASSO 2.1)
 - ✅ **RE-EXECUTAR** bateria de testes que falhou
 - ✅ Documentar reinicialização no relatório final
 
-**Justificativa:** Economiza ~60 segundos quando ambiente já está rodando e saudável.
-
----
-
-#### PASSO 2.2: Inicialização Completa (CONDICIONAL)
-
-**Executar SOMENTE se PASSO 2.1 Cenário B OU Cenário C:**
+**Inicialização:**
 
 ```bash
 python run.py
@@ -614,7 +617,7 @@ O script `run.py` executa automaticamente:
 
 ---
 
-#### PASSO 2.3: Credenciais de Teste (OBRIGATÓRIO)
+#### PASSO 2.2: Credenciais de Teste (OBRIGATÓRIO)
 
 Para executar testes E2E, use as seguintes credenciais:
 
@@ -631,7 +634,7 @@ Este usuário tem:
 
 ---
 
-#### PASSO 2.4: Preparação Manual (FALLBACK)
+#### PASSO 2.3: Preparação Manual (FALLBACK)
 
 Se `run.py` falhar ou não estiver disponível, executar MANUALMENTE:
 
@@ -670,7 +673,7 @@ Start-Process -NoNewWindow -FilePath "npm" -ArgumentList "start"
 
 ---
 
-#### PASSO 2.5: Validação de Health
+#### PASSO 2.4: Validação de Health
 
 Após iniciar backend (via run.py OU manual), SEMPRE validar:
 
