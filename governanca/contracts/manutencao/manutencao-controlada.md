@@ -1,9 +1,9 @@
 # CONTRATO DE MANUTENÇÃO CONTROLADA (CIRÚRGICA)
 
-**Versão:** 1.3
+**Versão:** 1.4
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (NOVA FASE 0: Criação automática de branch de correção)
+**Última Atualização:** 2026-01-08 (FASE 0 aprimorada: branch descritivo e reutilizável)
 
 ---
 
@@ -205,37 +205,70 @@ cd /d/IC2
 CURRENT_BRANCH=$(git branch --show-current)
 echo "Branch atual: $CURRENT_BRANCH"
 
-# 3. Extrair número do RF do prompt (ex: RF006)
-RF_NUMBER="RF006"  # Extrair do prompt
+# 3. Extrair RF e descrição do prompt
+RF_NUMBER="RF006"  # Extrair do prompt (ex: "RF Afetado: RF006")
+DESCRICAO_BREVE="corrigindo-hierarquia-tenant"  # Extrair do "Descrição:" do prompt
 
-# 4. Criar branch de correção
-BRANCH_NAME="correcao/${RF_NUMBER}"
-echo "Criando branch: $BRANCH_NAME"
+# 4. Normalizar RF para lowercase (RF006 → rf006)
+RF_LOWER=$(echo "$RF_NUMBER" | tr '[:upper:]' '[:lower:]')
 
-# 5. Criar branch a partir do branch atual
-git checkout -b "$BRANCH_NAME"
+# 5. Normalizar descrição (remover acentos, espaços → hífens, max 50 chars)
+DESC_NORMALIZED=$(echo "$DESCRICAO_BREVE" | tr '[:upper:]' '[:lower:]' | sed 's/ /-/g' | sed 's/[^a-z0-9-]//g' | cut -c1-50)
 
-# 6. Validar que estamos no branch correto
+# 6. Definir nome do branch (convenção: fix/rfXXX-descricao-curta)
+BRANCH_NAME="fix/${RF_LOWER}-${DESC_NORMALIZED}"
+echo "Branch de correção: $BRANCH_NAME"
+
+# 7. Verificar se branch já existe
+if git show-ref --verify --quiet refs/heads/"$BRANCH_NAME"; then
+  echo "✅ Branch $BRANCH_NAME já existe, fazendo checkout..."
+  git checkout "$BRANCH_NAME"
+  BRANCH_ACTION="selecionado"
+else
+  echo "Branch $BRANCH_NAME não existe, criando..."
+  git checkout -b "$BRANCH_NAME"
+  BRANCH_ACTION="criado"
+fi
+
+# 8. Validar que estamos no branch correto
 NEW_BRANCH=$(git branch --show-current)
 if [ "$NEW_BRANCH" != "$BRANCH_NAME" ]; then
-  echo "❌ ERRO: Branch não criado corretamente"
+  echo "❌ ERRO: Branch não está ativo"
   echo "Esperado: $BRANCH_NAME"
   echo "Atual: $NEW_BRANCH"
   exit 1
 fi
 
-echo "✅ Branch $BRANCH_NAME criado e ativo"
-echo "✅ Base: $CURRENT_BRANCH"
+echo "✅ Branch $BRANCH_NAME ativo ($BRANCH_ACTION)"
+if [ "$BRANCH_ACTION" = "criado" ]; then
+  echo "✅ Base: $CURRENT_BRANCH"
+fi
 ```
 
-**Saída esperada:**
+**Saída esperada (branch novo):**
 ```
-Branch atual: main
-Criando branch: correcao/RF006
-Switched to a new branch 'correcao/RF006'
-✅ Branch correcao/RF006 criado e ativo
-✅ Base: main
+Branch atual: dev
+Branch de correção: fix/rf006-corrigindo-hierarquia-tenant
+Branch fix/rf006-corrigindo-hierarquia-tenant não existe, criando...
+Switched to a new branch 'fix/rf006-corrigindo-hierarquia-tenant'
+✅ Branch fix/rf006-corrigindo-hierarquia-tenant ativo (criado)
+✅ Base: dev
 ```
+
+**Saída esperada (branch existente - múltiplas correções do mesmo RF):**
+```
+Branch atual: dev
+Branch de correção: fix/rf006-corrigindo-hierarquia-tenant
+✅ Branch fix/rf006-corrigindo-hierarquia-tenant já existe, fazendo checkout...
+Switched to branch 'fix/rf006-corrigindo-hierarquia-tenant'
+✅ Branch fix/rf006-corrigindo-hierarquia-tenant ativo (selecionado)
+```
+
+**Exemplos de nomes de branch:**
+- `fix/rf006-corrigindo-hierarquia-tenant`
+- `fix/rf010-preview-imagem-upload`
+- `fix/rf008-alinhamento-botao-cnpj`
+- `fix/generic-incompatibilidade-int64-int32` (quando RF não identificado)
 
 #### PASSO 0.3: Documentar Branch em .temp_ia
 

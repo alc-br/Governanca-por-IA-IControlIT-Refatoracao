@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.7
+**Versão:** 1.8
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (MUDANÇA: Executa no branch ativo, sem validação de branch)
+**Última Atualização:** 2026-01-08 (NOVA FEATURE: Merge automático em dev quando 100% aprovado)
 **Changelog:**
+- v1.8 (2026-01-08): NOVA FEATURE: Merge automático em dev quando testes atingem 100% em branch fix/*
 - v1.7 (2026-01-08): MUDANÇA CRÍTICA: Executa no branch ativo (não valida, não faz checkout)
 - v1.6 (2026-01-08): NOVA FASE 6.5: Auditoria de Conformidade Funcional e UX (incongruências, funcionalidades duplicadas, UX)
 - v1.5 (2026-01-08): CORREÇÃO CRÍTICA: validação de frontend com retry (120s) - Angular demora mais
@@ -1764,7 +1765,7 @@ Seguir D:\IC2\CLAUDE.md e contracts/desenvolvimento/execucao/manutencao/manutenc
 
 ---
 
-### FASE 8: DECISÃO FINAL
+### FASE 8: DECISÃO FINAL E MERGE AUTOMÁTICO
 
 #### PASSO 8.1: Aplicar Critério 0% ou 100%
 
@@ -1773,7 +1774,90 @@ Seguir D:\IC2\CLAUDE.md e contracts/desenvolvimento/execucao/manutencao/manutenc
 
 **NÃO EXISTE APROVAÇÃO COM RESSALVAS.**
 
-#### PASSO 8.2: Atualizar STATUS.yaml (SEM COMMIT)
+#### PASSO 8.2: Merge Automático em `dev` (SE APROVADO A 100%)
+
+**🚨 REGRA CRÍTICA: Merge Automático ao Atingir 100%**
+
+**SE taxa de aprovação = 100%:**
+
+```bash
+# 1. Identificar branch atual
+CURRENT_BRANCH=$(git branch --show-current)
+echo "Branch atual: $CURRENT_BRANCH"
+
+# 2. Verificar se está em branch de correção (fix/*)
+if [[ "$CURRENT_BRANCH" == fix/* ]]; then
+  echo "✅ Branch de correção detectado: $CURRENT_BRANCH"
+  echo "✅ Testes 100% aprovados, fazendo merge em dev..."
+
+  # 3. Fazer checkout para dev
+  git checkout dev
+
+  # 4. Fazer merge do branch de correção
+  git merge --no-ff "$CURRENT_BRANCH" -m "merge: $CURRENT_BRANCH - testes 100% aprovados
+
+Merge automático realizado após execução completa de testes.
+
+Taxa de aprovação: 100%
+Branch: $CURRENT_BRANCH
+Data: $(date +"%Y-%m-%d %H:%M:%S")
+
+Testes executados:
+- Backend: PASS
+- Frontend: PASS
+- E2E: PASS
+- Segurança: PASS
+- Conformidade UX: PASS
+
+🤖 Merge automático via contrato de testes
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+  # 5. Validar merge bem-sucedido
+  if [ $? -eq 0 ]; then
+    echo "✅ Merge realizado com sucesso em dev"
+    echo "ℹ️ Branch de correção mantido para referência: $CURRENT_BRANCH"
+    echo "ℹ️ Para deletar: git branch -d $CURRENT_BRANCH"
+  else
+    echo "❌ ERRO: Merge falhou"
+    echo "❌ Resolvendo manualmente..."
+    exit 1
+  fi
+else
+  echo "ℹ️ Branch atual não é de correção (fix/*), sem merge automático"
+  echo "ℹ️ Branch: $CURRENT_BRANCH"
+fi
+```
+
+**Saída esperada (branch de correção, 100% aprovado):**
+```
+Branch atual: fix/rf006-corrigindo-hierarquia-tenant
+✅ Branch de correção detectado: fix/rf006-corrigindo-hierarquia-tenant
+✅ Testes 100% aprovados, fazendo merge em dev...
+Switched to branch 'dev'
+Merge made by the 'ort' strategy.
+ [arquivos alterados listados]
+✅ Merge realizado com sucesso em dev
+ℹ️ Branch de correção mantido para referência: fix/rf006-corrigindo-hierarquia-tenant
+ℹ️ Para deletar: git branch -d fix/rf006-corrigindo-hierarquia-tenant
+```
+
+**Saída esperada (branch principal, 100% aprovado):**
+```
+Branch atual: dev
+ℹ️ Branch atual não é de correção (fix/*), sem merge automático
+ℹ️ Branch: dev
+```
+
+**SE taxa de aprovação < 100%:**
+- ❌ **NÃO fazer merge**
+- ✅ Permanecer no branch de correção (fix/*)
+- ✅ Gerar prompts de correção
+- ✅ Aguardar novas correções e re-execução de testes
+
+---
+
+#### PASSO 8.3: Atualizar STATUS.yaml (SEM COMMIT)
 
 **IMPORTANTE:**
 - ✅ Atualizar STATUS.yaml com resultados
