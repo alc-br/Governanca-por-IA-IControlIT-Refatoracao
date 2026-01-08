@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.1.1
+**Versão:** 1.2
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (Correção de estrutura de caminhos: MT/TC na raiz do RF, não em Testes/)
+**Última Atualização:** 2026-01-08 (Verificação inteligente de ambiente: economiza ~60s quando já está rodando)
 **Changelog:**
+- v1.2 (2026-01-08): Adicionada verificação inteligente de ambiente (health checks antes de iniciar)
 - v1.1.1 (2026-01-08): Correção de estrutura de caminhos (MT-RF*.yaml e TC-RF*.yaml estão na raiz do RF)
 - v1.1 (2026-01-08): Adicionadas 5 otimizações de eficiência (⬇️ 66% tempo de inicialização)
 - v1.0 (2026-01-03): Criação do contrato com auto-geração de specs E2E
@@ -551,9 +552,52 @@ Criar TODO list com as seguintes tarefas:
 
 ### FASE 2: SETUP DE AMBIENTE (AUTOMÁTICO)
 
-#### PASSO 2.1: Inicialização Automática (RECOMENDADO)
+#### PASSO 2.1: Verificação Inteligente de Ambiente (OBRIGATÓRIO)
 
-**A forma MAIS SIMPLES e RECOMENDADA de iniciar o sistema completo:**
+**🚨 REGRA CRÍTICA: VERIFICAR ANTES DE INICIAR**
+
+**SEMPRE verificar health checks ANTES de iniciar ambiente:**
+
+```bash
+# 1. Verificar backend
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health
+
+# 2. Verificar frontend
+curl -s -o /dev/null -w "%{http_code}" http://localhost:4200
+```
+
+**Cenário A: Ambos saudáveis (200 OK)**
+- ✅ Backend: Status 200
+- ✅ Frontend: Status 200
+- ✅ **PULAR** inicialização (ambiente já está pronto)
+- ✅ Seguir direto para PASSO 2.3 (credenciais)
+
+**Cenário B: Qualquer um falhou (não-200, timeout, erro de conexão)**
+- ❌ Backend: Status != 200 OU timeout OU connection refused
+- ❌ Frontend: Status != 200 OU timeout OU connection refused
+- ✅ **EXECUTAR** inicialização completa (PASSO 2.2)
+
+**Cenário C: Health checks passaram MAS testes falham com erros de ambiente**
+
+**SE durante FASE 3/4/5 ocorrerem erros que CLARAMENTE indicam problema de ambiente:**
+- ❌ Conexão recusada (backend/frontend)
+- ❌ Timeout em requisições HTTP
+- ❌ "Cannot connect to database"
+- ❌ "Port already in use" seguido de falhas
+- ❌ Erros de autenticação que não existiam antes
+
+**ENTÃO:**
+- ✅ **REINICIAR** ambiente completo (PASSO 2.2)
+- ✅ **RE-EXECUTAR** bateria de testes que falhou
+- ✅ Documentar reinicialização no relatório final
+
+**Justificativa:** Economiza ~60 segundos quando ambiente já está rodando e saudável.
+
+---
+
+#### PASSO 2.2: Inicialização Completa (CONDICIONAL)
+
+**Executar SOMENTE se PASSO 2.1 Cenário B OU Cenário C:**
 
 ```bash
 python run.py
@@ -568,7 +612,9 @@ O script `run.py` executa automaticamente:
 
 **IMPORTANTE:** Sempre use `python run.py` para garantir ambiente limpo e funcional.
 
-#### PASSO 2.2: Credenciais de Teste (OBRIGATÓRIO)
+---
+
+#### PASSO 2.3: Credenciais de Teste (OBRIGATÓRIO)
 
 Para executar testes E2E, use as seguintes credenciais:
 
@@ -583,7 +629,9 @@ Este usuário tem:
 - ✅ Acesso a TODAS as funcionalidades do sistema
 - ✅ Dados de teste pré-populados
 
-#### PASSO 2.3: Preparação Manual (FALLBACK)
+---
+
+#### PASSO 2.4: Preparação Manual (FALLBACK)
 
 Se `run.py` falhar ou não estiver disponível, executar MANUALMENTE:
 
@@ -620,7 +668,9 @@ Start-Process -NoNewWindow -FilePath "npm" -ArgumentList "start"
    - Rebuild: `dotnet build --no-incremental`
    - Reiniciar: `dotnet run`
 
-#### PASSO 2.4: Validação de Health
+---
+
+#### PASSO 2.5: Validação de Health
 
 Após iniciar backend (via run.py OU manual), SEMPRE validar:
 
