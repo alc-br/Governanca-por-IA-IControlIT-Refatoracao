@@ -315,10 +315,12 @@ TODO LIST - Adequacao Frontend RFXXX
   |-- [pending] Se erro no frontend atual: CORRIGIR e re-testar
   +-- [pending] Se erro em outro RF: criar RELATORIO-ERROS-RFXXX.md
 
-[pending] Adequar Componentes Existentes
+[pending] Adequar Componentes Existentes (ADICIONAR DATA-TEST DURANTE ADEQUACAO)
   |-- [pending] Ajustar DTOs conforme backend regularizado
   |-- [pending] Adicionar funcionalidades faltantes do UC
+  |     +-- [pending] Adicionar data-test em NOVOS elementos interativos
   |-- [pending] Implementar estados faltantes (Loading/Vazio/Erro)
+  |     +-- [pending] Adicionar data-test em botoes de acao
   |-- [pending] Refatorar para Standalone Components (se necessario)
   |-- [pending] Preservar layout aprovado (componentes Fuse)
   +-- [pending] Validar responsividade (desktop/tablet/mobile)
@@ -334,6 +336,14 @@ TODO LIST - Adequacao Frontend RFXXX
   |-- [pending] Criar chaves en-US
   |-- [pending] Criar chaves es-ES
   +-- [pending] Validar ZERO warnings no console
+
+[pending] Auditoria de Data-Test Attributes (OBRIGATORIO - PRE-TESTE E2E)
+  |-- [pending] Executar auditoria: Conforme D:\IC2_Governanca\governanca\prompts\auditoria\data-test.md
+  |-- [pending] Analisar relatorio de auditoria gerado
+  |-- [pending] Se problemas BLOQUEANTES: corrigir TODOS antes de prosseguir
+  |-- [pending] Se problemas ALTA: corrigir TODOS (nomenclatura incorreta)
+  |-- [pending] Re-auditar apos correcoes
+  +-- [pending] Validar 0 problemas BLOQUEANTES e 0 problemas ALTA
 
 [pending] Testes E2E (Playwright - OBRIGATORIO)
   |-- [pending] TC-E2E: Login como developer
@@ -699,6 +709,79 @@ Se qualquer item estiver ausente:
 - Logar erro claro
 - NAO permitir funcionamento silencioso
 - Alertar explicitamente
+
+---
+
+## AUDITORIA DE DATA-TEST ATTRIBUTES (OBRIGATORIO)
+
+**Momento de execução:** ANTES dos Testes E2E
+
+Durante a adequação, data-test attributes devem ser adicionados em TODOS os elementos interativos novos ou modificados. Elementos existentes também devem ser auditados para garantir conformidade com o padrão RF006-acao-alvo.
+
+### Por que auditar data-test?
+
+- **Elementos esquecidos:** É comum esquecer de adicionar data-test em novos botões, inputs ou modais
+- **Nomenclatura incorreta:** Elementos antigos podem ter nomenclatura sem prefixo RF (ex: `data-test="botao-salvar"` ao invés de `data-test="RF006-salvar-cliente"`)
+- **Cobertura incompleta:** Testes E2E dependem de 100% de cobertura de data-test
+
+### Fluxo de Auditoria (OBRIGATÓRIO)
+
+**Antes de executar testes E2E, o agente DEVE:**
+
+1. **Executar auditoria automatizada:**
+   ```
+   Conforme D:\IC2_Governanca\governanca\prompts\auditoria\data-test.md
+   ```
+
+2. **Analisar relatório gerado:**
+   - Relatório: `D:\IC2\.temp_ia\RELATORIO-AUDITORIA-DATA-TEST-RFXXX-*.md`
+   - Verificar problemas BLOQUEANTES (elementos sem data-test)
+   - Verificar problemas ALTA (nomenclatura incorreta - falta prefixo RFXXX)
+
+3. **Corrigir TODOS os problemas identificados:**
+   - Usar prompt de correção: `D:\IC2\.temp_ia\PROMPT-CORRECAO-DATA-TEST-RFXXX-*.md`
+   - Corrigir via `manutencao-controlada.md`
+   - Re-auditar após correções
+
+4. **Validar aprovação:**
+   - 0 problemas BLOQUEANTES
+   - 0 problemas ALTA
+   - 100% dos elementos interativos com data-test no padrão correto
+
+### Bloqueio de Execução
+
+**Se auditoria reprovar (problemas BLOQUEANTES/ALTA):**
+- ❌ **NÃO** executar testes E2E
+- ❌ **NÃO** considerar frontend concluído
+- ✅ **CORRIGIR** todos os problemas identificados
+- ✅ **RE-AUDITAR** até aprovação (0 BLOQUEANTES, 0 ALTA)
+
+### Padrão de Nomenclatura (RF-Específico)
+
+**Formato obrigatório:**
+```
+data-test="RFXXX-<acao>-<alvo>"
+```
+
+**Exemplos corretos:**
+- `data-test="RF006-salvar-cliente"`
+- `data-test="RF006-input-razaosocial"`
+- `data-test="RF006-editar-cliente"`
+- `data-test="RF006-filtro-status"`
+
+**Exemplos incorretos (problema ALTA):**
+- `data-test="botao-salvar"` ❌ (falta RFXXX)
+- `data-test="salvar-cliente"` ❌ (falta RFXXX)
+- `data-test="RF006_salvar"` ❌ (underscore)
+- `data-test="RF006-SalvarCliente"` ❌ (CamelCase)
+
+### Justificativa
+
+- Testes E2E dependem de data-test attributes estáveis
+- Sem data-test corretos, 100% dos testes FALHAM
+- Auditoria preventiva economiza tempo de debug
+- Garante qualidade e manutenibilidade dos testes
+- Evita retrabalho após implementação de testes E2E
 
 ---
 

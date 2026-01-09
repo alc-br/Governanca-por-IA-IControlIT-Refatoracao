@@ -238,6 +238,46 @@ execucao:
 
 **Ver padrões completos em:** `CONVENTIONS.md` (seção 5.6 - Data-test Attributes)
 
+### Auditoria de Data-Test (FASE OBRIGATÓRIA)
+
+**Momento de execução:** ANTES dos Testes E2E
+
+Durante o desenvolvimento, data-test attributes devem ser adicionados em TODOS os elementos interativos conforme são criados. Porém, é comum esquecer elementos ou usar nomenclatura incorreta.
+
+**Antes de executar testes E2E, o agente DEVE:**
+
+1. **Executar auditoria automatizada:**
+   ```
+   Conforme D:\IC2_Governanca\governanca\prompts\auditoria\data-test.md
+   ```
+
+2. **Analisar relatório gerado:**
+   - Relatório: `D:\IC2\.temp_ia\RELATORIO-AUDITORIA-DATA-TEST-RFXXX-*.md`
+   - Verificar problemas BLOQUEANTES (elementos sem data-test)
+   - Verificar problemas ALTA (nomenclatura incorreta)
+
+3. **Corrigir TODOS os problemas identificados:**
+   - Usar prompt de correção: `D:\IC2\.temp_ia\PROMPT-CORRECAO-DATA-TEST-RFXXX-*.md`
+   - Corrigir via `manutencao-controlada.md`
+   - Re-auditar após correções
+
+4. **Validar aprovação:**
+   - 0 problemas BLOQUEANTES
+   - 0 problemas ALTA
+   - 100% dos elementos interativos com data-test
+
+**BLOQUEIO:** Se auditoria reprovar (problemas BLOQUEANTES/ALTA):
+- **NÃO** executar testes E2E
+- **NÃO** considerar frontend concluído
+- **CORRIGIR** todos os problemas
+- **RE-AUDITAR** até aprovação
+
+**Justificativa:**
+- Testes E2E dependem de data-test attributes
+- Sem data-test corretos, 100% dos testes FALHAM
+- Auditoria preventiva economiza tempo de debug
+- Garante qualidade e manutenibilidade dos testes
+
 ---
 
 ## CONSULTA OBRIGATÓRIA À BASE DE CONHECIMENTO
@@ -531,12 +571,17 @@ TODO LIST - Frontend RFXXX
   |-- [pending] Se erro no frontend atual: CORRIGIR e re-testar
   +-- [pending] Se erro em outro RF: criar RELATORIO-ERROS-RFXXX.md
 
-[pending] Implementar Componentes UI
+[pending] Implementar Componentes UI (ADICIONAR DATA-TEST DURANTE DESENVOLVIMENTO)
   |-- [pending] Tela de Listagem (seguir padrao /management/users)
+  |     +-- [pending] Adicionar data-test em TODOS os elementos interativos
   |-- [pending] Tela de Criar/Editar
+  |     +-- [pending] Adicionar data-test em TODOS os elementos interativos
   |-- [pending] Tela de Visualizar
+  |     +-- [pending] Adicionar data-test em TODOS os elementos interativos
   |-- [pending] Modais (Confirmacao, Sucesso, Erro)
+  |     +-- [pending] Adicionar data-test em TODOS os botoes
   +-- [pending] Estados (Loading, Vazio, Erro)
+        +-- [pending] Adicionar data-test em botoes de acao
 
 [pending] Implementar Services
   |-- [pending] Criar service de API
@@ -553,6 +598,14 @@ TODO LIST - Frontend RFXXX
   |-- [pending] Criar chaves en-US
   |-- [pending] Criar chaves es-ES
   +-- [pending] Validar ZERO warnings no console
+
+[pending] Auditoria de Data-Test Attributes (OBRIGATORIO - PRE-TESTE E2E)
+  |-- [pending] Executar auditoria: Conforme D:\IC2_Governanca\governanca\prompts\auditoria\data-test.md
+  |-- [pending] Analisar relatorio de auditoria gerado
+  |-- [pending] Se problemas BLOQUEANTES: corrigir TODOS antes de prosseguir
+  |-- [pending] Se problemas ALTA: corrigir TODOS antes de prosseguir
+  |-- [pending] Re-auditar apos correcoes
+  +-- [pending] Validar 0 problemas BLOQUEANTES e 0 problemas ALTA
 
 [pending] Testes E2E (Playwright - OBRIGATORIO)
   |-- [pending] TC-E2E: Login como developer

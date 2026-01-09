@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.8
+**Versão:** 1.9
 **Data:** 2026-01-08
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (NOVA FEATURE: Merge automático em dev quando 100% aprovado)
+**Última Atualização:** 2026-01-08 (OTIMIZAÇÃO: run.py v2.0 valida health automaticamente)
 **Changelog:**
+- v1.9 (2026-01-08): OTIMIZAÇÃO CRÍTICA: run.py v2.0 valida health automaticamente (removidos health checks manuais do contrato)
 - v1.8 (2026-01-08): NOVA FEATURE: Merge automático em dev quando testes atingem 100% em branch fix/*
 - v1.7 (2026-01-08): MUDANÇA CRÍTICA: Executa no branch ativo (não valida, não faz checkout)
 - v1.6 (2026-01-08): NOVA FASE 6.5: Auditoria de Conformidade Funcional e UX (incongruências, funcionalidades duplicadas, UX)
@@ -681,61 +682,80 @@ Start-Process -NoNewWindow -FilePath "npm" -ArgumentList "start"
 
 ---
 
-#### PASSO 2.4: Validação de Health (OBRIGATÓRIO COM RETRY)
+#### PASSO 2.4: Validação de Health (AUTOMÁTICO via run.py v2.0)
 
-**🚨 REGRA CRÍTICA: AGUARDAR AMBIENTE ESTAR 100% PRONTO**
+**✅ MUDANÇA CRÍTICA: run.py v2.0 valida health automaticamente**
 
-Após executar `python run.py` (ou inicialização manual), **SEMPRE validar COM RETRY**:
+O script `python D:\IC2\run.py` agora valida automaticamente que backend e frontend estão 100% prontos antes de retornar:
 
-**1. Validar Backend (timeout: 60s, retry: a cada 5s)**
+**Comportamento do run.py v2.0:**
+- ✅ Mata processos anteriores (dotnet, node)
+- ✅ Inicia backend em background (porta 5000)
+- ✅ Inicia frontend em background (porta 4200)
+- ✅ **Valida health do backend com retry (timeout: 60s, intervalo: 5s)**
+- ✅ **Valida health do frontend com retry (timeout: 120s, intervalo: 5s)**
+- ✅ **Retorna exit code 0 SOMENTE quando AMBOS estão 200 OK**
+- ❌ **Retorna exit code 1 se timeout ou falha**
 
-```bash
-# Loop de validação (até 12 tentativas × 5s = 60s total)
-for i in {1..12}; do
-  STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health 2>/dev/null || echo "000")
-  if [ "$STATUS" = "200" ]; then
-    echo "✅ Backend pronto (tentativa $i)"
-    break
-  fi
-  echo "⏳ Backend não pronto ($STATUS), aguardando... (tentativa $i/12)"
-  sleep 5
-done
+**Exemplo de saída:**
+```
+============================================================
+  IControlIT - Gerenciador de Desenvolvimento v2.0
+============================================================
+
+[1/4] Matando processos existentes...
+  ✓ Processos finalizados
+  ✓ Portas liberadas
+
+[2/4] Iniciando backend...
+  ✓ Backend iniciado em background (porta 5000)
+
+[3/4] Iniciando frontend...
+  ✓ Frontend iniciado em background (porta 4200)
+
+[4/4] Validando ambiente...
+
+  Backend (http://localhost:5000/health):
+    ⏳ Aguardando... (tentativa 1, 0s/60s)
+    ⏳ Aguardando... (tentativa 2, 5s/60s)
+    ✓ Backend PRONTO (tentativa 3, 10s)
+
+  Frontend (http://localhost:4200):
+    ⏳ Aguardando compilação Angular... (tentativa 1, 0s/120s)
+    ⏳ Aguardando compilação Angular... (tentativa 5, 20s/120s)
+    ✓ Frontend PRONTO (tentativa 11, 50s)
+
+============================================================
+  ✓ AMBIENTE PRONTO
+
+  Backend:  http://localhost:5000/health (200 OK)
+  Frontend: http://localhost:4200 (200 OK)
+============================================================
 ```
 
-**Se backend NÃO responder 200 após 60s:** ❌ Backend TRAVADO (erro CRÍTICO)
-
----
-
-**2. Validar Frontend (timeout: 120s, retry: a cada 10s)**
-
-**⚠️ IMPORTANTE: Angular demora mais que backend (compilação + bundle)**
-
+**Regra de execução:**
 ```bash
-# Loop de validação (até 12 tentativas × 10s = 120s total)
-for i in {1..12}; do
-  STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4200 2>/dev/null || echo "000")
-  if [ "$STATUS" = "200" ]; then
-    echo "✅ Frontend pronto (tentativa $i)"
-    break
-  fi
-  echo "⏳ Frontend não pronto ($STATUS), aguardando... (tentativa $i/12)"
-  sleep 10
-done
+# Executar run.py (já valida health automaticamente)
+python D:\IC2\run.py
+
+# Verificar exit code
+if [ $? -eq 0 ]; then
+  echo "✅ Ambiente pronto, prosseguir para testes"
+else
+  echo "❌ Ambiente com falhas, BLOQUEAR execução de testes"
+  exit 1
+fi
 ```
-
-**Se frontend NÃO responder 200 após 120s:** ❌ Frontend TRAVADO (erro CRÍTICO)
-
----
 
 **PROIBIDO:**
-- ❌ Assumir que ambiente está pronto após tempo fixo (60s)
-- ❌ Executar testes E2E sem validar frontend 200 OK
-- ❌ Marcar como "BLOQUEADO" sem esperar timeout completo
+- ❌ Adicionar validações manuais de health após run.py
+- ❌ Adicionar sleep manual após run.py
+- ❌ Assumir que ambiente está pronto sem verificar exit code
 
 **REGRA FINAL:**
-- ✅ Backend DEVE estar 200 OK (até 60s de espera)
-- ✅ Frontend DEVE estar 200 OK (até 120s de espera)
-- ✅ Somente após AMBOS 200 OK: prosseguir para testes
+- ✅ Executar `python D:\IC2\run.py`
+- ✅ Validar exit code (0 = sucesso, 1 = falha)
+- ✅ Prosseguir para testes SOMENTE se exit code = 0
 
 ---
 
