@@ -1,0 +1,411 @@
+# CHECKLIST DE VALIDAÇÃO: TESTES E2E ISOLADOS
+# Versão: 1.0
+# Data: 2026-01-11
+# Contrato: CONTRATO-TESTES-E2E-ISOLADOS.md
+# Changelog v1.0: Criação do checklist para validar testes E2E isolados (beforeEach/afterEach, closeAllOverlays, Page Objects, sem test.describe.serial)
+
+metadata:
+  versao: "1.0"
+  data_criacao: "2026-01-11"
+  contrato_referencia: "D:\\IC2_Governanca\\governanca\\contracts\\testes\\CONTRATO-TESTES-E2E-ISOLADOS.md"
+  tipo: "validacao_estrutural"
+  severidade_default: "critica"
+
+# =============================================
+# SEÇÃO 1: ESTRUTURA DE PAGE OBJECTS
+# =============================================
+estrutura_page_objects:
+  - id: E2E-ISO-PO-01
+    categoria: estrutura
+    severidade: critica
+    titulo: "Diretório pages/ existe"
+    verificacao: "Verificar que D:\\IC2\\frontend\\icontrolit-app\\e2e\\pages\\ existe"
+    comando: "dir /b D:\\IC2\\frontend\\icontrolit-app\\e2e\\pages"
+    criterio_aprovacao: "Diretório existe e contém pelo menos 2 arquivos .ts"
+    se_falhar: "BLOQUEIO - Criar diretório pages/ e implementar Page Objects"
+
+  - id: E2E-ISO-PO-02
+    categoria: estrutura
+    severidade: critica
+    titulo: "BasePage implementado"
+    verificacao: "Verificar que base.page.ts existe e implementa closeAllOverlays()"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\e2e\\pages\\base.page.ts"
+    validacoes:
+      - contem: "export class BasePage"
+      - contem: "closeAllOverlays()"
+      - contem: "waitForDialogToClosed()"
+      - contem: "waitForDialogToOpen()"
+    se_falhar: "BLOQUEIO - Implementar BasePage conforme template do contrato"
+
+  - id: E2E-ISO-PO-03
+    categoria: estrutura
+    severidade: critica
+    titulo: "Page Objects herdam BasePage"
+    verificacao: "Verificar que TODOS os Page Objects herdam BasePage"
+    comando: "grep -r 'extends BasePage' e2e/pages/*.page.ts"
+    criterio_aprovacao: "Todos os Page Objects (exceto BasePage) herdam BasePage"
+    se_falhar: "BLOQUEIO - Fazer Page Objects herdarem BasePage"
+
+  - id: E2E-ISO-PO-04
+    categoria: estrutura
+    severidade: alta
+    titulo: "LoginPage implementado"
+    verificacao: "Verificar que login.page.ts existe"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\e2e\\pages\\login.page.ts"
+    validacoes:
+      - contem: "export class LoginPage"
+      - contem: "extends BasePage"
+      - contem: "login("
+      - contem: "logout("
+    se_falhar: "AVISO - LoginPage necessário para beforeEach"
+
+# =============================================
+# SEÇÃO 2: BEFOREEACH OBRIGATÓRIO
+# =============================================
+beforeeach_obrigatorio:
+  - id: E2E-ISO-BE-01
+    categoria: beforeeach
+    severidade: critica
+    titulo: "beforeEach presente em TODOS os specs"
+    verificacao: "Verificar que TODOS os specs TC-RFXXX-*.spec.ts possuem test.beforeEach"
+    comando: "python tools/validate-isolated-tests.py RFXXX"
+    criterio_aprovacao: "100% dos specs possuem test.beforeEach"
+    se_falhar: "BLOQUEIO - Adicionar test.beforeEach em specs ausentes"
+
+  - id: E2E-ISO-BE-02
+    categoria: beforeeach
+    severidade: critica
+    titulo: "beforeEach chama login"
+    verificacao: "Verificar que beforeEach executa login"
+    validacoes:
+      - contem: "loginPage.login("
+      - ou: "await loginPage.navigate()"
+    criterio_aprovacao: "beforeEach de TODOS os specs executa login"
+    se_falhar: "BLOQUEIO - Adicionar login em beforeEach"
+
+  - id: E2E-ISO-BE-03
+    categoria: beforeeach
+    severidade: critica
+    titulo: "beforeEach chama closeAllOverlays"
+    verificacao: "Verificar que beforeEach limpa overlays"
+    validacoes:
+      - contem: "closeAllOverlays()"
+    criterio_aprovacao: "beforeEach de TODOS os specs chama closeAllOverlays()"
+    se_falhar: "BLOQUEIO - Adicionar closeAllOverlays() em beforeEach"
+    observacao: "CRÍTICO para prevenir contaminação de estado (67% dos problemas RF006)"
+
+  - id: E2E-ISO-BE-04
+    categoria: beforeeach
+    severidade: critica
+    titulo: "beforeEach navega para página da entidade"
+    verificacao: "Verificar que beforeEach navega para página correta"
+    validacoes:
+      - contem: ".navigate()"
+    criterio_aprovacao: "beforeEach de TODOS os specs navega para página"
+    se_falhar: "BLOQUEIO - Adicionar navegação em beforeEach"
+
+# =============================================
+# SEÇÃO 3: AFTEREACH OBRIGATÓRIO
+# =============================================
+aftereach_obrigatorio:
+  - id: E2E-ISO-AE-01
+    categoria: aftereach
+    severidade: critica
+    titulo: "afterEach presente em TODOS os specs"
+    verificacao: "Verificar que TODOS os specs possuem test.afterEach"
+    comando: "python tools/validate-isolated-tests.py RFXXX"
+    criterio_aprovacao: "100% dos specs possuem test.afterEach"
+    se_falhar: "BLOQUEIO - Adicionar test.afterEach em specs ausentes"
+
+  - id: E2E-ISO-AE-02
+    categoria: aftereach
+    severidade: critica
+    titulo: "afterEach chama closeAllOverlays"
+    verificacao: "Verificar que afterEach limpa overlays"
+    validacoes:
+      - contem: "closeAllOverlays()"
+    criterio_aprovacao: "afterEach de TODOS os specs chama closeAllOverlays()"
+    se_falhar: "BLOQUEIO - Adicionar closeAllOverlays() em afterEach"
+    observacao: "CRÍTICO para prevenir overlay persistente entre testes"
+
+  - id: E2E-ISO-AE-03
+    categoria: aftereach
+    severidade: media
+    titulo: "afterEach executa logout"
+    verificacao: "Verificar que afterEach executa logout (recomendado)"
+    validacoes:
+      - contem: "logout()"
+    criterio_aprovacao: "afterEach executa logout (recomendado, não obrigatório)"
+    se_falhar: "AVISO - logout recomendado para isolamento completo"
+
+# =============================================
+# SEÇÃO 4: ISOLAMENTO DE TESTES
+# =============================================
+isolamento_testes:
+  - id: E2E-ISO-IT-01
+    categoria: isolamento
+    severidade: critica
+    titulo: "NENHUM uso de test.describe.serial"
+    verificacao: "Verificar que specs NÃO usam test.describe.serial"
+    comando: "grep -r 'test.describe.serial' e2e/specs/TC-RFXXX-*.spec.ts"
+    criterio_aprovacao: "Zero ocorrências de test.describe.serial"
+    se_falhar: "BLOQUEIO - Remover test.describe.serial, usar test.describe"
+    observacao: "test.describe.serial é PROIBIDO em testes isolated (causa dependências)"
+
+  - id: E2E-ISO-IT-02
+    categoria: isolamento
+    severidade: critica
+    titulo: "NENHUMA variável compartilhada entre testes"
+    verificacao: "Verificar que testes NÃO compartilham variáveis (let clienteId fora de test)"
+    validacao_manual: true
+    criterio_aprovacao: "Zero variáveis compartilhadas entre testes"
+    se_falhar: "BLOQUEIO - Mover variáveis para dentro de cada test()"
+    observacao: "Variáveis compartilhadas causam dependências implícitas"
+
+  - id: E2E-ISO-IT-03
+    categoria: isolamento
+    severidade: alta
+    titulo: "Cada teste cria SEUS dados"
+    verificacao: "Verificar que testes criam próprios dados (via API ou UI)"
+    validacao_manual: true
+    criterio_aprovacao: "Testes não dependem de dados criados por outros testes"
+    se_falhar: "AVISO - Fazer cada teste criar seus dados via API helper"
+    observacao: "Independência de dados é fundamental para isolamento"
+
+  - id: E2E-ISO-IT-04
+    categoria: isolamento
+    severidade: media
+    titulo: "API helpers implementados"
+    verificacao: "Verificar que e2e/helpers/api-helpers.ts existe"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\e2e\\helpers\\api-helpers.ts"
+    validacoes:
+      - contem: "export class APIHelper"
+      - contem: "ViaAPI("
+    criterio_aprovacao: "API helpers existem e são utilizados"
+    se_falhar: "AVISO - Criar API helpers para criação rápida de dados"
+
+# =============================================
+# SEÇÃO 5: CLOSEALLOVERLAYS IMPLEMENTAÇÃO
+# =============================================
+closealloverlays_implementacao:
+  - id: E2E-ISO-CO-01
+    categoria: closealloverlays
+    severidade: critica
+    titulo: "closeAllOverlays implementado em BasePage"
+    verificacao: "Verificar implementação de closeAllOverlays()"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\e2e\\pages\\base.page.ts"
+    validacoes:
+      - contem: "async closeAllOverlays()"
+      - contem: ".cdk-overlay-backdrop"
+      - contem: "page.keyboard.press('Escape')"
+      - contem: "state: 'detached'"
+    criterio_aprovacao: "closeAllOverlays implementado corretamente"
+    se_falhar: "BLOQUEIO - Implementar closeAllOverlays conforme template do contrato"
+
+  - id: E2E-ISO-CO-02
+    categoria: closealloverlays
+    severidade: critica
+    titulo: "closeAllOverlays tem retry logic"
+    verificacao: "Verificar que closeAllOverlays tenta múltiplas vezes"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\e2e\\pages\\base.page.ts"
+    validacoes:
+      - contem: "while"
+      - ou: "for"
+      - contem: "attempts"
+    criterio_aprovacao: "closeAllOverlays tem retry logic (max 5 tentativas)"
+    se_falhar: "BLOQUEIO - Adicionar retry logic (overlays aninhados)"
+
+  - id: E2E-ISO-CO-03
+    categoria: closealloverlays
+    severidade: critica
+    titulo: "closeAllOverlays lança erro se falhar"
+    verificacao: "Verificar que closeAllOverlays falha explicitamente se overlay persistir"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\e2e\\pages\\base.page.ts"
+    validacoes:
+      - contem: "throw new Error"
+    criterio_aprovacao: "closeAllOverlays lança erro se overlay persistir após retries"
+    se_falhar: "BLOQUEIO - Adicionar throw new Error se overlay persistir"
+
+# =============================================
+# SEÇÃO 6: DIALOG HELPERS
+# =============================================
+dialog_helpers:
+  - id: E2E-ISO-DH-01
+    categoria: helpers
+    severidade: alta
+    titulo: "waitForDialogToClosed implementado"
+    verificacao: "Verificar que BasePage possui waitForDialogToClosed"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\e2e\\pages\\base.page.ts"
+    validacoes:
+      - contem: "async waitForDialogToClosed("
+      - contem: ".cdk-overlay-backdrop"
+      - contem: "state: 'detached'"
+    criterio_aprovacao: "waitForDialogToClosed implementado"
+    se_falhar: "AVISO - Implementar waitForDialogToClosed para aguardar dialogs fecharem"
+
+  - id: E2E-ISO-DH-02
+    categoria: helpers
+    severidade: alta
+    titulo: "waitForDialogToOpen implementado"
+    verificacao: "Verificar que BasePage possui waitForDialogToOpen"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\e2e\\pages\\base.page.ts"
+    validacoes:
+      - contem: "async waitForDialogToOpen("
+      - contem: "waitForSelector"
+      - contem: "state: 'visible'"
+    criterio_aprovacao: "waitForDialogToOpen implementado"
+    se_falhar: "AVISO - Implementar waitForDialogToOpen para aguardar dialogs abrirem"
+
+# =============================================
+# SEÇÃO 7: CONFIGURAÇÃO PLAYWRIGHT
+# =============================================
+configuracao_playwright:
+  - id: E2E-ISO-CF-01
+    categoria: configuracao
+    severidade: media
+    titulo: "fullyParallel configurado (opcional)"
+    verificacao: "Verificar configuração de paralelização"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\playwright.config.ts"
+    validacoes:
+      - contem: "fullyParallel:"
+    criterio_aprovacao: "fullyParallel pode ser true (testes isolated suportam paralelização)"
+    se_falhar: "INFORMATIVO - Isolated suporta paralelização (opcional)"
+    observacao: "Diferente de stateful (fullyParallel: false obrigatório)"
+
+  - id: E2E-ISO-CF-02
+    categoria: configuracao
+    severidade: media
+    titulo: "workers configurado (opcional)"
+    verificacao: "Verificar configuração de workers"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\playwright.config.ts"
+    validacoes:
+      - contem: "workers:"
+    criterio_aprovacao: "workers pode ser > 1 (testes isolated suportam múltiplos workers)"
+    se_falhar: "INFORMATIVO - Isolated suporta múltiplos workers (opcional)"
+    observacao: "Diferente de stateful (workers: 1 obrigatório)"
+
+  - id: E2E-ISO-CF-03
+    categoria: configuracao
+    severidade: baixa
+    titulo: "retries configurado (opcional)"
+    verificacao: "Verificar configuração de retries"
+    arquivo: "D:\\IC2\\frontend\\icontrolit-app\\playwright.config.ts"
+    validacoes:
+      - contem: "retries:"
+    criterio_aprovacao: "retries pode ser > 0 (testes isolated suportam retries)"
+    se_falhar: "INFORMATIVO - Isolated suporta retries (opcional)"
+    observacao: "Diferente de stateful (retries: 0 obrigatório)"
+
+# =============================================
+# SEÇÃO 8: VALIDAÇÃO AUTOMÁTICA
+# =============================================
+validacao_automatica:
+  - id: E2E-ISO-VA-01
+    categoria: validacao
+    severidade: critica
+    titulo: "Script validate-isolated-tests.py existe"
+    verificacao: "Verificar que script de validação existe"
+    arquivo: "D:\\IC2_Governanca\\tools\\validate-isolated-tests.py"
+    criterio_aprovacao: "Script existe"
+    se_falhar: "BLOQUEIO - Criar script conforme especificação do contrato"
+
+  - id: E2E-ISO-VA-02
+    categoria: validacao
+    severidade: critica
+    titulo: "Validação automática APROVADA"
+    verificacao: "Executar validação automática de testes isolated"
+    comando: "python tools/validate-isolated-tests.py RFXXX"
+    criterio_aprovacao: "Script retorna exit code 0 (aprovado)"
+    se_falhar: "BLOQUEIO - Corrigir problemas reportados pelo script"
+    observacao: "Este é o critério DEFINITIVO de aprovação"
+
+# =============================================
+# SEÇÃO 9: TAXA DE APROVAÇÃO E2E
+# =============================================
+taxa_aprovacao_e2e:
+  - id: E2E-ISO-TA-01
+    categoria: aprovacao
+    severidade: critica
+    titulo: "Taxa de aprovação E2E ≥ 95%"
+    verificacao: "Verificar taxa de aprovação após primeira execução"
+    comando: "npx playwright test --reporter=json"
+    criterio_aprovacao: "Taxa de aprovação ≥ 95% (vs 10-60% do stateful)"
+    se_falhar: "BLOQUEIO - Investigar falhas, corrigir testes"
+    observacao: "Meta: 95-100% aprovação E2E (evidência de isolamento efetivo)"
+
+  - id: E2E-ISO-TA-02
+    categoria: aprovacao
+    severidade: critica
+    titulo: "Zero falhas por overlay/backdrop persistente"
+    verificacao: "Verificar que NENHUMA falha é causada por backdrop interceptando cliques"
+    validacao_manual: true
+    criterio_aprovacao: "Zero falhas contendo 'backdrop' ou 'overlay' nos logs"
+    se_falhar: "BLOQUEIO - Revisar implementação de closeAllOverlays"
+    observacao: "Evidência: RF006 tinha 67% de falhas por backdrop"
+
+  - id: E2E-ISO-TA-03
+    categoria: aprovacao
+    severidade: alta
+    titulo: "Zero falhas por contaminação de estado"
+    verificacao: "Verificar que testes NÃO falham por dados residuais de testes anteriores"
+    validacao_manual: true
+    criterio_aprovacao: "Testes passam na MESMA taxa quando executados isoladamente vs em batch"
+    se_falhar: "AVISO - Testes têm dependências implícitas, revisar beforeEach"
+
+# =============================================
+# SEÇÃO 10: DOCUMENTAÇÃO
+# =============================================
+documentacao:
+  - id: E2E-ISO-DC-01
+    categoria: documentacao
+    severidade: media
+    titulo: "STATUS.yaml atualizado"
+    verificacao: "Verificar que STATUS.yaml documenta uso de padrão isolated"
+    arquivo: "D:\\IC2_Governanca\\documentos\\requisitos\\RFXXX\\STATUS.yaml"
+    validacoes:
+      - contem: "tipo_teste_e2e: 'ISOLATED'"
+      - contem: "contrato_referencia: 'CONTRATO-TESTES-E2E-ISOLADOS.md'"
+    criterio_aprovacao: "STATUS.yaml documenta padrão isolated"
+    se_falhar: "AVISO - Atualizar STATUS.yaml"
+
+  - id: E2E-ISO-DC-02
+    categoria: documentacao
+    severidade: media
+    titulo: "TC-RFXXX.yaml documenta isolated"
+    verificacao: "Verificar que TC-RFXXX.yaml especifica tipo_teste: ISOLATED"
+    arquivo: "D:\\IC2_Governanca\\documentos\\testes\\TC-RFXXX.yaml"
+    validacoes:
+      - contem: "tipo_teste: 'ISOLATED'"
+    criterio_aprovacao: "TC documenta tipo de teste"
+    se_falhar: "AVISO - Atualizar TC-RFXXX.yaml"
+
+# =============================================
+# RESUMO DE VALIDAÇÃO
+# =============================================
+resumo_validacao:
+  total_checks: 28
+  checks_criticos: 18
+  checks_altos: 5
+  checks_medios: 4
+  checks_baixos: 1
+
+  criterio_aprovacao_geral:
+    - "TODOS os checks críticos: APROVADOS"
+    - "Taxa de aprovação E2E: ≥ 95%"
+    - "Script validate-isolated-tests.py: exit code 0"
+    - "Zero falhas por overlay/backdrop persistente"
+
+  se_falhar:
+    - "BLOQUEIO: Não prosseguir para deploy/entrega"
+    - "Corrigir TODOS os problemas reportados"
+    - "Re-executar validação até aprovação 100%"
+
+# =============================================
+# REFERÊNCIAS
+# =============================================
+referencias:
+  contrato: "D:\\IC2_Governanca\\governanca\\contracts\\testes\\CONTRATO-TESTES-E2E-ISOLADOS.md"
+  contrato_stateful: "D:\\IC2_Governanca\\governanca\\contracts\\testes\\CONTRATO-TESTES-E2E-STATEFUL.md"
+  contrato_execucao: "D:\\IC2_Governanca\\governanca\\contracts\\testes\\execucao-completa.md"
+  analise_rf006: "D:\\IC2\\.temp_ia\\RELATORIO-TESTES-RF006-2026-01-11.md"
+  proposta: "D:\\IC2\\.temp_ia\\PROPOSTA-ARQUITETO-INTEGRACAO-E2E-ISOLADOS.md"

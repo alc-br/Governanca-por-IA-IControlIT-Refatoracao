@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 2.0
+**Versão:** 2.1
 **Data:** 2026-01-11
 **Status:** Ativo
-**Última Atualização:** 2026-01-11 (NOVA VALIDAÇÃO: PASSO 5.9 - Cobertura 100% de TCs)
+**Última Atualização:** 2026-01-11 (NOVA VALIDAÇÃO: PASSO 5.10 - Isolamento de Testes E2E)
 **Changelog:**
+- v2.1 (2026-01-11): NOVO PASSO 5.10 BLOQUEANTE: Validar isolamento de testes E2E (isolated vs stateful, beforeEach/afterEach, closeAllOverlays) - Detecta padrão test.describe.serial PROIBIDO em testes isolated
 - v2.0 (2026-01-11): NOVO PASSO 5.9 BLOQUEANTE: Validar cobertura 100% de TCs (resolve GAP 2 do RF006 - 75% não testado)
 - v1.9 (2026-01-08): OTIMIZAÇÃO CRÍTICA: run.py v2.0 valida health automaticamente (removidos health checks manuais do contrato)
 - v1.8 (2026-01-08): NOVA FEATURE: Merge automático em dev quando testes atingem 100% em branch fix/*
@@ -1226,6 +1227,210 @@ Esta validação resolve **GAP 2 do RF006** (cobertura incompleta de TCs).
 - Relatório de testes: `D:\IC2\.temp_ia\RELATORIO-TESTES-RF006-2026-01-11.md` (GAP 2)
 - TC Template: `D:\IC2_Governanca\governanca\templates\TC-TEMPLATE.yaml`
 - Problema identificado: RF006 execução #9 (apenas 25% de cobertura TC)
+
+---
+
+#### PASSO 5.10: Validar Isolamento de Testes E2E (BLOQUEANTE) ✨ NOVO
+
+**Versão:** 1.0
+**Data de Criação:** 2026-01-11
+**Contexto:** Adicionado para validar que testes E2E seguem padrão correto (isolated vs stateful) e prevenir contaminação de estado.
+
+**Objetivo:** Validar que testes E2E seguem padrão **isolated** (SE aplicável) ou **stateful** (SE aplicável), garantindo estrutura correta.
+
+**EXECUTAR OBRIGATORIAMENTE:**
+
+```bash
+cd D:\IC2_Governanca\tools
+python validate-isolated-tests.py {RF_NUMERO}
+```
+
+**O que este script valida:**
+
+1. **SE tipo_teste = "ISOLATED":**
+   - ✅ Nenhum uso de `test.describe.serial` (PROIBIDO em isolated)
+   - ✅ TODOS os specs possuem `test.beforeEach`
+   - ✅ TODOS os specs possuem `test.afterEach`
+   - ✅ TODOS os specs chamam `closeAllOverlays()` (previne overlay persistente)
+   - ✅ TODOS os specs usam Page Objects
+
+2. **SE tipo_teste = "STATEFUL":**
+   - ✅ Usa `test.describe.serial` (obrigatório em stateful)
+   - ✅ Possui fixtures necessárias
+   - ✅ TCs E2E possuem `usa_fixture: true` e `fixture_dependencia`
+   - ✅ Sequência ordenada (1, 2, 3, 4)
+
+**Implementação do script:**
+
+```python
+#!/usr/bin/env python3
+"""
+Valida que testes E2E seguem padrão isolated (não stateful)
+
+Referência: CONTRATO-TESTES-E2E-ISOLADOS.md seção 5
+"""
+
+import os
+import re
+import sys
+import glob
+import yaml
+
+def validar_testes_isolados(rf_numero):
+    """
+    Valida que specs do RF seguem padrão isolated
+    """
+    # 1. Ler TC-RFXXX.yaml para identificar tipo de teste
+    tc_file = f"D:\\IC2_Governanca\\documentos\\testes\\TC-RF{rf_numero}.yaml"
+
+    if not os.path.exists(tc_file):
+        print(f"❌ TC-RF{rf_numero}.yaml não encontrado")
+        return 1
+
+    with open(tc_file, 'r', encoding='utf-8') as f:
+        tc_yaml = yaml.safe_load(f)
+
+    tipo_teste = tc_yaml.get('metadata', {}).get('tipo_teste', 'ISOLATED')
+
+    print(f"🔍 Validando testes E2E do RF{rf_numero}")
+    print(f"   Tipo de teste: {tipo_teste}")
+    print()
+
+    # 2. Localizar specs Playwright
+    e2e_dir = "D:\\IC2\\frontend\\icontrolit-app\\e2e\\specs"
+    spec_pattern = f"TC-RF{rf_numero}-*.spec.ts"
+    spec_files = glob.glob(f"{e2e_dir}\\{spec_pattern}")
+
+    if not spec_files:
+        print(f"⚠️  Nenhum spec encontrado para RF{rf_numero} (pode não ter testes E2E)")
+        return 0  # Não é erro se não tem testes E2E
+
+    falhas = []
+
+    # 3. Validar ISOLATED
+    if tipo_teste == "ISOLATED":
+        for spec_file in spec_files:
+            with open(spec_file, 'r', encoding='utf-8') as f:
+                conteudo = f.read()
+
+            # 3.1. Validar que NÃO usa test.describe.serial
+            if 'test.describe.serial' in conteudo:
+                falhas.append(f"{os.path.basename(spec_file)}: Usa test.describe.serial (PROIBIDO em isolated)")
+
+            # 3.2. Validar que possui beforeEach
+            if 'test.beforeEach' not in conteudo:
+                falhas.append(f"{os.path.basename(spec_file)}: Ausente test.beforeEach (OBRIGATÓRIO)")
+
+            # 3.3. Validar que beforeEach chama closeAllOverlays
+            if 'closeAllOverlays()' not in conteudo:
+                falhas.append(f"{os.path.basename(spec_file)}: Ausente closeAllOverlays() (OBRIGATÓRIO)")
+
+            # 3.4. Validar que possui afterEach
+            if 'test.afterEach' not in conteudo:
+                falhas.append(f"{os.path.basename(spec_file)}: Ausente test.afterEach (OBRIGATÓRIO)")
+
+            # 3.5. Validar que usa Page Objects
+            if 'Page' not in conteudo or 'import' not in conteudo:
+                falhas.append(f"{os.path.basename(spec_file)}: Não usa Page Objects (OBRIGATÓRIO)")
+
+    # 4. Validar STATEFUL
+    elif tipo_teste == "STATEFUL":
+        for spec_file in spec_files:
+            with open(spec_file, 'r', encoding='utf-8') as f:
+                conteudo = f.read()
+
+            # 4.1. Validar que USA test.describe.serial
+            if 'test.describe.serial' not in conteudo:
+                falhas.append(f"{os.path.basename(spec_file)}: Deve usar test.describe.serial (OBRIGATÓRIO em stateful)")
+
+            # 4.2. Validar que usa fixtures
+            if 'test.use' not in conteudo and 'fixture' not in conteudo.lower():
+                falhas.append(f"{os.path.basename(spec_file)}: Deve usar fixtures (stateful)")
+
+    # 5. Resultado
+    if falhas:
+        print(f"❌ RF{rf_numero} NÃO segue padrão {tipo_teste}:")
+        for falha in falhas:
+            print(f"  - {falha}")
+        print()
+        print("Ação: Corrigir specs para seguir padrão correto")
+        if tipo_teste == "ISOLATED":
+            print("Referência: CONTRATO-TESTES-E2E-ISOLADOS.md")
+        else:
+            print("Referência: CONTRATO-TESTES-E2E-STATEFUL.md")
+        return 1
+    else:
+        print(f"✅ RF{rf_numero} segue padrão {tipo_teste} corretamente")
+        print(f"  - {len(spec_files)} specs validados")
+        if tipo_teste == "ISOLATED":
+            print(f"  - beforeEach/afterEach presentes")
+            print(f"  - closeAllOverlays() implementado")
+            print(f"  - Page Objects utilizados")
+            print(f"  - Nenhum test.describe.serial encontrado")
+        else:
+            print(f"  - test.describe.serial utilizado corretamente")
+            print(f"  - Fixtures configuradas")
+        return 0
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print("Uso: python validate-isolated-tests.py <RF_NUMERO>")
+        sys.exit(1)
+
+    rf_numero = sys.argv[1]
+    sys.exit(validar_testes_isolados(rf_numero))
+```
+
+**Critério de Aprovação:**
+
+- ✅ Script retorna exit code 0
+- ✅ TODOS os specs seguem padrão correto (isolated ou stateful)
+- ✅ Nenhuma violação de estrutura
+
+**SE validação FALHAR:**
+
+1. **Identificar tipo de teste:**
+   - Ler `TC-RFXXX.yaml` → `metadata.tipo_teste`
+
+2. **SE ISOLATED:**
+   - Remover `test.describe.serial` (usar `test.describe`)
+   - Adicionar `test.beforeEach` com login + navigate + closeAllOverlays
+   - Adicionar `test.afterEach` com closeAllOverlays + logout
+   - Usar Page Objects
+   - Referência: [CONTRATO-TESTES-E2E-ISOLADOS.md](CONTRATO-TESTES-E2E-ISOLADOS.md)
+
+3. **SE STATEFUL:**
+   - Usar `test.describe.serial` (obrigatório)
+   - Configurar fixtures
+   - Configurar playwright.config.ts (workers: 1, fullyParallel: false)
+   - Referência: [CONTRATO-TESTES-E2E-STATEFUL.md](CONTRATO-TESTES-E2E-STATEFUL.md)
+
+4. **Re-executar validação:**
+   - `python validate-isolated-tests.py {RF}`
+   - Repetir até aprovação
+
+**Impacto esperado:**
+
+Esta validação **previne problemas sistemáticos** de contaminação de estado em testes E2E.
+
+**Sem esta validação:**
+- ❌ Testes isolated usam test.describe.serial (causa dependências)
+- ❌ Testes sem closeAllOverlays() (67% dos problemas RF006)
+- ❌ Overlay/backdrop persistente entre testes
+- ❌ Taxa de aprovação E2E: 10-60% (vs 95-100% esperado)
+
+**Com esta validação:**
+- ✅ Testes seguem padrão correto (isolated ou stateful)
+- ✅ closeAllOverlays() obrigatório (previne overlay persistente)
+- ✅ beforeEach/afterEach garantem isolamento
+- ✅ Taxa de aprovação E2E: 95-100%
+
+**Referências:**
+- Contrato Isolated: [CONTRATO-TESTES-E2E-ISOLADOS.md](CONTRATO-TESTES-E2E-ISOLADOS.md)
+- Contrato Stateful: [CONTRATO-TESTES-E2E-STATEFUL.md](CONTRATO-TESTES-E2E-STATEFUL.md)
+- Checklist Isolated: [CHECKLIST-TESTES-E2E-ISOLADOS.yaml](../../checklists/testes/CHECKLIST-TESTES-E2E-ISOLADOS.yaml)
+- Análise RF006: `D:\IC2\.temp_ia\RELATORIO-TESTES-RF006-2026-01-11.md` (overlay/backdrop persistente)
+- Proposta: `D:\IC2\.temp_ia\PROPOSTA-ARQUITETO-INTEGRACAO-E2E-ISOLADOS.md`
 
 ---
 
