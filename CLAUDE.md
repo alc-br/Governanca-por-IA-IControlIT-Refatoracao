@@ -1,8 +1,8 @@
 # D:\IC2\CLAUDE.md
 # Contrato de Governança de Documentação
 
-**Versão:** 4.0
-**Data:** 2026-01-04
+**Versão:** 4.1
+**Data:** 2026-01-09
 **Status:** Vigente
 
 Este arquivo define **COMO** o Claude Code deve se comportar ao trabalhar com **documentação** neste repositório.
@@ -341,7 +341,249 @@ Este comportamento é **obrigatório**.
 
 ---
 
+## 18. ALINHAMENTO OBRIGATÓRIO COM TESTES (NOVO)
+
+**Versão:** 1.0
+**Data:** 2026-01-09
+**Contexto:** Criado após análise do RF006 onde desalinhamento resultou em 12 execuções e apenas 74% E2E
+
+### 18.1. Regra Fundamental
+
+**Documentação e código DEVEM considerar testes desde o início.**
+
+Este não é um princípio aspiracional. É uma **regra obrigatória** com **bloqueios automáticos**.
+
+---
+
+### 18.2. Princípios Test-First Documentation
+
+#### 18.2.1. Test-First Documentation
+
+- **RF** já identifica elementos testáveis (botões, campos, estados)
+- **UC** já especifica data-test attributes, URLs, timeouts, estados UI
+- **TC** já especifica seletores E2E e código Playwright
+- **MT** já está sincronizado com backend seeds, frontend routing e UC
+
+**Problema que resolve:**
+- RF006 Problema 1/6: Credenciais MT desatualizadas → 100% falhas E2E
+- RF006 Problema 2/6: URLs não documentadas → 32 falhas E2E por 404
+- RF006 Problema 3/6: Data-test não especificados → 32 falhas E2E por seletores ausentes
+- RF006 Problema 4/6: Estados UI não documentados → Validações incompletas
+- RF006 Problema 5/6: Timeouts não especificados → 15 falhas E2E por timeout
+
+---
+
+#### 18.2.2. Bloqueios Obrigatórios
+
+**REGRA INVIOLÁVEL:** Sem alinhamento = BLOQUEIO automático
+
+| Bloqueio | Condição | Ação |
+|----------|----------|------|
+| **UC sem especificações de teste** | UC não possui: navegacao, credenciais, data-test, estados_ui, timeouts | ❌ BLOQUEIO: Não prosseguir para WF/MD/Backend/Frontend |
+| **Backend sem testes unitários** | Commands/Queries sem testes ou taxa < 100% | ❌ BLOQUEIO: Não marcar como concluído |
+| **Frontend sem data-test** | Auditoria `npm run audit-data-test RFXXX` retorna exit code 1 | ❌ BLOQUEIO: Não marcar como concluído |
+| **MT desatualizada** | Validações de sincronização falharam | ❌ BLOQUEIO: Não executar testes E2E |
+
+**Consequência de violar bloqueio:**
+- Execução é **INVALIDADA**
+- Status.yaml é marcado como **REPROVADO**
+- Necessária correção completa antes de prosseguir
+
+---
+
+#### 18.2.3. Validação Automática
+
+**Scripts obrigatórios ANTES de executar testes E2E:**
+
+```bash
+# Validar credenciais MT vs backend seeds
+npm run validate-credentials RFXXX
+# Exit code 0: PASS | Exit code 1: FAIL (credenciais desatualizadas)
+
+# Validar URLs MT vs frontend routing
+npm run validate-routes
+# Exit code 0: PASS | Exit code 1: FAIL (URLs 404)
+
+# Validar data-test MT vs UC
+npm run audit-data-test RFXXX
+# Exit code 0: PASS | Exit code 1: FAIL (seletores ausentes/inconsistentes)
+
+# Validar timeouts MT vs UC (se script existir)
+python tools/validate-timeouts.py RFXXX
+# Exit code 0: PASS | Exit code 1: FAIL (timeouts divergentes)
+
+# Validar especificações de teste em UC (se script existir)
+python tools/validate-uc-test-specs.py RFXXX
+# Exit code 0: PASS | Exit code 1: FAIL (UC incompleto)
+```
+
+**SE qualquer validação FALHAR:**
+- ❌ Testes E2E **NÃO podem** ser executados
+- ❌ Corrigir gaps e re-executar validações
+- ❌ Somente prosseguir quando **TODOS** retornarem exit code 0
+
+**Referência:** Checklist pré-execução de testes (seção sincronizacao_mt)
+
+---
+
+### 18.3. Critério de Sucesso
+
+**Taxa inicial E2E: ≥ 80%**
+
+Se primeira execução E2E < 80%:
+- ❌ Alinhamento FALHOU
+- ❌ RETORNAR à documentação (UC/TC/MT) ou implementação (Backend/Frontend)
+- ❌ Corrigir gaps e re-executar até ≥ 80%
+
+**Baseline (RF006):**
+- Taxa inicial: 0%
+- Execuções necessárias: 12
+- Tempo desperdiçado: ~10 horas
+
+**Meta (com alinhamento):**
+- Taxa inicial: 80-90%
+- Execuções necessárias: 2-3
+- Tempo economizado: ~8 horas por RF
+
+**ROI:**
+- Investimento: 90 horas (atualização governança - 7 sprints)
+- Break-even: 10-12 RFs (~3-4 sprints)
+- Economia anual: ~120-160 horas (estimativa 20 RFs/ano)
+
+---
+
+### 18.4. Rastreabilidade Completa
+
+**Cadeia obrigatória:** RF → UC → TC → MT → Backend → Frontend → E2E
+
+```
+RF-RFXXX.yaml
+    ↓ (identifica elementos testáveis)
+UC-RFXXX.yaml
+    ↓ (especifica data-test, URLs, timeouts, estados UI)
+TC-RFXXX.yaml
+    ↓ (especifica seletores E2E, código Playwright)
+MT-RFXXX.data.ts
+    ↓ (sincroniza credenciais, URLs, data-test, timeouts)
+Backend (Commands/Queries)
+    ↓ (testes unitários 100%)
+Frontend (Components)
+    ↓ (data-test attributes 100%)
+Testes E2E
+    ↓ (taxa inicial ≥ 80%)
+```
+
+**Quebra de rastreabilidade = BLOQUEIO**
+
+---
+
+### 18.5. Responsabilidades por Fase
+
+#### FASE DOCUMENTAÇÃO
+
+**Agente de RF (rf-criacao.md):**
+- ✅ Identificar elementos testáveis (botões, campos, tabelas)
+- ✅ Documentar nomenclatura esperada de data-test
+- ✅ Identificar URLs de navegação
+- ✅ Identificar timeouts esperados
+
+**Agente de UC (uc-criacao.md):**
+- ✅ Criar seções obrigatórias: navegacao, credenciais, estados_ui, performance, timeouts_e2e
+- ✅ Especificar data-test para TODOS os passos interativos
+- ✅ Documentar estados UI (loading, vazio, erro)
+- ✅ BLOQUEIO: UC incompleto = não prosseguir
+
+**Agente de TC (tc-criacao.md):**
+- ✅ Especificar seletores E2E para TODOS os passos
+- ✅ Especificar código Playwright (acao_e2e)
+- ✅ Validar sincronização com UC
+- ✅ BLOQUEIO: Seletores ausentes = não aprovar TC
+
+**Agente de MT (mt-criacao.md):**
+- ✅ Sincronizar credenciais com backend seeds
+- ✅ Sincronizar URLs com frontend routing
+- ✅ Sincronizar data-test com UC
+- ✅ Sincronizar timeouts com UC
+- ✅ BLOQUEIO: Validações falharam = não aprovar MT
+
+---
+
+#### FASE DESENVOLVIMENTO
+
+**Agente de Backend (backend-criacao.md):**
+- ✅ Criar testes unitários para TODOS os Commands/Queries
+- ✅ Executar testes: `dotnet test` → Taxa 100%
+- ✅ BLOQUEIO: Cobertura < 100% = não marcar como concluído
+
+**Agente de Frontend (frontend-criacao.md):**
+- ✅ Implementar data-test attributes conforme UC
+- ✅ Executar auditoria: `npm run audit-data-test RFXXX` → Exit code 0
+- ✅ BLOQUEIO: Auditoria FAIL = não marcar como concluído
+
+---
+
+#### FASE TESTES
+
+**Agente de Testes (execucao-completa.md):**
+- ✅ Executar checklist pré-execução (sincronizacao_mt)
+- ✅ Validar TODAS as sincronizações (exit code 0)
+- ✅ Executar testes E2E
+- ✅ Validar taxa inicial ≥ 80%
+- ✅ BLOQUEIO: Taxa < 80% = RETORNAR à documentação/implementação
+
+---
+
+### 18.6. Exceções
+
+**Nenhuma. Esta é uma regra INVIOLÁVEL.**
+
+Não existem exceções para:
+- "RF simples demais para precisar de testes"
+- "Só um botão, não precisa data-test"
+- "Vamos adicionar testes depois"
+- "Credenciais são as mesmas, não precisa validar"
+
+**TODO RF, independente de tamanho ou complexidade, DEVE seguir alinhamento obrigatório.**
+
+---
+
+### 18.7. Documentação de Apoio
+
+| Documento | Propósito |
+|-----------|-----------|
+| `checklists/testes/CHECKLIST-IMPLEMENTACAO-E2E.md` | Checklist completo 3 fases (pré, durante, pós) |
+| `processos/SINCRONIZACAO-MT-SEEDS.md` | Processo detalhado de sincronização MT |
+| `checklists/documentacao/geracao/uc.yaml` | Checklist com seção especificacoes_teste |
+| `checklists/documentacao/geracao/tc.yaml` | Checklist com seção seletores_e2e |
+| `checklists/desenvolvimento/validacao/frontend.yaml` | Checklist com seção data_test_attributes |
+| `checklists/testes/pre-execucao.yaml` | Checklist com seção sincronizacao_mt |
+
+---
+
+### 18.8. Versão e Histórico
+
+**v1.0 (2026-01-09):**
+- Criação da seção após análise do RF006
+- Definição de bloqueios obrigatórios
+- Critério de sucesso: taxa inicial E2E ≥ 80%
+- Rastreabilidade completa: RF → UC → TC → MT → Código → Testes
+- Scripts de validação automática
+- Processo de sincronização MT documentado
+
+---
+
 ## Changelog
+
+### v4.1 (2026-01-09)
+- **Adicionada seção 18: ALINHAMENTO OBRIGATÓRIO COM TESTES**
+- Criado após análise do RF006 (12 execuções, 74% E2E, 5/6 problemas evitáveis)
+- Regra fundamental: Documentação e código DEVEM considerar testes desde o início
+- Bloqueios obrigatórios: UC incompleto, Backend sem testes, Frontend sem data-test, MT desatualizada
+- Scripts de validação automática: validate-credentials, validate-routes, audit-data-test
+- Critério de sucesso: Taxa inicial E2E ≥ 80%
+- Rastreabilidade completa: RF → UC → TC → MT → Backend → Frontend → E2E
+- Responsabilidades por fase (Documentação, Desenvolvimento, Testes)
+- Documentação de apoio: 6 checklists atualizados + 2 processos novos
 
 ### v4.0 (2026-01-04)
 - **Foco exclusivo em governança de documentação**
@@ -359,5 +601,5 @@ Este comportamento é **obrigatório**.
 ---
 
 **Mantido por:** Time de Arquitetura IControlIT
-**Última Atualização:** 2026-01-04
-**Versão:** 4.0 - Governança de Documentação
+**Última Atualização:** 2026-01-09
+**Versão:** 4.1 - Governança de Documentação

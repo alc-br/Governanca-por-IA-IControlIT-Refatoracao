@@ -1,13 +1,98 @@
-# Matriz de Transições de Contratos
-# Define quais transições são permitidas entre contratos
-# Atualizado: 2025-12-26
-# Conforme: CONTRATO-ORQUESTRACAO.md
+# =============================================
+# MATRIZ DE TRANSIÇÕES DE CONTRATOS - ALINHAMENTO COM TESTES
+# =============================================
+# Versão: 2.0
+# Data: 2026-01-09
+# Contexto: Atualizado após análise do RF006 para incluir bloqueios
+#           por falta de alinhamento obrigatório com testes
+#
+# Mudanças principais (v2.0):
+# - Bloqueios adicionados por falta de especificações de teste
+# - Transições condicionadas a validações automáticas (exit codes)
+# - Fluxos de retorno para correção documentados
+# - Critério de sucesso E2E: taxa inicial ≥ 80%
+#
+# Referência:
+# - CLAUDE.md seção 18 "ALINHAMENTO OBRIGATÓRIO COM TESTES"
+# - contract-manifest.yaml v2.0
+# =============================================
 
 transitions:
   # ===========================
   # FASE 1: DOCUMENTAÇÃO
   # ===========================
 
+  # Transição: RF → UC
+  # Bloqueio NOVO (v2.0): RF sem considerações de teste
+  rf-criacao:
+    allowed_next:
+      - uc-criacao  # SE rf_sem_consideracoes_teste = false
+      - rf-criacao  # Iterativo SE incompleto
+
+    bloqueios:  # NOVO (v2.0)
+      - condicao: "rf_sem_consideracoes_teste"
+        acao: "BLOQUEIO: RF não pode prosseguir para UC"
+        proxima_acao: "Retornar a rf-criacao para completar FASE 3.5"
+        severidade: "critica"
+
+  # Transição: UC → WF/MD/Backend
+  # Bloqueio NOVO (v2.0): UC sem especificações de teste
+  uc-criacao:
+    allowed_next:
+      - wf-criacao  # SE uc_sem_especificacoes_teste = false
+      - md-criacao  # SE uc_sem_especificacoes_teste = false
+      - backend-criacao  # SE uc_sem_especificacoes_teste = false (direto)
+      - uc-criacao  # Iterativo SE incompleto
+
+    bloqueios:  # NOVO (v2.0)
+      - condicao: "uc_sem_especificacoes_teste"
+        acao: "BLOQUEIO: UC não pode prosseguir para WF/MD/Backend"
+        proxima_acao: "Retornar a uc-criacao para completar FASE 3.6"
+        severidade: "critica"
+        validacoes_ausentes:
+          - navegacao
+          - credenciais
+          - data_test_em_todos_passos
+          - estados_ui
+          - timeouts
+
+  # Transição: UC → TC
+  # Bloqueio NOVO (v2.0): UC sem especificações de teste OU MT não sincronizada
+  uc-criacao-para-tc:
+    de: uc-criacao
+    para: tc-criacao
+    bloqueios:  # NOVO (v2.0)
+      - condicao: "uc_sem_especificacoes_teste"
+        acao: "BLOQUEIO: TC não pode ser criado"
+        proxima_acao: "Retornar a uc-criacao"
+        severidade: "critica"
+
+  # Transição: MT → TC
+  # Bloqueio NOVO (v2.0): MT desatualizada
+  mt-criacao-para-tc:
+    de: mt-criacao
+    para: tc-criacao
+    bloqueios:  # NOVO (v2.0)
+      - condicao: "mt_credenciais_desatualizadas"
+        acao: "BLOQUEIO: TC não pode ser criado"
+        proxima_acao: "Retornar a mt-criacao para sincronizar"
+        validacao: "npm run validate-credentials RFXXX"
+        exit_code_esperado: 0
+        severidade: "critica"
+      - condicao: "mt_urls_desatualizadas"
+        acao: "BLOQUEIO: TC não pode ser criado"
+        proxima_acao: "Retornar a mt-criacao para sincronizar"
+        validacao: "npm run validate-routes"
+        exit_code_esperado: 0
+        severidade: "critica"
+      - condicao: "mt_data_test_desatualizados"
+        acao: "BLOQUEIO: TC não pode ser criado"
+        proxima_acao: "Retornar a mt-criacao para sincronizar"
+        validacao: "npm run audit-data-test RFXXX"
+        exit_code_esperado: 0
+        severidade: "critica"
+
+  # CONTRATOS LEGADOS (compatibilidade)
   CONTRATO-DOCUMENTACAO-ESSENCIAL:
     allowed_next:
       - CONTRATO-DOCUMENTACAO-GOVERNADA-TESTES
@@ -27,6 +112,35 @@ transitions:
   # FASE 2: DESENVOLVIMENTO BACKEND
   # ===========================
 
+  # Transição: Backend → Validação
+  # Bloqueio NOVO (v2.0): Backend sem testes unitários
+  backend-criacao:
+    allowed_next:
+      - backend-validacao  # SE backend_sem_testes_unitarios = false
+      - backend-criacao  # Iterativo SE testes falharem
+
+    bloqueios:  # NOVO (v2.0)
+      - condicao: "backend_sem_testes_unitarios"
+        acao: "BLOQUEIO: Backend não pode ser validado"
+        proxima_acao: "Retornar a backend-criacao para adicionar FASE 7.5"
+        validacao: "dotnet test backend/Application.Tests/Application.Tests.csproj"
+        exit_code_esperado: 0
+        severidade: "critica"
+      - condicao: "backend_cobertura_incompleta"
+        acao: "BLOQUEIO: Cobertura < 100%"
+        proxima_acao: "Adicionar testes ausentes"
+        severidade: "critica"
+
+  # Transição: Backend validado → Frontend
+  backend-validacao-para-frontend:
+    de: backend-validacao
+    para: frontend-criacao
+    pre_requisitos:
+      - backend_validado: true
+      - testes_unitarios_aprovados: true  # NOVO (v2.0)
+      - cobertura_100_percent: true  # NOVO (v2.0)
+
+  # CONTRATOS LEGADOS (compatibilidade)
   CONTRATO-EXECUCAO-BACKEND:
     allowed_next:
       - CONTRATO-EXECUCAO-TESTER-BACKEND
@@ -51,6 +165,36 @@ transitions:
   # FASE 3: DESENVOLVIMENTO FRONTEND
   # ===========================
 
+  # Transição: Frontend → Validação
+  # Bloqueio NOVO (v2.0): Frontend sem data-test attributes
+  frontend-criacao:
+    allowed_next:
+      - frontend-validacao  # SE frontend_sem_data_test = false
+      - frontend-criacao  # Iterativo SE auditoria falhar
+
+    bloqueios:  # NOVO (v2.0)
+      - condicao: "frontend_sem_data_test"
+        acao: "BLOQUEIO: Frontend não pode ser validado"
+        proxima_acao: "Retornar a frontend-criacao para adicionar FASE 6.5"
+        validacao: "npm run audit-data-test RFXXX"
+        exit_code_esperado: 0
+        severidade: "critica"
+      - condicao: "frontend_auditoria_falhou"
+        acao: "BLOQUEIO: Data-test ausentes ou inconsistentes"
+        proxima_acao: "Adicionar data-test ausentes, corrigir nomenclatura"
+        severidade: "critica"
+
+  # Transição: Frontend validado → Testes
+  frontend-validacao-para-testes:
+    de: frontend-validacao
+    para: testes-execucao-completa
+    pre_requisitos:
+      - frontend_validado: true
+      - data_test_attributes_completos: true  # NOVO (v2.0)
+      - auditoria_data_test_aprovada: true  # NOVO (v2.0)
+      - nomenclatura_consistente_uc: true  # NOVO (v2.0)
+
+  # CONTRATOS LEGADOS (compatibilidade)
   CONTRATO-EXECUCAO-FRONTEND:
     allowed_next:
       - CONTRATO-EXECUCAO-TESTES
@@ -59,6 +203,69 @@ transitions:
   # FASE 4: TESTES
   # ===========================
 
+  # Transição: Pré-execução de Testes → Execução
+  # Bloqueios NOVOS (v2.0): Validações obrigatórias antes de E2E
+  testes-pre-execucao:
+    allowed_next:
+      - testes-execucao-completa  # SE todas validações passarem (exit code 0)
+      - mt-criacao  # SE alguma validação falhar → retornar para sincronizar
+
+    validacoes_obrigatorias:  # NOVO (v2.0)
+      - validacao: "npm run validate-credentials RFXXX"
+        exit_code_esperado: 0
+        se_falhar: "Retornar a mt-criacao (credenciais desatualizadas)"
+      - validacao: "npm run validate-routes"
+        exit_code_esperado: 0
+        se_falhar: "Retornar a mt-criacao (URLs desatualizadas)"
+      - validacao: "npm run audit-data-test RFXXX"
+        exit_code_esperado: 0
+        se_falhar: "Retornar a frontend-criacao (data-test ausentes)"
+
+    bloqueios:  # NOVO (v2.0)
+      - condicao: "validacao_credenciais_falhou"
+        acao: "ABORTAR execução E2E"
+        proxima_acao: "Retornar a mt-criacao para sincronizar credenciais"
+        severidade: "critica"
+      - condicao: "validacao_urls_falhou"
+        acao: "ABORTAR execução E2E"
+        proxima_acao: "Retornar a mt-criacao para sincronizar URLs"
+        severidade: "critica"
+      - condicao: "validacao_data_test_falhou"
+        acao: "ABORTAR execução E2E"
+        proxima_acao: "Retornar a frontend-criacao para adicionar data-test"
+        severidade: "critica"
+
+  # Transição: Execução de Testes → Deploy ou Correção
+  # Bloqueio NOVO (v2.0): Taxa inicial E2E < 80%
+  testes-execucao-completa:
+    allowed_next:
+      - testes-transicao-para-deploy  # SE taxa_inicial_e2e >= 80% E taxa_final_e2e = 100%
+      - uc-criacao  # SE taxa_inicial_e2e < 80% → gap documentação
+      - backend-criacao  # SE falhas backend
+      - frontend-criacao  # SE falhas frontend
+
+    criterios_sucesso:  # NOVO (v2.0)
+      - taxa_inicial_e2e: ">= 80%"
+        se_falhar: "Retornar à documentação (UC/TC/MT) ou implementação"
+      - taxa_final_e2e: "= 100%"
+        se_falhar: "Corrigir falhas e re-executar"
+      - execucoes_maximas: "<= 3"
+        se_ultrapassar: "Auditoria de conformidade obrigatória"
+
+    bloqueios:  # NOVO (v2.0)
+      - condicao: "taxa_inicial_e2e_lt_80_percent"
+        acao: "RETORNAR à documentação/implementação"
+        proxima_acao:
+          - "SE problema documentação (data-test, URLs, credenciais) → uc-criacao ou mt-criacao"
+          - "SE problema implementação (backend) → backend-criacao"
+          - "SE problema implementação (frontend) → frontend-criacao"
+        severidade: "alta"
+      - condicao: "execucoes_gt_3"
+        acao: "Auditoria de conformidade obrigatória"
+        proxima_acao: "Identificar causa raiz sistêmica"
+        severidade: "alta"
+
+  # CONTRATOS LEGADOS (compatibilidade)
   CONTRATO-EXECUCAO-TESTES:
     allowed_next:
       - CONTRATO-TRANSICAO-TESTES-PARA-DEPLOY  # se aprovado (taxa 100%)
@@ -197,3 +404,28 @@ transitions:
   DOCUMENTACAO:
     allowed_next:
       - CONTRATO-DOCUMENTACAO-ESSENCIAL
+
+# =============================================
+# CHANGELOG
+# =============================================
+changelog:
+  - versao: "2.0"
+    data: "2026-01-09"
+    mudancas:
+      - "Expandido de 200 para 430 linhas (+115%)"
+      - "Adicionadas transições específicas para novos contratos (rf-criacao, uc-criacao, tc-criacao, mt-criacao, backend-criacao, frontend-criacao)"
+      - "Bloqueios automáticos por falta de alinhamento com testes especificados"
+      - "Validações obrigatórias antes de E2E (npm run validate-*, exit codes)"
+      - "Critério de sucesso E2E: taxa inicial ≥ 80%, taxa final = 100%"
+      - "Fluxos de retorno para correção documentados (uc-criacao, mt-criacao, backend-criacao, frontend-criacao)"
+      - "Transições condicionadas a pré-requisitos de teste (testes unitários backend, data-test frontend)"
+      - "Limite de execuções: ≤ 3 (se > 3 → auditoria obrigatória)"
+      - "Alinhamento com contract-manifest.yaml v2.0"
+      - "Referências cruzadas com CLAUDE.md seção 18"
+    contexto: "Sprint 5 Task 4 - Atualização pós-análise RF006"
+
+  - versao: "1.0"
+    data: "2025-12-26"
+    mudancas:
+      - "Versão inicial com transições de contratos legados"
+      - "Fluxos básicos: documentação → backend → frontend → testes → deploy"

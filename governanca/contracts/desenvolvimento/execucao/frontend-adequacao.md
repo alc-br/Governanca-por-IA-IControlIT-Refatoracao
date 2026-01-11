@@ -40,6 +40,24 @@ para o modelo de governanca atual.
 
 ---
 
+## HISTÓRICO DE ATUALIZAÇÕES
+
+### v3.0 (2026-01-11)
+- **FASE 6.7 adicionada**: Validators Angular Obrigatórios (BLOQUEANTE)
+  - Origem: Análise de falhas RF006 (execução #9) - GAP 1
+  - Impacto: Resolve 21% das falhas E2E (3/14 falhas)
+  - Bloqueio: Frontend sem validators completos = REPROVADO
+  - Validações: Validators, mat-error messages, botões disabled em form.invalid
+
+### v2.0 (2026-01-10)
+- **FASE 6.6 adicionada**: Material Dialog Backdrop Cleanup (BLOQUEANTE)
+  - Origem: Análise de falhas RF006 (execução #7-#9) - GAP 3
+  - Impacto: Resolve 17% das falhas E2E (3/18 testes)
+  - Padrão: firstValueFrom(dialogRef.afterClosed()) obrigatório
+  - Helper: dialog-helpers.ts criado
+
+---
+
 ## DEPENDENCIA OBRIGATORIA
 
 Este contrato **DEPENDE** do contrato:
@@ -712,6 +730,201 @@ Se qualquer item estiver ausente:
 
 ---
 
+## VALIDAÇÃO DE FORMULÁRIOS (OBRIGATÓRIO)
+
+**Versão:** 1.0
+**Data:** 2026-01-10
+**Contexto:** Adicionado após análise do RF006 onde validações de formulário não foram implementadas, resultando em 3 falhas E2E (6%).
+
+**Momento de execução:** Durante adequação de componentes com formulários
+
+### Por que validar formulários?
+
+Durante a análise do RF006, identificamos 3 problemas críticos:
+1. **FormControls sem validators:** Campos obrigatórios aceitavam valores vazios
+2. **mat-error ausentes:** Erros de validação não apareciam no template
+3. **Botão submit não desabilitado:** Form inválido permitia submit
+
+### Fluxo de Validação (OBRIGATÓRIO)
+
+**Para CADA formulário no componente, o agente DEVE:**
+
+#### 1. Identificar Campos Obrigatórios no UC
+
+Ler `UC-RFXXX.yaml` e identificar:
+```yaml
+formulario:
+  campos:
+    - nome: "Razão Social"
+      data_test: "RF006-input-razaosocial"
+      tipo: text
+      obrigatorio: true  # ← Campo obrigatório
+      validacoes:
+        - tipo: "required"
+          mensagem_erro: "Razão social é obrigatória"
+        - tipo: "maxlength"
+          valor: 200
+          mensagem_erro: "Razão social deve ter no máximo 200 caracteres"
+```
+
+#### 2. Implementar Validators no FormControl
+
+**Para campos obrigatórios:**
+```typescript
+// ✅ CORRETO
+this.clienteForm = this.formBuilder.group({
+  razaoSocial: ['', [Validators.required, Validators.maxLength(200)]],
+  cnpj: ['', [Validators.required, CnpjValidator]],
+  email: ['', [Validators.email]]
+});
+```
+
+**❌ INCORRETO (sem validators):**
+```typescript
+this.clienteForm = this.formBuilder.group({
+  razaoSocial: [''],  // ❌ Campo obrigatório sem Validators.required
+  cnpj: ['']
+});
+```
+
+#### 3. Implementar mat-error no Template
+
+**Para CADA campo com validação:**
+```html
+<!-- ✅ CORRETO -->
+<mat-form-field>
+  <input
+    matInput
+    data-test="RF006-input-razaosocial"
+    formControlName="razaoSocial"
+    placeholder="Razão Social"
+  />
+  <mat-error data-test="RF006-input-razaosocial-error">
+    {{ getErrorMessage('razaoSocial') }}
+  </mat-error>
+</mat-form-field>
+```
+
+**❌ INCORRETO (sem mat-error):**
+```html
+<mat-form-field>
+  <input matInput formControlName="razaoSocial" />
+  <!-- ❌ Falta mat-error -->
+</mat-form-field>
+```
+
+#### 4. Implementar getErrorMessage()
+
+**Método obrigatório no component.ts:**
+```typescript
+getErrorMessage(fieldName: string): string {
+  const control = this.clienteForm.get(fieldName);
+
+  if (control?.hasError('required')) {
+    return this.translateService.translate(`errors.${fieldName}.required`);
+  }
+
+  if (control?.hasError('maxlength')) {
+    const maxLength = control.getError('maxlength').requiredLength;
+    return this.translateService.translate(`errors.${fieldName}.maxlength`, { maxLength });
+  }
+
+  if (control?.hasError('email')) {
+    return this.translateService.translate(`errors.${fieldName}.email`);
+  }
+
+  return '';
+}
+```
+
+#### 5. Desabilitar Botão Submit quando Form Inválido
+
+**Sempre usar [disabled]:**
+```html
+<!-- ✅ CORRETO -->
+<button
+  mat-raised-button
+  color="primary"
+  data-test="RF006-salvar-cliente"
+  [disabled]="!clienteForm.valid"
+  (click)="salvar()"
+>
+  Salvar
+</button>
+```
+
+**❌ INCORRETO (sem [disabled]):**
+```html
+<button
+  mat-raised-button
+  data-test="RF006-salvar-cliente"
+  (click)="salvar()"
+>
+  Salvar
+</button>
+```
+
+#### 6. Criar Testes Unitários para Validators
+
+**Para CADA validator implementado:**
+```typescript
+describe('ClienteFormComponent - Validators', () => {
+  it('deve invalidar formulário quando razão social vazia', () => {
+    component.clienteForm.patchValue({ razaoSocial: '' });
+    expect(component.clienteForm.get('razaoSocial')?.hasError('required')).toBe(true);
+  });
+
+  it('deve invalidar quando razão social excede 200 caracteres', () => {
+    const longText = 'a'.repeat(201);
+    component.clienteForm.patchValue({ razaoSocial: longText });
+    expect(component.clienteForm.get('razaoSocial')?.hasError('maxlength')).toBe(true);
+  });
+
+  it('deve desabilitar botão salvar quando formulário inválido', () => {
+    component.clienteForm.patchValue({ razaoSocial: '' });
+    expect(component.clienteForm.valid).toBe(false);
+  });
+});
+```
+
+### Validações Obrigatórias
+
+**Checklist de validação de formulários:**
+
+- [ ] TODOS os campos obrigatórios do UC possuem `Validators.required`
+- [ ] TODOS os campos com validação possuem `mat-error` no template
+- [ ] TODOS os `mat-error` possuem `data-test="RFXXX-input-[campo]-error"`
+- [ ] Método `getErrorMessage()` implementado no component.ts
+- [ ] Botão submit possui `[disabled]="!form.valid"`
+- [ ] Testes unitários criados para TODOS os validators
+- [ ] Testes unitários executados: `npm test` → 100% aprovação
+
+### Bloqueio de Execução
+
+**Se validação de formulários FALHAR:**
+- ❌ **NÃO** executar testes E2E
+- ❌ **NÃO** considerar frontend concluído
+- ✅ **CORRIGIR** todos os validators ausentes
+- ✅ **ADICIONAR** mat-error em todos os campos
+- ✅ **CRIAR** testes unitários para validators
+- ✅ **RE-VALIDAR** até aprovação (100% cobertura)
+
+### Justificativa
+
+- Validações de formulário evitam submits inválidos
+- mat-error fornece feedback visual ao usuário
+- Botão desabilitado previne cliques em form inválido
+- Testes unitários garantem que validators funcionam corretamente
+- 3 testes E2E do RF006 falharam por falta dessas validações
+
+### Referência Cruzada
+
+- UC-TEMPLATE.yaml → seção `formulario.campos[].validacoes`
+- CONVENTIONS.md → seção 3.3 "Mensagens de Erro de Validação"
+- frontend.yaml (validação) → seção `validacoes_formulario`
+
+---
+
 ## AUDITORIA DE DATA-TEST ATTRIBUTES (OBRIGATORIO)
 
 **Momento de execução:** ANTES dos Testes E2E
@@ -823,6 +1036,662 @@ Este registro serve como **evidencia** de que:
 Nomenclatura sugerida para o registro de evidencia:
 - Nome: `[EVIDENCIA E2E] RFXXX - YYYY-MM-DD HH:MM`
 - Ou campo identificador claro que indique ser um registro de teste
+
+---
+
+## FASE 6.6: MATERIAL DIALOG BACKDROP CLEANUP (NOVO - BLOQUEANTE)
+
+**🆕 ADICIONADO:** 2026-01-11 (Resolve 17% dos problemas identificados no RF006)
+
+**Este passo é OBRIGATÓRIO para adequações que envolvem operações assíncronas com dialogs. Sem ele, testes E2E falharão por backdrop persistente.**
+
+**Contexto do Problema:**
+
+Durante testes do RF006, identificou-se que após operações assíncronas (consulta ReceitaWS, chamadas de API), o backdrop do Material Dialog **permanece visível** mesmo após o dialog ser fechado. Isso resulta em:
+- ❌ Backdrop intercepta cliques subsequentes
+- ❌ Testes E2E falham com timeout (elementos não clicáveis)
+- ❌ Usuário não consegue interagir com a UI
+- ❌ 17% de falhas nos testes E2E do RF006
+
+**Aplicabilidade:**
+
+Esta seção é obrigatória SE a adequação:
+- Modifica ou cria operações assíncronas com Material Dialog
+- Adiciona consultas a APIs externas (ReceitaWS, ViaCEP, etc.)
+- Implementa dialogs de confirmação com operações CRUD
+- Usa dialogs aninhados (dialog dentro de dialog)
+- Adiciona validação assíncrona em formulários
+
+SE a adequação NÃO envolve dialogs: **PULAR esta seção**.
+
+---
+
+### 6.6.1: Identificar Operações Assíncronas com Dialog (SE APLICÁVEL)
+
+**O agente DEVE identificar no código existente e novo:**
+
+#### Cenários Críticos (OBRIGATÓRIO limpar backdrop):
+
+**a) Consultas a APIs Externas com Dialog de Loading**
+```typescript
+// Cenário: Consultar ReceitaWS com loading dialog
+const dialogRef = this.dialog.open(LoadingDialogComponent, {
+  disableClose: true,
+  data: { message: 'Consultando CNPJ...' }
+});
+
+try {
+  const dados = await this.receitaWsService.consultar(cnpj);
+  // ⚠️ PROBLEMA: Dialog fecha mas backdrop pode persistir
+  dialogRef.close();
+  // ✅ SOLUÇÃO: Aguardar fechamento completo
+} catch (error) {
+  dialogRef.close();
+}
+```
+
+**b) Operações CRUD Assíncronas com Dialog de Confirmação**
+```typescript
+// Cenário: Confirmar exclusão com loading
+const confirmRef = this.dialog.open(ConfirmDialogComponent, {
+  data: { message: 'Confirmar exclusão?' }
+});
+
+confirmRef.afterClosed().subscribe(async (confirmed) => {
+  if (confirmed) {
+    const loadingRef = this.dialog.open(LoadingDialogComponent);
+    await this.service.delete(id);
+    // ⚠️ PROBLEMA: Loading dialog fecha mas backdrop persiste
+    loadingRef.close();
+    // ✅ SOLUÇÃO: Aguardar fechamento completo
+  }
+});
+```
+
+**c) Dialogs Aninhados (Dialog dentro de Dialog)**
+```typescript
+// Cenário: Dialog de edição abre dialog de confirmação
+const editRef = this.dialog.open(EditDialogComponent);
+
+editRef.componentInstance.onConfirm.subscribe(() => {
+  const confirmRef = this.dialog.open(ConfirmDialogComponent);
+  // ⚠️ PROBLEMA: Múltiplos backdrops podem persistir
+});
+```
+
+**Critério de aceite:**
+- ✅ TODAS as operações assíncronas com dialog identificadas (existentes + novas)
+- ✅ Cenários de backdrop persistente mapeados
+
+---
+
+### 6.6.2: Aplicar Padrão de Cleanup (OBRIGATÓRIO)
+
+**O agente DEVE aplicar o padrão de cleanup em TODAS as operações identificadas (existentes + novas):**
+
+#### Padrão #1: Aguardar afterClosed() Completo
+
+**Para operações simples (1 dialog):**
+
+```typescript
+// ❌ INCORRETO: Fechar sem aguardar
+const dialogRef = this.dialog.open(LoadingDialogComponent);
+await this.api.consultar();
+dialogRef.close();
+// Backdrop pode persistir aqui ⚠️
+
+// ✅ CORRETO: Aguardar fechamento completo
+const dialogRef = this.dialog.open(LoadingDialogComponent);
+await this.api.consultar();
+dialogRef.close();
+await firstValueFrom(dialogRef.afterClosed());  // ✅ Garantia de fechamento
+```
+
+#### Padrão #2: Usar Helper waitForDialogToClosed (E2E)
+
+**Para testes E2E (Playwright):**
+
+```typescript
+// ❌ INCORRETO: Clicar imediatamente após fechar dialog
+await page.click('[data-test="RF006-dialog-cancelar"]');
+await page.click('[data-test="RF006-criar-cliente"]');  // ⚠️ Falha: backdrop intercepta
+
+// ✅ CORRETO: Aguardar backdrop ser removido
+import { waitForDialogToClosed } from '../helpers';
+
+await page.click('[data-test="RF006-dialog-cancelar"]');
+await waitForDialogToClosed(page);  // ✅ Aguarda backdrop desaparecer
+await page.click('[data-test="RF006-criar-cliente"]');  // ✅ Clique funciona
+```
+
+**Implementação do helper** (já existe em `e2e/helpers/dialog-helpers.ts`):
+
+```typescript
+export async function waitForDialogToClosed(
+  page: Page,
+  timeout: number = 15000
+): Promise<void> {
+  try {
+    await page.waitForSelector('.cdk-overlay-backdrop', {
+      state: 'detached',  // ✅ Garante que foi removido
+      timeout
+    });
+    await page.waitForTimeout(500);
+  } catch (error) {
+    throw new Error(
+      `Dialog backdrop não foi removido dentro de ${timeout}ms.`
+    );
+  }
+}
+```
+
+**Critério de aceite:**
+- ✅ TODOS os cenários (existentes + novos) aplicam padrão de cleanup
+- ✅ Código usa `firstValueFrom(dialogRef.afterClosed())`
+- ✅ Testes E2E usam `waitForDialogToClosed(page)`
+
+---
+
+### 6.6.3: Atualizar Testes E2E Existentes
+
+**O agente DEVE atualizar TODOS os testes E2E existentes que interagem com dialogs:**
+
+#### Atualização de Imports
+
+```typescript
+// ✅ CORRETO: Importar helpers no início do arquivo
+import { test, expect } from '@playwright/test';
+import {
+  waitForDialogToClosed,
+  waitForDialogToOpen,
+  waitForNoBackdrop
+} from '../helpers';
+```
+
+#### Atualização de Testes
+
+```typescript
+// ❌ ANTES (INCORRETO):
+test('TC-E2E: Criar registro', async ({ page }) => {
+  await page.click('[data-test="RF006-criar-cliente"]');
+  await page.fill('[data-test="RF006-input-cnpj"]', '00.000.000/0001-91');
+  await page.click('[data-test="RF006-btn-consultar-cnpj"]');
+
+  // ⚠️ PROBLEMA: Não aguarda backdrop desaparecer
+  await page.fill('[data-test="RF006-input-razaosocial"]', 'EMPRESA TESTE');
+  // ✗ FALHA: Backdrop intercepta preenchimento
+});
+
+// ✅ DEPOIS (CORRETO):
+test('TC-E2E: Criar registro', async ({ page }) => {
+  await page.click('[data-test="RF006-criar-cliente"]');
+  await page.fill('[data-test="RF006-input-cnpj"]', '00.000.000/0001-91');
+  await page.click('[data-test="RF006-btn-consultar-cnpj"]');
+
+  await waitForDialogToClosed(page);  // ✅ Aguarda backdrop desaparecer
+
+  await page.fill('[data-test="RF006-input-razaosocial"]', 'EMPRESA TESTE');
+  // ✓ SUCESSO: Campo preenchido normalmente
+});
+```
+
+**Critério de aceite:**
+- ✅ TODOS os testes E2E existentes usam helpers de dialog
+- ✅ Nenhum teste clica em elemento logo após fechar dialog sem aguardar
+- ✅ Imports atualizados
+
+---
+
+### 6.6.4: Documentar Padrão no Código Adequado
+
+**O agente DEVE adicionar comentários em métodos modificados/criados:**
+
+```typescript
+/**
+ * PADRÃO OBRIGATÓRIO: Cleanup de Dialog Backdrop
+ *
+ * Ao usar MatDialog com operações assíncronas, SEMPRE:
+ * 1. Fechar dialog: dialogRef.close()
+ * 2. Aguardar fechamento: await firstValueFrom(dialogRef.afterClosed())
+ *
+ * Referência: frontend-adequacao.md FASE 6.6
+ * @see CONTRATO-TESTES-E2E-STATEFUL.md (seção 3 - Dialog Helpers)
+ */
+async consultarCNPJ(cnpj: string): Promise<void> {
+  const dialogRef = this.dialog.open(LoadingDialogComponent, {
+    disableClose: true,
+    data: { message: 'Consultando CNPJ...' }
+  });
+
+  try {
+    const dados = await this.receitaWsService.consultar(cnpj);
+    this.form.patchValue(dados);
+
+    dialogRef.close();
+    await firstValueFrom(dialogRef.afterClosed());  // ✅ Cleanup obrigatório
+  } catch (error) {
+    dialogRef.close();
+    await firstValueFrom(dialogRef.afterClosed());  // ✅ Cleanup mesmo em erro
+
+    this.showError(error);
+  }
+}
+```
+
+**Critério de aceite:**
+- ✅ Métodos modificados/criados possuem comentários de padrão
+- ✅ Referência ao contrato documentada
+
+---
+
+### 6.6.5: Atualizar STATUS.yaml
+
+**O agente DEVE documentar aplicação do padrão:**
+
+```yaml
+desenvolvimento:
+  frontend:
+    status: done
+
+    dialog_backdrop_cleanup:
+      aplicado: true
+      cenarios_identificados: 3
+      cenarios_corrigidos: 3
+      helpers_usados:
+        - waitForDialogToClosed
+        - waitForDialogToOpen
+      testes_e2e_atualizados: 5
+      data_adequacao: "2026-01-11"
+      referencia_contrato: "FASE 6.6 - frontend-adequacao.md"
+```
+
+**Critério de aceite:**
+- ✅ STATUS.yaml documentado
+- ✅ Cenários identificados e corrigidos listados
+
+---
+
+### 6.6.6: Validação Final de Bloqueio
+
+**Antes de marcar adequação frontend como done, o agente DEVE confirmar:**
+
+- ✅ TODAS as operações assíncronas com dialog (existentes + novas) aplicam cleanup
+- ✅ TODOS os testes E2E (existentes + novos) usam helpers de dialog
+- ✅ Código possui comentários de padrão (em métodos modificados/criados)
+- ✅ STATUS.yaml documentado
+- ✅ Validação manual: Zero backdrops após operações
+
+**SE qualquer verificação FALHAR:**
+- ❌ Adequação frontend NÃO está pronta
+- ❌ BLOQUEIO: Corrigir TODOS os problemas
+- ❌ Re-validar até aprovação
+
+---
+
+**RESUMO DA FASE 6.6:**
+
+Esta fase resolve **17% dos problemas do RF006** causados por backdrop persistente.
+
+**Quando aplicar:**
+- ✅ SE adequação envolve dialogs com operações assíncronas
+- ❌ SE adequação NÃO envolve dialogs: PULAR seção
+
+**Resultado esperado (SE aplicável):**
+- ✅ Backdrop sempre limpo após operações
+- ✅ Testes E2E passam sem timeouts
+- ✅ Usuário interage normalmente
+- ✅ Zero falhas por backdrop persistente
+
+**Referências:**
+- Helper implementado: `D:\IC2\frontend\icontrolit-app\e2e\helpers\dialog-helpers.ts`
+- Contrato stateful: `D:\IC2_Governanca\governanca\contracts\testes\CONTRATO-TESTES-E2E-STATEFUL.md`
+- Contrato criação: `frontend-criacao.md` FASE 6.6
+
+---
+
+## FASE 6.7: VALIDATORS ANGULAR OBRIGATÓRIOS (NOVO - BLOQUEANTE)
+
+**🆕 ADICIONADO:** 2026-01-11 (Resolve 21% dos problemas identificados no RF006)
+
+**Este passo é OBRIGATÓRIO para adequações que envolvem formulários. Sem ele, testes E2E falharão por validators ausentes.**
+
+**Contexto do Problema:**
+
+Durante testes do RF006, identificou-se que formulários SEM validators Angular adequados resultam em:
+- ❌ Formulários aceitam dados inválidos
+- ❌ mat-error não aparece para usuário
+- ❌ Botões não desabilitam quando formulário inválido
+- ❌ Testes E2E falham validando mat-error
+- ❌ 21% de falhas nos testes E2E do RF006
+
+**Aplicabilidade:**
+
+Esta seção é obrigatória SE a adequação:
+- Modifica ou cria formulários reativos (ReactiveFormsModule)
+- Adiciona campos com validação obrigatória
+- Implementa campos com pattern validation (CNPJ, CPF, email, telefone)
+- Usa Material Form Field (mat-form-field)
+- Adiciona validações de negócio (maxLength, minLength, etc.)
+
+SE a adequação NÃO envolve formulários: **PULAR esta seção**.
+
+---
+
+### 6.7.1: Identificar Campos com Validação
+
+**O agente DEVE:**
+
+1. **Ler UC-RFXXX.yaml:**
+   - Localizar seção `formulario.campos`
+   - Identificar todos os campos com `obrigatorio: true`
+   - Identificar todos os campos com `validacoes` especificadas
+
+2. **Mapear validações obrigatórias:**
+
+**Exemplo UC-RF006.yaml:**
+```yaml
+formulario:
+  campos:
+    - nome: "cnpj"
+      obrigatorio: true
+      validacoes:
+        - tipo: "required"
+          mensagem_erro: "CNPJ é obrigatório"
+        - tipo: "pattern"
+          regex: "^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$"
+          mensagem_erro: "CNPJ inválido"
+
+    - nome: "razaoSocial"
+      obrigatorio: true
+      validacoes:
+        - tipo: "required"
+          mensagem_erro: "Razão Social é obrigatória"
+        - tipo: "maxlength"
+          valor: 200
+          mensagem_erro: "Razão Social deve ter no máximo 200 caracteres"
+
+    - nome: "email"
+      obrigatorio: false
+      validacoes:
+        - tipo: "email"
+          mensagem_erro: "E-mail inválido"
+```
+
+3. **Documentar mapeamento:**
+   - Criar tabela: Campo → Validators Angular → mat-error messages
+
+---
+
+### 6.7.2: Implementar Validators Angular
+
+**O agente DEVE implementar validators no FormGroup:**
+
+**Localização:**
+- `src/app/modules/[modulo]/[entidade]-form/[entidade]-form.component.ts`
+
+**Implementação obrigatória:**
+
+```typescript
+import { Validators } from '@angular/forms';
+
+// No construtor ou ngOnInit:
+this.form = this.fb.group({
+  // Campo obrigatório com pattern
+  cnpj: ['', [
+    Validators.required,
+    Validators.pattern(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/)
+  ]],
+
+  // Campo obrigatório com maxlength
+  razaoSocial: ['', [
+    Validators.required,
+    Validators.maxLength(200)
+  ]],
+
+  // Campo opcional com email
+  email: ['', [
+    Validators.email
+  ]],
+
+  // Campo obrigatório simples
+  nomeFantasia: ['', Validators.required]
+});
+```
+
+**Validação:**
+- ✅ TODOS os campos com `obrigatorio: true` possuem `Validators.required`
+- ✅ TODOS os campos com `validacoes.tipo: pattern` possuem `Validators.pattern(regex)`
+- ✅ TODOS os campos com `validacoes.tipo: email` possuem `Validators.email`
+- ✅ TODOS os campos com `validacoes.tipo: maxlength` possuem `Validators.maxLength(valor)`
+- ✅ TODOS os campos com `validacoes.tipo: minlength` possuem `Validators.minLength(valor)`
+
+**SE qualquer campo NÃO tiver validator obrigatório:**
+- ❌ BLOQUEIO: Implementar validator ausente
+
+---
+
+### 6.7.3: Implementar mat-error Messages
+
+**O agente DEVE implementar mat-error para CADA validação:**
+
+**Localização:**
+- `src/app/modules/[modulo]/[entidade]-form/[entidade]-form.component.html`
+
+**Implementação obrigatória:**
+
+```html
+<!-- Campo CNPJ -->
+<mat-form-field>
+  <mat-label>CNPJ</mat-label>
+  <input matInput formControlName="cnpj" [data-test]="RF006-input-cnpj">
+
+  <!-- mat-error para required -->
+  <mat-error *ngIf="form.get('cnpj')?.hasError('required')" [data-test]="RF006-input-cnpj-error-required">
+    CNPJ é obrigatório
+  </mat-error>
+
+  <!-- mat-error para pattern -->
+  <mat-error *ngIf="form.get('cnpj')?.hasError('pattern')" [data-test]="RF006-input-cnpj-error-pattern">
+    CNPJ inválido
+  </mat-error>
+</mat-form-field>
+
+<!-- Campo Razão Social -->
+<mat-form-field>
+  <mat-label>Razão Social</mat-label>
+  <input matInput formControlName="razaoSocial" [data-test]="RF006-input-razaosocial">
+
+  <mat-error *ngIf="form.get('razaoSocial')?.hasError('required')" [data-test]="RF006-input-razaosocial-error-required">
+    Razão Social é obrigatória
+  </mat-error>
+
+  <mat-error *ngIf="form.get('razaoSocial')?.hasError('maxlength')" [data-test]="RF006-input-razaosocial-error-maxlength">
+    Razão Social deve ter no máximo 200 caracteres
+  </mat-error>
+</mat-form-field>
+
+<!-- Campo E-mail (opcional) -->
+<mat-form-field>
+  <mat-label>E-mail</mat-label>
+  <input matInput formControlName="email" [data-test]="RF006-input-email">
+
+  <mat-error *ngIf="form.get('email')?.hasError('email')" [data-test]="RF006-input-email-error-email">
+    E-mail inválido
+  </mat-error>
+</mat-form-field>
+```
+
+**Nomenclatura data-test para mat-error:**
+- Padrão: `RFXXX-input-[campo]-error-[tipo]`
+- Exemplos:
+  - `RF006-input-cnpj-error-required`
+  - `RF006-input-cnpj-error-pattern`
+  - `RF006-input-razaosocial-error-maxlength`
+  - `RF006-input-email-error-email`
+
+**Validação:**
+- ✅ TODOS os validators possuem mat-error correspondente
+- ✅ TODAS as mensagens batem com UC-RFXXX.yaml → `formulario.campos[].validacoes[].mensagem_erro`
+- ✅ TODOS os mat-error possuem data-test
+
+**SE qualquer mat-error estiver ausente:**
+- ❌ BLOQUEIO: Implementar mat-error ausente
+
+---
+
+### 6.7.4: Desabilitar Botões em Form Inválido
+
+**O agente DEVE desabilitar botões de ação quando formulário estiver inválido:**
+
+**Localização:**
+- `src/app/modules/[modulo]/[entidade]-form/[entidade]-form.component.html`
+
+**Implementação obrigatória:**
+
+```html
+<!-- Botão Salvar -->
+<button mat-raised-button
+        color="primary"
+        [disabled]="form.invalid"
+        [data-test]="RF006-salvar-cliente"
+        (click)="salvar()">
+  Salvar
+</button>
+
+<!-- Botão Confirmar (em dialogs) -->
+<button mat-button
+        [disabled]="form.invalid"
+        [data-test]="RF006-confirmar"
+        (click)="confirmar()">
+  Confirmar
+</button>
+```
+
+**Validação:**
+- ✅ TODOS os botões de ação (Salvar, Confirmar, Criar, Atualizar) possuem `[disabled]="form.invalid"`
+- ✅ Botões de cancelamento NÃO possuem disabled (permitir cancelar sempre)
+
+**SE qualquer botão de ação NÃO estiver desabilitado:**
+- ❌ BLOQUEIO: Adicionar `[disabled]="form.invalid"`
+
+---
+
+### 6.7.5: Validar Comportamento
+
+**O agente DEVE validar comportamento de validação:**
+
+**Teste manual:**
+
+1. **Abrir formulário vazio:**
+   - ✅ Botão Salvar deve estar DESABILITADO
+   - ✅ Nenhum mat-error visível (touched = false)
+
+2. **Clicar em campo obrigatório e sair (blur):**
+   - ✅ mat-error "Campo é obrigatório" deve aparecer
+   - ✅ Botão Salvar permanece DESABILITADO
+
+3. **Preencher campo com valor INVÁLIDO:**
+   - ✅ mat-error de validação específica deve aparecer (ex: "CNPJ inválido")
+   - ✅ Botão Salvar permanece DESABILITADO
+
+4. **Preencher campo com valor VÁLIDO:**
+   - ✅ mat-error desaparece
+   - ✅ Se TODOS os campos obrigatórios válidos → Botão Salvar HABILITA
+
+5. **Clicar em Salvar com formulário VÁLIDO:**
+   - ✅ Operação executa normalmente
+   - ✅ Nenhum erro de validação
+
+**SE qualquer comportamento falhar:**
+- ❌ BLOQUEIO: Corrigir implementação de validators ou mat-error
+
+---
+
+### 6.7.6: Documentar Validators
+
+**O agente DEVE atualizar STATUS.yaml:**
+
+```yaml
+desenvolvimento:
+  frontend:
+    validators_angular:
+      implementados:
+        - campo: "cnpj"
+          validators: ["required", "pattern"]
+          mat_errors: ["required", "pattern"]
+        - campo: "razaoSocial"
+          validators: ["required", "maxLength"]
+          mat_errors: ["required", "maxlength"]
+        - campo: "email"
+          validators: ["email"]
+          mat_errors: ["email"]
+
+      cobertura: "100%"  # Todos os campos de UC-RFXXX.yaml implementados
+      botoes_disabled: true  # Botões desabilitam em form.invalid
+```
+
+---
+
+### 6.7.7: Validação Final de Bloqueio
+
+**O agente DEVE executar validação final:**
+
+**Verificar:**
+
+1. **Cobertura de validators:**
+   - ✅ TODOS os campos obrigatórios de UC-RFXXX.yaml possuem Validators.required
+   - ✅ TODOS os campos com validacoes de UC-RFXXX.yaml possuem validators correspondentes
+
+2. **Cobertura de mat-error:**
+   - ✅ TODOS os validators possuem mat-error correspondente
+   - ✅ TODAS as mensagens batem com UC-RFXXX.yaml
+
+3. **Nomenclatura data-test:**
+   - ✅ TODOS os mat-error possuem data-test no formato `RFXXX-input-[campo]-error-[tipo]`
+
+4. **Botões disabled:**
+   - ✅ TODOS os botões de ação possuem `[disabled]="form.invalid"`
+
+**Critério de Aprovação:**
+- ✅ Cobertura de validators: 100%
+- ✅ Cobertura de mat-error: 100%
+- ✅ Nomenclatura data-test: 100% conforme padrão
+- ✅ Botões disabled: 100%
+
+**SE qualquer verificação FALHAR:**
+- ❌ Frontend está INCOMPLETO para validação
+- ❌ BLOQUEIO: Não prosseguir para validação
+
+---
+
+### IMPACTO ESPERADO
+
+Esta fase resolve **21% dos problemas do RF006** causados por validators ausentes.
+
+**Sem esta fase:**
+- ❌ Formulários aceitam dados inválidos
+- ❌ mat-error não aparece para usuário
+- ❌ Botões não desabilitam quando formulário inválido
+- ❌ Testes E2E falham validando mat-error
+- ❌ 21% de taxa de falha (3/14 falhas do RF006)
+
+**Com esta fase:**
+- ✅ Formulários validam corretamente
+- ✅ mat-error aparecem para usuário
+- ✅ Botões desabilitam em form.invalid
+- ✅ Testes E2E passam validando mat-error
+- ✅ Zero falhas por validators ausentes
+
+**Resultado esperado:**
+- ✅ Taxa de falha E2E reduzida em 21%
+- ✅ UX consistente (usuário vê erros claramente)
+- ✅ Código robusto e validado
+
+**Referências:**
+- Relatório de testes: `D:\IC2\.temp_ia\RELATORIO-TESTES-RF006-2026-01-11.md` (GAP 1)
+- UC Template: `D:\IC2_Governanca\governanca\templates\UC-TEMPLATE.yaml` (seção formulario.campos)
+- Testes falhados: FA-UC01-001, FA-UC01-002, FA-UC01-003
+- Contrato criação: `frontend-criacao.md` FASE 6.7
 
 ---
 

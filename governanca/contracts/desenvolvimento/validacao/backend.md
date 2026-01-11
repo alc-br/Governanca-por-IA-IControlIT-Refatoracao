@@ -637,6 +637,173 @@ Este contrato DEVE validar que:
 
 ---
 
+## VALIDAÇÃO 18: COBERTURA DE TESTES UNITÁRIOS (NOVO - BLOQUEANTE)
+
+**Versão:** 1.0
+**Data:** 2026-01-09
+**Contexto:** Adicionado após análise do RF006 para garantir que backend possui testes unitários OBRIGATÓRIOS para TODOS os Commands/Queries ANTES de marcar como concluído.
+
+**Objetivo:** Garantir que backend possui testes unitários com 100% de cobertura de Commands/Queries, evitando implementações sem validação automatizada.
+
+### PASSO 18.1: Validar Existência de Testes Unitários
+
+O agente DEVE validar que:
+
+```python
+# 1. Listar TODOS os Commands implementados
+commands_implementados = listar_arquivos(
+    "backend/Application/Features/**/Commands/**/*.cs",
+    excluir=["*Tests.cs", "*Validator.cs"]
+)
+
+# 2. Listar TODOS os Queries implementados
+queries_implementados = listar_arquivos(
+    "backend/Application/Features/**/Queries/**/*.cs",
+    excluir=["*Tests.cs", "*Validator.cs"]
+)
+
+# 3. Listar TODOS os arquivos de teste
+testes_existentes = listar_arquivos(
+    "backend/Application.Tests/Features/**/*Tests.cs"
+)
+
+# 4. Validar que CADA Command tem teste correspondente
+commands_sem_teste = []
+for command in commands_implementados:
+    nome_command = extrair_nome(command)  # Ex: CreateClienteCommand
+    nome_teste = nome_command + "Tests.cs"  # Ex: CreateClienteCommandTests.cs
+
+    teste_existe = any(nome_teste in teste for teste in testes_existentes)
+
+    if not teste_existe:
+        commands_sem_teste.append(nome_command)
+
+# 5. Validar que CADA Query tem teste correspondente
+queries_sem_teste = []
+for query in queries_implementados:
+    nome_query = extrair_nome(query)  # Ex: GetClienteByIdQuery
+    nome_teste = nome_query + "Tests.cs"  # Ex: GetClienteByIdQueryTests.cs
+
+    teste_existe = any(nome_teste in teste for teste in testes_existentes)
+
+    if not teste_existe:
+        queries_sem_teste.append(nome_query)
+
+# 6. Calcular cobertura
+total_commands_queries = len(commands_implementados) + len(queries_implementados)
+total_sem_teste = len(commands_sem_teste) + len(queries_sem_teste)
+total_com_teste = total_commands_queries - total_sem_teste
+
+cobertura_percentual = (total_com_teste / total_commands_queries * 100) if total_commands_queries > 0 else 0
+
+print(f"Cobertura de Testes Unitários: {total_com_teste}/{total_commands_queries} ({cobertura_percentual:.1f}%)")
+
+# 7. Validar bloqueio
+if cobertura_percentual < 100:
+    print("❌ BACKEND REPROVADO - Cobertura de testes < 100%")
+    print(f"Commands sem teste: {commands_sem_teste}")
+    print(f"Queries sem teste: {queries_sem_teste}")
+    print("❌ BLOQUEIO: Backend não pode ser marcado como concluído")
+    print("❌ RETORNAR ao contrato de backend-criacao.md para criar testes")
+    PARAR()
+```
+
+### PASSO 18.2: Executar Testes Unitários
+
+O agente DEVE executar testes e validar aprovação:
+
+```bash
+# 1. Executar testes unitários
+dotnet test backend/Application.Tests/Application.Tests.csproj --logger "console;verbosity=detailed"
+
+# 2. Capturar exit code
+exit_code=$?
+
+# 3. Validar resultado
+if [ $exit_code -ne 0 ]; then
+    echo "❌ BACKEND REPROVADO - Testes unitários falharam"
+    echo "❌ BLOQUEIO: Backend não pode ser marcado como concluído"
+    echo "❌ Corrigir falhas e re-executar"
+    PARAR()
+fi
+
+# 4. Capturar taxa de aprovação
+# Exemplo de output: "Passed: 45, Failed: 0, Skipped: 0"
+# Taxa de aprovação DEVE ser 100% (Failed = 0, Skipped = 0)
+```
+
+### PASSO 18.3: Validar Tipos de Testes Obrigatórios
+
+Para CADA Command, o agente DEVE validar que existem pelo menos 3 tipos de teste:
+
+1. **Teste de sucesso (happy path)**
+   - Cenário: Dados válidos
+   - Resultado esperado: `Success` com resultado correto
+
+2. **Teste de validação (FluentValidation)**
+   - Cenário: Dados inválidos (campo obrigatório ausente, formato inválido, etc.)
+   - Resultado esperado: Validation errors
+
+3. **Teste de regra de negócio**
+   - Cenário: Violação de RN (ex: CNPJ duplicado, cliente inativo, etc.)
+   - Resultado esperado: `Failure` com mensagem específica
+
+```python
+# Exemplo de validação
+for command in commands_implementados:
+    nome_teste = nome_command + "Tests.cs"
+    arquivo_teste = ler_arquivo(nome_teste)
+
+    # Validar presença de testes obrigatórios
+    tem_teste_sucesso = "Success" in arquivo_teste or "ShouldReturnSuccess" in arquivo_teste
+    tem_teste_validacao = "Validation" in arquivo_teste or "ShouldFailValidation" in arquivo_teste
+    tem_teste_rn = "BusinessRule" in arquivo_teste or "ShouldFailBusinessRule" in arquivo_teste
+
+    if not (tem_teste_sucesso and tem_teste_validacao and tem_teste_rn):
+        print(f"❌ {nome_command}: Tipos de teste obrigatórios ausentes")
+        print(f"   - Teste de sucesso: {'✅' if tem_teste_sucesso else '❌'}")
+        print(f"   - Teste de validação: {'✅' if tem_teste_validacao else '❌'}")
+        print(f"   - Teste de RN: {'✅' if tem_teste_rn else '❌'}")
+        REPROVAR()
+```
+
+### PASSO 18.4: Atualizar STATUS.yaml
+
+O agente DEVE atualizar `STATUS.yaml`:
+
+```yaml
+desenvolvimento:
+  backend:
+    testes_implementados:
+      - "CreateClienteCommandTests.cs (3 testes)"
+      - "UpdateClienteCommandTests.cs (3 testes)"
+      - "DeleteClienteCommandTests.cs (2 testes)"
+      - "GetClienteByIdQueryTests.cs (2 testes)"
+    cobertura_testes: "4/4 commands com testes (100%)"
+    taxa_aprovacao_testes: "10/10 testes aprovados (100%)"
+    ultima_execucao_testes: "2026-01-09 14:30:00"
+```
+
+### Critério de Aprovação
+
+- ✅ Cobertura: 100% dos Commands/Queries possuem testes
+- ✅ Taxa de aprovação: 100% (nenhum teste falhando ou skipped)
+- ✅ Tipos de teste: Cada Command possui pelo menos 3 tipos (sucesso, validação, RN)
+- ✅ Exit code: `dotnet test` retorna 0
+
+**SE qualquer verificação FALHAR:**
+- ❌ Backend REPROVADO
+- ❌ BLOQUEIO: Backend não pode ser marcado como concluído
+- ❌ Reportar Commands/Queries sem testes
+- ❌ Reportar testes falhando
+- ❌ RETORNAR ao contrato de backend-criacao.md
+
+**IMPORTANTE:** Esta validação garante que backend possui validação automatizada COMPLETA antes de ser considerado concluído, evitando implementações sem garantias de qualidade.
+
+**Referência:** `CLAUDE.md` seção 18.2.2 "Bloqueios Obrigatórios"
+
+---
+
 ## SAÍDA OBRIGATÓRIA
 
 Ao final da execução, o agente DEVE entregar:
@@ -730,6 +897,15 @@ Se violações forem aceitas pelo backend:
 **Este contrato é vinculante.**
 **Violações devem ser reportadas, NÃO corrigidas.**
 **O agente Tester-Backend tem autoridade para bloquear merges.**
+
+---
+
+## HISTÓRICO DE VERSÕES
+
+| Versão | Data | Descrição |
+|--------|------|-----------|
+| 1.1 | 2026-01-09 | Adicionada VALIDAÇÃO 18 "Cobertura de Testes Unitários" (BLOQUEANTE) - Valida que 100% dos Commands/Queries possuem testes unitários (sucesso, validação, RN), taxa de aprovação 100%, exit code 0. Garante que backend possui validação automatizada COMPLETA antes de ser marcado como concluído. Baseado em análise RF006. Referência: CLAUDE.md seção 18.2.2 |
+| 1.0 | [DATA ANTERIOR] | Criação do contrato de validação de backend com testes orientados por violação |
 
 ---
 

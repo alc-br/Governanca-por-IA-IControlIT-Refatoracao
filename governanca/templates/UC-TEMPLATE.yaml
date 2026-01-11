@@ -1,0 +1,364 @@
+# =============================================
+# TEMPLATE DE USE CASE (UC) - VERSÃO 2.0
+# =============================================
+#
+# Este template inclui TODAS as seções obrigatórias para alinhamento com testes desde o início.
+# IMPORTANTE: Seções marcadas com (OBRIGATÓRIO) devem ser preenchidas sempre.
+# Seções marcadas com (SE APLICÁVEL) devem ser preenchidas quando relevante.
+#
+# Última atualização: 2026-01-09
+# Versão: 2.0 - Alinhamento completo com testes E2E
+#
+# =============================================
+
+# =============================================
+# IDENTIFICAÇÃO
+# =============================================
+rf_id: RFXXX
+uc_id: UCXX
+titulo: "[Título do Use Case]"
+ator: "[Ator Principal - ex: Usuário Administrador]"
+prioridade: [ALTA|MEDIA|BAIXA]
+tipo: [CRUD|Consulta|Processamento|Integracao]
+
+# =============================================
+# NAVEGAÇÃO (NOVO - OBRIGATÓRIO)
+# =============================================
+# Esta seção documenta URLs e rotas para testes E2E
+navegacao:
+  url_completa: "http://localhost:4200/[rota-completa]"
+  # Exemplo: "http://localhost:4200/management/clientes"
+
+  referencia_routing: "src/app/[caminho]/[arquivo]-routing.module.ts"
+  # Exemplo: "src/app/modules/cadastros/cadastros-routing.module.ts"
+
+  breadcrumb: "[Home > Módulo > Tela]"
+  # Exemplo: "Home > Cadastros > Clientes"
+
+# =============================================
+# CREDENCIAIS (NOVO - OBRIGATÓRIO para testes E2E)
+# =============================================
+# Especifica qual perfil de usuário é necessário para este UC
+credenciais:
+  referencia_seeds: "backend/Infrastructure/Persistence/ApplicationDbContextInitialiser.cs"
+  perfil_necessario: "[Admin|Developer|Usuario]"
+  # Nota: O perfil deve ter as permissões especificadas no RF
+
+# =============================================
+# PRÉ-CONDIÇÕES (INTEGRAÇÃO COM PRE-FLIGHT CHECKS SQL)
+# =============================================
+# **ATENÇÃO:** Esta seção alimenta os pre-flight checks SQL em:
+#   governanca/checklists/testes/pre-execucao.yaml → pre_flight_checks_sql
+#
+# Os valores aqui são substituídos dinamicamente nos placeholders SQL:
+#   [TABELA_RFXXX] ← dados_minimos.tabela
+#   [MINIMO_UC] ← dados_minimos.quantidade_minima
+#   [TABELA_RELACIONADA] ← tabelas_relacionadas[]
+#   [MINIMO_PERMISSOES] ← permissoes_necessarias.length
+#   [ENTIDADE_RF] ← entidade_principal
+#
+pre_condicoes:
+  # ===== DADOS MÍNIMOS NO BANCO (OBRIGATÓRIO) =====
+  # Valida que tabela principal possui registros suficientes para testes
+  dados_minimos:
+    tabela: "[Nome da tabela principal - ex: Clientes]"
+    # Usado em: SELECT COUNT(*) FROM [TABELA_RFXXX] WHERE FlExcluido = 0
+
+    quantidade_minima: 5
+    # Usado em: TotalRegistros >= [MINIMO_UC]
+    # Justificativa: Testes de listagem, paginação, filtros precisam dados
+
+    observacao: "[Por que este mínimo é necessário - ex: Testes de paginação]"
+
+  # ===== TABELAS RELACIONADAS (SE APLICÁVEL) =====
+  # Valida integridade de FK, joins, dados relacionados
+  tabelas_relacionadas:
+    - nome: "[Tabela relacionada 1 - ex: ClienteEnderecos]"
+      quantidade_minima: 3
+      relacao: "[FK para tabela principal - ex: FK_ClienteEnderecos_Clientes]"
+      # Usado em: SELECT COUNT(*) FROM [TABELA_RELACIONADA] WHERE ClienteId IS NOT NULL
+
+    - nome: "[Tabela relacionada 2 - ex: ClienteContatos]"
+      quantidade_minima: 2
+      relacao: "[FK para tabela principal]"
+
+  # ===== PERMISSÕES NECESSÁRIAS (OBRIGATÓRIO) =====
+  # Valida que usuário de teste possui perfil completo para executar UC
+  permissoes_necessarias:
+    - "CAD.[ENTIDADE].VISUALIZAR"
+    # Exemplo: CAD.CLIENTES.VISUALIZAR
+
+    - "CAD.[ENTIDADE].CRIAR"
+    # Exemplo: CAD.CLIENTES.CRIAR
+
+    - "CAD.[ENTIDADE].EDITAR"
+    # Exemplo: CAD.CLIENTES.EDITAR
+
+    - "CAD.[ENTIDADE].EXCLUIR"
+    # Exemplo: CAD.CLIENTES.EXCLUIR
+    # Usado em: COUNT(*) >= [MINIMO_PERMISSOES] (length do array)
+
+  # ===== ENTIDADE PRINCIPAL (OBRIGATÓRIO) =====
+  # Usado nos placeholders de permissões
+  entidade_principal: "[ENTIDADE - ex: CLIENTES]"
+  # Usado em: up.Permissao LIKE 'CAD.[ENTIDADE_RF].%'
+
+  # ===== ESTADO ESPERADO DO TENANT (SE APLICÁVEL) =====
+  # Valida multi-tenancy, isolamento de dados
+  tenant:
+    validar_isolamento: true
+    # Se true, valida: WHERE TenantId = '[TENANT_ID_MT]'
+
+    tenant_id_esperado: "[UUID do tenant de teste]"
+    # Usado em: MT-RFXXX.data.ts → TENANT_ID_TESTE
+
+  # ===== PRÉ-CONDIÇÕES GERAIS =====
+  # Outras pré-condições não cobertas por SQL
+  gerais:
+    - descricao: "Usuário autenticado com perfil [Admin|Developer|Usuario]"
+      validacao_e2e: "Verificar token JWT válido em localStorage"
+      referencia_mt: "MT-RFXXX.data.ts → CREDENCIAIS_TESTE.[perfil]"
+
+    - descricao: "Banco de dados em estado consistente (migrations aplicadas)"
+      validacao_e2e: "Pre-flight check SQL valida versão schema >= X"
+      referencia_checklist: "pre-execucao.yaml → validacao_schema_version"
+
+# =============================================
+# PASSOS (ATUALIZADO - com data-test OBRIGATÓRIO)
+# =============================================
+# IMPORTANTE: Cada passo interativo DEVE ter elemento.data_test especificado
+passos:
+  - numero: 1
+    acao: "[Ação do usuário]"
+    # Exemplo: "Usuário clica no botão 'Novo Cliente'"
+
+    elemento:
+      tipo: [button|input|select|dialog|table|list|textarea|checkbox|radio]
+      data_test: "RFXXX-[acao]-[alvo]"
+      # Padrão obrigatório: RFXXX-[acao]-[alvo]
+      # Exemplo: "RF006-criar-cliente"
+
+      aliases: ["[alias-opcional-1]", "[alias-opcional-2]"]
+      # Aliases para compatibilidade com implementações existentes
+      # Exemplo: ["btn-novo-cliente", "new-client-btn"]
+
+      localizacao: "[arquivo.component.html linha XX]"
+      # Exemplo: "clientes-list.component.html linha 45"
+
+    resultado_esperado: "[O que deve acontecer]"
+    validacao_e2e: "[Como validar nos testes]"
+
+  - numero: 2
+    acao: "[Próxima ação]"
+    elemento:
+      tipo: input
+      data_test: "RFXXX-input-[nome-campo]"
+      # Exemplo: "RF006-input-razaosocial"
+      localizacao: "[arquivo.component.html linha XX]"
+    resultado_esperado: "[O que deve acontecer]"
+    validacao_e2e: "[Como validar nos testes]"
+
+# =============================================
+# ESTADOS DE UI (NOVO - OBRIGATÓRIO)
+# =============================================
+# Documenta estados obrigatórios da interface para testes E2E
+estados_ui:
+  loading:
+    descricao: "Spinner exibido durante carregamento da lista/dados"
+    data_test: "loading-spinner"
+    quando_exibido: "[Quando este estado é exibido]"
+    # Exemplo: "Durante carregamento inicial da lista de clientes"
+
+  vazio:
+    descricao: "Mensagem exibida quando não há dados para exibir"
+    data_test: "empty-state"
+    texto_esperado: "Nenhum [entidade] encontrado"
+    # Exemplo: "Nenhum cliente encontrado"
+    quando_exibido: "[Quando este estado é exibido]"
+    # Exemplo: "Quando lista está vazia ou filtro não retorna resultados"
+
+  erro:
+    descricao: "Mensagem exibida quando ocorre erro ao carregar/processar"
+    data_test: "error-message"
+    texto_esperado: "Erro ao [operacao]"
+    # Exemplo: "Erro ao carregar clientes"
+    quando_exibido: "[Quando este estado é exibido]"
+    # Exemplo: "Quando API retorna erro 500 ou timeout"
+
+# =============================================
+# TABELAS/LISTAS (SE APLICÁVEL)
+# =============================================
+# Preencher se UC possui listagem de dados
+tabela:
+  data_test_container: "[entidade]-list"
+  # Exemplo: "clientes-list"
+
+  data_test_row: "[entidade]-row"
+  # Exemplo: "cliente-row"
+
+  colunas:
+    - nome: "[Nome da coluna 1]"
+      data_test: "[entidade]-col-[nome]"
+      # Exemplo: "cliente-col-razaosocial"
+      tipo: [texto|numero|data|acao]
+      ordenavel: [true|false]
+      filtravel: [true|false]
+
+    - nome: "[Nome da coluna 2]"
+      data_test: "[entidade]-col-[nome]"
+      tipo: [texto|numero|data|acao]
+      ordenavel: [true|false]
+      filtravel: [true|false]
+
+  acoes_linha:
+    - acao: "[Nome da ação - ex: Editar]"
+      data_test: "RFXXX-editar-[entidade]"
+      # Exemplo: "RF006-editar-cliente"
+
+    - acao: "[Nome da ação - ex: Excluir]"
+      data_test: "RFXXX-excluir-[entidade]"
+      # Exemplo: "RF006-excluir-cliente"
+
+  paginacao:
+    habilitada: [true|false]
+    data_test_anterior: "pagination-previous"
+    data_test_proximo: "pagination-next"
+    data_test_tamanho: "pagination-size"
+
+# =============================================
+# FORMULÁRIOS (SE APLICÁVEL)
+# =============================================
+# Preencher se UC possui formulário de entrada
+formulario:
+  data_test_form: "RFXXX-form"
+  # Exemplo: "RF006-form"
+
+  campos:
+    - nome: "[Nome do campo]"
+      label: "[Label exibido]"
+      data_test: "RFXXX-input-[nome]"
+      # Exemplo: "RF006-input-razaosocial"
+
+      tipo: [text|number|email|select|textarea|date|checkbox|radio]
+      obrigatorio: [true|false]
+
+      validacoes:
+        - tipo: "[required|email|minlength|maxlength|pattern]"
+          mensagem_erro: "[Mensagem exata de erro]"
+          # Exemplo: "Razão Social é obrigatória"
+          data_test_erro: "RFXXX-input-[nome]-error"
+          # Exemplo: "RF006-input-razaosocial-error"
+
+    - nome: "[Outro campo]"
+      label: "[Label]"
+      data_test: "RFXXX-input-[nome]"
+      tipo: [tipo]
+      obrigatorio: [true|false]
+      validacoes: []
+
+  botoes:
+    - acao: "Salvar"
+      data_test: "RFXXX-salvar-[entidade]"
+      # Exemplo: "RF006-salvar-cliente"
+      tipo: "submit"
+
+    - acao: "Cancelar"
+      data_test: "RFXXX-cancelar-[entidade]"
+      # Exemplo: "RF006-cancelar-cliente"
+      tipo: "button"
+
+# =============================================
+# PERFORMANCE E TIMEOUTS (NOVO - OBRIGATÓRIO)
+# =============================================
+# Especifica tempos esperados para operações
+performance:
+  tempo_carregamento_maximo: 30000  # ms (30s padrão para listagens)
+  tempo_operacao_crud: 10000        # ms (10s padrão para criar/editar/excluir)
+  timeout_api_externa: 15000        # ms (15s padrão para APIs externas - SE APLICÁVEL)
+  # Exemplo: ReceitaWS, ViaCEP, etc.
+
+# =============================================
+# TIMEOUTS E2E (NOVO - OBRIGATÓRIO)
+# =============================================
+# Timeouts específicos para testes E2E Playwright
+timeouts_e2e:
+  navegacao: 30000           # Timeout para navegação de página
+  loading_spinner: 30000     # Timeout para spinner desaparecer
+  dialog: 10000              # Timeout para diálogos/modais
+  operacao_crud: 15000       # Timeout para operações CRUD
+  validacao_formulario: 5000 # Timeout para validações de formulário
+
+# =============================================
+# PÓS-CONDIÇÕES
+# =============================================
+pos_condicoes:
+  - descricao: "[Pós-condição 1]"
+    validacao_e2e: "[Como validar nos testes]"
+    # Exemplo: "Cliente criado está visível na lista"
+
+# =============================================
+# FLUXOS ALTERNATIVOS
+# =============================================
+fluxos_alternativos:
+  - id: FA-UCXX-001
+    titulo: "[Título do fluxo alternativo]"
+    # Exemplo: "Cancelar criação de cliente"
+    condicao: "[Quando este fluxo ocorre]"
+    passos:
+      - numero: 1
+        acao: "[Ação]"
+        elemento:
+          tipo: button
+          data_test: "RFXXX-[acao]-[alvo]"
+        resultado_esperado: "[Resultado]"
+
+# =============================================
+# FLUXOS DE EXCEÇÃO
+# =============================================
+fluxos_excecao:
+  - id: FE-UCXX-001
+    titulo: "[Título da exceção]"
+    # Exemplo: "Erro ao salvar cliente - CNPJ duplicado"
+    condicao: "[Quando esta exceção ocorre]"
+    mensagem_erro: "[Mensagem exata exibida]"
+    data_test_erro: "error-message"
+    tratamento: "[Como sistema trata esta exceção]"
+    validacao_e2e: "[Como validar nos testes]"
+
+# =============================================
+# REGRAS DE NEGÓCIO (UC-ESPECÍFICAS)
+# =============================================
+regras_negocio:
+  - id: RN-UCXX-001
+    descricao: "[Descrição da regra]"
+    referencia_rf: "RN-[ENTIDADE]-XXX-XX"
+    # Vincula com RN do RF
+    validacao_e2e: "[Como validar nos testes]"
+
+# =============================================
+# NOTAS DE IMPLEMENTAÇÃO
+# =============================================
+notas:
+  - "[Nota técnica importante 1]"
+  - "[Nota técnica importante 2]"
+
+# =============================================
+# REFERÊNCIAS CRUZADAS
+# =============================================
+referencias:
+  rf: RFXXX
+  tc: TC-RFXXX-[CAT]-XXX
+  # Exemplo: TC-RF006-E2E-001
+  mt: MT-RFXXX
+  # Exemplo: MT-RF006
+
+# =============================================
+# METADADOS
+# =============================================
+metadata:
+  versao: "1.0"
+  data_criacao: "[DATA]"
+  ultima_atualizacao: "[DATA]"
+  autor: "[Nome]"
+  especificacoes_teste_completas: false
+  # Marcar como true após preencher todas as seções de teste

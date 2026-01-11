@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 1.9
-**Data:** 2026-01-08
+**Versão:** 2.0
+**Data:** 2026-01-11
 **Status:** Ativo
-**Última Atualização:** 2026-01-08 (OTIMIZAÇÃO: run.py v2.0 valida health automaticamente)
+**Última Atualização:** 2026-01-11 (NOVA VALIDAÇÃO: PASSO 5.9 - Cobertura 100% de TCs)
 **Changelog:**
+- v2.0 (2026-01-11): NOVO PASSO 5.9 BLOQUEANTE: Validar cobertura 100% de TCs (resolve GAP 2 do RF006 - 75% não testado)
 - v1.9 (2026-01-08): OTIMIZAÇÃO CRÍTICA: run.py v2.0 valida health automaticamente (removidos health checks manuais do contrato)
 - v1.8 (2026-01-08): NOVA FEATURE: Merge automático em dev quando testes atingem 100% em branch fix/*
 - v1.7 (2026-01-08): MUDANÇA CRÍTICA: Executa no branch ativo (não valida, não faz checkout)
@@ -971,6 +972,260 @@ npm run e2e
 - Traces do Playwright
 
 **Resultado:** PASS/FAIL
+
+---
+
+#### PASSO 5.8: TESTES STATEFUL - VALIDAÇÃO DE PERSISTÊNCIA
+
+**🆕 ADICIONADO:** 2026-01-11 (Resolve problema RF006 - banco resetado entre testes)
+
+**Quando usar:**
+- ✅ Testes que validam fluxo CRUD completo (Criar → Listar → Editar → Excluir)
+- ✅ Testes que compartilham estado entre múltiplos passos
+- ✅ Testes que validam persistência de dados
+
+**Referência obrigatória:**
+```
+D:\IC2_Governanca\governanca\contracts\testes\CONTRATO-TESTES-E2E-STATEFUL.md
+```
+
+**Validação pré-execução:**
+
+```bash
+# 1. Verificar configuração Playwright
+cat D:\IC2\frontend\icontrolit-app\playwright.config.ts | grep -E "workers|fullyParallel|retries"
+
+# Esperado:
+#   workers: 1
+#   fullyParallel: false
+#   retries: 0
+```
+
+**Checklist obrigatório:**
+- [ ] `playwright.config.ts` com `workers: 1` e `fullyParallel: false`
+- [ ] `test.describe.serial` usado para fluxos CRUD
+- [ ] Backend **NÃO reseta** banco a cada request
+- [ ] Dados criados no Passo 1 **visíveis** no Passo 2
+
+**Se dados NÃO persistem entre testes:**
+
+```yaml
+Diagnóstico:
+  1. Verificar D:\IC2\backend\IControlIT.API\src\Web\Program.cs
+  2. Confirmar que InitialiseDatabaseAsync() executa apenas no startup
+  3. Verificar ApplicationDbContextInitialiser.cs (NÃO deve ter EnsureDeletedAsync)
+  4. Validar que backend não está reiniciando entre testes
+
+Responsável: Backend + DevOps
+Exit Code: 2 (falha de configuração, não de lógica)
+```
+
+**Referência completa:** Ver `CONTRATO-TESTES-E2E-STATEFUL.md` seções 2-7 para detalhes de implementação, fixtures do Playwright, e resolução de problemas.
+
+---
+
+#### PASSO 5.9: VALIDAR COBERTURA 100% DE TCs (NOVO - BLOQUEANTE)
+
+**🆕 ADICIONADO:** 2026-01-11 (Resolve problema RF006 - apenas 25% dos TCs executados)
+
+**Contexto:**
+Durante execução #9 do RF006, identificou-se que apenas **8 de 32 TCs (25%)** foram executados, deixando **75% não testado**. Categorias inteiras (SEGURANCA, EDGE_CASE, AUDITORIA, INTEGRACAO) não foram testadas.
+
+**Objetivo:**
+Garantir que **100% dos TCs** especificados em TC-RFXXX.yaml sejam executados, sem exceção.
+
+**Método de Validação:**
+
+```python
+#!/usr/bin/env python3
+# validate-tc-coverage.py
+
+import yaml
+import glob
+import sys
+
+def validar_cobertura_tc(rf_numero):
+    """
+    Valida que 100% dos TCs de TC-RFXXX.yaml foram executados.
+
+    Returns:
+        0: Cobertura 100% (APROVADO)
+        1: Cobertura < 100% (REPROVADO)
+    """
+
+    # 1. Ler TC-RFXXX.yaml
+    tc_file = f"D:\\IC2_Governanca\\documentos\\testes\\TC-RF{rf_numero}.yaml"
+
+    with open(tc_file, 'r', encoding='utf-8') as f:
+        tc_yaml = yaml.safe_load(f)
+
+    casos_teste_yaml = tc_yaml.get('casos_teste', [])
+    total_tcs_yaml = len(casos_teste_yaml)
+
+    # 2. Mapear TCs por categoria
+    tcs_por_categoria = {}
+    for tc in casos_teste_yaml:
+        categoria = tc.get('categoria', 'UNKNOWN')
+        if categoria not in tcs_por_categoria:
+            tcs_por_categoria[categoria] = []
+        tcs_por_categoria[categoria].append(tc['id'])
+
+    # 3. Contar specs Playwright executados
+    e2e_dir = f"D:\\IC2\\frontend\\icontrolit-app\\e2e\\specs"
+    spec_pattern = f"TC-RF{rf_numero}-*.spec.ts"
+    spec_files = glob.glob(f"{e2e_dir}\\{spec_pattern}")
+
+    total_specs_executados = len(spec_files)
+
+    # 4. Validar cobertura 100%
+    if total_specs_executados < total_tcs_yaml:
+        print(f"❌ COBERTURA INCOMPLETA")
+        print(f"   TCs especificados (TC-RF{rf_numero}.yaml): {total_tcs_yaml}")
+        print(f"   Specs Playwright executados: {total_specs_executados}")
+        print(f"   Cobertura: {(total_specs_executados / total_tcs_yaml) * 100:.1f}%")
+        print(f"   TCs NÃO TESTADOS: {total_tcs_yaml - total_specs_executados}")
+        print()
+
+        # Listar categorias não testadas
+        print("Categorias por cobertura:")
+        for categoria, tc_ids in tcs_por_categoria.items():
+            total_cat = len(tc_ids)
+            # Contar quantos specs dessa categoria existem
+            specs_cat = glob.glob(f"{e2e_dir}\\TC-RF{rf_numero}-{categoria}-*.spec.ts")
+            executados_cat = len(specs_cat)
+            cobertura_cat = (executados_cat / total_cat) * 100 if total_cat > 0 else 0
+
+            status = "✅" if cobertura_cat == 100 else "❌"
+            print(f"  {status} {categoria}: {executados_cat}/{total_cat} ({cobertura_cat:.1f}%)")
+
+            if cobertura_cat < 100:
+                print(f"      TCs ausentes: {tc_ids[executados_cat:]}")
+
+        print()
+        print("Ação: Criar specs Playwright para TODOS os TCs ausentes")
+        print("Referência: TC-RF{rf_numero}.yaml")
+        return 1
+
+    # Cobertura 100%
+    print(f"✅ COBERTURA 100% DE TCs")
+    print(f"   TCs especificados: {total_tcs_yaml}")
+    print(f"   Specs executados: {total_specs_executados}")
+    print(f"   Cobertura: 100%")
+    print()
+    print("Categorias testadas:")
+    for categoria, tc_ids in tcs_por_categoria.items():
+        print(f"  ✓ {categoria}: {len(tc_ids)}/{len(tc_ids)} (100%)")
+
+    return 0
+
+if __name__ == "__main__":
+    rf = sys.argv[1] if len(sys.argv) > 1 else input("RF número: ")
+    sys.exit(validar_cobertura_tc(rf))
+```
+
+**Execução obrigatória:**
+
+```bash
+cd D:\IC2_Governanca\tools
+python validate-tc-coverage.py {RF_NUMERO}
+```
+
+**Critério de aprovação:**
+- ✅ Cobertura: 100% (total_specs_executados == total_tcs_yaml)
+- ✅ TODAS as categorias testadas (FUNCIONAL, EDGE_CASE, SEGURANCA, INTEGRACAO, AUDITORIA, etc.)
+- ❌ Qualquer TC não testado = **REPROVADO** (bloqueante)
+
+**Saída esperada (APROVADO):**
+```
+✅ COBERTURA 100% DE TCs
+   TCs especificados: 32
+   Specs executados: 32
+   Cobertura: 100%
+
+Categorias testadas:
+  ✓ FUNCIONAL: 20/20 (100%)
+  ✓ EDGE_CASE: 5/5 (100%)
+  ✓ SEGURANCA: 3/3 (100%)
+  ✓ INTEGRACAO: 2/2 (100%)
+  ✓ AUDITORIA: 2/2 (100%)
+```
+
+**Saída esperada (REPROVADO):**
+```
+❌ COBERTURA INCOMPLETA
+   TCs especificados (TC-RF006.yaml): 32
+   Specs Playwright executados: 8
+   Cobertura: 25.0%
+   TCs NÃO TESTADOS: 24
+
+Categorias por cobertura:
+  ✅ FUNCIONAL: 8/20 (40%)
+      TCs ausentes: ['TC-RF006-E2E-009', 'TC-RF006-E2E-010', ..., 'TC-RF006-E2E-020']
+  ❌ EDGE_CASE: 0/5 (0%)
+      TCs ausentes: ['TC-RF006-EDGE-001', 'TC-RF006-EDGE-002', ..., 'TC-RF006-EDGE-005']
+  ❌ SEGURANCA: 0/3 (0%)
+      TCs ausentes: ['TC-RF006-SEC-001', 'TC-RF006-SEC-002', 'TC-RF006-SEC-003']
+  ❌ INTEGRACAO: 0/2 (0%)
+      TCs ausentes: ['TC-RF006-INT-001', 'TC-RF006-INT-002']
+  ❌ AUDITORIA: 0/2 (0%)
+      TCs ausentes: ['TC-RF006-AUD-001', 'TC-RF006-AUD-002']
+
+Ação: Criar specs Playwright para TODOS os TCs ausentes
+Referência: TC-RF006.yaml
+```
+
+**Integração com EXECUTION-MANIFEST:**
+
+```yaml
+testes:
+  e2e:
+    cobertura_tc:
+      total_tcs_yaml: 32
+      total_specs_executados: 32
+      cobertura: 100%
+      categorias:
+        FUNCIONAL: "20/20 (100%)"
+        EDGE_CASE: "5/5 (100%)"
+        SEGURANCA: "3/3 (100%)"
+        INTEGRACAO: "2/2 (100%)"
+        AUDITORIA: "2/2 (100%)"
+      status: "✅ APROVADO"
+```
+
+**Ações se REPROVADO:**
+
+1. **Identificar TCs ausentes:**
+   - Comparar TC-RFXXX.yaml com specs em `e2e/specs/`
+   - Listar categorias não testadas
+
+2. **Criar specs ausentes:**
+   - Para CADA TC ausente, criar spec Playwright correspondente
+   - Seguir padrão: `TC-RFXXX-{CATEGORIA}-{NUMERO}.spec.ts`
+
+3. **Re-executar validação:**
+   - `python validate-tc-coverage.py {RF}`
+   - Repetir até cobertura 100%
+
+**Impacto esperado:**
+
+Esta validação resolve **GAP 2 do RF006** (cobertura incompleta de TCs).
+
+**Sem esta validação:**
+- ❌ Apenas 25% dos TCs executados (RF006)
+- ❌ Categorias inteiras não testadas (SEGURANCA, EDGE_CASE, AUDITORIA, INTEGRACAO)
+- ❌ Falhas críticas não detectadas até produção
+- ❌ Falsa sensação de segurança (8/32 testes OK ≠ produto OK)
+
+**Com esta validação:**
+- ✅ 100% dos TCs executados (obrigatório)
+- ✅ TODAS as categorias testadas
+- ✅ Falhas detectadas ANTES de produção
+- ✅ Confiança real na qualidade do produto
+
+**Referências:**
+- Relatório de testes: `D:\IC2\.temp_ia\RELATORIO-TESTES-RF006-2026-01-11.md` (GAP 2)
+- TC Template: `D:\IC2_Governanca\governanca\templates\TC-TEMPLATE.yaml`
+- Problema identificado: RF006 execução #9 (apenas 25% de cobertura TC)
 
 ---
 

@@ -11,6 +11,24 @@ Ele define **como** a validacao deve ser executada.
 
 ---
 
+## HISTÓRICO DE ATUALIZAÇÕES
+
+### v3.0 (2026-01-11)
+- **VALIDAÇÃO 18 adicionada**: Validators Angular Obrigatórios (BLOQUEANTE)
+  - Origem: Análise de falhas RF006 (execução #9) - GAP 1
+  - Impacto: Detecta 21% das falhas E2E (validators ausentes)
+  - Bloqueio: Frontend sem validators completos = REPROVADO
+  - Validações: Validators, mat-error messages, botões disabled, comportamento
+
+### v2.0 (2026-01-10)
+- **VALIDAÇÃO 17 adicionada**: Material Dialog Backdrop Cleanup (BLOQUEANTE)
+  - Origem: Análise de falhas RF006 (execução #7-#9) - GAP 3
+  - Impacto: Detecta 17% das falhas E2E (backdrop persistente)
+  - Bloqueio: Backdrop persistente = CRÍTICO (bloqueante)
+  - Validações: firstValueFrom(afterClosed()), helpers E2E, validação manual
+
+---
+
 ## DEPENDENCIA OBRIGATORIA
 
 Este contrato **DEPENDE** dos seguintes contratos:
@@ -212,6 +230,635 @@ Exemplos de ressalvas que invalidam aprovacao:
 
 ---
 
+## VALIDAÇÕES OBRIGATÓRIAS
+
+Antes de APROVAR o frontend, o agente DEVE executar as seguintes validações obrigatórias.
+
+---
+
+### VALIDAÇÃO 16: Data-test Attributes Completos ✨ NOVO BLOQUEANTE
+
+**Objetivo:** Garantir que TODOS os data-test attributes especificados no UC estão presentes nos componentes HTML do frontend.
+
+**Contexto:**
+Esta validação foi adicionada após a análise de problemas identificados no RF006, onde a ausência de data-test attributes resultou em:
+- 32 testes E2E falharam por seletores não encontrados
+- Nomenclatura inconsistente entre UC e implementação
+- Taxa inicial E2E: 0% (vs meta 80%)
+- 3 de 12 execuções gastas apenas corrigindo seletores
+
+**Pré-requisito:**
+- UC-RFXXX.yaml DEVE conter especificações de teste completas (navegacao, credenciais, passos com data_test, estados_ui, etc.)
+- Ver VALIDAÇÃO 13 do contrato de validação de UC
+
+**Método:**
+
+1. **Extrair data-test esperados do UC:**
+   - Ler UC-RFXXX.yaml
+   - Extrair TODOS os `data_test` de:
+     - `passos[].elemento.data_test`
+     - `estados_ui.loading.data_test`
+     - `estados_ui.vazio.data_test`
+     - `estados_ui.erro.data_test`
+     - `tabela.data_test_container`, `tabela.data_test_row`, `tabela.colunas[].data_test`
+     - `formulario.data_test_form`, `formulario.campos[].data_test`, `formulario.botoes[].data_test`
+
+2. **Executar auditoria automática:**
+   ```bash
+   npm run audit-data-test RFXXX
+   ```
+
+3. **Analisar resultado:**
+   - Exit code 0: PASS (todos os data-test estão presentes)
+   - Exit code 1: FAIL (data-test ausentes ou inconsistentes)
+
+**Critério de aprovação:**
+- ✅ Auditoria retorna exit code 0
+- ✅ TODOS os data-test especificados no UC estão presentes no HTML
+- ✅ Nomenclatura é consistente: `RFXXX-[acao]-[alvo]`
+- ✅ Estados de UI obrigatórios possuem data-test: `loading-spinner`, `empty-state`, `error-message`
+- ❌ Qualquer data-test ausente = **CRÍTICO** (bloqueante)
+
+**Saída esperada (APROVADO):**
+```
+✅ VALIDAÇÃO 16: APROVADO
+   Auditoria de data-test: PASS
+   Data-test esperados (UC): 23
+   Data-test encontrados (HTML): 23
+   Taxa de cobertura: 100%
+   Nomenclatura: 100% consistente (RFXXX-[acao]-[alvo])
+
+   Detalhes:
+     ✓ Botões de ação: 5/5 presentes
+     ✓ Campos de formulário: 8/8 presentes
+     ✓ Estados de UI: 3/3 presentes
+     ✓ Tabela/Lista: 4/4 presentes
+     ✓ Diálogos: 3/3 presentes
+
+   Comando executado: npm run audit-data-test RFXXX
+```
+
+**Saída esperada (REPROVADO):**
+```
+❌ VALIDAÇÃO 16: REPROVADO
+   Auditoria de data-test: FAIL
+   Data-test esperados (UC): 23
+   Data-test encontrados (HTML): 18
+   Taxa de cobertura: 78%
+   Data-test ausentes: 5
+
+   Data-test AUSENTES:
+     ✗ RF006-criar-cliente (botão "Novo Cliente")
+       Esperado em: UC-RF006.yaml linha 45
+       Localização prevista: clientes-list.component.html
+
+     ✗ RF006-input-razaosocial (campo Razão Social)
+       Esperado em: UC-RF006.yaml linha 52
+       Localização prevista: cliente-form.component.html
+
+     ✗ RF006-btn-salvar (botão Salvar)
+       Esperado em: UC-RF006.yaml linha 67
+       Localização prevista: cliente-form.component.html
+
+     ✗ empty-state (estado vazio)
+       Esperado em: UC-RF006.yaml estados_ui.vazio
+       Localização prevista: clientes-list.component.html
+
+     ✗ error-message (estado erro)
+       Esperado em: UC-RF006.yaml estados_ui.erro
+       Localização prevista: clientes-list.component.html
+
+   Inconsistências de nomenclatura: 0
+
+   Severidade: CRÍTICO (bloqueante)
+   Ação: Adicionar data-test ausentes nos componentes HTML e re-executar
+   Comando: npm run audit-data-test RFXXX
+```
+
+**Exemplo de correção:**
+
+Antes (REPROVADO):
+```html
+<!-- clientes-list.component.html -->
+<button mat-raised-button color="primary" (click)="onCreate()">
+  Novo Cliente
+</button>
+```
+
+Depois (APROVADO):
+```html
+<!-- clientes-list.component.html -->
+<button mat-raised-button color="primary"
+        data-test="RF006-criar-cliente"
+        (click)="onCreate()">
+  Novo Cliente
+</button>
+```
+
+**Justificativa:**
+- **Gap identificado no RF006:** Data-test ausentes → 32 testes E2E falharam
+- **Impacto:** Sem data-test, testes E2E não conseguem localizar elementos
+- **Solução:** Validação obrigatória de data-test ANTES de aprovar frontend
+- **Resultado esperado:** Taxa inicial E2E 80-90% (vs 0% atual)
+
+**Responsabilidade:**
+- **Criação:** Contrato frontend-criacao.md FASE 6.5 (obriga implementação de data-test)
+- **Validação:** Este contrato (valida presença de data-test antes de aprovar)
+- **Script:** tools/audit-data-test.ts (ferramenta automática de auditoria)
+
+**Integração com EXECUTION-MANIFEST:**
+- Resultado da validação DEVE ser registrado no manifesto
+- Incluir referência ao comando executado: `npm run audit-data-test RFXXX`
+- Anexar saída completa da auditoria
+
+---
+
+### VALIDAÇÃO 17: Material Dialog Backdrop Cleanup ✨ NOVO BLOQUEANTE
+
+**Objetivo:** Garantir que operações assíncronas com Material Dialog limpam corretamente o backdrop, evitando que intercepte cliques subsequentes.
+
+**Contexto:**
+Esta validação foi adicionada após a análise de problemas identificados no RF006, onde backdrop persistente resultou em:
+- 3/18 testes E2E falharam por backdrop interceptando cliques (17% de falhas)
+- Timeouts em testes E2E (elementos clicáveis bloqueados)
+- Experiência de usuário comprometida (UI não responsiva após dialog fechar)
+- 3 de 12 execuções gastas apenas corrigindo backdrop
+
+**Pré-requisito:**
+- Frontend implementado conforme FASE 6.6 do contrato frontend-criacao.md
+- Operações assíncronas com dialog devem usar padrão de cleanup obrigatório
+
+**Método:**
+
+1. **Identificar operações assíncronas com dialog:**
+   - Procurar por `this.dialog.open()` em componentes TypeScript
+   - Identificar cenários: consulta API, CRUD, dialogs aninhados, validação assíncrona
+
+2. **Validar padrão de cleanup no código:**
+   ```typescript
+   // ✅ PADRÃO CORRETO ESPERADO:
+   const dialogRef = this.dialog.open(LoadingDialogComponent);
+   await this.api.consultar();
+   dialogRef.close();
+   await firstValueFrom(dialogRef.afterClosed());  // ✅ Cleanup obrigatório
+   ```
+
+3. **Validar testes E2E usam helpers:**
+   ```typescript
+   // ✅ PADRÃO CORRETO ESPERADO:
+   import { waitForDialogToClosed } from '../helpers';
+
+   await page.click('[data-test="RF006-dialog-cancelar"]');
+   await waitForDialogToClosed(page);  // ✅ Aguarda backdrop desaparecer
+   await page.click('[data-test="RF006-criar-cliente"]');
+   ```
+
+4. **Executar validação manual (Developer Console):**
+   ```javascript
+   // Durante teste manual, verificar:
+   document.querySelectorAll('.cdk-overlay-backdrop').length
+   // Esperado: 0 (nenhum backdrop após fechar dialog)
+   // Se > 0: backdrop preso (REPROVADO)
+   ```
+
+**Critério de aprovação:**
+- ✅ TODAS as operações assíncronas com dialog usam `await firstValueFrom(dialogRef.afterClosed())`
+- ✅ TODOS os testes E2E com dialog usam `waitForDialogToClosed(page)`
+- ✅ Validação manual: 0 backdrops após fechar dialogs
+- ✅ Código possui comentários documentando padrão de cleanup
+- ✅ STATUS.yaml documenta aplicação do padrão
+- ❌ Qualquer backdrop persistente = **CRÍTICO** (bloqueante)
+
+**Saída esperada (APROVADO):**
+```
+✅ VALIDAÇÃO 17: APROVADO
+   Material Dialog Backdrop Cleanup: PASS
+   Operações assíncronas com dialog: 5
+   Operações com cleanup correto: 5
+   Taxa de conformidade: 100%
+
+   Detalhes:
+     ✓ consultarCNPJ(): usa firstValueFrom(afterClosed())
+     ✓ confirmarExclusao(): usa firstValueFrom(afterClosed())
+     ✓ salvarCliente(): usa firstValueFrom(afterClosed())
+     ✓ editarCliente(): usa firstValueFrom(afterClosed())
+     ✓ cancelarEdicao(): usa firstValueFrom(afterClosed())
+
+   Testes E2E com dialog: 8
+   Testes usando waitForDialogToClosed(): 8
+   Taxa de cobertura E2E: 100%
+
+   Validação manual (Developer Console):
+     ✓ Backdrop count após operações: 0
+     ✓ Usuário pode interagir imediatamente
+     ✓ Múltiplos dialogs funcionam corretamente
+
+   STATUS.yaml documentado: ✓
+   Comentários de padrão no código: ✓
+```
+
+**Saída esperada (REPROVADO):**
+```
+❌ VALIDAÇÃO 17: REPROVADO
+   Material Dialog Backdrop Cleanup: FAIL
+   Operações assíncronas com dialog: 5
+   Operações com cleanup correto: 2
+   Taxa de conformidade: 40%
+   Operações SEM cleanup: 3
+
+   Operações SEM cleanup obrigatório:
+     ✗ consultarCNPJ() (linha 145 de cliente-form.component.ts)
+       Código atual:
+         dialogRef.close();
+         // FALTA: await firstValueFrom(dialogRef.afterClosed())
+
+       Código esperado:
+         dialogRef.close();
+         await firstValueFrom(dialogRef.afterClosed());  // ✅ Adicionar
+
+     ✗ confirmarExclusao() (linha 203 de cliente-list.component.ts)
+       Código atual:
+         loadingRef.close();
+         // FALTA: await firstValueFrom(loadingRef.afterClosed())
+
+       Código esperado:
+         loadingRef.close();
+         await firstValueFrom(loadingRef.afterClosed());  // ✅ Adicionar
+
+     ✗ editarCliente() (linha 178 de cliente-form.component.ts)
+       Código atual:
+         editRef.close();
+         // FALTA: await firstValueFrom(editRef.afterClosed())
+
+       Código esperado:
+         editRef.close();
+         await firstValueFrom(editRef.afterClosed());  // ✅ Adicionar
+
+   Testes E2E sem helpers:
+     ✗ TC-E2E-006: Criar registro (linha 78 de cliente.e2e-spec.ts)
+       Código atual:
+         await page.click('[data-test="RF006-dialog-cancelar"]');
+         await page.click('[data-test="RF006-criar-cliente"]');  // ⚠️ Falha: backdrop intercepta
+
+       Código esperado:
+         await page.click('[data-test="RF006-dialog-cancelar"]');
+         await waitForDialogToClosed(page);  // ✅ Adicionar
+         await page.click('[data-test="RF006-criar-cliente"]');
+
+   Validação manual (Developer Console):
+     ✗ Backdrop count após operações: 2 (esperado: 0)
+     ✗ Usuário NÃO pode interagir (backdrop intercepta cliques)
+
+   Severidade: CRÍTICO (bloqueante)
+   Ação: Aplicar padrão de cleanup em TODAS as operações e re-validar
+   Referência: frontend-criacao.md FASE 6.6
+```
+
+**Exemplo de correção:**
+
+Antes (REPROVADO):
+```typescript
+// cliente-form.component.ts
+async consultarCNPJ(cnpj: string): Promise<void> {
+  const dialogRef = this.dialog.open(LoadingDialogComponent, {
+    disableClose: true,
+    data: { message: 'Consultando CNPJ...' }
+  });
+
+  try {
+    const dados = await this.receitaWsService.consultar(cnpj);
+    this.form.patchValue(dados);
+    dialogRef.close();  // ⚠️ PROBLEMA: Backdrop pode persistir
+  } catch (error) {
+    dialogRef.close();
+    this.showError(error);
+  }
+}
+```
+
+Depois (APROVADO):
+```typescript
+// cliente-form.component.ts
+/**
+ * PADRÃO OBRIGATÓRIO: Cleanup de Dialog Backdrop
+ * Referência: frontend-criacao.md FASE 6.6
+ */
+async consultarCNPJ(cnpj: string): Promise<void> {
+  const dialogRef = this.dialog.open(LoadingDialogComponent, {
+    disableClose: true,
+    data: { message: 'Consultando CNPJ...' }
+  });
+
+  try {
+    const dados = await this.receitaWsService.consultar(cnpj);
+    this.form.patchValue(dados);
+
+    dialogRef.close();
+    await firstValueFrom(dialogRef.afterClosed());  // ✅ Cleanup obrigatório
+  } catch (error) {
+    dialogRef.close();
+    await firstValueFrom(dialogRef.afterClosed());  // ✅ Cleanup mesmo em erro
+
+    this.showError(error);
+  }
+}
+```
+
+Testes E2E - Antes (REPROVADO):
+```typescript
+test('TC-E2E: Criar Cliente com Consulta CNPJ', async ({ page }) => {
+  await page.click('[data-test="RF006-criar-cliente"]');
+  await page.fill('[data-test="RF006-input-cnpj"]', '00.000.000/0001-91');
+  await page.click('[data-test="RF006-btn-consultar-cnpj"]');
+
+  // ⚠️ PROBLEMA: Não aguarda backdrop desaparecer
+  await page.fill('[data-test="RF006-input-razaosocial"]', 'EMPRESA TESTE');
+  // ✗ FALHA: Backdrop intercepta preenchimento
+});
+```
+
+Testes E2E - Depois (APROVADO):
+```typescript
+import { waitForDialogToClosed } from '../helpers';
+
+test('TC-E2E: Criar Cliente com Consulta CNPJ', async ({ page }) => {
+  await page.click('[data-test="RF006-criar-cliente"]');
+  await page.fill('[data-test="RF006-input-cnpj"]', '00.000.000/0001-91');
+  await page.click('[data-test="RF006-btn-consultar-cnpj"]');
+
+  await waitForDialogToClosed(page);  // ✅ Aguarda backdrop desaparecer
+
+  await page.fill('[data-test="RF006-input-razaosocial"]', 'EMPRESA TESTE');
+  // ✓ SUCESSO: Campo preenchido normalmente
+});
+```
+
+**Justificativa:**
+- **Gap identificado no RF006:** Backdrop persistente → 3/18 testes E2E falharam (17%)
+- **Impacto:** Usuário não consegue interagir com UI após dialog fechar
+- **Solução:** Validação obrigatória de cleanup ANTES de aprovar frontend
+- **Resultado esperado:** Zero falhas por backdrop persistente
+
+**Responsabilidade:**
+- **Criação:** Contrato frontend-criacao.md FASE 6.6 (obriga implementação de cleanup)
+- **Validação:** Este contrato (valida cleanup antes de aprovar)
+- **Helper:** `e2e/helpers/dialog-helpers.ts` (funções auxiliares para E2E)
+
+**Integração com EXECUTION-MANIFEST:**
+- Resultado da validação DEVE ser registrado no manifesto
+- Incluir operações identificadas e taxa de conformidade
+- Anexar validação manual (backdrop count)
+
+**Referências:**
+- Helper implementado: `D:\IC2\frontend\icontrolit-app\e2e\helpers\dialog-helpers.ts`
+- Contrato stateful: `D:\IC2_Governanca\governanca\contracts\testes\CONTRATO-TESTES-E2E-STATEFUL.md`
+- Problema identificado: RF006 execução #7-#9 (17% de falhas)
+
+---
+
+### VALIDAÇÃO 18: Validators Angular Obrigatórios ✨ NOVO BLOQUEANTE
+
+**Objetivo:** Garantir que TODOS os formulários implementem validators Angular obrigatórios, mat-error messages, e comportamento de validação conforme UC.
+
+**Contexto:**
+Esta validação foi adicionada após a análise de problemas identificados no RF006, onde validators ausentes resultaram em:
+- 3/14 testes E2E falharam por validators ausentes (21% de falhas)
+- mat-error não aparecia para usuário (FA-UC01-001)
+- Botões não desabilitavam em form.invalid (FA-UC01-002)
+- Campos sem validação email (FA-UC01-003)
+
+**Pré-requisito:**
+- Frontend implementado conforme FASE 6.7 do contrato frontend-criacao.md
+- UC-RFXXX.yaml possui seção `formulario.campos` completa
+
+**Método:**
+
+1. **Ler UC-RFXXX.yaml e mapear campos:**
+   ```yaml
+   # Exemplo UC-RF006.yaml
+   formulario:
+     campos:
+       - nome: "cnpj"
+         obrigatorio: true
+         validacoes:
+           - tipo: "required"
+             mensagem_erro: "CNPJ é obrigatório"
+           - tipo: "pattern"
+             regex: "^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$"
+             mensagem_erro: "CNPJ inválido"
+   ```
+
+2. **Validar implementação de Validators Angular:**
+   ```typescript
+   // ✅ PADRÃO CORRETO ESPERADO:
+   this.form = this.fb.group({
+     cnpj: ['', [
+       Validators.required,              // ✅ UC: obrigatorio: true
+       Validators.pattern(/^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/)  // ✅ UC: pattern
+     ]],
+     razaoSocial: ['', [
+       Validators.required,              // ✅ UC: obrigatorio: true
+       Validators.maxLength(200)         // ✅ UC: maxlength: 200
+     ]],
+     email: ['', Validators.email]       // ✅ UC: tipo: email
+   });
+   ```
+
+3. **Validar implementação de mat-error:**
+   ```html
+   <!-- ✅ PADRÃO CORRETO ESPERADO: -->
+   <mat-form-field>
+     <input matInput formControlName="cnpj" [data-test]="RF006-input-cnpj">
+
+     <mat-error *ngIf="form.get('cnpj')?.hasError('required')"
+                [data-test]="RF006-input-cnpj-error-required">
+       CNPJ é obrigatório
+     </mat-error>
+
+     <mat-error *ngIf="form.get('cnpj')?.hasError('pattern')"
+                [data-test]="RF006-input-cnpj-error-pattern">
+       CNPJ inválido
+     </mat-error>
+   </mat-form-field>
+   ```
+
+4. **Validar botões disabled em form.invalid:**
+   ```html
+   <!-- ✅ PADRÃO CORRETO ESPERADO: -->
+   <button mat-raised-button
+           [disabled]="form.invalid"
+           [data-test]="RF006-salvar-cliente"
+           (click)="salvar()">
+     Salvar
+   </button>
+   ```
+
+5. **Executar validação manual (comportamento):**
+   - Abrir formulário vazio → Botão Salvar DESABILITADO
+   - Clicar em campo obrigatório e sair → mat-error APARECE
+   - Preencher com valor inválido → mat-error específico APARECE
+   - Preencher com valor válido → mat-error DESAPARECE, Botão HABILITA
+
+**Critério de aprovação:**
+- ✅ TODOS os campos com `obrigatorio: true` possuem `Validators.required`
+- ✅ TODOS os campos com `validacoes` possuem validators correspondentes
+- ✅ TODOS os validators possuem mat-error correspondente
+- ✅ TODAS as mensagens mat-error batem com UC-RFXXX.yaml
+- ✅ TODOS os mat-error possuem data-test no formato `RFXXX-input-[campo]-error-[tipo]`
+- ✅ TODOS os botões de ação possuem `[disabled]="form.invalid"`
+- ✅ Validação manual: comportamento correto
+- ❌ Qualquer validator/mat-error ausente = **CRÍTICO** (bloqueante)
+
+**Saída esperada (APROVADO):**
+```
+✅ VALIDAÇÃO 18: APROVADO
+   Validators Angular Obrigatórios: PASS
+   Campos do UC: 8
+   Campos com validators completos: 8
+   Taxa de cobertura validators: 100%
+
+   Detalhes de validators:
+     ✓ cnpj: required, pattern (2/2)
+     ✓ razaoSocial: required, maxLength (2/2)
+     ✓ nomeFantasia: required (1/1)
+     ✓ email: email (1/1)
+     ✓ telefone: pattern (1/1)
+     ✓ cep: pattern (1/1)
+     ✓ numero: required (1/1)
+     ✓ complemento: - (0/0 - opcional sem validação)
+
+   mat-error messages:
+     ✓ TODOS os validators possuem mat-error
+     ✓ TODAS as mensagens batem com UC-RFXXX.yaml
+     ✓ TODOS os mat-error possuem data-test
+
+   Botões disabled:
+     ✓ btn-salvar: [disabled]="form.invalid"
+     ✓ btn-confirmar: [disabled]="form.invalid"
+
+   Validação manual (comportamento):
+     ✓ Formulário vazio: botão desabilitado
+     ✓ Campo obrigatório vazio: mat-error aparece
+     ✓ Campo inválido: mat-error específico aparece
+     ✓ Campo válido: mat-error desaparece, botão habilita
+
+   STATUS.yaml documentado: ✓
+```
+
+**Saída esperada (REPROVADO):**
+```
+❌ VALIDAÇÃO 18: REPROVADO
+   Validators Angular Obrigatórios: FAIL
+   Campos do UC: 8
+   Campos com validators completos: 5
+   Taxa de cobertura validators: 62.5%
+   Campos SEM validators: 3
+
+   Campos SEM validators obrigatórios:
+     ✗ email (linha 85 de cliente-form.component.ts)
+       UC especifica: validacoes.tipo: "email"
+       Código atual:
+         email: ['']  // ⚠️ FALTA: Validators.email
+       Código esperado:
+         email: ['', Validators.email]  // ✅ Adicionar
+
+     ✗ telefone (linha 86 de cliente-form.component.ts)
+       UC especifica: validacoes.tipo: "pattern"
+       Código atual:
+         telefone: ['']  // ⚠️ FALTA: Validators.pattern
+       Código esperado:
+         telefone: ['', Validators.pattern(/^\(\d{2}\) \d{4,5}-\d{4}$/)]
+
+     ✗ cep (linha 87 de cliente-form.component.ts)
+       UC especifica: obrigatorio: true
+       Código atual:
+         cep: ['']  // ⚠️ FALTA: Validators.required
+       Código esperado:
+         cep: ['', Validators.required]
+
+   mat-error messages ausentes:
+     ✗ cnpj: FALTA mat-error para 'pattern' (cliente-form.component.html linha 45)
+     ✗ razaoSocial: FALTA mat-error para 'maxlength' (cliente-form.component.html linha 52)
+     ✗ email: FALTA mat-error para 'email' (cliente-form.component.html linha 59)
+
+   Botões SEM disabled:
+     ✗ btn-salvar: FALTA [disabled]="form.invalid" (cliente-form.component.html linha 120)
+
+   Validação manual (comportamento):
+     ✗ Formulário vazio: botão NÃO desabilita (esperado: desabilitado)
+     ✗ Campo email inválido: mat-error NÃO aparece (esperado: "E-mail inválido")
+     ✗ Campo CNPJ inválido: mat-error NÃO aparece (esperado: "CNPJ inválido")
+
+   Severidade: CRÍTICO (bloqueante)
+   Ação: Implementar validators/mat-error ausentes conforme FASE 6.7 e re-validar
+   Referência: frontend-criacao.md FASE 6.7
+```
+
+**Exemplo de correção:**
+
+1. **Adicionar validators ausentes:**
+   ```typescript
+   // ANTES (INCORRETO):
+   this.form = this.fb.group({
+     email: ['']  // ❌ Sem validação
+   });
+
+   // DEPOIS (CORRETO):
+   this.form = this.fb.group({
+     email: ['', Validators.email]  // ✅ Com validação
+   });
+   ```
+
+2. **Adicionar mat-error ausentes:**
+   ```html
+   <!-- ANTES (INCORRETO): -->
+   <mat-form-field>
+     <input matInput formControlName="cnpj">
+     <!-- ❌ Sem mat-error -->
+   </mat-form-field>
+
+   <!-- DEPOIS (CORRETO): -->
+   <mat-form-field>
+     <input matInput formControlName="cnpj" [data-test]="RF006-input-cnpj">
+
+     <mat-error *ngIf="form.get('cnpj')?.hasError('required')"
+                [data-test]="RF006-input-cnpj-error-required">
+       CNPJ é obrigatório
+     </mat-error>
+
+     <mat-error *ngIf="form.get('cnpj')?.hasError('pattern')"
+                [data-test]="RF006-input-cnpj-error-pattern">
+       CNPJ inválido
+     </mat-error>
+   </mat-form-field>
+   ```
+
+3. **Adicionar disabled em botões:**
+   ```html
+   <!-- ANTES (INCORRETO): -->
+   <button (click)="salvar()">Salvar</button>  <!-- ❌ Sem disabled -->
+
+   <!-- DEPOIS (CORRETO): -->
+   <button [disabled]="form.invalid"
+           [data-test]="RF006-salvar-cliente"
+           (click)="salvar()">
+     Salvar
+   </button>
+   ```
+
+**Documentação no manifesto:**
+- Resultado da validação DEVE ser registrado no manifesto
+- Incluir campos identificados, validators implementados, mat-error presentes
+- Taxa de cobertura de validators (% campos com validators completos)
+
+**Referências:**
+- Relatório de testes: `D:\IC2\.temp_ia\RELATORIO-TESTES-RF006-2026-01-11.md` (GAP 1)
+- UC Template: `D:\IC2_Governanca\governanca\templates\UC-TEMPLATE.yaml` (seção formulario.campos)
+- Testes falhados: FA-UC01-001, FA-UC01-002, FA-UC01-003
+- Contrato criação: `frontend-criacao.md` FASE 6.7
+
+---
+
 ## TODO LIST OBRIGATORIA (LER PRIMEIRO)
 
 > **ATENCAO:** O agente DEVE criar esta todo list IMEDIATAMENTE apos ativar o contrato.
@@ -299,6 +946,27 @@ TODO LIST - Validacao Frontend RFXXX
   |-- [pending] Backend: Erros estruturados tratados?
   |-- [pending] Seeds: dados minimos disponiveis?
   +-- [pending] Central de Modulos: registrado?
+
+[pending] VALIDACAO 16: Data-test Attributes Completos (BLOQUEANTE)
+  |-- [pending] Ler UC-RFXXX.yaml e extrair TODOS os data_test esperados
+  |-- [pending] Executar: npm run audit-data-test RFXXX
+  |-- [pending] Analisar resultado da auditoria
+  |-- [pending] Verificar exit code 0 (PASS) ou 1 (FAIL)
+  |-- [pending] Se FAIL: identificar data-test ausentes
+  |-- [pending] Se FAIL: identificar inconsistencias de nomenclatura
+  |-- [pending] Validar 100% dos data-test do UC presentes no HTML
+  +-- [pending] Se < 100%: REPROVAR frontend (BLOQUEIO)
+
+[pending] VALIDACAO 17: Material Dialog Backdrop Cleanup (BLOQUEANTE)
+  |-- [pending] Identificar operacoes assincronas com dialog no codigo
+  |-- [pending] Validar padrao de cleanup: await firstValueFrom(dialogRef.afterClosed())
+  |-- [pending] Validar testes E2E usam: import { waitForDialogToClosed } from '../helpers'
+  |-- [pending] Executar validacao manual (Developer Console):
+  |     +-- [pending] document.querySelectorAll('.cdk-overlay-backdrop').length === 0
+  |-- [pending] Verificar codigo possui comentarios de padrao
+  |-- [pending] Verificar STATUS.yaml documenta aplicacao do padrao
+  |-- [pending] Taxa de conformidade = 100% (TODAS operacoes com cleanup)
+  +-- [pending] Se < 100%: REPROVAR frontend (BLOQUEIO)
 
 [pending] Executar Testes E2E
   |-- [pending] npm run e2e -- RFXXX

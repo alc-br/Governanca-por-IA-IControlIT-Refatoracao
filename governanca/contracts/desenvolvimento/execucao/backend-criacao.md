@@ -665,6 +665,277 @@ Se qualquer item estiver ausente:
 
 ---
 
+## FASE 7.5: TESTES UNITÁRIOS OBRIGATÓRIOS (NOVO - BLOQUEANTE)
+
+**Este passo é OBRIGATÓRIO. Sem ele, backend está INCOMPLETO.**
+
+### Contexto
+
+Esta fase foi adicionada após análise de problemas identificados no RF006, onde a ausência de testes unitários desde o início resultou em:
+- Backend aprovado SEM testes unitários
+- Descoberta de bugs apenas em testes E2E (tardiamente)
+- Retrabalho para adicionar testes após implementação completa
+- Falta de validação de regras de negócio durante desenvolvimento
+
+### Objetivo
+
+Garantir que **TODOS os Commands e Queries** possuem testes unitários ANTES de marcar backend como concluído.
+
+### PASSO 7.5.1: Criar Testes Unitários para Commands
+
+**Para CADA Command criado** (Create, Update, Delete, etc.), o agente DEVE criar testes unitários cobrindo:
+
+#### 1. Teste de Sucesso (Happy Path)
+
+**Cenário:** Dados válidos fornecidos ao Command
+**Resultado esperado:** Command retorna `Success` com resultado esperado
+
+**Exemplo:**
+```csharp
+// backend/tests/Application.Tests/Features/Clientes/Commands/CreateClienteCommandTests.cs
+
+public class CreateClienteCommandTests
+{
+    [Fact]
+    public async Task CreateCliente_ComDadosValidos_DeveRetornarSucesso()
+    {
+        // Arrange
+        var command = new CreateClienteCommand
+        {
+            RazaoSocial = "Cliente Teste Ltda",
+            CNPJ = "12.345.678/0001-90",
+            Email = "contato@clienteteste.com"
+        };
+
+        var handler = new CreateClienteCommandHandler(_context, _mapper);
+
+        // Act
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.Succeeded);
+        Assert.NotNull(result.Data);
+        Assert.Equal("Cliente Teste Ltda", result.Data.RazaoSocial);
+    }
+}
+```
+
+#### 2. Teste de Validação (FluentValidation)
+
+**Cenário:** Dados inválidos fornecidos ao Command
+**Resultado esperado:** Validator retorna erros de validação
+
+**Exemplo:**
+```csharp
+[Fact]
+public void CreateCliente_ComRazaoSocialVazia_DeveFalhar()
+{
+    // Arrange
+    var command = new CreateClienteCommand
+    {
+        RazaoSocial = "",  // INVÁLIDO
+        CNPJ = "12.345.678/0001-90",
+        Email = "contato@clienteteste.com"
+    };
+
+    var validator = new CreateClienteCommandValidator();
+
+    // Act
+    var result = validator.Validate(command);
+
+    // Assert
+    Assert.False(result.IsValid);
+    Assert.Contains(result.Errors, e => e.PropertyName == "RazaoSocial");
+}
+```
+
+#### 3. Teste de Regra de Negócio
+
+**Cenário:** Violação de RN (ex: CNPJ duplicado)
+**Resultado esperado:** Command retorna `Failure` com mensagem específica
+
+**Exemplo:**
+```csharp
+[Fact]
+public async Task CreateCliente_ComCNPJDuplicado_DeveRetornarErro()
+{
+    // Arrange
+    // Criar cliente com CNPJ X
+    await _context.Clientes.AddAsync(new Cliente
+    {
+        RazaoSocial = "Cliente Existente",
+        CNPJ = "12.345.678/0001-90"
+    });
+    await _context.SaveChangesAsync();
+
+    // Tentar criar outro cliente com mesmo CNPJ
+    var command = new CreateClienteCommand
+    {
+        RazaoSocial = "Cliente Novo",
+        CNPJ = "12.345.678/0001-90"  // DUPLICADO
+    };
+
+    var handler = new CreateClienteCommandHandler(_context, _mapper);
+
+    // Act
+    var result = await handler.Handle(command, CancellationToken.None);
+
+    // Assert
+    Assert.False(result.Succeeded);
+    Assert.Contains("CNPJ já cadastrado", result.Messages);
+}
+```
+
+**Localização dos testes:**
+```
+D:\IC2\backend\tests\Application.Tests\Features\[Entidade]\Commands\[Command]Tests.cs
+```
+
+### PASSO 7.5.2: Criar Testes Unitários para Queries
+
+**Para CADA Query criada** (GetAll, GetById, etc.), o agente DEVE criar testes unitários cobrindo:
+
+#### 1. Teste de Sucesso (Retorno de Dados)
+
+**Exemplo:**
+```csharp
+// backend/tests/Application.Tests/Features/Clientes/Queries/GetClientesQueryTests.cs
+
+public class GetClientesQueryTests
+{
+    [Fact]
+    public async Task GetClientes_ComDadosExistentes_DeveRetornarLista()
+    {
+        // Arrange
+        await _context.Clientes.AddRangeAsync(
+            new Cliente { RazaoSocial = "Cliente 1" },
+            new Cliente { RazaoSocial = "Cliente 2" }
+        );
+        await _context.SaveChangesAsync();
+
+        var query = new GetClientesQuery();
+        var handler = new GetClientesQueryHandler(_context, _mapper);
+
+        // Act
+        var result = await handler.Handle(query, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, result.Data.Count);
+    }
+}
+```
+
+#### 2. Teste de Retorno Vazio
+
+**Exemplo:**
+```csharp
+[Fact]
+public async Task GetClientes_SemDados_DeveRetornarListaVazia()
+{
+    // Arrange
+    var query = new GetClientesQuery();
+    var handler = new GetClientesQueryHandler(_context, _mapper);
+
+    // Act
+    var result = await handler.Handle(query, CancellationToken.None);
+
+    // Assert
+    Assert.True(result.Succeeded);
+    Assert.Empty(result.Data);
+}
+```
+
+### PASSO 7.5.3: Estrutura de Testes Obrigatória
+
+**O agente DEVE criar:**
+
+```
+D:\IC2\backend\tests\Application.Tests\
+├── Features\
+│   └── [Entidade]\
+│       ├── Commands\
+│       │   ├── Create[Entidade]CommandTests.cs
+│       │   ├── Update[Entidade]CommandTests.cs
+│       │   └── Delete[Entidade]CommandTests.cs
+│       └── Queries\
+│           ├── Get[Entidade]sQueryTests.cs
+│           └── Get[Entidade]ByIdQueryTests.cs
+└── Common\
+    └── TestBase.cs  (helper para setup de testes)
+```
+
+### PASSO 7.5.4: Executar Testes
+
+**O agente DEVE:**
+
+1. **Rodar testes unitários:**
+   ```bash
+   cd D:\IC2\backend
+   dotnet test tests/Application.Tests/Application.Tests.csproj
+   ```
+
+2. **Validar resultado:**
+   - Taxa de aprovação: **100%**
+   - Nenhum teste falhando
+   - Nenhum teste ignorado
+
+**SE testes FALHAREM:**
+- ❌ BLOQUEIO: Backend NÃO pode ser marcado como concluído
+- ❌ Corrigir falhas e re-executar
+- ❌ NÃO prosseguir até todos os testes passarem
+
+### PASSO 7.5.5: Documentar Cobertura
+
+**O agente DEVE atualizar STATUS.yaml:**
+
+```yaml
+desenvolvimento:
+  backend:
+    status: completed
+    testes_implementados:
+      - "CreateClienteCommandTests.cs (3 testes: sucesso, validação, RN)"
+      - "UpdateClienteCommandTests.cs (3 testes)"
+      - "DeleteClienteCommandTests.cs (2 testes)"
+      - "GetClientesQueryTests.cs (2 testes: com dados, vazio)"
+      - "GetClienteByIdQueryTests.cs (2 testes: encontrado, não encontrado)"
+    cobertura_testes: "5/5 Commands/Queries com testes (100%)"
+    taxa_aprovacao_testes: "12/12 testes passando (100%)"
+```
+
+### PASSO 7.5.6: Validar Cobertura Completa
+
+**Verificar:**
+
+- ✅ **TODOS** os Commands possuem testes (Create, Update, Delete, etc.)
+- ✅ **TODOS** os Queries possuem testes (GetAll, GetById, etc.)
+- ✅ **TODOS** os testes estão passando 100%
+- ✅ Testes cobrem:
+  - Happy path (sucesso)
+  - Validação (FluentValidation)
+  - Regras de negócio (RNs)
+  - Casos de erro (não encontrado, duplicado, etc.)
+
+**SE qualquer Command/Query NÃO possui testes:**
+- ❌ Backend está INCOMPLETO
+- ❌ BLOQUEIO: Não marcar como concluído
+
+### CRITÉRIO DE APROVAÇÃO (Fase 7.5)
+
+- ✅ Cobertura: **100%** dos Commands/Queries possuem testes
+- ✅ Taxa de aprovação: **100%** dos testes passando
+- ✅ Testes cobrem happy path + validação + RNs
+- ✅ STATUS.yaml documentado com cobertura completa
+- ✅ Comando executado: `dotnet test` retorna exit code 0
+
+**Justificativa:**
+- **Gap identificado:** Backend aprovado SEM testes → bugs descobertos tardiamente em E2E
+- **Impacto:** Sem testes unitários, RNs não são validadas durante desenvolvimento
+- **Solução:** Tornar testes unitários OBRIGATÓRIOS desde criação do backend
+- **Resultado esperado:** Bugs detectados ANTES de testes E2E, reduzindo retrabalho
+
+---
+
 ## CRITERIO DE PRONTO OBRIGATORIO
 
 Para considerar o backend COMPLETO, DEVE atender:

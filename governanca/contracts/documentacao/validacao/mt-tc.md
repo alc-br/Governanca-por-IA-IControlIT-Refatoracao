@@ -1,8 +1,10 @@
 # CONTRATO DE VALIDAÇÃO MT + TC (MASSA DE TESTE + CASOS DE TESTE)
 
-**Versão:** 1.0
-**Data:** 2026-01-02
+**Versão:** 1.2
+**Data:** 2026-01-11
 **Status:** Ativo
+**Changelog v1.2:** Adicionada validação 11 "Validar TC Stateful" na FASE 2 (TC) - Valida TCs stateful possuem: metadata.tipo_teste = "STATEFUL", contrato_teste_stateful ref, requisitos_playwright (workers: 1, fullyParallel: false, retries: 0), fixtures_necessarias, TCs E2E com usa_fixture, fixture_dependencia, sequencia ordenada. Resolve gap arquitetural: validação verifica stateful ANTES de execução
+**Changelog v1.1:** Adicionada validação 10 "Validar Seletores E2E Especificados" na FASE 2 (TC) - Valida que TODOS os passos possuem seletor, seguem padrão [data-test='...'], possuem acao_e2e, e data-test batem com UC. Baseado em análise RF006. Referência: CLAUDE.md seção 18.2.2
 **Changelog v1.0:** Criação do contrato de validação integrada de MT e TC com critério binário (0% ou 100%)
 
 ---
@@ -267,7 +269,260 @@ Antes de QUALQUER ação, o agente DEVE validar:
    - Todos TC referenciam MT existentes (massa_teste.referencias)?
    - Nenhuma referência MT inválida?
 
-10. **Resultado FASE 2:**
+10. **Validar Seletores E2E Especificados (NOVO - CRÍTICO):**
+
+   **Versão:** 1.0
+   **Data:** 2026-01-09
+   **Contexto:** Adicionado após análise do RF006 para garantir que TC possui seletores E2E corretos ANTES de executar testes.
+
+   **Objetivo:** Garantir que TC-RFXXX.yaml possui seletores E2E especificados para TODOS os passos, evitando falhas sistemáticas em testes E2E.
+
+   ```python
+   # 1. Ler TC-RFXXX.yaml
+   tc_yaml = ler_yaml(f"TC-RF{rf}.yaml")
+
+   # 2. Ler UC-RFXXX.yaml (para validar consistência)
+   uc_yaml = ler_yaml(f"UC-RF{rf}.yaml")
+
+   # 3. Validar TODOS os TCs possuem seletores E2E
+   falhas_seletores = []
+
+   for tc in tc_yaml["casos_teste"]:
+       tc_id = tc["id"]
+       passos = tc.get("passos", [])
+
+       # 3.1 Validar que TC possui passos
+       if not passos:
+           falhas_seletores.append(f"{tc_id}: TC sem passos definidos")
+           continue
+
+       # 3.2 Validar que TODOS os passos possuem campo 'seletor'
+       passos_sem_seletor = []
+       for i, passo in enumerate(passos):
+           if "seletor" not in passo:
+               passos_sem_seletor.append(f"Passo {i+1}")
+
+       if passos_sem_seletor:
+           falhas_seletores.append(
+               f"{tc_id}: Passos sem seletor: {', '.join(passos_sem_seletor)}"
+           )
+
+       # 3.3 Validar que TODOS os seletores seguem padrão [data-test='...']
+       for i, passo in enumerate(passos):
+           if "seletor" in passo:
+               seletor = passo["seletor"]
+               if not seletor.startswith("[data-test="):
+                   falhas_seletores.append(
+                       f"{tc_id}: Passo {i+1} com seletor fora do padrão: {seletor}"
+                   )
+
+       # 3.4 Validar que TODOS os passos possuem campo 'acao_e2e' (código Playwright)
+       passos_sem_acao_e2e = []
+       for i, passo in enumerate(passos):
+           if "acao_e2e" not in passo:
+               passos_sem_acao_e2e.append(f"Passo {i+1}")
+
+       if passos_sem_acao_e2e:
+           falhas_seletores.append(
+               f"{tc_id}: Passos sem acao_e2e: {', '.join(passos_sem_acao_e2e)}"
+           )
+
+   # 4. Validar consistência com UC (data-test batem?)
+   # Extrair TODOS data-test do UC
+   data_tests_uc = set()
+   passos_uc = uc_yaml.get("passos", [])
+   for passo in passos_uc:
+       if "elemento" in passo and "data_test" in passo["elemento"]:
+           data_tests_uc.add(passo["elemento"]["data_test"])
+
+   # Estados UI
+   if "estados_ui" in uc_yaml:
+       for estado, config in uc_yaml["estados_ui"].items():
+           if "data_test" in config:
+               data_tests_uc.add(config["data_test"])
+
+   # Tabela
+   if "tabela" in uc_yaml:
+       if "data_test_container" in uc_yaml["tabela"]:
+           data_tests_uc.add(uc_yaml["tabela"]["data_test_container"])
+       if "data_test_row" in uc_yaml["tabela"]:
+           data_tests_uc.add(uc_yaml["tabela"]["data_test_row"])
+
+   # Formulário
+   if "formulario" in uc_yaml:
+       if "data_test_form" in uc_yaml["formulario"]:
+           data_tests_uc.add(uc_yaml["formulario"]["data_test_form"])
+       campos = uc_yaml["formulario"].get("campos", [])
+       for campo in campos:
+           if "data_test" in campo:
+               data_tests_uc.add(campo["data_test"])
+
+   # Extrair TODOS data-test do TC
+   data_tests_tc = set()
+   for tc in tc_yaml["casos_teste"]:
+       passos = tc.get("passos", [])
+       for passo in passos:
+           if "seletor" in passo:
+               seletor = passo["seletor"]
+               # Extrair data-test de [data-test="RFXXX-xxx"]
+               import re
+               match = re.search(r'\[data-test=["\']([^"\']+)["\']\]', seletor)
+               if match:
+                   data_tests_tc.add(match.group(1))
+
+   # 5. Validar que TC usa data-test do UC (não inventados)
+   data_tests_invalidos = data_tests_tc - data_tests_uc
+   if data_tests_invalidos:
+       falhas_seletores.append(
+           f"TC usando data-test NÃO documentados em UC: {data_tests_invalidos}"
+       )
+
+   # 6. Verificar aprovação
+   if falhas_seletores:
+       print("❌ TC REPROVADO - Seletores E2E ausentes/inconsistentes:")
+       for falha in falhas_seletores:
+           print(f"  - {falha}")
+       REPROVAR()
+   else:
+       print("✅ TC com seletores E2E completos e consistentes com UC")
+   ```
+
+   **Critério de Aprovação:**
+   - ✅ TODOS os TCs possuem passos
+   - ✅ TODOS os passos possuem campo `seletor`
+   - ✅ TODOS os seletores seguem padrão `[data-test='...']`
+   - ✅ TODOS os passos possuem campo `acao_e2e` (código Playwright)
+   - ✅ TODOS os data-test do TC estão documentados no UC
+   - ✅ Nenhum data-test inventado (não presente em UC)
+
+   **SE qualquer verificação FALHAR:**
+   - ❌ TC REPROVADO (seletores ausentes/inconsistentes)
+   - ❌ Reportar TCs e passos com problemas
+   - ❌ BLOQUEIO: Não prosseguir para execução de testes
+
+   **IMPORTANTE:** Esta validação garante que testes E2E terão seletores corretos, evitando falhas sistemáticas por seletores não encontrados (como ocorreu em 32 testes do RF006).
+
+   **Referência:** `CLAUDE.md` seção 18.2.2 "Bloqueios Obrigatórios"
+
+11. **Validar TC Stateful (SE APLICÁVEL):**
+
+   **Versão:** 1.0
+   **Data:** 2026-01-11
+   **Contexto:** Adicionado após análise do RF006 para validar que TCs stateful estão documentados corretamente.
+
+   **Objetivo:** Validar que TCs stateful possuem configuração e estrutura adequadas ANTES de execução de testes.
+
+   ```python
+   # 1. Ler TC-RFXXX.yaml
+   tc_yaml = ler_yaml(f"TC-RF{rf}.yaml")
+
+   # 2. Verificar se é stateful
+   tipo_teste = tc_yaml.get("metadata", {}).get("tipo_teste", "ISOLATED")
+
+   if tipo_teste == "STATEFUL":
+       print("✅ TC identificado como STATEFUL - Validando configuração...")
+
+       # 3. Validar metadata obrigatória
+       falhas_stateful = []
+
+       # 3.1 Validar referência ao contrato
+       if "contrato_teste_stateful" not in tc_yaml["metadata"]:
+           falhas_stateful.append("metadata.contrato_teste_stateful ausente")
+       else:
+           contrato_ref = tc_yaml["metadata"]["contrato_teste_stateful"]
+           if "CONTRATO-TESTES-E2E-STATEFUL.md" not in contrato_ref:
+               falhas_stateful.append(f"contrato_teste_stateful incorreto: {contrato_ref}")
+
+       # 3.2 Validar requisitos_playwright
+       if "requisitos_playwright" not in tc_yaml["metadata"]:
+           falhas_stateful.append("metadata.requisitos_playwright ausente")
+       else:
+           req_pw = tc_yaml["metadata"]["requisitos_playwright"]
+
+           if req_pw.get("workers") != 1:
+               falhas_stateful.append(f"workers deve ser 1, encontrado: {req_pw.get('workers')}")
+
+           if req_pw.get("fullyParallel") != False:
+               falhas_stateful.append(f"fullyParallel deve ser false, encontrado: {req_pw.get('fullyParallel')}")
+
+           if req_pw.get("retries") != 0:
+               falhas_stateful.append(f"retries deve ser 0, encontrado: {req_pw.get('retries')}")
+
+       # 3.3 Validar fixtures_necessarias
+       if "fixtures_necessarias" not in tc_yaml["metadata"]:
+           falhas_stateful.append("metadata.fixtures_necessarias ausente")
+       else:
+           fixtures = tc_yaml["metadata"]["fixtures_necessarias"]
+           if not fixtures:
+               falhas_stateful.append("fixtures_necessarias está vazia (deve ter pelo menos 1)")
+
+           for fixture in fixtures:
+               if "nome" not in fixture:
+                   falhas_stateful.append(f"Fixture sem campo 'nome': {fixture}")
+               if "tipo" not in fixture:
+                   falhas_stateful.append(f"Fixture sem campo 'tipo': {fixture}")
+               if "arquivo_fixture" not in fixture:
+                   falhas_stateful.append(f"Fixture sem campo 'arquivo_fixture': {fixture}")
+
+       # 4. Validar TCs E2E possuem campos stateful
+       tcs_e2e = [tc for tc in tc_yaml["casos_teste"] if tc.get("categoria") == "E2E"]
+
+       for tc in tcs_e2e:
+           tc_id = tc["id"]
+
+           # 4.1 Validar usa_fixture
+           if "usa_fixture" not in tc or tc["usa_fixture"] != True:
+               falhas_stateful.append(f"{tc_id}: Campo 'usa_fixture' ausente ou false")
+
+           # 4.2 Validar fixture_dependencia
+           if "fixture_dependencia" not in tc:
+               falhas_stateful.append(f"{tc_id}: Campo 'fixture_dependencia' ausente")
+
+           # 4.3 Validar sequencia
+           if "sequencia" not in tc:
+               falhas_stateful.append(f"{tc_id}: Campo 'sequencia' ausente (ordem de execução)")
+
+           # 4.4 Validar pré-condições (opcional mas recomendado)
+           if "pre_condicoes" not in tc:
+               print(f"⚠️  {tc_id}: Campo 'pre_condicoes' ausente (recomendado)")
+
+       # 5. Validar sequência está ordenada
+       sequencias = [tc.get("sequencia", 0) for tc in tcs_e2e]
+       if sequencias != sorted(sequencias):
+           falhas_stateful.append(f"Sequências fora de ordem: {sequencias}")
+
+       # 6. Verificar aprovação
+       if falhas_stateful:
+           print("❌ TC STATEFUL REPROVADO - Configuração incompleta/incorreta:")
+           for falha in falhas_stateful:
+               print(f"  - {falha}")
+           REPROVAR()
+       else:
+           print("✅ TC STATEFUL com configuração completa e correta")
+   else:
+       print("✅ TC identificado como ISOLATED - Validação stateful N/A")
+   ```
+
+   **Critério de Aprovação (SE STATEFUL):**
+   - ✅ `metadata.tipo_teste = "STATEFUL"`
+   - ✅ `metadata.contrato_teste_stateful` referencia CONTRATO-TESTES-E2E-STATEFUL.md
+   - ✅ `metadata.requisitos_playwright` com workers: 1, fullyParallel: false, retries: 0
+   - ✅ `metadata.fixtures_necessarias` não está vazia
+   - ✅ TODOS os TCs E2E possuem `usa_fixture: true`
+   - ✅ TODOS os TCs E2E possuem `fixture_dependencia`
+   - ✅ TODOS os TCs E2E possuem `sequencia`
+   - ✅ Sequências estão ordenadas (1, 2, 3, 4)
+
+   **SE qualquer verificação FALHAR:**
+   - ❌ TC STATEFUL REPROVADO (configuração incompleta/incorreta)
+   - ❌ Reportar gaps identificados
+   - ❌ BLOQUEIO: Não prosseguir para execução de testes
+
+   **IMPORTANTE:** Esta validação garante que testes stateful serão executados corretamente (workers: 1, serial, fixtures), evitando falhas sistemáticas por configuração incorreta (como 67% dos problemas do RF006).
+
+   **Referência:** [CONTRATO-TESTES-E2E-STATEFUL.md](D:\IC2_Governanca\governanca\contracts\testes\CONTRATO-TESTES-E2E-STATEFUL.md) seção 2 (Configuração Obrigatória)
+
+12. **Resultado FASE 2:**
     - ✅ APROVADO 100%: Validação concluída com sucesso
     - ❌ REPROVADO: Gerar relatório de gaps
 
@@ -620,7 +875,17 @@ documentacao:
 
 ---
 
-## 12. REGRA DE NEGAÇÃO ZERO
+## 12. Histórico de Versões
+
+| Versão | Data | Descrição |
+|--------|------|-----------|
+| 1.2 | 2026-01-11 | Adicionada validação 11 "Validar TC Stateful" na FASE 2 (TC) - Valida que TCs stateful possuem configuração completa: metadata.tipo_teste = "STATEFUL", metadata.contrato_teste_stateful referenciando CONTRATO-TESTES-E2E-STATEFUL.md, metadata.requisitos_playwright (workers: 1, fullyParallel: false, retries: 0), metadata.fixtures_necessarias não vazia, TODOS os TCs E2E com usa_fixture, fixture_dependencia, sequencia ordenada. Garante que testes stateful serão executados corretamente, evitando 67% dos problemas do RF006. Resolve gap arquitetural: validação agora verifica stateful ANTES de execução. Referência: CONTRATO-TESTES-E2E-STATEFUL.md seção 2. |
+| 1.1 | 2026-01-09 | Adicionada validação 10 "Validar Seletores E2E Especificados" na FASE 2 (TC) - Valida que TODOS os passos possuem seletor, seguem padrão [data-test='...'], possuem acao_e2e, e data-test batem com UC (não inventados). Garante que testes E2E terão seletores corretos, evitando falhas sistemáticas. Baseado em análise RF006 (32 testes falharam por seletores não encontrados). Referência: CLAUDE.md seção 18.2.2 |
+| 1.0 | 2026-01-02 | Criação do contrato de validação integrada de MT e TC com critério binário (0% ou 100%) |
+
+---
+
+## 13. REGRA DE NEGAÇÃO ZERO
 
 Se uma solicitação:
 - não estiver explicitamente prevista no contrato ativo, ou

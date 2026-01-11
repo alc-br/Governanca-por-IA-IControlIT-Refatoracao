@@ -688,9 +688,162 @@ Super Admin
 
 ---
 
-## 9. Integrações
+## 9. Padrões de UI e Formulários (Angular Material)
 
-### 9.1 Visão Geral
+**🆕 ADICIONADO:** 2026-01-11 (Resolve problema RF006 - formulários multi-aba)
+
+### 9.1 Formulários Multi-Aba (Angular Material Tabs)
+
+#### Problema Técnico
+
+Angular Material Tabs (`<mat-tab-group>`) usa **lazy loading por padrão**:
+
+- ✅ **Performance:** Abas inativas não são renderizadas no DOM
+- ❌ **Testes E2E:** Campos em abas inativas não existem até aba ser clicada
+- ❌ **Preenchimento:** `page.fill()` falha em campos não renderizados
+- ❌ **Timing:** `page.click('text=Aba')` não garante renderização **imediata**
+
+**Evidência no código:**
+
+```html
+<!-- ❌ COMPORTAMENTO PADRÃO (Problemático para testes) -->
+<mat-tab-group>
+  <mat-tab label="Dados Básicos">
+    <input data-test="razaoSocial" />  <!-- ✅ Renderizado -->
+  </mat-tab>
+  <mat-tab label="Contato">
+    <input data-test="email" />  <!-- ❌ NÃO renderizado até clicar -->
+  </mat-tab>
+</mat-tab-group>
+```
+
+#### Solução #1: Desabilitar Lazy Loading (RECOMENDADO)
+
+```html
+<!-- ✅ CORRETO: Renderizar todas as abas -->
+<mat-tab-group [preserveContent]="true">
+  <mat-tab label="Dados Básicos">...</mat-tab>
+  <mat-tab label="Contato">...</mat-tab>
+  <mat-tab label="Observações">...</mat-tab>
+</mat-tab-group>
+```
+
+**Vantagens:**
+- ✅ Testes E2E acessam todos os campos imediatamente
+- ✅ Validação completa de formulário
+- ✅ Sem workarounds em testes
+- ✅ Código mais simples
+
+**Desvantagens:**
+- ⚠️ Performance: todas as abas carregam ao abrir formulário
+- ℹ️ Mitigação: usar apenas em formulários pequenos (<10 campos por aba)
+
+**Quando usar:**
+- Formulários com até 30 campos totais
+- Abas com validação cruzada entre campos
+- Formulários testados em E2E
+
+#### Solução #2: Campos Críticos na Primeira Aba
+
+```html
+<!-- ✅ CORRETO: Campos obrigatórios/críticos na primeira aba -->
+<mat-tab-group>
+  <mat-tab label="Dados Básicos">
+    <input data-test="razaoSocial" required />
+    <input data-test="cnpj" required />
+    <input data-test="email" required />  <!-- ✅ Email AQUI -->
+  </mat-tab>
+  <mat-tab label="Dados Adicionais">
+    <input data-test="observacoes" />  <!-- Opcional -->
+  </mat-tab>
+</mat-tab-group>
+```
+
+**Quando usar:**
+- Formulários com >30 campos
+- Performance é crítica
+- Campos opcionais podem ficar em abas secundárias
+
+#### Solução #3: Navegação Programática em Testes (ÚLTIMO RECURSO)
+
+```typescript
+// ⚠️ Usar apenas se Solução #1 e #2 não aplicáveis
+test('Preencher formulário multi-aba', async ({ page }) => {
+  // Aba 1: Dados Básicos (sempre renderizada)
+  await page.fill('[data-test~="razaoSocial"]', 'Cliente Teste');
+
+  // Ativar aba 2: Contato
+  await page.click('.mat-mdc-tab').filter({ hasText: 'Contato' });
+  await page.waitForSelector('[data-test~="email"]', {
+    state: 'visible',
+    timeout: 5000
+  });
+
+  // Preencher campos da aba 2
+  await page.fill('[data-test~="email"]', 'teste@exemplo.com');
+
+  // Voltar para aba 1 e salvar
+  await page.click('.mat-mdc-tab').filter({ hasText: 'Dados Básicos' });
+  await page.click('[data-test~="btn-salvar"]');
+});
+```
+
+**Quando usar:**
+- Formulário é wizard (navegação aba-por-aba obrigatória)
+- Formulários muito grandes (>50 campos)
+- Performance é crítica E campos não são obrigatórios
+
+#### Regra de Decisão Arquitetural
+
+```yaml
+Se formulário tem abas E campos são validados em testes E2E:
+  Então: Usar [preserveContent]="true"  # ✅ Solução #1
+
+Se formulário tem >30 campos E performance é crítica:
+  Então: Campos obrigatórios/críticos na primeira aba  # ✅ Solução #2
+
+Se formulário é wizard (aba-por-aba obrigatório):
+  Então: Navegação programática em testes  # ⚠️ Solução #3
+```
+
+#### Validação Obrigatória (Checklist)
+
+- [ ] Todos os `mat-tab-group` com campos críticos usam `[preserveContent]="true"`
+- [ ] **OU**: Campos obrigatórios estão na primeira aba
+- [ ] Testes E2E validam **TODOS** os campos do formulário
+- [ ] Sem TODOs sobre "aba não renderiza" em testes
+- [ ] Performance validada (formulário abre em <1s mesmo com `[preserveContent]="true"`)
+
+#### Exemplo Aplicado: RF006 (Cliente)
+
+**Arquivo:** `D:\IC2\frontend\icontrolit-app\src\app\modules\admin\management\clientes\details\details.component.html`
+
+**Alteração:**
+
+```html
+<!-- ANTES -->
+<mat-tab-group>
+  <mat-tab label="Dados Básicos">...</mat-tab>
+  <mat-tab label="Contato">...</mat-tab>
+</mat-tab-group>
+
+<!-- DEPOIS -->
+<mat-tab-group [preserveContent]="true">
+  <mat-tab label="Dados Básicos">...</mat-tab>
+  <mat-tab label="Contato">...</mat-tab>
+</mat-tab-group>
+```
+
+**Justificativa:**
+- Formulário Cliente tem apenas 7 campos
+- Performance **NÃO** é impactada com 7 campos
+- Resolve problema de testes E2E **imediatamente**
+
+---
+
+## 10. Integrações
+
+### 10.1 Visão Geral
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -711,7 +864,7 @@ Super Admin
 └──────────────┘ └──────────┘ └──────────┘ └──────────────┘
 ```
 
-### 9.2 Integrações Principais
+### 10.2 Integrações Principais
 
 | Sistema | Protocolo | Autenticação | Frequência |
 |---------|-----------|--------------|------------|
@@ -723,7 +876,7 @@ Super Admin
 | ViaCEP | REST API | Nenhuma | On-demand |
 | SendGrid | REST API | API Key | On-demand |
 
-### 9.3 Padrões de Resiliência
+### 10.3 Padrões de Resiliência
 
 | Padrão | Configuração |
 |--------|--------------|

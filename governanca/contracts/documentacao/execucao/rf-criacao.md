@@ -1,7 +1,7 @@
 # CONTRATO DE GERAÇÃO RF (REQUISITO FUNCIONAL)
 
-**Versão:** 1.0
-**Data:** 2026-01-03
+**Versão:** 1.1
+**Data:** 2026-01-09
 **Status:** Ativo
 
 ---
@@ -235,7 +235,77 @@ permissoes = identificar_permissoes(requisitos, tipo_rf)
 endpoints = definir_endpoints(requisitos, tipo_rf)
 ```
 
-### Passo 3: Geração de RFXXX.md
+### Passo 3: Considerações de Teste (NOVO - OBRIGATÓRIO)
+
+**Versão:** 1.0
+**Data:** 2026-01-09
+**Contexto:** Adicionado após análise do RF006 para garantir que RF já considere testes desde o início.
+
+**Objetivo:** Garantir que RF já identifique elementos testáveis, nomenclatura de data-test, URLs de navegação e timeouts esperados ANTES de prosseguir para UC.
+
+```python
+# 1. Identificar elementos testáveis (UI)
+elementos_testaveis = identificar_elementos_ui(requisitos)
+# Exemplos:
+# - Botões de ação: "Novo Cliente", "Editar", "Excluir", "Salvar", "Cancelar"
+# - Campos de formulário: "Razão Social", "CNPJ", "Tipo Pessoa"
+# - Tabelas/listas: Lista de clientes, linhas da tabela
+# - Estados de UI: Loading spinner, lista vazia, mensagem de erro
+
+# 2. Documentar nomenclatura de data-test esperada
+# Padrão: RFXXX-[acao]-[alvo]
+data_test_nomenclatura = {
+    "botoes": [
+        {"elemento": "Novo Cliente", "data_test": f"RF{rf}-criar-cliente"},
+        {"elemento": "Editar", "data_test": f"RF{rf}-editar-cliente"},
+        {"elemento": "Excluir", "data_test": f"RF{rf}-excluir-cliente"},
+        {"elemento": "Salvar", "data_test": f"RF{rf}-salvar-cliente"},
+        {"elemento": "Cancelar", "data_test": f"RF{rf}-cancelar-edicao"}
+    ],
+    "campos": [
+        {"elemento": "Razão Social", "data_test": f"RF{rf}-input-razaosocial"},
+        {"elemento": "CNPJ", "data_test": f"RF{rf}-input-cnpj"},
+        {"elemento": "Tipo Pessoa", "data_test": f"RF{rf}-select-tipopessoa"}
+    ],
+    "tabela": {
+        "container": f"clientes-list",
+        "linha": f"cliente-row"
+    },
+    "estados_ui": {
+        "loading": "loading-spinner",
+        "vazio": "empty-state",
+        "erro": "error-message"
+    }
+}
+
+# 3. Identificar URLs de navegação esperadas
+# Padrão: /[modulo]/[entidade-plural]
+urls_navegacao = identificar_urls(requisitos, entidades)
+# Exemplo: /management/clientes, /management/clientes/novo
+
+# 4. Identificar timeouts esperados
+timeouts = {
+    "tempo_carregamento_maximo": 30000,  # 30s (padrão)
+    "tempo_operacao_crud": 10000,         # 10s (padrão)
+    "timeout_api_externa": 15000          # 15s (se houver integração)
+}
+
+# 5. Validar que considerações foram documentadas
+if not elementos_testaveis:
+    AVISO("Nenhum elemento testável identificado - RF pode ter problemas em UC")
+
+if not data_test_nomenclatura["botoes"]:
+    AVISO("Nenhum botão identificado - RF pode estar incompleto")
+
+if not urls_navegacao:
+    AVISO("URLs de navegação não identificadas - UC ficará incompleto")
+```
+
+**IMPORTANTE:** Esta fase garante que RF já possui considerações de teste, facilitando a criação de UC completo com especificações de teste na sequência.
+
+**Referência:** `CLAUDE.md` seção 18.5 "Responsabilidades por Fase - FASE DOCUMENTAÇÃO - Agente de RF"
+
+### Passo 4: Geração de RFXXX.md
 
 ```python
 # 1. Ler template RF.md
@@ -281,7 +351,7 @@ rf_md = montar_rf_md(template_md, secoes)
 salvar_arquivo(f"{pasta_rf}/RF{rf}.md", documentacao_md)
 ```
 
-### Passo 4: Geração de RFXXX.yaml
+### Passo 5: Geração de RFXXX.yaml
 
 ```python
 # 1. Ler template RF.yaml
@@ -316,7 +386,7 @@ rf_yaml = {
 salvar_yaml(f"{pasta_rf}/RF{rf}.yaml", documentacao_yaml)
 ```
 
-### Passo 5: Criação de STATUS.yaml
+### Passo 6: Criação de STATUS.yaml
 
 ```python
 # 1. Ler template STATUS.yaml
@@ -363,7 +433,7 @@ status_yaml = {
 salvar_yaml(f"{pasta_rf}/STATUS.yaml", status_yaml)
 ```
 
-### Passo 6: Validação Automática Obrigatória
+### Passo 7: Validação Automática Obrigatória
 
 ```python
 # 1. Executar validador
@@ -379,7 +449,7 @@ else:
 
 **IMPORTANTE:** Se validação FALHAR, o agente DEVE corrigir e revalidar até passar.
 
-### Passo 7: Atualização de documentacao-funcional.md (se existir)
+### Passo 8: Atualização de documentacao-funcional.md (se existir)
 
 ```python
 # 1. Verificar se existe
@@ -556,6 +626,7 @@ Criar **Casos de Uso (UC)** derivados do RF.
 
 | Versão | Data | Descrição |
 |--------|------|-----------|
+| 1.1 | 2026-01-09 | Adicionado Passo 3: Considerações de Teste (OBRIGATÓRIO) - Identifica elementos testáveis, data-test nomenclatura, URLs, timeouts ANTES de prosseguir para UC. Renumerados passos subsequentes (3→4, 4→5, 5→6, 6→7, 7→8). Baseado em análise RF006. Referência: CLAUDE.md seção 18.5 |
 | 1.0 | 2026-01-03 | Criação do contrato de geração de RF (NOVO) |
 
 ---

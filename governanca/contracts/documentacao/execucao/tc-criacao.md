@@ -1,8 +1,10 @@
 # CONTRATO DE GERAÇÃO TC (CASOS DE TESTE)
 
-**Versão:** 2.0
-**Data:** 2025-12-31
+**Versão:** 2.2
+**Data:** 2026-01-11
 **Status:** Ativo
+**Changelog v2.2:** Adicionada Fase 1.4 (Identificar Tipo de Teste E2E) e Fase 2.2 (Documentar TC Stateful) - Identifica se RF requer STATEFUL ou ISOLATED durante criação. TCs stateful documentam: tipo_teste, requisitos_playwright, fixtures_necessarias, usa_fixture, fixture_dependencia, sequencia. Resolve gap arquitetural: stateful conhecido DURANTE criação do TC (não apenas execução)
+**Changelog v2.1:** Adicionada seção 6 (Validação de UC com Especificações de Teste - BLOQUEANTE) para garantir UC completo antes de criar TC. Renumeradas seções 6→7, 7→8, 8→9, 9→10, 10→11, 11→12, 12→13, 13→14
 **Changelog v2.0:** Ordem execução bloqueante, IDs canônicos, vínculo CA obrigatório, regras priorização, política E2E, validação ciclo completo RF→UC→MT→TC
 
 ---
@@ -296,7 +298,169 @@ O contrato TRAVA se qualquer condição falhar:
 
 ---
 
-## 6. Workflow Obrigatório de Geração
+## 6. Validação de UC com Especificações de Teste (NOVO - BLOQUEANTE)
+
+**Versão:** 1.0
+**Data:** 2026-01-09
+**Contexto:** Adicionado após análise do RF006 para garantir que UC possui TODAS as especificações necessárias para testes E2E ANTES de criar TC.
+
+**Objetivo:** Garantir que UC-RFXXX.yaml está 100% completo com especificações de teste, evitando criação de TC incompleto ou desatualizado.
+
+### PASSO 6.1: Validar UC Completo com Especificações de Teste
+
+O agente DEVE verificar que `UC-RFXXX.yaml` possui:
+
+```python
+# 1. Ler UC-RFXXX.yaml
+uc_yaml = ler_yaml(f"D:\\IC2\\documentacao\\{fase}\\{epic}\\RF{rf}\\UC-RF{rf}.yaml")
+
+# 2. Verificar seções obrigatórias para testes
+validacoes = {
+    "navegacao": False,
+    "credenciais": False,
+    "data_test_em_passos": False,
+    "estados_ui": False,
+    "tabela_se_aplicavel": False,
+    "formulario_se_aplicavel": False,
+    "performance": False,
+    "timeouts_e2e": False
+}
+
+# 3. Validar seção navegacao
+if "navegacao" in uc_yaml and \
+   "url_completa" in uc_yaml["navegacao"] and \
+   "referencia_routing" in uc_yaml["navegacao"]:
+    validacoes["navegacao"] = True
+else:
+    ERRO("UC sem seção 'navegacao' completa (url_completa, referencia_routing)")
+
+# 4. Validar seção credenciais
+if "credenciais" in uc_yaml and \
+   "referencia_seeds" in uc_yaml["credenciais"] and \
+   "perfil_necessario" in uc_yaml["credenciais"]:
+    validacoes["credenciais"] = True
+else:
+    ERRO("UC sem seção 'credenciais' completa (referencia_seeds, perfil_necessario)")
+
+# 5. Validar data-test em TODOS os passos
+passos = uc_yaml.get("passos", [])
+if not passos:
+    ERRO("UC sem passos definidos")
+
+passos_com_data_test = 0
+for passo in passos:
+    if "elemento" in passo and "data_test" in passo["elemento"]:
+        passos_com_data_test += 1
+
+if passos_com_data_test == len(passos):
+    validacoes["data_test_em_passos"] = True
+else:
+    ERRO(f"UC com passos sem data-test: {len(passos) - passos_com_data_test}/{len(passos)} faltando")
+
+# 6. Validar seção estados_ui
+if "estados_ui" in uc_yaml:
+    estados_obrigatorios = ["loading", "vazio", "erro"]
+    estados_presentes = list(uc_yaml["estados_ui"].keys())
+
+    if all(estado in estados_presentes for estado in estados_obrigatorios):
+        # Validar que cada estado tem data_test
+        todos_com_data_test = True
+        for estado in estados_obrigatorios:
+            if "data_test" not in uc_yaml["estados_ui"][estado]:
+                ERRO(f"Estado '{estado}' sem data_test")
+                todos_com_data_test = False
+
+        if todos_com_data_test:
+            validacoes["estados_ui"] = True
+    else:
+        ERRO(f"UC sem estados UI obrigatórios: {estados_obrigatorios}")
+else:
+    ERRO("UC sem seção 'estados_ui'")
+
+# 7. Validar seção tabela (se aplicável)
+# Se UC menciona lista/tabela, seção é obrigatória
+if "tabela" in uc_yaml:
+    if "data_test_container" in uc_yaml["tabela"] and \
+       "data_test_row" in uc_yaml["tabela"] and \
+       "colunas" in uc_yaml["tabela"]:
+        validacoes["tabela_se_aplicavel"] = True
+    else:
+        ERRO("UC com seção 'tabela' incompleta")
+else:
+    # Se não possui tabela, considerar como N/A (passou)
+    validacoes["tabela_se_aplicavel"] = True
+
+# 8. Validar seção formulario (se aplicável)
+# Se UC menciona formulário, seção é obrigatória
+if "formulario" in uc_yaml:
+    if "data_test_form" in uc_yaml["formulario"] and \
+       "campos" in uc_yaml["formulario"]:
+        # Validar que TODOS os campos têm data_test
+        campos = uc_yaml["formulario"]["campos"]
+        campos_com_data_test = sum(1 for campo in campos if "data_test" in campo)
+
+        if campos_com_data_test == len(campos):
+            validacoes["formulario_se_aplicavel"] = True
+        else:
+            ERRO(f"Formulário com campos sem data_test: {len(campos) - campos_com_data_test}/{len(campos)}")
+    else:
+        ERRO("UC com seção 'formulario' incompleta")
+else:
+    # Se não possui formulário, considerar como N/A (passou)
+    validacoes["formulario_se_aplicavel"] = True
+
+# 9. Validar seção performance
+if "performance" in uc_yaml and \
+   "tempo_carregamento_maximo" in uc_yaml["performance"] and \
+   "tempo_operacao_crud" in uc_yaml["performance"]:
+    validacoes["performance"] = True
+else:
+    ERRO("UC sem seção 'performance' completa")
+
+# 10. Validar seção timeouts_e2e
+if "timeouts_e2e" in uc_yaml:
+    timeouts_obrigatorios = ["navegacao", "loading_spinner", "dialog", "operacao_crud"]
+    timeouts_presentes = list(uc_yaml["timeouts_e2e"].keys())
+
+    if all(timeout in timeouts_presentes for timeout in timeouts_obrigatorios):
+        validacoes["timeouts_e2e"] = True
+    else:
+        ERRO(f"UC sem timeouts E2E obrigatórios: {timeouts_obrigatorios}")
+else:
+    ERRO("UC sem seção 'timeouts_e2e'")
+
+# 11. Verificar aprovação
+if all(validacoes.values()):
+    print("✅ UC completo com especificações de teste - TC pode ser criado")
+else:
+    falhas = [k for k, v in validacoes.items() if not v]
+    print(f"❌ UC INCOMPLETO para testes - Faltam: {falhas}")
+    print("❌ BLOQUEIO: TC NÃO pode ser criado")
+    print("❌ RETORNAR ao contrato de UC (uc-criacao.md) para completar")
+    PARAR()
+```
+
+**Critério de Aprovação:**
+- ✅ UC possui seção `navegacao` completa (URL + referência routing)
+- ✅ UC possui seção `credenciais` completa (referência seeds + perfil)
+- ✅ UC possui seção `passos` com `data_test` para TODOS os elementos
+- ✅ UC possui seção `estados_ui` completa (loading, vazio, erro com data_test)
+- ✅ UC possui seção `tabela` completa (se aplicável)
+- ✅ UC possui seção `formulario` completa (se aplicável)
+- ✅ UC possui seção `performance` completa (timeouts)
+- ✅ UC possui seção `timeouts_e2e` completa
+
+**SE UC NÃO possui todas as seções:**
+- ❌ BLOQUEIO: TC NÃO pode ser criado
+- ❌ RETORNAR ao contrato de UC para completar FASE 3.6 (Especificações de Teste)
+
+**IMPORTANTE:** Esta validação garante que TC será criado com seletores E2E corretos, URLs corretas, credenciais corretas e timeouts corretos, evitando falhas sistemáticas em testes E2E.
+
+**Referência:** `CLAUDE.md` seção 18.2.2 "Bloqueios Obrigatórios"
+
+---
+
+## 7. Workflow Obrigatório de Geração
 
 ### Fase 1: Leitura de UC e MT (OBRIGATÓRIA)
 
@@ -326,6 +490,77 @@ Antes de criar qualquer caso de teste, o agente DEVE:
 - ✅ MT.yaml lido integralmente
 - ✅ Cenários de teste mapeados
 - ✅ Massas de teste identificadas
+
+#### 1.4 Identificar Tipo de Teste E2E (NOVO - CRÍTICO)
+
+**Versão:** 1.0
+**Data:** 2026-01-11
+**Contexto:** Adicionado após análise do RF006 para garantir que TCs stateful sejam documentados corretamente ANTES de implementação.
+
+**Objetivo:** Identificar se RF requer testes **stateful** (compartilhamento de dados entre testes sequenciais) ou **isolated** (cada teste independente).
+
+**O agente DEVE identificar:**
+
+```python
+# 1. Analisar UCs do RF
+ucs = ler_todos_ucs(f"UC-RF{rf}.yaml")
+
+# 2. Identificar padrão CRUD completo
+crud_completo = False
+operacoes = set()
+
+for uc in ucs:
+    if "criar" in uc.lower() or "create" in uc.lower():
+        operacoes.add("CREATE")
+    if "listar" in uc.lower() or "read" in uc.lower() or "visualizar" in uc.lower():
+        operacoes.add("READ")
+    if "editar" in uc.lower() or "update" in uc.lower():
+        operacoes.add("UPDATE")
+    if "excluir" in uc.lower() or "delete" in uc.lower():
+        operacoes.add("DELETE")
+
+# Se RF possui operações CRUD completas → stateful obrigatório
+if len(operacoes) >= 3:  # Pelo menos 3 operações CRUD
+    crud_completo = True
+
+# 3. Identificar fluxos sequenciais
+fluxos_sequenciais = False
+for uc in ucs:
+    if "depende" in uc.lower() or "após" in uc.lower() or "sequencial" in uc.lower():
+        fluxos_sequenciais = True
+        break
+
+# 4. Determinar tipo de teste
+if crud_completo or fluxos_sequenciais:
+    tipo_teste_e2e = "STATEFUL"
+    print("✅ RF requer testes E2E STATEFUL (compartilhamento de dados)")
+    print("   Referência obrigatória: CONTRATO-TESTES-E2E-STATEFUL.md")
+else:
+    tipo_teste_e2e = "ISOLATED"
+    print("✅ RF requer testes E2E ISOLATED (cada teste independente)")
+```
+
+**Critérios para STATEFUL:**
+- ✅ RF possui CRUD completo (≥ 3 operações)
+- ✅ RF possui fluxos sequenciais explícitos
+- ✅ UC menciona dependências entre passos
+- ✅ UC menciona compartilhamento de dados (ex: "usar ID criado")
+
+**Critérios para ISOLATED:**
+- ✅ RF possui apenas 1-2 operações isoladas
+- ✅ UC não menciona dependências
+- ✅ Cada UC é independente
+
+**SE STATEFUL identificado:**
+O agente DEVE:
+1. Documentar em TC metadata: `tipo_teste: "STATEFUL"`
+2. Referenciar contrato: `D:\IC2_Governanca\governanca\contracts\testes\CONTRATO-TESTES-E2E-STATEFUL.md`
+3. Documentar requisitos:
+   - playwright.config.ts: workers: 1, fullyParallel: false
+   - Fixtures necessárias (ex: clienteId)
+   - test.describe.serial para sequência garantida
+
+**Referência:** `CONTRATO-TESTES-E2E-STATEFUL.md` seção 2 (Configuração Obrigatória - Playwright)
 
 ---
 
@@ -416,6 +651,177 @@ TC-HP-001:
 - ❌ Criar TC sem MT correspondente
 - ❌ Criar TC órfão (sem origem rastreável)
 
+#### 2.2 Documentar TC Stateful (SE APLICÁVEL)
+
+**Versão:** 1.0
+**Data:** 2026-01-11
+**Contexto:** Adicionado após análise do RF006 para garantir que TCs stateful sejam documentados corretamente durante criação.
+
+**Aplicabilidade:** SE tipo_teste = "STATEFUL" (identificado em Fase 1.4), o agente DEVE adicionar seção específica em TC-RFXXX.yaml.
+
+**Estrutura obrigatória para TC stateful:**
+
+```yaml
+metadata:
+  tipo_teste: "STATEFUL"  # ← OBRIGATÓRIO
+
+  # ← OBRIGATÓRIO: Referência ao contrato
+  contrato_teste_stateful: "D:\\IC2_Governanca\\governanca\\contracts\\testes\\CONTRATO-TESTES-E2E-STATEFUL.md"
+
+  # ← OBRIGATÓRIO: Requisitos de configuração
+  requisitos_playwright:
+    workers: 1                # Apenas 1 worker (obrigatório para stateful)
+    fullyParallel: false      # Desabilitar paralelização (obrigatório)
+    retries: 0                # Sem retries (obrigatório)
+
+  # ← OBRIGATÓRIO: Fixtures necessárias
+  fixtures_necessarias:
+    - nome: "clienteId"         # Exemplo: ID da entidade criada
+      tipo: "string"
+      descricao: "ID do cliente criado no setup, compartilhado entre testes"
+      arquivo_fixture: "e2e/fixtures/cliente-teste.ts"
+
+# ← OBRIGATÓRIO: TCs E2E stateful devem especificar sequência
+test_cases:
+  TC-RF006-E2E-001:
+    categoria: "E2E"
+    prioridade: "CRITICA"
+
+    # ← OBRIGATÓRIO: Indicar que teste usa fixture
+    usa_fixture: true
+    fixture_dependencia: "clienteId"  # Depende do fixture clienteId
+
+    # ← OBRIGATÓRIO: Sequência de execução (test.describe.serial)
+    sequencia: 1  # Ordem de execução
+
+    descricao:
+      resumo: "Passo 1: Criar Cliente (Setup via Fixture)"
+      objetivo: "Fixture cria cliente UMA VEZ, compartilha ID com demais testes"
+
+    covers:
+      uc_items:
+        - "UC01-FP-01"  # Criar cliente
+
+    acao:
+      tipo: "FIXTURE_SETUP"  # ← Especificar que é setup de fixture
+      fixture: "clienteId"
+
+    resultado_esperado:
+      sucesso: true
+      fixture_fornecido: "clienteId (string UUID)"
+
+  TC-RF006-E2E-002:
+    categoria: "E2E"
+    prioridade: "CRITICA"
+
+    # ← OBRIGATÓRIO: Indicar que teste usa fixture
+    usa_fixture: true
+    fixture_dependencia: "clienteId"
+
+    sequencia: 2  # Executar APÓS TC-RF006-E2E-001
+
+    descricao:
+      resumo: "Passo 2: Listar Cliente Criado"
+      objetivo: "Validar que cliente criado pela fixture está visível na listagem"
+
+    covers:
+      uc_items:
+        - "UC02-FP-01"  # Listar clientes
+
+    pre_condicoes:
+      - "Cliente criado pela fixture clienteId existe"
+
+    acao:
+      tipo: "READ"
+      endpoint_logico: "clientes.list"
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        contem:
+          - id: "${clienteId}"  # ← Referência ao fixture
+
+  TC-RF006-E2E-003:
+    categoria: "E2E"
+    prioridade: "CRITICA"
+
+    usa_fixture: true
+    fixture_dependencia: "clienteId"
+
+    sequencia: 3  # Executar APÓS TC-RF006-E2E-002
+
+    descricao:
+      resumo: "Passo 3: Editar Cliente Criado"
+      objetivo: "Validar edição do cliente criado pela fixture"
+
+    covers:
+      uc_items:
+        - "UC03-FP-01"  # Editar cliente
+
+    pre_condicoes:
+      - "Cliente criado pela fixture clienteId existe"
+
+    acao:
+      tipo: "UPDATE"
+      endpoint_logico: "clientes.update"
+      parametros:
+        id: "${clienteId}"  # ← Referência ao fixture
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+
+  TC-RF006-E2E-004:
+    categoria: "E2E"
+    prioridade: "CRITICA"
+
+    usa_fixture: true
+    fixture_dependencia: "clienteId"
+
+    sequencia: 4  # Executar APÓS TC-RF006-E2E-003
+
+    descricao:
+      resumo: "Passo 4: Excluir Cliente Criado"
+      objetivo: "Validar exclusão do cliente criado pela fixture"
+
+    covers:
+      uc_items:
+        - "UC04-FP-01"  # Excluir cliente
+
+    pre_condicoes:
+      - "Cliente criado pela fixture clienteId existe"
+
+    acao:
+      tipo: "DELETE"
+      endpoint_logico: "clientes.delete"
+      parametros:
+        id: "${clienteId}"  # ← Referência ao fixture
+
+    resultado_esperado:
+      sucesso: true
+      http_status: 204
+      banco:
+        clientes:
+          nao_deve_existir:
+            - id: "${clienteId}"
+```
+
+**Critério de Aprovação (SE STATEFUL):**
+- ✅ `metadata.tipo_teste = "STATEFUL"`
+- ✅ `metadata.contrato_teste_stateful` referencia CONTRATO-TESTES-E2E-STATEFUL.md
+- ✅ `metadata.requisitos_playwright` especifica workers: 1, fullyParallel: false, retries: 0
+- ✅ `metadata.fixtures_necessarias` lista TODAS as fixtures
+- ✅ TCs E2E possuem `usa_fixture: true` e `fixture_dependencia`
+- ✅ TCs E2E possuem `sequencia` (ordem de execução)
+- ✅ TCs E2E referenciam fixture com `${nomeFixture}`
+
+**SE tipo_teste = "ISOLATED":**
+- ⚪ Esta seção NÃO é aplicável
+- ⚪ PULAR para Fase 3
+
+**Referência obrigatória:** [CONTRATO-TESTES-E2E-STATEFUL.md](D:\IC2_Governanca\governanca\contracts\testes\CONTRATO-TESTES-E2E-STATEFUL.md)
+
 ---
 
 ### Fase 3: Validação Estrutural
@@ -463,7 +869,7 @@ Após atualizar STATUS.yaml, a geração de TCs está concluída.
 
 ---
 
-## 7. Regras de Qualidade (OBRIGATÓRIAS)
+## 8. Regras de Qualidade (OBRIGATÓRIAS)
 
 ### 7.1 TC deve cobrir 100% dos UCs
 
@@ -489,7 +895,7 @@ Após atualizar STATUS.yaml, a geração de TCs está concluída.
 
 ---
 
-## 8. Bloqueios de Execução
+## 9. Bloqueios de Execução
 
 O agente DEVE PARAR se:
 
@@ -502,7 +908,7 @@ O agente DEVE PARAR se:
 
 ---
 
-## 9. Critério de Pronto
+## 10. Critério de Pronto
 
 O contrato só é considerado CONCLUÍDO quando:
 
@@ -526,7 +932,7 @@ O contrato só é considerado CONCLUÍDO quando:
 
 ---
 
-## 10. Próximo Contrato
+## 11. Próximo Contrato
 
 Após conclusão deste contrato, a documentação de testes está completa (MT + TC).
 
@@ -541,7 +947,7 @@ O próximo passo é:
 
 ---
 
-## 11. Arquivos Relacionados
+## 12. Arquivos Relacionados
 
 | Arquivo | Descrição |
 |---------|-----------|
@@ -552,16 +958,18 @@ O próximo passo é:
 
 ---
 
-## 12. Histórico de Versões
+## 13. Histórico de Versões
 
 | Versão | Data | Descrição |
 |--------|------|-----------|
+| 2.2 | 2026-01-11 | Adicionada Fase 1.4 "Identificar Tipo de Teste E2E" e Fase 2.2 "Documentar TC Stateful" - Identifica se RF requer testes STATEFUL (CRUD completo, fluxos sequenciais) ou ISOLATED durante criação do TC. TCs stateful DEVEM documentar: tipo_teste, requisitos_playwright (workers: 1, fullyParallel: false, retries: 0), fixtures_necessarias, e TCs E2E com usa_fixture, fixture_dependencia, sequencia. Referência obrigatória: CONTRATO-TESTES-E2E-STATEFUL.md. Baseado em análise RF006 (67% dos problemas por configuração incorreta). Resolve gap arquitetural: TC agora conhece stateful DURANTE criação, não apenas execução. |
+| 2.1 | 2026-01-09 | Adicionada seção 6 "Validação de UC com Especificações de Teste" (BLOQUEANTE) - Valida que UC possui navegacao, credenciais, data-test em TODOS passos, estados_ui, tabela/formulario (se aplicável), performance, timeouts_e2e ANTES de criar TC. Renumeradas seções 6→7, 7→8, 8→9, 9→10, 10→11, 11→12, 12→13, 13→14. Baseado em análise RF006. Referência: CLAUDE.md seção 18.2.2 |
 | 2.0 | 2025-12-31 | **UPGRADE CRÍTICO:** Ordem execução bloqueante (MT validado obrigatório), IDs canônicos TC-RFXXX-[CAT]-NNN, vínculo CA obrigatório, regras priorização por categoria, política E2E obrigatória, granularidade mínima TCs, validação ciclo completo RF→UC→MT→TC |
 | 1.0 | 2025-12-31 | Criação do contrato separado (TC depois de MT, TC depois de UC) |
 
 ---
 
-## 13. REGRA DE NEGAÇÃO ZERO
+## 14. REGRA DE NEGAÇÃO ZERO
 
 Se uma solicitação:
 - não estiver explicitamente prevista no contrato ativo, ou

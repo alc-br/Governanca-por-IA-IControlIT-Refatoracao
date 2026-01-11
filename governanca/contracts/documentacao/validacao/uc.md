@@ -447,6 +447,185 @@ documentacao:
 
 ---
 
+### VALIDAÇÃO 13: Especificações de Teste Completas ✨ NOVO BLOQUEANTE
+
+**Objetivo:** Garantir que UC possui TODAS as especificações necessárias para testes E2E.
+
+**Contexto:**
+Esta validação foi adicionada após a análise de problemas identificados no RF006, onde a falta de especificações de teste desde o início resultou em:
+- Taxa inicial E2E: 0% (vs meta 80%)
+- 12 execuções necessárias para atingir 74%
+- 50% das falhas eram evitáveis com melhor documentação
+
+**Seções obrigatórias em UC.yaml:**
+
+1. **`navegacao`** (OBRIGATÓRIA):
+   ```yaml
+   navegacao:
+     url_completa: "http://localhost:4200/[rota-completa]"
+     referencia_routing: "src/app/[caminho]/[arquivo]-routing.module.ts"
+   ```
+
+2. **`credenciais`** (OBRIGATÓRIA):
+   ```yaml
+   credenciais:
+     referencia_seeds: "backend/Infrastructure/Persistence/ApplicationDbContextInitialiser.cs"
+     perfil_necessario: "[Admin|Developer|Usuario]"
+   ```
+
+3. **`passos` com `elemento.data_test`** (OBRIGATÓRIO para TODOS os passos interativos):
+   ```yaml
+   passos:
+     - numero: 1
+       acao: "[Ação do usuário]"
+       elemento:
+         tipo: [button|input|select|dialog]
+         data_test: "RFXXX-[acao]-[alvo]"
+         aliases: ["[alias-opcional]"]
+         localizacao: "[arquivo.component.html linha XX]"
+   ```
+
+4. **`estados_ui`** (OBRIGATÓRIA):
+   ```yaml
+   estados_ui:
+     loading:
+       descricao: "[Quando exibido]"
+       data_test: "loading-spinner"
+     vazio:
+       descricao: "[Quando exibido]"
+       data_test: "empty-state"
+       texto_esperado: "[Texto exato]"
+     erro:
+       descricao: "[Quando exibido]"
+       data_test: "error-message"
+       texto_esperado: "[Texto exato]"
+   ```
+
+5. **`performance` e `timeouts_e2e`** (OBRIGATÓRIAS):
+   ```yaml
+   performance:
+     tempo_carregamento_maximo: 30000  # ms
+     tempo_operacao_crud: 10000        # ms
+     timeout_api_externa: 15000        # ms (se aplicável)
+
+   timeouts_e2e:
+     navegacao: 30000
+     loading_spinner: 30000
+     dialog: 10000
+     operacao_crud: 15000
+   ```
+
+6. **`tabela`** (OBRIGATÓRIA se UC possui listagem):
+   ```yaml
+   tabela:
+     data_test_container: "[entidade]-list"
+     data_test_row: "[entidade]-row"
+     colunas:
+       - nome: "[Nome da coluna]"
+         data_test: "[entidade]-col-[nome]"
+     acoes_linha:
+       - nome: "[Editar|Excluir]"
+         data_test: "[entidade]-btn-[acao]"
+   ```
+
+7. **`formulario`** (OBRIGATÓRIA se UC possui formulário):
+   ```yaml
+   formulario:
+     data_test_form: "RFXXX-form"
+     campos:
+       - nome: "[Nome do campo]"
+         data_test: "RFXXX-input-[nome]"
+         tipo: [text|number|email|select]
+         obrigatorio: [true|false]
+         validacoes:
+           - tipo: "[required|email|maxlength]"
+             mensagem_erro: "[Mensagem exata]"
+             data_test_erro: "RFXXX-input-[nome]-error"
+     botoes:
+       - nome: "[Salvar|Cancelar]"
+         data_test: "RFXXX-btn-[acao]"
+   ```
+
+**Método de validação:**
+
+```python
+# Verificar presença de seções obrigatórias
+secoes_obrigatorias = [
+    'navegacao',
+    'credenciais',
+    'estados_ui',
+    'performance',
+    'timeouts_e2e'
+]
+
+ausentes = []
+for secao in secoes_obrigatorias:
+    if secao not in uc_yaml_content:
+        ausentes.append(secao)
+
+# Verificar data_test em passos
+passos_sem_data_test = []
+for passo in uc_yaml['passos']:
+    if 'elemento' in passo and 'data_test' not in passo['elemento']:
+        passos_sem_data_test.append(passo['numero'])
+
+# Verificar tabela (se UC possui listagem)
+if 'listagem' in uc_description.lower() and 'tabela' not in uc_yaml_content:
+    ausentes.append('tabela')
+
+# Verificar formulario (se UC possui formulário)
+if any(palavra in uc_description.lower() for palavra in ['criar', 'editar', 'cadastrar', 'formulário']):
+    if 'formulario' not in uc_yaml_content:
+        ausentes.append('formulario')
+```
+
+**Critério de aprovação:**
+- ✅ TODAS as seções obrigatórias presentes
+- ✅ TODOS os passos interativos possuem `elemento.data_test`
+- ✅ `tabela` presente SE UC possui listagem
+- ✅ `formulario` presente SE UC possui formulário
+- ❌ Qualquer seção ausente = **CRÍTICO** (bloqueante)
+
+**Saída esperada (APROVADO):**
+```
+✅ VALIDAÇÃO 13: APROVADO
+   Especificações de Teste: 100% completas
+   Seções obrigatórias: 7/7 presentes
+     ✓ navegacao (url_completa, referencia_routing)
+     ✓ credenciais (referencia_seeds, perfil_necessario)
+     ✓ passos com data_test (15/15 passos)
+     ✓ estados_ui (loading, vazio, erro)
+     ✓ performance (tempos especificados)
+     ✓ timeouts_e2e (4 timeouts configurados)
+     ✓ tabela (listagem completa)
+     ✓ formulario (campos + validações)
+   Data-test attributes: 23 especificados
+```
+
+**Saída esperada (REPROVADO):**
+```
+❌ VALIDAÇÃO 13: REPROVADO
+   Especificações de Teste: INCOMPLETAS
+   Seções ausentes: 3
+     ✗ navegacao (ausente)
+     ✗ estados_ui (ausente)
+     ✗ timeouts_e2e (ausente)
+   Passos sem data_test: 5/15 (33%)
+     ✗ Passo 3: Clicar em botão (sem data_test)
+     ✗ Passo 7: Preencher campo (sem data_test)
+     ✗ Passo 9: Selecionar opção (sem data_test)
+   Severidade: CRÍTICO (bloqueante)
+   Ação: Executar contrato uc-criacao.md FASE 3.6 (Especificações de Teste)
+```
+
+**Justificativa:**
+- **Gap identificado no RF006:** UC sem especificações de teste → taxa inicial E2E 0%
+- **Impacto:** Sem essas especificações, implementação E testes não estão alinhados
+- **Solução:** Tornar especificações de teste OBRIGATÓRIAS desde criação do UC
+- **Resultado esperado:** Taxa inicial E2E 80-90% (vs 0% atual)
+
+---
+
 ## RELATÓRIO DE VALIDAÇÃO
 
 **Template de saída:**
@@ -475,8 +654,9 @@ documentacao:
 | 10. Validador automático | ✅ PASS | CRÍTICO | Exit code 0 |
 | 11. STATUS.yaml adequacao_uc | ✅ PASS | IMPORTANTE | Seção presente |
 | 12. STATUS.yaml documentacao.uc | ✅ PASS | IMPORTANTE | true |
+| **13. Especificações de Teste** | **✅ PASS** | **CRÍTICO** | **7/7 seções completas** |
 
-**PONTUAÇÃO FINAL:** 12/12 PASS (100%)
+**PONTUAÇÃO FINAL:** 13/13 PASS (100%)
 
 **VEREDICTO:** ✅ **APROVADO** - UC-RFXXX está 100% conforme (ZERO GAPS)
 
@@ -503,10 +683,10 @@ Nenhuma ação corretiva necessária. UC-RFXXX pode prosseguir para próximo con
 
 ## CRITÉRIOS DE APROVAÇÃO/REPROVAÇÃO
 
-### ⚠️ REGRA DE ZERO TOLERÂNCIA v3.0 (Ajustada)
+### ⚠️ REGRA DE ZERO TOLERÂNCIA v3.1 (Atualizada)
 
 **CRITÉRIO DE APROVAÇÃO:**
-- ✅ **APROVADO** = 12/12 validações PASS + ZERO gaps CRÍTICOS + ZERO gaps IMPORTANTES
+- ✅ **APROVADO** = 13/13 validações PASS + ZERO gaps CRÍTICOS + ZERO gaps IMPORTANTES
 - ❌ **REPROVADO** = Qualquer validação FAIL OU gap CRÍTICO OU gap IMPORTANTE
 
 **GAPS MENORES:**
@@ -523,10 +703,11 @@ Nenhuma ação corretiva necessária. UC-RFXXX pode prosseguir para próximo con
 ### ✅ APROVADO - CRITÉRIO RIGOROSO MAS PRAGMÁTICO
 
 **Exigências ABSOLUTAS:**
-- ✅ Todas as 12 validações PASS
+- ✅ Todas as 13 validações PASS
 - ✅ ZERO gaps CRÍTICOS
 - ✅ ZERO gaps IMPORTANTES
 - ✅ ZERO violações de nomenclatura FA-001 vs FA-UC00-001 (CRÍTICO)
+- ✅ ZERO especificações de teste ausentes (CRÍTICO)
 - ✅ ZERO jobs background não documentados (IMPORTANTE)
 - ✅ ZERO integrações externas incompletas (IMPORTANTE)
 - ✅ Validador Python exit code 0 (ou justificativa técnica)
@@ -537,7 +718,7 @@ Nenhuma ação corretiva necessária. UC-RFXXX pode prosseguir para próximo con
 
 **Exemplo de aprovação válida:**
 ```
-12/12 PASS
+13/13 PASS
 0 gaps CRÍTICOS
 0 gaps IMPORTANTES
 1 gap MENOR (arquivo diagnóstico ausente)  ← PERMITIDO, gera advertência
@@ -549,14 +730,14 @@ Veredicto: ✅ APROVADO COM ADVERTÊNCIA
 ### ❌ REPROVADO - CRITÉRIO CLARO
 
 **Motivos de REPROVAÇÃO:**
-- ❌ 11/12 ou menos validações PASS
-- ❌ **QUALQUER gap CRÍTICO** (ex: RN não coberta, nomenclatura FA-001 incorreta)
+- ❌ 12/13 ou menos validações PASS
+- ❌ **QUALQUER gap CRÍTICO** (ex: RN não coberta, nomenclatura FA-001 incorreta, especificações de teste ausentes)
 - ❌ **QUALQUER gap IMPORTANTE** (ex: job não documentado, integração incompleta)
 - ❌ Validador exit code ≠ 0 (exceto falhas técnicas Python com análise manual)
 
-**Exemplo de reprovação por gap CRÍTICO:**
+**Exemplo de reprovação por gap CRÍTICO (nomenclatura):**
 ```
-11/12 PASS (Validação 3.5 FAIL)
+12/13 PASS (Validação 3.5 FAIL)
 1 gap CRÍTICO: Nomenclatura FA-001 vs FA-UC00-001 (42 violações)
 0 gaps IMPORTANTES
 0 gaps MENORES
@@ -564,9 +745,19 @@ Veredicto: ❌ REPROVADO
 Motivo: Nomenclatura de fluxos incorreta (gap CRÍTICO)
 ```
 
+**Exemplo de reprovação por gap CRÍTICO (especificações de teste):**
+```
+12/13 PASS (Validação 13 FAIL)
+1 gap CRÍTICO: Especificações de teste ausentes (navegacao, estados_ui)
+0 gaps IMPORTANTES
+0 gaps MENORES
+Veredicto: ❌ REPROVADO
+Motivo: UC não está pronto para implementação E2E (gap CRÍTICO)
+```
+
 **Exemplo de aprovação com gap MENOR:**
 ```
-12/12 PASS
+13/13 PASS
 0 gaps CRÍTICOS
 0 gaps IMPORTANTES
 1 gap MENOR: Arquivo diagnóstico ausente
@@ -585,6 +776,8 @@ Motivo: Gap MENOR não bloqueia aprovação
    - Motivo: RN não documentada pode gerar bug
 3. **UC.yaml ↔ UC.md dessincronizados**
    - Motivo: Fonte da verdade corrompida
+4. **Especificações de Teste Ausentes** (navegacao, credenciais, data_test, estados_ui, timeouts)
+   - Motivo: Sem essas especificações, implementação e testes não estarão alinhados, resultando em taxa inicial E2E < 80%
 
 **IMPORTANTE (BLOQUEANTE):**
 1. **Job Background não documentado**
@@ -606,7 +799,7 @@ Motivo: Gap MENOR não bloqueia aprovação
 
 **Aprovação condicional permitida SOMENTE se:**
 ```
-11/12 PASS (faltou apenas Validação #10: Validador Automático)
+12/13 PASS (faltou apenas Validação #10: Validador Automático)
 0 gaps CRÍTICOS
 0 gaps IMPORTANTES
 0 gaps MENORES

@@ -467,9 +467,301 @@ Se checklist REPROVAR:
 
 ---
 
-### Fase 4: Atualização STATUS.yaml (AMPLIADO v2.0)
+### Fase 4: Sincronização Obrigatória (NOVO - BLOQUEANTE)
 
-#### 4.1 Atualizar STATUS.yaml
+**Este passo é OBRIGATÓRIO. Sem ele, MT está DESATUALIZADA.**
+
+Esta fase garante que a Massa de Teste esteja **100% sincronizada** com backend seeds, frontend routing e UC especificações.
+
+---
+
+#### 4.1: Sincronizar Credenciais com Backend Seeds
+
+**O agente DEVE:**
+
+1. **Ler `ApplicationDbContextInitialiser.cs`:**
+   - Localização: `backend/Infrastructure/Persistence/ApplicationDbContextInitialiser.cs`
+   - Localizar seção de seeds de usuários (geralmente linhas 150-300)
+   - Extrair email e senha do usuário de teste
+
+2. **Identificar perfil necessário conforme UC:**
+   - Ler `UC-RFXXX.yaml` → seção `credenciais.perfil_necessario`
+   - Exemplo: "Admin", "Developer", "Usuario"
+
+3. **Criar seção `CREDENCIAIS_TESTE` em MT-RFXXX.yaml:**
+
+```yaml
+# =============================================
+# CREDENCIAIS (SINCRONIZADAS COM BACKEND SEEDS)
+# =============================================
+
+credenciais_teste:
+  # FONTE: backend/Infrastructure/Persistence/ApplicationDbContextInitialiser.cs (linhas XX-YY)
+  # ÚLTIMA SINCRONIZAÇÃO: 2026-01-09
+  # VALIDAÇÃO: Execute `dotnet run seed-check` antes de rodar E2E
+
+  admin_teste:
+    email: "[email do seed - linha XX]"        # Ex: [email protected]
+    password: "[senha do seed - linha YY]"      # Ex: Admin@123
+    perfil: "Admin"
+    descricao: "Administrador com acesso completo"
+
+  developer_teste:
+    email: "[email do seed]"
+    password: "[senha do seed]"
+    perfil: "Developer"
+    descricao: "Desenvolvedor com permissões de teste"
+
+# Perfil necessário para este RF (conforme UC-RFXXX.yaml):
+perfil_necessario: "Admin"  # ou "Developer" conforme UC
+```
+
+**Critério de aceite:**
+- ✅ Credenciais sincronizadas com seeds exatos do backend
+- ✅ Comentários documentam linha de origem no seed
+- ✅ Data de sincronização documentada
+- ✅ Perfil necessário especificado (conforme UC)
+
+---
+
+#### 4.2: Sincronizar URLs com Routing Angular
+
+**O agente DEVE:**
+
+1. **Ler arquivo routing referenciado no UC:**
+   - Localizar via `UC-RFXXX.yaml` → `navegacao.referencia_routing`
+   - Exemplo: `src/app/modules/cadastros/cadastros-routing.module.ts`
+
+2. **Extrair rota exata:**
+   - Exemplo: `{ path: 'management/clientes', component: ClientesListComponent }`
+
+3. **Criar seção `FRONTEND_URLS` em MT-RFXXX.yaml:**
+
+```yaml
+# =============================================
+# URLS FRONTEND (SINCRONIZADAS COM ROUTING)
+# =============================================
+
+frontend_urls:
+  # FONTE: src/app/modules/cadastros/cadastros-routing.module.ts
+  # ÚLTIMA SINCRONIZAÇÃO: 2026-01-09
+  # VALIDAÇÃO: Execute `npm run validate-routes` antes de rodar E2E
+
+  signIn: "http://localhost:4200/sign-in"
+
+  # URLs específicas do RF
+  clientes: "http://localhost:4200/management/clientes"
+  clientesCriar: "http://localhost:4200/management/clientes/novo"
+  clientesEditar: "http://localhost:4200/management/clientes/{id}"  # Placeholder {id}
+  clientesVisualizar: "http://localhost:4200/management/clientes/{id}/view"
+```
+
+**Critério de aceite:**
+- ✅ URLs completas especificadas (protocolo + host + caminho)
+- ✅ URLs sincronizadas com routing Angular
+- ✅ Comentários documentam arquivo de origem
+- ✅ Data de sincronização documentada
+
+---
+
+#### 4.3: Sincronizar Data-test com UC
+
+**O agente DEVE:**
+
+1. **Ler UC-RFXXX.yaml:**
+   - Extrair TODOS os `data_test` de:
+     - `passos[].elemento.data_test`
+     - `estados_ui.loading.data_test`
+     - `estados_ui.vazio.data_test`
+     - `estados_ui.erro.data_test`
+     - `tabela.data_test_container`
+     - `tabela.data_test_row`
+     - `tabela.acoes_linha[].data_test`
+     - `formulario.data_test_form`
+     - `formulario.campos[].data_test`
+     - `formulario.botoes[].data_test`
+
+2. **Criar seção `DATA_TEST_SELECTORS` em MT-RFXXX.yaml:**
+
+```yaml
+# =============================================
+# SELETORES E2E (SINCRONIZADOS COM UC)
+# =============================================
+
+data_test_selectors:
+  # FONTE: UC-RFXXX.yaml (seções passos, estados_ui, tabela, formulario)
+  # ÚLTIMA SINCRONIZAÇÃO: 2026-01-09
+  # VALIDAÇÃO: Execute `npm run audit-data-test RFXXX` antes de rodar E2E
+
+  # ==================== NAVEGAÇÃO ====================
+  btnNovoCliente: "RF006-criar-cliente"
+  btnEditarCliente: "RF006-editar-cliente"
+  btnExcluirCliente: "RF006-excluir-cliente"
+
+  # ==================== ESTADOS UI ====================
+  loadingSpinner: "loading-spinner"
+  emptyState: "empty-state"
+  errorMessage: "error-message"
+
+  # ==================== TABELA/LISTA ====================
+  clientesList: "clientes-list"
+  clienteRow: "cliente-row"
+
+  # ==================== FORMULÁRIO ====================
+  formCliente: "RF006-form"
+
+  # Inputs
+  inputRazaoSocial: "RF006-input-razaosocial"
+  inputCNPJ: "RF006-input-cnpj"
+  inputEmail: "RF006-input-email"
+
+  # Erros
+  inputRazaoSocialError: "RF006-input-razaosocial-error"
+  inputCNPJError: "RF006-input-cnpj-error"
+
+  # ==================== BOTÕES DE FORMULÁRIO ====================
+  btnSalvar: "RF006-salvar-cliente"
+  btnCancelar: "RF006-cancelar-cliente"
+
+  # ==================== DIÁLOGOS/MODAIS ====================
+  dialogConfirmacao: "dialog-confirmacao"
+  btnConfirmarDialog: "btn-confirmar-dialog"
+  btnCancelarDialog: "btn-cancelar-dialog"
+```
+
+**Critério de aceite:**
+- ✅ TODOS os data-test de UC estão mapeados
+- ✅ Nomenclatura é IDÊNTICA ao UC
+- ✅ Seletores organizados por categoria
+- ✅ Comentários documentam origem (UC)
+
+---
+
+#### 4.4: Sincronizar Timeouts com UC
+
+**O agente DEVE:**
+
+1. **Ler UC-RFXXX.yaml:**
+   - Extrair `performance` e `timeouts_e2e`
+
+2. **Criar seção `TIMEOUTS` em MT-RFXXX.yaml:**
+
+```yaml
+# =============================================
+# TIMEOUTS (SINCRONIZADOS COM UC)
+# =============================================
+
+timeouts:
+  # FONTE: UC-RFXXX.yaml (seções performance e timeouts_e2e)
+  # ÚLTIMA SINCRONIZAÇÃO: 2026-01-09
+
+  # Navegação e carregamento
+  navegacao: 30000              # 30s - Timeout para navegação de página
+  loadingSpinner: 30000         # 30s - Timeout para spinner desaparecer
+
+  # Diálogos e modais
+  dialog: 10000                 # 10s - Timeout para diálogos/modals
+
+  # Operações CRUD
+  operacaoCRUD: 15000           # 15s - Timeout para criar/editar/excluir
+  operacaoSalvar: 15000         # 15s - Timeout específico para salvar
+  operacaoExcluir: 10000        # 10s - Timeout específico para excluir
+
+  # Validações
+  validacaoFormulario: 5000     # 5s - Timeout para validações de formulário
+
+  # APIs externas (se aplicável)
+  apiReceitaWS: 15000           # 15s - Exemplo: ReceitaWS
+  apiViaCEP: 10000              # 10s - Exemplo: ViaCEP
+```
+
+**Critério de aceite:**
+- ✅ Timeouts sincronizados com UC
+- ✅ Valores exatos copiados de UC
+- ✅ Comentários descrevem propósito de cada timeout
+
+---
+
+#### 4.5: Validar Sincronização
+
+**Após sincronizar todas as seções acima, o agente DEVE verificar:**
+
+- ✅ Seção `credenciais_teste` completa e sincronizada com seeds
+- ✅ Seção `frontend_urls` completa e sincronizada com routing
+- ✅ Seção `data_test_selectors` completa e sincronizada com UC
+- ✅ Seção `timeouts` completa e sincronizada com UC
+- ✅ TODOS os valores são exatos (não inferidos)
+- ✅ Comentários documentam origem e data de sincronização
+
+**SE qualquer verificação FALHAR:**
+- ❌ MT está DESATUALIZADA
+- ❌ BLOQUEIO: Não prosseguir para STATUS.yaml
+- ❌ Corrigir sincronização e revalidar
+
+---
+
+#### 4.6: Criar Helpers de Validação
+
+**O agente DEVE adicionar seção de helpers de validação em MT-RFXXX.yaml:**
+
+```yaml
+# =============================================
+# HELPERS DE VALIDAÇÃO (OPCIONAL - USAR NO E2E)
+# =============================================
+
+validacao_helpers:
+  # Estas funções PODEM ser usadas nos testes E2E para validar sincronização
+
+  validateCredentials:
+    descricao: "Valida sincronização de credenciais com backend seeds"
+    execucao: "npm run validate-credentials RFXXX"
+    bloqueante: true
+
+  validateRoutes:
+    descricao: "Valida URLs com routing do Angular"
+    execucao: "npm run validate-routes"
+    bloqueante: true
+
+  validateDataTestAttributes:
+    descricao: "Valida data-test attributes com componentes"
+    execucao: "npm run audit-data-test RFXXX"
+    bloqueante: true
+```
+
+**Critério de aceite:**
+- ✅ Seção `validacao_helpers` documentada
+- ✅ Comandos de validação especificados
+- ✅ Marcação de bloqueante quando aplicável
+
+---
+
+**RESUMO DA FASE 4:**
+
+Esta fase é **CRÍTICA** para alinhamento entre MT e implementação. Sem ela:
+- ❌ Credenciais de MT não batem com seeds (login falha)
+- ❌ URLs de MT não batem com routing (404 em testes)
+- ❌ Data-test de MT não batem com UC (seletores não encontrados)
+- ❌ Timeouts de MT são arbitrários (testes flakey)
+- ❌ Taxa de aprovação inicial será 0%
+
+**Com esta fase:**
+- ✅ MT 100% sincronizada com backend, frontend e UC
+- ✅ Credenciais corretas para login
+- ✅ URLs corretas para navegação
+- ✅ Data-test corretos para seletores
+- ✅ Timeouts corretos para estabilidade
+- ✅ Taxa de aprovação inicial será 80-90%
+
+**Resultado esperado:**
+- ✅ MT pronta para testes E2E
+- ✅ Rastreabilidade: UC → MT → Testes
+- ✅ Zero gaps de sincronização
+
+---
+
+### Fase 5: Atualização STATUS.yaml (AMPLIADO v2.0)
+
+#### 5.1 Atualizar STATUS.yaml
 
 **Baseado em:** `D:\IC2\docs\templates\STATUS.yaml`
 
@@ -502,7 +794,7 @@ historico_execucao_mt:
 
 ---
 
-### Fase 5: Finalização
+### Fase 6: Finalização
 
 Após atualizar STATUS.yaml, a geração de MTs está concluída.
 

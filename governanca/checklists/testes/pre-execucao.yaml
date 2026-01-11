@@ -1,6 +1,7 @@
 nome: "Checklist Pré-Execução de Testes"
-versao: "1.0"
+versao: "1.3"
 data_criacao: "2026-01-08"
+ultima_atualizacao: "2026-01-10"
 aplicavel_a: "Execução completa de testes (RF)"
 responsavel: "Agente de Testes (qa-tester)"
 
@@ -53,6 +54,234 @@ validacoes:
     resultado_esperado: "Arquivo encontrado"
     bloqueante: true
     acao_se_falhar: "ABORTAR execução (casos de teste obrigatórios)"
+
+# =============================================
+# SINCRONIZAÇÃO MT (NOVO - CRÍTICO)
+# =============================================
+# Adicionado após análise do RF006 para garantir que MT está sincronizada
+# com backend seeds, frontend routing e UC antes de executar testes E2E
+# Elimina problemas: credenciais erradas, URLs 404, seletores ausentes
+
+sincronizacao_mt:
+  - item: "MT-RFXXX.data.ts existe"
+    comando: "test -f /d/IC2/frontend/icontrolit-app/e2e/data/MT-RFXXX.data.ts && echo EXISTS || echo NOT_FOUND"
+    resultado_esperado: "EXISTS"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (massa de teste TypeScript obrigatória para E2E)"
+    contexto: "MT-RFXXX.data.ts contém credenciais, URLs, seletores e timeouts para testes E2E"
+
+  - item: "Validar que usuário de teste EXISTE no banco (RESULTADO, não processo)"
+    comando: "sqlcmd -S 'tcp:sql-icontrolit-dev-834e464c.database.windows.net,1433' -d 'IControlIT_DEV' -U 'sqladmin' -P 'YourStrong@Passw0rd123' -Q \"SELECT COUNT(*) as UserExists FROM Usuarios WHERE Email = '[EMAIL_MT]'\" -C -h -1"
+    resultado_esperado: "UserExists >= 1"
+    bloqueante: true
+    acao_se_falhar: "CRIAR usuário via SQL direto (não depender de seed)"
+    contexto: "VALIDA RESULTADO: usuário existe (independente se seed funcionou ou não)"
+    impacto_blindagem: "RESOLVIDO: NÃO trava se seed falhar - valida resultado final"
+    alternativa: "Se usuário não existe, executar: INSERT INTO Usuarios (...) VALUES (...)"
+
+  - item: "Validar sincronização de credenciais (MT ↔ Backend Seeds)"
+    comando: "cd /d/IC2_Governanca && npm run validate-credentials RFXXX"
+    resultado_esperado: "Exit code 0 (credenciais sincronizadas)"
+    bloqueante: false
+    acao_se_falhar: "ALERTAR (credenciais MT desatualizadas vs backend seeds, mas usuário existe)"
+    contexto: "Valida se CREDENCIAIS_TESTE em MT batem com ApplicationDbContextInitialiser.cs"
+    impacto_rf006: "Problema 1/6 resolvido - 100% de falhas E2E por credenciais erradas"
+    arquivo_validado: "backend/Infrastructure/Persistence/ApplicationDbContextInitialiser.cs"
+    mudanca_v12: "DOWNGRADE de bloqueante:true → bloqueante:false (prioridade: usuário existir)"
+
+  - item: "Validar sincronização de URLs (MT ↔ Frontend Routing)"
+    comando: "cd /d/IC2_Governanca && npm run validate-routes"
+    resultado_esperado: "Exit code 0 (URLs sincronizadas)"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (URLs MT desatualizadas vs app-routing.module.ts)"
+    contexto: "Valida se FRONTEND_URLS em MT batem com rotas configuradas no Angular"
+    impacto_rf006: "Problema 2/6 resolvido - 32 falhas E2E por URLs 404"
+    arquivo_validado: "frontend/icontrolit-app/src/app/*-routing.module.ts"
+
+  - item: "Validar sincronização de data-test (MT ↔ UC)"
+    comando: "cd /d/IC2_Governanca && npm run audit-data-test RFXXX"
+    resultado_esperado: "Exit code 0 (data-test sincronizados)"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (data-test MT desatualizados vs UC-RFXXX.yaml)"
+    contexto: "Valida se DATA_TEST_SELECTORS em MT batem com UC-RFXXX.yaml"
+    impacto_rf006: "Problema 3/6 resolvido - 32 falhas E2E por seletores não encontrados"
+    arquivo_validado: "documentacao/Fase-*/[EPIC]/RFXXX/UC-RFXXX.yaml"
+
+  - item: "Validar sincronização de timeouts (MT ↔ UC)"
+    comando: "cd /d/IC2_Governanca && python tools/validate-timeouts.py RFXXX"
+    resultado_esperado: "Exit code 0 (timeouts sincronizados)"
+    bloqueante: false
+    acao_se_falhar: "ALERTAR (timeouts MT divergentes de UC, pode causar falhas intermitentes)"
+    contexto: "Valida se TIMEOUTS em MT batem com UC-RFXXX.yaml (performance/timeouts_e2e)"
+    impacto_rf006: "Problema 5/6 resolvido - 15 falhas E2E por timeout insuficiente"
+    arquivo_validado: "documentacao/Fase-*/[EPIC]/RFXXX/UC-RFXXX.yaml"
+
+  - item: "UC-RFXXX.yaml possui especificações de teste completas"
+    comando: "cd /d/IC2_Governanca && python tools/validate-uc-test-specs.py RFXXX"
+    resultado_esperado: "Exit code 0 (especificações completas)"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (UC sem especificações de teste necessárias para E2E)"
+    contexto: "Valida se UC possui: navegacao, credenciais, data-test, estados_ui, timeouts"
+    impacto_rf006: "Problema 4/6 resolvido - Estados UI não documentados"
+    secoes_obrigatorias:
+      - navegacao
+      - credenciais
+      - estados_ui
+      - performance
+      - timeouts_e2e
+
+  - item: "Frontend possui data-test attributes (auditoria HTML)"
+    comando: "cd /d/IC2_Governanca && npm run audit-data-test RFXXX --check-html"
+    resultado_esperado: "Exit code 0 (todos data-test presentes no HTML)"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (componentes HTML sem data-test attributes)"
+    contexto: "Valida se TODOS os data-test de UC estão implementados no HTML"
+    impacto_rf006: "Problema 3/6 resolvido - Seletores ausentes no HTML"
+    arquivo_validado: "frontend/icontrolit-app/src/app/**/*.component.html"
+
+  - item: "Backend possui seeds sincronizados (validação reversa)"
+    comando: "cd /d/IC2_Governanca && npm run validate-credentials RFXXX --reverse-check"
+    resultado_esperado: "Exit code 0 (seeds backend sincronizados com MT)"
+    bloqueante: false
+    acao_se_falhar: "ALERTAR (backend seeds divergentes de MT, pode ter sido atualizado)"
+    contexto: "Validação reversa: verifica se backend seeds foram alterados sem atualizar MT"
+    impacto_rf006: "Prevenir problema 1/6 - Detect backend seed changes"
+
+# =============================================
+# PRE-FLIGHT CHECKS SQL (NOVO - CRÍTICO)
+# =============================================
+# Adicionado após análise do RF006 para garantir que DADOS e PERMISSÕES
+# existem no banco ANTES de executar testes E2E
+# Elimina problemas: banco vazio, permissões não configuradas
+
+pre_flight_checks_sql:
+  - item: "Validar dados mínimos no banco (tabela principal do RF)"
+    comando: |
+      sqlcmd -S 'tcp:sql-icontrolit-dev-834e464c.database.windows.net,1433' \
+        -d 'IControlIT_DEV' \
+        -U 'sqladmin' \
+        -P 'YourStrong@Passw0rd123' \
+        -Q "SELECT COUNT(*) as TotalRegistros FROM [TABELA_RFXXX] WHERE FlExcluido = 0" \
+        -C -h -1
+    resultado_esperado: "TotalRegistros >= [MINIMO_UC]"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (dados mínimos ausentes, testes falharão)"
+    contexto: "Valida que tabela principal possui dados mínimos conforme especificado em UC-RFXXX.yaml"
+    impacto_rf006: "GAP 3 resolvido - 2 problemas (4%) de banco vazio durante testes"
+    exemplo_rf006: "SELECT COUNT(*) as TotalRegistros FROM Clientes WHERE FlExcluido = 0 (esperado >= 5)"
+    configuracao_uc: "UC-RFXXX.yaml → pre_condicoes.dados_minimos.tabela e quantidade_minima"
+
+  - item: "Validar permissões do usuário de teste (perfil completo)"
+    comando: |
+      sqlcmd -S 'tcp:sql-icontrolit-dev-834e464c.database.windows.net,1433' \
+        -d 'IControlIT_DEV' \
+        -U 'sqladmin' \
+        -P 'YourStrong@Passw0rd123' \
+        -Q "SELECT COUNT(*) as TotalPermissoes \
+            FROM UsuarioPermissoes up \
+            INNER JOIN Usuarios u ON up.UsuarioId = u.Id \
+            WHERE u.Email = '[EMAIL_MT]' \
+              AND up.Permissao LIKE 'CAD.[ENTIDADE_RF].%' \
+              AND up.FlAtivo = 1" \
+        -C -h -1
+    resultado_esperado: "TotalPermissoes >= [MINIMO_PERMISSOES]"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (permissões não configuradas, testes falharão com 403 Forbidden)"
+    contexto: "Valida que usuário de teste possui TODAS as permissões necessárias conforme RF-RFXXX.yaml"
+    impacto_rf006: "GAP 3 resolvido - 2 problemas (4%) de permissões não configuradas"
+    exemplo_rf006: |
+      SELECT COUNT(*) as TotalPermissoes
+      FROM UsuarioPermissoes up
+      INNER JOIN Usuarios u ON up.UsuarioId = u.Id
+      WHERE u.Email = 'admin@icontrolit.com.br'
+        AND up.Permissao LIKE 'CAD.CLIENTES.%'
+        AND up.FlAtivo = 1
+      (esperado >= 5: VISUALIZAR, CRIAR, EDITAR, EXCLUIR, EXPORTAR)
+    configuracao_rf: "RF-RFXXX.yaml → permissoes_obrigatorias (lista completa)"
+
+  - item: "Validar integridade referencial (foreign keys necessárias)"
+    comando: |
+      sqlcmd -S 'tcp:sql-icontrolit-dev-834e464c.database.windows.net,1433' \
+        -d 'IControlIT_DEV' \
+        -U 'sqladmin' \
+        -P 'YourStrong@Passw0rd123' \
+        -Q "SELECT COUNT(*) as TotalReferencias \
+            FROM [TABELA_RELACIONADA] \
+            WHERE FlExcluido = 0" \
+        -C -h -1
+    resultado_esperado: "TotalReferencias >= 1"
+    bloqueante: false
+    acao_se_falhar: "ALERTAR (tabelas relacionadas vazias, alguns testes podem falhar)"
+    contexto: "Valida que tabelas relacionadas (foreign keys) possuem dados"
+    impacto_rf006: "GAP 3 resolvido - Prevenir falhas de constraint violation"
+    exemplo_rf006: "SELECT COUNT(*) as TotalReferencias FROM Categorias WHERE FlExcluido = 0 (esperado >= 1)"
+    configuracao_uc: "UC-RFXXX.yaml → pre_condicoes.tabelas_relacionadas (lista)"
+
+  - item: "Validar tenant do usuário de teste (multi-tenancy)"
+    comando: |
+      sqlcmd -S 'tcp:sql-icontrolit-dev-834e464c.database.windows.net,1433' \
+        -d 'IControlIT_DEV' \
+        -U 'sqladmin' \
+        -P 'YourStrong@Passw0rd123' \
+        -Q "SELECT u.TenantId, t.Nome as TenantNome \
+            FROM Usuarios u \
+            INNER JOIN Tenants t ON u.TenantId = t.Id \
+            WHERE u.Email = '[EMAIL_MT]' \
+              AND t.FlAtivo = 1" \
+        -C -h -1
+    resultado_esperado: "TenantId presente e TenantNome != NULL"
+    bloqueante: true
+    acao_se_falhar: "ABORTAR execução (tenant não configurado, testes multi-tenancy falharão)"
+    contexto: "Valida que usuário de teste está associado a um tenant ATIVO"
+    impacto_rf006: "GAP 3 resolvido - Prevenir falhas de isolamento de tenant"
+    exemplo_rf006: |
+      SELECT u.TenantId, t.Nome as TenantNome
+      FROM Usuarios u
+      INNER JOIN Tenants t ON u.TenantId = t.Id
+      WHERE u.Email = 'admin@icontrolit.com.br'
+        AND t.FlAtivo = 1
+      (esperado: TenantId = 1, TenantNome = 'ICONTROLIT')
+
+  - item: "Validar estado do banco (sem transações pendentes)"
+    comando: |
+      sqlcmd -S 'tcp:sql-icontrolit-dev-834e464c.database.windows.net,1433' \
+        -d 'IControlIT_DEV' \
+        -U 'sqladmin' \
+        -P 'YourStrong@Passw0rd123' \
+        -Q "SELECT COUNT(*) as TransacoesPendentes \
+            FROM sys.dm_tran_active_transactions \
+            WHERE transaction_begin_time < DATEADD(MINUTE, -5, GETDATE())" \
+        -C -h -1
+    resultado_esperado: "TransacoesPendentes = 0"
+    bloqueante: false
+    acao_se_falhar: "ALERTAR (transações antigas pendentes, pode causar locks durante testes)"
+    contexto: "Valida que não há transações antigas travadas no banco"
+    impacto_rf006: "GAP 3 - Prevenir timeouts de query por locks"
+
+substituicoes_dinamicas:
+  - placeholder: "[TABELA_RFXXX]"
+    origem: "UC-RFXXX.yaml → pre_condicoes.dados_minimos.tabela"
+    exemplo: "Clientes"
+
+  - placeholder: "[MINIMO_UC]"
+    origem: "UC-RFXXX.yaml → pre_condicoes.dados_minimos.quantidade_minima"
+    exemplo: "5"
+
+  - placeholder: "[EMAIL_MT]"
+    origem: "MT-RFXXX.data.ts → CREDENCIAIS_TESTE.admin_teste.email"
+    exemplo: "admin@icontrolit.com.br"
+
+  - placeholder: "[ENTIDADE_RF]"
+    origem: "RF-RFXXX.yaml → metadados.entidade_principal"
+    exemplo: "CLIENTES"
+
+  - placeholder: "[MINIMO_PERMISSOES]"
+    origem: "RF-RFXXX.yaml → permissoes_obrigatorias.length"
+    exemplo: "5 (VISUALIZAR, CRIAR, EDITAR, EXCLUIR, EXPORTAR)"
+
+  - placeholder: "[TABELA_RELACIONADA]"
+    origem: "UC-RFXXX.yaml → pre_condicoes.tabelas_relacionadas[0]"
+    exemplo: "Categorias"
 
 observacoes:
   - "Substituir RFXXX pelo RF real durante execução (ex: RF006)"
@@ -122,7 +351,111 @@ matriz_decisao_bloqueios:
     testes_e2e: "BLOQUEAR"
     decisao_final: "PARCIAL (frontend inválido)"
 
+  - pre_requisito: "Credenciais MT desatualizadas (validate-credentials FAIL)"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "TOTAL E2E (credenciais inválidas)"
+    contexto_rf006: "Problema 1/6 - 100% falhas E2E por credenciais erradas"
+
+  - pre_requisito: "URLs MT desatualizadas (validate-routes FAIL)"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "TOTAL E2E (URLs 404)"
+    contexto_rf006: "Problema 2/6 - 32 falhas E2E por URLs 404"
+
+  - pre_requisito: "Data-test MT desatualizados (audit-data-test FAIL)"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "TOTAL E2E (seletores ausentes)"
+    contexto_rf006: "Problema 3/6 - 32 falhas E2E por seletores não encontrados"
+
+  - pre_requisito: "UC sem especificações de teste (validate-uc-test-specs FAIL)"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "TOTAL E2E (UC incompleto)"
+    contexto_rf006: "Problema 4/6 - Estados UI não documentados"
+
+  - pre_requisito: "Frontend sem data-test attributes (audit HTML FAIL)"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "TOTAL E2E (seletores ausentes no HTML)"
+    contexto_rf006: "Problema 3/6 - HTML sem data-test attributes"
+
+  - pre_requisito: "Dados mínimos ausentes no banco (SQL query retorna COUNT < mínimo UC)"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "TOTAL E2E (banco vazio, testes falharão)"
+    contexto_rf006: "GAP 3 - 2 problemas (4%) de banco vazio durante testes"
+
+  - pre_requisito: "Permissões ausentes para usuário de teste (SQL query retorna COUNT < mínimo RF)"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "TOTAL E2E (permissões não configuradas, testes falharão com 403)"
+    contexto_rf006: "GAP 3 - 2 problemas (4%) de permissões não configuradas"
+
+  - pre_requisito: "Tenant não configurado para usuário de teste (SQL query retorna TenantId NULL)"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "BLOQUEAR"
+    decisao_final: "TOTAL E2E (isolamento multi-tenancy falharão)"
+    contexto_rf006: "GAP 3 - Prevenir falhas de tenant isolation"
+
 changelog:
+  - versao: "1.3"
+    data: "2026-01-10"
+    mudancas:
+      - "PRE-FLIGHT CHECKS SQL: Adicionada seção pre_flight_checks_sql (5 validações críticas)"
+      - "Validação 1: Dados mínimos no banco (SELECT COUNT(*) FROM [TABELA_RFXXX] >= [MINIMO_UC])"
+      - "Validação 2: Permissões do usuário de teste (SELECT COUNT(*) FROM UsuarioPermissoes >= [MINIMO_PERMISSOES])"
+      - "Validação 3: Integridade referencial (SELECT COUNT(*) FROM [TABELA_RELACIONADA] >= 1)"
+      - "Validação 4: Tenant do usuário de teste (SELECT TenantId != NULL)"
+      - "Validação 5: Estado do banco (SELECT COUNT(*) FROM sys.dm_tran_active_transactions = 0)"
+      - "Substituições dinâmicas: 6 placeholders documentados ([TABELA_RFXXX], [MINIMO_UC], [EMAIL_MT], [ENTIDADE_RF], [MINIMO_PERMISSOES], [TABELA_RELACIONADA])"
+      - "Matriz de decisão: 3 novos bloqueios (dados ausentes, permissões ausentes, tenant não configurado)"
+      - "Impacto RF006: GAP 3 resolvido - 2 problemas (4%) de banco vazio e permissões não configuradas"
+      - "Integração com UC: pre_condicoes.dados_minimos e pre_condicoes.tabelas_relacionadas"
+      - "Integração com RF: permissoes_obrigatorias e metadados.entidade_principal"
+
+  - versao: "1.2"
+    data: "2026-01-10"
+    mudancas:
+      - "BLINDAGEM contra falhas de seed: Adicionada validação de RESULTADO (usuário existe) antes de validação de PROCESSO (seed executou)"
+      - "Validação SQL direta: SELECT COUNT(*) FROM Usuarios WHERE Email = '[EMAIL_MT]' (bloqueante:true)"
+      - "Downgrade: validate-credentials de bloqueante:true → bloqueante:false (prioridade: usuário existir)"
+      - "Solução: Se seed falhar mas usuário existe = PROSSEGUIR (não travar)"
+      - "Alternativa documentada: Se usuário não existe, executar INSERT INTO Usuarios via SQL direto"
+      - "Princípio: VALIDAR RESULTADO, NÃO PROCESSO"
+      - "Impacto: Sistema NÃO trava mais em falhas silenciosas de seed, desde que resultado seja alcançado"
+
+  - versao: "1.1"
+    data: "2026-01-09"
+    mudancas:
+      - "Adicionada seção sincronizacao_mt (8 validações)"
+      - "Validação de credenciais MT vs backend seeds (validate-credentials)"
+      - "Validação de URLs MT vs frontend routing (validate-routes)"
+      - "Validação de data-test MT vs UC (audit-data-test)"
+      - "Validação de timeouts MT vs UC (validate-timeouts)"
+      - "Validação de especificações de teste em UC (validate-uc-test-specs)"
+      - "Validação de data-test attributes em HTML (audit HTML)"
+      - "Validação reversa de backend seeds (--reverse-check)"
+      - "Matriz de decisão expandida com 5 novos bloqueios de sincronização"
+      - "Contexto RF006: resolve 5/6 problemas identificados (credenciais, URLs, seletores, estados UI, timeouts)"
+
   - versao: "1.0"
     data: "2026-01-08"
     mudancas:

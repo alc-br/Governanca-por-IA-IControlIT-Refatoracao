@@ -2,9 +2,9 @@
 
 # 📐 Convenções Técnicas do Projeto IControlIT
 
-> **Versão:** 1.1  
-> **Data:** 2025-12-20  
-> **Status:** Vigente  
+> **Versão:** 1.2
+> **Data:** 2026-01-10
+> **Status:** Vigente
 > **Aplicação:** Obrigatória para todo código novo; progressiva para código legado
 
 ---
@@ -23,12 +23,13 @@
 
 1. [Estrutura de Pastas e Organização](#1-estrutura-de-pastas-e-organização)
 2. [Convenções de Nomenclatura](#2-convenções-de-nomenclatura)
-3. [Convenções de Camadas](#3-convenções-de-camadas)
-4. [Padrões de Código](#4-padrões-de-código)
-5. [Convenções de Testes](#5-convenções-de-testes)
-6. [Convenções de Commits e Versionamento](#6-convenções-de-commits-e-versionamento)
-7. [Convenções de Documentação](#7-convenções-de-documentação)
-8. [Checklist de Conformidade](#8-checklist-de-conformidade)
+3. [Nomenclatura de Data-test Attributes (Test-First)](#3-nomenclatura-de-data-test-attributes-test-first) **✨ NOVO**
+4. [Convenções de Camadas](#4-convenções-de-camadas)
+5. [Padrões de Código](#5-padrões-de-código)
+6. [Convenções de Testes](#6-convenções-de-testes)
+7. [Convenções de Commits e Versionamento](#7-convenções-de-commits-e-versionamento)
+8. [Convenções de Documentação](#8-convenções-de-documentação)
+9. [Checklist de Conformidade](#9-checklist-de-conformidade)
 
 ---
 
@@ -381,9 +382,925 @@ Toda tabela de negócio deve ter:
 
 ---
 
-## 3. Convenções de Camadas
+## 3. Nomenclatura de Data-test Attributes (Test-First) **✨ NOVO**
 
-### 3.1 Responsabilidades por Camada
+**Versão:** 1.0
+**Data:** 2026-01-09
+**Contexto:** Criado após análise do RF006 onde falta de padronização resultou em 32 falhas E2E por seletores não encontrados.
+
+### 3.1. Princípio Fundamental
+
+**Data-test attributes são OBRIGATÓRIOS para TODOS os elementos interativos.**
+
+Este não é um princípio aspiracional. É uma **regra obrigatória** com **bloqueios automáticos**.
+
+**Referência:** `CLAUDE.md` seção 18 "ALINHAMENTO OBRIGATÓRIO COM TESTES"
+
+---
+
+### 3.2. Formato Padrão (OBRIGATÓRIO)
+
+#### 🔴 REGRA: Nomenclatura de Data-test
+
+**Formato:** `RFXXX-[acao]-[alvo]`
+
+**Componentes:**
+- `RFXXX`: Identificador do Requisito Funcional (ex: RF006, RF012)
+- `[acao]`: Verbo que descreve a ação (criar, editar, excluir, salvar, cancelar, listar, filtrar)
+- `[alvo]`: Substantivo que identifica o elemento de negócio (cliente, usuario, ativo, contrato)
+
+**Características obrigatórias:**
+- Tudo em **minúsculas**
+- Separação por **hífen** (`-`)
+- **Sem acentos** ou caracteres especiais
+- **Sem espaços**
+- **Prefixo RF obrigatório** para elementos de ação
+- **Sem prefixo RF** para estados de UI reutilizáveis (loading, empty, error)
+
+---
+
+### 3.3. Elementos que DEVEM ter Data-test
+
+#### 🔴 OBRIGATÓRIO: Botões de Ação
+
+**Padrão:** `RFXXX-[acao]-[alvo]`
+
+| Tipo de Botão | Padrão | Exemplo |
+|---------------|--------|---------|
+| Criar novo registro | `RFXXX-criar-[entidade]` | `RF006-criar-cliente` |
+| Editar registro existente | `RFXXX-editar-[entidade]` | `RF006-editar-cliente` |
+| Excluir registro | `RFXXX-excluir-[entidade]` | `RF006-excluir-cliente` |
+| Salvar formulário | `RFXXX-salvar-[entidade]` | `RF006-salvar-cliente` |
+| Cancelar operação | `RFXXX-cancelar-[contexto]` | `RF006-cancelar-edicao` |
+| Buscar/Filtrar | `RFXXX-filtrar-[entidade]` | `RF006-filtrar-cliente` |
+| Limpar filtros | `RFXXX-limpar-filtros` | `RF006-limpar-filtros` |
+
+**Exemplo HTML:**
+```html
+<!-- ✅ CORRETO -->
+<button mat-raised-button data-test="RF006-criar-cliente" (click)="criarCliente()">
+  Novo Cliente
+</button>
+
+<button mat-icon-button data-test="RF006-editar-cliente" (click)="editarCliente(cliente.id)">
+  <mat-icon>edit</mat-icon>
+</button>
+
+<!-- ❌ INCORRETO (sem data-test) -->
+<button mat-raised-button (click)="criarCliente()">
+  Novo Cliente
+</button>
+
+<!-- ❌ INCORRETO (nomenclatura inconsistente) -->
+<button mat-raised-button data-test="btn-novo-cliente" (click)="criarCliente()">
+  Novo Cliente
+</button>
+```
+
+---
+
+#### 🔴 OBRIGATÓRIO: Campos de Formulário
+
+**Padrão:** `RFXXX-input-[nome-campo]`
+
+| Tipo de Campo | Padrão | Exemplo |
+|---------------|--------|---------|
+| Input text | `RFXXX-input-[campo]` | `RF006-input-razaosocial` |
+| Input number | `RFXXX-input-[campo]` | `RF006-input-valor` |
+| Input email | `RFXXX-input-[campo]` | `RF006-input-email` |
+| Select/Dropdown | `RFXXX-select-[campo]` | `RF006-select-tipopessoa` |
+| Textarea | `RFXXX-textarea-[campo]` | `RF006-textarea-observacoes` |
+| Checkbox | `RFXXX-checkbox-[campo]` | `RF006-checkbox-ativo` |
+| Radio button | `RFXXX-radio-[campo]` | `RF006-radio-tipopagamento` |
+| Date picker | `RFXXX-datepicker-[campo]` | `RF006-datepicker-datainicio` |
+
+**Exemplo HTML (Angular + PrimeNG):**
+```html
+<!-- ✅ CORRETO -->
+<input
+  pInputText
+  data-test="RF006-input-razaosocial"
+  formControlName="razaoSocial"
+  placeholder="Razão Social"
+/>
+
+<p-dropdown
+  data-test="RF006-select-tipopessoa"
+  formControlName="tipoPessoa"
+  [options]="tiposPessoa"
+></p-dropdown>
+
+<!-- ❌ INCORRETO (sem data-test) -->
+<input pInputText formControlName="razaoSocial" />
+
+<!-- ❌ INCORRETO (nomenclatura inconsistente) -->
+<input pInputText data-test="input-razao" formControlName="razaoSocial" />
+```
+
+---
+
+#### 🔴 OBRIGATÓRIO: Mensagens de Erro de Validação
+
+**Padrão:** `RFXXX-input-[campo]-error`
+
+| Tipo | Padrão | Exemplo |
+|------|--------|---------|
+| Erro de campo obrigatório | `RFXXX-input-[campo]-error` | `RF006-input-razaosocial-error` |
+| Erro de formato (email, CPF) | `RFXXX-input-[campo]-error` | `RF006-input-email-error` |
+| Erro de tamanho (maxlength) | `RFXXX-input-[campo]-error` | `RF006-input-cnpj-error` |
+
+**Exemplo HTML (Angular Material):**
+```html
+<!-- ✅ CORRETO -->
+<mat-form-field>
+  <input matInput data-test="RF006-input-email" formControlName="email" />
+  <mat-error data-test="RF006-input-email-error">
+    {{ getErrorMessage('email') }}
+  </mat-error>
+</mat-form-field>
+
+<!-- ❌ INCORRETO (sem data-test no mat-error) -->
+<mat-form-field>
+  <input matInput data-test="RF006-input-email" formControlName="email" />
+  <mat-error>{{ getErrorMessage('email') }}</mat-error>
+</mat-form-field>
+```
+
+---
+
+#### 🔴 OBRIGATÓRIO: Tabelas e Listas
+
+**Padrão:**
+- Container: `[entidade]-list` (sem prefixo RF)
+- Linha/Item: `[entidade]-row` (sem prefixo RF)
+- Ações da linha: `RFXXX-[acao]-[entidade]` (com prefixo RF)
+
+| Elemento | Padrão | Exemplo |
+|----------|--------|---------|
+| Container da lista | `[entidade]-list` | `clientes-list` |
+| Linha/Item da lista | `[entidade]-row` | `cliente-row` |
+| Botão editar (linha) | `RFXXX-editar-[entidade]` | `RF006-editar-cliente` |
+| Botão excluir (linha) | `RFXXX-excluir-[entidade]` | `RF006-excluir-cliente` |
+
+**Exemplo HTML (PrimeNG Table):**
+```html
+<!-- ✅ CORRETO -->
+<p-table data-test="clientes-list" [value]="clientes">
+  <ng-template pTemplate="body" let-cliente>
+    <tr data-test="cliente-row">
+      <td>{{ cliente.razaoSocial }}</td>
+      <td>
+        <button
+          mat-icon-button
+          data-test="RF006-editar-cliente"
+          (click)="editar(cliente)"
+        >
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button
+          mat-icon-button
+          data-test="RF006-excluir-cliente"
+          (click)="excluir(cliente)"
+        >
+          <mat-icon>delete</mat-icon>
+        </button>
+      </td>
+    </tr>
+  </ng-template>
+</p-table>
+
+<!-- ❌ INCORRETO (sem data-test) -->
+<p-table [value]="clientes">
+  <ng-template pTemplate="body" let-cliente>
+    <tr>
+      <td>{{ cliente.razaoSocial }}</td>
+    </tr>
+  </ng-template>
+</p-table>
+```
+
+---
+
+#### 🔴 OBRIGATÓRIO: Estados de UI (Reutilizáveis)
+
+**Padrão:** `[estado]` (SEM prefixo RF, pois são reutilizáveis)
+
+| Estado | Data-test | Descrição |
+|--------|-----------|-----------|
+| Loading/Spinner | `loading-spinner` | Spinner exibido durante carregamento |
+| Lista vazia | `empty-state` | Mensagem quando lista está vazia |
+| Erro ao carregar | `error-message` | Mensagem de erro ao carregar dados |
+| Sem resultados (filtro) | `no-results` | Mensagem quando filtro não retorna resultados |
+
+**Exemplo HTML:**
+```html
+<!-- ✅ CORRETO -->
+<div *ngIf="isLoading" data-test="loading-spinner">
+  <mat-spinner></mat-spinner>
+</div>
+
+<div *ngIf="clientes.length === 0 && !isLoading" data-test="empty-state">
+  <p>Nenhum cliente encontrado.</p>
+</div>
+
+<div *ngIf="hasError" data-test="error-message">
+  <p>Erro ao carregar clientes.</p>
+</div>
+
+<!-- ❌ INCORRETO (sem data-test) -->
+<div *ngIf="isLoading">
+  <mat-spinner></mat-spinner>
+</div>
+```
+
+---
+
+#### 🔴 OBRIGATÓRIO: Dialogs/Modais
+
+**Padrão:**
+- Container: `RFXXX-dialog-[contexto]`
+- Botões: `RFXXX-dialog-[acao]`
+
+| Elemento | Padrão | Exemplo |
+|----------|--------|---------|
+| Container do dialog | `RFXXX-dialog-[contexto]` | `RF006-dialog-confirmar-exclusao` |
+| Botão confirmar | `RFXXX-dialog-confirmar` | `RF006-dialog-confirmar` |
+| Botão cancelar | `RFXXX-dialog-cancelar` | `RF006-dialog-cancelar` |
+
+**Exemplo HTML (Angular Material Dialog):**
+```html
+<!-- ✅ CORRETO -->
+<div mat-dialog-content data-test="RF006-dialog-confirmar-exclusao">
+  <p>Tem certeza que deseja excluir este cliente?</p>
+</div>
+<div mat-dialog-actions>
+  <button
+    mat-button
+    data-test="RF006-dialog-cancelar"
+    (click)="onCancel()"
+  >
+    Cancelar
+  </button>
+  <button
+    mat-raised-button
+    color="warn"
+    data-test="RF006-dialog-confirmar"
+    (click)="onConfirm()"
+  >
+    Confirmar
+  </button>
+</div>
+
+<!-- ❌ INCORRETO (sem data-test) -->
+<div mat-dialog-content>
+  <p>Tem certeza?</p>
+</div>
+```
+
+---
+
+### 3.4. Casos Especiais
+
+#### Aliases (Compatibilidade Retroativa)
+
+**Permitido:** Adicionar aliases para compatibilidade com implementações existentes.
+
+**Como documentar no UC:**
+```yaml
+passos:
+  - numero: 3
+    acao: "Clicar em 'Novo Cliente'"
+    elemento:
+      tipo: button
+      data_test: "RF006-criar-cliente"
+      aliases: ["btn-novo-cliente", "criar-cliente"]  # ✅ Aliases permitidos
+      localizacao: "clientes.component.html linha 42"
+```
+
+**Exemplo HTML:**
+```html
+<!-- ✅ CORRETO (data-test principal + alias) -->
+<button
+  mat-raised-button
+  data-test="RF006-criar-cliente"
+  id="btn-novo-cliente"
+  (click)="criarCliente()"
+>
+  Novo Cliente
+</button>
+```
+
+---
+
+#### Elementos Dinâmicos (Loop)
+
+**Padrão:** Data-test base + índice/id
+
+| Tipo | Padrão | Exemplo |
+|------|--------|---------|
+| Linha de tabela (por índice) | `[entidade]-row` | `cliente-row` (Playwright usa nth-child) |
+| Botão editar (por linha) | `RFXXX-editar-[entidade]` | `RF006-editar-cliente` (Playwright filtra por row) |
+
+**Exemplo HTML:**
+```html
+<!-- ✅ CORRETO -->
+<tr *ngFor="let cliente of clientes; let i = index" data-test="cliente-row">
+  <td>{{ cliente.razaoSocial }}</td>
+  <td>
+    <button
+      mat-icon-button
+      data-test="RF006-editar-cliente"
+      (click)="editar(cliente)"
+    >
+      <mat-icon>edit</mat-icon>
+    </button>
+  </td>
+</tr>
+```
+
+**Uso no Playwright:**
+```typescript
+// Editar o primeiro cliente
+await page.locator('[data-test="cliente-row"]').first()
+  .locator('[data-test="RF006-editar-cliente"]').click();
+
+// Editar o terceiro cliente
+await page.locator('[data-test="cliente-row"]').nth(2)
+  .locator('[data-test="RF006-editar-cliente"]').click();
+```
+
+---
+
+### 3.5. Validação de Nomenclatura
+
+#### 🔴 OBRIGATÓRIO: Script de Auditoria
+
+**Comando:**
+```bash
+npm run audit-data-test RFXXX
+```
+
+**O que valida:**
+1. TODOS os data-test de `UC-RFXXX.yaml` estão presentes no HTML
+2. Nomenclatura segue padrão `RFXXX-[acao]-[alvo]`
+3. Estados de UI (loading, empty, error) estão presentes
+4. Campos de formulário possuem data-test
+5. Mensagens de erro possuem data-test
+
+**Exit codes:**
+- `0`: Auditoria PASSOU (100% de cobertura)
+- `1`: Auditoria FALHOU (data-test ausentes ou inconsistentes)
+
+**Bloqueio:**
+- Se exit code = 1 → ❌ Frontend REPROVADO (não pode prosseguir para testes E2E)
+
+**Referência:** `CLAUDE.md` seção 18.2.2 "Bloqueios Obrigatórios"
+
+---
+
+### 3.6. Integração com Testes E2E (Playwright)
+
+#### Como UC → TC → MT → E2E se conectam
+
+**Fluxo de rastreabilidade:**
+
+1. **UC-RFXXX.yaml** especifica data-test:
+```yaml
+passos:
+  - numero: 3
+    acao: "Clicar em 'Novo Cliente'"
+    elemento:
+      tipo: button
+      data_test: "RF006-criar-cliente"
+```
+
+2. **TC-RFXXX.yaml** especifica seletor E2E:
+```yaml
+passos:
+  - numero: 3
+    descricao: "Clicar em 'Novo Cliente'"
+    seletor: "[data-test='RF006-criar-cliente']"
+    acao_e2e: "page.click('[data-test=\"RF006-criar-cliente\"]')"
+```
+
+3. **MT-RFXXX.data.ts** centraliza seletores:
+```typescript
+export const DATA_TEST_SELECTORS = {
+  btnNovoCliente: 'RF006-criar-cliente',
+  inputRazaoSocial: 'RF006-input-razaosocial',
+  loadingSpinner: 'loading-spinner'
+};
+```
+
+4. **Teste E2E (Playwright)** usa seletores de MT:
+```typescript
+import { DATA_TEST_SELECTORS } from './MT-RF006.data';
+
+test('deve criar cliente com sucesso', async ({ page }) => {
+  await page.click(`[data-test="${DATA_TEST_SELECTORS.btnNovoCliente}"]`);
+  await page.fill(`[data-test="${DATA_TEST_SELECTORS.inputRazaoSocial}"]`, 'Empresa Teste');
+  // ...
+});
+```
+
+---
+
+### 3.7. Exemplos Completos por Cenário
+
+#### Cenário 1: Listagem com CRUD
+
+```html
+<!-- Container da lista -->
+<div>
+  <!-- Botão criar (topo) -->
+  <button
+    mat-raised-button
+    data-test="RF006-criar-cliente"
+    (click)="criarCliente()"
+  >
+    Novo Cliente
+  </button>
+
+  <!-- Estados de UI -->
+  <div *ngIf="isLoading" data-test="loading-spinner">
+    <mat-spinner></mat-spinner>
+  </div>
+
+  <div *ngIf="clientes.length === 0 && !isLoading" data-test="empty-state">
+    <p>Nenhum cliente encontrado.</p>
+  </div>
+
+  <div *ngIf="hasError" data-test="error-message">
+    <p>Erro ao carregar clientes.</p>
+  </div>
+
+  <!-- Tabela -->
+  <p-table data-test="clientes-list" [value]="clientes">
+    <ng-template pTemplate="body" let-cliente>
+      <tr data-test="cliente-row">
+        <td>{{ cliente.razaoSocial }}</td>
+        <td>
+          <button
+            mat-icon-button
+            data-test="RF006-editar-cliente"
+            (click)="editar(cliente)"
+          >
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button
+            mat-icon-button
+            data-test="RF006-excluir-cliente"
+            (click)="excluir(cliente)"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+</div>
+```
+
+---
+
+#### Cenário 2: Formulário Completo
+
+```html
+<form [formGroup]="clienteForm" data-test="RF006-form-cliente">
+  <!-- Campo 1: Razão Social -->
+  <mat-form-field>
+    <input
+      matInput
+      data-test="RF006-input-razaosocial"
+      formControlName="razaoSocial"
+      placeholder="Razão Social"
+    />
+    <mat-error data-test="RF006-input-razaosocial-error">
+      {{ getErrorMessage('razaoSocial') }}
+    </mat-error>
+  </mat-form-field>
+
+  <!-- Campo 2: CNPJ -->
+  <mat-form-field>
+    <input
+      matInput
+      data-test="RF006-input-cnpj"
+      formControlName="cnpj"
+      placeholder="CNPJ"
+    />
+    <mat-error data-test="RF006-input-cnpj-error">
+      {{ getErrorMessage('cnpj') }}
+    </mat-error>
+  </mat-form-field>
+
+  <!-- Campo 3: Tipo Pessoa (Select) -->
+  <mat-form-field>
+    <mat-select
+      data-test="RF006-select-tipopessoa"
+      formControlName="tipoPessoa"
+      placeholder="Tipo Pessoa"
+    >
+      <mat-option value="F">Física</mat-option>
+      <mat-option value="J">Jurídica</mat-option>
+    </mat-select>
+    <mat-error data-test="RF006-select-tipopessoa-error">
+      {{ getErrorMessage('tipoPessoa') }}
+    </mat-error>
+  </mat-form-field>
+
+  <!-- Ações do formulário -->
+  <div>
+    <button
+      mat-button
+      data-test="RF006-cancelar-edicao"
+      (click)="cancelar()"
+    >
+      Cancelar
+    </button>
+    <button
+      mat-raised-button
+      color="primary"
+      data-test="RF006-salvar-cliente"
+      (click)="salvar()"
+      [disabled]="!clienteForm.valid"
+    >
+      Salvar
+    </button>
+  </div>
+</form>
+```
+
+---
+
+### 3.8. Checklist de Conformidade
+
+Antes de marcar frontend como concluído, verificar:
+
+- [ ] TODOS os botões de ação possuem data-test no formato `RFXXX-[acao]-[alvo]`
+- [ ] TODOS os campos de formulário possuem data-test no formato `RFXXX-input-[campo]`
+- [ ] TODAS as mensagens de erro possuem data-test no formato `RFXXX-input-[campo]-error`
+- [ ] Container de tabela possui data-test `[entidade]-list`
+- [ ] Linhas de tabela possuem data-test `[entidade]-row`
+- [ ] Estados de UI (loading, empty, error) possuem data-test sem prefixo RF
+- [ ] Dialogs possuem data-test `RFXXX-dialog-[contexto]`
+- [ ] Script de auditoria executado: `npm run audit-data-test RFXXX`
+- [ ] Exit code da auditoria = 0 (100% cobertura)
+- [ ] Nomenclatura é consistente com `UC-RFXXX.yaml`
+
+**SE qualquer item FALHAR:**
+- ❌ Frontend REPROVADO
+- ❌ Adicionar data-test ausentes
+- ❌ Corrigir nomenclatura inconsistente
+- ❌ Re-executar auditoria até exit code = 0
+
+---
+
+### 3.9. Referências Relacionadas
+
+| Documento | Seção | Descrição |
+|-----------|-------|-----------|
+| `CLAUDE.md` | 18 | Alinhamento Obrigatório com Testes |
+| `CHECKLIST-IMPLEMENTACAO-E2E.md` | 2.1 | Checklist de Data-test Attributes |
+| `frontend.yaml` (validação) | data_test_attributes | Validação de data-test (28 itens) |
+| `pre-execucao.yaml` | sincronizacao_mt | Auditoria de data-test obrigatória |
+| `UC-TEMPLATE.yaml` | passos.elemento.data_test | Especificação de data-test em UC |
+| `MT-TEMPLATE.data.ts` | DATA_TEST_SELECTORS | Centralização de seletores E2E |
+
+---
+
+### 3.10. Padrões de Seletores Angular Material **✨ NOVO**
+
+**Versão:** 1.0
+**Data:** 2026-01-10
+**Contexto:** Criado após análise do RF006 onde 4 problemas (8%) foram causados por seletores incorretos para componentes Angular Material.
+
+#### Problema Identificado (RF006)
+
+Durante testes E2E, identificamos falhas por uso de seletores CSS genéricos que não funcionam corretamente com Angular Material:
+
+**❌ INCORRETO:**
+```typescript
+// Tenta clicar no mat-select mas clica no wrapper
+await page.click('mat-select');  // FALHA
+
+// Tenta preencher input Material mas pega elemento interno
+await page.fill('input', 'valor');  // FALHA intermitente
+```
+
+**✅ CORRETO:**
+```typescript
+// Usa data-test que aponta para o elemento clicável correto
+await page.click('[data-test="RF006-select-tipopessoa"]');
+
+// Usa data-test que aponta para o input correto
+await page.fill('[data-test="RF006-input-razaosocial"]', 'valor');
+```
+
+---
+
+#### 🔴 OBRIGATÓRIO: Seletores para Componentes Material
+
+| Componente Material | Elemento que recebe data-test | Exemplo HTML | Seletor Playwright |
+|---------------------|-------------------------------|--------------|-------------------|
+| `<mat-form-field>` + `<input>` | `<input matInput>` | `<input matInput data-test="RF006-input-email">` | `[data-test="RF006-input-email"]` |
+| `<mat-select>` | `<mat-select>` | `<mat-select data-test="RF006-select-tipo">` | `[data-test="RF006-select-tipo"]` |
+| `<mat-option>` (dentro de select) | `<mat-option>` | `<mat-option value="F" data-test="RF006-option-fisica">` | `[data-test="RF006-option-fisica"]` |
+| `<mat-checkbox>` | `<mat-checkbox>` | `<mat-checkbox data-test="RF006-checkbox-ativo">` | `[data-test="RF006-checkbox-ativo"]` |
+| `<mat-radio-button>` | `<mat-radio-button>` | `<mat-radio-button data-test="RF006-radio-sim">` | `[data-test="RF006-radio-sim"]` |
+| `<mat-datepicker>` | `<input matInput>` (trigger) | `<input matInput data-test="RF006-datepicker-inicio">` | `[data-test="RF006-datepicker-inicio"]` |
+| `<mat-error>` | `<mat-error>` | `<mat-error data-test="RF006-input-email-error">` | `[data-test="RF006-input-email-error"]` |
+| `<button mat-button>` | `<button>` | `<button mat-button data-test="RF006-cancelar">` | `[data-test="RF006-cancelar"]` |
+| `<button mat-raised-button>` | `<button>` | `<button mat-raised-button data-test="RF006-salvar">` | `[data-test="RF006-salvar"]` |
+| `<button mat-icon-button>` | `<button>` | `<button mat-icon-button data-test="RF006-editar">` | `[data-test="RF006-editar"]` |
+| `<mat-dialog-content>` | `<div mat-dialog-content>` | `<div mat-dialog-content data-test="RF006-dialog-confirmar">` | `[data-test="RF006-dialog-confirmar"]` |
+| `<mat-spinner>` | Wrapper do spinner | `<div *ngIf="isLoading" data-test="loading-spinner">` | `[data-test="loading-spinner"]` |
+| `<mat-progress-bar>` | `<mat-progress-bar>` | `<mat-progress-bar data-test="progress-upload">` | `[data-test="progress-upload"]` |
+| `<mat-slide-toggle>` | `<mat-slide-toggle>` | `<mat-slide-toggle data-test="RF006-toggle-notificacoes">` | `[data-test="RF006-toggle-notificacoes"]` |
+
+---
+
+#### Exemplos Corretos por Componente
+
+##### mat-select (Dropdown)
+
+```html
+<!-- ✅ CORRETO -->
+<mat-form-field>
+  <mat-label>Tipo de Pessoa</mat-label>
+  <mat-select
+    data-test="RF006-select-tipopessoa"
+    formControlName="tipoPessoa"
+  >
+    <mat-option value="F" data-test="RF006-option-fisica">Física</mat-option>
+    <mat-option value="J" data-test="RF006-option-juridica">Jurídica</mat-option>
+  </mat-select>
+  <mat-error data-test="RF006-select-tipopessoa-error">
+    {{ getErrorMessage('tipoPessoa') }}
+  </mat-error>
+</mat-form-field>
+```
+
+**Uso no Playwright:**
+```typescript
+// Abrir o dropdown
+await page.click('[data-test="RF006-select-tipopessoa"]');
+
+// Selecionar opção
+await page.click('[data-test="RF006-option-juridica"]');
+
+// Verificar erro
+await expect(page.locator('[data-test="RF006-select-tipopessoa-error"]'))
+  .toBeVisible();
+```
+
+---
+
+##### mat-datepicker (Data)
+
+```html
+<!-- ✅ CORRETO -->
+<mat-form-field>
+  <mat-label>Data de Início</mat-label>
+  <input
+    matInput
+    [matDatepicker]="picker"
+    data-test="RF006-datepicker-datainicio"
+    formControlName="dataInicio"
+  />
+  <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+  <mat-datepicker #picker></mat-datepicker>
+  <mat-error data-test="RF006-datepicker-datainicio-error">
+    {{ getErrorMessage('dataInicio') }}
+  </mat-error>
+</mat-form-field>
+```
+
+**Uso no Playwright:**
+```typescript
+// Preencher data diretamente
+await page.fill('[data-test="RF006-datepicker-datainicio"]', '01/01/2024');
+
+// OU: Clicar no toggle e selecionar data no calendário
+await page.click('[data-test="RF006-datepicker-datainicio"]');
+// (Material abre o calendário automaticamente)
+await page.click('.mat-calendar-body-cell[aria-label="1 janeiro 2024"]');
+```
+
+---
+
+##### mat-checkbox (Checkbox)
+
+```html
+<!-- ✅ CORRETO -->
+<mat-checkbox
+  data-test="RF006-checkbox-ativo"
+  formControlName="ativo"
+>
+  Ativo
+</mat-checkbox>
+```
+
+**Uso no Playwright:**
+```typescript
+// Marcar checkbox
+await page.click('[data-test="RF006-checkbox-ativo"]');
+
+// Verificar estado
+const isChecked = await page.locator('[data-test="RF006-checkbox-ativo"]')
+  .locator('input[type="checkbox"]').isChecked();
+```
+
+---
+
+##### mat-radio-button (Radio)
+
+```html
+<!-- ✅ CORRETO -->
+<mat-radio-group formControlName="tipoPagamento">
+  <mat-radio-button value="PIX" data-test="RF006-radio-pix">
+    PIX
+  </mat-radio-button>
+  <mat-radio-button value="BOLETO" data-test="RF006-radio-boleto">
+    Boleto
+  </mat-radio-button>
+  <mat-radio-button value="CARTAO" data-test="RF006-radio-cartao">
+    Cartão
+  </mat-radio-button>
+</mat-radio-group>
+```
+
+**Uso no Playwright:**
+```typescript
+// Selecionar opção
+await page.click('[data-test="RF006-radio-boleto"]');
+
+// Verificar seleção
+const isSelected = await page.locator('[data-test="RF006-radio-boleto"]')
+  .locator('input[type="radio"]').isChecked();
+```
+
+---
+
+##### mat-dialog (Dialog/Modal)
+
+```html
+<!-- ✅ CORRETO -->
+<h2 mat-dialog-title>Confirmar Exclusão</h2>
+<div mat-dialog-content data-test="RF006-dialog-confirmar-exclusao">
+  <p>Tem certeza que deseja excluir este cliente?</p>
+  <p><strong>{{ cliente.razaoSocial }}</strong></p>
+</div>
+<div mat-dialog-actions>
+  <button
+    mat-button
+    data-test="RF006-dialog-cancelar"
+    (click)="onCancel()"
+  >
+    Cancelar
+  </button>
+  <button
+    mat-raised-button
+    color="warn"
+    data-test="RF006-dialog-confirmar"
+    (click)="onConfirm()"
+  >
+    Confirmar
+  </button>
+</div>
+```
+
+**Uso no Playwright:**
+```typescript
+import { waitForDialogToOpen, dialogFlow } from '../helpers';
+
+// Fluxo completo de dialog
+await dialogFlow(
+  page,
+  'RF006-excluir-cliente',      // botão que abre
+  'RF006-dialog-confirmar-exclusao',  // container do dialog
+  async (page) => {
+    // Ações dentro do dialog
+    await page.click('[data-test="RF006-dialog-confirmar"]');
+  }
+);
+```
+
+---
+
+##### mat-spinner (Loading)
+
+```html
+<!-- ✅ CORRETO -->
+<div *ngIf="isLoading" data-test="loading-spinner" class="loading-container">
+  <mat-spinner diameter="50"></mat-spinner>
+  <p>Carregando...</p>
+</div>
+```
+
+**Uso no Playwright:**
+```typescript
+import { waitForNoBackdrop } from '../helpers';
+
+// Aguardar spinner desaparecer
+await page.waitForSelector('[data-test="loading-spinner"]', {
+  state: 'detached',
+  timeout: 30000
+});
+
+// OU: Usar helper específico
+await waitForNoBackdrop(page, 30000);
+```
+
+---
+
+#### 🔴 PROIBIDO: Seletores CSS Genéricos para Material
+
+**Não use:**
+```typescript
+// ❌ INCORRETO - seletor CSS genérico não funciona com Material
+await page.click('mat-select');           // Clica no wrapper, não no trigger
+await page.fill('input', 'valor');        // Pode pegar input interno do Material
+await page.click('button');               // Ambíguo, pode clicar no botão errado
+await page.click('.mat-raised-button');   // Classe interna do Material, instável
+await page.click('mat-option');           // Sem contexto, pode clicar na opção errada
+```
+
+**Use data-test:**
+```typescript
+// ✅ CORRETO - seletor por data-test é estável
+await page.click('[data-test="RF006-select-tipopessoa"]');
+await page.fill('[data-test="RF006-input-razaosocial"]', 'valor');
+await page.click('[data-test="RF006-salvar-cliente"]');
+await page.click('[data-test="RF006-option-juridica"]');
+```
+
+---
+
+#### Razões para Evitar Seletores CSS Genéricos
+
+1. **Estrutura DOM complexa:** Material envolve elementos em múltiplos wrappers (`mat-form-field`, `mat-select-trigger`, etc.)
+2. **Classes CSS dinâmicas:** Classes internas do Material podem mudar entre versões
+3. **Shadow DOM (futuro):** Material pode migrar para Shadow DOM, quebrando seletores CSS
+4. **Ambiguidade:** Múltiplos `<input>` ou `<button>` na mesma página
+5. **Manutenibilidade:** data-test é explícito e rastreável até UC/TC
+
+---
+
+#### Checklist de Conformidade (Material)
+
+Antes de marcar frontend Material como concluído:
+
+- [ ] TODOS os `<mat-select>` possuem data-test
+- [ ] TODAS as `<mat-option>` dentro de selects críticos possuem data-test
+- [ ] TODOS os `<input matInput>` possuem data-test
+- [ ] TODOS os `<mat-checkbox>` possuem data-test
+- [ ] TODOS os `<mat-radio-button>` possuem data-test
+- [ ] TODOS os `<mat-datepicker>` (input trigger) possuem data-test
+- [ ] TODOS os `<mat-error>` possuem data-test
+- [ ] TODOS os `<mat-dialog-content>` possuem data-test
+- [ ] TODOS os `<mat-spinner>` possuem wrapper com data-test
+- [ ] Nenhum teste E2E usa seletores CSS genéricos (`mat-select`, `input`, `button`)
+- [ ] Testes E2E usam helpers de dialog (`waitForDialogToOpen`, `dialogFlow`)
+
+**SE qualquer item FALHAR:**
+- ❌ Frontend REPROVADO
+- ❌ Adicionar data-test ausentes em componentes Material
+- ❌ Refatorar testes E2E que usam seletores CSS genéricos
+
+---
+
+#### Referências Relacionadas
+
+| Documento | Seção | Descrição |
+|-----------|-------|-----------|
+| `D:\IC2\frontend\icontrolit-app\e2e\helpers\dialog-helpers.ts` | `waitForDialogToOpen`, `dialogFlow` | Helpers para dialogs Material |
+| `ANALISE-GAPS-GOVERNANCA-RF006-COMPLETA.md` | GAP 4 | Problema de seletores Material (4 problemas, 8%) |
+| `frontend-adequacao.md` | FASE 6.5 | Data-test attributes obrigatórios |
+
+---
+
+### 3.11. Changelog
+
+#### v1.1 (2026-01-10)
+- Adicionada subseção 3.10 "Padrões de Seletores Angular Material"
+- Tabela de referência rápida para 13 componentes Material
+- Exemplos corretos e incorretos para cada componente
+- Checklist de conformidade específico para Material
+- Contexto do RF006: GAP 4 resolvido (4 problemas, 8%)
+
+#### v1.0 (2026-01-09)
+- Criação da seção dedicada a nomenclatura de data-test attributes
+- Definição de formato padrão obrigatório: `RFXXX-[acao]-[alvo]`
+- Exemplos completos para todos os tipos de elementos (botões, campos, tabelas, estados UI)
+- Integração com auditoria automática (`npm run audit-data-test`)
+- Referências cruzadas com CLAUDE.md seção 18
+- Alinhamento com governança de testes (Sprint 5)
+
+---
+
+## 4. Convenções de Camadas
+
+### 4.1 Responsabilidades por Camada
 
 #### 🔴 OBRIGATÓRIO: Domain
 
@@ -1703,6 +2620,7 @@ export interface Empresa {
 
 | Versão | Data | Autor | Descrição |
 |--------|------|-------|-----------|
+| 1.2 | 2026-01-09 | Arquitetura | Adicionada seção 3 (Nomenclatura de Data-test Attributes - Test-First) - 591 linhas com padrões obrigatórios RFXXX-[acao]-[alvo], exemplos completos para botões/campos/tabelas/estados UI, integração Playwright, checklist conformidade, auditoria automática npm run audit-data-test |
 | 1.1 | 2025-12-20 | Arquitetura | Adicionada seção 7.5 (Documentação de RFs) e 7.6 (Relacionamento) |
 | 1.0 | 2025-12-20 | Arquitetura | Versão inicial |
 

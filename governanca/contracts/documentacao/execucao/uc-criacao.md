@@ -635,6 +635,403 @@ Esta fase AUMENTA automaticamente a cobertura de UC ao detectar:
 
 ---
 
+### Fase 3.6: Especificações de Teste (NOVO - OBRIGATÓRIO)
+
+**Este passo é OBRIGATÓRIO. Sem ele, UC está INCOMPLETO.**
+
+Esta fase garante que o UC já contenha TODAS as especificações necessárias para testes E2E desde o início, eliminando gaps de alinhamento entre documentação e testes.
+
+---
+
+#### 3.6.1: Documentar Data-test Attributes
+
+**Para CADA passo do UC, o agente DEVE:**
+
+1. **Identificar elemento interativo:**
+   - Tipo: `button` | `input` | `select` | `dialog` | `table` | `list` | `textarea` | `checkbox` | `radio`
+
+2. **Definir data-test:**
+   - Padrão obrigatório: `RFXXX-[acao]-[alvo]`
+   - Exemplo: `RF006-criar-cliente`, `RF006-input-razaosocial`
+
+3. **Adicionar aliases (se necessário):**
+   - Para compatibilidade com implementações existentes
+   - Exemplo: `btn-novo-cliente`
+
+4. **Documentar localização esperada:**
+   - Arquivo: `[componente].component.html`
+   - Linha aproximada: `[XX]`
+
+**Formato no UC-RFXXX.yaml:**
+
+```yaml
+passos:
+  - numero: 1
+    acao: "Usuário clica no botão 'Novo Cliente'"
+    elemento:
+      tipo: button
+      data_test: "RF006-criar-cliente"
+      aliases: ["btn-novo-cliente"]
+      localizacao: "clientes-list.component.html linha 45"
+    resultado_esperado: "Sistema exibe formulário de criação"
+    validacao_e2e: "await expect(page.locator('[data-test=\"RF006-criar-cliente\"]')).toBeVisible()"
+```
+
+**Critério de aceite:**
+- ✅ TODOS os passos interativos possuem `elemento.data_test`
+- ✅ Nomenclatura segue padrão `RFXXX-[acao]-[alvo]`
+
+---
+
+#### 3.6.2: Documentar Estados de UI
+
+**O agente DEVE documentar os 3 estados obrigatórios:**
+
+1. **Loading (Carregamento):**
+   - Quando exibido: Durante carregamento de lista/dados
+   - data_test: `loading-spinner`
+   - Texto esperado (se aplicável)
+
+2. **Vazio (Empty State):**
+   - Quando exibido: Lista vazia ou sem resultados
+   - data_test: `empty-state`
+   - Texto esperado: `"Nenhum [entidade] encontrado"`
+
+3. **Erro (Error State):**
+   - Quando exibido: Falha ao carregar/processar
+   - data_test: `error-message`
+   - Texto esperado: `"Erro ao carregar [entidade]"`
+
+**Formato no UC-RFXXX.yaml:**
+
+```yaml
+estados_ui:
+  loading:
+    descricao: "Spinner exibido durante carregamento da lista de clientes"
+    data_test: "loading-spinner"
+    quando_exibido: "Durante carregamento inicial da lista"
+
+  vazio:
+    descricao: "Mensagem exibida quando não há clientes cadastrados"
+    data_test: "empty-state"
+    texto_esperado: "Nenhum cliente encontrado"
+    quando_exibido: "Quando lista está vazia ou filtro não retorna resultados"
+
+  erro:
+    descricao: "Mensagem exibida quando ocorre erro ao carregar clientes"
+    data_test: "error-message"
+    texto_esperado: "Erro ao carregar clientes"
+    quando_exibido: "Quando API retorna erro 500 ou timeout"
+```
+
+**Critério de aceite:**
+- ✅ Seção `estados_ui` completa com os 3 estados
+- ✅ Cada estado possui `data_test`, `quando_exibido` e `texto_esperado`
+
+---
+
+#### 3.6.3: Documentar URLs de Navegação
+
+**O agente DEVE especificar:**
+
+1. **URL completa da funcionalidade:**
+   - Formato: `http://localhost:4200/[rota-completa]`
+   - Exemplo: `http://localhost:4200/management/clientes`
+
+2. **Referenciar arquivo routing:**
+   - Caminho: `src/app/[caminho]/[arquivo]-routing.module.ts`
+   - Exemplo: `src/app/modules/cadastros/cadastros-routing.module.ts`
+
+3. **Breadcrumb (se aplicável):**
+   - Exemplo: `"Home > Cadastros > Clientes"`
+
+**Formato no UC-RFXXX.yaml:**
+
+```yaml
+navegacao:
+  url_completa: "http://localhost:4200/management/clientes"
+  referencia_routing: "src/app/modules/cadastros/cadastros-routing.module.ts"
+  breadcrumb: "Home > Cadastros > Clientes"
+```
+
+**Critério de aceite:**
+- ✅ Seção `navegacao` completa
+- ✅ URL completa especificada
+- ✅ Referência ao arquivo routing documentada
+
+---
+
+#### 3.6.4: Documentar Credenciais Necessárias
+
+**O agente DEVE especificar:**
+
+1. **Perfil de usuário necessário:**
+   - Admin | Developer | Usuario
+
+2. **Referência aos seeds do backend:**
+   - Arquivo: `backend/Infrastructure/Persistence/ApplicationDbContextInitialiser.cs`
+
+**Formato no UC-RFXXX.yaml:**
+
+```yaml
+credenciais:
+  referencia_seeds: "backend/Infrastructure/Persistence/ApplicationDbContextInitialiser.cs"
+  perfil_necessario: "Admin"
+```
+
+**Critério de aceite:**
+- ✅ Seção `credenciais` completa
+- ✅ Perfil necessário especificado (conforme permissões do RF)
+
+---
+
+#### 3.6.5: Documentar Tabelas/Listas (SE APLICÁVEL)
+
+**Se UC possui listagem de dados, o agente DEVE especificar:**
+
+1. **data_test do container:**
+   - Padrão: `[entidade]-list`
+   - Exemplo: `clientes-list`
+
+2. **data_test das linhas:**
+   - Padrão: `[entidade]-row`
+   - Exemplo: `cliente-row`
+
+3. **Colunas da tabela:**
+   - Nome, data_test, tipo, ordenável, filtrável
+
+4. **Ações de linha:**
+   - Editar, Excluir, Visualizar
+   - data_test de cada ação
+
+**Formato no UC-RFXXX.yaml:**
+
+```yaml
+tabela:
+  data_test_container: "clientes-list"
+  data_test_row: "cliente-row"
+
+  colunas:
+    - nome: "Razão Social"
+      data_test: "cliente-col-razaosocial"
+      tipo: texto
+      ordenavel: true
+      filtravel: true
+
+    - nome: "CNPJ"
+      data_test: "cliente-col-cnpj"
+      tipo: texto
+      ordenavel: true
+      filtravel: true
+
+  acoes_linha:
+    - acao: "Editar"
+      data_test: "RF006-editar-cliente"
+
+    - acao: "Excluir"
+      data_test: "RF006-excluir-cliente"
+
+  paginacao:
+    habilitada: true
+    data_test_anterior: "pagination-previous"
+    data_test_proximo: "pagination-next"
+    data_test_tamanho: "pagination-size"
+```
+
+**Critério de aceite:**
+- ✅ Se UC possui listagem → Seção `tabela` completa
+- ✅ Colunas e ações possuem data_test
+
+---
+
+#### 3.6.6: Documentar Formulários (SE APLICÁVEL)
+
+**Se UC possui formulário, o agente DEVE especificar:**
+
+1. **data_test do formulário:**
+   - Padrão: `RFXXX-form`
+   - Exemplo: `RF006-form`
+
+2. **Campos do formulário:**
+   - Nome, label, data_test, tipo, obrigatório, validações
+
+3. **Botões do formulário:**
+   - Salvar, Cancelar
+   - data_test de cada botão
+
+**Formato no UC-RFXXX.yaml:**
+
+```yaml
+formulario:
+  data_test_form: "RF006-form"
+
+  campos:
+    - nome: "razaoSocial"
+      label: "Razão Social"
+      data_test: "RF006-input-razaosocial"
+      tipo: text
+      obrigatorio: true
+      validacoes:
+        - tipo: "required"
+          mensagem_erro: "Razão Social é obrigatória"
+          data_test_erro: "RF006-input-razaosocial-error"
+
+    - nome: "cnpj"
+      label: "CNPJ"
+      data_test: "RF006-input-cnpj"
+      tipo: text
+      obrigatorio: true
+      validacoes:
+        - tipo: "required"
+          mensagem_erro: "CNPJ é obrigatório"
+          data_test_erro: "RF006-input-cnpj-error"
+        - tipo: "pattern"
+          mensagem_erro: "CNPJ inválido"
+          data_test_erro: "RF006-input-cnpj-error"
+
+  botoes:
+    - acao: "Salvar"
+      data_test: "RF006-salvar-cliente"
+      tipo: "submit"
+
+    - acao: "Cancelar"
+      data_test: "RF006-cancelar-cliente"
+      tipo: "button"
+```
+
+**Critério de aceite:**
+- ✅ Se UC possui formulário → Seção `formulario` completa
+- ✅ TODOS os campos possuem data_test
+- ✅ Validações possuem mensagens e data_test_erro
+
+---
+
+#### 3.6.7: Documentar Timeouts
+
+**O agente DEVE especificar:**
+
+1. **Performance esperada:**
+   - Tempo de carregamento máximo (navegação)
+   - Tempo de operação CRUD
+   - Timeout de APIs externas (se aplicável)
+
+2. **Timeouts E2E:**
+   - Navegação, loading spinner, dialog, operação CRUD
+
+**Formato no UC-RFXXX.yaml:**
+
+```yaml
+performance:
+  tempo_carregamento_maximo: 30000  # ms (30s padrão para listagens)
+  tempo_operacao_crud: 10000        # ms (10s padrão para criar/editar/excluir)
+  timeout_api_externa: 15000        # ms (15s padrão para APIs externas - SE APLICÁVEL)
+
+timeouts_e2e:
+  navegacao: 30000           # Timeout para navegação de página
+  loading_spinner: 30000     # Timeout para spinner desaparecer
+  dialog: 10000              # Timeout para diálogos/modais
+  operacao_crud: 15000       # Timeout para operações CRUD
+  validacao_formulario: 5000 # Timeout para validações de formulário
+```
+
+**Critério de aceite:**
+- ✅ Seção `performance` completa
+- ✅ Seção `timeouts_e2e` completa
+
+---
+
+#### 3.6.8: Validar Completude de Especificações
+
+**Após documentar todas as seções acima, o agente DEVE verificar:**
+
+- ✅ UC possui seção `navegacao` completa (URL + referência routing)
+- ✅ UC possui seção `credenciais` completa (referência seeds + perfil)
+- ✅ TODOS os passos interativos possuem `elemento.data_test`
+- ✅ UC possui seção `estados_ui` completa (loading, vazio, erro)
+- ✅ UC possui seção `tabela` completa (SE listagem presente)
+- ✅ UC possui seção `formulario` completa (SE formulário presente)
+- ✅ UC possui seção `performance` completa (timeouts especificados)
+- ✅ UC possui seção `timeouts_e2e` completa
+
+**SE qualquer verificação FALHAR:**
+- ❌ UC está INCOMPLETO para testes
+- ❌ BLOQUEIO: Não prosseguir para WF/MD/Backend/Frontend
+- ❌ Corrigir gaps e revalidar
+
+---
+
+#### 3.6.9: Atualizar UC-RFXXX.md com Especificações de Teste
+
+**O agente DEVE também atualizar UC-RFXXX.md para incluir:**
+
+1. **Seção "Especificações de Teste"** ao final de cada UC detalhado:
+
+```markdown
+### UC01: Criar Cliente
+
+#### 4.1.1 Objetivo
+[...]
+
+#### 4.1.2 Pré-condições
+[...]
+
+#### 4.1.3 Fluxo Principal
+[...]
+
+#### 4.1.4 Especificações de Teste (E2E)
+
+**Navegação:**
+- URL: `http://localhost:4200/management/clientes`
+- Routing: `src/app/modules/cadastros/cadastros-routing.module.ts`
+
+**Credenciais:**
+- Perfil necessário: Admin
+- Seeds: `ApplicationDbContextInitialiser.cs`
+
+**Data-test Attributes:**
+- Botão "Novo Cliente": `RF006-criar-cliente`
+- Input "Razão Social": `RF006-input-razaosocial`
+- Botão "Salvar": `RF006-salvar-cliente`
+- Botão "Cancelar": `RF006-cancelar-cliente`
+
+**Estados de UI:**
+- Loading: `loading-spinner`
+- Vazio: `empty-state` (texto: "Nenhum cliente encontrado")
+- Erro: `error-message` (texto: "Erro ao carregar clientes")
+
+**Timeouts:**
+- Navegação: 30s
+- Loading spinner: 30s
+- Operação CRUD: 15s
+```
+
+**Critério de aceite:**
+- ✅ UC-RFXXX.md atualizado com seção "Especificações de Teste" em cada UC
+- ✅ Sincronização: UC-RFXXX.md ↔ UC-RFXXX.yaml (especificações idênticas)
+
+---
+
+**RESUMO DA FASE 3.6:**
+
+Esta fase é **CRÍTICA** para alinhamento com testes E2E. Sem ela:
+- ❌ Frontend não saberá quais data-test implementar
+- ❌ MT (Massa de Teste) não terá seletores corretos
+- ❌ TC (Casos de Teste) não terá especificações E2E
+- ❌ Testes E2E terão taxa de aprovação inicial baixa (0-20%)
+
+**Com esta fase:**
+- ✅ Frontend implementa data-test corretos desde o início
+- ✅ MT sincroniza seletores com UC
+- ✅ TC já possui seletores E2E validados
+- ✅ Testes E2E têm taxa de aprovação inicial alta (80-90%)
+
+**Resultado esperado:**
+- ✅ UC completo com TODAS as especificações de teste
+- ✅ Rastreabilidade: RF → UC → TC → MT → Frontend → Testes
+- ✅ Zero gaps de alinhamento entre documentação e testes
+
+---
+
 ### Fase 4: Validação e Correção Iterativa (OBRIGATÓRIA)
 
 #### 4.1 Executar Validador de Cobertura RF→UC (1ª Rodada)
