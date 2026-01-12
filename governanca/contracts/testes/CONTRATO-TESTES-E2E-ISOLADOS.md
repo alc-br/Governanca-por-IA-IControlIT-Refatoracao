@@ -1,10 +1,12 @@
 # CONTRATO DE TESTES E2E ISOLADOS (ISOLATED PATTERN)
 
-**Versão:** 1.0
+**Versão:** 1.1
 **Data:** 2026-01-11
 **Status:** Ativo
 **Tipo:** Contrato de Execução - Testes E2E
-**Changelog v1.0:** Criação do contrato para testes E2E isolados com Page Object Pattern, beforeEach/afterEach obrigatórios, closeAllOverlays() helper, e validação de isolamento. Substitui padrão stateful (test.describe.serial) por isolated (test.describe). Baseado em análise de problemas RF006 (10-60% aprovação E2E devido a contaminação de estado).
+**Changelog:**
+- **v1.1 (2026-01-11):** Adicionada seção 2 (PRÉ-REQUISITO: INICIALIZAÇÃO DO AMBIENTE) com verificação de ambiente, inicialização automática via `python run.py`, validação pós-inicialização e credenciais de teste obrigatórias. Alinhamento com execucao-completa.md.
+- **v1.0 (2026-01-11):** Criação do contrato para testes E2E isolados com Page Object Pattern, beforeEach/afterEach obrigatórios, closeAllOverlays() helper, e validação de isolamento. Substitui padrão stateful (test.describe.serial) por isolated (test.describe). Baseado em análise de problemas RF006 (10-60% aprovação E2E devido a contaminação de estado).
 
 ---
 
@@ -108,9 +110,107 @@ test.describe('TC-RF006-E2E-001', () => {
 
 ---
 
-## 2. ESTRUTURA OBRIGATÓRIA: PAGE OBJECT PATTERN
+## 2. PRÉ-REQUISITO: INICIALIZAÇÃO DO AMBIENTE
 
-### 2.1. Organização de Arquivos
+### 2.1. Verificação do Ambiente
+
+**ANTES de executar qualquer teste E2E, o agente DEVE verificar se o ambiente está rodando:**
+
+```bash
+# Verificar backend (porta 5000)
+curl -f http://localhost:5000/health || echo "Backend NÃO está rodando"
+
+# Verificar frontend (porta 4200)
+curl -f http://localhost:4200 || echo "Frontend NÃO está rodando"
+```
+
+**SE backend OU frontend NÃO estiver rodando:**
+- ✅ **EXECUTAR** inicialização automática (PASSO 2.2)
+- ✅ **AGUARDAR** serviços ficarem prontos
+- ✅ Validar health checks automaticamente
+
+**SE backend E frontend estiverem rodando:**
+- ✅ **PROSSEGUIR** diretamente para criação de testes
+- ✅ Não reinicializar (evita overhead desnecessário)
+
+---
+
+### 2.2. Inicialização Automática com run.py
+
+**QUANDO ambiente NÃO estiver rodando, executar:**
+
+```bash
+cd /d/IC2
+python run.py
+```
+
+**O que `run.py` faz automaticamente:**
+- ✅ Mata TODOS os processos travados (backend/frontend)
+- ✅ Inicia backend em BACKGROUND (porta 5000)
+- ✅ Inicia frontend em BACKGROUND (porta 4200)
+- ✅ Aguarda ambos estarem prontos (health checks)
+- ✅ Valida que serviços responderam corretamente
+
+**IMPORTANTE:**
+- `run.py` executa em ~20-30 segundos
+- Garante ambiente limpo e funcional
+- Evita "port already in use" e processos zumbis
+- Health checks são automáticos (não precisa validar manualmente)
+
+**Timeout:** 60 segundos (se falhar, reportar erro de ambiente)
+
+---
+
+### 2.3. Validação Pós-Inicialização
+
+**APÓS `run.py` completar, validar:**
+
+```bash
+# Validar backend respondendo
+curl -f http://localhost:5000/health
+
+# Validar frontend respondendo
+curl -f http://localhost:4200
+```
+
+**Resultado esperado:**
+- ✅ Backend: HTTP 200 (healthy)
+- ✅ Frontend: HTTP 200 (index.html servido)
+
+**SE validação FALHAR:**
+- ❌ **BLOQUEAR** execução de testes
+- ❌ Reportar erro: "Ambiente não inicializou corretamente"
+- ❌ Sugerir verificação manual de logs
+
+---
+
+### 2.4. Credenciais de Teste (OBRIGATÓRIO)
+
+Para executar testes E2E, use as seguintes credenciais:
+
+```typescript
+export const CREDENCIAIS_TESTE = {
+  admin_teste: {
+    email: 'anderson.chipak@k2apartners.com.br',
+    password: 'Vi696206@',
+    perfil: 'Developer'
+  }
+};
+```
+
+Este usuário tem:
+- ✅ Perfil: Developer (escopo = 3)
+- ✅ Permissões completas para TODOS os RFs
+- ✅ Acesso a TODAS as funcionalidades do sistema
+- ✅ Dados de teste pré-populados
+
+**FONTE:** `backend/Infrastructure/Persistence/ApplicationDbContextInitialiser.cs` (seeds)
+
+---
+
+## 3. ESTRUTURA OBRIGATÓRIA: PAGE OBJECT PATTERN
+
+### 3.1. Organização de Arquivos
 
 ```
 e2e/
@@ -131,7 +231,7 @@ e2e/
     └── MT-RF006.data.ts
 ```
 
-### 2.2. Template: Base Page Object
+### 3.2. Template: Base Page Object
 
 **Arquivo:** `e2e/pages/base.page.ts`
 
@@ -215,7 +315,7 @@ export class BasePage {
 }
 ```
 
-### 2.3. Template: Entity Page Object
+### 3.3. Template: Entity Page Object
 
 **Arquivo:** `e2e/pages/clientes.page.ts`
 
@@ -319,7 +419,7 @@ export class ClientesPage extends BasePage {
 
 ---
 
-## 3. FASE 1: ESTRUTURA DE TESTE ISOLADO
+## 4. FASE 1: ESTRUTURA DE TESTE ISOLADO
 
 ### 3.1. beforeEach: Setup Obrigatório
 
@@ -380,7 +480,7 @@ test.afterEach(async ({ page }) => {
 
 ---
 
-## 4. FASE 2: CRIAÇÃO DE DADOS ISOLADOS
+## 5. FASE 2: CRIAÇÃO DE DADOS ISOLADOS
 
 ### 4.1. Padrão: Criar Dados via API
 
@@ -502,7 +602,7 @@ test('Criar e excluir cliente', async ({ page }) => {
 
 ---
 
-## 5. FASE 3: VALIDAÇÃO DE ISOLAMENTO
+## 6. FASE 3: VALIDAÇÃO DE ISOLAMENTO
 
 ### 5.1. Script de Validação (Python)
 
@@ -600,7 +700,7 @@ python tools/validate-isolated-tests.py 006
 
 ---
 
-## 6. CONFIGURAÇÃO PLAYWRIGHT
+## 7. CONFIGURAÇÃO PLAYWRIGHT
 
 ### 6.1. playwright.config.ts (Isolated)
 
@@ -653,7 +753,7 @@ export default defineConfig({
 
 ---
 
-## 7. EXEMPLO COMPLETO: TC-RF006-E2E-001.spec.ts
+## 8. EXEMPLO COMPLETO: TC-RF006-E2E-001.spec.ts
 
 ```typescript
 import { test, expect } from '@playwright/test';
@@ -822,7 +922,7 @@ test.describe('TC-RF006-E2E-001: CRUD Clientes (Isolated)', () => {
 
 ---
 
-## 8. CRITÉRIO DE APROVAÇÃO
+## 9. CRITÉRIO DE APROVAÇÃO
 
 ### 8.1. Estrutura
 
@@ -860,7 +960,7 @@ test.describe('TC-RF006-E2E-001: CRUD Clientes (Isolated)', () => {
 
 ---
 
-## 9. VANTAGENS DO PADRÃO ISOLATED
+## 10. VANTAGENS DO PADRÃO ISOLATED
 
 | Aspecto | Stateful | Isolated | Vantagem |
 |---------|----------|----------|----------|
@@ -873,7 +973,7 @@ test.describe('TC-RF006-E2E-001: CRUD Clientes (Isolated)', () => {
 
 ---
 
-## 10. MIGRAÇÃO DE STATEFUL PARA ISOLATED
+## 11. MIGRAÇÃO DE STATEFUL PARA ISOLATED
 
 ### 10.1. Quando Migrar
 
@@ -900,7 +1000,7 @@ test.describe('TC-RF006-E2E-001: CRUD Clientes (Isolated)', () => {
 
 ---
 
-## 11. REFERÊNCIAS
+## 12. REFERÊNCIAS
 
 | Documento | Caminho |
 |-----------|---------|
@@ -912,7 +1012,7 @@ test.describe('TC-RF006-E2E-001: CRUD Clientes (Isolated)', () => {
 
 ---
 
-## 12. HISTÓRICO DE VERSÕES
+## 13. HISTÓRICO DE VERSÕES
 
 | Versão | Data | Descrição |
 |--------|------|-----------|
@@ -920,7 +1020,7 @@ test.describe('TC-RF006-E2E-001: CRUD Clientes (Isolated)', () => {
 
 ---
 
-## 13. REGRA DE NEGAÇÃO ZERO
+## 14. REGRA DE NEGAÇÃO ZERO
 
 Se uma solicitação:
 - Não estiver explicitamente prevista neste contrato, OU
