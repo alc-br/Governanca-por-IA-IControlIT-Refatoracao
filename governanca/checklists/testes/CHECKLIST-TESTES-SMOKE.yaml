@@ -1,0 +1,325 @@
+# CHECKLIST-TESTES-SMOKE.yaml
+# Checklist para validação de Smoke Test (MVS - Mínimo Viável Seguro)
+# Versão: 1.0
+# Data: 2026-01-11
+
+metadata:
+  versao: "1.0"
+  data: "2026-01-11"
+  descricao: "Checklist para validação de smoke test (happy path) antes de subir para HOM"
+  estrategia: "MVS (Mínimo Viável Seguro)"
+  tempo_estimado: "30-60 min"
+  referencias:
+    - "CONTRATO-TESTES-MINIMO-VIAVEL-SEGURO.md"
+
+# ==============================================================================
+# PRÉ-REQUISITOS (BLOQUEANTES)
+# ==============================================================================
+
+pre_requisitos:
+  - id: SMOKE-PRE-01
+    categoria: prerequisito
+    severidade: critica
+    titulo: "Backend aprovado (validação = 100%)"
+    verificacao: "STATUS.yaml → desenvolvimento.backend.validacao = done"
+    bloqueante: true
+
+  - id: SMOKE-PRE-02
+    categoria: prerequisito
+    severidade: critica
+    titulo: "Frontend aprovado (validação = 100%)"
+    verificacao: "STATUS.yaml → desenvolvimento.frontend.validacao = done"
+    bloqueante: true
+
+  - id: SMOKE-PRE-03
+    categoria: prerequisito
+    severidade: critica
+    titulo: "Testes unitários backend = 100%"
+    verificacao: "dotnet test --filter RFXXX → 100% aprovação"
+    bloqueante: true
+
+  - id: SMOKE-PRE-04
+    categoria: prerequisito
+    severidade: critica
+    titulo: "Ambiente inicializado (backend + frontend rodando)"
+    verificacao: "python run.py → backend:5000 + frontend:4200 UP"
+    bloqueante: true
+
+# ==============================================================================
+# ESTRUTURA DO SMOKE TEST
+# ==============================================================================
+
+estrutura_smoke:
+  - id: SMOKE-EST-01
+    categoria: estrutura
+    severidade: critica
+    titulo: "Arquivo TC-RFXXX-SMOKE.spec.ts existe"
+    verificacao: "frontend/icontrolit-app/e2e/specs/TC-RFXXX-SMOKE.spec.ts presente"
+
+  - id: SMOKE-EST-02
+    categoria: estrutura
+    severidade: critica
+    titulo: "Usa padrão isolated (beforeEach + afterEach)"
+    verificacao: "Spec possui test.beforeEach e test.afterEach"
+
+  - id: SMOKE-EST-03
+    categoria: estrutura
+    severidade: critica
+    titulo: "Page Objects importados"
+    verificacao: "LoginPage e [Entity]Page importados"
+
+  - id: SMOKE-EST-04
+    categoria: estrutura
+    severidade: media
+    titulo: "Comentário de estratégia MVS presente"
+    verificacao: "Comentário documenta: ESTRATÉGIA: MVS, COBERTURA, O QUE TESTA/NÃO TESTA"
+
+# ==============================================================================
+# COBERTURA DO SMOKE TEST
+# ==============================================================================
+
+cobertura_smoke:
+  - id: SMOKE-COV-01
+    categoria: cobertura
+    severidade: critica
+    titulo: "Login + autenticação"
+    verificacao: "loginPage.login() executado com credenciais válidas"
+
+  - id: SMOKE-COV-02
+    categoria: cobertura
+    severidade: critica
+    titulo: "Navegação para módulo do RF"
+    verificacao: "[entity]Page.navigate() executado"
+
+  - id: SMOKE-COV-03
+    categoria: cobertura
+    severidade: critica
+    titulo: "Criar registro (happy path)"
+    verificacao: "[entity]Page.criar[Entity]() com dados VÁLIDOS"
+
+  - id: SMOKE-COV-04
+    categoria: cobertura
+    severidade: critica
+    titulo: "Validar registro na listagem"
+    verificacao: "[entity]Page.validar[Entity]NaListagem() executado"
+
+  - id: SMOKE-COV-05
+    categoria: cobertura
+    severidade: alta
+    titulo: "Editar registro criado"
+    verificacao: "[entity]Page.editar[Entity]() executado"
+
+  - id: SMOKE-COV-06
+    categoria: cobertura
+    severidade: media
+    titulo: "Excluir registro (se aplicável)"
+    verificacao: "[entity]Page.excluir[Entity]() executado (opcional se RF não tem exclusão)"
+
+  - id: SMOKE-COV-07
+    categoria: cobertura
+    severidade: critica
+    titulo: "Cleanup completo (logout)"
+    verificacao: "afterEach executa closeAllOverlays() + logout()"
+
+# ==============================================================================
+# O QUE NÃO DEVE SER TESTADO (SMOKE)
+# ==============================================================================
+
+nao_testar_smoke:
+  - id: SMOKE-SKIP-01
+    categoria: escopo
+    severidade: info
+    titulo: "Validações de formulário NÃO testadas"
+    observacao: "Campos obrigatórios, formatos, etc. serão testados antes de PRD"
+
+  - id: SMOKE-SKIP-02
+    categoria: escopo
+    severidade: info
+    titulo: "Mensagens de erro NÃO testadas"
+    observacao: "Textos de erro específicos serão validados antes de PRD"
+
+  - id: SMOKE-SKIP-03
+    categoria: escopo
+    severidade: info
+    titulo: "Edge cases de UI NÃO testados"
+    observacao: "Lista vazia, loading, erro de API serão testados antes de PRD"
+
+  - id: SMOKE-SKIP-04
+    categoria: escopo
+    severidade: info
+    titulo: "Performance NÃO testada"
+    observacao: "Timeouts, tempos de carregamento serão validados antes de PRD"
+
+# ==============================================================================
+# EXECUÇÃO DO SMOKE TEST
+# ==============================================================================
+
+execucao_smoke:
+  - id: SMOKE-EXEC-01
+    categoria: execucao
+    severidade: critica
+    titulo: "Executar smoke test em modo headed"
+    comando: "npx playwright test TC-RFXXX-SMOKE --headed"
+    timeout: "10 min"
+
+  - id: SMOKE-EXEC-02
+    categoria: execucao
+    severidade: critica
+    titulo: "Taxa de aprovação = 100%"
+    verificacao: "1/1 testes passando (0 falhando)"
+    bloqueante: true
+
+  - id: SMOKE-EXEC-03
+    categoria: execucao
+    severidade: alta
+    titulo: "Screenshots/vídeos capturados"
+    verificacao: "test-results/ contém evidências"
+
+  - id: SMOKE-EXEC-04
+    categoria: execucao
+    severidade: media
+    titulo: "Tempo de execução ≤ 5 min"
+    verificacao: "Smoke test executa em no máximo 5 minutos"
+
+# ==============================================================================
+# TESTES DE SEGURANÇA CRÍTICOS
+# ==============================================================================
+
+seguranca_critica:
+  - id: SMOKE-SEC-01
+    categoria: seguranca
+    severidade: critica
+    titulo: "SQL Injection testado (automatizado)"
+    comando: "python tools/security/sql-injection-test.py RFXXX"
+    verificacao: "100% dos payloads bloqueados"
+    bloqueante: true
+
+  - id: SMOKE-SEC-02
+    categoria: seguranca
+    severidade: critica
+    titulo: "Autenticação: logout e tentar acessar"
+    verificacao: "Após logout, acessar módulo redireciona para /sign-in"
+    bloqueante: true
+
+  - id: SMOKE-SEC-03
+    categoria: seguranca
+    severidade: critica
+    titulo: "Autorização: usuário sem permissão"
+    verificacao: "Usuário sem CAD.XXX.VISUALIZAR recebe 403 ou redirecionamento"
+    bloqueante: true
+
+  - id: SMOKE-SEC-04
+    categoria: seguranca
+    severidade: critica
+    titulo: "Multi-tenancy: isolamento de dados"
+    verificacao: "Tenant A NÃO vê dados de Tenant B"
+    bloqueante: true
+
+# ==============================================================================
+# APROVAÇÃO FINAL
+# ==============================================================================
+
+aprovacao_final:
+  - id: SMOKE-APR-01
+    categoria: aprovacao
+    severidade: critica
+    titulo: "Testes unitários = 100%"
+    verificacao: "dotnet test → 100% aprovação"
+    bloqueante: true
+
+  - id: SMOKE-APR-02
+    categoria: aprovacao
+    severidade: critica
+    titulo: "Smoke E2E = 100%"
+    verificacao: "1/1 spec passando"
+    bloqueante: true
+
+  - id: SMOKE-APR-03
+    categoria: aprovacao
+    severidade: critica
+    titulo: "Segurança crítica = 100%"
+    verificacao: "SQL Injection + Autenticação + Multi-tenancy PASS"
+    bloqueante: true
+
+  - id: SMOKE-APR-04
+    categoria: aprovacao
+    severidade: critica
+    titulo: "STATUS.yaml atualizado"
+    verificacao: "testes_ti.estrategia = MVS, resultado_final = APROVADO_HOM"
+
+  - id: SMOKE-APR-05
+    categoria: aprovacao
+    severidade: critica
+    titulo: "Relatório MVS gerado"
+    verificacao: "relatorios/testes/RELATORIO-MVS-RFXXX-[DATA].yaml criado"
+
+# ==============================================================================
+# CRITÉRIO FINAL (0% OU 100%)
+# ==============================================================================
+
+criterio_final:
+  descricao: "Critério de aprovação é 0% ou 100% (sem meio-termo)"
+
+  aprovado:
+    condicao: "TODOS os bloqueantes PASS"
+    resultado: "APROVADO PARA HOM"
+    proximos_passos:
+      - "Atualizar STATUS.yaml (resultado_final: APROVADO_HOM)"
+      - "Criar tag de versão"
+      - "Subir para ambiente de homologação"
+      - "Notificar cliente que funcionalidade está disponível"
+
+  reprovado:
+    condicao: "QUALQUER bloqueante FAIL"
+    resultado: "REPROVADO (NÃO SOBE PARA HOM)"
+    proximos_passos:
+      - "Retornar para desenvolvimento"
+      - "Corrigir falhas identificadas"
+      - "Re-executar smoke test"
+      - "NÃO subir para HOM até 100% aprovação"
+
+# ==============================================================================
+# GAPS CONHECIDOS (DOCUMENTAR)
+# ==============================================================================
+
+gaps_conhecidos:
+  - id: GAP-01
+    descricao: "Validações detalhadas de formulário não testadas"
+    impacto: "Cliente pode encontrar bugs de validação em HOM"
+    mitigacao: "Testes completos antes de PRD"
+
+  - id: GAP-02
+    descricao: "Mensagens de erro específicas não validadas"
+    impacto: "Textos de erro podem estar incorretos"
+    mitigacao: "Validação funcional em HOM + testes completos antes de PRD"
+
+  - id: GAP-03
+    descricao: "Edge cases de UI não testados"
+    impacto: "Estados vazios, loading, erro podem ter problemas"
+    mitigacao: "Testes completos antes de PRD"
+
+  - id: GAP-04
+    descricao: "Performance não testada"
+    impacto: "Timeouts podem ocorrer em dados reais"
+    mitigacao: "Monitoramento em HOM + testes de carga antes de PRD"
+
+# ==============================================================================
+# MÉTRICAS DE SUCESSO
+# ==============================================================================
+
+metricas_sucesso:
+  tempo:
+    total_maximo: "4 horas"
+    unitarios_maximo: "1 hora"
+    smoke_e2e_maximo: "2 horas"
+    seguranca_maximo: "1 hora"
+
+  qualidade:
+    taxa_aprovacao_unitarios: "100%"
+    taxa_aprovacao_smoke: "100%"
+    taxa_bloqueio_sql_injection: "100%"
+    taxa_aprovacao_autenticacao: "100%"
+
+  negocio:
+    tempo_subida_hom: "1 dia (vs 3 dias com testes completos)"
+    bugs_criticos_hom_max: "2 (meta: 0-1)"

@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 2.1
+**Versão:** 2.2
 **Data:** 2026-01-11
 **Status:** Ativo
-**Última Atualização:** 2026-01-11 (NOVA VALIDAÇÃO: PASSO 5.10 - Isolamento de Testes E2E)
+**Última Atualização:** 2026-01-11 (NOVA ESTRATÉGIA: Seção 2.5 - MVS vs COMPLETO)
 **Changelog:**
+- v2.2 (2026-01-11): NOVA SEÇÃO 2.5: Seleção de Estratégia de Testes (MVS para HOM, COMPLETO para PRD) - Reduz tempo de 10h → 2-4h para homologação mantendo 80% cobertura de riscos críticos
 - v2.1 (2026-01-11): NOVO PASSO 5.10 BLOQUEANTE: Validar isolamento de testes E2E (isolated vs stateful, beforeEach/afterEach, closeAllOverlays) - Detecta padrão test.describe.serial PROIBIDO em testes isolated
 - v2.0 (2026-01-11): NOVO PASSO 5.9 BLOQUEANTE: Validar cobertura 100% de TCs (resolve GAP 2 do RF006 - 75% não testado)
 - v1.9 (2026-01-08): OTIMIZAÇÃO CRÍTICA: run.py v2.0 valida health automaticamente (removidos health checks manuais do contrato)
@@ -261,6 +262,107 @@ Para o RF006 execute o docs\prompts\testes\execucao-completa.md
 - ❌ Executar sem gerar/exibir prompt
 - ❌ Pedir confirmação ao usuário
 - ❌ Tentar executar sem ler o prompt primeiro
+
+---
+
+## 2.5. SELEÇÃO DE ESTRATÉGIA DE TESTES (NOVO - v2.2)
+
+**ANTES de iniciar execução, o agente DEVE perguntar ao usuário qual estratégia usar:**
+
+### Estratégias Disponíveis
+
+#### OPÇÃO A: MVS - Mínimo Viável Seguro (PADRÃO PARA HOM)
+- ⏱️ **Tempo:** 2-4 horas/RF
+- 📊 **Cobertura:** 80% dos riscos críticos
+- 🎯 **Uso:** Subir para **HOMOLOGAÇÃO**
+- ✅ **Testes:**
+  - Unitários backend: 100%
+  - Smoke E2E: 1 spec (happy path)
+  - Segurança: SQL Injection + Autenticação
+- 📄 **Contrato:** `CONTRATO-TESTES-MINIMO-VIAVEL-SEGURO.md`
+
+#### OPÇÃO B: COMPLETO (PADRÃO PARA PRD)
+- ⏱️ **Tempo:** 10+ horas/RF
+- 📊 **Cobertura:** 95-100% dos riscos
+- 🎯 **Uso:** Subir para **PRODUÇÃO**
+- ✅ **Testes:**
+  - Unitários backend: 100%
+  - E2E completo: Todos os specs (10-30 specs)
+  - Segurança: Completo (5 tipos)
+  - Auditoria UX
+- 📄 **Contrato:** Este arquivo (execucao-completa.md)
+
+### Decisão Automática (Se usuário não especificar)
+
+**SE usuário mencionar "HOM" ou "homologação":**
+- ✅ Usar estratégia **MVS** automaticamente
+- ℹ️ Informar: "Usando estratégia MVS para HOM (2-4h)"
+
+**SE usuário mencionar "PRD" ou "produção":**
+- ✅ Usar estratégia **COMPLETO** automaticamente
+- ℹ️ Informar: "Usando estratégia COMPLETO para PRD (10+h)"
+
+**SE usuário NÃO especificar destino:**
+- ❓ **PERGUNTAR**: "Este RF vai para HOM ou PRD?"
+- ⏳ Aguardar resposta do usuário
+- ✅ Aplicar estratégia correspondente
+
+### Prompt de Confirmação
+
+```
+Este RF vai para:
+A) HOMOLOGAÇÃO (usar MVS: 2-4h, 80% cobertura)
+B) PRODUÇÃO (usar COMPLETO: 10+h, 95-100% cobertura)
+
+Responda A ou B (ou especifique se incerto).
+```
+
+### Executando Estratégia MVS
+
+**QUANDO usuário escolher MVS (OPÇÃO A):**
+
+1. ✅ Ativar contrato: `CONTRATO-TESTES-MINIMO-VIAVEL-SEGURO.md`
+2. ✅ Executar:
+   - FASE 1: Pré-requisitos (validar backend/frontend aprovados)
+   - FASE 2: Testes Unitários (100%)
+   - FASE 3: Smoke Test E2E (1 spec)
+   - FASE 4: Segurança Crítica (SQL Injection + Autenticação)
+   - FASE 5: Aprovação Final
+3. ✅ Gerar relatório: `RELATORIO-MVS-RFXXX-[DATA].yaml`
+4. ✅ Atualizar STATUS.yaml: `estrategia: MVS, resultado_final: APROVADO_HOM`
+5. ✅ Documentar gaps conhecidos: `GAPS-CONHECIDOS-RFXXX.md`
+
+**Critério MVS:**
+- ✅ Unitários: 100%
+- ✅ Smoke E2E: 100% (1 spec)
+- ✅ Segurança: 100%
+
+**Tempo total:** 2-4 horas
+
+---
+
+### Executando Estratégia COMPLETO
+
+**QUANDO usuário escolher COMPLETO (OPÇÃO B):**
+
+1. ✅ Continuar execução normal deste contrato
+2. ✅ Executar TODAS as fases (1-8)
+3. ✅ Gerar relatório completo
+4. ✅ Atualizar STATUS.yaml: `estrategia: COMPLETO, resultado_final: APROVADO_PRD`
+
+**Critério COMPLETO:**
+- ✅ Todos os testes: 100%
+
+**Tempo total:** 10+ horas
+
+---
+
+### Regras de Estratégia
+
+1. **MVS é SUFICIENTE para HOM** (cliente validará funcionalmente)
+2. **COMPLETO é OBRIGATÓRIO para PRD** (zero tolerância a bugs)
+3. **Estratégia é IRREVERSÍVEL** durante execução (não mudar no meio)
+4. **Gaps conhecidos do MVS DEVEM ser documentados**
 
 ---
 
