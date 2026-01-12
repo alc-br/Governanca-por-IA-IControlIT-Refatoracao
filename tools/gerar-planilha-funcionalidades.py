@@ -14,7 +14,8 @@ COLUNAS:
 OUTPUT: D:\\IC2_Governanca\\funcionalidades.xlsx
 
 AUTOR: Agência ALC - alc.dev.br
-DATA: 2026-01-11
+DATA: 2026-01-12
+VERSÃO: 2.0
 """
 
 import os
@@ -24,6 +25,36 @@ import glob
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+def extrair_texto(valor):
+    """
+    Extrai texto de uma estrutura YAML que pode ser string, dict ou outro tipo.
+
+    Args:
+        valor: Valor a extrair (string, dict, list, etc)
+
+    Returns:
+        str: Texto extraído ou vazio
+    """
+    if not valor:
+        return ''
+
+    if isinstance(valor, str):
+        return valor.strip()
+
+    if isinstance(valor, dict):
+        # Tenta campos comuns
+        for campo in ['objetivo', 'problema_resolvido', 'descricao', 'texto', 'resumo']:
+            if campo in valor and valor[campo]:
+                return extrair_texto(valor[campo])
+        # Se não encontrou, converte dict para string legível
+        return str(valor)
+
+    if isinstance(valor, list):
+        # Junta itens da lista
+        return '. '.join(str(item) for item in valor if item)
+
+    return str(valor)
 
 def extrair_rfs_yaml(documentacao_path):
     """
@@ -53,39 +84,78 @@ def extrair_rfs_yaml(documentacao_path):
             # Extrair código do RF
             rf_id = dados.get('rf_id', '')
             if not rf_id:
+                # Tentar extrair de estrutura aninhada rf.id
+                if 'rf' in dados and isinstance(dados['rf'], dict):
+                    rf_id = dados['rf'].get('id', '')
+            if not rf_id:
                 # Tentar extrair do nome do arquivo
                 rf_id = os.path.basename(arquivo).replace('.yaml', '')
 
             # Extrair nome/título
             nome = dados.get('titulo', dados.get('nome', dados.get('title', '')))
+            if not nome:
+                # Tentar extrair de estrutura aninhada rf.nome
+                if 'rf' in dados and isinstance(dados['rf'], dict):
+                    nome = dados['rf'].get('nome', '')
 
-            # Extrair descrição
-            descricao = dados.get('descricao', dados.get('description', ''))
+            # Garantir que nome é string
+            nome = extrair_texto(nome)
 
-            # Se descricao é um dicionário, extrair campo objetivo ou problema_resolvido
-            if isinstance(descricao, dict):
-                descricao = descricao.get('objetivo', descricao.get('problema_resolvido', ''))
+            # Extrair descrição (prioridade: resumo_executivo > descricao > objetivo)
+            descricao = ''
 
-            if not descricao:
-                # Tentar pegar objetivo diretamente
-                objetivo = dados.get('objetivo', dados.get('objective', ''))
-                if isinstance(objetivo, dict):
-                    descricao = objetivo.get('texto', str(objetivo))
+            # 1. Tentar resumo_executivo (mais direto)
+            if 'resumo_executivo' in dados:
+                descricao = extrair_texto(dados['resumo_executivo'])
+
+            # 2. Se vazio, tentar descricao (pode ser dict ou string)
+            if not descricao and 'descricao' in dados:
+                descricao_raw = dados['descricao']
+                if isinstance(descricao_raw, dict):
+                    # Prioridade: objetivo > problema_resolvido > publico_afetado
+                    descricao = extrair_texto(descricao_raw.get('objetivo', ''))
+                    if not descricao:
+                        descricao = extrair_texto(descricao_raw.get('problema_resolvido', ''))
                 else:
-                    descricao = objetivo
+                    descricao = extrair_texto(descricao_raw)
 
-            # Garantir que descricao é string
-            if isinstance(descricao, dict):
-                descricao = str(descricao)
-            elif not isinstance(descricao, str):
-                descricao = str(descricao) if descricao else ''
+            # 3. Se ainda vazio, tentar objetivos (lista)
+            if not descricao and 'objetivos' in dados:
+                objetivos_list = dados['objetivos']
+                if isinstance(objetivos_list, list) and len(objetivos_list) > 0:
+                    primeiro_obj = objetivos_list[0]
+                    if isinstance(primeiro_obj, dict):
+                        descricao = extrair_texto(primeiro_obj.get('descricao', ''))
 
-            # Extrair regras de negócio
+            # 4. Se ainda vazio, tentar objetivo direto
+            if not descricao and 'objetivo' in dados:
+                descricao = extrair_texto(dados['objetivo'])
+
+            # Limitar descrição a ~200 caracteres (sucinta)
+            if len(descricao) > 200:
+                descricao = descricao[:197] + '...'
+
+            # Extrair regras de negócio (SIMPLIFICADAS para coordenação)
             regras = []
+
+            # Tentar estrutura nova: regras_negocio.regras[]
             if 'regras_negocio' in dados:
-                rns = dados['regras_negocio']
-                if isinstance(rns, list):
-                    for rn in rns:
+                rns_obj = dados['regras_negocio']
+
+                # Se é dict com campo regras
+                if isinstance(rns_obj, dict) and 'regras' in rns_obj:
+                    regras_list = rns_obj['regras']
+                    if isinstance(regras_list, list):
+                        for rn in regras_list:
+                            if isinstance(rn, dict):
+                                # Usar apenas o título (sem detalhes técnicos)
+                                titulo_rn = rn.get('titulo', '')
+                                if titulo_rn:
+                                    regras.append(titulo_rn)
+
+                # Se é lista direta
+                elif isinstance(rns_obj, list):
+                    for rn in rns_obj:
                         if isinstance(rn, dict):
                             titulo_rn = rn.get('titulo', rn.get('descricao', ''))
                             if titulo_rn:
@@ -112,16 +182,21 @@ def extrair_rfs_yaml(documentacao_path):
                     except:
                         pass
 
-            # Formatar regras em parágrafo único
-            regras_texto = ". ".join(regras) if regras else "Sem regras documentadas"
-            if regras_texto and not regras_texto.endswith('.'):
-                regras_texto += '.'
+            # Formatar regras em parágrafo único (linguagem simples, nível coordenação)
+            if regras:
+                # Limitar a 5 primeiras regras (mais importantes)
+                regras_top5 = regras[:5]
+                regras_texto = ". ".join(regras_top5)
+                if not regras_texto.endswith('.'):
+                    regras_texto += '.'
+            else:
+                regras_texto = "Regras de negócio não documentadas."
 
             # Adicionar RF à lista
             rfs.append({
                 'codigo': rf_id,
-                'nome': nome,
-                'descricao': descricao,
+                'nome': nome if nome else "Nome não disponível",
+                'descricao': descricao if descricao else "Descrição não disponível.",
                 'regras': regras_texto,
                 'notas': ''
             })
@@ -246,7 +321,7 @@ def gerar_planilha_excel(rfs, output_path):
 
 def main():
     print("=" * 80)
-    print("GERADOR DE PLANILHA DE FUNCIONALIDADES")
+    print("GERADOR DE PLANILHA DE FUNCIONALIDADES v2.0")
     print("=" * 80)
     print()
 
@@ -280,16 +355,24 @@ def main():
     print("ESTATÍSTICAS")
     print("=" * 80)
     print(f"Total de RFs: {len(rfs)}")
-    print(f"RFs com descrição: {sum(1 for rf in rfs if rf['descricao'])}")
-    print(f"RFs com regras: {sum(1 for rf in rfs if rf['regras'] != 'Sem regras documentadas')}")
+    print(f"RFs com nome preenchido: {sum(1 for rf in rfs if rf['nome'] != 'Nome não disponível')}")
+    print(f"RFs com descrição preenchida: {sum(1 for rf in rfs if rf['descricao'] != 'Descrição não disponível.')}")
+    print(f"RFs com regras: {sum(1 for rf in rfs if rf['regras'] != 'Regras de negócio não documentadas.')}")
     print()
 
     # Primeiros 5 RFs como amostra
     print("AMOSTRA (5 primeiros RFs):")
     print("-" * 80)
     for rf in rfs[:5]:
-        print(f"  {rf['codigo']}: {rf['nome']}")
-    print()
+        # Remover caracteres especiais que causam erro de encoding
+        nome_safe = rf['nome'].encode('ascii', 'ignore').decode('ascii')
+        desc_safe = rf['descricao'][:80].encode('ascii', 'ignore').decode('ascii')
+        regras_safe = rf['regras'][:80].encode('ascii', 'ignore').decode('ascii')
+
+        print(f"  {rf['codigo']}: {nome_safe}")
+        print(f"    Descricao: {desc_safe}...")
+        print(f"    Regras: {regras_safe}...")
+        print()
 
     print("=" * 80)
     print("[OK] CONCLUÍDO")
