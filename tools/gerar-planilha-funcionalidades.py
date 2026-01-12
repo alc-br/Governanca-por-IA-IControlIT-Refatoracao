@@ -91,12 +91,22 @@ def extrair_rfs_yaml(documentacao_path):
                 # Tentar extrair do nome do arquivo
                 rf_id = os.path.basename(arquivo).replace('.yaml', '')
 
-            # Extrair nome/título
+            # Extrair nome/título (múltiplos campos possíveis)
             nome = dados.get('titulo', dados.get('nome', dados.get('title', '')))
+
+            # Se vazio, tentar rf_title (usado em 26 RFs)
             if not nome:
-                # Tentar extrair de estrutura aninhada rf.nome
+                nome = dados.get('rf_title', '')
+
+            # Se ainda vazio, tentar estrutura aninhada rf.nome ou rf.titulo
+            if not nome:
                 if 'rf' in dados and isinstance(dados['rf'], dict):
-                    nome = dados['rf'].get('nome', '')
+                    nome = dados['rf'].get('nome', dados['rf'].get('titulo', ''))
+
+            # Se ainda vazio, tentar metadata.titulo (alguns RFs usam essa estrutura)
+            if not nome:
+                if 'metadata' in dados and isinstance(dados['metadata'], dict):
+                    nome = dados['metadata'].get('titulo', dados['metadata'].get('nome', ''))
 
             # Garantir que nome é string
             nome = extrair_texto(nome)
