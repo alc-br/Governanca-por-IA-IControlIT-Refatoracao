@@ -9,13 +9,20 @@ COLUNAS:
 - Nome Funcionalidade
 - Descrição (sucinta)
 - Regras (parágrafo único, linguagem simples)
-- Notas (vazio para anotações posteriores)
+- Epic (agrupamento)
+- Fase (priorização)
+- Prioridade (CLIENTE PREENCHE: Alta/Média/Baixa)
+- Status Discussão (CLIENTE PREENCHE: Aprovado/Revisar/Remover)
+- Responsável (CLIENTE PREENCHE: Nome)
+- Notas (CLIENTE PREENCHE: Comentários)
+
+COLUNAS EDITÁVEIS (fundo amarelo): Prioridade, Status Discussão, Responsável, Notas
 
 OUTPUT: D:\\IC2_Governanca\\funcionalidades.xlsx
 
 AUTOR: Agência ALC - alc.dev.br
 DATA: 2026-01-12
-VERSÃO: 2.0
+VERSÃO: 3.0 (com colunas para discussão interna do cliente)
 """
 
 import os
@@ -141,6 +148,36 @@ def extrair_rfs_yaml(documentacao_path):
             if not descricao and 'objetivo' in dados:
                 descricao = extrair_texto(dados['objetivo'])
 
+            # 5. Se ainda vazio, tentar visao_geral (alguns RFs usam isso)
+            if not descricao and 'visao_geral' in dados:
+                visao_geral = dados['visao_geral']
+                if isinstance(visao_geral, dict):
+                    # Tentar campos comuns em visao_geral
+                    descricao = extrair_texto(visao_geral.get('resumo', visao_geral.get('descricao', visao_geral.get('objetivo', ''))))
+                else:
+                    descricao = extrair_texto(visao_geral)
+
+            # 6. Se ainda vazio, tentar escopo (81 RFs têm esse campo)
+            if not descricao and 'escopo' in dados:
+                escopo = dados['escopo']
+                if isinstance(escopo, dict):
+                    # Se escopo é dict, tentar extrair campo 'incluso' ou 'objetivo'
+                    escopo_texto = escopo.get('objetivo', escopo.get('descricao', ''))
+                    if not escopo_texto and 'incluso' in escopo:
+                        # Se tem lista de itens inclusos, pegar primeiro item como descrição
+                        incluso = escopo['incluso']
+                        if isinstance(incluso, list) and len(incluso) > 0:
+                            escopo_texto = f"Inclui: {incluso[0]}"
+                    descricao = extrair_texto(escopo_texto)
+                else:
+                    descricao = extrair_texto(escopo)
+
+            # 7. Se ainda vazio, tentar metadata.descricao ou metadata.resumo
+            if not descricao and 'metadata' in dados:
+                metadata = dados['metadata']
+                if isinstance(metadata, dict):
+                    descricao = extrair_texto(metadata.get('descricao', metadata.get('resumo', '')))
+
             # Limitar descrição a ~200 caracteres (sucinta)
             if len(descricao) > 200:
                 descricao = descricao[:197] + '...'
@@ -202,13 +239,34 @@ def extrair_rfs_yaml(documentacao_path):
             else:
                 regras_texto = "Regras de negócio não documentadas."
 
-            # Adicionar RF à lista
+            # Extrair informações adicionais para tomada de decisão
+
+            # Epic (para agrupamento)
+            epic = dados.get('epic', '')
+            if not epic and 'rf' in dados and isinstance(dados['rf'], dict):
+                epic = dados['rf'].get('epic', '')
+            # Garantir que epic é string (pode ser dict com 'codigo' e 'nome')
+            epic = extrair_texto(epic) if epic else ''
+
+            # Fase (para priorização)
+            fase = dados.get('fase', '')
+            if not fase and 'rf' in dados and isinstance(dados['rf'], dict):
+                fase = dados['rf'].get('fase', '')
+            # Garantir que fase é string
+            fase = extrair_texto(fase) if fase else ''
+
+            # Adicionar RF à lista (com colunas extras para discussão do cliente)
             rfs.append({
                 'codigo': rf_id,
                 'nome': nome if nome else "Nome não disponível",
                 'descricao': descricao if descricao else "Descrição não disponível.",
                 'regras': regras_texto,
-                'notas': ''
+                'epic': epic,
+                'fase': fase,
+                'prioridade': '',  # Cliente preenche: Alta/Média/Baixa
+                'status_discussao': '',  # Cliente preenche: Aprovado/Revisar/Remover
+                'responsavel': '',  # Cliente preenche: Nome do responsável
+                'notas': ''  # Cliente preenche: Comentários/Observações
             })
 
         except Exception as e:
@@ -257,12 +315,17 @@ def gerar_planilha_excel(rfs, output_path):
                    top=Side(style='thin', color='000000'),
                    bottom=Side(style='thin', color='000000'))
 
-    # Cabeçalhos
+    # Cabeçalhos (expandidos para facilitar discussão do cliente)
     cabecalhos = [
         'Cód. Funcionalidade',
         'Nome Funcionalidade',
         'Descrição',
         'Regras',
+        'Epic',
+        'Fase',
+        'Prioridade',
+        'Status Discussão',
+        'Responsável',
         'Notas'
     ]
 
@@ -302,27 +365,70 @@ def gerar_planilha_excel(rfs, output_path):
         celula.alignment = alinhamento_dados
         celula.border = borda
 
-        # Notas (vazio)
-        celula = ws.cell(row=row_idx, column=5, value=rf['notas'])
+        # Epic
+        celula = ws.cell(row=row_idx, column=5, value=rf['epic'])
         celula.font = fonte_dados
         celula.alignment = alinhamento_dados
         celula.border = borda
+
+        # Fase
+        celula = ws.cell(row=row_idx, column=6, value=rf['fase'])
+        celula.font = fonte_dados
+        celula.alignment = alinhamento_dados
+        celula.border = borda
+
+        # Prioridade (vazio - cliente preenche)
+        celula = ws.cell(row=row_idx, column=7, value=rf['prioridade'])
+        celula.font = fonte_dados
+        celula.alignment = Alignment(horizontal='center', vertical='center')
+        celula.border = borda
+        # Fundo amarelo claro para destacar campo editável
+        celula.fill = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
+
+        # Status Discussão (vazio - cliente preenche)
+        celula = ws.cell(row=row_idx, column=8, value=rf['status_discussao'])
+        celula.font = fonte_dados
+        celula.alignment = Alignment(horizontal='center', vertical='center')
+        celula.border = borda
+        # Fundo amarelo claro para destacar campo editável
+        celula.fill = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
+
+        # Responsável (vazio - cliente preenche)
+        celula = ws.cell(row=row_idx, column=9, value=rf['responsavel'])
+        celula.font = fonte_dados
+        celula.alignment = alinhamento_dados
+        celula.border = borda
+        # Fundo amarelo claro para destacar campo editável
+        celula.fill = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
+
+        # Notas (vazio - cliente preenche)
+        celula = ws.cell(row=row_idx, column=10, value=rf['notas'])
+        celula.font = fonte_dados
+        celula.alignment = alinhamento_dados
+        celula.border = borda
+        # Fundo amarelo claro para destacar campo editável
+        celula.fill = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
 
         # Altura da linha (auto-ajuste baseado em conteúdo)
         ws.row_dimensions[row_idx].height = 40
 
     # Larguras das colunas
-    ws.column_dimensions['A'].width = 18  # Cód. Funcionalidade
-    ws.column_dimensions['B'].width = 40  # Nome Funcionalidade
-    ws.column_dimensions['C'].width = 60  # Descrição
-    ws.column_dimensions['D'].width = 80  # Regras
-    ws.column_dimensions['E'].width = 30  # Notas
+    ws.column_dimensions['A'].width = 12  # Cód. Funcionalidade
+    ws.column_dimensions['B'].width = 35  # Nome Funcionalidade
+    ws.column_dimensions['C'].width = 50  # Descrição
+    ws.column_dimensions['D'].width = 70  # Regras
+    ws.column_dimensions['E'].width = 25  # Epic
+    ws.column_dimensions['F'].width = 30  # Fase
+    ws.column_dimensions['G'].width = 15  # Prioridade
+    ws.column_dimensions['H'].width = 18  # Status Discussão
+    ws.column_dimensions['I'].width = 20  # Responsável
+    ws.column_dimensions['J'].width = 40  # Notas
 
     # Congelar primeira linha (cabeçalho)
     ws.freeze_panes = 'A2'
 
-    # Filtro automático
-    ws.auto_filter.ref = f"A1:E{len(rfs) + 1}"
+    # Filtro automático (todas as colunas)
+    ws.auto_filter.ref = f"A1:J{len(rfs) + 1}"
 
     # Salvar
     wb.save(output_path)
@@ -331,7 +437,8 @@ def gerar_planilha_excel(rfs, output_path):
 
 def main():
     print("=" * 80)
-    print("GERADOR DE PLANILHA DE FUNCIONALIDADES v2.0")
+    print("GERADOR DE PLANILHA DE FUNCIONALIDADES v3.0")
+    print("Com colunas para discussão interna do cliente")
     print("=" * 80)
     print()
 
