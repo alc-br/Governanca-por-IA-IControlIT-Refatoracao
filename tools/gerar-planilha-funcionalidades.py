@@ -1,60 +1,143 @@
 #!/usr/bin/env python3
 """
-gerar-planilha-funcionalidades.py
+Gera planilha consolidada de funcionalidades (RFs) do IControlIT.
 
-Gera planilha consolidada de funcionalidades (RFs) do sistema.
-
-COLUNAS:
-- Cód. Funcionalidade (ex: RF006)
-- Nome Funcionalidade
-- Descrição (sucinta)
-- Regras (parágrafo único, linguagem simples)
-- Epic (agrupamento)
-- Fase (priorização)
-- Prioridade (CLIENTE PREENCHE: Alta/Média/Baixa)
-- Status Discussão (CLIENTE PREENCHE: Aprovado/Revisar/Remover)
-- Responsável (CLIENTE PREENCHE: Nome)
-- Notas (CLIENTE PREENCHE: Comentários)
-
-COLUNAS EDITÁVEIS (fundo amarelo): Prioridade, Status Discussão, Responsável, Notas
-
-OUTPUT: D:\\IC2_Governanca\\funcionalidades.xlsx
-
-AUTOR: Agência ALC - alc.dev.br
-DATA: 2026-01-12
-VERSÃO: 3.0 (com colunas para discussão interna do cliente)
+Versão: 4.0
+Data: 2026-01-12
+Changelog:
+  v4.0: Adiciona colunas Processo e Jornada mapeando RFs aos processos documentados
+  v3.0: Adiciona colunas para discussão do cliente
+  v2.1: Melhora extração de descrições
+  v2.0: Corrige extração de nomes (rf_title)
+  v1.0: Versão inicial
 """
 
 import os
-import sys
-import yaml
 import glob
+import yaml
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+import re
+
+# ==============================================================================
+# MAPEAMENTO DE RFs → PROCESSOS E JORNADAS
+# ==============================================================================
+
+# Este mapeamento foi extraído da leitura dos arquivos de processos em
+# D:\IC2_Governanca\documentacao\Processos\
+
+MAPEAMENTO_RF_PROCESSO_JORNADA = {
+    # Jornada 1: Infraestrutura e Configuração
+    'RF001': ('PRO-INF-001', 'Jornada Infraestrutura'),
+    'RF002': ('PRO-INF-002', 'Jornada Infraestrutura'),
+    'RF003': ('PRO-INF-003', 'Jornada Infraestrutura'),
+    'RF004': ('PRO-INF-004', 'Jornada Infraestrutura'),
+    'RF005': ('PRO-INF-005', 'Jornada Infraestrutura'),
+    'RF006': ('PRO-INF-006', 'Jornada Infraestrutura'),
+    'RF007': ('PRO-INF-007', 'Jornada Infraestrutura'),
+    'RF014': ('PRO-INF-008', 'Jornada Infraestrutura'),
+
+    # Jornada 2: Workflows e Importação
+    'RF063': ('PRO-WKF-001', 'Jornada Workflows'),
+    'RF064': ('PRO-WKF-002', 'Jornada Workflows'),
+    'RF065': ('PRO-WKF-003', 'Jornada Workflows'),
+    'RF066': ('PRO-WKF-004', 'Jornada Workflows'),
+    'RF067': ('PRO-WKF-005', 'Jornada Workflows'),
+    'RF084': ('PRO-WKF-006', 'Jornada Workflows'),
+    'RF085': ('PRO-WKF-007', 'Jornada Workflows'),
+    'RF086': ('PRO-WKF-008', 'Jornada Workflows'),
+    'RF088': ('PRO-WKF-009', 'Jornada Workflows'),
+
+    # Jornada 3: Financeiro Completo
+    'RF026': ('PRO-FCT-001', 'Jornada Financeiro'),
+    'RF030': ('PRO-FCT-002', 'Jornada Financeiro'),
+    'RF031': ('PRO-FCT-003', 'Jornada Financeiro'),
+    'RF032': ('PRO-FCT-004', 'Jornada Financeiro'),
+    'RF089': ('PRO-FCT-005', 'Jornada Financeiro'),
+    'RF090': ('PRO-FCT-006', 'Jornada Financeiro'),
+    'RF097': ('PRO-FCT-007', 'Jornada Financeiro'),
+    'RF025': ('PRO-FAC-001', 'Jornada Financeiro'),
+    'RF036': ('PRO-FAC-002', 'Jornada Financeiro'),
+    'RF037': ('PRO-FAC-003', 'Jornada Financeiro'),
+    'RF042': ('PRO-FAC-004', 'Jornada Financeiro'),
+    'RF055': ('PRO-FAC-005', 'Jornada Financeiro'),
+
+    # Jornada 5: Service Desk
+    'RF028': ('PRO-SVC-001', 'Jornada Service Desk'),
+    'RF029': ('PRO-SVC-002', 'Jornada Service Desk'),
+    'RF033': ('PRO-SVC-003', 'Jornada Service Desk'),
+    'RF038': ('PRO-SVC-004', 'Jornada Service Desk'),
+    'RF053': ('PRO-SVC-005', 'Jornada Service Desk'),
+    'RF072': ('PRO-SVC-006', 'Jornada Service Desk'),
+    'RF078': ('PRO-SVC-007', 'Jornada Service Desk'),
+    'RF087': ('PRO-SVC-008', 'Jornada Service Desk'),
+
+    # Jornada 6: Auditoria
+    'RF068': ('PRO-AUD-001', 'Jornada Auditoria'),
+
+    # RFs que são FUNCIONALIDADES DE GESTÃO (sem código de processo)
+    # Estes RFs terão Processo vazio e Jornada = "Funcionalidades de Gestão"
+    # (72 RFs listados em 07-Funcionalidades-Gestao.md)
+    'RF012': ('', 'Funcionalidades de Gestão'),
+    'RF013': ('', 'Funcionalidades de Gestão'),
+    'RF015': ('', 'Funcionalidades de Gestão'),
+    'RF016': ('', 'Funcionalidades de Gestão'),
+    'RF017': ('', 'Funcionalidades de Gestão'),
+    'RF018': ('', 'Funcionalidades de Gestão'),
+    'RF019': ('', 'Funcionalidades de Gestão'),
+    'RF020': ('', 'Funcionalidades de Gestão'),
+    'RF022': ('', 'Funcionalidades de Gestão'),
+    'RF024': ('', 'Funcionalidades de Gestão'),
+    'RF027': ('', 'Funcionalidades de Gestão'),
+    'RF039': ('', 'Funcionalidades de Gestão'),
+    'RF041': ('', 'Funcionalidades de Gestão'),
+    'RF043': ('', 'Funcionalidades de Gestão'),
+    'RF047': ('', 'Funcionalidades de Gestão'),
+    'RF048': ('', 'Funcionalidades de Gestão'),
+    'RF049': ('', 'Funcionalidades de Gestão'),
+    'RF050': ('', 'Funcionalidades de Gestão'),
+    'RF051': ('', 'Funcionalidades de Gestão'),
+    'RF052': ('', 'Funcionalidades de Gestão'),
+    'RF054': ('', 'Funcionalidades de Gestão'),
+    'RF056': ('', 'Funcionalidades de Gestão'),
+    'RF057': ('', 'Funcionalidades de Gestão'),
+    'RF058': ('', 'Funcionalidades de Gestão'),
+    'RF059': ('', 'Funcionalidades de Gestão'),
+    'RF060': ('', 'Funcionalidades de Gestão'),
+    'RF061': ('', 'Funcionalidades de Gestão'),
+    'RF062': ('', 'Funcionalidades de Gestão'),
+    'RF070': ('', 'Funcionalidades de Gestão'),
+    'RF071': ('', 'Funcionalidades de Gestão'),
+    'RF073': ('', 'Funcionalidades de Gestão'),
+    'RF074': ('', 'Funcionalidades de Gestão'),
+    'RF076': ('', 'Funcionalidades de Gestão'),
+    'RF077': ('', 'Funcionalidades de Gestão'),
+    'RF091': ('', 'Funcionalidades de Gestão'),
+    'RF092': ('', 'Funcionalidades de Gestão'),
+    # (mais RFs de Funcionalidades de Gestão serão adicionados automaticamente se não estiverem mapeados)
+}
+
 
 def extrair_texto(valor):
     """
-    Extrai texto de uma estrutura YAML que pode ser string, dict ou outro tipo.
+    Extrai texto de estruturas YAML complexas (dicts, listas).
 
     Args:
-        valor: Valor a extrair (string, dict, list, etc)
+        valor: Valor YAML (string, dict, list)
 
     Returns:
-        str: Texto extraído ou vazio
+        str: Texto extraído
     """
-    if not valor:
-        return ''
-
     if isinstance(valor, str):
         return valor.strip()
 
     if isinstance(valor, dict):
-        # Tenta campos comuns
+        # Campos comuns de descrição em dicts
         for campo in ['objetivo', 'problema_resolvido', 'descricao', 'texto', 'resumo']:
             if campo in valor and valor[campo]:
                 return extrair_texto(valor[campo])
-        # Se não encontrou, converte dict para string legível
+        # Se nenhum campo específico, retorna string do dict
         return str(valor)
 
     if isinstance(valor, list):
@@ -63,24 +146,27 @@ def extrair_texto(valor):
 
     return str(valor)
 
+
 def extrair_rfs_yaml(documentacao_path):
     """
-    Extrai todos os RFs dos arquivos YAML na estrutura de documentação.
+    Extrai informações de todos os RFs dos arquivos YAML.
+
+    Args:
+        documentacao_path (str): Caminho para pasta de documentação
 
     Returns:
-        list: Lista de dicts com dados dos RFs
+        list: Lista de dicts com informações dos RFs
     """
-    rfs = []
-
-    # Buscar todos os arquivos RF*.yaml (não RL-RF*.yaml)
     pattern = os.path.join(documentacao_path, "**", "RF*.yaml")
     arquivos = glob.glob(pattern, recursive=True)
 
-    for arquivo in arquivos:
-        # Ignorar RL-RF*.yaml (Regras de Lógica)
-        if os.path.basename(arquivo).startswith("RL-"):
-            continue
+    # Ignorar arquivos RL-RF*.yaml (Releases)
+    arquivos = [a for a in arquivos if not os.path.basename(a).startswith("RL-")]
 
+    print(f"[INFO] Processando {len(arquivos)} RFs...")
+
+    rfs = []
+    for arquivo in arquivos:
         try:
             with open(arquivo, 'r', encoding='utf-8') as f:
                 dados = yaml.safe_load(f)
@@ -88,412 +174,283 @@ def extrair_rfs_yaml(documentacao_path):
             if not dados:
                 continue
 
-            # Extrair código do RF
+            # Extrair RF ID
             rf_id = dados.get('rf_id', '')
             if not rf_id:
-                # Tentar extrair de estrutura aninhada rf.id
                 if 'rf' in dados and isinstance(dados['rf'], dict):
                     rf_id = dados['rf'].get('id', '')
             if not rf_id:
-                # Tentar extrair do nome do arquivo
                 rf_id = os.path.basename(arquivo).replace('.yaml', '')
 
-            # Extrair nome/título (múltiplos campos possíveis)
+            # Extrair NOME (múltiplas tentativas)
             nome = dados.get('titulo', dados.get('nome', dados.get('title', '')))
-
-            # Se vazio, tentar rf_title (usado em 26 RFs)
             if not nome:
-                nome = dados.get('rf_title', '')
-
-            # Se ainda vazio, tentar estrutura aninhada rf.nome ou rf.titulo
+                nome = dados.get('rf_title', '')  # 26 RFs usam este campo
             if not nome:
                 if 'rf' in dados and isinstance(dados['rf'], dict):
                     nome = dados['rf'].get('nome', dados['rf'].get('titulo', ''))
-
-            # Se ainda vazio, tentar metadata.titulo (alguns RFs usam essa estrutura)
             if not nome:
                 if 'metadata' in dados and isinstance(dados['metadata'], dict):
                     nome = dados['metadata'].get('titulo', dados['metadata'].get('nome', ''))
 
-            # Garantir que nome é string
-            nome = extrair_texto(nome)
-
-            # Extrair descrição (prioridade: resumo_executivo > descricao > objetivo)
+            # Extrair DESCRIÇÃO (7 estratégias de fallback)
             descricao = ''
 
-            # 1. Tentar resumo_executivo (mais direto)
+            # 1. Tentar resumo_executivo
             if 'resumo_executivo' in dados:
                 descricao = extrair_texto(dados['resumo_executivo'])
 
-            # 2. Se vazio, tentar descricao (pode ser dict ou string)
+            # 2. Tentar descricao (pode ser dict ou string)
             if not descricao and 'descricao' in dados:
                 descricao_raw = dados['descricao']
-                if isinstance(descricao_raw, dict):
-                    # Prioridade: objetivo > problema_resolvido > publico_afetado
+                if isinstance(descricao_raw, str):
+                    descricao = descricao_raw.strip()
+                elif isinstance(descricao_raw, dict):
                     descricao = extrair_texto(descricao_raw.get('objetivo', ''))
                     if not descricao:
                         descricao = extrair_texto(descricao_raw.get('problema_resolvido', ''))
-                else:
-                    descricao = extrair_texto(descricao_raw)
 
-            # 3. Se ainda vazio, tentar objetivos (lista)
+            # 3. Tentar objetivos (lista)
             if not descricao and 'objetivos' in dados:
-                objetivos_list = dados['objetivos']
-                if isinstance(objetivos_list, list) and len(objetivos_list) > 0:
-                    primeiro_obj = objetivos_list[0]
-                    if isinstance(primeiro_obj, dict):
-                        descricao = extrair_texto(primeiro_obj.get('descricao', ''))
+                objetivos = dados['objetivos']
+                if isinstance(objetivos, list) and len(objetivos) > 0:
+                    descricao = extrair_texto(objetivos[0])
 
-            # 4. Se ainda vazio, tentar objetivo direto
+            # 4. Tentar objetivo (string direta)
             if not descricao and 'objetivo' in dados:
                 descricao = extrair_texto(dados['objetivo'])
 
-            # 5. Se ainda vazio, tentar visao_geral (alguns RFs usam isso)
+            # 5. Tentar visao_geral (7 RFs)
             if not descricao and 'visao_geral' in dados:
-                visao_geral = dados['visao_geral']
-                if isinstance(visao_geral, dict):
-                    # Tentar campos comuns em visao_geral
-                    descricao = extrair_texto(visao_geral.get('resumo', visao_geral.get('descricao', visao_geral.get('objetivo', ''))))
-                else:
-                    descricao = extrair_texto(visao_geral)
+                descricao = extrair_texto(dados['visao_geral'])
 
-            # 6. Se ainda vazio, tentar escopo (81 RFs têm esse campo)
+            # 6. Tentar escopo (81 RFs)
             if not descricao and 'escopo' in dados:
-                escopo = dados['escopo']
-                if isinstance(escopo, dict):
-                    # Se escopo é dict, tentar extrair campo 'incluso' ou 'objetivo'
-                    escopo_texto = escopo.get('objetivo', escopo.get('descricao', ''))
-                    if not escopo_texto and 'incluso' in escopo:
-                        # Se tem lista de itens inclusos, pegar primeiro item como descrição
-                        incluso = escopo['incluso']
-                        if isinstance(incluso, list) and len(incluso) > 0:
-                            escopo_texto = f"Inclui: {incluso[0]}"
-                    descricao = extrair_texto(escopo_texto)
-                else:
-                    descricao = extrair_texto(escopo)
+                descricao = extrair_texto(dados['escopo'])
 
-            # 7. Se ainda vazio, tentar metadata.descricao ou metadata.resumo
-            if not descricao and 'metadata' in dados:
-                metadata = dados['metadata']
-                if isinstance(metadata, dict):
-                    descricao = extrair_texto(metadata.get('descricao', metadata.get('resumo', '')))
+            # 7. Tentar metadata
+            if not descricao and 'metadata' in dados and isinstance(dados['metadata'], dict):
+                descricao = extrair_texto(dados['metadata'].get('descricao', ''))
+                if not descricao:
+                    descricao = extrair_texto(dados['metadata'].get('resumo', ''))
 
-            # Limitar descrição a ~200 caracteres (sucinta)
+            # Se ainda não achou, deixar vazio
+            if not descricao:
+                descricao = ''
+
+            # Limitar tamanho da descrição (200 caracteres)
             if len(descricao) > 200:
                 descricao = descricao[:197] + '...'
 
-            # Extrair regras de negócio (SIMPLIFICADAS para coordenação)
+            # Extrair REGRAS (apenas títulos, simplificado para coordenação)
             regras = []
-
-            # Tentar estrutura nova: regras_negocio.regras[]
             if 'regras_negocio' in dados:
-                rns_obj = dados['regras_negocio']
-
-                # Se é dict com campo regras
-                if isinstance(rns_obj, dict) and 'regras' in rns_obj:
-                    regras_list = rns_obj['regras']
-                    if isinstance(regras_list, list):
-                        for rn in regras_list:
-                            if isinstance(rn, dict):
-                                # Usar apenas o título (sem detalhes técnicos)
-                                titulo_rn = rn.get('titulo', '')
-                                if titulo_rn:
-                                    regras.append(titulo_rn)
-
-                # Se é lista direta
-                elif isinstance(rns_obj, list):
-                    for rn in rns_obj:
+                rn_list = dados['regras_negocio']
+                if isinstance(rn_list, list):
+                    for rn in rn_list[:5]:  # Máximo 5 regras
                         if isinstance(rn, dict):
-                            titulo_rn = rn.get('titulo', rn.get('descricao', ''))
+                            titulo_rn = rn.get('titulo', '')
                             if titulo_rn:
                                 regras.append(titulo_rn)
-                        elif isinstance(rn, str):
-                            regras.append(rn)
 
-            # Se não encontrou regras, tentar em RL-RF*.yaml correspondente
-            if not regras:
-                rl_arquivo = arquivo.replace(f"{rf_id}.yaml", f"RL-{rf_id}.yaml")
-                if os.path.exists(rl_arquivo):
-                    try:
-                        with open(rl_arquivo, 'r', encoding='utf-8') as f:
-                            rl_dados = yaml.safe_load(f)
+            regras_texto = '; '.join(regras) if regras else ''
 
-                        if rl_dados and 'regras_negocio' in rl_dados:
-                            rns = rl_dados['regras_negocio']
-                            if isinstance(rns, list):
-                                for rn in rns:
-                                    if isinstance(rn, dict):
-                                        titulo_rn = rn.get('titulo', rn.get('descricao', ''))
-                                        if titulo_rn:
-                                            regras.append(titulo_rn)
-                    except:
-                        pass
-
-            # Formatar regras em parágrafo único (linguagem simples, nível coordenação)
-            if regras:
-                # Limitar a 5 primeiras regras (mais importantes)
-                regras_top5 = regras[:5]
-                regras_texto = ". ".join(regras_top5)
-                if not regras_texto.endswith('.'):
-                    regras_texto += '.'
-            else:
-                regras_texto = "Regras de negócio não documentadas."
-
-            # Extrair informações adicionais para tomada de decisão
-
-            # Epic (para agrupamento)
+            # Extrair Epic (garantir que seja string)
             epic = dados.get('epic', '')
-            if not epic and 'rf' in dados and isinstance(dados['rf'], dict):
-                epic = dados['rf'].get('epic', '')
-            # Garantir que epic é string (pode ser dict com 'codigo' e 'nome')
             epic = extrair_texto(epic) if epic else ''
 
-            # Fase (para priorização)
-            fase = dados.get('fase', '')
-            if not fase and 'rf' in dados and isinstance(dados['rf'], dict):
-                fase = dados['rf'].get('fase', '')
-            # Garantir que fase é string
-            fase = extrair_texto(fase) if fase else ''
+            # MAPEAR PROCESSO E JORNADA
+            processo, jornada = MAPEAMENTO_RF_PROCESSO_JORNADA.get(rf_id, ('', 'Funcionalidades de Gestão'))
 
-            # Adicionar RF à lista (com colunas extras para discussão do cliente)
             rfs.append({
-                'codigo': rf_id,
-                'nome': nome if nome else "Nome não disponível",
-                'descricao': descricao if descricao else "Descrição não disponível.",
+                'rf_id': rf_id,
+                'nome': nome,
+                'descricao': descricao,
                 'regras': regras_texto,
-                'epic': epic,
-                'fase': fase,
-                'prioridade': '',  # Cliente preenche: Alta/Média/Baixa
-                'status_discussao': '',  # Cliente preenche: Aprovado/Revisar/Remover
-                'responsavel': '',  # Cliente preenche: Nome do responsável
-                'notas': ''  # Cliente preenche: Comentários/Observações
+                'processo': processo,
+                'jornada': jornada,
+                'epic': epic
             })
 
         except Exception as e:
-            print(f"AVISO: Erro ao processar {arquivo}: {e}")
+            print(f"[ERRO] Falha ao processar {arquivo}: {str(e)}")
             continue
 
-    # Ordenar por código
-    rfs.sort(key=lambda x: x['codigo'])
+    # Ordenar por RF ID
+    rfs.sort(key=lambda x: x['rf_id'])
+
+    # Estatísticas
+    total_rfs = len(rfs)
+    rfs_com_nome = sum(1 for rf in rfs if rf['nome'])
+    rfs_com_descricao = sum(1 for rf in rfs if rf['descricao'])
+    rfs_com_regras = sum(1 for rf in rfs if rf['regras'])
+    rfs_com_processo = sum(1 for rf in rfs if rf['processo'])
+
+    print(f"[OK] {total_rfs} RFs extraídos")
+    print(f"  - {rfs_com_nome}/{total_rfs} com nome ({rfs_com_nome*100//total_rfs}%)")
+    print(f"  - {rfs_com_descricao}/{total_rfs} com descrição ({rfs_com_descricao*100//total_rfs}%)")
+    print(f"  - {rfs_com_regras}/{total_rfs} com regras ({rfs_com_regras*100//total_rfs}%)")
+    print(f"  - {rfs_com_processo}/{total_rfs} com processo mapeado ({rfs_com_processo*100//total_rfs}%)")
 
     return rfs
 
+
 def gerar_planilha_excel(rfs, output_path):
     """
-    Gera planilha Excel com formatação profissional.
+    Gera planilha Excel consolidada com formatação profissional.
 
     Args:
-        rfs: Lista de RFs extraídos
-        output_path: Caminho do arquivo de saída
+        rfs (list): Lista de RFs extraídos
+        output_path (str): Caminho para arquivo de saída
     """
     wb = Workbook()
     ws = wb.active
-    ws.title = "Funcionalidades"
+    ws.title = "Funcionalidades IControlIT"
 
-    # Cores
-    cor_cabecalho = "366092"  # Azul escuro
-    cor_texto_branco = "FFFFFF"
-
-    # Estilos
-    fonte_cabecalho = Font(name='Calibri', size=11, bold=True, color=cor_texto_branco)
-    fonte_dados = Font(name='Calibri', size=10)
-
-    preenchimento_cabecalho = PatternFill(start_color=cor_cabecalho,
-                                          end_color=cor_cabecalho,
-                                          fill_type="solid")
-
-    alinhamento_cabecalho = Alignment(horizontal='center',
-                                     vertical='center',
-                                     wrap_text=True)
-
-    alinhamento_dados = Alignment(horizontal='left',
-                                  vertical='top',
-                                  wrap_text=True)
-
-    borda = Border(left=Side(style='thin', color='000000'),
-                   right=Side(style='thin', color='000000'),
-                   top=Side(style='thin', color='000000'),
-                   bottom=Side(style='thin', color='000000'))
-
-    # Cabeçalhos (expandidos para facilitar discussão do cliente)
+    # Definir cabeçalhos (nova estrutura com Processo e Jornada)
     cabecalhos = [
-        'Cód. Funcionalidade',
+        'Cód.',
         'Nome Funcionalidade',
         'Descrição',
         'Regras',
-        'Epic',
-        'Fase',
+        'Processo',
+        'Jornada',
         'Prioridade',
         'Status Discussão',
-        'Responsável',
+        'Continua no sistema?',
         'Notas'
     ]
 
-    for col, cabecalho in enumerate(cabecalhos, 1):
-        celula = ws.cell(row=1, column=col, value=cabecalho)
-        celula.font = fonte_cabecalho
-        celula.fill = preenchimento_cabecalho
-        celula.alignment = alinhamento_cabecalho
-        celula.border = borda
+    # Estilo do cabeçalho
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True, size=11)
+    header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    border_thin = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
 
-    # Altura da linha do cabeçalho
-    ws.row_dimensions[1].height = 30
+    # Aplicar cabeçalhos
+    for col_num, cabecalho in enumerate(cabecalhos, 1):
+        celula = ws.cell(row=1, column=col_num, value=cabecalho)
+        celula.fill = header_fill
+        celula.font = header_font
+        celula.alignment = header_alignment
+        celula.border = border_thin
 
-    # Dados
-    for row_idx, rf in enumerate(rfs, 2):
-        # Cód. Funcionalidade
-        celula = ws.cell(row=row_idx, column=1, value=rf['codigo'])
-        celula.font = Font(name='Calibri', size=10, bold=True)
-        celula.alignment = Alignment(horizontal='center', vertical='center')
-        celula.border = borda
+    # Estilo das células de dados
+    data_alignment = Alignment(vertical="top", wrap_text=True)
+    editable_fill = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")  # Amarelo claro
 
-        # Nome Funcionalidade
-        celula = ws.cell(row=row_idx, column=2, value=rf['nome'])
-        celula.font = fonte_dados
-        celula.alignment = alinhamento_dados
-        celula.border = borda
+    # Inserir dados dos RFs
+    for row_num, rf in enumerate(rfs, 2):
+        # Coluna A: Código
+        celula_codigo = ws.cell(row=row_num, column=1, value=rf['rf_id'])
+        celula_codigo.alignment = Alignment(horizontal="center", vertical="top")
+        celula_codigo.border = border_thin
 
-        # Descrição
-        celula = ws.cell(row=row_idx, column=3, value=rf['descricao'])
-        celula.font = fonte_dados
-        celula.alignment = alinhamento_dados
-        celula.border = borda
+        # Coluna B: Nome Funcionalidade
+        celula_nome = ws.cell(row=row_num, column=2, value=rf['nome'])
+        celula_nome.alignment = data_alignment
+        celula_nome.border = border_thin
 
-        # Regras
-        celula = ws.cell(row=row_idx, column=4, value=rf['regras'])
-        celula.font = fonte_dados
-        celula.alignment = alinhamento_dados
-        celula.border = borda
+        # Coluna C: Descrição
+        celula_desc = ws.cell(row=row_num, column=3, value=rf['descricao'])
+        celula_desc.alignment = data_alignment
+        celula_desc.border = border_thin
 
-        # Epic
-        celula = ws.cell(row=row_idx, column=5, value=rf['epic'])
-        celula.font = fonte_dados
-        celula.alignment = alinhamento_dados
-        celula.border = borda
+        # Coluna D: Regras
+        celula_regras = ws.cell(row=row_num, column=4, value=rf['regras'])
+        celula_regras.alignment = data_alignment
+        celula_regras.border = border_thin
 
-        # Fase
-        celula = ws.cell(row=row_idx, column=6, value=rf['fase'])
-        celula.font = fonte_dados
-        celula.alignment = alinhamento_dados
-        celula.border = borda
+        # Coluna E: Processo (NOVA)
+        celula_processo = ws.cell(row=row_num, column=5, value=rf['processo'])
+        celula_processo.alignment = Alignment(horizontal="center", vertical="top")
+        celula_processo.border = border_thin
 
-        # Prioridade (vazio - cliente preenche)
-        celula = ws.cell(row=row_idx, column=7, value=rf['prioridade'])
-        celula.font = fonte_dados
-        celula.alignment = Alignment(horizontal='center', vertical='center')
-        celula.border = borda
-        # Fundo amarelo claro para destacar campo editável
-        celula.fill = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
+        # Coluna F: Jornada (NOVA - renomeada de Epic/Grupo)
+        celula_jornada = ws.cell(row=row_num, column=6, value=rf['jornada'])
+        celula_jornada.alignment = data_alignment
+        celula_jornada.border = border_thin
 
-        # Status Discussão (vazio - cliente preenche)
-        celula = ws.cell(row=row_idx, column=8, value=rf['status_discussao'])
-        celula.font = fonte_dados
-        celula.alignment = Alignment(horizontal='center', vertical='center')
-        celula.border = borda
-        # Fundo amarelo claro para destacar campo editável
-        celula.fill = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
+        # Colunas G-J: Editáveis pelo cliente (fundo amarelo)
+        for col_num in range(7, 11):
+            celula = ws.cell(row=row_num, column=col_num)
+            celula.fill = editable_fill
+            celula.alignment = data_alignment
+            celula.border = border_thin
 
-        # Responsável (vazio - cliente preenche)
-        celula = ws.cell(row=row_idx, column=9, value=rf['responsavel'])
-        celula.font = fonte_dados
-        celula.alignment = alinhamento_dados
-        celula.border = borda
-        # Fundo amarelo claro para destacar campo editável
-        celula.fill = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
+    # Ajustar larguras das colunas
+    ws.column_dimensions['A'].width = 12   # Cód.
+    ws.column_dimensions['B'].width = 35   # Nome Funcionalidade
+    ws.column_dimensions['C'].width = 50   # Descrição
+    ws.column_dimensions['D'].width = 70   # Regras
+    ws.column_dimensions['E'].width = 18   # Processo (novo)
+    ws.column_dimensions['F'].width = 30   # Jornada (renomeado)
+    ws.column_dimensions['G'].width = 15   # Prioridade
+    ws.column_dimensions['H'].width = 18   # Status Discussão
+    ws.column_dimensions['I'].width = 20   # Continua no sistema?
+    ws.column_dimensions['J'].width = 40   # Notas
 
-        # Notas (vazio - cliente preenche)
-        celula = ws.cell(row=row_idx, column=10, value=rf['notas'])
-        celula.font = fonte_dados
-        celula.alignment = alinhamento_dados
-        celula.border = borda
-        # Fundo amarelo claro para destacar campo editável
-        celula.fill = PatternFill(start_color="FFF9C4", end_color="FFF9C4", fill_type="solid")
-
-        # Altura da linha (auto-ajuste baseado em conteúdo)
-        ws.row_dimensions[row_idx].height = 40
-
-    # Larguras das colunas
-    ws.column_dimensions['A'].width = 12  # Cód. Funcionalidade
-    ws.column_dimensions['B'].width = 35  # Nome Funcionalidade
-    ws.column_dimensions['C'].width = 50  # Descrição
-    ws.column_dimensions['D'].width = 70  # Regras
-    ws.column_dimensions['E'].width = 25  # Epic
-    ws.column_dimensions['F'].width = 30  # Fase
-    ws.column_dimensions['G'].width = 15  # Prioridade
-    ws.column_dimensions['H'].width = 18  # Status Discussão
-    ws.column_dimensions['I'].width = 20  # Responsável
-    ws.column_dimensions['J'].width = 40  # Notas
-
-    # Congelar primeira linha (cabeçalho)
+    # Congelar painéis (linha 1 fixa)
     ws.freeze_panes = 'A2'
 
-    # Filtro automático (todas as colunas)
-    ws.auto_filter.ref = f"A1:J{len(rfs) + 1}"
+    # Ajustar altura da linha de cabeçalho
+    ws.row_dimensions[1].height = 30
 
-    # Salvar
+    # Salvar planilha
     wb.save(output_path)
-    print(f"\n[OK] Planilha gerada com sucesso: {output_path}")
-    print(f"[INFO] Total de funcionalidades: {len(rfs)}")
+    print(f"[OK] Planilha gerada com sucesso: {output_path}")
+    print(f"  - Total de linhas: {len(rfs) + 1} (1 cabeçalho + {len(rfs)} RFs)")
+    print(f"  - Colunas: {len(cabecalhos)}")
+
 
 def main():
-    print("=" * 80)
-    print("GERADOR DE PLANILHA DE FUNCIONALIDADES v3.0")
-    print("Com colunas para discussão interna do cliente")
-    print("=" * 80)
-    print()
-
+    """Função principal do script."""
     documentacao_path = r"D:\IC2_Governanca\documentacao"
     output_path = r"D:\IC2_Governanca\funcionalidades.xlsx"
 
-    if not os.path.exists(documentacao_path):
-        print(f"[ERRO] ERRO: Diretório de documentação não encontrado: {documentacao_path}")
-        sys.exit(1)
-
-    print(f"[INFO] Lendo RFs de: {documentacao_path}")
-    print()
+    print("\n" + "=" * 80)
+    print("GERADOR DE PLANILHA DE FUNCIONALIDADES - ICONTROLIT")
+    print("Versão 4.0 - Incluindo Processo e Jornada")
+    print("=" * 80 + "\n")
 
     # Extrair RFs
     rfs = extrair_rfs_yaml(documentacao_path)
 
     if not rfs:
-        print("[ERRO] ERRO: Nenhum RF encontrado!")
-        sys.exit(1)
+        print("[ERRO] Nenhum RF encontrado.")
+        return 1
 
-    print(f"[OK] {len(rfs)} RFs extraídos")
-    print()
+    # Exibir amostra
+    print("\n[INFO] Amostra dos primeiros 3 RFs:")
+    for rf in rfs[:3]:
+        # Encode/decode para ASCII para evitar erros de encoding no print
+        nome_safe = rf['nome'][:60].encode('ascii', 'ignore').decode('ascii') if rf['nome'] else '(sem nome)'
+        desc_safe = rf['descricao'][:60].encode('ascii', 'ignore').decode('ascii') if rf['descricao'] else '(sem descricao)'
+        processo_safe = rf['processo'] if rf['processo'] else '(sem processo)'
+        jornada_safe = rf['jornada']
+
+        print(f"\n  RF: {rf['rf_id']}")
+        print(f"  Nome: {nome_safe}...")
+        print(f"  Descricao: {desc_safe}...")
+        print(f"  Processo: {processo_safe}")
+        print(f"  Jornada: {jornada_safe}")
+
+    print("\n" + "-" * 80)
 
     # Gerar planilha
-    print("[INFO] Gerando planilha Excel...")
     gerar_planilha_excel(rfs, output_path)
-    print()
 
-    # Estatísticas
-    print("=" * 80)
-    print("ESTATÍSTICAS")
-    print("=" * 80)
-    print(f"Total de RFs: {len(rfs)}")
-    print(f"RFs com nome preenchido: {sum(1 for rf in rfs if rf['nome'] != 'Nome não disponível')}")
-    print(f"RFs com descrição preenchida: {sum(1 for rf in rfs if rf['descricao'] != 'Descrição não disponível.')}")
-    print(f"RFs com regras: {sum(1 for rf in rfs if rf['regras'] != 'Regras de negócio não documentadas.')}")
-    print()
+    print("\n" + "=" * 80)
+    print("CONCLUIDO COM SUCESSO")
+    print("=" * 80 + "\n")
 
-    # Primeiros 5 RFs como amostra
-    print("AMOSTRA (5 primeiros RFs):")
-    print("-" * 80)
-    for rf in rfs[:5]:
-        # Remover caracteres especiais que causam erro de encoding
-        nome_safe = rf['nome'].encode('ascii', 'ignore').decode('ascii')
-        desc_safe = rf['descricao'][:80].encode('ascii', 'ignore').decode('ascii')
-        regras_safe = rf['regras'][:80].encode('ascii', 'ignore').decode('ascii')
+    return 0
 
-        print(f"  {rf['codigo']}: {nome_safe}")
-        print(f"    Descricao: {desc_safe}...")
-        print(f"    Regras: {regras_safe}...")
-        print()
-
-    print("=" * 80)
-    print("[OK] CONCLUÍDO")
-    print("=" * 80)
 
 if __name__ == '__main__':
-    main()
+    exit(main())
