@@ -320,7 +320,53 @@ Se primeira execução E2E < 80%:
 
 ---
 
-## FASE 3: PÓS-IMPLEMENTAÇÃO (3 checklists)
+### 2.5. Validação Visual (Layout e Alinhamento)
+
+**Objetivo:** Garantir que elementos estão visualmente corretos (alinhamento, posição, layout)
+
+**Checklist:**
+
+#### Screenshots de Baseline
+- [ ] Screenshots de baseline criados para TODAS as páginas principais
+- [ ] Nomenclatura: `[RFXXX]-[pagina]-[estado].png`
+- [ ] Armazenados em: `e2e/screenshots/baseline/RFXXX/`
+- [ ] Baseline cobre estados: normal, loading, vazio, erro
+
+#### Validações de Layout
+- [ ] Botões principais estão visíveis e alinhados corretamente
+- [ ] Campos de formulário estão alinhados verticalmente
+- [ ] Tabelas possuem colunas alinhadas
+- [ ] Estados UI (loading, vazio, erro) estão centralizados
+- [ ] Elementos não estão sobrepostos ou cortados
+- [ ] Nenhum elemento está fora da viewport
+
+#### Configuração Playwright
+- [ ] `screenshot: 'on'` configurado em playwright.config.ts
+- [ ] Testes de snapshot criados para páginas principais
+- [ ] Tolerância de diff configurada (`maxDiffPixels: 100`)
+- [ ] Viewport configurado consistentemente (1920x1080 para desktop)
+
+#### Validações Programáticas (Opcional)
+- [ ] Validação de alinhamento de botões (boundingBox)
+- [ ] Validação de posição de elementos críticos
+- [ ] Validação de elementos dentro da viewport
+
+**Critério de Aprovação:**
+- ✅ TODAS as páginas principais possuem baseline visual
+- ✅ Testes de snapshot executam sem falhas (ou diff < maxDiffPixels)
+- ✅ Layout responsivo validado (desktop + mobile se aplicável)
+
+**Se FALHAR:**
+- ❌ Corrigir CSS/layout desalinhado
+- ❌ Atualizar baseline (se mudança intencional)
+- ❌ Re-executar testes visuais até PASS
+
+**Impacto RF006:**
+- Resolve GAP 4: Regressões visuais não detectadas (alinhamento, layout)
+
+---
+
+## FASE 3: PÓS-IMPLEMENTAÇÃO (4 checklists)
 
 ### 3.1. Validação Técnica (Build, Testes Unitários/Backend)
 
@@ -362,7 +408,45 @@ Se primeira execução E2E < 80%:
 
 ---
 
-### 3.2. Validação E2E Primeira Execução (≥ 80%)
+### 3.2. Validação Visual Primeira Execução
+
+**Objetivo:** Garantir que baseline visual foi criado e testes visuais executam
+
+**Checklist:**
+
+#### Criação de Baseline
+- [ ] Executar criação de baseline:
+  ```bash
+  cd frontend/icontrolit-app && npm run e2e:visual:baseline RFXXX
+  ```
+- [ ] Screenshots criados em: `e2e/screenshots/baseline/RFXXX/`
+- [ ] Baseline cobre TODAS as páginas do RF
+
+#### Primeira Execução de Testes Visuais
+- [ ] Executar testes visuais:
+  ```bash
+  cd frontend/icontrolit-app && npm run e2e:visual RFXXX
+  ```
+- [ ] Testes visuais passam (ou diff < maxDiffPixels)
+- [ ] Nenhum elemento fora da viewport detectado
+
+#### Análise de Falhas Visuais (se houver)
+- [ ] Identificar se falha é regressão (corrigir CSS) ou mudança intencional (atualizar baseline)
+- [ ] Documentar decisão em comentário do commit
+- [ ] Re-executar até PASS
+
+**Critério de Aprovação:**
+- ✅ Baseline criado para TODAS as páginas
+- ✅ Testes visuais executam sem falhas críticas
+
+**Se FALHAR:**
+- ❌ Corrigir CSS/layout desalinhado
+- ❌ Atualizar baseline (se mudança intencional)
+- ❌ Re-executar testes visuais
+
+---
+
+### 3.3. Validação E2E Primeira Execução (≥ 80%)
 
 **Objetivo:** Garantir que primeira execução E2E atinge taxa de aprovação ≥ 80%
 
@@ -407,7 +491,7 @@ Se primeira execução E2E < 80%:
 
 ---
 
-### 3.3. Documentação (STATUS.yaml, EXECUTION-MANIFEST)
+### 3.4. Documentação (STATUS.yaml, EXECUTION-MANIFEST)
 
 **Objetivo:** Documentar resultado da implementação e primeira execução E2E
 
@@ -431,6 +515,10 @@ Se primeira execução E2E < 80%:
   validacao:
     backend: passed
     frontend: passed
+    testes_visuais:
+      baseline_criado: true
+      testes_aprovados: true
+      data: "[DATA]"
     testes_e2e_primeira_execucao:
       taxa_aprovacao: "[X]%"
       status: "[APROVADO|REPROVADO]"

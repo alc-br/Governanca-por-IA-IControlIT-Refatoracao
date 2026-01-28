@@ -885,7 +885,73 @@ documentacao:
 
 ---
 
-## 13. REGRA DE NEGAÇÃO ZERO
+## 13. Git Operations (SOMENTE SE APROVADO 100% SEM RESSALVAS)
+
+**Versão:** 1.0
+**Data:** 2026-01-28
+
+### Regra Fundamental
+
+**SE E SOMENTE SE:**
+1. ✅ MT-RF[XXX].yaml APROVADO 100%
+2. ✅ TC-RF[XXX].yaml APROVADO 100%
+3. ✅ **ZERO** ressalvas ou gaps
+4. ✅ Branch atual **NÃO** é `dev`
+
+**ENTÃO:** Executar Git Operations automaticamente.
+
+### Sequência Obrigatória
+
+```bash
+# 1. Verificar branch atual
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+if [ "$current_branch" == "dev" ]; then
+    echo "✅ Já está em dev. Sem necessidade de merge."
+    exit 0
+fi
+
+# 2. Verificar se há alterações pendentes
+if [ -n "$(git status --porcelain)" ]; then
+    echo "📝 Alterações pendentes detectadas. Commitando..."
+
+    # 3. Adicionar TODAS as alterações
+    git add .
+
+    # 4. Criar commit
+    git commit -m "docs(RFXXX): MT+TC validados 100%
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+fi
+
+# 5. Merge com dev
+git checkout dev
+git pull origin dev
+git merge $current_branch --no-ff -m "merge($current_branch): MT+TC validados 100%
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+
+# 6. Push para remoto
+git push origin dev
+
+# 7. Deletar branch local (opcional)
+git branch -d $current_branch
+
+echo "✅ Git Operations concluídas. MT+TC mergeados em dev."
+```
+
+### Critérios de Bloqueio
+
+**NÃO executar Git Operations se:**
+- ❌ MT REPROVADO
+- ❌ TC REPROVADO
+- ❌ Qualquer ressalva
+- ❌ Já está em branch `dev`
+- ❌ Conflitos de merge detectados
+
+---
+
+## 14. REGRA DE NEGAÇÃO ZERO
 
 Se uma solicitação:
 - não estiver explicitamente prevista no contrato ativo, ou

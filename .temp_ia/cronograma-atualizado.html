@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronograma IControlIT - Refatoração</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 3px solid #e9ecef;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .phases {
+            padding: 40px;
+        }
+
+        .phase {
+            margin-bottom: 40px;
+            border-left: 5px solid #667eea;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        .phase::before {
+            content: '';
+            position: absolute;
+            left: -10px;
+            top: 0;
+            width: 15px;
+            height: 15px;
+            background: #667eea;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 3px #667eea;
+        }
+
+        .phase-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .phase-title {
+            font-size: 1.8em;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+
+        .phase-status {
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-in-progress {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-planned {
+            background: #cfe2ff;
+            color: #084298;
+        }
+
+        .phase-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-icon {
+            font-size: 1.5em;
+        }
+
+        .info-text {
+            font-size: 0.95em;
+        }
+
+        .info-label {
+            color: #6c757d;
+            display: block;
+            font-size: 0.85em;
+        }
+
+        .info-value {
+            color: #2c3e50;
+            font-weight: bold;
+            display: block;
+        }
+
+        .timeline {
+            position: relative;
+            margin: 20px 0;
+            height: 40px;
+            background: #e9ecef;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .timeline-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            transition: width 0.5s ease;
+        }
+
+        .tasks {
+            margin-top: 20px;
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .task-header h3 {
+            color: #495057;
+            font-size: 1.2em;
+        }
+
+        .toggle-tasks {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-tasks:hover {
+            background: #764ba2;
+        }
+
+        .task-list {
+            display: none;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .task-list.show {
+            display: grid;
+        }
+
+        .task-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+
+        .task-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.1);
+        }
+
+        .task-id {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .task-name {
+            color: #2c3e50;
+            font-size: 0.95em;
+        }
+
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .footer p {
+            margin: 5px 0;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .phase-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .stat-value {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Cronograma IControlIT - Refatoração</h1>
+            <p>Sistema Completo de Gestão de Ativos e Telecomunicações</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">Total de Horas</div>
+                <div class="stat-value" id="totalHours">0h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Horas Concluídas</div>
+                <div class="stat-value" id="completedHours">0h</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total de RFs</div>
+                <div class="stat-value" id="totalRFs">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Progresso Geral</div>
+                <div class="stat-value" id="overallProgress">0%</div>
+            </div>
+        </div>
+
+        <div class="phases" id="phasesContainer"></div>
+
+        <div class="footer">
+            <p><strong>Projeto:</strong> IControlIT - Refatoração Completa</p>
+            <p><strong>Cliente:</strong> K2A Telecom</p>
+            <p><strong>Última Atualização:</strong> <span id="lastUpdate">14/01/2026</span></p>
+        </div>
+    </div>
+
+    <script>
+        const projectData = {
+            phases: [
+                {
+                    id: "fase1",
+                    title: "Fase 1 - Sistema Base (Infraestrutura)",
+                    status: "completed",
+                    plannedHours: 280,
+                    actualHours: 280,
+                    startDate: "2025-10-01",
+                    endDate: "2025-11-15",
+                    tasks: [
+                        { id: "RF001", name: "Arquitetura Clean Architecture + CQRS" },
+                        { id: "RF002", name: "Multi-Tenancy com Row-Level Security" },
+                        { id: "RF003", name: "Sistema de Autenticação JWT" },
+                        { id: "RF004", name: "RBAC (Controle de Acesso Baseado em Perfis)" },
+                        { id: "RF005", name: "Gestão de Usuários e Perfis" },
+                        { id: "RF006", name: "Gestão de Clientes (Multi-Tenancy)" },
+                        { id: "RF007", name: "Login e Autenticação Frontend" },
+                        { id: "RF008", name: "i18n (Internacionalização pt-BR, en-US, es-ES)" }
+                    ]
+                },
+                {
+                    id: "fase2",
+                    title: "Fase 2 - Cadastros Base (Expandida)",
+                    status: "completed",
+                    plannedHours: 385,
+                    actualHours: 385,
+                    startDate: "2025-11-16",
+                    endDate: "2026-01-10",
+                    tasks: [
+                        { id: "RF009", name: "Gestão de Fornecedores" },
+                        { id: "RF010", name: "Gestão de Departamentos" },
+                        { id: "RF011", name: "Hierarquia Corporativa" },
+                        { id: "RF012", name: "Gestão de Locais e Endereços" },
+                        { id: "RF013", name: "Gestão de Categorias de Ativos" },
+                        { id: "RF014", name: "Gestão de Tipos de Ativos" },
+                        { id: "RF015", name: "Gestão de Tipos de Consumidores" },
+                        { id: "RF016", name: "Gestão de Documentos e Anexos" },
+                        { id: "RF017", name: "Sistema de Templates de Relatórios" },
+                        { id: "RF018", name: "Sistema de Notificações Completo" },
+                        { id: "RF019", name: "Gestão de Centros de Custo" },
+                        { id: "RF083", name: "Central de Funcionalidades (Módulos Ativos)" }
+                    ]
+                },
+                {
+                    id: "fase3",
+                    title: "Fase 3 - Financeiro Completo (Base Contábil + Processos + Menu Matricial)",
+                    status: "in-progress",
+                    plannedHours: 695,
+                    actualHours: 0,
+                    startDate: "2026-01-14",
+                    endDate: "2026-03-15",
+                    tasks: [
+                        // Base Contábil (Antiga Fase 3)
+                        { id: "RF020", name: "Gestão de Contratos (CRUD + Validações)" },
+                        { id: "RF021", name: "Gestão de Tarifas e Planos" },
+                        { id: "RF022", name: "Gestão de SLAs (Service Level Agreements)" },
+                        { id: "RF023", name: "Gestão de Vigências e Renovações" },
+                        { id: "RF024", name: "Gestão de Reajustes Tarifários" },
+                        { id: "RF025", name: "Gestão de Verbas Contratuais" },
+                        { id: "RF026", name: "Gestão de Faturas (Importação Manual)" },
+                        { id: "RF027", name: "Auditoria de Faturas (Análise Manual)" },
+                        { id: "RF028", name: "Plano de Contas Contábil" },
+                        { id: "RF029", name: "Hierarquia de Contas (Árvore Contábil)" },
+                        // Processos (Antiga Fase 4)
+                        { id: "RF030", name: "Rateio de Custos por Departamento" },
+                        { id: "RF031", name: "Rateio de Custos por Centro de Custo" },
+                        { id: "RF032", name: "Rateio de Custos por Hierarquia Corporativa" },
+                        { id: "RF033", name: "Gestão de Despesas (Lançamentos Manuais)" },
+                        { id: "RF034", name: "Workflow de Aprovação de Pagamentos" },
+                        { id: "RF035", name: "Relatórios Financeiros (Consolidados)" },
+                        { id: "RF036", name: "Análises de Custos (Tendências e Comparativos)" },
+                        // Menu Matricial e UX (Novo)
+                        { id: "UX001", name: "Implementação do Menu Matricial (Vetor Vertical × Vetor Horizontal)" },
+                        { id: "UX002", name: "Reorganização da Navegação (Ícones e Agrupamentos)" },
+                        { id: "UX003", name: "Breadcrumbs e Indicadores de Contexto" },
+                        { id: "UX004", name: "Wireframes das Principais Telas de Negócio" },
+                        { id: "UX005", name: "Mockups das Telas de Contratos e Faturas" }
+                    ]
+                },
+                {
+                    id: "fase4",
+                    title: "Fase 4 - Service Desk (Suporte N0/N1)",
+                    status: "planned",
+                    plannedHours: 320,
+                    actualHours: 0,
+                    startDate: "2026-03-16",
+                    endDate: "2026-05-15",
+                    tasks: [
+                        { id: "RF040", name: "Gestão de Tickets (Abertura, Atribuição, Resolução)" },
+                        { id: "RF041", name: "Base de Conhecimento (FAQs e Artigos)" },
+                        { id: "RF042", name: "Gestão de SLAs de Suporte" },
+                        { id: "RF043", name: "Chatbot Inteligente (IA)" },
+                        { id: "RF044", name: "Portal do Cliente (Self-Service)" },
+                        { id: "RF045", name: "Dashboard de Tickets (Tempo Real)" },
+                        { id: "RF046", name: "Relatórios de Performance de Suporte" }
+                    ]
+                },
+                {
+                    id: "fase5",
+                    title: "Fase 5 - Ativos, Inventário e Integrações",
+                    status: "planned",
+                    plannedHours: 450,
+                    actualHours: 0,
+                    startDate: "2026-05-16",
+                    endDate: "2026-07-31",
+                    tasks: [
+                        { id: "RF050", name: "Gestão de Ativos (CRUD Completo)" },
+                        { id: "RF051", name: "Inventário de Linhas (Telefonia Móvel)" },
+                        { id: "RF052", name: "Inventário de Links (Telefonia Fixa + Dados)" },
+                        { id: "RF053", name: "Cruzamento Fatura × Inventário" },
+                        { id: "RF054", name: "Alertas de Discrepâncias (Cobranças Indevidas)" },
+                        { id: "RF055", name: "RPA - Captura Automática de Faturas (Bots)" },
+                        { id: "RF056", name: "Integração Bidirecional com ERPs (SAP, TOTVS)" },
+                        { id: "RF057", name: "Integração com PowerBI (Dashboards)" },
+                        { id: "RF058", name: "API Pública (Endpoints para Clientes)" }
+                    ]
+                }
+            ]
+        };
+
+        function initDashboard() {
+            const totalHours = projectData.phases.reduce((sum, phase) => sum + phase.plannedHours, 0);
+            const completedHours = projectData.phases
+                .filter(p => p.status === 'completed')
+                .reduce((sum, phase) => sum + phase.actualHours, 0);
+            const totalRFs = projectData.phases.reduce((sum, phase) => sum + phase.tasks.length, 0);
+            const overallProgress = ((completedHours / totalHours) * 100).toFixed(1);
+
+            document.getElementById('totalHours').textContent = `${totalHours}h`;
+            document.getElementById('completedHours').textContent = `${completedHours}h`;
+            document.getElementById('totalRFs').textContent = totalRFs;
+            document.getElementById('overallProgress').textContent = `${overallProgress}%`;
+
+            renderPhases();
+        }
+
+        function renderPhases() {
+            const container = document.getElementById('phasesContainer');
+            container.innerHTML = '';
+
+            projectData.phases.forEach(phase => {
+                const phaseElement = document.createElement('div');
+                phaseElement.className = 'phase';
+
+                const statusClass = phase.status === 'completed' ? 'status-completed' :
+                                  phase.status === 'in-progress' ? 'status-in-progress' : 'status-planned';
+                const statusText = phase.status === 'completed' ? '✅ Concluída' :
+                                 phase.status === 'in-progress' ? '🔄 Em Andamento' : '⏳ Planejada';
+
+                const progress = phase.status === 'completed' ? 100 :
+                               phase.status === 'in-progress' ? ((phase.actualHours / phase.plannedHours) * 100).toFixed(1) : 0;
+
+                phaseElement.innerHTML = `
+                    <div class="phase-header">
+                        <div class="phase-title">${phase.title}</div>
+                        <div class="phase-status ${statusClass}">${statusText}</div>
+                    </div>
+                    <div class="phase-info">
+                        <div class="info-item">
+                            <span class="info-icon">⏱️</span>
+                            <div class="info-text">
+                                <span class="info-label">Horas Planejadas</span>
+                                <span class="info-value">${phase.plannedHours}h</span>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-icon">📅</span>
+                            <div class="info-text">
+                                <span class="info-label">Período</span>
+                                <span class="info-value">${formatDate(phase.startDate)} - ${formatDate(phase.endDate)}</span>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-icon">📋</span>
+                            <div class="info-text">
+                                <span class="info-label">Total de RFs</span>
+                                <span class="info-value">${phase.tasks.length}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="timeline">
+                        <div class="timeline-bar" style="width: ${progress}%">${progress}%</div>
+                    </div>
+                    <div class="tasks">
+                        <div class="task-header">
+                            <h3>📌 Requisitos Funcionais</h3>
+                            <button class="toggle-tasks" onclick="toggleTasks('${phase.id}')">
+                                Ver Detalhes
+                            </button>
+                        </div>
+                        <div class="task-list" id="tasks-${phase.id}">
+                            ${phase.tasks.map(task => `
+                                <div class="task-item">
+                                    <div class="task-id">${task.id}</div>
+                                    <div class="task-name">${task.name}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(phaseElement);
+            });
+        }
+
+        function toggleTasks(phaseId) {
+            const taskList = document.getElementById(`tasks-${phaseId}`);
+            taskList.classList.toggle('show');
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        // Initialize dashboard on load
+        initDashboard();
+    </script>
+</body>
+</html>

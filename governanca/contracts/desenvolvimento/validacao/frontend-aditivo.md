@@ -85,4 +85,68 @@ resultado_tests = executar_npm_test()
 
 ---
 
+## Git Operations (SOMENTE SE APROVADO 100% SEM RESSALVAS)
+
+**Versão:** 1.0
+**Data:** 2026-01-28
+
+### Regra Fundamental
+
+**SE E SOMENTE SE:**
+1. ✅ Validação passou **100%** (10/10 PASS)
+2. ✅ **ZERO** ressalvas ou gaps
+3. ✅ Branch atual **NÃO** é `dev`
+
+**ENTÃO:** Executar Git Operations automaticamente.
+
+### Sequência Obrigatória
+
+```bash
+# 1. Verificar branch atual
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+if [ "$current_branch" == "dev" ]; then
+    echo "✅ Já está em dev. Sem necessidade de merge."
+    exit 0
+fi
+
+# 2. Verificar se há alterações pendentes
+if [ -n "$(git status --porcelain)" ]; then
+    echo "📝 Alterações pendentes detectadas. Commitando..."
+
+    # 3. Adicionar TODAS as alterações
+    git add .
+
+    # 4. Criar commit
+    git commit -m "feat(RFXXX): frontend aditivo validado 100%
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+fi
+
+# 5. Merge com dev
+git checkout dev
+git pull origin dev
+git merge $current_branch --no-ff -m "merge($current_branch): frontend aditivo validado 100%
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+
+# 6. Push para remoto
+git push origin dev
+
+# 7. Deletar branch local (opcional)
+git branch -d $current_branch
+
+echo "✅ Git Operations concluídas. Frontend aditivo mergeado em dev."
+```
+
+### Critérios de Bloqueio
+
+**NÃO executar Git Operations se:**
+- ❌ Validação < 100%
+- ❌ Qualquer ressalva ou observação
+- ❌ Já está em branch `dev`
+- ❌ Conflitos de merge detectados
+
+---
+
 **Versão:** 1.0 | **Mantido por:** Time IControlIT | **Governado por:** D:\IC2\CLAUDE.md

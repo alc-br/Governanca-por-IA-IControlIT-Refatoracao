@@ -75,6 +75,128 @@ Este projeto opera em **MODO DE GOVERNANÇA RÍGIDA**.
 
 ---
 
+## 3.1. Localização de Arquivos RF (OBRIGATÓRIO)
+
+**Versão:** 1.0
+**Data:** 2026-01-13
+**Contexto:** Criado após identificar que agentes gastam 4-6 tentativas para localizar arquivos RF
+
+### Problema
+
+**Estrutura de pastas profunda:**
+```
+D:\IC2_Governanca\documentacao\
+  └── Fase-{N}-{Nome-Fase}/
+      └── EPIC{NNN}-{Categoria}-{Nome-Epic}/
+          └── RF{NNN}-{Nome-RF}/
+              ├── RF{NNN}.md
+              ├── RF{NNN}.yaml
+              └── ... (outros arquivos)
+```
+
+**Sintoma:** Agentes usam Glob com padrões genéricos (`**/RFXXX.md`) que falham em estruturas profundas.
+
+### Regra Obrigatória
+
+**SEMPRE localizar arquivos RF usando `find` ANTES de tentar ler.**
+
+#### NUNCA Use
+
+- ❌ Glob com padrão genérico (`**/RFXXX.md`, `**/RFXXX.yaml`)
+- ❌ Tentativas de adivinhar caminho
+- ❌ Múltiplas tentativas de localização sem validação
+
+#### SEMPRE Use
+
+- ✅ `find` com caminho base completo
+- ✅ Utilitário `find-rf.sh` (recomendado)
+- ✅ Validar que diretório existe antes de prosseguir
+
+### Comando Obrigatório (Passo 0)
+
+**Antes de qualquer operação com RF, execute:**
+
+```bash
+# Localizar diretório do RF
+RF_DIR=$(find D:/IC2_Governanca/documentacao/ -type d -name "RFXXX*" | head -1)
+
+# Validar que diretório foi encontrado
+if [ -z "$RF_DIR" ]; then
+    echo "ERRO: RF não encontrado"
+    exit 1
+fi
+
+echo "Diretório encontrado: $RF_DIR"
+
+# Listar arquivos disponíveis
+ls -1 "$RF_DIR"
+```
+
+### Utilitário Recomendado
+
+**Use o utilitário de localização rápida:**
+
+```bash
+# Localizar RF007
+bash D:/IC2_Governanca/tools/find-rf.sh RF007
+```
+
+**Output esperado:**
+```
+✅ RF localizado com sucesso!
+
+📁 Diretório: .../RF007-Login-e-Autenticacao
+
+📄 Arquivos disponíveis:
+MD-RF007.yaml
+RF007.md
+RF007.yaml
+RL-RF007.md
+UC-RF007.md
+WF-RF007.md
+STATUS.yaml
+
+📌 Caminhos completos:
+  RF.md   : .../RF007.md
+  RF.yaml : .../RF007.yaml
+  UC.yaml : .../UC-RF007.yaml
+  RL.yaml : .../RL-RF007.yaml
+```
+
+### Regra de Validação
+
+**BLOQUEIO:** Qualquer tentativa de ler arquivo RF sem localização prévia é considerada **VIOLAÇÃO**.
+
+**Sequência correta:**
+1. Localizar diretório do RF (usando `find` ou `find-rf.sh`)
+2. Validar que diretório existe
+3. Listar arquivos disponíveis
+4. Ler arquivos necessários
+
+**Sequência incorreta (PROIBIDA):**
+1. ~~Tentar ler `**/RFXXX.md` diretamente~~ → FALHA
+2. ~~Tentar Glob `**/RFXXX.yaml`~~ → FALHA
+3. ~~Adivinhar caminho~~ → FALHA
+4. ~~Múltiplas tentativas sem validação~~ → INEFICIENTE
+
+### Impacto Esperado
+
+| Métrica | Antes | Depois |
+|---------|-------|--------|
+| Tentativas de localização | 4-6 comandos | 1 comando |
+| Tempo de localização | 15-30 segundos | 2-5 segundos |
+| Taxa de falsos positivos | 25% | 0% |
+
+### Documentação de Apoio
+
+| Documento | Propósito |
+|-----------|-----------|
+| `tools/find-rf.sh` | Utilitário de localização rápida |
+| `tools/TEMPLATE-LOCALIZACAO-RF.md` | Template de seção para contratos/prompts |
+| `prompts/documentacao/validacao/rf.md` | Exemplo de aplicação (seção já adicionada) |
+
+---
+
 ## 4. REGRA DE NEGAÇÃO ZERO
 
 Se uma solicitação:
@@ -560,7 +682,128 @@ Não existem exceções para:
 
 ---
 
-### 18.8. Versão e Histórico
+### 18.8. Validação Visual (Novo)
+
+**Versão:** 1.0
+**Data:** 2026-01-13
+
+#### Princípio
+
+**Testes E2E DEVEM validar não apenas funcionalidade, mas também aparência visual.**
+
+Validações funcionais (elementos presentes, clicáveis, textos corretos) **NÃO** detectam:
+- Elementos desalinhados ou fora da tela
+- Layout quebrado ou responsividade incorreta
+- Sobreposição de elementos
+- CSS incorreto (cores, fontes, espaçamento)
+
+#### Validações Obrigatórias
+
+| Validação | Descrição | Quando |
+|-----------|-----------|--------|
+| **Screenshots de Baseline** | Capturar screenshots de TODAS as páginas principais | Primeira implementação do RF |
+| **Visual Regression** | Comparar screenshots atuais com baseline | A cada execução de testes E2E |
+| **Layout Responsivo** | Validar layout em desktop (1920x1080) | A cada execução de testes E2E |
+
+#### Abordagens Suportadas
+
+**1. Playwright Snapshots (Recomendado - Built-in)**
+```typescript
+test('Deve exibir lista com layout correto', async ({ page }) => {
+  await page.goto('/management/clientes');
+  await page.waitForSelector('[data-test="clientes-list"]');
+
+  await expect(page).toHaveScreenshot('clientes-list.png', {
+    maxDiffPixels: 100,  // Tolerância de 100 pixels
+  });
+});
+```
+
+**2. Validações Programáticas CSS (Opcional)**
+```typescript
+test('Botão deve estar alinhado à direita', async ({ page }) => {
+  const button = page.locator('[data-test="btn-novo"]');
+  const box = await button.boundingBox();
+  const pageWidth = await page.viewportSize()?.width;
+
+  expect(box!.x + box!.width).toBeGreaterThan(pageWidth! - 100);
+});
+```
+
+**3. Ferramentas Externas (Opcional)**
+- Chromatic (gratuito até 5k snapshots/mês)
+- Percy (pago)
+- Applitools (pago)
+
+#### Bloqueios
+
+**Bloqueio Parcial (NÃO impede testes funcionais):**
+- ❌ Baseline ausente → ALERTAR (testes visuais bloqueados, testes funcionais prosseguem)
+- ❌ Playwright sem screenshot → ALERTAR (validação visual impossível)
+
+**Se projeto optar por validação visual rigorosa:**
+- ❌ Diferenças visuais > maxDiffPixels → FALHA (bloqueia deploy)
+
+**Se projeto optar por validação visual informativa (padrão):**
+- ⚠️ Diferenças visuais detectadas → ALERTAR (não bloqueia deploy)
+
+#### Configuração Playwright
+
+**playwright.config.ts:**
+```typescript
+export default defineConfig({
+  use: {
+    screenshot: 'on',  // OBRIGATÓRIO para testes visuais
+    viewport: { width: 1920, height: 1080 },  // Consistência de resolução
+  },
+});
+```
+
+#### Estrutura de Arquivos
+
+```
+e2e/
+├── visual/
+│   ├── RFXXX-visual.spec.ts       ← Testes visuais
+│   └── ...
+├── screenshots/
+│   ├── baseline/
+│   │   └── RFXXX/
+│   │       ├── lista-normal.png   ← Baseline (versionado no git)
+│   │       ├── lista-vazio.png
+│   │       └── lista-erro.png
+│   └── actual/                     ← Screenshots atuais (gerados em runtime)
+│       └── RFXXX/
+```
+
+#### Comandos
+
+| Comando | Propósito |
+|---------|-----------|
+| `npm run e2e:visual:baseline RFXXX` | Criar baseline de screenshots |
+| `npm run e2e:visual RFXXX` | Executar testes visuais (comparação) |
+| `npm run e2e:visual:update RFXXX` | Atualizar baseline (após mudança intencional) |
+
+#### Documentação de Apoio
+
+| Documento | Propósito |
+|-----------|-----------|
+| `checklists/testes/CHECKLIST-IMPLEMENTACAO-E2E.md` | Seção 2.5 - Validação Visual |
+| `checklists/testes/pre-execucao.yaml` | Seção validacao_visual |
+| `processos/VALIDACAO-VISUAL-E2E.md` | Processo detalhado de validação visual |
+
+---
+
+### 18.9. Versão e Histórico
+
+**v1.1 (2026-01-13):**
+- Adicionada subseção 18.8: Validação Visual
+- Criado após identificação de GAP 4 (regressões visuais não detectadas)
+- Abordagens suportadas: Playwright Snapshots, CSS Assertions, Ferramentas Externas
+- Bloqueios parciais (não impedem testes funcionais)
+- Configuração Playwright obrigatória para testes visuais
+- Estrutura de arquivos e comandos documentados
+- Documentação de apoio: 3 documentos atualizados
 
 **v1.0 (2026-01-09):**
 - Criação da seção após análise do RF006
@@ -573,6 +816,28 @@ Não existem exceções para:
 ---
 
 ## Changelog
+
+### v4.3 (2026-01-13)
+- **Adicionada seção 3.1: LOCALIZAÇÃO DE ARQUIVOS RF (OBRIGATÓRIO)**
+- Criado após identificar que agentes gastam 4-6 tentativas para localizar arquivos RF
+- Regra obrigatória: SEMPRE usar `find` com caminho base completo
+- Utilitário find-rf.sh criado (localização em 1 comando)
+- Template TEMPLATE-LOCALIZACAO-RF.md criado para aplicação em contratos/prompts
+- Bloqueio: Tentar ler RF sem localização prévia é considerado VIOLAÇÃO
+- Impacto esperado: 5x menos tentativas, 6x mais rápido
+- Documentação de apoio: 3 utilitários criados (find-rf.sh, template, script de aplicação)
+- Aplicação progressiva: seção já adicionada em prompts/documentacao/validacao/rf.md
+
+### v4.2 (2026-01-13)
+- **Adicionada subseção 18.8: VALIDAÇÃO VISUAL**
+- Criado após identificação de GAP 4 (regressões visuais não detectadas)
+- Validações obrigatórias: Screenshots de Baseline, Visual Regression, Layout Responsivo
+- Abordagens suportadas: Playwright Snapshots (recomendado), CSS Assertions, Ferramentas Externas
+- Bloqueios parciais: baseline ausente ou Playwright não configurado NÃO impedem testes funcionais
+- Configuração Playwright: screenshot: 'on' + viewport: 1920x1080
+- Estrutura de arquivos: e2e/visual/ + e2e/screenshots/baseline/
+- Comandos: npm run e2e:visual:baseline, e2e:visual, e2e:visual:update
+- Documentação de apoio: 3 documentos atualizados (CHECKLIST-IMPLEMENTACAO-E2E.md, pre-execucao.yaml, novo processo VALIDACAO-VISUAL-E2E.md)
 
 ### v4.1 (2026-01-09)
 - **Adicionada seção 18: ALINHAMENTO OBRIGATÓRIO COM TESTES**
@@ -601,5 +866,5 @@ Não existem exceções para:
 ---
 
 **Mantido por:** Time de Arquitetura IControlIT
-**Última Atualização:** 2026-01-09
-**Versão:** 4.1 - Governança de Documentação
+**Última Atualização:** 2026-01-13
+**Versão:** 4.3 - Governança de Documentação

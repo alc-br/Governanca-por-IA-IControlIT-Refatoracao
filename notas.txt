@@ -1,0 +1,424 @@
+================================================================================
+NOTAS E IDEIAS - SISTEMA ICONTROLIT
+================================================================================
+Data: 2026-01-13
+Atualizado: 2026-01-13
+================================================================================
+
+## CONTEXTO: MODELO SAAS
+
+O IControlIT é um **sistema SaaS (Software as a Service)** baseado em assinaturas.
+
+**Arquitetura de Módulos e Assinaturas:**
+- **RF083 (Central de Módulos)** = Catálogo técnico de TODAS as funcionalidades do sistema
+- **RF117 (Gestão de Assinaturas)** = Planos comerciais que agrupam módulos
+- **Cliente assina plano** → ganha acesso aos módulos inclusos no plano
+- **Módulos podem ter dependências** → só funcionam se módulos pré-requisitos estiverem ativos
+
+**Fluxo:**
+1. Desenvolvedor cria nova funcionalidade → registra na Central de Módulos (RF083)
+2. Comercial cria plano de assinatura → seleciona módulos do catálogo (RF117)
+3. Cliente assina plano → RF117 ativa módulos automaticamente
+4. Usuário acessa sistema → RF083 valida se módulo está na assinatura ativa
+
+---
+
+################################################################################
+# RF083 - CENTRAL DE MÓDULOS
+################################################################################
+
+## OBJETIVO PRINCIPAL (SAAS)
+Catálogo centralizado de TODAS as funcionalidades do sistema.
+Toda nova feature desenvolvida DEVE ser registrada aqui para ser controlável
+via assinaturas, RBAC, ambientes e Feature Flags.
+
+---
+
+## IDEIAS PARA EVOLUÇÃO
+
+### 1. Controle de Ativação por Ambiente
+- Permitir ativar/desativar módulo por ambiente (Dev/Hom/Prod) independentemente
+- Campo: `ambientes_ativos_json` = ["desenvolvimento", "homologacao"]
+- Exemplo: módulo ativo em Dev e Hom, mas bloqueado em Prod
+- Útil para: testes graduais, rollout controlado, validação antes de produção
+- Integração com RBAC: registrar permissões de ambiente
+
+**CASO DE USO:**
+- Módulo sendo testado → ativo apenas em Desenvolvimento
+- Após validação → libera para Homologação
+- Após aprovação cliente → libera para Produção
+- Flexibilidade total: qualquer combinação de ambientes é possível
+
+---
+
+### 2. Restrição de Módulos por Cliente Específico
+- Módulos customizados para clientes específicos
+- Campo já existe: `empresas_exclusivas_json`
+- Comportamento: vazio = todos os clientes / preenchido = apenas clientes listados
+- Útil para: funcionalidades personalizadas, features exclusivas
+
+**REGRA DE NEGÓCIO:**
+- Array vazio ou null → módulo disponível para todos os clientes
+- Array com IDs → módulo disponível apenas para clientes listados
+- Exemplo: Módulo "Integração SAP Customizada" → exclusivo para Cliente X e Y
+
+---
+
+### 3. Módulos Contratados vs Disponíveis
+- Separar "tecnicamente disponível" de "contratualmente permitido"
+- Campo novo: `requer_contrato` (boolean)
+- Validação: consultar RF117 (Gestão de Assinaturas) antes de liberar acesso
+- Evita confusão: "Cliente vê módulo mas não pode usar porque não contratou"
+
+**FLUXO DE VALIDAÇÃO:**
+1. Usuário tenta acessar módulo X
+2. Central verifica: ambiente OK? ✓
+3. Central verifica: RBAC OK? ✓
+4. Central verifica: Assinatura OK? ✓ (consulta RF117)
+5. Só libera se TODAS as condições passarem
+
+---
+
+### 4. Acesso Antecipado (Preview/Beta)
+- Campo novo: `disponivel_preview` (boolean)
+- Campo novo: `clientes_preview_json` (lista de IDs)
+- Permitir clientes específicos testarem módulos antes do lançamento oficial
+- Útil para: validar com parceiros de confiança, early adopters, piloto
+
+**EXEMPLO:**
+- Novo módulo "Dashboard Analytics 2.0"
+- Marcar como `disponivel_preview = true`
+- Selecionar 3 clientes para teste
+- Após validação positiva → libera `disponivel_preview = false` (todos)
+
+---
+
+### 5. Relatório de Uso Real
+- Endpoint novo: `GET /api/funcionalidades/estatisticas/uso`
+- Métricas: quantos clientes USAM cada módulo (não só têm acesso)
+- Diferença entre "está liberado" e "está sendo usado"
+- Útil para: identificar módulos subutilizados, priorizar melhorias
+
+**MÉTRICAS SUGERIDAS:**
+- Total de clientes com acesso ao módulo
+- Total de clientes que usaram nos últimos 30 dias
+- Taxa de adoção real (usaram / têm acesso)
+- Frequência de uso (diário, semanal, mensal, raramente)
+
+---
+
+### 6. Notificações de Mudanças de Módulos
+- Integração com Sistema de Notificações
+- Avisar usuários quando módulos são ativados para eles
+- Avisar quando módulos são desativados/removidos
+- Evita surpresas: "cadê aquela funcionalidade que estava aqui ontem?"
+
+**EVENTOS PARA NOTIFICAR:**
+- Novo módulo liberado para o cliente
+- Módulo removido/bloqueado do cliente
+- Módulo atualizado (nova versão disponível)
+- Módulo em manutenção (temporariamente indisponível)
+
+---
+
+### 7. Histórico de Ativações
+- Tabela auxiliar: `HistoricoModuloCliente`
+- Registrar: quem ativou/desativou, quando, em qual ambiente, para qual cliente
+- Útil para: troubleshooting, auditoria, responder "desde quando cliente X tem isso?"
+
+**CAMPOS SUGERIDOS:**
+- modulo_id
+- cliente_id
+- ambiente (dev/hom/prod)
+- acao (ativado/desativado)
+- usuario_responsavel_id
+- data_hora
+- motivo (opcional)
+
+---
+
+### 8. Dependências entre Módulos (CRÍTICO PARA SAAS)
+- Campo novo: `modulos_requeridos_json` (lista de IDs de módulos pré-requisitos)
+- **Validação obrigatória** em múltiplos pontos do sistema
+- Dependências são transitivas (se A requer B, e B requer C, então A requer B e C)
+
+**EXEMPLOS DE DEPENDÊNCIAS:**
+- "Renovação de Contratos" requer "Gestão de Contratos"
+- "Auditoria de Faturas" requer "Gestão de Faturas"
+- "Relatórios Avançados" requer "Relatórios Básicos"
+- "Gestão de Ativos Telecom" requer "Gestão de Ativos"
+
+**VALIDAÇÕES OBRIGATÓRIAS:**
+
+**8.1. Ao Ativar Módulo Manualmente (RF083)**
+- Usuário Developer tenta ativar módulo X
+- Sistema verifica se todos os módulos em `modulos_requeridos_json` estão ativos
+- Se faltante → BLOQUEAR e mostrar: "Para ativar [Módulo X], você precisa ativar antes: [Módulo Y, Módulo Z]"
+- Oferecer botão "Ativar todos os pré-requisitos"
+
+**8.2. Ao Desativar Módulo (RF083)**
+- Usuário tenta desativar módulo Y
+- Sistema verifica se existe algum módulo ativo que depende de Y
+- Se existe → BLOQUEAR e mostrar: "Não é possível desativar [Módulo Y] pois os seguintes módulos ativos dependem dele: [Módulo A, Módulo B]"
+- Sugerir: "Desative primeiro os módulos dependentes ou desative todos juntos"
+
+**8.3. Ao Criar Plano de Assinatura (RF117)**
+- Comercial cria plano e seleciona módulos
+- Sistema valida automaticamente se todas as dependências estão incluídas
+- Se faltante → ALERTAR: "Você selecionou [Módulo X] que requer [Módulo Y], deseja incluir automaticamente?"
+- Opções: "Incluir automaticamente" / "Remover módulo com dependência faltante" / "Ignorar (não recomendado)"
+
+**8.4. Ao Cliente Assinar Plano (RF117)**
+- Cliente assina plano com módulos [A, B, C]
+- Sistema resolve dependências: A requer D, B requer E
+- Sistema ativa automaticamente: [A, B, C, D, E]
+- Cliente recebe notificação: "Seu plano inclui X módulos + Y módulos ativados automaticamente por dependência"
+
+**8.5. Ao Adicionar Addon (RF117)**
+- Cliente contrata módulo X como addon
+- Sistema verifica dependências de X
+- Se dependências não estão na assinatura → BLOQUEAR e mostrar: "Este módulo requer [Módulo Y]. Deseja incluir no plano por +R$ ZZZ/mês?"
+
+**8.6. Ao Fazer Downgrade (RF117)**
+- Cliente faz downgrade de Premium → Básico
+- Plano Básico não inclui módulo Y, mas inclui módulo X que depende de Y
+- Sistema detecta conflito → BLOQUEAR downgrade
+- Sugestão: "Remova [Módulo X] da assinatura antes de fazer downgrade" OU "Mantenha [Módulo Y] como addon por +R$ ZZZ/mês"
+
+**CAMPOS ADICIONAIS:**
+- `modulos_requeridos_json`: ["id1", "id2"] (pré-requisitos diretos)
+- `dependencias_resolvidas_json`: ["id1", "id2", "id3"] (pré-requisitos + transitivos, calculado automaticamente)
+- `modulos_dependentes_json`: ["id5", "id6"] (módulos que dependem deste, calculado automaticamente)
+
+**INTERFACE (RF083):**
+- Ao editar módulo, seção "Dependências":
+  - Campo multi-select: "Este módulo requer:"
+  - Lista de módulos selecionados
+  - Botão "Validar dependências" (verifica ciclos, valida IDs)
+- Ao visualizar módulo, seção "Dependências":
+  - "Requer: [Módulo A, Módulo B]" (com links)
+  - "Requerido por: [Módulo X, Módulo Y]" (com links)
+
+**RELATÓRIOS:**
+- Dashboard: "Módulos com mais dependências" (top 10)
+- Dashboard: "Módulos mais requeridos por outros" (top 10)
+- Alerta: "Módulos órfãos" (não são dependência de ninguém e não estão em nenhum plano)
+- Alerta: "Dependências circulares detectadas" (A → B → C → A)
+
+**REGRAS DE NEGÓCIO:**
+- RN-RF083-17: Dependências circulares são **PROIBIDAS** (A não pode depender de B se B depende de A, direta ou transitivamente)
+- RN-RF083-18: Ao desativar módulo, todos os dependentes **DEVEM** ser desativados junto
+- RN-RF083-19: Ao ativar módulo, todas as dependências **DEVEM** ser ativadas junto
+- RN-RF083-20: Planos de assinatura **DEVEM** incluir todas as dependências dos módulos selecionados
+
+---
+
+### 9. Pacotes Inclusos (Marketing)
+- Campo novo: `pacotes_inclusos_json` = ["basico", "premium", "enterprise"]
+- Indicar em quais planos comerciais o módulo está incluído
+- Útil para: interface de vendas, upsell, comunicação com cliente
+- Exemplo: Módulo "Relatórios Avançados" → apenas em ["premium", "enterprise"]
+- Integração: RF117 consulta este campo para montar planos
+
+---
+
+### 10. Disponibilidade para Venda
+- Campo novo: `disponivel_para_venda` (boolean)
+- Separar módulos:
+  - Prontos para vender ✓
+  - Em desenvolvimento (não oferecido)
+  - Descontinuados (legado, não vender mais)
+- Útil para: catálogo comercial, propostas, contratos novos
+- Integração: RF117 só permite criar planos com módulos `disponivel_para_venda = true`
+
+---
+
+### 11. Redirect para Página de Vendas
+- Quando usuário tenta acessar módulo não contratado → redirect para vendas
+- Endpoint: `GET /vendas/upgrade?modulo={codigo_modulo}`
+- Links no menu permanecem visíveis (estratégia de upsell)
+- Bloqueio ocorre ao tentar acessar a página
+- Página de vendas exibe: benefícios, planos que incluem, botão "Solicitar ao Comercial"
+
+**REGRA DE NEGÓCIO:** RN-RF083-16
+- Validar: módulo existe + requer contrato + assinatura não tem módulo
+- Redirect HTTP 307 (Temporary Redirect)
+- Registrar tentativa de acesso em analytics (oportunidade comercial)
+
+---
+
+################################################################################
+# RF117 - GESTÃO DE ASSINATURAS (NOVO)
+################################################################################
+
+## OBJETIVO
+Gerenciar planos de assinatura, módulos contratados, upgrades, downgrades e addons.
+**Versão Fase 1: Básico Essencial (Mínimo Viável para SaaS)**
+
+**FASE:** Fase 1 - Sistema Base
+**EPIC:** EPIC001-SYS - Sistema e Infraestrutura
+**PRIORIDADE:** Alta (pré-requisito para modelo SaaS)
+
+## DIFERENÇA DE RF023
+- RF023 = Contratos jurídicos (termos, cláusulas, fornecedores, SLAs)
+- RF117 = Assinaturas comerciais (planos, módulos, faturamento recorrente)
+
+---
+
+## FUNCIONALIDADES FASE 1 (8 ESSENCIAIS)
+
+### 1. Catálogo de Planos de Assinatura
+- Cadastrar planos comerciais: Básico, Profissional, Premium, Enterprise
+- Cada plano tem: nome, descrição, preço mensal, preço anual, lista de módulos inclusos
+- Planos podem ter desconto por pagamento anual (ex: 12 meses pelo preço de 10)
+- Status do plano: ativo (vendendo), inativo (não oferecido), descontinuado (legado)
+
+**CAMPOS PRINCIPAIS:**
+- id, codigo (ex: "PLAN-BASIC"), nome, descricao
+- preco_mensal, preco_anual, moeda (BRL, USD, EUR)
+- modulos_inclusos_json (lista de IDs de módulos do RF083)
+- limite_usuarios (null = ilimitado, ou número máximo)
+- limite_clientes (para multi-tenant)
+- ativo, disponivel_para_venda
+- categoria_plano (startup, empresarial, corporativo)
+
+---
+
+### 2. Assinatura do Cliente
+- Cliente assina um plano específico
+- Registrar: data_inicio, data_vencimento, status, forma_pagamento
+- Status: ativo, trial, suspenso, cancelado, vencido
+- Permitir múltiplas assinaturas por cliente (ex: plano principal + addon)
+
+**CAMPOS PRINCIPAIS:**
+- id, cliente_id, plano_id
+- data_inicio, data_vencimento, data_cancelamento
+- status, motivo_cancelamento
+- forma_pagamento (boleto, cartao, transferencia)
+- renovacao_automatica (boolean)
+- desconto_aplicado (percentual ou valor fixo)
+
+---
+
+### 3. Addons e Módulos Extras
+- Permitir contratar módulos avulsos além do plano base
+- Addon tem preço próprio e vigência própria
+- Tipos de addon: permanente, temporário (trial 30 dias), sazonal
+- Addon pode ser cortesia (gratuito por tempo limitado)
+
+**EXEMPLO:**
+- Cliente tem Plano Básico (10 módulos)
+- Contrata addon "Relatórios Avançados" por +R$ 200/mês
+- Addon trial "BI Analytics" gratuito por 30 dias
+- Após trial, sistema notifica para conversão ou remoção
+
+**CAMPOS:**
+- id, assinatura_id, modulo_id
+- tipo (permanente / temporario / cortesia)
+- preco_adicional
+- data_inicio, data_fim (null se permanente)
+- renovacao_automatica
+
+---
+
+### 4. Upgrade e Downgrade de Planos
+- Cliente pode fazer upgrade (Básico → Premium)
+- Cliente pode fazer downgrade (Premium → Básico)
+- Calcular pro-rata: crédito/débito proporcional ao tempo restante
+- Upgrade = imediato, Downgrade = no próximo ciclo (para não perder receita)
+
+**REGRAS:**
+- Upgrade: ativa imediatamente, cobra diferença pro-rata
+- Downgrade: agenda para próxima renovação, mantém plano atual até lá
+- Validar: downgrade não pode remover módulos em uso ativo
+- Notificar cliente sobre mudanças de acesso
+
+**CAMPOS (tabela HistoricoMudancaPlano):**
+- id, assinatura_id
+- plano_anterior_id, plano_novo_id
+- tipo_mudanca (upgrade / downgrade)
+- data_solicitacao, data_efetivacao
+- valor_ajuste (positivo = cobrar, negativo = creditar)
+- usuario_solicitante_id
+
+---
+
+### 5. Gestão de Vigência e Renovação
+- Assinatura tem ciclo: mensal, trimestral, semestral, anual
+- Renovação pode ser automática ou manual
+- Sistema notifica: 30, 15, 7 dias antes do vencimento
+- Se não renovar: suspender → bloquear acesso após período de graça
+
+**PERÍODO DE GRAÇA:**
+- Assinatura vence → status = "vencido"
+- Período de graça: 7 dias (ainda funciona mas com alerta)
+- Após graça: status = "suspenso" → bloqueia acesso
+- Após 30 dias suspenso: status = "cancelado" → remove dados (LGPD)
+
+**CAMPOS:**
+- ciclo_faturamento (mensal / trimestral / semestral / anual)
+- proximo_faturamento_em
+- dias_periodo_graca (default 7)
+
+---
+
+### 6. Histórico de Faturamento
+- Registrar todas as cobranças da assinatura
+- Vincular com RF026 (Gestão de Faturas) ou criar própria
+- Status: pendente, pago, vencido, cancelado
+- Gerar fatura automaticamente a cada ciclo
+
+**CAMPOS:**
+- id, assinatura_id
+- data_emissao, data_vencimento, data_pagamento
+- valor_plano, valor_addons, valor_desconto, valor_total
+- status, metodo_pagamento
+- nota_fiscal_id (se integrado)
+
+---
+
+### 7. Notificações Automáticas
+- Assinatura criada → email de boas-vindas
+- Trial iniciado → email com tutorial
+- Trial próximo do fim → emails de lembrete
+- Assinatura próxima do vencimento → lembrete de renovação
+- Assinatura vencida → alerta de suspensão
+- Upgrade realizado → email de confirmação + novos módulos disponíveis
+- Addon adicionado → email de confirmação
+- Módulo bloqueado por falta de pagamento → alerta
+
+---
+
+### 8. Integração com RF083
+- RF117 consulta RF083 para obter lista de módulos disponíveis
+- RF117 cria planos agrupando módulos cadastrados em RF083
+- Quando cliente assina plano, RF117 registra quais módulos foram contratados
+- RF083 valida acesso consultando assinatura ativa no RF117
+- Se usuário tentar acessar módulo não contratado, RF083 redireciona para página de vendas
+- Página de vendas mostra planos do RF117 que incluem aquele módulo
+- Upgrade de plano no RF117 libera automaticamente novos módulos no RF083
+
+---
+
+################################################################################
+# INTEGRAÇÃO ENTRE RF083 E RF117
+################################################################################
+
+## FLUXO COMPLETO
+
+1. **RF083 (Central de Módulos)** cadastra módulos disponíveis no sistema
+2. **RF117 (Gestão de Assinaturas)** cria planos agrupando módulos
+3. Cliente assina plano no **RF117**
+4. **RF117** registra assinatura ativa com lista de módulos
+5. Usuário tenta acessar funcionalidade
+6. **RF083** valida: ambiente + RBAC + consulta RF117 (módulo contratado?)
+7. Se não contratado → redirect para página de vendas (RF083)
+8. Página mostra planos disponíveis (RF117) que incluem aquele módulo
+9. Cliente solicita upgrade → **RF117** processa mudança de plano
+10. **RF117** notifica **RF083** → módulos liberados automaticamente
+
+---
+
+================================================================================
+FIM DAS NOTAS
+================================================================================

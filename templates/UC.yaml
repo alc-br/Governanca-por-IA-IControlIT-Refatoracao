@@ -1,14 +1,235 @@
 # =============================================
 # UC - Casos de Uso (Contrato Comportamental)
-# Versão: 1.0
+# Versão: 2.0
 # Autor padrão: Agência ALC - alc.dev.br
+# =============================================
+# CHANGELOG v2.0:
+# - Adicionada seção RBAC obrigatória (segregação por ação)
+# - Adicionada seção especificacoes_teste (alinhamento E2E)
+# - Campo permissao atualizado para padrão MODULO.ENTIDADE.ACAO
 # =============================================
 
 uc:
   documentacao: "RFXXX"
-  versao: "1.0"
+  versao: "2.0"
   data: "YYYY-MM-DD"
 
+# =============================================
+# RBAC - PERMISSÕES E CENTRAL DE FUNCIONALIDADES (OBRIGATÓRIO)
+# =============================================
+# Conforme RF112: Toda funcionalidade DEVE ser registrada na Central de Funcionalidades
+# Conforme CLAUDE.md: Segregação de ações no RBAC é OBRIGATÓRIA
+rbac:
+  modulo:
+    codigo: "MODULO"               # Ex: "CAD" (Cadastros), "FIN" (Financeiro), "CONF" (Configuração)
+    nome: "Nome do Módulo"
+    descricao: "Descrição do módulo para Central de Funcionalidades"
+    categoria: "cadastro"          # cadastro | operacao | relatorio | configuracao
+
+  permissoes:
+    # REGRA: Uma permissão para CADA ação da funcionalidade
+    # PADRÃO: MODULO.ENTIDADE.ACAO (UPPERCASE com pontos)
+    # OBRIGATÓRIO: Perfil Developer SEMPRE deve ter TODAS as permissões (para testes)
+
+    - acao: "VIEW"
+      codigo: "MODULO.ENTIDADE.VIEW"
+      nome: "Visualizar Entidade"
+      descricao: "Permite visualizar registros de entidade"
+      uc_ids: ["UC00"]             # UCs que exigem esta permissão
+      perfis_obrigatorios:
+        - "Developer"              # OBRIGATÓRIO: Perfil Developer para testes
+      perfis_sugeridos:
+        - "Super Admin"
+        - "Admin"
+        - "User"
+
+    - acao: "CREATE"
+      codigo: "MODULO.ENTIDADE.CREATE"
+      nome: "Criar Entidade"
+      descricao: "Permite criar novos registros de entidade"
+      uc_ids: ["UC01"]
+      perfis_obrigatorios:
+        - "Developer"
+      perfis_sugeridos:
+        - "Super Admin"
+        - "Admin"
+
+    - acao: "UPDATE"
+      codigo: "MODULO.ENTIDADE.UPDATE"
+      nome: "Editar Entidade"
+      descricao: "Permite editar registros existentes de entidade"
+      uc_ids: ["UC02"]
+      perfis_obrigatorios:
+        - "Developer"
+      perfis_sugeridos:
+        - "Super Admin"
+        - "Admin"
+
+    - acao: "DELETE"
+      codigo: "MODULO.ENTIDADE.DELETE"
+      nome: "Excluir Entidade"
+      descricao: "Permite excluir registros de entidade (soft delete)"
+      uc_ids: ["UC03"]
+      perfis_obrigatorios:
+        - "Developer"
+      perfis_sugeridos:
+        - "Super Admin"
+        - "Admin"
+
+    # Adicionar permissões adicionais conforme necessário:
+    # - EXPORT (exportar registros)
+    # - IMPORT (importar registros)
+    # - APPROVE (aprovar registros)
+    # - CANCEL (cancelar operação)
+    # - CLONE (duplicar registro)
+    # - etc.
+
+  validacao_rbac:
+    - item: "Todas as ações possuem permissão específica?"
+      status: "pending"  # pending | ok | fail
+    - item: "Perfil Developer associado a TODAS as permissões?"
+      status: "pending"
+    - item: "Módulo registrado na Central de Funcionalidades?"
+      status: "pending"
+    - item: "Código de permissões segue padrão MODULO.ENTIDADE.ACAO?"
+      status: "pending"
+
+# =============================================
+# ESPECIFICAÇÕES DE TESTE (OBRIGATÓRIO)
+# =============================================
+# Conforme CLAUDE.md seção 18: Alinhamento Obrigatório com Testes
+# Documentar ANTES da implementação para garantir alinhamento UC ↔ MT ↔ Testes E2E
+especificacoes_teste:
+  navegacao:
+    url_base: "/modulo/entidade"
+    rotas:
+      - acao: "listar"
+        url: "/modulo/entidade"
+        metodo: "GET"
+      - acao: "criar"
+        url: "/modulo/entidade/novo"
+        metodo: "GET"
+      - acao: "salvar"
+        url: "/modulo/entidade"
+        metodo: "POST"
+      - acao: "editar"
+        url: "/modulo/entidade/:id/editar"
+        metodo: "GET"
+      - acao: "atualizar"
+        url: "/modulo/entidade/:id"
+        metodo: "PUT"
+      - acao: "excluir"
+        url: "/modulo/entidade/:id"
+        metodo: "DELETE"
+
+  credenciais:
+    perfil: "Developer"
+    usuario: "developer@test.com"
+    senha: "Test@1234"
+    tenant: "tenant-teste"
+
+  data_test_attributes:
+    # Para CADA passo interativo do UC, especificar data-test
+    # Padrão: data-test="elemento-identificador-acao"
+    # Exemplo: data-test="btn-novo-cliente", data-test="input-nome", data-test="cliente-list"
+
+    - uc_id: "UC00"
+      passo: 1
+      descricao: "Usuário acessa a funcionalidade"
+      elementos:
+        - id: "menu-entidade"
+          tipo: "link"
+          obrigatorio: true
+
+    - uc_id: "UC00"
+      passo: 3
+      descricao: "Sistema exibe a lista"
+      elementos:
+        - id: "entidade-list"
+          tipo: "table"
+          obrigatorio: true
+        - id: "entidade-list-row"
+          tipo: "table-row"
+          obrigatorio: true
+        - id: "entidade-list-pagination"
+          tipo: "pagination"
+          obrigatorio: true
+
+    - uc_id: "UC01"
+      passo: 1
+      descricao: "Usuário solicita criação"
+      elementos:
+        - id: "btn-novo-entidade"
+          tipo: "button"
+          obrigatorio: true
+
+    - uc_id: "UC01"
+      passo: 2
+      descricao: "Sistema exibe formulário"
+      elementos:
+        - id: "form-entidade"
+          tipo: "form"
+          obrigatorio: true
+        - id: "input-nome"
+          tipo: "input"
+          obrigatorio: true
+        - id: "input-descricao"
+          tipo: "textarea"
+          obrigatorio: false
+        - id: "select-status"
+          tipo: "select"
+          obrigatorio: true
+        - id: "btn-salvar"
+          tipo: "button"
+          obrigatorio: true
+        - id: "btn-cancelar"
+          tipo: "button"
+          obrigatorio: true
+
+  estados_ui:
+    # Estados obrigatórios que DEVEM ser implementados
+    - estado: "loading"
+      descricao: "Exibido durante carregamento de dados"
+      data_test: "loading-spinner"
+      obrigatorio: true
+
+    - estado: "vazio"
+      descricao: "Exibido quando não há registros"
+      data_test: "empty-state"
+      obrigatorio: true
+
+    - estado: "erro"
+      descricao: "Exibido quando ocorre erro de API (4xx/5xx)"
+      data_test: "error-state"
+      obrigatorio: true
+
+    - estado: "sucesso"
+      descricao: "Feedback após ação bem-sucedida"
+      data_test: "success-message"
+      obrigatorio: true
+
+  timeouts_e2e:
+    navegacao: 5000          # ms para navegação entre páginas
+    carregamento_lista: 3000 # ms para carregar lista
+    salvamento: 5000         # ms para salvar/atualizar registro
+    exclusao: 3000           # ms para excluir registro
+    api_timeout: 10000       # ms para timeout de API
+
+  validacao_especificacoes:
+    - item: "Todas as URLs documentadas?"
+      status: "pending"
+    - item: "Data-test especificados para TODOS os passos interativos?"
+      status: "pending"
+    - item: "Estados UI (loading, vazio, erro) especificados?"
+      status: "pending"
+    - item: "Timeouts especificados para cada operação?"
+      status: "pending"
+    - item: "Credenciais sincronizadas com backend seeds?"
+      status: "pending"
+
+# =============================================
+# CASOS DE USO
+# =============================================
 casos_de_uso:
 
   - id: "UC00"
@@ -53,7 +274,7 @@ casos_de_uso:
           required: true
 
     precondicoes:
-      - permissao: "entidade.view_any"
+      - permissao: "MODULO.ENTIDADE.VIEW"  # Atualizado para novo padrão
 
     gatilho: "Usuario acessa a funcionalidade pelo menu"
 
@@ -61,6 +282,7 @@ casos_de_uso:
       - passo: 1
         ator: "usuario"
         acao: "acessa_menu"
+        data_test: "menu-entidade"  # Data-test para testes E2E
       - passo: 2
         ator: "sistema"
         acao: "validar_permissao"
@@ -70,6 +292,7 @@ casos_de_uso:
       - passo: 4
         ator: "sistema"
         acao: "exibir_lista"
+        data_test: "entidade-list"  # Data-test para testes E2E
 
     fluxos_alternativos:
       - id: "FA-UC00-01"
@@ -80,6 +303,7 @@ casos_de_uso:
       - id: "FE-UC00-01"
         condicao: "sem_permissao"
         resultado: "acesso_negado"
+        http_esperado: 403
 
     regras_aplicadas:
       - "RN-MOD-XXX-01"
@@ -141,34 +365,46 @@ casos_de_uso:
           required: true
 
     precondicoes:
-      - permissao: "entidade.create"
+      - permissao: "MODULO.ENTIDADE.CREATE"  # Atualizado para novo padrão
 
     gatilho: "Usuario clica em Novo"
 
     fluxo_principal:
       - passo: 1
+        ator: "usuario"
+        acao: "clicar_novo"
+        data_test: "btn-novo-entidade"  # Data-test para testes E2E
+      - passo: 2
         ator: "sistema"
         acao: "exibir_formulario"
-      - passo: 2
-        ator: "usuario"
-        acao: "preencher_campos"
+        data_test: "form-entidade"
       - passo: 3
         ator: "usuario"
-        acao: "salvar"
+        acao: "preencher_campos"
+        data_test: "input-nome,input-descricao,select-status"
       - passo: 4
-        ator: "sistema"
-        acao: "validar_dados"
+        ator: "usuario"
+        acao: "salvar"
+        data_test: "btn-salvar"
       - passo: 5
         ator: "sistema"
-        acao: "persistir_registro"
+        acao: "validar_dados"
       - passo: 6
         ator: "sistema"
+        acao: "persistir_registro"
+      - passo: 7
+        ator: "sistema"
         acao: "registrar_auditoria"
+      - passo: 8
+        ator: "sistema"
+        acao: "confirmar_sucesso"
+        data_test: "success-message"
 
     fluxos_excecao:
       - id: "FE-UC01-01"
         condicao: "validacao_falhou"
         resultado: "exibir_erros"
+        http_esperado: 400
 
     regras_aplicadas:
       - "RN-MOD-XXX-01"
@@ -181,6 +417,19 @@ exclusions:
   uc_items: []
 
 historico:
+  - versao: "2.0"
+    data: "2026-01-13"
+    autor: "Agência ALC - alc.dev.br + Claude (Agente de Governança)"
+    descricao: |
+      Versão 2.0 - Adições críticas:
+      - Seção RBAC obrigatória (segregação por ação + Central de Funcionalidades)
+      - Seção especificacoes_teste (alinhamento E2E conforme CLAUDE.md seção 18)
+      - Campo permissao atualizado para padrão MODULO.ENTIDADE.ACAO
+      - Data-test attributes especificados em fluxo_principal
+      - Estados UI obrigatórios documentados
+      - Timeouts E2E especificados
+      - Checklist de validação RBAC e testes
+
   - versao: "1.0"
     data: "YYYY-MM-DD"
     autor: "Agência ALC - alc.dev.br"

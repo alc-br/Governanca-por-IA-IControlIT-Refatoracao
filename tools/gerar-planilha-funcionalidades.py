@@ -2,9 +2,12 @@
 """
 Gera planilha consolidada de funcionalidades (RFs) do IControlIT.
 
-Versão: 4.0
-Data: 2026-01-12
+Versão: 4.3
+Data: 2026-01-20
 Changelog:
+  v4.3: Remove truncamento de regras (exibe texto completo)
+  v4.2: Melhora extração de descrições e regras (10 fontes de fallback, busca em escopo.incluso e regras_negocio.descricao)
+  v4.1: Remove limite de 200 caracteres nas descrições (exibe texto completo)
   v4.0: Adiciona colunas Processo e Jornada mapeando RFs aos processos documentados
   v3.0: Adiciona colunas para discussão do cliente
   v2.1: Melhora extração de descrições
@@ -193,7 +196,7 @@ def extrair_rfs_yaml(documentacao_path):
                 if 'metadata' in dados and isinstance(dados['metadata'], dict):
                     nome = dados['metadata'].get('titulo', dados['metadata'].get('nome', ''))
 
-            # Extrair DESCRIÇÃO (7 estratégias de fallback)
+            # Extrair DESCRIÇÃO (10 estratégias de fallback para cobrir todas as estruturas)
             descricao = ''
 
             # 1. Tentar resumo_executivo
@@ -224,9 +227,17 @@ def extrair_rfs_yaml(documentacao_path):
             if not descricao and 'visao_geral' in dados:
                 descricao = extrair_texto(dados['visao_geral'])
 
-            # 6. Tentar escopo (81 RFs)
+            # 6. Tentar escopo.incluso (primeiro item da lista de escopo)
             if not descricao and 'escopo' in dados:
-                descricao = extrair_texto(dados['escopo'])
+                escopo = dados['escopo']
+                if isinstance(escopo, dict) and 'incluso' in escopo:
+                    incluso = escopo['incluso']
+                    if isinstance(incluso, list) and len(incluso) > 0:
+                        # Pegar os 3 primeiros itens do escopo
+                        itens_escopo = [str(item) for item in incluso[:3] if item]
+                        descricao = '; '.join(itens_escopo)
+                elif isinstance(escopo, str):
+                    descricao = escopo.strip()
 
             # 7. Tentar metadata
             if not descricao and 'metadata' in dados and isinstance(dados['metadata'], dict):
@@ -234,23 +245,47 @@ def extrair_rfs_yaml(documentacao_path):
                 if not descricao:
                     descricao = extrair_texto(dados['metadata'].get('resumo', ''))
 
-            # Se ainda não achou, deixar vazio
-            if not descricao:
-                descricao = ''
+            # 8. Tentar primeira regra de negócio como descrição (RF050 e similares)
+            if not descricao and 'regras_negocio' in dados:
+                rn_list = dados['regras_negocio']
+                if isinstance(rn_list, list) and len(rn_list) > 0:
+                    primeira_rn = rn_list[0]
+                    if isinstance(primeira_rn, dict):
+                        # Tentar campo descricao da regra
+                        descricao = extrair_texto(primeira_rn.get('descricao', ''))
+                        if not descricao:
+                            descricao = extrair_texto(primeira_rn.get('titulo', ''))
 
-            # Limitar tamanho da descrição (200 caracteres)
-            if len(descricao) > 200:
-                descricao = descricao[:197] + '...'
+            # 9. Tentar rf.descricao ou rf.objetivo (estrutura aninhada)
+            if not descricao and 'rf' in dados and isinstance(dados['rf'], dict):
+                rf_data = dados['rf']
+                descricao = extrair_texto(rf_data.get('descricao', ''))
+                if not descricao:
+                    descricao = extrair_texto(rf_data.get('objetivo', ''))
 
-            # Extrair REGRAS (apenas títulos, simplificado para coordenação)
+            # 10. Se ainda não achou, criar descrição a partir do nome
+            if not descricao and nome:
+                descricao = f"Funcionalidade de {nome}"
+
+            # Limpar descrição (remover quebras de linha excessivas)
+            if descricao:
+                descricao = ' '.join(descricao.split())
+
+            # Extrair REGRAS (títulos ou descrições, sem truncamento)
             regras = []
             if 'regras_negocio' in dados:
                 rn_list = dados['regras_negocio']
                 if isinstance(rn_list, list):
                     for rn in rn_list[:5]:  # Máximo 5 regras
                         if isinstance(rn, dict):
+                            # Tentar titulo primeiro, depois descricao
                             titulo_rn = rn.get('titulo', '')
+                            if not titulo_rn:
+                                # Tentar descricao (RF048 e similares usam este campo)
+                                titulo_rn = rn.get('descricao', '')
                             if titulo_rn:
+                                # Limpar texto (remover quebras de linha)
+                                titulo_rn = ' '.join(str(titulo_rn).split())
                                 regras.append(titulo_rn)
 
             regras_texto = '; '.join(regras) if regras else ''
@@ -386,7 +421,7 @@ def gerar_planilha_excel(rfs, output_path):
     # Ajustar larguras das colunas
     ws.column_dimensions['A'].width = 12   # Cód.
     ws.column_dimensions['B'].width = 35   # Nome Funcionalidade
-    ws.column_dimensions['C'].width = 50   # Descrição
+    ws.column_dimensions['C'].width = 80   # Descrição (aumentado para texto completo)
     ws.column_dimensions['D'].width = 70   # Regras
     ws.column_dimensions['E'].width = 18   # Processo (novo)
     ws.column_dimensions['F'].width = 30   # Jornada (renomeado)
@@ -415,7 +450,7 @@ def main():
 
     print("\n" + "=" * 80)
     print("GERADOR DE PLANILHA DE FUNCIONALIDADES - ICONTROLIT")
-    print("Versão 4.0 - Incluindo Processo e Jornada")
+    print("Versão 4.3 - Textos Completos (sem truncamento)")
     print("=" * 80 + "\n")
 
     # Extrair RFs

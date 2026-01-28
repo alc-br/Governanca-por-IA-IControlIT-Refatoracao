@@ -1,7 +1,14 @@
 # =============================================
 # Modelo de Dados (MD) — Template YAML
-# Versão: 1.0
+# Versão: 2.0
 # Autor padrão: Agência ALC - alc.dev.br
+# =============================================
+# CHANGELOG v2.0:
+# - Seção seed.habilitado alterada para TRUE (OBRIGATÓRIO)
+# - Seção central_funcionalidades adicionada (RF112)
+# - Seção permissoes atualizada com padrão MODULO.ENTIDADE.ACAO
+# - Seção role_permissions adicionada (associação perfis)
+# - Seção validacao_seeds adicionada (checklist)
 # =============================================
 
 # =============================================
@@ -299,32 +306,156 @@ entidades:
           codigo: "where('ativo', false)"
 
     # =============================================
-    # 2.5 MD-Seed (OPCIONAL) — PERMISSÕES / FACTORY / SEEDER
+    # 2.5 MD-Seed (OBRIGATÓRIO) — PERMISSÕES E CENTRAL DE FUNCIONALIDADES
     # =============================================
     seed:
-      habilitado: false
+      habilitado: true  # OBRIGATÓRIO para toda funcionalidade (alterado de false para true)
 
-      permissoes: # Spatie Laravel Permission (opcional)
-        - nome: "nome_da_tabela.view_any"
-          descricao: "Listar registros"
-          roles: ["admin", "user"]
+      # -----------------------------
+      # CENTRAL DE FUNCIONALIDADES (OBRIGATÓRIO)
+      # -----------------------------
+      # Conforme RF112: Toda funcionalidade DEVE ser registrada na Central de Módulos
+      central_funcionalidades:
+        modulo:
+          codigo: "MODULO"                    # Ex: "CAD" (Cadastros), "FIN" (Financeiro), "CONF" (Configuração)
+          nome: "Nome do Módulo"
+          descricao: "Descrição do módulo para exibição na Central de Funcionalidades"
+          categoria: "cadastro"               # cadastro | operacao | relatorio | configuracao | admin
+          icone: "mdi-database"               # Material Design Icon (https://materialdesignicons.com/)
+          ordem: 10                           # Ordem de exibição no menu (menor = primeiro)
+          ativo: true
+          url_base: "/modulo/entidade"
 
-        - nome: "nome_da_tabela.view"
-          descricao: "Visualizar registro"
-          roles: ["admin", "user"]
+        funcionalidade:
+          codigo: "MODULO_ENTIDADE"           # Código único da funcionalidade (snake_case UPPERCASE)
+          nome: "Gestão de Entidade"
+          descricao: "Gerenciamento completo de registros de entidade"
+          icone: "mdi-file-document"
+          ordem: 1                            # Ordem dentro do módulo
+          ativo: true
+          url: "/modulo/entidade"
+          modulo_codigo: "MODULO"             # FK para módulo acima (DEVE corresponder)
 
-        - nome: "nome_da_tabela.create"
-          descricao: "Criar registro"
-          roles: ["admin"]
+      # -----------------------------
+      # PERMISSÕES RBAC (OBRIGATÓRIO)
+      # -----------------------------
+      # REGRA: Segregação por AÇÃO (VIEW, CREATE, UPDATE, DELETE, EXPORT, etc.)
+      # PADRÃO: MODULO.ENTIDADE.ACAO (UPPERCASE com pontos)
+      # OBRIGATÓRIO: Perfil Developer SEMPRE deve ter TODAS as permissões (para testes)
+      permissoes:
+        - codigo: "MODULO.ENTIDADE.VIEW"
+          nome: "Visualizar Entidade"
+          descricao: "Permite visualizar lista e detalhes de registros de entidade"
+          funcionalidade_codigo: "MODULO_ENTIDADE"  # FK para funcionalidade acima
+          ativo: true
+          perfis_obrigatorios:
+            - "Developer"                     # OBRIGATÓRIO: Perfil Developer para testes
+          perfis_sugeridos:
+            - "Super Admin"
+            - "Admin"
+            - "User"
+          uc_relacionado: "UC00"              # UC que exige esta permissão
+          endpoint_backend: "GET /api/v1/entidade"
 
-        - nome: "nome_da_tabela.update"
-          descricao: "Atualizar registro"
-          roles: ["admin"]
+        - codigo: "MODULO.ENTIDADE.CREATE"
+          nome: "Criar Entidade"
+          descricao: "Permite criar novos registros de entidade"
+          funcionalidade_codigo: "MODULO_ENTIDADE"
+          ativo: true
+          perfis_obrigatorios:
+            - "Developer"
+          perfis_sugeridos:
+            - "Super Admin"
+            - "Admin"
+          uc_relacionado: "UC01"
+          endpoint_backend: "POST /api/v1/entidade"
 
-        - nome: "nome_da_tabela.delete"
-          descricao: "Excluir registro"
-          roles: ["admin"]
+        - codigo: "MODULO.ENTIDADE.UPDATE"
+          nome: "Editar Entidade"
+          descricao: "Permite editar registros existentes de entidade"
+          funcionalidade_codigo: "MODULO_ENTIDADE"
+          ativo: true
+          perfis_obrigatorios:
+            - "Developer"
+          perfis_sugeridos:
+            - "Super Admin"
+            - "Admin"
+          uc_relacionado: "UC02"
+          endpoint_backend: "PUT /api/v1/entidade/:id"
 
+        - codigo: "MODULO.ENTIDADE.DELETE"
+          nome: "Excluir Entidade"
+          descricao: "Permite excluir registros de entidade (soft delete)"
+          funcionalidade_codigo: "MODULO_ENTIDADE"
+          ativo: true
+          perfis_obrigatorios:
+            - "Developer"
+          perfis_sugeridos:
+            - "Super Admin"
+            - "Admin"
+          uc_relacionado: "UC03"
+          endpoint_backend: "DELETE /api/v1/entidade/:id"
+
+        - codigo: "MODULO.ENTIDADE.EXPORT"
+          nome: "Exportar Entidade"
+          descricao: "Permite exportar registros de entidade para Excel/PDF"
+          funcionalidade_codigo: "MODULO_ENTIDADE"
+          ativo: true
+          perfis_obrigatorios:
+            - "Developer"
+          perfis_sugeridos:
+            - "Super Admin"
+            - "Admin"
+            - "User"
+          uc_relacionado: "UC04"
+          endpoint_backend: "GET /api/v1/entidade/export"
+
+        # Adicionar permissões adicionais conforme necessário:
+        # - MODULO.ENTIDADE.IMPORT (importar registros)
+        # - MODULO.ENTIDADE.APPROVE (aprovar registros)
+        # - MODULO.ENTIDADE.CANCEL (cancelar operação)
+        # - MODULO.ENTIDADE.CLONE (duplicar registro)
+        # - etc.
+
+      # -----------------------------
+      # ASSOCIAÇÃO PERFIS x PERMISSÕES (OBRIGATÓRIO)
+      # -----------------------------
+      role_permissions:
+        - role: "Developer"
+          permissoes:
+            - "MODULO.ENTIDADE.VIEW"
+            - "MODULO.ENTIDADE.CREATE"
+            - "MODULO.ENTIDADE.UPDATE"
+            - "MODULO.ENTIDADE.DELETE"
+            - "MODULO.ENTIDADE.EXPORT"
+          justificativa: "Perfil Developer DEVE ter TODAS as permissões para execução de testes E2E"
+
+        - role: "Super Admin"
+          permissoes:
+            - "MODULO.ENTIDADE.VIEW"
+            - "MODULO.ENTIDADE.CREATE"
+            - "MODULO.ENTIDADE.UPDATE"
+            - "MODULO.ENTIDADE.DELETE"
+            - "MODULO.ENTIDADE.EXPORT"
+          justificativa: "Super Admin possui acesso total ao sistema"
+
+        - role: "Admin"
+          permissoes:
+            - "MODULO.ENTIDADE.VIEW"
+            - "MODULO.ENTIDADE.CREATE"
+            - "MODULO.ENTIDADE.UPDATE"
+            - "MODULO.ENTIDADE.DELETE"
+          justificativa: "Admin pode gerenciar registros mas não exportar"
+
+        - role: "User"
+          permissoes:
+            - "MODULO.ENTIDADE.VIEW"
+            - "MODULO.ENTIDADE.EXPORT"
+          justificativa: "User pode apenas visualizar e exportar"
+
+      # -----------------------------
+      # DADOS DE TESTE (OPCIONAL)
+      # -----------------------------
       factory: # opcional
         campos:
           tenant_id: "Tenant::factory()"
@@ -350,6 +481,34 @@ entidades:
             status: "rascunho"
             ativo: true
 
+      # -----------------------------
+      # VALIDAÇÃO DE COMPLETUDE (OBRIGATÓRIO)
+      # -----------------------------
+      validacao_seeds:
+        - item: "Módulo registrado na Central de Funcionalidades?"
+          status: "pending"  # pending | ok | fail
+
+        - item: "Funcionalidade registrada na Central de Funcionalidades?"
+          status: "pending"
+
+        - item: "TODAS as ações possuem permissão segregada?"
+          status: "pending"
+
+        - item: "Perfil Developer associado a TODAS as permissões?"
+          status: "pending"
+
+        - item: "Código de permissões segue padrão MODULO.ENTIDADE.ACAO?"
+          status: "pending"
+
+        - item: "Todas as permissões possuem endpoint_backend documentado?"
+          status: "pending"
+
+        - item: "Todas as permissões possuem uc_relacionado documentado?"
+          status: "pending"
+
+        - item: "Todas as permissões possuem funcionalidade_codigo correto?"
+          status: "pending"
+
 # =============================================
 # 3. RELACIONAMENTOS GLOBAIS (OPCIONAL)
 # =============================================
@@ -372,11 +531,30 @@ observacoes:
   - categoria: "Migração"
     descricao: "Regras de migração de dados, compatibilidades e cuidados"
 
+  - categoria: "RBAC"
+    descricao: "Justificativa da segregação de permissões e perfis associados"
+
+  - categoria: "Central de Funcionalidades"
+    descricao: "Categoria, ícone e ordenação escolhidos para o módulo/funcionalidade"
+
 # =============================================
 # 5. HISTÓRICO DE ALTERAÇÕES (OBRIGATÓRIO)
 # =============================================
 historico:
   - versao: "2.0"
+    data: "2026-01-13"
+    autor: "Agência ALC - alc.dev.br + Claude (Agente de Governança)"
+    descricao: |
+      Versão 2.0 - Adições críticas:
+      - seed.habilitado alterado para TRUE (OBRIGATÓRIO para todas as funcionalidades)
+      - Seção central_funcionalidades adicionada (RF112 - registro obrigatório)
+      - Seção permissoes atualizada com padrão MODULO.ENTIDADE.ACAO
+      - Seção role_permissions adicionada (associação perfis x permissões)
+      - Seção validacao_seeds adicionada (checklist de completude)
+      - Perfil Developer OBRIGATÓRIO em todas as permissões (para testes)
+      - Rastreabilidade completa: Permissão → UC → Endpoint → Funcionalidade
+
+  - versao: "1.0"
     data: "YYYY-MM-DD"
     autor: "Agência ALC - alc.dev.br"
     descricao: "Versão inicial do template em camadas (Core/App/Seed)"

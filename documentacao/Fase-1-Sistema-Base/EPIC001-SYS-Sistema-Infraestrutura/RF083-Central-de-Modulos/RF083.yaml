@@ -1,0 +1,510 @@
+# =============================================
+# RF-083: Central de Módulos
+# Versão: 2.0
+# Data: 2026-01-13
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+rf:
+  id: "RF083"
+  nome: "Central de Módulos"
+  versao: "2.0"
+  data: "2026-01-13"
+  fase: "Fase 1 - Sistema Base"
+  epic: "EPIC001-SYS"
+  status: "em_desenvolvimento" # draft | aprovado | em_desenvolvimento | concluido
+  tipo_rf: "crud" # crud | leitura | integracao | batch
+  contexto: "saas" # Sistema SaaS baseado em assinaturas
+
+descricao:
+  objetivo: "Sistema fundamental de gerenciamento de todas as funcionalidades do sistema IControlIT. Atua como catálogo centralizado que registra, organiza e controla acesso a todas as funcionalidades, suas ações, permissões RBAC, categorização e exclusividade por cliente. Integrado com RF117 (Gestão de Assinaturas) para controle baseado em planos comerciais."
+  problema_resolvido: "Antes da Central de Módulos, não havia controle centralizado de funcionalidades, suas permissões e ações. A Central resolve: (1) Catálogo único de funcionalidades, (2) Vinculação com RBAC e Feature Flags, (3) Controle de exclusividade por cliente, (4) Organização hierárquica e por categorias, (5) Dependências entre módulos, (6) Controle por ambiente, (7) Integração com assinaturas comerciais."
+  publico_afetado: "Desenvolvedores (gerenciam funcionalidades), Administradores de Sistema (visualizam), Tenants (visualizam funcionalidades disponíveis baseadas em assinatura). TODAS as funcionalidades do sistema dependem deste RF."
+
+escopo:
+  incluso:
+    - "Cadastro centralizado de funcionalidades do sistema"
+    - "Cadastro de ações por funcionalidade (VIEW, CREATE, UPDATE, DELETE, EXPORT, ADMIN)"
+    - "Organização hierárquica de funcionalidades (pai/filha)"
+    - "Categorização de funcionalidades (Cadastros, Sistema, Configurações, etc.)"
+    - "Vinculação com Feature Flags para ativação dinâmica"
+    - "Controle de empresas exclusivas (funcionalidade disponível apenas para clientes específicos)"
+    - "Visualização agrupada por categoria"
+    - "Estatísticas de funcionalidades (total, ativas, por categoria)"
+    - "Gerenciamento de ordem de exibição e indentação"
+    - "Vinculação com sistema de permissões RBAC"
+    - "Controle de acesso baseado em perfil (Developer, System, Tenant)"
+    - "Auditoria de operações"
+    - "Soft delete"
+    - "Isolamento multi-tenant"
+    - "Dependências entre módulos (módulos pré-requisitos)"
+    - "Controle de ativação por ambiente (Dev/Hom/Prod)"
+    - "Integração com RF117 (Gestão de Assinaturas)"
+    - "Redirect para página de vendas quando módulo não contratado"
+    - "Módulos em modo preview/beta"
+    - "Validação de dependências circulares"
+  fora:
+    - "Interface visual de drag-and-drop (existente, mas não faz parte deste RF)"
+    - "Criação automática de permissões no sistema RBAC (apenas vinculação)"
+    - "Geração automática de rotas no frontend"
+    - "Sincronização automática com código-fonte"
+    - "Versionamento de funcionalidades"
+    - "Histórico de mudanças de configuração"
+
+entidades:
+  - nome: "SistemaFuncionalidade"
+    descricao: "Funcionalidade do sistema registrada na Central de Módulos (ex: Gestão de Usuários, Gestão de Clientes)"
+    multi_tenant: false # Funcionalidades são globais, não isoladas por tenant
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "codigo (string, unique): Código único no formato FF.[CAMADA].[MODULO]"
+      - "nome (string): Nome amigável da funcionalidade"
+      - "descricao (string): Descrição detalhada"
+      - "icone (string): Ícone heroicons"
+      - "rota (string): Rota principal no frontend"
+      - "feature_flag_id (guid, FK): Vinculação com Feature Flag"
+      - "ativo (boolean): Se funcionalidade está ativa"
+      - "ordem (int): Ordem de exibição"
+      - "categoria (string, deprecated): Categoria textual legada"
+      - "categoria_id (guid, FK): Relacionamento com SistemaCategoria"
+      - "funcionalidade_pai_id (guid, FK): Auto-referência para hierarquia"
+      - "permissao_requerida (string): Código de permissão RBAC base"
+      - "empresas_exclusivas_json (string): IDs de empresas com acesso exclusivo (JSON)"
+      - "modulos_requeridos_json (string): IDs de módulos pré-requisitos (dependências diretas)"
+      - "dependencias_resolvidas_json (string): IDs de todas as dependências (diretas + transitivas, calculado)"
+      - "modulos_dependentes_json (string): IDs de módulos que dependem deste (reverso, calculado)"
+      - "ambientes_ativos_json (string): Ambientes onde módulo está ativo (dev/hom/prod)"
+      - "requer_contrato (boolean): Se requer assinatura ativa para acesso"
+      - "disponivel_para_venda (boolean): Se está disponível para incluir em planos"
+      - "disponivel_preview (boolean): Se está em modo preview/beta"
+      - "clientes_preview_json (string): IDs de clientes com acesso antecipado"
+
+  - nome: "SistemaFuncionalidadeAcao"
+    descricao: "Ação específica dentro de uma funcionalidade (ex: Criar Usuário, Excluir Cliente)"
+    multi_tenant: false
+    soft_delete: true
+    auditoria: true
+    campos_principais:
+      - "funcionalidade_id (guid, FK): Funcionalidade pai"
+      - "codigo (string, unique): Código único da ação"
+      - "nome (string): Nome amigável da ação"
+      - "descricao (string): Descrição da ação"
+      - "icone (string): Ícone heroicons"
+      - "permissao_codigo (string): Código de permissão RBAC vinculada"
+      - "tipo_acao (string): VIEW | CREATE | UPDATE | DELETE | EXPORT | ADMIN"
+      - "ativo (boolean): Se ação está ativa"
+      - "ordem (int): Ordem de exibição"
+      - "acao_padrao (boolean): Se é ação padrão que aparece para todos"
+
+regras_negocio:
+  - id: "RN-RF112-01"
+    descricao: "Código único de funcionalidade deve seguir formato FF.[CAMADA].[MODULO]"
+    tipo: "unicidade"
+    campos_afetados: ["codigo"]
+    obrigatorio: true
+
+  - id: "RN-RF112-02"
+    descricao: "Isolamento por perfil de usuário: Developer (todas), System (Corporativo+Sistema), Tenant (apenas Corporativo)"
+    tipo: "seguranca"
+    campos_afetados: ["filtro_listagem"]
+    obrigatorio: true
+
+  - id: "RN-RF112-03"
+    descricao: "Empresas exclusivas vazias = acesso total (modelo whitelist)"
+    tipo: "regra_negocio"
+    campos_afetados: ["empresas_exclusivas_json"]
+    obrigatorio: true
+
+  - id: "RN-RF112-04"
+    descricao: "Apenas Developer pode gerenciar empresas exclusivas"
+    tipo: "seguranca"
+    campos_afetados: ["endpoint_empresas_exclusivas"]
+    obrigatorio: true
+
+  - id: "RN-RF112-05"
+    descricao: "Soft delete obrigatório (fl_excluido = true, não exclusão física)"
+    tipo: "regra_negocio"
+    campos_afetados: ["fl_excluido"]
+    obrigatorio: true
+
+  - id: "RN-RF112-06"
+    descricao: "Hierarquia de funcionalidades (pai/filha) com profundidade máxima de 3 níveis"
+    tipo: "regra_negocio"
+    campos_afetados: ["funcionalidade_pai_id", "nivel_indentacao"]
+    obrigatorio: true
+
+  - id: "RN-RF112-07"
+    descricao: "Vinculação com Feature Flag (feature_flag_id nulo = sempre disponível se ativa)"
+    tipo: "integracao"
+    campos_afetados: ["feature_flag_id"]
+    obrigatorio: false
+
+  - id: "RN-RF112-08"
+    descricao: "Ações devem pertencer a uma funcionalidade existente (FK constraint)"
+    tipo: "validacao"
+    campos_afetados: ["funcionalidade_id"]
+    obrigatorio: true
+
+  - id: "RN-RF112-09"
+    descricao: "Código de ação segue padrão [MODULO].[ENTIDADE].[OPERACAO]"
+    tipo: "validacao"
+    campos_afetados: ["codigo_acao"]
+    obrigatorio: true
+
+  - id: "RN-RF112-10"
+    descricao: "Tipos de ação padronizados: VIEW | CREATE | UPDATE | DELETE | EXPORT | ADMIN"
+    tipo: "validacao"
+    campos_afetados: ["tipo_acao"]
+    obrigatorio: true
+
+  - id: "RN-RF112-11"
+    descricao: "Ordem de exibição: menor valor = mais acima, empate = ordenar por nome"
+    tipo: "regra_negocio"
+    campos_afetados: ["ordem"]
+    obrigatorio: true
+
+  - id: "RN-RF112-12"
+    descricao: "Categoria textual legada (deprecated): prioridade para categoria_id"
+    tipo: "regra_negocio"
+    campos_afetados: ["categoria", "categoria_id"]
+    obrigatorio: false
+
+  - id: "RN-RF112-13"
+    descricao: "Auditoria obrigatória: created_at, created_by, updated_at, updated_by"
+    tipo: "auditoria"
+    campos_afetados: ["created_at", "created_by", "updated_at", "updated_by"]
+    obrigatorio: true
+
+  - id: "RN-RF112-14"
+    descricao: "Estatísticas consideram apenas registros ativos e não excluídos"
+    tipo: "regra_negocio"
+    campos_afetados: ["endpoint_estatisticas"]
+    obrigatorio: true
+
+  - id: "RN-RF083-15"
+    descricao: "Reset de funcionalidades é operação destrutiva (apenas Developer/Super Admin)"
+    tipo: "seguranca"
+    campos_afetados: ["endpoint_reset"]
+    obrigatorio: true
+
+  - id: "RN-RF083-16"
+    descricao: "Redirect para página de vendas quando módulo não contratado"
+    tipo: "regra_negocio"
+    campos_afetados: ["requer_contrato", "validacao_acesso"]
+    obrigatorio: true
+    integracao: "RF117"
+
+  - id: "RN-RF083-17"
+    descricao: "Dependências circulares são proibidas (validação de grafo)"
+    tipo: "validacao"
+    campos_afetados: ["modulos_requeridos_json", "dependencias_resolvidas_json"]
+    obrigatorio: true
+
+  - id: "RN-RF083-18"
+    descricao: "Ao desativar módulo, desativar todos os dependentes ou bloquear operação"
+    tipo: "validacao"
+    campos_afetados: ["ativo", "modulos_requeridos_json"]
+    obrigatorio: true
+
+  - id: "RN-RF083-19"
+    descricao: "Ao ativar módulo, ativar todas as dependências automaticamente"
+    tipo: "validacao"
+    campos_afetados: ["ativo", "modulos_requeridos_json", "dependencias_resolvidas_json"]
+    obrigatorio: true
+
+  - id: "RN-RF083-20"
+    descricao: "Planos de assinatura devem incluir todas as dependências dos módulos selecionados"
+    tipo: "validacao"
+    campos_afetados: ["modulos_inclusos_json"]
+    obrigatorio: true
+    integracao: "RF117"
+
+  - id: "RN-RF083-21"
+    descricao: "Controle de ativação por ambiente (Dev/Hom/Prod) independente"
+    tipo: "regra_negocio"
+    campos_afetados: ["ambientes_ativos_json"]
+    obrigatorio: true
+
+  - id: "RN-RF083-22"
+    descricao: "Integração com Gestão de Assinaturas para validar acesso baseado em plano"
+    tipo: "integracao"
+    campos_afetados: ["requer_contrato"]
+    obrigatorio: true
+    integracao: "RF117"
+
+estados:
+  - id: "ativo"
+    descricao: "Funcionalidade disponível para uso (ativo = true)"
+  - id: "inativo"
+    descricao: "Funcionalidade temporariamente desabilitada (ativo = false)"
+  - id: "excluido"
+    descricao: "Funcionalidade excluída logicamente (fl_excluido = true)"
+
+transicoes:
+  permitidas:
+    - de: "ativo"
+      para: "inativo"
+      condicao: "Operação de desativação"
+    - de: "inativo"
+      para: "ativo"
+      condicao: "Operação de reativação"
+    - de: "ativo"
+      para: "excluido"
+      condicao: "Operação de exclusão (soft delete)"
+    - de: "inativo"
+      para: "excluido"
+      condicao: "Operação de exclusão (soft delete)"
+  proibidas:
+    - de: "excluido"
+      para: "ativo"
+      motivo: "Soft delete é irreversível via API"
+    - de: "excluido"
+      para: "inativo"
+      motivo: "Soft delete é irreversível via API"
+
+permissoes:
+  - codigo: "central_modulos.view_any"
+    descricao: "Listar funcionalidades"
+    escopo: "Developer, System, Tenant"
+  - codigo: "central_modulos.view"
+    descricao: "Visualizar funcionalidade específica"
+    escopo: "Developer, System, Tenant"
+  - codigo: "central_modulos.create"
+    descricao: "Criar funcionalidade"
+    escopo: "Developer"
+  - codigo: "central_modulos.update"
+    descricao: "Atualizar funcionalidade"
+    escopo: "Developer"
+  - codigo: "central_modulos.delete"
+    descricao: "Excluir funcionalidade (soft delete)"
+    escopo: "Developer"
+  - codigo: "central_modulos.manage_exclusives"
+    descricao: "Gerenciar empresas exclusivas"
+    escopo: "Developer"
+  - codigo: "central_modulos.reset"
+    descricao: "Resetar funcionalidades (operação destrutiva)"
+    escopo: "Developer, Super Admin"
+
+integracoes:
+  internas:
+    - sistema: "Autenticação"
+      descricao: "Identificar usuário autenticado e perfil (Developer/System/Tenant)"
+      obrigatoria: true
+    - sistema: "RBAC (Permissões)"
+      descricao: "Vincular funcionalidades e ações com permissões"
+      obrigatoria: true
+    - sistema: "Feature Flags"
+      descricao: "Vincular funcionalidades com flags de ativação dinâmica"
+      obrigatoria: false
+    - sistema: "Empresas (Tenants)"
+      descricao: "Validar IDs de empresas para exclusividade"
+      obrigatoria: false
+    - sistema: "Auditoria"
+      descricao: "Registrar quem criou/atualizou funcionalidades e ações"
+      obrigatoria: true
+    - sistema: "i18n (Internacionalização)"
+      descricao: "Chaves de tradução para funcionalidades e ações"
+      obrigatoria: true
+    - sistema: "RF117 (Gestão de Assinaturas)"
+      descricao: "Validar se cliente tem assinatura ativa que inclui o módulo. Validar dependências ao criar planos."
+      obrigatoria: true
+      endpoints_consumidos:
+        - "GET /api/assinaturas/cliente/{clienteId}/modulos"
+        - "GET /api/assinaturas/cliente/{clienteId}/tem-modulo/{moduloId}"
+  externas: []
+
+seguranca:
+  isolamento_tenant: false # Funcionalidades são globais, mas filtradas por perfil
+  auditoria_obrigatoria: true
+  soft_delete: true
+  validacoes_entrada:
+    - "Código único de funcionalidade"
+    - "Formato de código válido (FF.[CAMADA].[MODULO])"
+    - "Nome obrigatório"
+    - "Tipos de ação padronizados"
+    - "Empresas exclusivas existentes no sistema"
+
+rastreabilidade:
+  ucs_esperados:
+    - "UC00 - Listar funcionalidades agrupadas por categoria"
+    - "UC01 - Visualizar detalhes de uma funcionalidade"
+    - "UC02 - Obter estatísticas de funcionalidades"
+    - "UC03 - Gerenciar empresas exclusivas (Developer)"
+    - "UC04 - Resetar funcionalidades (Developer/Super Admin)"
+    - "UC05 - Expandir/contrair categorias"
+    - "UC06 - Filtrar funcionalidades por categoria"
+  dependencias:
+    - rf_id: "RF001"
+      descricao: "Parâmetros e Configurações do Sistema (dependência para configurações gerais)"
+    - rf_id: "RF007"
+      descricao: "Login e Autenticação (dependência para identificação de perfil)"
+    - rf_id: "RF117"
+      descricao: "Gestão de Assinaturas (dependência para validação de planos e acesso baseado em assinatura)"
+
+catalog:
+  crud:
+    - id: "RF-CRUD-01"
+      title: "Criar funcionalidade"
+      required: true
+      regras:
+        - "RN-RF112-01"
+        - "RN-RF112-13"
+      status: "implementado"
+      endpoint: "POST /api/funcionalidades (não documentado explicitamente, mas implícito)"
+
+    - id: "RF-CRUD-02"
+      title: "Listar funcionalidades"
+      required: true
+      regras:
+        - "RN-RF112-02"
+        - "RN-RF112-05"
+        - "RN-RF112-11"
+      status: "implementado"
+      endpoint: "GET /api/funcionalidades"
+
+    - id: "RF-CRUD-02.1"
+      title: "Listar funcionalidades agrupadas por categoria"
+      required: true
+      regras:
+        - "RN-RF112-02"
+        - "RN-RF112-05"
+        - "RN-RF112-11"
+      status: "implementado"
+      endpoint: "GET /api/funcionalidades (filtro por categoria via frontend service)"
+
+    - id: "RF-CRUD-03"
+      title: "Visualizar funcionalidade por ID"
+      required: true
+      regras:
+        - "RN-RF112-05"
+      status: "implementado"
+      endpoint: "GET /api/funcionalidades/{id}"
+
+    - id: "RF-CRUD-04"
+      title: "Atualizar funcionalidade"
+      required: true
+      regras:
+        - "RN-RF112-01"
+        - "RN-RF112-13"
+      status: "implementado"
+      endpoint: "PUT /api/funcionalidades/{id} (não documentado explicitamente, mas implícito)"
+
+    - id: "RF-CRUD-04.1"
+      title: "Atualizar empresas exclusivas"
+      required: true
+      regras:
+        - "RN-RF112-03"
+        - "RN-RF112-04"
+      status: "implementado"
+      endpoint: "PUT /api/funcionalidades/{id}/empresas-exclusivas"
+
+    - id: "RF-CRUD-05"
+      title: "Excluir funcionalidade (soft delete)"
+      required: true
+      regras:
+        - "RN-RF112-05"
+      status: "implementado"
+      endpoint: "DELETE /api/funcionalidades/{id} (não documentado explicitamente, mas implícito)"
+
+    - id: "RF-CRUD-06"
+      title: "Obter estatísticas de funcionalidades"
+      required: true
+      regras:
+        - "RN-RF112-14"
+      status: "implementado"
+      endpoint: "GET /api/funcionalidades/estatisticas"
+
+  validacoes:
+    - id: "RF-VAL-01"
+      title: "Validar código único de funcionalidade"
+      required: true
+      regras:
+        - "RN-RF112-01"
+      status: "implementado"
+
+    - id: "RF-VAL-02"
+      title: "Validar formato de código (FF.[CAMADA].[MODULO])"
+      required: true
+      regras:
+        - "RN-RF112-01"
+      status: "implementado"
+
+    - id: "RF-VAL-03"
+      title: "Validar tipos de ação padronizados"
+      required: true
+      regras:
+        - "RN-RF112-10"
+      status: "implementado"
+
+    - id: "RF-VAL-04"
+      title: "Validar empresas exclusivas existentes"
+      required: false
+      regras:
+        - "RN-RF112-03"
+      status: "implementado"
+
+    - id: "RF-VAL-05"
+      title: "Validar profundidade máxima de hierarquia (3 níveis)"
+      required: true
+      regras:
+        - "RN-RF112-06"
+      status: "nao_implementado"
+
+  seguranca:
+    - id: "RF-SEC-01"
+      title: "Isolamento por perfil (Developer/System/Tenant)"
+      required: true
+      regras:
+        - "RN-RF112-02"
+      status: "implementado"
+
+    - id: "RF-SEC-02"
+      title: "Permissões RBAC vinculadas"
+      required: true
+      regras: []
+      status: "parcialmente_implementado"
+      observacao: "Vinculação via campos permissao_requerida e permissao_codigo, mas sem enforcement explícito nos endpoints"
+
+    - id: "RF-SEC-03"
+      title: "Apenas Developer pode gerenciar empresas exclusivas"
+      required: true
+      regras:
+        - "RN-RF112-04"
+      status: "implementado"
+
+    - id: "RF-SEC-04"
+      title: "Reset de funcionalidades restrito (Developer/Super Admin)"
+      required: true
+      regras:
+        - "RN-RF112-15"
+      status: "implementado"
+
+  admin:
+    - id: "RF-ADMIN-01"
+      title: "Resetar e repopular funcionalidades"
+      required: true
+      regras:
+        - "RN-RF112-15"
+      status: "implementado"
+      endpoint: "POST /api/funcionalidades/reset"
+
+exclusions:
+  documentacao_items:
+    - item: "Interface drag-and-drop"
+      motivo: "Existente no frontend, mas não faz parte do escopo deste RF"
+    - item: "Criação automática de permissões RBAC"
+      motivo: "Central apenas vincula, não cria permissões"
+    - item: "Versionamento de funcionalidades"
+      motivo: "Não implementado, fora do escopo atual"
+
+historico:
+  - versao: "2.0"
+    data: "2026-01-13"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Adição de funcionalidades SaaS: (1) Dependências entre módulos com validação de ciclos, (2) Controle por ambiente (Dev/Hom/Prod), (3) Integração com RF117 (Gestão de Assinaturas), (4) Redirect para vendas, (5) Modo preview/beta, (6) Campos: modulos_requeridos_json, dependencias_resolvidas_json, modulos_dependentes_json, ambientes_ativos_json, requer_contrato, disponivel_para_venda, disponivel_preview, clientes_preview_json, (7) Novas regras: RN-RF083-16 a RN-RF083-22"
+
+  - versao: "1.0"
+    data: "2026-01-13"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Versão inicial - Documentação baseada em análise de código existente (frontend: central-modulos.component.ts, backend: SistemaFuncionalidade.cs, Funcionalidades.cs endpoint)"

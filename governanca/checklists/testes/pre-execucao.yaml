@@ -415,7 +415,92 @@ matriz_decisao_bloqueios:
     decisao_final: "TOTAL E2E (isolamento multi-tenancy falharão)"
     contexto_rf006: "GAP 3 - Prevenir falhas de tenant isolation"
 
+  - pre_requisito: "Baseline visual ausente (screenshots baseline não existem)"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "PROSSEGUIR"
+    testes_visuais: "BLOQUEAR"
+    decisao_final: "PARCIAL (testes visuais bloqueados, E2E funcionais prosseguem)"
+    contexto: "GAP 4 - Sem baseline, regressões visuais não podem ser detectadas"
+
+  - pre_requisito: "Playwright não configurado para screenshots (screenshot != 'on')"
+    testes_backend_unit: "PROSSEGUIR"
+    testes_backend_functional: "PROSSEGUIR"
+    testes_frontend: "PROSSEGUIR"
+    testes_e2e: "PROSSEGUIR"
+    testes_visuais: "BLOQUEAR"
+    decisao_final: "PARCIAL (testes visuais bloqueados, E2E funcionais prosseguem)"
+    contexto: "GAP 4 - Sem screenshots, validação visual impossível"
+
+# =============================================
+# VALIDAÇÃO VISUAL (NOVO - CRÍTICO)
+# =============================================
+# Adicionado em 2026-01-13 para detectar regressões visuais
+# (alinhamento, layout, elementos fora da tela, CSS quebrado)
+# Elimina problemas: elementos desalinhados, layout quebrado, elementos sobrepostos
+
+validacao_visual:
+  - item: "Screenshots de baseline existem"
+    comando: "test -d /d/IC2/frontend/icontrolit-app/e2e/screenshots/baseline/RFXXX && echo EXISTS || echo NOT_FOUND"
+    resultado_esperado: "EXISTS"
+    bloqueante: false
+    acao_se_falhar: "ALERTAR (testes visuais serão ignorados, apenas testes funcionais executarão)"
+    contexto: "Validar que baseline de screenshots existe para comparação visual"
+    impacto: "Sem baseline, regressões visuais não serão detectadas (layout, alinhamento, CSS)"
+    como_criar_baseline: "npm run e2e:visual:baseline RFXXX"
+
+  - item: "Playwright configurado para screenshots"
+    comando: "grep -E 'screenshot.*[\"'']on[\"'']' /d/IC2/frontend/icontrolit-app/playwright.config.ts && echo CONFIGURED || echo NOT_CONFIGURED"
+    resultado_esperado: "CONFIGURED"
+    bloqueante: false
+    acao_se_falhar: "ALERTAR (screenshots não serão capturados durante testes visuais)"
+    contexto: "Validar que playwright.config.ts possui screenshot: 'on' para testes visuais"
+    impacto: "Sem screenshots, comparação visual impossível"
+    como_configurar: "Adicionar 'screenshot: \"on\"' em playwright.config.ts → use: { screenshot: 'on' }"
+
+  - item: "Viewport configurado consistentemente"
+    comando: "grep -E 'viewport.*width.*1920' /d/IC2/frontend/icontrolit-app/playwright.config.ts && echo CONFIGURED || echo NOT_CONFIGURED"
+    resultado_esperado: "CONFIGURED"
+    bloqueante: false
+    acao_se_falhar: "ALERTAR (screenshots podem ter resoluções inconsistentes)"
+    contexto: "Validar que viewport está configurado para 1920x1080 (padrão desktop)"
+    impacto: "Resoluções inconsistentes causam falsos positivos em testes visuais"
+    como_configurar: "Adicionar 'viewport: { width: 1920, height: 1080 }' em playwright.config.ts"
+
+  - item: "Tolerância de diff configurada"
+    comando: "grep -E 'maxDiffPixels.*[0-9]+' /d/IC2/frontend/icontrolit-app/e2e/visual/*.spec.ts && echo CONFIGURED || echo NOT_CONFIGURED"
+    resultado_esperado: "CONFIGURED"
+    bloqueante: false
+    acao_se_falhar: "ALERTAR (testes visuais podem ser muito sensíveis a pequenas mudanças)"
+    contexto: "Validar que testes visuais possuem maxDiffPixels configurado (ex: 100)"
+    impacto: "Sem tolerância, pequenas diferenças de renderização causam falsos positivos"
+    valor_recomendado: "maxDiffPixels: 100 (permite até 100 pixels diferentes)"
+
+  - item: "Testes visuais existem para RFXXX"
+    comando: "test -f /d/IC2/frontend/icontrolit-app/e2e/visual/RFXXX-visual.spec.ts && echo EXISTS || echo NOT_FOUND"
+    resultado_esperado: "EXISTS"
+    bloqueante: false
+    acao_se_falhar: "ALERTAR (nenhum teste visual criado para RFXXX)"
+    contexto: "Validar que testes visuais foram criados para o RF atual"
+    impacto: "Sem testes visuais, validação de layout não será executada"
+    como_criar: "Criar e2e/visual/RFXXX-visual.spec.ts com testes de snapshot"
+
 changelog:
+  - versao: "1.4"
+    data: "2026-01-13"
+    mudancas:
+      - "VALIDAÇÃO VISUAL: Adicionada seção validacao_visual (5 validações)"
+      - "Validação 1: Screenshots de baseline existem (e2e/screenshots/baseline/RFXXX)"
+      - "Validação 2: Playwright configurado para screenshots (screenshot: 'on')"
+      - "Validação 3: Viewport configurado consistentemente (1920x1080)"
+      - "Validação 4: Tolerância de diff configurada (maxDiffPixels: 100)"
+      - "Validação 5: Testes visuais existem para RFXXX (e2e/visual/RFXXX-visual.spec.ts)"
+      - "Matriz de decisão: 2 novos bloqueios (baseline ausente, Playwright não configurado)"
+      - "Impacto: GAP 4 resolvido - Regressões visuais agora podem ser detectadas"
+      - "Comandos documentados: npm run e2e:visual:baseline RFXXX"
+      - "Contexto: Detectar alinhamento incorreto, layout quebrado, elementos fora da tela"
+
   - versao: "1.3"
     data: "2026-01-10"
     mudancas:

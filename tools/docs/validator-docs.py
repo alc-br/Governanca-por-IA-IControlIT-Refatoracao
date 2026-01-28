@@ -94,7 +94,7 @@ class RFValidationResult:
 
     def to_dict(self):
         return {
-            "rf_id": self.rf_id,
+            "rf_id": self.documentacao_id,
             "pasta": self.pasta,
             "arquivos_esperados": {k: v.to_dict() for k, v in self.arquivos_esperados.items()},
             "arquivos_duplicados": self.arquivos_duplicados,
@@ -522,27 +522,27 @@ class RFDocumentationValidator:
         """Encontra pasta de um RF"""
         for fase_dir in self.base_path.glob("Fase-*"):
             for epic_dir in fase_dir.glob("EPIC*"):
-                for documentacao_dir in epic_dir.glob(f"{rf_id}*"):
+                for documentacao_dir in epic_dir.glob(f"{documentacao_id}*"):
                     if documentacao_dir.is_dir():
                         return documentacao_dir
 
-        raise FileNotFoundError(f"RF {rf_id} não encontrado em {self.base_path}")
+        raise FileNotFoundError(f"RF {documentacao_id} não encontrado em {self.base_path}")
 
     def validar_rf(self, documentacao_id: str) -> RFValidationResult:
         """Valida documentação completa de um RF"""
         try:
-            documentacao_path = self.encontrar_rf(rf_id)
+            documentacao_path = self.encontrar_rf(documentacao_id)
         except FileNotFoundError as e:
             return RFValidationResult(
-                documentacao_id=rf_id,
+                documentacao_id=documentacao_id,
                 pasta="NÃO ENCONTRADA",
                 conforme=False,
                 total_gaps=1
             )
 
         result = RFValidationResult(
-            documentacao_id=rf_id,
-            pasta=str(rf_path)
+            documentacao_id=documentacao_id,
+            pasta=str(documentacao_path)
         )
 
         # Validar cada arquivo esperado
@@ -560,10 +560,10 @@ class RFDocumentationValidator:
             result.total_gaps += len(validation.gaps)
 
         # Detectar arquivos duplicados
-        result.arquivos_duplicados = self._detectar_duplicados(rf_path, documentacao_id)
+        result.arquivos_duplicados = self._detectar_duplicados(documentacao_path, documentacao_id)
 
         # Detectar arquivos extra (não esperados)
-        result.arquivos_extra = self._detectar_arquivos_extra(rf_path, documentacao_id)
+        result.arquivos_extra = self._detectar_arquivos_extra(documentacao_path, documentacao_id)
 
         # Determinar se está conforme
         result.conforme = (
@@ -640,8 +640,8 @@ class RFDocumentationValidator:
                     match = re.match(r'(RF\d+)', documentacao_dir.name)
                     if match:
                         documentacao_id = match.group(1)
-                        print(f"Validando {rf_id}...")
-                        result = self.validar_rf(rf_id)
+                        print(f"Validando {documentacao_id}...")
+                        result = self.validar_rf(documentacao_id)
                         results.append(result)
 
         return results
@@ -683,7 +683,7 @@ def gerar_relatorio_json(results: List[RFValidationResult], output_path: str):
         "resumo_por_tipo_gap": _resumir_gaps_por_tipo(results),
         "arquivos_duplicados_global": _listar_duplicados_global(results),
         "rfs_criticos": [
-            r.rf_id for r in results
+            r.documentacao_id for r in results
             if any(
                 g['tipo'] == 'CRÍTICO'
                 for v in r.arquivos_esperados.values()
@@ -719,7 +719,7 @@ def _listar_duplicados_global(results: List[RFValidationResult]) -> List[Dict[st
     for result in results:
         for dup in result.arquivos_duplicados:
             duplicados.append({
-                "rf_id": result.rf_id,
+                "rf_id": result.documentacao_id,
                 "arquivo": dup,
                 "caminho": result.pasta
             })
@@ -1317,8 +1317,8 @@ def gerar_relatorio_html(results: List[RFValidationResult], output_path: str):
 '''
 
     # Gerar linhas da tabela
-    for result in sorted(results, key=lambda x: x.rf_id):
-        documentacao_id = result.rf_id
+    for result in sorted(results, key=lambda x: x.documentacao_id):
+        documentacao_id = result.documentacao_id
         conforme = result.conforme
 
         # Função auxiliar para gerar célula com check/cross
@@ -1331,7 +1331,7 @@ def gerar_relatorio_html(results: List[RFValidationResult], output_path: str):
                 return '<td><span class="check">✓</span></td>'
 
             # Montar tooltip expandido com comparações
-            tooltip_id = f"{rf_id}-{file_key.replace('.', '-')}"
+            tooltip_id = f"{documentacao_id}-{file_key.replace('.', '-')}"
             gaps_html = ""
 
             for idx, gap in enumerate(arq.gaps[:10]):  # Primeiros 10 gaps
@@ -1412,7 +1412,7 @@ A ação a ser tomada é:
                         <span class="close" onclick="closeModal('{tooltip_id}')">&times;</span>
                     </div>
                     <div class="modal-body">
-                        <p><strong>RF:</strong> {rf_id}</p>
+                        <p><strong>RF:</strong> {documentacao_id}</p>
                         <p><strong>Total de Gaps:</strong> {len(arq.gaps)}</p>
                         <hr>
                         {gaps_html}
@@ -1425,16 +1425,16 @@ A ação a ser tomada é:
 
         # Mapear arquivos
         file_map = {
-            f'{rf_id}.md': 'RF.md',
-            f'{rf_id}.yaml': 'RF.yaml',
-            f'RL-{rf_id}.md': 'RL.md',
-            f'RL-{rf_id}.yaml': 'RL.yaml',
-            f'UC-{rf_id}.md': 'UC.md',
-            f'UC-{rf_id}.yaml': 'UC.yaml',
-            f'MD-{rf_id}.yaml': 'MD.yaml',
-            f'WF-{rf_id}.md': 'WF.md',
-            f'TC-{rf_id}.yaml': 'TC.yaml',
-            f'MT-{rf_id}.yaml': 'MT.yaml',
+            f'{documentacao_id}.md': 'RF.md',
+            f'{documentacao_id}.yaml': 'RF.yaml',
+            f'RL-{documentacao_id}.md': 'RL.md',
+            f'RL-{documentacao_id}.yaml': 'RL.yaml',
+            f'UC-{documentacao_id}.md': 'UC.md',
+            f'UC-{documentacao_id}.yaml': 'UC.yaml',
+            f'MD-{documentacao_id}.yaml': 'MD.yaml',
+            f'WF-{documentacao_id}.md': 'WF.md',
+            f'TC-{documentacao_id}.yaml': 'TC.yaml',
+            f'MT-{documentacao_id}.yaml': 'MT.yaml',
             'STATUS.yaml': 'STATUS'
         }
 
@@ -1442,17 +1442,17 @@ A ação a ser tomada é:
 
         html += f'''
                     <tr data-status="{'conforme' if conforme else 'nao-conforme'}">
-                        <td class="rf-id">{rf_id}</td>
-                        {cell_status(f'{rf_id}.md')}
-                        {cell_status(f'{rf_id}.yaml')}
-                        {cell_status(f'RL-{rf_id}.md')}
-                        {cell_status(f'RL-{rf_id}.yaml')}
-                        {cell_status(f'UC-{rf_id}.md')}
-                        {cell_status(f'UC-{rf_id}.yaml')}
-                        {cell_status(f'MD-{rf_id}.yaml')}
-                        {cell_status(f'WF-{rf_id}.md')}
-                        {cell_status(f'TC-{rf_id}.yaml')}
-                        {cell_status(f'MT-{rf_id}.yaml')}
+                        <td class="rf-id">{documentacao_id}</td>
+                        {cell_status(f'{documentacao_id}.md')}
+                        {cell_status(f'{documentacao_id}.yaml')}
+                        {cell_status(f'RL-{documentacao_id}.md')}
+                        {cell_status(f'RL-{documentacao_id}.yaml')}
+                        {cell_status(f'UC-{documentacao_id}.md')}
+                        {cell_status(f'UC-{documentacao_id}.yaml')}
+                        {cell_status(f'MD-{documentacao_id}.yaml')}
+                        {cell_status(f'WF-{documentacao_id}.md')}
+                        {cell_status(f'TC-{documentacao_id}.yaml')}
+                        {cell_status(f'MT-{documentacao_id}.yaml')}
                         {cell_status('STATUS.yaml')}
                         <td><span class="badge {'success' if result.total_gaps == 0 else 'danger'}">{result.total_gaps}</span></td>
                         <td><span class="badge {'success' if len(result.arquivos_duplicados) == 0 else 'warning'}">{len(result.arquivos_duplicados)}</span></td>
@@ -2080,7 +2080,7 @@ def gerar_relatorio_completo_html(results: List[RFValidationResult], output_path
 '''
 
         # Gerar conteúdo por RF
-        for documentacao in sorted(rfs, key=lambda x: x.rf_id):
+        for documentacao in sorted(rfs, key=lambda x: x.documentacao_id):
             gaps_criticos = sum(1 for arq in rf.arquivos_esperados.values() for gap in arq.gaps if gap.get('tipo') == 'CRÍTICO')
             gaps_importantes = sum(1 for arq in rf.arquivos_esperados.values() for gap in arq.gaps if gap.get('tipo') == 'IMPORTANTE')
 
@@ -2354,7 +2354,7 @@ def gerar_relatorio_markdown(results: List[RFValidationResult], output_path: str
     for result in results:
         status = "OK" if result.conforme else "GAPS"
         lines.append(
-            f"| {result.rf_id} | {Path(result.pasta).name} | {status} | "
+            f"| {result.documentacao_id} | {Path(result.pasta).name} | {status} | "
             f"{result.total_gaps} | {len(result.arquivos_duplicados)} | "
             f"{len(result.arquivos_extra)} |"
         )
@@ -2363,7 +2363,7 @@ def gerar_relatorio_markdown(results: List[RFValidationResult], output_path: str
 
     for result in results:
         if not result.conforme:
-            lines.append(f"### {result.rf_id}")
+            lines.append(f"### {result.documentacao_id}")
             lines.append("")
 
             # Arquivos com problemas
@@ -2576,11 +2576,11 @@ def main():
                     pass
 
             # Remover o RF atual dos resultados antigos (se existir) e adicionar o novo
-            all_results = [r for r in all_results if r.rf_id != results[0].rf_id]
+            all_results = [r for r in all_results if r.documentacao_id != results[0].rf_id]
             all_results.append(results[0])
 
             # Ordenar por RF ID
-            all_results.sort(key=lambda r: r.rf_id)
+            all_results.sort(key=lambda r: r.documentacao_id)
 
             # Salvar JSON consolidado atualizado
             gerar_relatorio_json(all_results, str(json_consolidado))

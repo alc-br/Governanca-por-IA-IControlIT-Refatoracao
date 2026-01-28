@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronograma Interativo - Modernização IControlIT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: rgb(75, 82, 96);
+            --secondary-color: rgb(240, 79, 75);
+            --primary-dark: rgb(55, 60, 70);
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+        }
+        .accordion-button.open .accordion-arrow {
+            transform: rotate(180deg);
+        }
+        .accordion-arrow {
+            transition: transform 0.3s ease-in-out;
+        }
+        .task-row.completed .task-name {
+            text-decoration: line-through;
+            color: #9ca3af;
+        }
+        .task-observation-display:empty::before {
+            content: "Clique para adicionar anotações...";
+            color: #9ca3af;
+            font-style: italic;
+        }
+        input[type='number']::-webkit-inner-spin-button,
+        input[type='number']::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type='number'] {
+            -moz-appearance: textfield;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            cursor: pointer;
+        }
+        input[type="date"] {
+            color: #4b5563;
+        }
+        input[type="date"]:invalid {
+            color: #9ca3af;
+        }
+        .task-checkbox:checked {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+        .task-checkbox:focus {
+            ring-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--primary-color) !important;
+            ring-color: var(--primary-color) !important;
+        }
+        .accordion-button {
+            transition: all 0.3s ease;
+        }
+        .accordion-button:hover {
+            background-color: rgba(75, 82, 96, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 sm:p-8">
+
+    <div class="w-full max-w-full mx-auto bg-white rounded-2xl shadow-lg overflow-hidden">
+        <!-- HEADER -->
+        <div class="relative overflow-hidden">
+            <!-- Barra superior vermelha (accent) -->
+            <div class="h-2" style="background: linear-gradient(90deg, rgb(240, 79, 75) 0%, rgb(255, 110, 100) 100%);"></div>
+
+            <!-- Conteúdo principal do header -->
+            <div class="px-8 py-6 bg-white">
+                <div class="flex items-center justify-between mb-6">
+                    <!-- Logo em caixa branca com sombra -->
+                    <div class="flex items-center space-x-6">
+                        <div class="bg-white border-2 border-gray-200 rounded-xl p-4 shadow-lg">
+                            <img src="https://alc.dev.br/wp-content/uploads/2024/06/logo1.svg" alt="Agência ALC" class="h-12 w-auto">
+                        </div>
+                        <div>
+                            <h1 class="text-3xl font-bold tracking-tight" style="color: rgb(75, 82, 96);">Cronograma de Modernização</h1>
+                            <p class="text-gray-600 mt-1 font-medium">Projeto IControlIT | Web Forms VB.NET → .NET 10 + Angular 19</p>
+                        </div>
+                    </div>
+                    <!-- Badge de status -->
+                    <div class="bg-gray-50 border-2 border-gray-200 rounded-lg px-6 py-3">
+                        <p class="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Status do Projeto</p>
+                        <p class="text-xl font-bold" style="color: rgb(240, 79, 75);">Em Andamento</p>
+                    </div>
+                </div>
+
+                <!-- Métricas em grid moderno -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
+                    <div class="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 border-2 border-gray-100 hover:shadow-lg transition-shadow">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-xs uppercase tracking-wider text-gray-500 font-bold">Planejado</p>
+                            <div class="w-3 h-3 rounded-full" style="background-color: rgb(75, 82, 96);"></div>
+                        </div>
+                        <p id="global-planned-total" class="text-4xl font-bold tracking-tight" style="color: rgb(75, 82, 96);">2.230h</p>
+                        <p class="text-xs text-gray-500 mt-2">Total estimado</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-red-50 to-white rounded-xl p-5 border-2 border-red-100 hover:shadow-lg transition-shadow">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-xs uppercase tracking-wider text-gray-500 font-bold">Realizado</p>
+                            <div class="w-3 h-3 rounded-full" style="background-color: rgb(240, 79, 75);"></div>
+                        </div>
+                        <p id="global-realized-total" class="text-4xl font-bold tracking-tight" style="color: rgb(240, 79, 75);">688h</p>
+                        <p class="text-xs text-gray-500 mt-2">Concluído</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 border-2 border-gray-100 hover:shadow-lg transition-shadow">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-xs uppercase tracking-wider text-gray-500 font-bold">Restante</p>
+                            <div class="w-3 h-3 rounded-full bg-gray-400"></div>
+                        </div>
+                        <p id="global-remaining-total" class="text-4xl font-bold tracking-tight text-gray-700">1.542h</p>
+                        <p class="text-xs text-gray-500 mt-2">A realizar</p>
+                    </div>
+
+                    <div class="bg-gradient-to-br from-red-50 to-white rounded-xl p-5 border-2 border-red-100 hover:shadow-lg transition-shadow">
+                        <div class="flex items-center justify-between mb-3">
+                            <p class="text-xs uppercase tracking-wider text-gray-500 font-bold">Progresso</p>
+                            <div class="w-3 h-3 rounded-full" style="background-color: rgb(240, 79, 75);"></div>
+                        </div>
+                        <p id="global-progress-percent" class="text-4xl font-bold tracking-tight" style="color: rgb(240, 79, 75);">30.8%</p>
+                        <div class="w-full bg-gray-200 rounded-full h-2 mt-3">
+                            <div class="h-2 rounded-full transition-all duration-300" style="width: 30.8%; background: linear-gradient(90deg, rgb(240, 79, 75) 0%, rgb(255, 110, 100) 100%);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Linha divisória cinza -->
+            <div class="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+        </div>
+
+        <div id="accordion-container">
+            <!-- Template para uma linha de tarefa -->
+            <template id="task-row-template">
+                <div class="task-row flex items-start border-b py-3 px-4 min-w-max hover:bg-gray-50 transition-colors">
+                    <div class="pt-1 flex-shrink-0">
+                        <input type="checkbox" class="task-checkbox h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer">
+                    </div>
+                    <div class="w-96 flex-grow ml-4 task-name-container">
+                        <span class="task-name p-1 cursor-pointer hover:bg-gray-100 rounded"></span>
+                        <input type="text" class="task-name-input hidden w-full p-1 border rounded-md focus:ring-2 focus:ring-indigo-500" />
+                    </div>
+                    <div class="w-24 text-right pt-1 flex-shrink-0">
+                        <span class="task-planned-hours font-medium text-gray-700"></span>
+                    </div>
+                    <div class="w-24 text-right pt-1 flex-shrink-0">
+                        <input type="number" class="task-realized-hours w-20 text-right bg-gray-50 border border-gray-200 rounded-md px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="0h">
+                    </div>
+                    <div class="w-32 pt-1 flex-shrink-0 ml-2">
+                        <select class="task-status w-full bg-gray-50 border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="pending">Pendente</option>
+                            <option value="in-progress">Em Andamento</option>
+                            <option value="completed">Concluída</option>
+                        </select>
+                    </div>
+                    <div class="w-64 ml-4 flex-shrink-0 observation-container">
+                        <p class="task-observation-display w-full p-2 text-xs text-gray-800 cursor-pointer min-h-[2.5rem] break-words rounded hover:bg-gray-100"></p>
+                        <textarea class="task-observation w-full p-2 border rounded-md text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 hidden" rows="2" placeholder="Anotações..."></textarea>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <!-- TIMELINE VISUAL -->
+        <div class="p-6 bg-gradient-to-br from-gray-50 to-gray-100 border-t border-gray-200">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">📊 Linha do Tempo</h2>
+
+            <div class="overflow-x-auto">
+                <div class="inline-flex flex-col min-w-max space-y-3">
+                    <!-- Headers -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-48 text-xs font-semibold text-gray-600 uppercase">Fase</div>
+                        <div class="w-24 text-center text-xs font-semibold text-gray-600">Out/25</div>
+                        <div class="w-24 text-center text-xs font-semibold text-gray-600">Nov/25</div>
+                        <div class="w-24 text-center text-xs font-semibold text-gray-600">Dez/25</div>
+                        <div class="w-24 text-center text-xs font-semibold text-gray-600">Jan/26</div>
+                        <div class="w-24 text-center text-xs font-semibold text-gray-600">Fev/26</div>
+                        <div class="w-24 text-center text-xs font-semibold text-gray-600">Mar/26</div>
+                        <div class="w-24 text-center text-xs font-semibold text-gray-600">Abr/26</div>
+                        <div class="w-24 text-center text-xs font-semibold text-gray-600">Mai/26</div>
+                        <div class="w-24 text-center text-xs font-semibold text-gray-600">Jun/26</div>
+                        <div class="w-24 text-center text-xs font-semibold text-gray-600">Jul/26</div>
+                    </div>
+
+                    <!-- Fase 0 -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-48 text-sm font-medium text-gray-800">Fase 0 - Preparação<br><span class="text-xs text-gray-500">120h</span></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-full bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">✓</div></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                    </div>
+
+                    <!-- Fase 1 -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-48 text-sm font-medium text-gray-800">Fase 1 - Sistema Base<br><span class="text-xs text-gray-500">10 RFs | 310h</span></div>
+                        <div class="w-24"></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-full bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">✓</div></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                    </div>
+
+                    <!-- Fase 2 -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-48 text-sm font-medium text-gray-800">Fase 2 - Cadastros<br><span class="text-xs text-gray-500">26 RFs | 258h</span></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-full bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">✓</div></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-20 bg-yellow-100 rounded-lg flex items-center justify-center text-yellow-700 text-xs font-semibold border-2 border-yellow-400">Reorg*</div></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                    </div>
+
+                    <!-- Fase 3 CONSOLIDADA -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-48 text-sm font-medium text-gray-800">Fase 3 - Financeiro<br><span class="text-xs text-gray-500">17 RFs | 695h**</span></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-20 bg-yellow-100 rounded-lg flex items-center justify-center text-yellow-700 text-xs font-semibold border-2 border-yellow-400">Plan</div></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-full bg-gradient-to-r from-gray-400 to-gray-500 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">Planejado</div></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-full bg-gradient-to-r from-gray-400 to-gray-500 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">Planejado</div></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                    </div>
+
+                    <!-- Fase 4 - Ativos/Integrações (Jun-Jul) -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-48 text-sm font-medium text-gray-800">Fase 4 - Ativos/Integ.<br><span class="text-xs text-gray-500">9 RFs | 307h</span></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-full bg-gradient-to-r from-gray-400 to-gray-500 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">Planejado</div></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-full bg-gradient-to-r from-gray-400 to-gray-500 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">Planejado</div></div>
+                    </div>
+
+                    <!-- Fase 5 - Service Desk (Abr-Mai) -->
+                    <div class="flex items-center space-x-2">
+                        <div class="w-48 text-sm font-medium text-gray-800">Fase 5 - Service Desk<br><span class="text-xs text-gray-500">14 RFs | 580h</span></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-full bg-gradient-to-r from-gray-400 to-gray-500 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">Planejado</div></div>
+                        <div class="w-24 flex justify-center"><div class="h-10 w-full bg-gradient-to-r from-gray-400 to-gray-500 rounded-lg flex items-center justify-center text-white text-xs font-bold shadow-md">Planejado</div></div>
+                        <div class="w-24"></div>
+                        <div class="w-24"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex items-center justify-center space-x-6">
+                <div class="flex items-center space-x-2">
+                    <div class="h-4 w-12 bg-gradient-to-r from-green-500 to-green-600 rounded"></div>
+                    <span class="text-sm text-gray-600">Concluído</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div class="h-4 w-12 bg-gradient-to-r from-gray-400 to-gray-500 rounded"></div>
+                    <span class="text-sm text-gray-600">Planejado</span>
+                </div>
+            </div>
+
+            <div class="mt-4 text-xs text-gray-600 space-y-1">
+                <p class="text-center">
+                    <strong>*Reorganização:</strong> Alguns cadastros da Fase 2 seguem em Jan/26 sem consumo adicional de horas
+                </p>
+                <p class="text-center">
+                    <strong>**Fase 3 Consolidada:</strong> Unifica antigas Fases 3 e 4 (Base Contábil + Processos).<br>
+                    Total: 655h de RFs + 40h de Menu Matricial/UX = 695h | Conclusão: 15/Mar/2026
+                </p>
+            </div>
+        </div>
+
+        <!-- NOTA METODOLOGIA ÁGIL -->
+        <div class="p-6 bg-gray-50 border-t border-gray-200">
+            <h3 class="font-semibold text-gray-800 mb-2">📝 Nota sobre a Metodologia Ágil</h3>
+            <p class="text-sm text-gray-600 leading-relaxed">
+                Este cronograma representa nossa melhor estimativa no momento atual. Como um projeto ágil, ele é um organismo vivo.
+                As prioridades das atividades dentro de cada fase podem ser ajustadas para maximizar o valor entregue.
+                No entanto, qualquer ajuste será feito de forma transparente e gerenciado para garantir que o projeto seja
+                concluído dentro do <strong>escopo, prazo e orçamento totais</strong>.
+            </p>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="relative">
+            <!-- Linha divisória superior -->
+            <div class="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+
+            <div class="bg-white px-8 py-8">
+                <div class="flex items-center justify-between">
+                    <!-- Logo e informações -->
+                    <div class="flex items-center space-x-6">
+                        <div class="bg-white border-2 border-gray-200 rounded-xl p-3 shadow-md">
+                            <img src="https://alc.dev.br/wp-content/uploads/2024/06/logo1.svg" alt="Agência ALC" class="h-10 w-auto">
+                        </div>
+                        <div>
+                            <p class="text-lg font-bold" style="color: rgb(75, 82, 96);">Modernização IControlIT</p>
+                            <p class="text-sm text-gray-600 mt-1">Migração de ASP.NET Web Forms (VB.NET) para .NET 10 + Angular 19</p>
+                        </div>
+                    </div>
+
+                    <!-- Informações de data e empresa -->
+                    <div class="text-right">
+                        <p class="text-xs uppercase tracking-wider text-gray-500 font-bold mb-1">Desenvolvido por</p>
+                        <p class="text-sm font-semibold">
+                            <a href="https://alc.dev.br" target="_blank" class="hover:underline transition-colors" style="color: rgb(240, 79, 75);">Agência ALC</a>
+                        </p>
+                        <p class="text-xs text-gray-500 mt-2">Documento gerado em 14/01/2026</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Barra inferior vermelha (accent) -->
+            <div class="h-2" style="background: linear-gradient(90deg, rgb(240, 79, 75) 0%, rgb(255, 110, 100) 100%);"></div>
+        </div>
+    </div>
+
+    <script>
+        // Dados do Projeto IControlIT
+        const projectData = [
+            {
+                id: "fase0",
+                title: "Fase 0 - Preparação do Ambiente",
+                color: "bg-gray-600",
+                status: "completed",
+                plannedHours: 120,
+                tasks: [
+                    { id: "f0_setup", name: "Setup de Infraestrutura DevOps", hours: 40 },
+                    { id: "f0_tools", name: "Configuração de Ferramentas e Ambientes", hours: 40 },
+                    { id: "f0_docs", name: "Documentação Base e Padrões", hours: 40 },
+                ]
+            },
+            {
+                id: "fase1",
+                title: "Fase 1 - Sistema Base",
+                color: "bg-blue-600",
+                status: "completed",
+                plannedHours: 310,
+                tasks: [
+                    { id: "rf001", name: "RF001 - Parâmetros e Configurações", hours: 35 },
+                    { id: "rf002", name: "RF002 - Configurações e Parametrização", hours: 30 },
+                    { id: "rf003", name: "RF003 - Logs e Monitoramento", hours: 35 },
+                    { id: "rf004", name: "RF004 - Auditoria e Logs", hours: 40 },
+                    { id: "rf005", name: "RF005 - i18n Orçamento Provisão", hours: 30 },
+                    { id: "rf006", name: "RF006 - Gestão de Clientes", hours: 35 },
+                    { id: "rf007", name: "RF007 - Login e Autenticação", hours: 45 },
+                    { id: "rf008", name: "RF008 - Gestão de Usuários RBAC", hours: 40 },
+                    { id: "rf009", name: "RF009 - Gestão de Idiomas", hours: 10 },
+                    { id: "rf010", name: "RF010 - Gestão de Módulos", hours: 10 },
+                ]
+            },
+            {
+                id: "fase2",
+                title: "Fase 2 - Cadastros e Serviços Transversais",
+                color: "bg-teal-600",
+                status: "completed",
+                plannedHours: 258,
+                tasks: [
+                    { id: "rf011", name: "RF011 - Gestão de Empresas", hours: 25 },
+                    { id: "rf012", name: "RF012 - Gestão de Filiais", hours: 25 },
+                    { id: "rf013", name: "RF013 - Gestão de Departamentos", hours: 20 },
+                    { id: "rf014", name: "RF014 - Gestão de Centros de Custo", hours: 20 },
+                    { id: "rf015", name: "RF015 - Gestão de Fornecedores", hours: 25 },
+                    { id: "rf016", name: "RF016 - Gestão de Fabricantes", hours: 15 },
+                    { id: "rf017", name: "RF017 - Gestão de Categorias", hours: 15 },
+                    { id: "rf063", name: "RF063 - Motor de Templates", hours: 30 },
+                    { id: "rf064", name: "RF064 - Templates de E-mail", hours: 25 },
+                    { id: "rf065", name: "RF065 - Templates de Relatórios", hours: 28 },
+                    { id: "rf066", name: "RF066 - Notificações e Alertas", hours: 30 },
+                ]
+            },
+            {
+                id: "fase3",
+                title: "Fase 3 - Financeiro Completo (Base Contábil + Processos + Menu Matricial)",
+                color: "bg-purple-600",
+                status: "planned",
+                plannedHours: 695,
+                tasks: [
+                    // Base Contábil (Antiga Fase 3)
+                    { id: "rf032", name: "RF032 - Plano de Contas", hours: 40 },
+                    { id: "rf033", name: "RF033 - Centro de Custo Contábil", hours: 35 },
+                    { id: "rf034", name: "RF034 - Orçamento e Provisão", hours: 40 },
+                    { id: "rf035", name: "RF035 - Lançamentos Financeiros", hours: 45 },
+                    { id: "rf036", name: "RF036 - Contas a Pagar", hours: 40 },
+                    { id: "rf037", name: "RF037 - Contas a Receber", hours: 40 },
+                    { id: "rf038", name: "RF038 - Conciliação Bancária", hours: 45 },
+                    { id: "rf039", name: "RF039 - Relatórios Financeiros", hours: 35 },
+                    { id: "rf040", name: "RF040 - DRE", hours: 35 },
+                    { id: "rf041", name: "RF041 - Análise Financeira", hours: 30 },
+                    // Processos (Antiga Fase 4)
+                    { id: "rf042", name: "RF042 - Fluxo de Caixa", hours: 40 },
+                    { id: "rf043", name: "RF043 - Rateio de Custos", hours: 45 },
+                    { id: "rf044", name: "RF044 - Controle Orçamentário", hours: 35 },
+                    { id: "rf045", name: "RF045 - Análise de Variações", hours: 30 },
+                    { id: "rf046", name: "RF046 - Relatórios Gerenciais", hours: 35 },
+                    { id: "rf047", name: "RF047 - Dashboards Financeiros", hours: 35 },
+                    { id: "rf055", name: "RF055 - Gestão de Rateio", hours: 50 },
+                    // Menu Matricial e UX (Novo)
+                    { id: "ux001", name: "UX001 - Implementação Menu Matricial", hours: 15 },
+                    { id: "ux002", name: "UX002 - Reorganização da Navegação", hours: 10 },
+                    { id: "ux003", name: "UX003 - Breadcrumbs e Indicadores", hours: 5 },
+                    { id: "ux004", name: "UX004 - Wireframes das Telas", hours: 5 },
+                    { id: "ux005", name: "UX005 - Mockups Contratos e Faturas", hours: 5 },
+                ]
+            },
+            {
+                id: "fase4",
+                title: "Fase 4 - Ativos, Auditoria e Integrações",
+                color: "bg-green-600",
+                status: "planned",
+                plannedHours: 307,
+                tasks: [
+                    { id: "rf083", name: "RF083 - Cadastro de Ativos TI", hours: 35 },
+                    { id: "rf084", name: "RF084 - Inventário Automático", hours: 40 },
+                    { id: "rf085", name: "RF085 - Movimentação de Ativos", hours: 30 },
+                    { id: "rf086", name: "RF086 - Inventário Cíclico", hours: 35 },
+                    { id: "rf087", name: "RF087 - Trilha de Auditoria", hours: 35 },
+                    { id: "rf088", name: "RF088 - Relatórios Compliance", hours: 30 },
+                    { id: "rf089", name: "RF089 - Alertas de Anomalias", hours: 25 },
+                    { id: "rf095", name: "RF095 - Integração ERPs", hours: 40 },
+                    { id: "rf096", name: "RF096 - Active Directory", hours: 37 },
+                ]
+            },
+            {
+                id: "fase5",
+                title: "Fase 5 - Service Desk (Suporte N0/N1)",
+                color: "bg-indigo-600",
+                status: "planned",
+                plannedHours: 580,
+                tasks: [
+                    { id: "rf049", name: "RF049 - Gestão de Chamados", hours: 50 },
+                    { id: "rf050", name: "RF050 - SLA por Tipo de Chamado", hours: 40 },
+                    { id: "rf051", name: "RF051 - Filas de Atendimento", hours: 35 },
+                    { id: "rf052", name: "RF052 - Escalação Automática", hours: 40 },
+                    { id: "rf053", name: "RF053 - Base de Conhecimento", hours: 45 },
+                    { id: "rf054", name: "RF054 - Portal do Usuário", hours: 50 },
+                    { id: "rf056", name: "RF056 - Ordens de Serviço", hours: 40 },
+                    { id: "rf069", name: "RF069 - Configuração SLA Chamados", hours: 35 },
+                    { id: "rf070", name: "RF070 - Base Conhecimento", hours: 30 },
+                    { id: "rf073", name: "RF073 - Gestão Chamados e SLA", hours: 45 },
+                    { id: "rf074", name: "RF074 - Gestão Tickets", hours: 40 },
+                    { id: "rf078", name: "RF078 - Integração ERPs", hours: 50 },
+                    { id: "rf080", name: "RF080 - Termos LGPD", hours: 40 },
+                    { id: "rf082", name: "RF082 - Termos Responsabilidade", hours: 40 },
+                ]
+            },
+        ];
+
+        // Funções auxiliares
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => { clearTimeout(timeout); func(...args); };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        function updateRowStyle(row, isCompleted) {
+            row.classList.toggle('completed', isCompleted);
+        }
+
+        function updateProgress(accordionItem) {
+            const taskRows = accordionItem.querySelectorAll('.task-row');
+            let totalHours = 0;
+            let completedHours = 0;
+
+            taskRows.forEach(row => {
+                const hours = parseInt(row.querySelector('.task-planned-hours').textContent, 10) || 0;
+                totalHours += hours;
+                if (row.querySelector('.task-checkbox')?.checked) {
+                    completedHours += hours;
+                }
+            });
+
+            const percentage = totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0;
+            const progressBar = accordionItem.querySelector('.progress-bar');
+            const progressText = accordionItem.querySelector('.progress-text');
+
+            if (progressBar) progressBar.style.width = `${percentage}%`;
+            if (progressText) progressText.textContent = `${percentage}%`;
+        }
+
+        function updateAllTotals() {
+            let globalPlanned = 0, globalRealized = 0;
+
+            document.querySelectorAll('.accordion-item').forEach(item => {
+                let sectionPlanned = 0, sectionRealized = 0;
+
+                item.querySelectorAll('.task-row').forEach(row => {
+                    sectionPlanned += parseInt(row.querySelector('.task-planned-hours').textContent, 10) || 0;
+                    sectionRealized += parseInt(row.querySelector('.task-realized-hours').value, 10) || 0;
+                });
+
+                item.querySelector('.section-planned-total').textContent = `${sectionPlanned}h`;
+                item.querySelector('.section-realized-total').textContent = `${sectionRealized}h`;
+                globalPlanned += sectionPlanned;
+                globalRealized += sectionRealized;
+            });
+
+            document.getElementById('global-planned-total').textContent = `${globalPlanned}h`;
+            document.getElementById('global-realized-total').textContent = `${globalRealized}h`;
+            document.getElementById('global-remaining-total').textContent = `${globalPlanned - globalRealized}h`;
+            document.getElementById('global-progress-percent').textContent = `${Math.round((globalRealized / globalPlanned) * 100)}%`;
+        }
+
+        // Salvamento em localStorage
+        function saveAllTasksState() {
+            const tasksState = {};
+            document.querySelectorAll('.task-row').forEach(row => {
+                const taskId = row.dataset.taskId;
+                tasksState[taskId] = {
+                    completed: row.querySelector('.task-checkbox').checked,
+                    name: row.querySelector('.task-name').textContent,
+                    realizedHours: row.querySelector('.task-realized-hours').value,
+                    status: row.querySelector('.task-status').value,
+                    observation: row.querySelector('.task-observation').value
+                };
+            });
+            localStorage.setItem('icontrolit-cronograma', JSON.stringify(tasksState));
+        }
+
+        function loadTasksState() {
+            const savedState = localStorage.getItem('icontrolit-cronograma');
+            if (!savedState) return;
+
+            const tasksState = JSON.parse(savedState);
+            document.querySelectorAll('.task-row').forEach(row => {
+                const taskId = row.dataset.taskId;
+                const taskData = tasksState[taskId];
+                if (!taskData) return;
+
+                const checkbox = row.querySelector('.task-checkbox');
+                const realizedHoursInput = row.querySelector('.task-realized-hours');
+                const statusSelect = row.querySelector('.task-status');
+
+                checkbox.checked = taskData.completed || false;
+                if (taskData.name) row.querySelector('.task-name').textContent = taskData.name;
+                realizedHoursInput.value = taskData.realizedHours || '';
+                statusSelect.value = taskData.status || 'pending';
+                row.querySelector('.task-observation').value = taskData.observation || '';
+                row.querySelector('.task-observation-display').textContent = taskData.observation || '';
+
+                // Se está marcado como concluído, desabilitar edição de horas
+                if (taskData.completed) {
+                    realizedHoursInput.disabled = true;
+                    realizedHoursInput.classList.add('bg-gray-200', 'cursor-not-allowed');
+                }
+
+                updateRowStyle(row, taskData.completed);
+            });
+
+            document.querySelectorAll('.accordion-item').forEach(updateProgress);
+            updateAllTotals();
+        }
+
+        const debouncedSave = debounce(saveAllTasksState, 800);
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            const accordionContainer = document.getElementById('accordion-container');
+            const taskRowTemplate = document.getElementById('task-row-template');
+
+            // Gerar HTML das seções
+            projectData.forEach((section, index) => {
+                const sectionTotal = section.plannedHours;
+                const statusBadge = section.status === 'completed'
+                    ? '<span class="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Concluída</span>'
+                    : '<span class="ml-2 px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Planejado</span>';
+
+                const sectionHtml = `
+                    <div class="accordion-item border-b border-gray-200">
+                        <button class="accordion-button w-full flex justify-between items-center p-6 text-left hover:bg-gray-50 focus:outline-none transition-colors">
+                            <div class="flex items-center">
+                                <span class="text-sm font-bold text-white ${section.color} rounded-full h-10 w-10 flex items-center justify-center mr-4 shadow-md">${index}</span>
+                                <div>
+                                    <span class="text-lg font-semibold text-gray-800">${section.title}</span>
+                                    ${statusBadge}
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-6">
+                                <div class="text-right">
+                                    <div class="text-xs text-gray-500">Planejado</div>
+                                    <span class="section-planned-total text-lg font-bold text-gray-700">${sectionTotal}h</span>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-xs text-gray-500">Realizado</div>
+                                    <span class="section-realized-total text-lg font-bold text-green-600">0h</span>
+                                </div>
+                                <svg class="accordion-arrow w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
+                        </button>
+                        <div class="accordion-content">
+                            <div class="p-6 overflow-x-auto">
+                                <div class="pb-4">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-xs font-semibold text-gray-700">Progresso</span>
+                                        <span class="progress-text text-xs font-semibold" style="color: rgb(240, 79, 75);">0%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                        <div class="progress-bar h-2.5 rounded-full transition-all duration-500" style="width: 0%; background: linear-gradient(90deg, rgb(240, 79, 75) 0%, rgb(220, 60, 56) 100%);"></div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center text-xs text-gray-700 uppercase bg-gray-50 px-4 py-3 font-semibold min-w-max rounded-t-lg">
+                                    <div class="w-8 flex-shrink-0"></div>
+                                    <div class="w-96 flex-grow ml-4">Atividade</div>
+                                    <div class="w-24 flex-shrink-0 text-right">Planejado</div>
+                                    <div class="w-24 flex-shrink-0 text-right">Realizado</div>
+                                    <div class="w-32 flex-shrink-0 text-left ml-2">Status</div>
+                                    <div class="w-64 flex-shrink-0 ml-4">Observações</div>
+                                </div>
+                                <div class="task-list bg-white rounded-b-lg"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                accordionContainer.innerHTML += sectionHtml;
+            });
+
+            // Preencher tarefas
+            document.querySelectorAll('.accordion-item').forEach((sectionEl, index) => {
+                const taskList = sectionEl.querySelector('.task-list');
+                const sectionData = projectData[index];
+
+                sectionData.tasks.forEach(taskData => {
+                    const taskRow = taskRowTemplate.content.cloneNode(true).firstElementChild;
+                    taskRow.dataset.taskId = taskData.id;
+                    taskRow.querySelector('.task-name').textContent = taskData.name;
+                    taskRow.querySelector('.task-planned-hours').textContent = `${taskData.hours}h`;
+                    taskList.appendChild(taskRow);
+                });
+            });
+
+            // Event Listeners
+            accordionContainer.addEventListener('click', (event) => {
+                const button = event.target.closest('.accordion-button');
+                if (button) {
+                    const content = button.nextElementSibling;
+                    button.classList.toggle('open');
+                    content.style.maxHeight = content.style.maxHeight ? null : content.scrollHeight + "px";
+                }
+
+                const taskNameSpan = event.target.closest('.task-name');
+                if (taskNameSpan) {
+                    const container = taskNameSpan.closest('.task-name-container');
+                    const input = container.querySelector('.task-name-input');
+                    input.value = taskNameSpan.textContent;
+                    taskNameSpan.classList.add('hidden');
+                    input.classList.remove('hidden');
+                    input.focus();
+                }
+
+                const observationP = event.target.closest('.task-observation-display');
+                if (observationP) {
+                    const ta = observationP.nextElementSibling;
+                    observationP.classList.add('hidden');
+                    ta.classList.remove('hidden');
+                    ta.value = observationP.textContent;
+                    ta.focus();
+                }
+            });
+
+            accordionContainer.addEventListener('change', (event) => {
+                const target = event.target;
+                if (target.matches('.task-checkbox, .task-status')) {
+                    if (target.matches('.task-checkbox')) {
+                        const taskRow = target.closest('.task-row');
+                        const statusSelect = taskRow.querySelector('.task-status');
+                        const realizedHoursInput = taskRow.querySelector('.task-realized-hours');
+                        const plannedHours = parseInt(taskRow.querySelector('.task-planned-hours').textContent, 10) || 0;
+
+                        if (target.checked) {
+                            // Marcar como concluído
+                            statusSelect.value = 'completed';
+                            realizedHoursInput.value = plannedHours;
+                            realizedHoursInput.disabled = true;
+                            realizedHoursInput.classList.add('bg-gray-200', 'cursor-not-allowed');
+                        } else {
+                            // Desmarcar - permite edição novamente
+                            statusSelect.value = 'pending';
+                            realizedHoursInput.value = '';
+                            realizedHoursInput.disabled = false;
+                            realizedHoursInput.classList.remove('bg-gray-200', 'cursor-not-allowed');
+                        }
+
+                        updateRowStyle(taskRow, target.checked);
+                        updateProgress(taskRow.closest('.accordion-item'));
+                        updateAllTotals();
+                    }
+                    saveAllTasksState();
+                }
+            });
+
+            accordionContainer.addEventListener('blur', (event) => {
+                const target = event.target;
+                if (target.matches('.task-observation, .task-name-input, .task-realized-hours')) {
+                    if (target.matches('.task-observation')) {
+                        const p = target.previousElementSibling;
+                        p.textContent = target.value;
+                        target.classList.add('hidden');
+                        p.classList.remove('hidden');
+                    }
+                    if (target.matches('.task-name-input')) {
+                        const span = target.previousElementSibling;
+                        span.textContent = target.value || span.textContent;
+                        target.classList.add('hidden');
+                        span.classList.remove('hidden');
+                    }
+                    if (target.matches('.task-realized-hours')) {
+                        updateAllTotals();
+                    }
+                    saveAllTasksState();
+                }
+            }, true);
+
+            accordionContainer.addEventListener('input', (event) => {
+                if (event.target.matches('.task-realized-hours')) {
+                    updateAllTotals();
+                    debouncedSave();
+                }
+            });
+
+            // Marcar automaticamente as fases concluídas (Fase 0, 1, 2)
+            function markCompletedPhases() {
+                const completedPhaseIds = ['fase0', 'fase1', 'fase2'];
+
+                document.querySelectorAll('.accordion-item').forEach((sectionEl, index) => {
+                    const phaseId = projectData[index].id;
+
+                    if (completedPhaseIds.includes(phaseId)) {
+                        sectionEl.querySelectorAll('.task-row').forEach(row => {
+                            const checkbox = row.querySelector('.task-checkbox');
+                            const statusSelect = row.querySelector('.task-status');
+                            const realizedHoursInput = row.querySelector('.task-realized-hours');
+                            const plannedHours = parseInt(row.querySelector('.task-planned-hours').textContent, 10) || 0;
+
+                            checkbox.checked = true;
+                            statusSelect.value = 'completed';
+                            realizedHoursInput.value = plannedHours;
+                            realizedHoursInput.disabled = true;
+                            realizedHoursInput.classList.add('bg-gray-200', 'cursor-not-allowed');
+                            updateRowStyle(row, true);
+                        });
+
+                        updateProgress(sectionEl);
+                    }
+                });
+
+                updateAllTotals();
+                saveAllTasksState();
+            }
+
+            // Carregar estado salvo
+            const hasSavedState = localStorage.getItem('icontrolit-cronograma');
+            if (!hasSavedState) {
+                // Se não houver estado salvo, marcar fases concluídas automaticamente
+                markCompletedPhases();
+            } else {
+                // Se houver estado salvo, carregar
+                loadTasksState();
+            }
+            updateAllTotals();
+        });
+    </script>
+</body>
+</html>

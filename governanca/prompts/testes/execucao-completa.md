@@ -6,6 +6,33 @@ Seguir D:\IC2\CLAUDE.md.
 CHECKLIST OBRIGATÓRIO:
 Validar todos os itens de D:\IC2_Governanca\governanca\checklists\testes\pre-execucao.yaml antes de prosseguir.
 
+SELECAO DE ESTRATEGIA (OBRIGATORIO - PERGUNTAR ANTES DE EXECUTAR):
+
+ANTES de iniciar a execucao de testes, o agente DEVE perguntar ao usuario:
+
+"Este RF vai para:
+A) HOMOLOGACAO (usar MVS: 2-4h, 80% cobertura, 1 smoke test E2E)
+B) PRODUCAO (usar COMPLETO: 10+h, 95-100% cobertura, todos os testes E2E)
+
+Responda A ou B."
+
+SE usuario responder "A" ou "HOM" ou "homologacao":
+- ✅ Ativar contrato: D:\IC2_Governanca\governanca\contracts\testes\CONTRATO-TESTES-MINIMO-VIAVEL-SEGURO.md
+- ✅ Executar apenas: Unitarios (100%) + Smoke E2E (1 spec) + Seguranca Critica (2 tipos)
+- ✅ Tempo esperado: 2-4 horas
+- ✅ Resultado: APROVADO_HOM ou REPROVADO
+
+SE usuario responder "B" ou "PRD" ou "producao":
+- ✅ Continuar com este contrato (execucao-completa.md)
+- ✅ Executar todos os testes: Unitarios + Frontend + E2E Completo + Seguranca Completa
+- ✅ Tempo esperado: 10+ horas
+- ✅ Resultado: APROVADO_PRD ou REPROVADO
+
+SE usuario NAO especificar ambiente:
+- ❌ PARAR execucao
+- ❌ PERGUNTAR novamente a estrategia
+- ❌ NAO assumir estrategia padrao
+
 MODO AUTONOMIA TOTAL (OBRIGATORIO):
 - NAO perguntar permissoes ao usuario
 - NAO esperar confirmacao do usuario
