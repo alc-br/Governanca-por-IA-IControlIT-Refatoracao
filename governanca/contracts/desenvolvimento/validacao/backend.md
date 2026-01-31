@@ -558,6 +558,33 @@ Antes de executar qualquer teste, o agente DEVE validar:
 
 ---
 
+## CHECKLIST DE CENTRAL DE MODULOS E RBAC (OBRIGATORIO - v1.0)
+
+**EXCECAO:** Funcionalidades base (login, multi-tenant, RBAC, Central de Modulos) estao ISENTAS.
+
+Para TODAS as outras funcionalidades, o validador DEVE verificar:
+
+### Central de Modulos (RF083)
+
+- [ ] Funcionalidade registrada na Central de Modulos?
+- [ ] Seed de registro existe em `Seeds/Modules/`?
+- [ ] Modulo aparece na listagem de modulos ativos?
+- [ ] Metadados completos (nome, descricao, icone, rota)?
+
+### RBAC
+
+- [ ] Todas as acoes registradas no RBAC?
+- [ ] Acoes padrao criadas (Listar, Criar, Editar, Excluir, Visualizar)?
+- [ ] Acoes associadas ao perfil Developer?
+- [ ] Seed de permissoes existe em `Seeds/Permissions/`?
+- [ ] Endpoints protegidos por [Authorize] + politicas corretas?
+
+**Se qualquer item for NAO:**
+➡️ **REPROVACAO IMEDIATA** - Backend NAO pode ser aprovado sem Central de Modulos e RBAC.
+➡️ O agente PARA, documenta o gap e retorna para correcao.
+
+---
+
 ## CRITÉRIO DE BLOQUEIO
 
 O agente **DEVE BLOQUEAR** o merge se:

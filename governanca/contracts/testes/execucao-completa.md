@@ -233,6 +233,37 @@ CRITÉRIO DE APROVAÇÃO (0% OU 100%):
 - ❌ REPROVADO: Taxa de aprovação < 100% (QUALQUER teste falhou)
 
 NÃO EXISTE APROVAÇÃO COM RESSALVAS.
+
+⚠️ CATEGORIAS INVENTADAS SÃO PROIBIDAS (v1.4 - 2026-01-31):
+
+As seguintes categorias NÃO EXISTEM e são VIOLAÇÕES GRAVES:
+- ❌ "APROVADO CONDICIONALMENTE" → NÃO EXISTE
+- ❌ "APROVADO COM RESSALVAS" → NÃO EXISTE
+- ❌ "APROVADO PARCIALMENTE" → NÃO EXISTE
+- ❌ "APROVADO PARA HOM, PENDENTE PRD" → NÃO EXISTE
+- ❌ "PROBLEMA DE INFRAESTRUTURA, NÃO DO CÓDIGO" → NÃO É DESCULPA
+
+SE agente usar qualquer categoria acima:
+- Execução é INVÁLIDA
+- Aprovação é NULA
+- Agente VIOLOU o contrato
+
+REGRA PARA PROBLEMAS DE AUTENTICAÇÃO/INTEGRAÇÃO (v1.4):
+
+SE testes falharem por problemas de autenticação (401, token expirado, interceptor):
+1. NÃO aprovar condicionalmente
+2. NÃO atribuir a "infraestrutura" e aprovar
+3. RESOLVER o problema (debugar, ajustar config, corrigir código)
+4. SE não conseguir resolver: REPROVAR com responsabilidade atribuída
+
+Exemplos de atribuição CORRETA:
+- Token expirado muito rápido → BACKEND (configuração JWT)
+- Interceptor não adiciona header → FRONTEND (auth.interceptor.ts)
+- LocalStorage não persiste → FRONTEND (auth.service.ts)
+- E2E não mantém sessão → TESTES (storageState do Playwright)
+
+A ÚNICA saída é: APROVADO (100%) ou REPROVADO (< 100%).
+Não existe meio termo.
 ```
 
 ### Regras de Geração
@@ -1001,11 +1032,65 @@ D:\IC2\frontend\icontrolit-app/e2e/specs/RF006/
 └── TC-RF006-E2E-003.spec.ts
 ```
 
-#### 🚨 PASSO 5.2: SE SPECS NÃO EXISTEM OU INCOMPLETOS → AUTO-GERAÇÃO (BLOQUEANTE)
+#### 🚨 PASSO 5.2: SE SPECS NÃO EXISTEM OU INCOMPLETOS → BLOQUEIO TOTAL E REPROVAÇÃO IMEDIATA
+
+**⚠️ REGRA INVIOLÁVEL (v1.3 - 2026-01-28):**
 
 **SE specs não existem ou cobertura < 100%:**
 
-**O agente DEVE AUTOMATICAMENTE:**
+**O agente DEVE OBRIGATORIAMENTE:**
+
+1. **REPROVAR IMEDIATAMENTE** - NÃO prosseguir para testes E2E
+2. **ATRIBUIR RESPONSABILIDADE** ao agente de geração E2E
+3. **GERAR PROMPT DE CORREÇÃO** para o usuário executar
+
+**MENSAGEM DE REPROVAÇÃO OBRIGATÓRIA:**
+```
+❌ REPROVADO - SPECS PLAYWRIGHT NÃO EXISTEM
+
+BLOQUEIO TOTAL: Testes E2E não podem ser executados.
+
+DIAGNÓSTICO:
+- Pasta e2e/specs/RFXXX/ não existe ou está incompleta
+- Cobertura de specs: 0% (esperado: 100%)
+- TC-E2E definidos em TC-RFXXX.yaml: [N] casos
+- Specs Playwright encontrados: 0
+
+RESPONSABILIDADE: AGENTE DE GERAÇÃO E2E
+
+O agente de criação de TC/MT (mt-tc-criacao.md) criou os casos de teste
+(TC-RFXXX.yaml), mas os specs Playwright (.spec.ts) não foram gerados.
+
+AÇÃO NECESSÁRIA:
+Execute o prompt de geração de specs E2E:
+
+═══════════════════════════════════════════════════════════════════════
+Para o RF[XXX] [CAMINHO_COMPLETO_RF] execute o
+D:\IC2_Governanca\governanca\prompts\testes\geracao-e2e-playwright.md
+═══════════════════════════════════════════════════════════════════════
+
+APÓS gerar specs, re-execute este contrato de testes.
+
+RESULTADO: REPROVADO
+STATUS.yaml: testes_ti.resultado_final = "REPROVADO"
+STATUS.yaml: testes_ti.motivo_reprovacao = "SPECS_E2E_AUSENTES"
+```
+
+**PROIBIÇÕES ABSOLUTAS:**
+- ❌ **NUNCA** aprovar sem specs E2E (VIOLAÇÃO GRAVE)
+- ❌ **NUNCA** pular validação de specs (VIOLAÇÃO GRAVE)
+- ❌ **NUNCA** assumir que "smoke test é opcional" (FALSO)
+- ❌ **NUNCA** continuar para FASE 6 sem specs 100%
+- ❌ **NUNCA** marcar testes_ti.resultado_final como "APROVADO" sem specs
+
+**SE agente tentar aprovar sem specs:**
+- Execução é **INVÁLIDA**
+- Aprovação é **NULA**
+- Usuário DEVE re-executar após gerar specs
+
+**AUTO-GERAÇÃO (OPCIONAL - APÓS REPROVAÇÃO):**
+
+SE o agente tiver capacidade de gerar specs (mesma sessão):
 
 1. **Ativar contrato de geração de specs:**
    ```
@@ -1021,12 +1106,15 @@ D:\IC2\frontend\icontrolit-app/e2e/specs/RF006/
    - Validar cobertura 100% de TC-E2E
 
 3. **SOMENTE prosseguir** se geração aprovada 100%
+4. **SE geração falhar:** REPROVAR (não continuar)
 
-**REGRA CRÍTICA:**
+**REGRA CRÍTICA FINAL:**
 - ❌ NÃO executar testes E2E sem specs completos
-- ❌ NÃO pular auto-geração
-- ✅ SEMPRE validar cobertura 100% antes de executar
-- ✅ SEMPRE chamar contrato de geração se specs faltando
+- ❌ NÃO pular validação de specs
+- ❌ NÃO aprovar com 0% de specs
+- ✅ SEMPRE reprovar se specs ausentes
+- ✅ SEMPRE atribuir responsabilidade clara
+- ✅ SEMPRE gerar prompt de correção para usuário
 
 #### PASSO 5.3: Executar Testes E2E
 
@@ -2356,6 +2444,31 @@ Seguir D:\IC2\CLAUDE.md e contracts/desenvolvimento/execucao/manutencao/manutenc
 
 **NÃO EXISTE APROVAÇÃO COM RESSALVAS.**
 
+**⚠️ PROIBIÇÕES ABSOLUTAS (v1.4 - 2026-01-31):**
+
+- ❌ **NUNCA** usar "APROVADO CONDICIONALMENTE" (categoria não existe)
+- ❌ **NUNCA** usar "APROVADO COM RESSALVAS" (categoria não existe)
+- ❌ **NUNCA** atribuir a "infraestrutura" e aprovar (problema deve ser resolvido)
+- ❌ **NUNCA** dizer "código está correto, problema é de integração" e aprovar
+- ❌ **NUNCA** sugerir "aprovação condicional pendente correção de auth"
+
+**SE testes de autenticação falharem:**
+1. IDENTIFICAR: Qual componente está falhando (backend JWT, frontend interceptor, E2E storageState)
+2. RESOLVER: Corrigir o problema OU documentar para correção
+3. REPROVAR: Se não resolver, reprovar com responsabilidade atribuída
+4. REPETIR: Após correção, re-executar testes
+
+**Responsabilidade em falhas de autenticação:**
+| Sintoma | Responsável |
+|---------|-------------|
+| Token expira muito rápido | BACKEND (config JWT) |
+| Header Authorization ausente | FRONTEND (auth.interceptor.ts) |
+| Token não persiste no localStorage | FRONTEND (auth.service.ts) |
+| E2E perde sessão entre requests | TESTES (storageState Playwright) |
+| 401 em endpoint protegido | BACKEND (policy) ou FRONTEND (interceptor) |
+
+**Resultado: APROVADO (100%) ou REPROVADO (< 100%). Não existe outro.**
+
 #### PASSO 8.2: Merge Automático em `dev` (SE APROVADO A 100%)
 
 **🚨 REGRA CRÍTICA: Merge Automático ao Atingir 100%**
@@ -2603,6 +2716,58 @@ CONTEXTO:
 - ❌ **Executar testes E2E sem verificar se specs existem**
 - ❌ **Pular auto-geração de specs quando faltando**
 - ❌ **Executar com frontend em porta diferente de 4200**
+
+### 7.4. Proibições de Categorias de Aprovação (v1.4 - 2026-01-31)
+
+**O agente NÃO PODE criar ou usar categorias que não existem:**
+
+- ❌ **"APROVADO CONDICIONALMENTE"** → Categoria não existe
+- ❌ **"APROVADO COM RESSALVAS"** → Categoria não existe
+- ❌ **"APROVADO PARCIALMENTE"** → Categoria não existe
+- ❌ **"APROVADO PARA HOM"** → Categoria não existe (use MVS se quiser HOM)
+- ❌ **"PASSOU, MAS COM PROBLEMA DE INTEGRAÇÃO"** → NÃO é aprovação
+
+**Exemplos de relatórios INVÁLIDOS:**
+
+```
+❌ INVÁLIDO:
+"O frontend RF083 deve ser considerado APROVADO CONDICIONALMENTE.
+Próximos passos para resolver o GAP-INTEGRACAO-001..."
+
+❌ INVÁLIDO:
+"Recomendação: Este é um problema de infraestrutura de testes, não do código.
+O código está correto, problema é de integração."
+
+❌ INVÁLIDO:
+"Conclusão: O problema NÃO é do código RF083. É um problema de INTEGRAÇÃO entre
+o mecanismo de autenticação e o ambiente E2E."
+```
+
+**Exemplo de relatório VÁLIDO:**
+
+```
+✅ VÁLIDO:
+"Resultado: REPROVADO
+
+Testes falharam por problema de autenticação (401 Unauthorized).
+
+RESPONSABILIDADE ATRIBUÍDA:
+- Componente: FRONTEND (auth.interceptor.ts)
+- Sintoma: Header Authorization não adicionado em requests
+- Evidência: Network tab mostra request sem Bearer token
+
+AÇÃO NECESSÁRIA:
+Executar prompt de manutenção para corrigir auth.interceptor.ts
+
+STATUS.yaml: testes_ti.resultado_final = REPROVADO
+STATUS.yaml: testes_ti.motivo_reprovacao = AUTH_INTERCEPTOR_FALHA"
+```
+
+**REGRA CRÍTICA:**
+- Se testes falham → REPROVAR e atribuir responsabilidade
+- Não existe "problema de infraestrutura que não impede aprovação"
+- Não existe "código correto mas testes falhando"
+- Se testes falham, algo está errado e DEVE ser corrigido
 
 ---
 

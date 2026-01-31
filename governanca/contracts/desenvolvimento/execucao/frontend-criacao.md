@@ -2196,7 +2196,6 @@ Para considerar o frontend COMPLETO, DEVE atender:
 - [ ] Seeds funcionais aplicados com sucesso
 - [ ] Backend funciona **sem reset manual de banco**
 - [ ] Funcionalidade navegavel e funcional
-- [ ] i18n completo (todos os idiomas especificados no projeto)
 - [ ] Nenhuma alteracao fora do escopo
 - [ ] Testes E2E **EXECUTADOS e aprovados (100%)**
 - [ ] Usuario com perfil adequado consegue:
@@ -2206,6 +2205,34 @@ Para considerar o frontend COMPLETO, DEVE atender:
 - [ ] Nenhum erro de permissao no console
 - [ ] Nenhuma chave i18n faltante
 - [ ] Pronto para passar pelo contrato de validacao de frontend
+
+### TRAVA OBRIGATORIA - i18n Completo (v1.0 - 2026-01-30)
+
+**EXCECAO:** Funcionalidades base (login, multi-tenant, RBAC, Central de Modulos) estao ISENTAS desta trava.
+
+Para TODAS as outras funcionalidades, o frontend so e considerado COMPLETO se:
+
+- [ ] **PT-BR:** TODAS as chaves de traducao criadas/atualizadas em `pt-BR.json`
+- [ ] **EN-US:** TODAS as chaves de traducao criadas/atualizadas em `en-US.json`
+- [ ] **ES-ES:** TODAS as chaves de traducao criadas/atualizadas em `es-ES.json`
+- [ ] **Console:** ZERO warnings de traducao no console (chaves faltantes)
+- [ ] **Fallback:** Hierarquia pt-BR → en-US → es-ES funcional
+
+**VALIDACAO OBRIGATORIA:**
+O agente DEVE executar a funcionalidade nos 3 idiomas e verificar:
+- Nenhum texto hardcoded aparecendo
+- Nenhuma chave nao traduzida (ex: `management.clientes.titulo`)
+- Nenhum warning no console
+
+**SE QUALQUER ITEM ACIMA FOR NAO:**
+- ❌ Frontend NAO e considerado COMPLETO
+- ❌ NAO pode passar para CONTRATO-VALIDACAO-FRONTEND
+- ❌ STATUS.yaml DEVE permanecer como `em_progresso`
+
+**JUSTIFICATIVA:**
+- Sistema e multi-idioma por design
+- Usuarios em PT, EN e ES dependem de traducoes completas
+- Chaves faltantes degradam experiencia do usuario
 
 ⚠️ **ATENCAO CRITICA:** Este contrato NAO permite implementacao parcial.
 

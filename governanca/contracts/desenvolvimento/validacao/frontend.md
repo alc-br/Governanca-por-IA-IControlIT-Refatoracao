@@ -1396,13 +1396,21 @@ Antes de APROVAR, o agente DEVE validar visualmente:
 
 Antes de APROVAR, o agente DEVE validar:
 
-### i18n (Transloco)
+### i18n (Transloco) - TRAVA OBRIGATORIA (v1.0 - 2026-01-30)
 
-- [ ] pt-BR: Todas as chaves registradas?
-- [ ] en-US: Todas as chaves registradas?
-- [ ] es-ES: Todas as chaves registradas?
-- [ ] Console: ZERO warnings de traducao?
-- [ ] Fallback: pt-BR → en → es funcional?
+**EXCECAO:** Funcionalidades base (login, multi-tenant, RBAC, Central de Modulos) estao ISENTAS.
+
+- [ ] **PT-BR:** TODAS as chaves registradas em `pt-BR.json`?
+- [ ] **EN-US:** TODAS as chaves registradas em `en-US.json`?
+- [ ] **ES-ES:** TODAS as chaves registradas em `es-ES.json`?
+- [ ] **Console:** ZERO warnings de traducao no console?
+- [ ] **Fallback:** Hierarquia pt-BR → en-US → es-ES funcional?
+- [ ] **Validacao visual:** Funcionalidade testada nos 3 idiomas?
+- [ ] **Hardcoded:** Nenhum texto hardcoded nos templates?
+
+**Se qualquer item for NAO:**
+➡️ **REPROVACAO IMEDIATA** - Frontend NAO pode ser aprovado sem i18n completo.
+➡️ O agente PARA, documenta o gap e retorna para correcao.
 
 ### Diagnosticos
 
@@ -1431,14 +1439,19 @@ Antes de APROVAR, o agente DEVE validar:
 - [ ] Dependencias criadas automaticamente?
 - [ ] Permissoes associadas ao perfil developer?
 
-### Central de Modulos
+### Central de Modulos - TRAVA OBRIGATORIA (v1.0 - 2026-01-30)
 
-- [ ] Funcionalidade registrada?
-- [ ] Menu navegavel?
-- [ ] Rota protegida por guard?
+**EXCECAO:** Funcionalidades base (login, multi-tenant, RBAC, Central de Modulos) estao ISENTAS.
+
+- [ ] Funcionalidade registrada na Central de Modulos (backend)?
+- [ ] Menu navegavel e visivel para usuario com permissao?
+- [ ] Rota protegida por guard de autenticacao?
+- [ ] Rota protegida por guard de autorizacao (RBAC)?
+- [ ] Icone e label corretos no menu?
 
 **Se qualquer item for NAO:**
-➡️ O agente PARA, documenta e abre gap critico.
+➡️ **REPROVACAO IMEDIATA** - Frontend NAO pode ser aprovado sem registro na Central de Modulos.
+➡️ O agente PARA, documenta o gap e retorna para correcao.
 
 ---
 

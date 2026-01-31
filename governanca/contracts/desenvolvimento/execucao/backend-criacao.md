@@ -958,6 +958,32 @@ Para considerar o backend COMPLETO, DEVE atender:
 - [ ] Nenhuma alteracao fora do escopo ocorreu
 - [ ] Pronto para passar pelo CONTRATO-VALIDACAO-BACKEND
 
+### TRAVA OBRIGATORIA - Central de Modulos e RBAC (v1.0 - 2026-01-30)
+
+**EXCECAO:** Funcionalidades base (login, multi-tenant, RBAC, Central de Modulos) estao ISENTAS desta trava.
+
+Para TODAS as outras funcionalidades, o backend so e considerado COMPLETO se:
+
+- [ ] **Central de Modulos (RF083):** Funcionalidade registrada na Central de Modulos
+  - Seed de registro criado em `Seeds/Modules/`
+  - Modulo visivel na listagem de modulos ativos
+  - Metadados completos (nome, descricao, icone, rota)
+
+- [ ] **RBAC:** Todas as acoes da funcionalidade registradas no RBAC
+  - Acoes criadas: Listar, Criar, Editar, Excluir, Visualizar (conforme aplicavel)
+  - Acoes associadas ao perfil Developer para testes
+  - Seed de permissoes criado em `Seeds/Permissions/`
+
+**SE QUALQUER ITEM ACIMA FOR NAO:**
+- ❌ Backend NAO e considerado COMPLETO
+- ❌ NAO pode passar para CONTRATO-VALIDACAO-BACKEND
+- ❌ STATUS.yaml DEVE permanecer como `em_progresso`
+
+**JUSTIFICATIVA:**
+- Toda funcionalidade DEVE ser auditavel via Central de Modulos
+- Toda funcionalidade DEVE respeitar controle de acesso via RBAC
+- Sem registro, funcionalidade fica "invisivel" para governanca
+
 ⚠️ **ATENCAO CRITICA:** Este contrato NAO permite implementacao parcial.
 
 **TODOS os UCs do UC-RFXXX devem estar implementados.**

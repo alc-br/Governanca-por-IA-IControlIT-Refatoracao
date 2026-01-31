@@ -5,6 +5,11 @@
 **Status:** Ativo
 **Última Atualização:** 2026-01-13
 **Changelog:**
+- v1.1 (2026-01-28): CORREÇÃO CRÍTICA - Smoke test spec é OBRIGATÓRIO (antes era "opcional")
+  - Removida regra "NÃO bloquear (smoke test é opcional em MVS)" - FALHA GRAVE
+  - Adicionado BLOQUEIO TOTAL e REPROVAÇÃO IMEDIATA se spec não existir
+  - Adicionada atribuição de responsabilidade ao agente de geração E2E
+  - Adicionado prompt de correção para usuário
 - v1.0 (2026-01-13): Criação do contrato MVS (estratégia otimizada para HOM - 2-4h vs 10h+)
 
 ---
@@ -305,9 +310,37 @@ D:\IC2\frontend\icontrolit-app\e2e\specs\[RF]\smoke-[funcionalidade].spec.ts
 ```
 
 **SE spec NÃO existir:**
-- ⚠️ AVISAR usuário: "Smoke test spec não encontrado"
-- ✅ Sugerir geração manual ou usar contrato de geração
-- ❌ NÃO bloquear (smoke test é opcional em MVS)
+- ❌ **REPROVAR IMEDIATAMENTE** (v1.1 - 2026-01-28)
+- ❌ **NÃO** aprovar sem smoke test (VIOLAÇÃO GRAVE)
+- ❌ **NÃO** prosseguir para próxima fase
+- ✅ **ATRIBUIR RESPONSABILIDADE** ao agente de geração E2E
+- ✅ **GERAR PROMPT DE CORREÇÃO:**
+
+```
+❌ REPROVADO - SMOKE TEST SPEC NÃO EXISTE
+
+BLOQUEIO TOTAL: Smoke test E2E não pode ser executado.
+
+DIAGNÓSTICO:
+- Pasta e2e/specs/[RF]/ não existe ou não contém smoke-*.spec.ts
+- Smoke test é OBRIGATÓRIO mesmo em estratégia MVS
+
+RESPONSABILIDADE: AGENTE DE GERAÇÃO E2E
+
+AÇÃO NECESSÁRIA:
+Execute o prompt de geração de specs E2E:
+
+═══════════════════════════════════════════════════════════════════════
+Para o RF[XXX] [CAMINHO_COMPLETO_RF] execute o
+D:\IC2_Governanca\governanca\prompts\testes\geracao-e2e-playwright.md
+═══════════════════════════════════════════════════════════════════════
+
+APÓS gerar specs, re-execute este contrato MVS.
+
+RESULTADO: REPROVADO
+STATUS.yaml: testes_ti.resultado_final = "REPROVADO"
+STATUS.yaml: testes_ti.motivo_reprovacao = "SMOKE_TEST_AUSENTE"
+```
 
 **SE spec existir:**
 - ✅ Prosseguir para execução
@@ -746,12 +779,13 @@ observacoes: "RF reprovado. Corrigir falhas e re-executar."
 
 1. ✅ Validar pré-requisitos
 2. ✅ Executar testes unitários (100%)
-3. ✅ Executar smoke test E2E (se existir)
-4. ✅ Executar segurança crítica (SQL Injection + Autenticação)
-5. ✅ Gerar relatório MVS
-6. ✅ Documentar gaps conhecidos
-7. ✅ Atualizar STATUS.yaml
-8. ✅ Consolidar evidências
+3. ✅ **Validar que smoke test spec EXISTE** (OBRIGATÓRIO - v1.1)
+4. ✅ Executar smoke test E2E (100% - OBRIGATÓRIO)
+5. ✅ Executar segurança crítica (SQL Injection + Autenticação)
+6. ✅ Gerar relatório MVS
+7. ✅ Documentar gaps conhecidos
+8. ✅ Atualizar STATUS.yaml
+9. ✅ Consolidar evidências
 
 ### O Agente NÃO Deve
 
@@ -759,7 +793,7 @@ observacoes: "RF reprovado. Corrigir falhas e re-executar."
 2. ❌ Executar segurança completa (apenas crítica)
 3. ❌ Executar auditoria UX
 4. ❌ Esperar aprovação 100% em E2E completo
-5. ❌ Gerar specs E2E faltantes (apenas smoke)
+5. ❌ **APROVAR sem smoke test spec** (VIOLAÇÃO GRAVE - v1.1)
 
 ---
 
@@ -768,7 +802,8 @@ observacoes: "RF reprovado. Corrigir falhas e re-executar."
 Ao final da execução MVS, validar:
 
 - [ ] Testes unitários backend: 100%
-- [ ] Smoke test E2E: 100% (se spec existir)
+- [ ] **Smoke test spec EXISTE** (OBRIGATÓRIO - v1.1)
+- [ ] Smoke test E2E: 100% (OBRIGATÓRIO)
 - [ ] Segurança crítica: 100% (SQL Injection + Autenticação)
 - [ ] Relatório MVS gerado: `RELATORIO-MVS-RF[XXX]-[DATA].yaml`
 - [ ] Gaps conhecidos documentados: `GAPS-CONHECIDOS-RF[XXX].md`
