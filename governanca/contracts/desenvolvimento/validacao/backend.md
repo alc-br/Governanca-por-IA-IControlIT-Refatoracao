@@ -266,6 +266,81 @@ O agente PODE:
 
 ---
 
+## REGRA DE AUTONOMIA (v1.6 - 2026-01-31)
+
+**VOCE E UM AGENTE AUTONOMO. VOCE RESOLVE PROBLEMAS DE INFRAESTRUTURA.**
+
+### Problemas de Infraestrutura (RESOLVER AUTOMATICAMENTE)
+
+SE o problema for de **infraestrutura** (não de código), VOCE DEVE RESOLVER:
+
+| Problema | Ação Automática |
+|----------|-----------------|
+| Processo bloqueando build | `taskkill /PID [PID] /F` → re-executar build |
+| Porta ocupada | Matar processo na porta → reiniciar serviço |
+| Arquivo .dll travado | Parar processo → limpar bin/obj → rebuild |
+| Backend rodando | Parar backend → build → reiniciar se necessário |
+
+**Exemplo (RF007 real):**
+
+❌ COMPORTAMENTO PASSIVO (PROIBIDO):
+```
+❌ RF007 REPROVADO: Ambiente quebrado com erros externos
+🔧 Solução: Para resolver, basta parar a API antes de rodar o build:
+Opção 1 - Task Manager: Abrir Task Manager, finalizar processo
+Opção 2 - Linha de comando: taskkill /PID 718248 /F
+
+🔄 Próximos Passos:
+⏸️ Parar a API (PID 718248)
+✅ Validar que nenhum processo está rodando
+✅ Executar dotnet build novamente
+
+Não posso prosseguir com a validação enquanto a API estiver rodando.
+```
+
+✅ COMPORTAMENTO ATIVO (OBRIGATÓRIO):
+```
+PROBLEMA DETECTADO: Build falhou - API rodando (PID 718248)
+
+RESOLUÇÃO AUTOMÁTICA:
+Tentativa 1: Identificar processo
+→ netstat -ano | findstr :5000
+→ Processo dotnet.exe (PID 718248) encontrado
+
+Tentativa 2: Matar processo
+→ taskkill /F /PID 718248
+→ SUCCESS: Processo terminado
+
+Tentativa 3: Limpar build artifacts
+→ dotnet clean
+→ SUCCESS
+
+Tentativa 4: Re-executar build
+→ cd backend/IControlIT.API
+→ dotnet build
+→ Build succeeded
+
+BUILD: APROVADO
+Prosseguindo com validação...
+```
+
+### PROIBIÇÕES (v1.6):
+
+- ❌ **"Para resolver, basta..."** (VOCE resolve, não instrui usuário)
+- ❌ **"Próximos Passos:"** (VOCE executa, não lista para usuário)
+- ❌ **"Não posso prosseguir"** (VOCE resolve e prossegue)
+- ❌ **"Validação REPROVADA por ambiente quebrado"** (VOCE corrige ambiente)
+- ❌ **"Opção 1, Opção 2"** (VOCE escolhe e executa)
+
+### Quando REPROVAR (sem tentar resolver):
+
+REPROVAR apenas quando o problema for de **CÓDIGO** de outro RF:
+- Erros de compilação em código
+- Testes unitários falhando
+- Violações de contrato em outro módulo
+
+---
+
 ## TRATAMENTO DE ERROS EXTERNOS (OBRIGATORIO)
 
 ### Cenário: Build Quebrado FORA do Escopo do RF
