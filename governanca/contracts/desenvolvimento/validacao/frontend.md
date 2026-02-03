@@ -1556,6 +1556,144 @@ Ao final da execucao, o agente DEVE entregar:
 
 ---
 
+## GIT OPERATIONS AUTOMÁTICAS (SE APROVADO 100%) - v1.7
+
+**REGRA:** Se aprovação = 100% (ZERO ressalvas), o agente DEVE fazer commit e merge AUTOMATICAMENTE.
+
+### Pré-requisitos para Git Operations
+
+Antes de fazer commit/merge, VALIDAR:
+
+- ✅ Aprovação = 100% (ZERO ressalvas)
+- ✅ Build sem erros
+- ✅ Testes E2E passando 100%
+- ✅ i18n completo (PT, EN, ES)
+- ✅ Estados visuais implementados
+- ✅ STATUS.yaml atualizado
+- ✅ Branch atual NÃO é `dev` (deve estar em branch de feature/fix)
+
+### Sequência Obrigatória (SE APROVADO 100%)
+
+```bash
+# 1. Identificar branch atual
+CURRENT_BRANCH=$(git branch --show-current)
+echo "Branch atual: $CURRENT_BRANCH"
+
+# 2. Verificar se está em branch de feature/fix
+if [[ "$CURRENT_BRANCH" == "dev" || "$CURRENT_BRANCH" == "main" ]]; then
+  echo "❌ ERRO: Validação deve ser executada em branch de feature/fix"
+  echo "❌ Branch atual: $CURRENT_BRANCH (protegido)"
+  exit 1
+fi
+
+# 3. Adicionar arquivos de validação
+git add frontend/icontrolit-app/e2e/
+git add frontend/icontrolit-app/src/app/
+git add D:/IC2_Governanca/documentacao/*/STATUS.yaml
+git status
+
+# 4. Criar commit de validação
+git commit -m "$(cat <<'EOF'
+test(RFXXX): validacao frontend aprovada 100%
+
+Validacao de contrato frontend executada com sucesso.
+
+Resultados:
+- Build: PASS
+- Testes E2E: PASS (100%)
+- Cobertura UC: 100%
+- i18n: COMPLETO (PT, EN, ES)
+- Estados visuais: IMPLEMENTADOS
+- Layout: PRESERVADO
+- Status: APROVADO
+
+Arquivos validados:
+- frontend/icontrolit-app/e2e/specs/RFXXX/
+- frontend/icontrolit-app/src/app/pages/RFXXX/
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+EOF
+)"
+
+# 5. Fazer checkout para dev
+git checkout dev
+
+# 6. Fazer merge do branch de feature/fix
+git merge --no-ff "$CURRENT_BRANCH" -m "$(cat <<'EOF'
+merge: $CURRENT_BRANCH - validacao frontend 100% aprovada
+
+Merge automatico apos validacao de contrato frontend.
+
+Validacao: APROVADA 100%
+Branch: $CURRENT_BRANCH
+Data: $(date +"%Y-%m-%d %H:%M:%S")
+
+Testes executados:
+- Build: PASS
+- Testes E2E: PASS (100%)
+- Cobertura UC: 100%
+- i18n: COMPLETO
+- Estados visuais: IMPLEMENTADOS
+
+🤖 Merge automatico via contrato de validacao frontend
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+EOF
+)"
+
+# 7. Validar merge bem-sucedido
+if [ $? -eq 0 ]; then
+  echo "✅ Merge realizado com sucesso em dev"
+  echo "ℹ️ Branch de feature mantido: $CURRENT_BRANCH"
+  echo "ℹ️ Para deletar: git branch -d $CURRENT_BRANCH"
+else
+  echo "❌ ERRO: Merge falhou"
+  echo "❌ Resolvendo conflitos manualmente..."
+  exit 1
+fi
+```
+
+### Saída Esperada (APROVADO 100%)
+
+```
+Branch atual: feature/RF007-login-ui
+✅ Branch de feature detectado
+
+[feature/RF007-login-ui def5678] test(RF007): validacao frontend aprovada 100%
+ 25 files changed, 890 insertions(+)
+
+Switched to branch 'dev'
+Merge made by the 'ort' strategy.
+ [arquivos alterados listados]
+
+✅ Merge realizado com sucesso em dev
+ℹ️ Branch de feature mantido: feature/RF007-login-ui
+```
+
+### Proibições
+
+- ❌ **Fazer commit/merge se aprovação < 100%**
+- ❌ **Fazer commit/merge se houver ressalvas**
+- ❌ **Fazer commit/merge se i18n incompleto**
+- ❌ **Fazer commit/merge se estados visuais faltando**
+- ❌ **Fazer merge sem commit antes**
+- ❌ **Fazer merge em branch protegido (dev/main)**
+- ❌ **Fazer commit sem atualizar STATUS.yaml**
+
+### SE REPROVADO (< 100%)
+
+```
+❌ REPROVADO (taxa XX%)
+
+SEM commit
+SEM merge
+SEM sync
+
+Aguardando correções...
+```
+
+---
+
 ## ATUALIZACAO DO ANTI-ESQUECIMENTO (QUANDO REPROVADO)
 
 Caso o contrato seja **REPROVADO**, o agente DEVE:
