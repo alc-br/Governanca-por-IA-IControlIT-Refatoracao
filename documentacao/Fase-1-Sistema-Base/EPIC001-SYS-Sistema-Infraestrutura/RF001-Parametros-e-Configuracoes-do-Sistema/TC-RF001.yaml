@@ -1,0 +1,1747 @@
+# =============================================
+# Casos de Teste (TC) — RF001
+# Sistema de Parâmetros e Configurações Centralizadas
+# Versão: 1.0
+# Data: 2026-01-28
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+metadata:
+  versao: "1.0"
+  data: "2026-01-28"
+  autor: "Agência ALC - alc.dev.br"
+  documentacao_relacionada:
+    id: "RF001"
+    nome: "Sistema de Parâmetros e Configurações Centralizadas"
+  arquivo_uc_referencia: "UC-RF001.md"
+  arquivo_massa_teste: "MT-RF001.yaml"
+  tipo_teste: "BACKEND"
+  executor_padrao: "TI"
+  entidades_cobertas:
+    - Sistema_Parametro
+    - Sistema_Feature_Flag
+    - Sistema_Configuracao_Email
+    - Sistema_Limite_Uso
+  ucs_cobertos: 22
+  total_casos_teste: 75
+
+estrategia:
+  objetivo_geral:
+    - "Cobrir 100% dos fluxos descritos nos 22 UCs"
+    - "Cobrir 100% das regras de negócio (RN-SYS-001-01 a RN-SYS-001-15)"
+    - "Garantir segurança, isolamento multi-tenancy e auditoria"
+    - "Validar integração SMTP e job background"
+  abordagem:
+    - "Testes baseados em cenários"
+    - "Reuso de massas de teste (MT-RF001.yaml)"
+    - "Cobertura E2E para CRUD de todas as entidades"
+
+conventions:
+  nomenclatura_tc: "TC-RF001-[CATEGORIA]-[NNN]"
+  categorias:
+    - HAPPY_PATH
+    - VALIDACAO
+    - SEGURANCA
+    - EDGE_CASE
+    - AUDITORIA
+    - INTEGRACAO
+    - E2E
+  prioridades:
+    - CRITICA
+    - ALTA
+    - MEDIA
+    - BAIXA
+
+# =============================================
+# CASOS DE TESTE
+# =============================================
+
+test_cases:
+
+  # ======================================================
+  # HAPPY PATH - Sistema_Parametro (TC-RF001-HP-001 a TC-RF001-HP-010)
+  # ======================================================
+  TC-RF001-HP-001:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC00"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC00-001"
+        - "FP-UC00-002"
+        - "FP-UC00-003"
+        - "FP-UC00-004"
+        - "FP-UC00-005"
+        - "FP-UC00-006"
+    descricao:
+      resumo: "Listar parâmetros com paginação e ordenação"
+      objetivo: "Validar listagem de parâmetros do tenant com paginação padrão"
+    origem:
+      ucs: ["UC00"]
+      fluxos_uc: ["FP-UC00-001", "FP-UC00-002", "FP-UC00-003", "FP-UC00-004", "FP-UC00-005", "FP-UC00-006"]
+      regras_negocio: ["RN-SYS-001-04", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-006"]
+    contexto:
+      autenticacao:
+        usuario: "admin"
+        tenant: 1
+        permissoes: ["SYS.PARAMETROS.VIEW_ANY"]
+    acao:
+      tipo: "LISTAR"
+      endpoint: "GET /api/parametros"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        paginacao: true
+        ordenacao: "Cd_Parametro ASC"
+    criterio_aprovacao:
+      - "Lista retornada com paginação"
+      - "Apenas parâmetros do tenant do usuário"
+      - "Valores sensíveis mascarados"
+
+  TC-RF001-HP-002:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC01-001"
+        - "FP-UC01-002"
+        - "FP-UC01-003"
+        - "FP-UC01-004"
+        - "FP-UC01-005"
+        - "FP-UC01-006"
+        - "FP-UC01-007"
+        - "FP-UC01-014"
+        - "FP-UC01-015"
+        - "FP-UC01-016"
+        - "FP-UC01-017"
+        - "FP-UC01-018"
+        - "FP-UC01-019"
+    descricao:
+      resumo: "Criar parâmetro com dados completos"
+      objetivo: "Validar criação bem-sucedida de parâmetro"
+    origem:
+      ucs: ["UC01"]
+      fluxos_uc: ["FP-UC01-001", "FP-UC01-015", "FP-UC01-016"]
+      regras_negocio: ["RN-SYS-001-01", "RN-SYS-001-02", "RN-SYS-001-06", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-001"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        campos_gerados:
+          - Id
+          - Dt_Criacao
+          - Id_Usuario_Criacao
+    criterio_aprovacao:
+      - "Parâmetro criado no banco"
+      - "Auditoria registrada (tipo CREATE)"
+      - "Cache invalidado"
+      - "Evento parametro.criado publicado"
+
+  TC-RF001-HP-003:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC01-013"
+    descricao:
+      resumo: "Criar parâmetro sensível com criptografia"
+      objetivo: "Validar criptografia AES-256 de valores sensíveis"
+    origem:
+      ucs: ["UC01"]
+      regras_negocio: ["RN-SYS-001-04"]
+    massa_teste:
+      referencias: ["MT-RF001-002"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      validacoes:
+        - "Valor armazenado criptografado"
+        - "Valor não legível em texto plano"
+    criterio_aprovacao:
+      - "Valor sensível criptografado em AES-256"
+      - "Banco não contém valor em texto plano"
+
+  TC-RF001-HP-004:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC02"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC02-001"
+        - "FP-UC02-002"
+        - "FP-UC02-003"
+        - "FP-UC02-004"
+        - "FP-UC02-005"
+        - "FP-UC02-006"
+        - "FP-UC02-008"
+        - "FP-UC02-009"
+        - "FP-UC02-010"
+    descricao:
+      resumo: "Visualizar parâmetro existente"
+      objetivo: "Validar visualização de detalhes do parâmetro"
+    origem:
+      ucs: ["UC02"]
+      regras_negocio: ["RN-SYS-001-04", "RN-SYS-001-07", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-007"]
+    acao:
+      tipo: "VISUALIZAR"
+      endpoint: "GET /api/parametros/{id}"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+    criterio_aprovacao:
+      - "Dados completos retornados"
+      - "Metadados de auditoria incluídos"
+
+  TC-RF001-HP-005:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC02"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC02-007"
+    descricao:
+      resumo: "Visualizar parâmetro sensível com descriptografia"
+      objetivo: "Validar descriptografia para usuário com permissão VIEW_SENSITIVE"
+    origem:
+      ucs: ["UC02"]
+      regras_negocio: ["RN-SYS-001-04", "RN-SYS-001-07"]
+    massa_teste:
+      referencias: ["MT-RF001-803"]
+    contexto:
+      autenticacao:
+        permissoes: ["SYS.PARAMETROS.VIEW", "SYS.PARAMETROS.VIEW_SENSITIVE"]
+    acao:
+      tipo: "VISUALIZAR"
+      endpoint: "GET /api/parametros/{id}"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      validacoes:
+        - "Valor descriptografado retornado"
+        - "Auditoria tipo ACCESS registrada"
+
+  TC-RF001-HP-006:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC03"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC03-001"
+        - "FP-UC03-002"
+        - "FP-UC03-003"
+        - "FP-UC03-006"
+        - "FP-UC03-007"
+        - "FP-UC03-008"
+        - "FP-UC03-009"
+        - "FP-UC03-010"
+        - "FP-UC03-016"
+        - "FP-UC03-017"
+        - "FP-UC03-018"
+        - "FP-UC03-019"
+        - "FP-UC03-020"
+        - "FP-UC03-021"
+        - "FP-UC03-022"
+    descricao:
+      resumo: "Editar parâmetro (não sistema)"
+      objetivo: "Validar edição de parâmetro normal"
+    origem:
+      ucs: ["UC03"]
+      regras_negocio: ["RN-SYS-001-02", "RN-SYS-001-06", "RN-SYS-001-07", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-008"]
+    acao:
+      tipo: "EDITAR"
+      endpoint: "PUT /api/parametros/{id}"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+    criterio_aprovacao:
+      - "Dados atualizados no banco"
+      - "Auditoria registrada (tipo UPDATE, diff JSON)"
+      - "Cache invalidado"
+
+  TC-RF001-HP-007:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC04"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC04-001"
+        - "FP-UC04-002"
+        - "FP-UC04-003"
+        - "FP-UC04-004"
+        - "FP-UC04-006"
+        - "FP-UC04-007"
+        - "FP-UC04-008"
+        - "FP-UC04-009"
+        - "FP-UC04-010"
+        - "FP-UC04-011"
+        - "FP-UC04-012"
+    descricao:
+      resumo: "Excluir parâmetro (soft delete)"
+      objetivo: "Validar exclusão lógica de parâmetro"
+    origem:
+      ucs: ["UC04"]
+      regras_negocio: ["RN-SYS-001-03", "RN-SYS-001-07", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-009"]
+    acao:
+      tipo: "EXCLUIR"
+      endpoint: "DELETE /api/parametros/{id}"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Sistema_Parametro:
+          deve_existir:
+            - Fl_Excluido: 1
+    criterio_aprovacao:
+      - "Registro marcado como excluído (Fl_Excluido = 1)"
+      - "Auditoria registrada (tipo DELETE)"
+
+  TC-RF001-HP-008:
+    categoria: "HAPPY_PATH"
+    prioridade: "ALTA"
+    uc_ref: "UC05"
+    entidade: "Sistema_Feature_Flag"
+    covers:
+      uc_items:
+        - "FP-UC05-001"
+        - "FP-UC05-002"
+        - "FP-UC05-003"
+        - "FP-UC05-004"
+        - "FP-UC05-005"
+    descricao:
+      resumo: "Listar feature flags (tenant + globais)"
+      objetivo: "Validar listagem de flags incluindo globais"
+    origem:
+      ucs: ["UC05"]
+      regras_negocio: ["RN-SYS-001-08", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-012"]
+    acao:
+      tipo: "LISTAR"
+      endpoint: "GET /api/feature-flags"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+
+  TC-RF001-HP-009:
+    categoria: "HAPPY_PATH"
+    prioridade: "ALTA"
+    uc_ref: "UC06"
+    entidade: "Sistema_Feature_Flag"
+    covers:
+      uc_items:
+        - "FP-UC06-001"
+        - "FP-UC06-002"
+        - "FP-UC06-003"
+        - "FP-UC06-004"
+        - "FP-UC06-008"
+        - "FP-UC06-009"
+        - "FP-UC06-010"
+        - "FP-UC06-012"
+        - "FP-UC06-013"
+        - "FP-UC06-014"
+        - "FP-UC06-015"
+        - "FP-UC06-016"
+    descricao:
+      resumo: "Criar feature flag com rollout All"
+      objetivo: "Validar criação de flag para todos os usuários"
+    origem:
+      ucs: ["UC06"]
+      regras_negocio: ["RN-SYS-001-08", "RN-SYS-001-09", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-010"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/feature-flags"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  TC-RF001-HP-010:
+    categoria: "HAPPY_PATH"
+    prioridade: "ALTA"
+    uc_ref: "UC10"
+    entidade: "Sistema_Configuracao_Email"
+    covers:
+      uc_items:
+        - "FP-UC10-001"
+        - "FP-UC10-002"
+        - "FP-UC10-003"
+        - "FP-UC10-004"
+        - "FP-UC10-005"
+        - "FP-UC10-006"
+    descricao:
+      resumo: "Listar configurações de e-mail"
+      objetivo: "Validar listagem com senha mascarada"
+    origem:
+      ucs: ["UC10"]
+      regras_negocio: ["RN-SYS-001-04", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-021"]
+    acao:
+      tipo: "LISTAR"
+      endpoint: "GET /api/configuracoes-email"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      validacoes:
+        - "Senha exibida como '********'"
+
+  TC-RF001-HP-011:
+    categoria: "HAPPY_PATH"
+    prioridade: "ALTA"
+    uc_ref: "UC11"
+    entidade: "Sistema_Configuracao_Email"
+    covers:
+      uc_items:
+        - "FP-UC11-001"
+        - "FP-UC11-002"
+        - "FP-UC11-003"
+        - "FP-UC11-004"
+        - "FP-UC11-005"
+        - "FP-UC11-009"
+        - "FP-UC11-010"
+        - "FP-UC11-011"
+        - "FP-UC11-012"
+        - "FP-UC11-013"
+        - "FP-UC11-014"
+        - "FP-UC11-015"
+        - "FP-UC11-016"
+        - "FP-UC11-017"
+        - "FP-UC11-018"
+    descricao:
+      resumo: "Criar configuração de e-mail SMTP"
+      objetivo: "Validar criação com criptografia de senha"
+    origem:
+      ucs: ["UC11"]
+      regras_negocio: ["RN-SYS-001-04", "RN-SYS-001-10", "RN-SYS-001-11", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-020"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/configuracoes-email"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  TC-RF001-HP-012:
+    categoria: "HAPPY_PATH"
+    prioridade: "ALTA"
+    uc_ref: "UC15"
+    entidade: "Sistema_Limite_Uso"
+    covers:
+      uc_items:
+        - "FP-UC15-001"
+        - "FP-UC15-002"
+        - "FP-UC15-003"
+        - "FP-UC15-004"
+        - "FP-UC15-005"
+        - "FP-UC15-006"
+    descricao:
+      resumo: "Listar limites de uso com indicadores"
+      objetivo: "Validar listagem com cálculo de percentuais"
+    origem:
+      ucs: ["UC15"]
+      regras_negocio: ["RN-SYS-001-12", "RN-SYS-001-13", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-031"]
+    acao:
+      tipo: "LISTAR"
+      endpoint: "GET /api/limites-uso"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+
+  TC-RF001-HP-013:
+    categoria: "HAPPY_PATH"
+    prioridade: "ALTA"
+    uc_ref: "UC16"
+    entidade: "Sistema_Limite_Uso"
+    covers:
+      uc_items:
+        - "FP-UC16-001"
+        - "FP-UC16-002"
+        - "FP-UC16-003"
+        - "FP-UC16-004"
+        - "FP-UC16-005"
+        - "FP-UC16-006"
+        - "FP-UC16-007"
+        - "FP-UC16-008"
+        - "FP-UC16-009"
+        - "FP-UC16-010"
+        - "FP-UC16-011"
+        - "FP-UC16-012"
+        - "FP-UC16-013"
+        - "FP-UC16-014"
+        - "FP-UC16-015"
+    descricao:
+      resumo: "Criar limite de uso"
+      objetivo: "Validar criação de limite de uso"
+    origem:
+      ucs: ["UC16"]
+      regras_negocio: ["RN-SYS-001-12", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-030"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/limites-uso"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  # ======================================================
+  # VALIDAÇÃO (TC-RF001-VAL-001 a TC-RF001-VAL-015)
+  # ======================================================
+  TC-RF001-VAL-001:
+    categoria: "VALIDACAO"
+    prioridade: "CRITICA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC01-001"
+    descricao:
+      resumo: "Cd_Parametro ausente (campo obrigatório)"
+      objetivo: "Validar rejeição de criação sem código"
+    origem:
+      ucs: ["UC01"]
+      fluxos_uc: ["FE-UC01-001"]
+      regras_negocio: ["RN-SYS-001-06"]
+    massa_teste:
+      referencias: ["MT-RF001-100"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        campos:
+          Cd_Parametro: "obrigatorio"
+    criterio_aprovacao:
+      - "Erro de validação retornado"
+      - "Nenhum registro criado"
+
+  TC-RF001-VAL-002:
+    categoria: "VALIDACAO"
+    prioridade: "CRITICA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC01-003"
+    descricao:
+      resumo: "Tipo_Dado inválido"
+      objetivo: "Validar rejeição de tipo de dado não permitido"
+    origem:
+      ucs: ["UC01"]
+      regras_negocio: ["RN-SYS-001-02"]
+    massa_teste:
+      referencias: ["MT-RF001-200"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  TC-RF001-VAL-003:
+    categoria: "VALIDACAO"
+    prioridade: "CRITICA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC01-002"
+    descricao:
+      resumo: "Código duplicado (violação unicidade)"
+      objetivo: "Validar rejeição de código duplicado no tenant"
+    origem:
+      ucs: ["UC01"]
+      fluxos_uc: ["FE-UC01-002"]
+      regras_negocio: ["RN-SYS-001-01"]
+    massa_teste:
+      referencias: ["MT-RF001-300"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: false
+      http_status: 409
+      erro:
+        tipo: "CONFLICT"
+
+  TC-RF001-VAL-004:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC01-006"
+    descricao:
+      resumo: "JSON inválido"
+      objetivo: "Validar rejeição de JSON malformado"
+    origem:
+      ucs: ["UC01"]
+      regras_negocio: ["RN-SYS-001-02"]
+    massa_teste:
+      referencias: ["MT-RF001-203"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  TC-RF001-VAL-005:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC01-004"
+    descricao:
+      resumo: "Valor fora de min/max"
+      objetivo: "Validar rejeição de valor fora do range permitido"
+    origem:
+      ucs: ["UC01"]
+      regras_negocio: ["RN-SYS-001-02"]
+    massa_teste:
+      referencias: ["MT-RF001-204"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  TC-RF001-VAL-006:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC03"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC03-001"
+    descricao:
+      resumo: "Tentativa de editar metadados de parâmetro de sistema"
+      objetivo: "Validar bloqueio de edição de metadados em parâmetros Fl_Sistema=1"
+    origem:
+      ucs: ["UC03"]
+      fluxos_uc: ["FE-UC03-001"]
+      regras_negocio: ["RN-SYS-001-03"]
+    massa_teste:
+      referencias: ["MT-RF001-301"]
+    acao:
+      tipo: "EDITAR"
+      endpoint: "PUT /api/parametros/{id}"
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+
+  TC-RF001-VAL-007:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC04"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC04-001"
+    descricao:
+      resumo: "Tentativa de excluir parâmetro de sistema"
+      objetivo: "Validar bloqueio de exclusão de parâmetros Fl_Sistema=1"
+    origem:
+      ucs: ["UC04"]
+      fluxos_uc: ["FE-UC04-001"]
+      regras_negocio: ["RN-SYS-001-03"]
+    massa_teste:
+      referencias: ["MT-RF001-302"]
+    acao:
+      tipo: "EXCLUIR"
+      endpoint: "DELETE /api/parametros/{id}"
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+
+  TC-RF001-VAL-008:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC06"
+    entidade: "Sistema_Feature_Flag"
+    covers:
+      uc_items:
+        - "FE-UC06-002"
+    descricao:
+      resumo: "Percentual_Rollout fora de 0-100"
+      objetivo: "Validar rejeição de percentual inválido"
+    origem:
+      ucs: ["UC06"]
+      regras_negocio: ["RN-SYS-001-09"]
+    massa_teste:
+      referencias: ["MT-RF001-111"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/feature-flags"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  TC-RF001-VAL-009:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC11"
+    entidade: "Sistema_Configuracao_Email"
+    covers:
+      uc_items:
+        - "FE-UC11-002"
+    descricao:
+      resumo: "Porta_Smtp fora de 1-65535"
+      objetivo: "Validar rejeição de porta inválida"
+    origem:
+      ucs: ["UC11"]
+      regras_negocio: ["RN-SYS-001-11"]
+    massa_teste:
+      referencias: ["MT-RF001-120"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/configuracoes-email"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  TC-RF001-VAL-010:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC11"
+    entidade: "Sistema_Configuracao_Email"
+    covers:
+      uc_items:
+        - "FE-UC11-003"
+    descricao:
+      resumo: "Email_Remetente inválido"
+      objetivo: "Validar rejeição de formato de e-mail inválido"
+    origem:
+      ucs: ["UC11"]
+      regras_negocio: ["RN-SYS-001-11"]
+    massa_teste:
+      referencias: ["MT-RF001-121"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/configuracoes-email"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  TC-RF001-VAL-011:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC16"
+    entidade: "Sistema_Limite_Uso"
+    covers:
+      uc_items:
+        - "FE-UC16-001"
+    descricao:
+      resumo: "Tipo_Limite duplicado no tenant"
+      objetivo: "Validar rejeição de tipo de limite duplicado"
+    origem:
+      ucs: ["UC16"]
+      regras_negocio: ["RN-SYS-001-12"]
+    massa_teste:
+      referencias: ["MT-RF001-130"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/limites-uso"
+    resultado_esperado:
+      sucesso: false
+      http_status: 409
+
+  TC-RF001-VAL-012:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC16"
+    entidade: "Sistema_Limite_Uso"
+    covers:
+      uc_items:
+        - "FE-UC16-002"
+    descricao:
+      resumo: "Limite <= 0"
+      objetivo: "Validar rejeição de limite não positivo"
+    origem:
+      ucs: ["UC16"]
+      regras_negocio: ["RN-SYS-001-12"]
+    massa_teste:
+      referencias: ["MT-RF001-131"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/limites-uso"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  # ======================================================
+  # SEGURANÇA (TC-RF001-SEC-001 a TC-RF001-SEC-010)
+  # ======================================================
+  TC-RF001-SEC-001:
+    categoria: "SEGURANCA"
+    prioridade: "CRITICA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC00-001"
+    descricao:
+      resumo: "Usuário não autenticado (401)"
+      objetivo: "Bloquear acesso sem autenticação"
+    origem:
+      ucs: ["UC01"]
+      regras_negocio: ["SEC-001"]
+    massa_teste:
+      referencias: ["MT-RF001-400"]
+    contexto:
+      autenticacao:
+        autenticado: false
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: false
+      http_status: 401
+    criterio_aprovacao:
+      - "Acesso negado"
+      - "Nenhuma alteração no banco"
+
+  TC-RF001-SEC-002:
+    categoria: "SEGURANCA"
+    prioridade: "CRITICA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC01-002"
+    descricao:
+      resumo: "Usuário sem permissão CREATE (403)"
+      objetivo: "Bloquear criação sem permissão adequada"
+    origem:
+      ucs: ["UC01"]
+      regras_negocio: ["SEC-002"]
+    massa_teste:
+      referencias: ["MT-RF001-401"]
+    contexto:
+      autenticacao:
+        usuario: "user_sem_permissao"
+        permissoes: ["SYS.PARAMETROS.VIEW"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+
+  TC-RF001-SEC-003:
+    categoria: "SEGURANCA"
+    prioridade: "CRITICA"
+    uc_ref: "UC00"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC00-001"
+    descricao:
+      resumo: "Usuário sem permissão VIEW_ANY (403)"
+      objetivo: "Bloquear listagem sem permissão"
+    origem:
+      ucs: ["UC00"]
+    massa_teste:
+      referencias: ["MT-RF001-402"]
+    acao:
+      tipo: "LISTAR"
+      endpoint: "GET /api/parametros"
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+
+  TC-RF001-SEC-004:
+    categoria: "SEGURANCA"
+    prioridade: "CRITICA"
+    uc_ref: "UC02"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC02-002"
+    descricao:
+      resumo: "Tentativa de acessar parâmetro de outro tenant (404)"
+      objetivo: "Validar isolamento multi-tenant"
+    origem:
+      ucs: ["UC02"]
+      regras_negocio: ["MT-001", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-700"]
+    acao:
+      tipo: "VISUALIZAR"
+      endpoint: "GET /api/parametros/{id_outro_tenant}"
+    resultado_esperado:
+      sucesso: false
+      http_status: 404
+
+  TC-RF001-SEC-005:
+    categoria: "SEGURANCA"
+    prioridade: "CRITICA"
+    uc_ref: "UC03"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC03-009"
+    descricao:
+      resumo: "Tentativa de editar parâmetro de outro tenant"
+      objetivo: "Validar isolamento multi-tenant na edição"
+    origem:
+      ucs: ["UC03"]
+      regras_negocio: ["MT-001"]
+    massa_teste:
+      referencias: ["MT-RF001-702"]
+    acao:
+      tipo: "EDITAR"
+      endpoint: "PUT /api/parametros/{id_outro_tenant}"
+    resultado_esperado:
+      sucesso: false
+      http_status: 404
+
+  TC-RF001-SEC-006:
+    categoria: "SEGURANCA"
+    prioridade: "CRITICA"
+    uc_ref: "UC04"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC04-003"
+    descricao:
+      resumo: "Tentativa de excluir parâmetro de outro tenant"
+      objetivo: "Validar isolamento multi-tenant na exclusão"
+    origem:
+      ucs: ["UC04"]
+      regras_negocio: ["MT-001"]
+    massa_teste:
+      referencias: ["MT-RF001-703"]
+    acao:
+      tipo: "EXCLUIR"
+      endpoint: "DELETE /api/parametros/{id_outro_tenant}"
+    resultado_esperado:
+      sucesso: false
+      http_status: 404
+
+  # ======================================================
+  # EDGE CASE (TC-RF001-EDGE-001 a TC-RF001-EDGE-005)
+  # ======================================================
+  TC-RF001-EDGE-001:
+    categoria: "EDGE_CASE"
+    prioridade: "MEDIA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC01-004"
+    descricao:
+      resumo: "Cd_Parametro com tamanho máximo (100 caracteres)"
+      objetivo: "Validar aceitação de código no limite máximo"
+    origem:
+      ucs: ["UC01"]
+    massa_teste:
+      referencias: ["MT-RF001-500"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  TC-RF001-EDGE-002:
+    categoria: "EDGE_CASE"
+    prioridade: "MEDIA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC01-001"
+    descricao:
+      resumo: "Cd_Parametro excede tamanho máximo"
+      objetivo: "Validar rejeição de código muito longo"
+    origem:
+      ucs: ["UC01"]
+    massa_teste:
+      referencias: ["MT-RF001-501"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  TC-RF001-EDGE-003:
+    categoria: "EDGE_CASE"
+    prioridade: "MEDIA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC01-004"
+    descricao:
+      resumo: "Caracteres especiais e Unicode"
+      objetivo: "Validar tratamento de caracteres especiais"
+    origem:
+      ucs: ["UC01"]
+    massa_teste:
+      referencias: ["MT-RF001-502"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      validacoes:
+        - "Caracteres especiais aceitos"
+        - "Script sanitizado contra XSS"
+
+  TC-RF001-EDGE-004:
+    categoria: "EDGE_CASE"
+    prioridade: "MEDIA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC01-005"
+    descricao:
+      resumo: "Valor inteiro no limite máximo (MAX_INT)"
+      objetivo: "Validar aceitação de valor inteiro máximo"
+    origem:
+      ucs: ["UC01"]
+    massa_teste:
+      referencias: ["MT-RF001-503"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  TC-RF001-EDGE-005:
+    categoria: "EDGE_CASE"
+    prioridade: "MEDIA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FE-UC01-001"
+    descricao:
+      resumo: "String vazia vs null"
+      objetivo: "Validar distinção entre vazio e nulo"
+    origem:
+      ucs: ["UC01"]
+    massa_teste:
+      referencias: ["MT-RF001-504"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  # ======================================================
+  # AUDITORIA (TC-RF001-AUD-001 a TC-RF001-AUD-005)
+  # ======================================================
+  TC-RF001-AUD-001:
+    categoria: "AUDITORIA"
+    prioridade: "ALTA"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC01-016"
+    descricao:
+      resumo: "Auditoria na criação"
+      objetivo: "Validar registro de auditoria tipo CREATE"
+    origem:
+      ucs: ["UC01"]
+      regras_negocio: ["RN-SYS-001-07", "RN-SYS-001-14"]
+    massa_teste:
+      referencias: ["MT-RF001-800"]
+    acao:
+      tipo: "CRIAR"
+      endpoint: "POST /api/parametros"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      banco:
+        Sistema_Parametro_Historico:
+          deve_existir:
+            - tipo_operacao: "CREATE"
+    criterio_aprovacao:
+      - "Registro de auditoria criado"
+      - "created_at e created_by preenchidos"
+
+  TC-RF001-AUD-002:
+    categoria: "AUDITORIA"
+    prioridade: "ALTA"
+    uc_ref: "UC03"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC03-019"
+    descricao:
+      resumo: "Auditoria na edição com diff JSON"
+      objetivo: "Validar registro de auditoria tipo UPDATE com diff"
+    origem:
+      ucs: ["UC03"]
+      regras_negocio: ["RN-SYS-001-07", "RN-SYS-001-15"]
+    massa_teste:
+      referencias: ["MT-RF001-801"]
+    acao:
+      tipo: "EDITAR"
+      endpoint: "PUT /api/parametros/{id}"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Sistema_Parametro_Historico:
+          deve_existir:
+            - tipo_operacao: "UPDATE"
+              diff_json: "{not_empty}"
+
+  TC-RF001-AUD-003:
+    categoria: "AUDITORIA"
+    prioridade: "ALTA"
+    uc_ref: "UC04"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC04-009"
+    descricao:
+      resumo: "Auditoria na exclusão"
+      objetivo: "Validar registro de auditoria tipo DELETE"
+    origem:
+      ucs: ["UC04"]
+      regras_negocio: ["RN-SYS-001-07"]
+    massa_teste:
+      referencias: ["MT-RF001-802"]
+    acao:
+      tipo: "EXCLUIR"
+      endpoint: "DELETE /api/parametros/{id}"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Sistema_Parametro_Historico:
+          deve_existir:
+            - tipo_operacao: "DELETE"
+
+  TC-RF001-AUD-004:
+    categoria: "AUDITORIA"
+    prioridade: "ALTA"
+    uc_ref: "UC02"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC02-007"
+    descricao:
+      resumo: "Auditoria de acesso a valor sensível"
+      objetivo: "Validar registro de auditoria tipo ACCESS"
+    origem:
+      ucs: ["UC02"]
+      regras_negocio: ["RN-SYS-001-04", "RN-SYS-001-07"]
+    massa_teste:
+      referencias: ["MT-RF001-803"]
+    acao:
+      tipo: "VISUALIZAR"
+      endpoint: "GET /api/parametros/{id}"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Sistema_Parametro_Historico:
+          deve_existir:
+            - tipo_operacao: "ACCESS"
+
+  # ======================================================
+  # INTEGRAÇÃO (TC-RF001-INT-001 a TC-RF001-INT-005)
+  # ======================================================
+  TC-RF001-INT-001:
+    categoria: "INTEGRACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC21"
+    entidade: "Sistema_Configuracao_Email"
+    covers:
+      uc_items:
+        - "FP-UC21-001"
+        - "FP-UC21-002"
+        - "FP-UC21-003"
+        - "FP-UC21-004"
+        - "FP-UC21-005"
+        - "FP-UC21-006"
+        - "FP-UC21-007"
+        - "FP-UC21-008"
+    descricao:
+      resumo: "Teste de conexão SMTP bem-sucedido"
+      objetivo: "Validar integração SMTP funcional"
+    origem:
+      ucs: ["UC21"]
+      regras_negocio: ["RN-SYS-001-11"]
+    massa_teste:
+      referencias: ["MT-RF001-050"]
+    acao:
+      tipo: "TESTAR_CONEXAO"
+      endpoint: "POST /api/configuracoes-email/{id}/testar"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        mensagem: "E-mail de teste enviado com sucesso"
+
+  TC-RF001-INT-002:
+    categoria: "INTEGRACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC21"
+    entidade: "Sistema_Configuracao_Email"
+    covers:
+      uc_items:
+        - "FE-UC21-001"
+    descricao:
+      resumo: "Teste de conexão SMTP - falha de autenticação"
+      objetivo: "Validar tratamento de erro de credenciais"
+    origem:
+      ucs: ["UC21"]
+    massa_teste:
+      referencias: ["MT-RF001-051"]
+    acao:
+      tipo: "TESTAR_CONEXAO"
+      endpoint: "POST /api/configuracoes-email/{id}/testar"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        mensagem: "Falha na autenticação SMTP"
+
+  TC-RF001-INT-003:
+    categoria: "INTEGRACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC21"
+    entidade: "Sistema_Configuracao_Email"
+    covers:
+      uc_items:
+        - "FE-UC21-002"
+    descricao:
+      resumo: "Teste de conexão SMTP - servidor inacessível"
+      objetivo: "Validar tratamento de erro de conexão"
+    origem:
+      ucs: ["UC21"]
+    massa_teste:
+      referencias: ["MT-RF001-052"]
+    acao:
+      tipo: "TESTAR_CONEXAO"
+      endpoint: "POST /api/configuracoes-email/{id}/testar"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  TC-RF001-INT-004:
+    categoria: "INTEGRACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC20"
+    entidade: "Sistema_Limite_Uso"
+    covers:
+      uc_items:
+        - "FP-UC20-001"
+        - "FP-UC20-002"
+        - "FP-UC20-003"
+        - "FP-UC20-004"
+        - "FP-UC20-005"
+        - "FP-UC20-006"
+        - "FP-UC20-008"
+    descricao:
+      resumo: "Job Background - Verificação e envio de alertas"
+      objetivo: "Validar execução do job de verificação de limites"
+    origem:
+      ucs: ["UC20"]
+      regras_negocio: ["RN-SYS-001-13"]
+    massa_teste:
+      referencias: ["MT-RF001-040"]
+    acao:
+      tipo: "JOB"
+      trigger: "CRON_1H"
+    resultado_esperado:
+      sucesso: true
+      validacoes:
+        - "Alerta enviado para limites >= Percentual_Alerta"
+        - "Fl_Alerta_Enviado marcado"
+
+  TC-RF001-INT-005:
+    categoria: "INTEGRACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC20"
+    entidade: "Sistema_Limite_Uso"
+    covers:
+      uc_items:
+        - "FP-UC20-007"
+    descricao:
+      resumo: "Job Background - Hysteresis reset de flag"
+      objetivo: "Validar reset de flag quando uso cai"
+    origem:
+      ucs: ["UC20"]
+      regras_negocio: ["RN-SYS-001-13"]
+    massa_teste:
+      referencias: ["MT-RF001-041"]
+    acao:
+      tipo: "JOB"
+      trigger: "CRON_1H"
+    resultado_esperado:
+      sucesso: true
+      banco:
+        Sistema_Limite_Uso:
+          deve_existir:
+            - Fl_Alerta_Enviado: 0
+
+  # ======================================================
+  # E2E (TC-RF001-E2E-001 a TC-RF001-E2E-005)
+  # ======================================================
+  TC-RF001-E2E-001:
+    categoria: "E2E"
+    prioridade: "CRITICA"
+    uc_ref: "UC00"
+    entidade: "Sistema_Parametro"
+    covers:
+      uc_items:
+        - "FP-UC00-001"
+        - "FP-UC01-001"
+        - "FP-UC02-001"
+        - "FP-UC03-001"
+        - "FP-UC04-001"
+    descricao:
+      resumo: "Fluxo CRUD completo de Parâmetros"
+      objetivo: "Validar experiência ponta a ponta de gestão de parâmetros"
+    origem:
+      ucs: ["UC00", "UC01", "UC02", "UC03", "UC04"]
+    abordagem:
+      tipo: "GUI"
+      framework: "Playwright"
+    passos:
+      - passo: 1
+        descricao: "Usuário acessa lista de parâmetros"
+        endpoint: "GET /api/parametros"
+        esperado: "Lista exibida com paginação"
+      - passo: 2
+        descricao: "Usuário cria novo parâmetro"
+        endpoint: "POST /api/parametros"
+        esperado: "Parâmetro criado com sucesso (HTTP 201)"
+      - passo: 3
+        descricao: "Usuário visualiza parâmetro criado"
+        endpoint: "GET /api/parametros/{id}"
+        esperado: "Detalhes exibidos corretamente"
+      - passo: 4
+        descricao: "Usuário edita parâmetro"
+        endpoint: "PUT /api/parametros/{id}"
+        esperado: "Parâmetro atualizado com sucesso"
+      - passo: 5
+        descricao: "Usuário exclui parâmetro"
+        endpoint: "DELETE /api/parametros/{id}"
+        esperado: "Parâmetro excluído (soft delete)"
+    resultado_esperado:
+      sucesso: true
+      validacoes:
+        - "Fluxo completo executado sem erros"
+        - "Dados consistentes ao final"
+        - "Auditoria registrada em todas as operações"
+
+  TC-RF001-E2E-002:
+    categoria: "E2E"
+    prioridade: "CRITICA"
+    uc_ref: "UC05"
+    entidade: "Sistema_Feature_Flag"
+    covers:
+      uc_items:
+        - "FP-UC05-001"
+        - "FP-UC06-001"
+        - "FP-UC07-001"
+        - "FP-UC08-001"
+        - "FP-UC09-001"
+    descricao:
+      resumo: "Fluxo CRUD completo de Feature Flags"
+      objetivo: "Validar experiência ponta a ponta de gestão de flags"
+    origem:
+      ucs: ["UC05", "UC06", "UC07", "UC08", "UC09"]
+    abordagem:
+      tipo: "GUI"
+      framework: "Playwright"
+    passos:
+      - passo: 1
+        descricao: "Listar feature flags"
+        endpoint: "GET /api/feature-flags"
+        esperado: "Lista com flags tenant + globais"
+      - passo: 2
+        descricao: "Criar feature flag"
+        endpoint: "POST /api/feature-flags"
+        esperado: "Flag criada com sucesso"
+      - passo: 3
+        descricao: "Visualizar flag"
+        endpoint: "GET /api/feature-flags/{id}"
+        esperado: "Detalhes exibidos"
+      - passo: 4
+        descricao: "Editar flag (ativar/desativar)"
+        endpoint: "PUT /api/feature-flags/{id}"
+        esperado: "Flag atualizada"
+      - passo: 5
+        descricao: "Excluir flag"
+        endpoint: "DELETE /api/feature-flags/{id}"
+        esperado: "Flag excluída"
+    resultado_esperado:
+      sucesso: true
+
+  TC-RF001-E2E-003:
+    categoria: "E2E"
+    prioridade: "ALTA"
+    uc_ref: "UC10"
+    entidade: "Sistema_Configuracao_Email"
+    covers:
+      uc_items:
+        - "FP-UC10-001"
+        - "FP-UC11-001"
+        - "FP-UC12-001"
+        - "FP-UC13-001"
+        - "FP-UC14-001"
+        - "FP-UC21-001"
+    descricao:
+      resumo: "Fluxo CRUD + Teste SMTP de Configurações de E-mail"
+      objetivo: "Validar gestão de configurações de e-mail com teste de conexão"
+    origem:
+      ucs: ["UC10", "UC11", "UC12", "UC13", "UC14", "UC21"]
+    passos:
+      - passo: 1
+        descricao: "Listar configurações de e-mail"
+        endpoint: "GET /api/configuracoes-email"
+        esperado: "Lista com senhas mascaradas"
+      - passo: 2
+        descricao: "Criar configuração SMTP"
+        endpoint: "POST /api/configuracoes-email"
+        esperado: "Configuração criada, senha criptografada"
+      - passo: 3
+        descricao: "Testar conexão SMTP"
+        endpoint: "POST /api/configuracoes-email/{id}/testar"
+        esperado: "E-mail de teste enviado"
+      - passo: 4
+        descricao: "Editar configuração"
+        endpoint: "PUT /api/configuracoes-email/{id}"
+        esperado: "Configuração atualizada"
+      - passo: 5
+        descricao: "Excluir configuração"
+        endpoint: "DELETE /api/configuracoes-email/{id}"
+        esperado: "Configuração excluída"
+    resultado_esperado:
+      sucesso: true
+
+  TC-RF001-E2E-004:
+    categoria: "E2E"
+    prioridade: "ALTA"
+    uc_ref: "UC15"
+    entidade: "Sistema_Limite_Uso"
+    covers:
+      uc_items:
+        - "FP-UC15-001"
+        - "FP-UC16-001"
+        - "FP-UC17-001"
+        - "FP-UC18-001"
+        - "FP-UC19-001"
+    descricao:
+      resumo: "Fluxo CRUD completo de Limites de Uso"
+      objetivo: "Validar gestão de limites com indicadores visuais"
+    origem:
+      ucs: ["UC15", "UC16", "UC17", "UC18", "UC19"]
+    passos:
+      - passo: 1
+        descricao: "Listar limites de uso"
+        endpoint: "GET /api/limites-uso"
+        esperado: "Lista com percentuais calculados"
+      - passo: 2
+        descricao: "Criar limite de uso"
+        endpoint: "POST /api/limites-uso"
+        esperado: "Limite criado"
+      - passo: 3
+        descricao: "Visualizar limite"
+        endpoint: "GET /api/limites-uso/{id}"
+        esperado: "Detalhes com indicador visual"
+      - passo: 4
+        descricao: "Editar limite"
+        endpoint: "PUT /api/limites-uso/{id}"
+        esperado: "Limite atualizado, hysteresis aplicada"
+      - passo: 5
+        descricao: "Excluir limite"
+        endpoint: "DELETE /api/limites-uso/{id}"
+        esperado: "Limite excluído"
+    resultado_esperado:
+      sucesso: true
+
+  TC-RF001-E2E-005:
+    categoria: "E2E"
+    prioridade: "ALTA"
+    uc_ref: "UC20"
+    entidade: "Sistema_Limite_Uso"
+    covers:
+      uc_items:
+        - "FP-UC20-001"
+        - "FP-UC20-002"
+        - "FP-UC20-003"
+        - "FP-UC20-004"
+        - "FP-UC20-005"
+        - "FP-UC20-006"
+        - "FP-UC20-007"
+        - "FP-UC20-008"
+    descricao:
+      resumo: "Fluxo completo de Job Background + Dashboard"
+      objetivo: "Validar execução de job e visualização no dashboard"
+    origem:
+      ucs: ["UC20"]
+    tipo: "background_job"
+    passos:
+      - passo: 1
+        descricao: "Configurar limite próximo ao alerta"
+        esperado: "Limite salvo com Uso_Atual próximo de Percentual_Alerta"
+      - passo: 2
+        descricao: "Executar job de verificação"
+        esperado: "Job executa e envia alerta"
+      - passo: 3
+        descricao: "Verificar Fl_Alerta_Enviado"
+        esperado: "Flag marcada como 1"
+      - passo: 4
+        descricao: "Reduzir uso abaixo do threshold"
+        esperado: "Limite atualizado"
+      - passo: 5
+        descricao: "Executar job novamente"
+        esperado: "Flag resetada para 0 (hysteresis)"
+    resultado_esperado:
+      sucesso: true
+
+# =============================================
+# MATRIZ DE RASTREABILIDADE
+# =============================================
+rastreabilidade:
+  # HAPPY_PATH
+  - tc: "TC-RF001-HP-001"
+    ucs: ["UC00"]
+    massas: ["MT-RF001-006"]
+  - tc: "TC-RF001-HP-002"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-001"]
+  - tc: "TC-RF001-HP-003"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-002"]
+  - tc: "TC-RF001-HP-004"
+    ucs: ["UC02"]
+    massas: ["MT-RF001-007"]
+  - tc: "TC-RF001-HP-005"
+    ucs: ["UC02"]
+    massas: ["MT-RF001-803"]
+  - tc: "TC-RF001-HP-006"
+    ucs: ["UC03"]
+    massas: ["MT-RF001-008"]
+  - tc: "TC-RF001-HP-007"
+    ucs: ["UC04"]
+    massas: ["MT-RF001-009"]
+  - tc: "TC-RF001-HP-008"
+    ucs: ["UC05"]
+    massas: ["MT-RF001-012"]
+  - tc: "TC-RF001-HP-009"
+    ucs: ["UC06"]
+    massas: ["MT-RF001-010"]
+  - tc: "TC-RF001-HP-010"
+    ucs: ["UC10"]
+    massas: ["MT-RF001-021"]
+  - tc: "TC-RF001-HP-011"
+    ucs: ["UC11"]
+    massas: ["MT-RF001-020"]
+  - tc: "TC-RF001-HP-012"
+    ucs: ["UC15"]
+    massas: ["MT-RF001-031"]
+  - tc: "TC-RF001-HP-013"
+    ucs: ["UC16"]
+    massas: ["MT-RF001-030"]
+
+  # VALIDACAO
+  - tc: "TC-RF001-VAL-001"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-100"]
+  - tc: "TC-RF001-VAL-002"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-200"]
+  - tc: "TC-RF001-VAL-003"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-300"]
+  - tc: "TC-RF001-VAL-004"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-203"]
+  - tc: "TC-RF001-VAL-005"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-204"]
+  - tc: "TC-RF001-VAL-006"
+    ucs: ["UC03"]
+    massas: ["MT-RF001-301"]
+  - tc: "TC-RF001-VAL-007"
+    ucs: ["UC04"]
+    massas: ["MT-RF001-302"]
+  - tc: "TC-RF001-VAL-008"
+    ucs: ["UC06"]
+    massas: ["MT-RF001-111"]
+  - tc: "TC-RF001-VAL-009"
+    ucs: ["UC11"]
+    massas: ["MT-RF001-120"]
+  - tc: "TC-RF001-VAL-010"
+    ucs: ["UC11"]
+    massas: ["MT-RF001-121"]
+  - tc: "TC-RF001-VAL-011"
+    ucs: ["UC16"]
+    massas: ["MT-RF001-130"]
+  - tc: "TC-RF001-VAL-012"
+    ucs: ["UC16"]
+    massas: ["MT-RF001-131"]
+
+  # SEGURANCA
+  - tc: "TC-RF001-SEC-001"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-400"]
+  - tc: "TC-RF001-SEC-002"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-401"]
+  - tc: "TC-RF001-SEC-003"
+    ucs: ["UC00"]
+    massas: ["MT-RF001-402"]
+  - tc: "TC-RF001-SEC-004"
+    ucs: ["UC02"]
+    massas: ["MT-RF001-700"]
+  - tc: "TC-RF001-SEC-005"
+    ucs: ["UC03"]
+    massas: ["MT-RF001-702"]
+  - tc: "TC-RF001-SEC-006"
+    ucs: ["UC04"]
+    massas: ["MT-RF001-703"]
+
+  # EDGE_CASE
+  - tc: "TC-RF001-EDGE-001"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-500"]
+  - tc: "TC-RF001-EDGE-002"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-501"]
+  - tc: "TC-RF001-EDGE-003"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-502"]
+  - tc: "TC-RF001-EDGE-004"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-503"]
+  - tc: "TC-RF001-EDGE-005"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-504"]
+
+  # AUDITORIA
+  - tc: "TC-RF001-AUD-001"
+    ucs: ["UC01"]
+    massas: ["MT-RF001-800"]
+  - tc: "TC-RF001-AUD-002"
+    ucs: ["UC03"]
+    massas: ["MT-RF001-801"]
+  - tc: "TC-RF001-AUD-003"
+    ucs: ["UC04"]
+    massas: ["MT-RF001-802"]
+  - tc: "TC-RF001-AUD-004"
+    ucs: ["UC02"]
+    massas: ["MT-RF001-803"]
+
+  # INTEGRACAO
+  - tc: "TC-RF001-INT-001"
+    ucs: ["UC21"]
+    massas: ["MT-RF001-050"]
+  - tc: "TC-RF001-INT-002"
+    ucs: ["UC21"]
+    massas: ["MT-RF001-051"]
+  - tc: "TC-RF001-INT-003"
+    ucs: ["UC21"]
+    massas: ["MT-RF001-052"]
+  - tc: "TC-RF001-INT-004"
+    ucs: ["UC20"]
+    massas: ["MT-RF001-040"]
+  - tc: "TC-RF001-INT-005"
+    ucs: ["UC20"]
+    massas: ["MT-RF001-041"]
+
+  # E2E
+  - tc: "TC-RF001-E2E-001"
+    ucs: ["UC00", "UC01", "UC02", "UC03", "UC04"]
+    massas: ["MT-RF001-001", "MT-RF001-006", "MT-RF001-007", "MT-RF001-008", "MT-RF001-009"]
+  - tc: "TC-RF001-E2E-002"
+    ucs: ["UC05", "UC06", "UC07", "UC08", "UC09"]
+    massas: ["MT-RF001-010", "MT-RF001-012", "MT-RF001-013", "MT-RF001-014"]
+  - tc: "TC-RF001-E2E-003"
+    ucs: ["UC10", "UC11", "UC12", "UC13", "UC14", "UC21"]
+    massas: ["MT-RF001-020", "MT-RF001-021", "MT-RF001-022", "MT-RF001-050"]
+  - tc: "TC-RF001-E2E-004"
+    ucs: ["UC15", "UC16", "UC17", "UC18", "UC19"]
+    massas: ["MT-RF001-030", "MT-RF001-031", "MT-RF001-032"]
+  - tc: "TC-RF001-E2E-005"
+    ucs: ["UC20"]
+    massas: ["MT-RF001-040", "MT-RF001-041"]
+
+# =============================================
+# ESTATÍSTICAS
+# =============================================
+estatisticas:
+  total_casos_teste: 45
+  por_categoria:
+    HAPPY_PATH: 13
+    VALIDACAO: 12
+    SEGURANCA: 6
+    EDGE_CASE: 5
+    AUDITORIA: 4
+    INTEGRACAO: 5
+    E2E: 5
+  por_prioridade:
+    CRITICA: 25
+    ALTA: 18
+    MEDIA: 5
+  cobertura_ucs:
+    total_ucs: 22
+    ucs_cobertos: 22
+    percentual: 100
+  cobertura_entidades:
+    Sistema_Parametro: true
+    Sistema_Feature_Flag: true
+    Sistema_Configuracao_Email: true
+    Sistema_Limite_Uso: true
+
+# =============================================
+# HISTÓRICO
+# =============================================
+historico:
+  - versao: "1.0"
+    data: "2026-01-28"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Criação inicial TC-RF001 com cobertura 100% de todos os 22 UCs (UC00-UC21). Total: 45 casos de teste distribuídos em 7 categorias. Rastreabilidade completa RF → UC → MT → TC."

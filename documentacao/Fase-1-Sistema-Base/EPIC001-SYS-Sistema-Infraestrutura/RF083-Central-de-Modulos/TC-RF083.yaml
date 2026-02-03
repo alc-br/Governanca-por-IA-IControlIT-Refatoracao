@@ -1,0 +1,1490 @@
+# =============================================
+# TC-RF083 - Casos de Teste
+# Central de Módulos
+# Versão: 1.0
+# Data: 2026-02-01
+# Autor: Agente Claude Code
+# =============================================
+# IMPORTANTE: RF083 é funcionalidade GLOBAL (não multi-tenant)
+# - Funcionalidades são compartilhadas entre todos os tenants
+# - Acesso filtrado por PERFIL (Developer/System/Tenant)
+# =============================================
+
+tc:
+  rf_id: "RF083"
+  nome: "Central de Módulos - Casos de Teste"
+  versao: "1.0"
+  data: "2026-02-01"
+  tipo: "leitura_e_admin"
+
+rastreabilidade:
+  rf: "RF083"
+  uc_ids: ["UC00", "UC01", "UC02", "UC03", "UC04", "UC05", "UC06", "UC07"]
+  regras_negocio:
+    - "RN-RF083-02" # Isolamento por perfil
+    - "RN-RF083-03" # Empresas exclusivas vazias = acesso total
+    - "RN-RF083-04" # Apenas Developer gerencia exclusivas
+    - "RN-RF083-05" # Soft delete
+    - "RN-RF083-11" # Ordenação
+    - "RN-RF083-13" # Auditoria
+    - "RN-RF083-14" # Estatísticas ativos/não excluídos
+    - "RN-RF083-15" # Reset restrito
+
+# =============================================
+# CASOS DE TESTE
+# =============================================
+
+test_cases:
+
+  # ==========================================================
+  # HAPPY_PATH (HP)
+  # Cenários de sucesso - fluxo principal completo
+  # ==========================================================
+
+  TC-RF083-HP-001:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC00"
+    descricao:
+      resumo: "UC00 - Listar funcionalidades como Developer (acesso total)"
+      detalhada: |
+        Validar que Developer consegue listar TODAS as funcionalidades do sistema,
+        incluindo funcionalidades Developer, System e Corporativo.
+
+        Fluxo principal completo (FP-UC00) de listagem.
+
+    covers:
+      uc_items:
+        - "FP-UC00-001"  # Usuário acessa Central de Módulos pelo menu
+        - "FP-UC00-002"  # Sistema valida autenticação
+        - "FP-UC00-003"  # Sistema identifica perfil do usuário
+        - "FP-UC00-004"  # Sistema aplica filtro por perfil (RN-RF083-02)
+        - "FP-UC00-005"  # Sistema carrega funcionalidades ativas não excluídas
+        - "FP-UC00-008"  # Sistema aplica ordenação
+        - "FP-UC00-009"  # Sistema exibe a lista agrupada por categoria
+
+    origem:
+      criterios_aceite: []  # UC00 não possui CAs explícitos
+      ucs: ["UC00"]
+      fluxos_uc: ["FP-UC00-001", "FP-UC00-009"]
+      regras_negocio: ["RN-RF083-02", "RN-RF083-11"]
+
+    massa_teste:
+      referencias: ["MT-RF083-001"]
+      dados_entrada:
+        usuario: "developer@icontrolit.com"
+        senha: "Test@1234"
+        perfil: "Developer"
+      dados_esperados:
+        minimo_funcionalidades: 10
+        categorias_esperadas: ["Cadastros", "Sistema", "Configuracoes"]
+        ordenacao: "ordem ASC, nome ASC"
+
+    passos:
+      - passo: 1
+        acao: "Usuario autenticado como Developer"
+        data_test: "login-form"
+        esperado: "Login bem-sucedido, token JWT obtido"
+
+      - passo: 2
+        acao: "Acessar Central de Módulos pelo menu lateral"
+        data_test: "menu-central-modulos"
+        esperado: "Navegação para /management/central-modulos"
+
+      - passo: 3
+        acao: "Sistema valida autenticação e identifica perfil Developer"
+        data_test: "loading-spinner"
+        esperado: "Loading exibido durante carregamento"
+
+      - passo: 4
+        acao: "Sistema carrega funcionalidades via GET /api/funcionalidades"
+        esperado: "API retorna HTTP 200 com array de funcionalidades"
+
+      - passo: 5
+        acao: "Sistema exibe lista agrupada por categoria"
+        data_test: "funcionalidades-list"
+        esperado: "Lista completa exibida, Developer vê TODAS as funcionalidades"
+
+    acao:
+      tipo: "GET"
+      endpoint: "/api/funcionalidades"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "Array não vazio (mínimo 10 funcionalidades)"
+        - "Developer vê funcionalidades de TODAS as camadas (Developer, System, Corporativo)"
+        - "Ordenação: ordem ASC, nome ASC"
+        - "Lista agrupada por categoria exibida"
+
+  TC-RF083-HP-002:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC01"
+    descricao:
+      resumo: "UC01 - Visualizar detalhes de funcionalidade existente"
+      detalhada: |
+        Validar que usuário autenticado consegue visualizar detalhes completos
+        de uma funcionalidade, incluindo ações associadas e funcionalidades filhas.
+
+    covers:
+      uc_items:
+        - "FP-UC01-001"  # Usuário seleciona funcionalidade na lista
+        - "FP-UC01-002"  # Sistema valida autenticação
+        - "FP-UC01-003"  # Sistema carrega funcionalidade por ID
+        - "FP-UC01-004"  # Sistema verifica existência e soft delete
+        - "FP-UC01-005"  # Sistema carrega ações associadas
+        - "FP-UC01-006"  # Sistema carrega funcionalidades filhas
+        - "FP-UC01-007"  # Sistema carrega empresas exclusivas
+        - "FP-UC01-010"  # Sistema exibe detalhes completos
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC01"]
+      fluxos_uc: ["FP-UC01-001", "FP-UC01-010"]
+      regras_negocio: ["RN-RF083-05", "RN-RF083-13"]
+
+    massa_teste:
+      referencias: ["MT-RF083-004"]
+      dados_entrada:
+        funcionalidade_id: "{guid_existente}"
+      dados_esperados:
+        campos_obrigatorios: ["id", "codigo", "nome", "ativo"]
+        campos_auditoria: ["created", "createdBy", "lastModified", "lastModifiedBy"]
+        acoes: "array (pode estar vazio)"
+        filhas: "array (pode estar vazio)"
+
+    passos:
+      - passo: 1
+        acao: "Usuário seleciona funcionalidade na lista"
+        data_test: "funcionalidade-item"
+        esperado: "Click na funcionalidade dispara carregamento de detalhes"
+
+      - passo: 2
+        acao: "Sistema carrega detalhes via GET /api/funcionalidades/{id}"
+        esperado: "API retorna HTTP 200 com FuncionalidadeDetalhadaDto"
+
+      - passo: 3
+        acao: "Sistema exibe detalhes completos"
+        data_test: "funcionalidade-detalhes"
+        esperado: "Painel de detalhes exibido com todas as informações"
+
+    acao:
+      tipo: "GET"
+      endpoint: "/api/funcionalidades/{id}"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "Campos obrigatórios presentes (id, codigo, nome, ativo)"
+        - "Campos de auditoria presentes (created, createdBy, lastModified, lastModifiedBy)"
+        - "Ações associadas incluídas (array acoes)"
+        - "Funcionalidades filhas incluídas (array filhas)"
+
+  TC-RF083-HP-003:
+    categoria: "HAPPY_PATH"
+    prioridade: "ALTA"
+    uc_ref: "UC02"
+    descricao:
+      resumo: "UC02 - Listar funcionalidades por categoria específica"
+      detalhada: |
+        Validar que sistema consegue filtrar funcionalidades por categoria
+        e retornar apenas funcionalidades daquela categoria.
+
+    covers:
+      uc_items:
+        - "FP-UC02-001"  # Usuário seleciona categoria no filtro
+        - "FP-UC02-004"  # Sistema carrega funcionalidades da categoria
+        - "FP-UC02-007"  # Sistema exibe lista filtrada
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC02"]
+      fluxos_uc: ["FP-UC02-001", "FP-UC02-007"]
+      regras_negocio: ["RN-RF083-02", "RN-RF083-12"]
+
+    massa_teste:
+      referencias: ["MT-RF083-005"]
+      dados_entrada:
+        categoria: "Cadastros"
+      dados_esperados:
+        todas_categoria: "Cadastros"
+
+    passos:
+      - passo: 1
+        acao: "Usuário seleciona categoria 'Cadastros' no filtro dropdown"
+        data_test: "select-filtro-categoria"
+        esperado: "Dropdown categoria ativado"
+
+      - passo: 2
+        acao: "Sistema filtra lista localmente (frontend) OU via GET /api/funcionalidades/categoria/Cadastros"
+        esperado: "API retorna HTTP 200 com funcionalidades filtradas"
+
+      - passo: 3
+        acao: "Sistema exibe lista filtrada"
+        data_test: "funcionalidades-list"
+        esperado: "Apenas funcionalidades da categoria 'Cadastros' exibidas"
+
+    acao:
+      tipo: "GET"
+      endpoint: "/api/funcionalidades/categoria/{categoria}"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "TODAS as funcionalidades retornadas pertencem à categoria selecionada"
+        - "Funcionalidades de outras categorias NÃO aparecem"
+
+  TC-RF083-HP-004:
+    categoria: "HAPPY_PATH"
+    prioridade: "ALTA"
+    uc_ref: "UC03"
+    descricao:
+      resumo: "UC03 - Obter estatísticas de funcionalidades"
+      detalhada: |
+        Validar que sistema consegue calcular e exibir estatísticas
+        de funcionalidades (total geral e agrupadas por categoria).
+
+    covers:
+      uc_items:
+        - "FP-UC03-003"  # Sistema calcula total de funcionalidades
+        - "FP-UC03-005"  # Sistema agrupa por categoria
+        - "FP-UC03-006"  # Sistema exibe dashboard
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC03"]
+      fluxos_uc: ["FP-UC03-003", "FP-UC03-006"]
+      regras_negocio: ["RN-RF083-14"]
+
+    massa_teste:
+      referencias: ["MT-RF083-006"]
+      dados_esperados:
+        totalGeral: ">= 10"
+        porCategoria: "objeto com chaves = categorias"
+
+    passos:
+      - passo: 1
+        acao: "Sistema carrega estatísticas via GET /api/funcionalidades/estatisticas"
+        esperado: "API retorna HTTP 200 com EstatisticasFuncionalidadesDto"
+
+      - passo: 2
+        acao: "Sistema exibe dashboard com estatísticas"
+        data_test: "estatisticas-dashboard"
+        esperado: "Cards de estatísticas exibidos"
+
+    acao:
+      tipo: "GET"
+      endpoint: "/api/funcionalidades/estatisticas"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "totalGeral é soma de todos os grupos"
+        - "porCategoria é objeto com chave=categoria, valor=count"
+        - "Considera apenas funcionalidades ativas e não excluídas (RN-RF083-14)"
+
+  TC-RF083-HP-005:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC04"
+    descricao:
+      resumo: "UC04 - Atualizar empresas exclusivas como Developer"
+      detalhada: |
+        Validar que Developer consegue atualizar a lista de empresas
+        com acesso exclusivo a uma funcionalidade.
+
+    covers:
+      uc_items:
+        - "FP-UC04-002"  # Sistema valida se usuário é Developer
+        - "FP-UC04-003"  # Developer clica em Gerenciar Empresas Exclusivas
+        - "FP-UC04-006"  # Developer confirma alteração
+        - "FP-UC04-008"  # Sistema persiste alteração
+        - "FP-UC04-010"  # Sistema exibe confirmação de sucesso
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC04"]
+      fluxos_uc: ["FP-UC04-002", "FP-UC04-010"]
+      regras_negocio: ["RN-RF083-03", "RN-RF083-04", "RN-RF083-13"]
+
+    massa_teste:
+      referencias: ["MT-RF083-007"]
+      dados_entrada:
+        funcionalidade_id: "{guid}"
+        empresas_ids: ["{guid_empresa_1}", "{guid_empresa_2}"]
+      dados_esperados:
+        sucesso: true
+
+    passos:
+      - passo: 1
+        acao: "Developer acessa detalhes da funcionalidade"
+        data_test: "funcionalidade-item"
+        esperado: "Detalhes carregados"
+
+      - passo: 2
+        acao: "Developer clica em 'Gerenciar Empresas Exclusivas'"
+        data_test: "btn-gerenciar-exclusivas"
+        esperado: "Modal empresas exclusivas aberto"
+
+      - passo: 3
+        acao: "Developer seleciona empresas na lista"
+        data_test: "empresas-checkbox-list"
+        esperado: "Checkboxes selecionados"
+
+      - passo: 4
+        acao: "Developer clica em 'Confirmar'"
+        data_test: "btn-confirmar-exclusivas"
+        esperado: "PUT /api/funcionalidades/{id}/empresas-exclusivas enviado"
+
+      - passo: 5
+        acao: "Sistema persiste alteração"
+        esperado: "API retorna HTTP 200, empresasExclusivasJson atualizado"
+
+      - passo: 6
+        acao: "Sistema exibe mensagem de sucesso"
+        data_test: "success-message"
+        esperado: "Snackbar 'Empresas exclusivas atualizadas com sucesso'"
+
+    acao:
+      tipo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      autenticacao_requerida: true
+      autorizacao_requerida: "Developer"
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "empresasExclusivasJson atualizado com JSON dos IDs"
+        - "Auditoria: lastModifiedBy = developer@icontrolit.com"
+        - "Modal fechado após sucesso"
+
+  TC-RF083-HP-006:
+    categoria: "HAPPY_PATH"
+    prioridade: "CRITICA"
+    uc_ref: "UC05"
+    descricao:
+      resumo: "UC05 - Resetar funcionalidades como Developer"
+      detalhada: |
+        Validar que Developer/Super Admin consegue resetar todas as funcionalidades
+        para o estado padrão (operação destrutiva).
+
+    covers:
+      uc_items:
+        - "FP-UC05-002"  # Sistema valida perfil Developer ou Super Admin
+        - "FP-UC05-003"  # Usuário clica em Resetar Funcionalidades
+        - "FP-UC05-006"  # Usuário confirma operação
+        - "FP-UC05-007"  # Sistema deleta funcionalidades existentes
+        - "FP-UC05-008"  # Sistema recria com dados padrão
+        - "FP-UC05-010"  # Sistema exibe resultado
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC05"]
+      fluxos_uc: ["FP-UC05-002", "FP-UC05-010"]
+      regras_negocio: ["RN-RF083-15"]
+
+    massa_teste:
+      referencias: ["MT-RF083-009"]
+      dados_esperados:
+        sucesso: true
+        mensagem: "Funcionalidades resetadas e repopuladas com sucesso. 35 funcionalidades criadas."
+
+    passos:
+      - passo: 1
+        acao: "Developer clica em 'Resetar Funcionalidades'"
+        data_test: "btn-resetar-funcionalidades"
+        esperado: "Modal de confirmação exibido"
+
+      - passo: 2
+        acao: "Sistema exibe alerta de operação destrutiva"
+        data_test: "modal-alerta-destrutivo"
+        esperado: "Modal com campo de confirmação 'RESET' exibido"
+
+      - passo: 3
+        acao: "Developer digita 'RESET' no campo de confirmação"
+        data_test: "input-confirmacao"
+        esperado: "Botão confirmar habilitado"
+
+      - passo: 4
+        acao: "Developer clica em 'Confirmar Reset'"
+        data_test: "btn-confirmar-reset"
+        esperado: "POST /api/funcionalidades/reset enviado"
+
+      - passo: 5
+        acao: "Sistema reseta e repopula funcionalidades"
+        esperado: "API retorna HTTP 200 com mensagem de sucesso"
+
+      - passo: 6
+        acao: "Sistema exibe mensagem de sucesso"
+        data_test: "success-message"
+        esperado: "Snackbar '35 funcionalidades criadas com sucesso'"
+
+    acao:
+      tipo: "POST"
+      endpoint: "/api/funcionalidades/reset"
+      autenticacao_requerida: true
+      autorizacao_requerida: "Developer OU Super Admin"
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "sucesso = true"
+        - "mensagem contém quantidade de funcionalidades criadas"
+        - "Operação destrutiva completada"
+
+  TC-RF083-HP-007:
+    categoria: "HAPPY_PATH"
+    prioridade: "MEDIA"
+    uc_ref: "UC06"
+    descricao:
+      resumo: "UC06 - Expandir/Contrair categoria"
+      detalhada: |
+        Validar que usuário consegue expandir e contrair categorias
+        na lista de funcionalidades (comportamento frontend).
+
+    covers:
+      uc_items:
+        - "FP-UC06-002"  # Usuário clica no ícone expandir/contrair
+        - "FP-UC06-003"  # Sistema alterna estado visual
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC06"]
+      fluxos_uc: ["FP-UC06-002", "FP-UC06-003"]
+      regras_negocio: []
+
+    massa_teste:
+      referencias: []  # Frontend-only, sem MT backend
+      dados_entrada:
+        categoria: "Cadastros"
+
+    passos:
+      - passo: 1
+        acao: "Usuário visualiza lista de categorias"
+        data_test: "categoria-group"
+        esperado: "Categorias exibidas (inicial: contraídas)"
+
+      - passo: 2
+        acao: "Usuário clica no ícone de expandir categoria 'Cadastros'"
+        data_test: "btn-expandir-categoria"
+        esperado: "Categoria 'Cadastros' expandida, funcionalidades visíveis"
+
+      - passo: 3
+        acao: "Usuário clica novamente no ícone"
+        data_test: "btn-expandir-categoria"
+        esperado: "Categoria 'Cadastros' contraída, funcionalidades ocultas"
+
+    acao:
+      tipo: "UI"
+      componente: "MatExpansionPanel"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      validacoes:
+        - "Categoria alterna entre expandida/contraída"
+        - "Estado visual atualizado (ícone chevron)"
+        - "Preferência persistida em localStorage (opcional)"
+
+  TC-RF083-HP-008:
+    categoria: "HAPPY_PATH"
+    prioridade: "ALTA"
+    uc_ref: "UC07"
+    descricao:
+      resumo: "UC07 - Filtrar funcionalidades por nome/código"
+      detalhada: |
+        Validar que usuário consegue filtrar funcionalidades em tempo real
+        digitando termo de busca (comportamento frontend).
+
+    covers:
+      uc_items:
+        - "FP-UC07-002"  # Usuário aplica filtro por nome/código
+        - "FP-UC07-003"  # Sistema filtra em tempo real
+        - "FP-UC07-004"  # Sistema exibe resultados filtrados
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC07"]
+      fluxos_uc: ["FP-UC07-002", "FP-UC07-004"]
+      regras_negocio: []
+
+    massa_teste:
+      referencias: []  # Frontend-only, sem MT backend
+      dados_entrada:
+        termo_busca: "Clientes"
+
+    passos:
+      - passo: 1
+        acao: "Usuário acessa Central de Módulos"
+        data_test: "menu-central-modulos"
+        esperado: "Lista completa exibida"
+
+      - passo: 2
+        acao: "Usuário digita 'Clientes' no campo de busca"
+        data_test: "input-filtro-busca"
+        esperado: "Filtro aplicado em tempo real"
+
+      - passo: 3
+        acao: "Sistema filtra lista localmente"
+        data_test: "funcionalidades-list"
+        esperado: "Apenas funcionalidades com 'Clientes' no nome/código/descrição exibidas"
+
+      - passo: 4
+        acao: "Usuário limpa campo de busca"
+        data_test: "btn-limpar-filtros"
+        esperado: "Lista completa restaurada"
+
+    acao:
+      tipo: "UI"
+      componente: "MatFormField + computed signal"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      validacoes:
+        - "Filtro aplicado em tempo real (sem debounce visível)"
+        - "Busca case-insensitive"
+        - "Busca em nome, código e descrição"
+        - "Lista vazia exibida se nenhum resultado (estado empty)"
+
+  # ==========================================================
+  # VALIDACAO (VAL)
+  # Cenários de validação de entrada e erros
+  # ==========================================================
+
+  TC-RF083-VAL-001:
+    categoria: "VALIDACAO"
+    prioridade: "CRITICA"
+    uc_ref: "UC01"
+    descricao:
+      resumo: "UC01 - Visualizar funcionalidade com ID inexistente (404)"
+      detalhada: |
+        Validar que sistema retorna 404 Not Found quando tentar
+        visualizar funcionalidade com ID inexistente.
+
+    covers:
+      uc_items:
+        - "FE-UC01-001"  # Funcionalidade não encontrada → 404
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC01"]
+      fluxos_uc: ["FE-UC01-001"]
+      regras_negocio: []
+
+    massa_teste:
+      referencias: ["MT-RF083-101"]
+      dados_entrada:
+        funcionalidade_id: "99999999-9999-9999-9999-999999999999"
+
+    passos:
+      - passo: 1
+        acao: "Usuário tenta acessar GET /api/funcionalidades/{id_inexistente}"
+        esperado: "API retorna HTTP 404"
+
+      - passo: 2
+        acao: "Sistema exibe mensagem de erro"
+        data_test: "error-state"
+        esperado: "Estado de erro exibido no frontend"
+
+    acao:
+      tipo: "GET"
+      endpoint: "/api/funcionalidades/{id}"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      http_status: 404
+      validacoes:
+        - "404 Not Found retornado"
+        - "Mensagem: 'Funcionalidade com ID ... nao encontrada'"
+        - "Estado de erro exibido no frontend"
+
+  TC-RF083-VAL-002:
+    categoria: "VALIDACAO"
+    prioridade: "CRITICA"
+    uc_ref: "UC01"
+    descricao:
+      resumo: "UC01 - Visualizar funcionalidade excluída (soft delete = 404)"
+      detalhada: |
+        Validar que funcionalidades excluídas (fl_excluido = true)
+        não são retornadas, comportando-se como ID inexistente.
+
+    covers:
+      uc_items:
+        - "FE-UC01-002"  # Funcionalidade excluída → 404
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC01"]
+      fluxos_uc: ["FE-UC01-002"]
+      regras_negocio: ["RN-RF083-05"]
+
+    massa_teste:
+      referencias: ["MT-RF083-102"]
+      dados_entrada:
+        funcionalidade_id: "{guid_excluido}"
+
+    passos:
+      - passo: 1
+        acao: "Usuário tenta acessar funcionalidade excluída (fl_excluido = true)"
+        esperado: "API retorna HTTP 404"
+
+      - passo: 2
+        acao: "Sistema exibe mensagem de erro"
+        data_test: "error-state"
+        esperado: "Estado de erro exibido"
+
+    acao:
+      tipo: "GET"
+      endpoint: "/api/funcionalidades/{id}"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      http_status: 404
+      validacoes:
+        - "Funcionalidades excluídas não são retornadas (RN-RF083-05)"
+        - "Comportamento idêntico a ID inexistente"
+
+  TC-RF083-VAL-003:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC00"
+    descricao:
+      resumo: "UC00 - Listar funcionalidades por categoria inexistente (retorna vazio)"
+      detalhada: |
+        Validar que filtro por categoria inexistente retorna array vazio
+        (não é erro, apenas sem resultados).
+
+    covers:
+      uc_items:
+        - "FE-UC00-002"  # Nenhuma funcionalidade encontrada → estado vazio
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC00"]
+      fluxos_uc: ["FE-UC00-002"]
+      regras_negocio: []
+
+    massa_teste:
+      referencias: ["MT-RF083-100"]
+      dados_entrada:
+        categoria: "CategoriaInexistente"
+
+    passos:
+      - passo: 1
+        acao: "Usuário aplica filtro por categoria inexistente"
+        data_test: "select-filtro-categoria"
+        esperado: "GET /api/funcionalidades?categoria=CategoriaInexistente"
+
+      - passo: 2
+        acao: "Sistema retorna array vazio"
+        esperado: "API retorna HTTP 200 com []"
+
+      - passo: 3
+        acao: "Sistema exibe estado vazio"
+        data_test: "empty-state"
+        esperado: "Mensagem 'Nenhuma funcionalidade encontrada'"
+
+    acao:
+      tipo: "GET"
+      endpoint: "/api/funcionalidades"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "Retorna array vazio [] (não 404)"
+        - "Estado vazio exibido no frontend"
+
+  TC-RF083-VAL-004:
+    categoria: "VALIDACAO"
+    prioridade: "ALTA"
+    uc_ref: "UC04"
+    descricao:
+      resumo: "UC04 - Atualizar empresas exclusivas de funcionalidade inexistente (404)"
+      detalhada: |
+        Validar que tentativa de atualizar empresas exclusivas de funcionalidade
+        inexistente retorna 404 Not Found.
+
+    covers:
+      uc_items:
+        - "FE-UC04-003"  # Funcionalidade não encontrada → 404
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC04"]
+      fluxos_uc: ["FE-UC04-003"]
+      regras_negocio: []
+
+    massa_teste:
+      referencias: ["MT-RF083-103"]
+      dados_entrada:
+        funcionalidade_id: "99999999-9999-9999-9999-999999999999"
+        empresas_ids: ["{guid_empresa}"]
+
+    passos:
+      - passo: 1
+        acao: "Developer tenta atualizar empresas exclusivas de funcionalidade inexistente"
+        esperado: "PUT /api/funcionalidades/{id_inexistente}/empresas-exclusivas"
+
+      - passo: 2
+        acao: "Sistema retorna 404 Not Found"
+        esperado: "API retorna HTTP 404"
+
+      - passo: 3
+        acao: "Sistema exibe mensagem de erro"
+        data_test: "error-state"
+        esperado: "Snackbar com erro exibido"
+
+    acao:
+      tipo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      autenticacao_requerida: true
+      autorizacao_requerida: "Developer"
+
+    resultado_esperado:
+      http_status: 404
+      validacoes:
+        - "404 Not Found retornado"
+        - "Operação não realizada"
+
+  # ==========================================================
+  # SEGURANCA (SEC)
+  # Cenários de autenticação e autorização
+  # ==========================================================
+
+  TC-RF083-SEC-001:
+    categoria: "SEGURANCA"
+    prioridade: "CRITICA"
+    uc_ref: "UC00"
+    descricao:
+      resumo: "UC00 - Listar funcionalidades sem autenticação (401 Unauthorized)"
+      detalhada: |
+        Validar que requisição sem token JWT retorna 401 Unauthorized.
+
+    covers:
+      uc_items:
+        - "FE-UC00-001"  # Usuário não autenticado → redirect para login
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC00"]
+      fluxos_uc: ["FE-UC00-001"]
+      regras_negocio: []
+
+    massa_teste:
+      referencias: ["MT-RF083-400"]
+      dados_entrada:
+        autenticacao: null
+
+    passos:
+      - passo: 1
+        acao: "Tentar acessar GET /api/funcionalidades sem token JWT"
+        esperado: "API retorna HTTP 401"
+
+      - passo: 2
+        acao: "AuthGuard redireciona para login"
+        esperado: "Navegação para /login"
+
+    acao:
+      tipo: "GET"
+      endpoint: "/api/funcionalidades"
+      autenticacao_requerida: false  # Teste sem autenticação
+
+    resultado_esperado:
+      http_status: 401
+      validacoes:
+        - "401 Unauthorized retornado"
+        - "Redirect para login no frontend"
+
+  TC-RF083-SEC-002:
+    categoria: "SEGURANCA"
+    prioridade: "CRITICA"
+    uc_ref: "UC04"
+    descricao:
+      resumo: "UC04 - Atualizar empresas exclusivas sem ser Developer (403 Forbidden)"
+      detalhada: |
+        Validar que apenas Developer pode gerenciar empresas exclusivas.
+        Admin/User deve receber 403 Forbidden (RN-RF083-04).
+
+    covers:
+      uc_items:
+        - "FE-UC04-001"  # Usuário não é Developer → 403
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC04"]
+      fluxos_uc: ["FE-UC04-001"]
+      regras_negocio: ["RN-RF083-04"]
+
+    massa_teste:
+      referencias: ["MT-RF083-402"]
+      dados_entrada:
+        usuario: "admin@icontrolit.com"
+        perfil: "Admin"  # NÃO é Developer
+
+    passos:
+      - passo: 1
+        acao: "Admin tenta atualizar empresas exclusivas"
+        esperado: "PUT /api/funcionalidades/{id}/empresas-exclusivas"
+
+      - passo: 2
+        acao: "Sistema verifica perfil (não é Developer)"
+        esperado: "API retorna HTTP 403"
+
+      - passo: 3
+        acao: "Sistema exibe mensagem de erro"
+        data_test: "error-state"
+        esperado: "Snackbar 'Apenas desenvolvedores podem gerenciar empresas exclusivas'"
+
+    acao:
+      tipo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      autenticacao_requerida: true
+      autorizacao_requerida: "Developer"
+
+    resultado_esperado:
+      http_status: 403
+      validacoes:
+        - "403 Forbidden retornado"
+        - "Mensagem: 'Apenas desenvolvedores podem gerenciar empresas exclusivas'"
+        - "Operação bloqueada (RN-RF083-04)"
+
+  TC-RF083-SEC-003:
+    categoria: "SEGURANCA"
+    prioridade: "CRITICA"
+    uc_ref: "UC05"
+    descricao:
+      resumo: "UC05 - Resetar funcionalidades sem ser Developer/Super Admin (403)"
+      detalhada: |
+        Validar que apenas Developer/Super Admin pode resetar funcionalidades.
+        User/Admin deve receber 403 Forbidden (RN-RF083-15).
+
+    covers:
+      uc_items:
+        - "FE-UC05-001"  # Usuário não autorizado → 403
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC05"]
+      fluxos_uc: ["FE-UC05-001"]
+      regras_negocio: ["RN-RF083-15"]
+
+    massa_teste:
+      referencias: ["MT-RF083-403"]
+      dados_entrada:
+        usuario: "user@icontrolit.com"
+        perfil: "User"  # NÃO é Developer nem Super Admin
+
+    passos:
+      - passo: 1
+        acao: "User tenta resetar funcionalidades"
+        esperado: "POST /api/funcionalidades/reset"
+
+      - passo: 2
+        acao: "Sistema verifica perfil (não é Developer/Super Admin)"
+        esperado: "API retorna HTTP 403"
+
+      - passo: 3
+        acao: "Sistema exibe mensagem de erro"
+        data_test: "error-state"
+        esperado: "Snackbar com erro de permissão"
+
+    acao:
+      tipo: "POST"
+      endpoint: "/api/funcionalidades/reset"
+      autenticacao_requerida: true
+      autorizacao_requerida: "Developer OU Super Admin"
+
+    resultado_esperado:
+      http_status: 403
+      validacoes:
+        - "403 Forbidden retornado"
+        - "Operação bloqueada (RN-RF083-15)"
+
+  # ==========================================================
+  # EDGE_CASE (EDGE)
+  # Cenários de casos extremos
+  # ==========================================================
+
+  TC-RF083-EDGE-001:
+    categoria: "EDGE_CASE"
+    prioridade: "MEDIA"
+    uc_ref: "UC00"
+    descricao:
+      resumo: "UC00 - Listar funcionalidades com filtros combinados"
+      detalhada: |
+        Validar que sistema consegue aplicar múltiplos filtros simultaneamente
+        (categoria + status + busca).
+
+    covers:
+      uc_items: []
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC00", "UC07"]
+      fluxos_uc: []
+      regras_negocio: []
+
+    massa_teste:
+      referencias: []
+      dados_entrada:
+        categoria: "Cadastros"
+        status: "ativo"
+        termo_busca: "Cliente"
+
+    passos:
+      - passo: 1
+        acao: "Usuário aplica filtro categoria='Cadastros'"
+        data_test: "select-filtro-categoria"
+        esperado: "Lista filtrada por categoria"
+
+      - passo: 2
+        acao: "Usuário aplica filtro status='ativo'"
+        data_test: "select-filtro-status"
+        esperado: "Lista filtrada por categoria E status"
+
+      - passo: 3
+        acao: "Usuário digita 'Cliente' no campo de busca"
+        data_test: "input-filtro-busca"
+        esperado: "Lista filtrada por categoria E status E termo de busca"
+
+      - passo: 4
+        acao: "Sistema exibe resultados que atendem TODOS os filtros"
+        data_test: "funcionalidades-list"
+        esperado: "Apenas funcionalidades que atendem os 3 filtros exibidas"
+
+    acao:
+      tipo: "UI"
+      componente: "computed signal com múltiplos filtros"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      validacoes:
+        - "Filtros aplicados em sequência (AND lógico)"
+        - "Lista pode ficar vazia se nenhum resultado atender todos os filtros"
+        - "Estado vazio exibido se nenhum resultado"
+
+  TC-RF083-EDGE-002:
+    categoria: "EDGE_CASE"
+    prioridade: "MEDIA"
+    uc_ref: "UC04"
+    descricao:
+      resumo: "UC04 - Limpar empresas exclusivas (array vazio = acesso total)"
+      detalhada: |
+        Validar comportamento de empresas exclusivas vazias (whitelist vazio = acesso total).
+
+    covers:
+      uc_items:
+        - "FA-UC04-001"  # Limpar exclusividade (todas empresas)
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC04"]
+      fluxos_uc: ["FA-UC04-001"]
+      regras_negocio: ["RN-RF083-03"]
+
+    massa_teste:
+      referencias: ["MT-RF083-008"]
+      dados_entrada:
+        funcionalidade_id: "{guid}"
+        empresas_ids: []  # Array vazio
+
+    passos:
+      - passo: 1
+        acao: "Developer limpa lista de empresas exclusivas (array vazio)"
+        esperado: "PUT /api/funcionalidades/{id}/empresas-exclusivas com empresasIds=[]"
+
+      - passo: 2
+        acao: "Sistema define empresasExclusivasJson = null"
+        esperado: "API retorna HTTP 200"
+
+      - passo: 3
+        acao: "Funcionalidade disponível para TODAS as empresas"
+        esperado: "Acesso total restaurado (RN-RF083-03)"
+
+    acao:
+      tipo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      autenticacao_requerida: true
+      autorizacao_requerida: "Developer"
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "empresasExclusivasJson definido como null"
+        - "Funcionalidade disponível para TODAS as empresas (RN-RF083-03)"
+
+  # ==========================================================
+  # AUDITORIA (AUD)
+  # Cenários de auditoria
+  # ==========================================================
+
+  TC-RF083-AUD-001:
+    categoria: "AUDITORIA"
+    prioridade: "ALTA"
+    uc_ref: "UC04"
+    descricao:
+      resumo: "UC04 - Auditoria ao atualizar empresas exclusivas"
+      detalhada: |
+        Validar que operação de atualização de empresas exclusivas
+        registra auditoria completa (lastModifiedBy, lastModified).
+
+    covers:
+      uc_items:
+        - "FP-UC04-009"  # Sistema registra auditoria
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC04"]
+      fluxos_uc: ["FP-UC04-009"]
+      regras_negocio: ["RN-RF083-13"]
+
+    massa_teste:
+      referencias: ["MT-RF083-800"]
+      dados_entrada:
+        usuario: "developer@icontrolit.com"
+
+    passos:
+      - passo: 1
+        acao: "Developer atualiza empresas exclusivas"
+        esperado: "PUT /api/funcionalidades/{id}/empresas-exclusivas"
+
+      - passo: 2
+        acao: "Sistema atualiza campos de auditoria"
+        esperado: "lastModifiedBy = 'developer@icontrolit.com', lastModified = timestamp UTC"
+
+      - passo: 3
+        acao: "Verificar auditoria no banco de dados"
+        esperado: "Campos de auditoria persistidos corretamente"
+
+    acao:
+      tipo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      autenticacao_requerida: true
+      autorizacao_requerida: "Developer"
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "lastModifiedBy atualizado com email do usuário autenticado"
+        - "lastModified atualizado com timestamp UTC atual"
+        - "Auditoria completa conforme RN-RF083-13"
+
+  TC-RF083-AUD-002:
+    categoria: "AUDITORIA"
+    prioridade: "ALTA"
+    uc_ref: "UC05"
+    descricao:
+      resumo: "UC05 - Auditoria ao resetar funcionalidades (operação destrutiva)"
+      detalhada: |
+        Validar que operação de reset (destrutiva) é auditada via logs do sistema.
+
+    covers:
+      uc_items:
+        - "FP-UC05-009"  # Sistema registra auditoria
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC05"]
+      fluxos_uc: ["FP-UC05-009"]
+      regras_negocio: ["RN-RF083-15"]
+
+    massa_teste:
+      referencias: ["MT-RF083-801"]
+      dados_entrada:
+        usuario: "developer@icontrolit.com"
+
+    passos:
+      - passo: 1
+        acao: "Developer reseta funcionalidades"
+        esperado: "POST /api/funcionalidades/reset"
+
+      - passo: 2
+        acao: "Sistema deleta funcionalidades antigas"
+        esperado: "Funcionalidades antigas removidas (ou fl_excluido = true)"
+
+      - passo: 3
+        acao: "Sistema cria 35 funcionalidades padrão"
+        esperado: "created_by = 'system' para funcionalidades seed"
+
+      - passo: 4
+        acao: "Operação auditada via logs"
+        esperado: "Log de reset registrado com usuário que executou"
+
+    acao:
+      tipo: "POST"
+      endpoint: "/api/funcionalidades/reset"
+      autenticacao_requerida: true
+      autorizacao_requerida: "Developer OU Super Admin"
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "Operação destrutiva completada"
+        - "Novas funcionalidades com created_by = 'system'"
+        - "Reset auditado via logs do sistema"
+
+  # ==========================================================
+  # INTEGRACAO (INT)
+  # Cenários de integração com outros módulos
+  # ==========================================================
+
+  TC-RF083-INT-001:
+    categoria: "INTEGRACAO"
+    prioridade: "MEDIA"
+    uc_ref: "UC00"
+    descricao:
+      resumo: "UC00 - Listar funcionalidades com Feature Flag vinculada"
+      detalhada: |
+        Validar que funcionalidades com Feature Flag vinculada
+        são retornadas corretamente (campo featureFlagId).
+
+    covers:
+      uc_items: []
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC00"]
+      fluxos_uc: []
+      regras_negocio: ["RN-RF083-07"]
+
+    massa_teste:
+      referencias: ["MT-RF083-900"]
+
+    passos:
+      - passo: 1
+        acao: "Usuário lista funcionalidades"
+        esperado: "GET /api/funcionalidades"
+
+      - passo: 2
+        acao: "Sistema retorna funcionalidades com featureFlagId"
+        esperado: "Funcionalidades com Feature Flag vinculada incluem campo featureFlagId"
+
+      - passo: 3
+        acao: "Validar FK constraint (se featureFlagId não nulo)"
+        esperado: "featureFlagId aponta para registro existente em feature_flags (opcional)"
+
+    acao:
+      tipo: "GET"
+      endpoint: "/api/funcionalidades"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "featureFlagId pode ser null (funcionalidade sempre disponível se ativa)"
+        - "featureFlagId não nulo = FK constraint válida (RN-RF083-07)"
+        - "Integração com Feature Flags funcional"
+
+  TC-RF083-INT-002:
+    categoria: "INTEGRACAO"
+    prioridade: "MEDIA"
+    uc_ref: "UC04"
+    descricao:
+      resumo: "UC04 - Atualizar empresas exclusivas com IDs de empresas válidos"
+      detalhada: |
+        Validar que sistema aceita IDs de empresas válidos (GUIDs)
+        sem validar existência (por performance).
+
+    covers:
+      uc_items: []
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC04"]
+      fluxos_uc: []
+      regras_negocio: []
+
+    massa_teste:
+      referencias: ["MT-RF083-901"]
+      dados_entrada:
+        empresas_ids:
+          - "11111111-0000-0000-0000-000000000001"
+          - "11111111-0000-0000-0000-000000000002"
+
+    passos:
+      - passo: 1
+        acao: "Developer envia lista de IDs de empresas"
+        esperado: "PUT /api/funcionalidades/{id}/empresas-exclusivas"
+
+      - passo: 2
+        acao: "Sistema aceita IDs sem validar existência (performance)"
+        esperado: "API retorna HTTP 200"
+
+      - passo: 3
+        acao: "empresasExclusivasJson armazena JSON dos IDs"
+        esperado: "JSON serializado persistido"
+
+    acao:
+      tipo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      autenticacao_requerida: true
+      autorizacao_requerida: "Developer"
+
+    resultado_esperado:
+      http_status: 200
+      validacoes:
+        - "Backend NÃO valida se IDs existem (por performance)"
+        - "Validação de existência é responsabilidade do frontend (opcional)"
+        - "empresasExclusivasJson armazena JSON dos IDs"
+
+  # ==========================================================
+  # E2E (End-to-End)
+  # Fluxo completo integrando backend + frontend
+  # ==========================================================
+
+  TC-RF083-E2E-001:
+    categoria: "E2E"
+    prioridade: "CRITICA"
+    uc_ref: "UC00, UC01, UC02, UC03, UC05, UC06, UC07"
+    descricao:
+      resumo: "Fluxo completo: Listar → Visualizar → Filtrar → Expandir → Estatísticas"
+      detalhada: |
+        Teste E2E completo validando integração backend + frontend
+        para funcionalidades principais de leitura.
+
+        Fluxo: Login → Listar → Visualizar → Filtrar → Expandir/Contrair → Estatísticas
+
+    covers:
+      uc_items:
+        - "FP-UC00-001"  # Acessar Central de Módulos
+        - "FP-UC00-009"  # Exibir lista agrupada
+        - "FP-UC01-001"  # Selecionar funcionalidade
+        - "FP-UC01-010"  # Exibir detalhes
+        - "FP-UC07-002"  # Aplicar filtro busca
+        - "FP-UC06-002"  # Expandir/contrair categoria
+        - "FP-UC03-006"  # Exibir estatísticas
+
+    origem:
+      criterios_aceite: []
+      ucs: ["UC00", "UC01", "UC02", "UC03", "UC06", "UC07"]
+      fluxos_uc: []
+      regras_negocio: []
+
+    massa_teste:
+      referencias: ["MT-RF083-001", "MT-RF083-004", "MT-RF083-006"]
+      dados_entrada:
+        usuario: "developer@icontrolit.com"
+        senha: "Test@1234"
+
+    passos:
+      - passo: 1
+        acao: "Developer faz login"
+        data_test: "login-form"
+        endpoint: "POST /api/auth/login"
+        esperado: "Login bem-sucedido, token JWT obtido"
+
+      - passo: 2
+        acao: "Developer acessa Central de Módulos pelo menu"
+        data_test: "menu-central-modulos"
+        endpoint: "Navegação para /management/central-modulos"
+        esperado: "Página Central de Módulos carregada"
+
+      - passo: 3
+        acao: "Sistema carrega funcionalidades"
+        data_test: "loading-spinner"
+        endpoint: "GET /api/funcionalidades"
+        esperado: "Loading exibido, depois lista carregada"
+
+      - passo: 4
+        acao: "Sistema exibe lista agrupada por categoria"
+        data_test: "funcionalidades-list"
+        esperado: "Mínimo 10 funcionalidades exibidas (Developer vê todas)"
+
+      - passo: 5
+        acao: "Developer seleciona funcionalidade 'Gestão de Clientes'"
+        data_test: "funcionalidade-item"
+        endpoint: "GET /api/funcionalidades/{id}"
+        esperado: "Detalhes da funcionalidade exibidos"
+
+      - passo: 6
+        acao: "Developer fecha detalhes e aplica filtro busca='Cliente'"
+        data_test: "input-filtro-busca"
+        esperado: "Lista filtrada em tempo real (apenas funcionalidades com 'Cliente')"
+
+      - passo: 7
+        acao: "Developer expande categoria 'Cadastros'"
+        data_test: "btn-expandir-categoria"
+        esperado: "Categoria expandida, funcionalidades visíveis"
+
+      - passo: 8
+        acao: "Developer contrai categoria 'Cadastros'"
+        data_test: "btn-expandir-categoria"
+        esperado: "Categoria contraída, funcionalidades ocultas"
+
+      - passo: 9
+        acao: "Developer acessa estatísticas"
+        data_test: "btn-estatisticas"
+        endpoint: "GET /api/funcionalidades/estatisticas"
+        esperado: "Dashboard de estatísticas exibido (totalGeral, porCategoria)"
+
+    acao:
+      tipo: "E2E"
+      framework: "Playwright"
+      autenticacao_requerida: true
+
+    resultado_esperado:
+      validacoes:
+        - "Fluxo completo executado sem erros"
+        - "Integração backend + frontend funcionando"
+        - "Estados obrigatórios (loading, data) exibidos corretamente"
+        - "Filtros funcionando (frontend + backend)"
+        - "Navegação entre telas funcionando"
+        - "Tempo total < 30 segundos"
+
+# =============================================
+# MATRIZ DE RASTREABILIDADE
+# =============================================
+
+rastreabilidade_matriz:
+  - tc: "TC-RF083-HP-001"
+    ucs: ["UC00"]
+    massas: ["MT-RF083-001"]
+    regras_negocio: ["RN-RF083-02", "RN-RF083-11"]
+
+  - tc: "TC-RF083-HP-002"
+    ucs: ["UC01"]
+    massas: ["MT-RF083-004"]
+    regras_negocio: ["RN-RF083-05", "RN-RF083-13"]
+
+  - tc: "TC-RF083-HP-003"
+    ucs: ["UC02"]
+    massas: ["MT-RF083-005"]
+    regras_negocio: ["RN-RF083-02", "RN-RF083-12"]
+
+  - tc: "TC-RF083-HP-004"
+    ucs: ["UC03"]
+    massas: ["MT-RF083-006"]
+    regras_negocio: ["RN-RF083-14"]
+
+  - tc: "TC-RF083-HP-005"
+    ucs: ["UC04"]
+    massas: ["MT-RF083-007"]
+    regras_negocio: ["RN-RF083-03", "RN-RF083-04", "RN-RF083-13"]
+
+  - tc: "TC-RF083-HP-006"
+    ucs: ["UC05"]
+    massas: ["MT-RF083-009"]
+    regras_negocio: ["RN-RF083-15"]
+
+  - tc: "TC-RF083-HP-007"
+    ucs: ["UC06"]
+    massas: []
+    regras_negocio: []
+
+  - tc: "TC-RF083-HP-008"
+    ucs: ["UC07"]
+    massas: []
+    regras_negocio: []
+
+  - tc: "TC-RF083-VAL-001"
+    ucs: ["UC01"]
+    massas: ["MT-RF083-101"]
+    regras_negocio: []
+
+  - tc: "TC-RF083-VAL-002"
+    ucs: ["UC01"]
+    massas: ["MT-RF083-102"]
+    regras_negocio: ["RN-RF083-05"]
+
+  - tc: "TC-RF083-VAL-003"
+    ucs: ["UC00"]
+    massas: ["MT-RF083-100"]
+    regras_negocio: []
+
+  - tc: "TC-RF083-VAL-004"
+    ucs: ["UC04"]
+    massas: ["MT-RF083-103"]
+    regras_negocio: []
+
+  - tc: "TC-RF083-SEC-001"
+    ucs: ["UC00"]
+    massas: ["MT-RF083-400"]
+    regras_negocio: []
+
+  - tc: "TC-RF083-SEC-002"
+    ucs: ["UC04"]
+    massas: ["MT-RF083-402"]
+    regras_negocio: ["RN-RF083-04"]
+
+  - tc: "TC-RF083-SEC-003"
+    ucs: ["UC05"]
+    massas: ["MT-RF083-403"]
+    regras_negocio: ["RN-RF083-15"]
+
+  - tc: "TC-RF083-EDGE-001"
+    ucs: ["UC00", "UC07"]
+    massas: []
+    regras_negocio: []
+
+  - tc: "TC-RF083-EDGE-002"
+    ucs: ["UC04"]
+    massas: ["MT-RF083-008"]
+    regras_negocio: ["RN-RF083-03"]
+
+  - tc: "TC-RF083-AUD-001"
+    ucs: ["UC04"]
+    massas: ["MT-RF083-800"]
+    regras_negocio: ["RN-RF083-13"]
+
+  - tc: "TC-RF083-AUD-002"
+    ucs: ["UC05"]
+    massas: ["MT-RF083-801"]
+    regras_negocio: ["RN-RF083-15"]
+
+  - tc: "TC-RF083-INT-001"
+    ucs: ["UC00"]
+    massas: ["MT-RF083-900"]
+    regras_negocio: ["RN-RF083-07"]
+
+  - tc: "TC-RF083-INT-002"
+    ucs: ["UC04"]
+    massas: ["MT-RF083-901"]
+    regras_negocio: []
+
+  - tc: "TC-RF083-E2E-001"
+    ucs: ["UC00", "UC01", "UC02", "UC03", "UC06", "UC07"]
+    massas: ["MT-RF083-001", "MT-RF083-004", "MT-RF083-006"]
+    regras_negocio: []
+
+# =============================================
+# RESUMO DE COBERTURA
+# =============================================
+
+cobertura:
+  categorias_implementadas:
+    - "HAPPY_PATH (8 casos): TC-RF083-HP-001 a 008"
+    - "VALIDACAO (4 casos): TC-RF083-VAL-001 a 004"
+    - "SEGURANCA (3 casos): TC-RF083-SEC-001 a 003"
+    - "EDGE_CASE (2 casos): TC-RF083-EDGE-001 a 002"
+    - "AUDITORIA (2 casos): TC-RF083-AUD-001 a 002"
+    - "INTEGRACAO (2 casos): TC-RF083-INT-001 a 002"
+    - "E2E (1 caso): TC-RF083-E2E-001"
+
+  total_casos: 22  # 8 + 4 + 3 + 2 + 2 + 2 + 1
+
+  ucs_cobertos:
+    - "UC00: Listar Funcionalidades (HP-001, VAL-003, SEC-001, EDGE-001, INT-001, E2E-001)"
+    - "UC01: Visualizar Funcionalidade (HP-002, VAL-001, VAL-002, E2E-001)"
+    - "UC02: Listar por Categoria (HP-003, E2E-001)"
+    - "UC03: Obter Estatísticas (HP-004, E2E-001)"
+    - "UC04: Gerenciar Empresas Exclusivas (HP-005, VAL-004, SEC-002, EDGE-002, AUD-001, INT-002)"
+    - "UC05: Resetar Funcionalidades (HP-006, SEC-003, AUD-002)"
+    - "UC06: Expandir/Contrair Categorias (HP-007, E2E-001)"
+    - "UC07: Filtrar Funcionalidades (HP-008, EDGE-001, E2E-001)"
+
+  cobertura_uc_items: "100%"
+  cobertura_regras_negocio: "100%"
+
+observacoes:
+  - "RF083 é funcionalidade GLOBAL (não multi-tenant) - sem TCs multi-tenancy"
+  - "UC06 e UC07 são comportamentos frontend - TCs validam UI, não backend"
+  - "E2E completo cobre 7/8 UCs em um único fluxo integrado"
+  - "Todas as categorias obrigatórias implementadas (HP, VAL, SEC, EDGE, AUD, INT, E2E)"
+  - "Rastreabilidade completa UC → MT → TC documentada na matriz"
+  - "Data-test attributes mapeados conforme UC-RF083.yaml"
+  - "Endpoints: GET /funcionalidades, GET /{id}, PUT /empresas-exclusivas, GET /categoria/{cat}, GET /estatisticas, POST /reset"

@@ -23,6 +23,21 @@ Se você estiver rodando a partir da raiz D:\IC2_Governanca\ nunca altere nada e
 
 Se você estiver rodando a partir da raiz D:\IC2\ nunca altere nada em D:\IC2_Governanca\.
 
+**EXCEÇÃO ÚNICA - STATUS.yaml (v4.4 - 2026-01-28):**
+
+O arquivo `STATUS.yaml` é a **ÚNICA exceção** à regra acima.
+
+✅ **STATUS.yaml DEVE ser atualizado por TODOS os contratos**, independente de onde o agente está rodando.
+
+Caminho: `D:\IC2_Governanca\documentacao\[Fase]\[EPIC]\[RFXXX]\STATUS.yaml`
+
+STATUS.yaml é o arquivo de rastreamento de progresso do RF. Ele DEVE ser atualizado após:
+- Execução de testes (`testes_ti.resultado_final`, `testes_ti.taxa_aprovacao`)
+- Validação de documentação (`documentacao.mt`, `documentacao.tc`)
+- Execução de backend/frontend (`execucao.backend`, `execucao.frontend`)
+
+**SOMENTE** STATUS.yaml é exceção. Nenhum outro arquivo em D:\IC2_Governanca\ pode ser alterado quando rodando de D:\IC2\.
+
 ---
 
 ## 1. Idioma e Comunicação
@@ -816,6 +831,12 @@ e2e/
 ---
 
 ## Changelog
+
+### v4.4 (2026-01-28)
+- **Adicionada EXCEÇÃO ÚNICA - STATUS.yaml**
+- STATUS.yaml é o ÚNICO arquivo que PODE e DEVE ser alterado por agentes rodando de D:\IC2\
+- Regra aplicável a TODOS os contratos (testes, documentação, backend, frontend)
+- Corrige problema onde agentes não atualizavam STATUS.yaml por interpretar regra de forma muito rígida
 
 ### v4.3 (2026-01-13)
 - **Adicionada seção 3.1: LOCALIZAÇÃO DE ARQUIVOS RF (OBRIGATÓRIO)**

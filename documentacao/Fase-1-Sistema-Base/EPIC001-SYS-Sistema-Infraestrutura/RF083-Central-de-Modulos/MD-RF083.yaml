@@ -1,0 +1,1046 @@
+# =============================================
+# Modelo de Dados (MD) - RF083: Central de Modulos
+# Versao: 2.0
+# Data: 2026-01-30
+# Autor: Agencia ALC - alc.dev.br
+# =============================================
+# CHANGELOG:
+# v2.0 - Criacao inicial derivada de RF083, UC-RF083, WF-RF083
+# =============================================
+# NOTA ESPECIAL - MODULO DE SISTEMA:
+# Este RF documenta entidades GLOBAIS (nao isoladas por tenant).
+# O isolamento e feito por PERFIL (Developer/System/Tenant), nao por tenant_id.
+# Esta decisao arquitetural esta documentada em RF083.yaml.
+# =============================================
+
+# =============================================
+# 1. METADADOS DO DOCUMENTO (OBRIGATORIO)
+# =============================================
+metadata:
+  versao: "2.0"
+  data: "2026-01-30"
+  autor: "Agencia ALC - alc.dev.br"
+
+  documentacao_relacionada:
+    id: "RF083"
+    nome: "Central de Modulos"
+
+  sistema_modulo: "SYS - Sistema Infraestrutura"
+  banco_de_dados:
+    engine: "logico"
+    schema: "logico"
+  padroes:
+    multi_tenancy: false  # EXCECAO: Funcionalidades sao GLOBAIS (decisao RF083.yaml)
+    auditoria: true
+    soft_delete: true
+
+# =============================================
+# 2. ENTIDADES
+# =============================================
+entidades:
+
+  # ===========================================
+  # 2.1 SISTEMA FUNCIONALIDADE
+  # ===========================================
+  - nome: "sistema_funcionalidade"
+    descricao: "Funcionalidade do sistema registrada na Central de Modulos. Representa um modulo ou submmodulo do sistema IControlIT."
+
+    # -----------------------------
+    # 2.1.1 CAMPOS
+    # -----------------------------
+    campos:
+      # CHAVE PRIMARIA (OBRIGATORIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primaria"
+        pk: true
+        mutavel: false
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          observacao: "Campo padrao de identificacao"
+
+      # CAMPOS DE NEGOCIO (derivados do RF/UC/WF)
+      - nome: "codigo"
+        tipo: "VARCHAR(100)"
+        nulo: false
+        default: null
+        descricao: "Codigo unico da funcionalidade no formato FF.[CAMADA].[MODULO]"
+        unique: true
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-004"
+          regra: "RN-RF083-01"
+
+      - nome: "nome"
+        tipo: "VARCHAR(200)"
+        nulo: false
+        default: null
+        descricao: "Nome amigavel da funcionalidade"
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC00"
+          wf: "WF-01"
+          campo_wf: "CMP-WF01-007"
+
+      - nome: "descricao"
+        tipo: "VARCHAR(500)"
+        nulo: true
+        default: null
+        descricao: "Descricao detalhada da funcionalidade"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-003"
+
+      - nome: "icone"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Icone heroicons para exibicao no menu"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-01"
+          campo_wf: "CMP-WF01-007"
+
+      - nome: "rota"
+        tipo: "VARCHAR(200)"
+        nulo: true
+        default: null
+        descricao: "Rota principal no frontend"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-005"
+
+      - nome: "feature_flag_id"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "FK para Feature Flag (se nulo, funcionalidade sempre disponivel se ativa)"
+        mutavel: true
+        fk:
+          tabela: "feature_flag"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-012"
+          regra: "RN-RF083-07"
+
+      - nome: "ativo"
+        tipo: "BOOLEAN"
+        nulo: false
+        default: true
+        descricao: "Se funcionalidade esta ativa"
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC00"
+          wf: "WF-01"
+          campo_wf: "CMP-WF01-003"
+          regra: "RN-RF083-18, RN-RF083-19"
+
+      - nome: "ordem"
+        tipo: "INT"
+        nulo: false
+        default: 0
+        descricao: "Ordem de exibicao (menor = mais acima)"
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC00"
+          wf: "WF-01"
+          regra: "RN-RF083-11"
+
+      - nome: "categoria"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Categoria textual legada (DEPRECATED - usar categoria_id)"
+        index: true
+        mutavel: true
+        deprecated: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC02"
+          wf: "WF-01"
+          campo_wf: "CMP-WF01-005"
+          regra: "RN-RF083-12"
+
+      - nome: "categoria_id"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "FK para tabela de categorias (substitui campo categoria)"
+        index: true
+        mutavel: true
+        fk:
+          tabela: "sistema_categoria"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF083"
+          uc: "UC02"
+          wf: "WF-01"
+          campo_wf: "CMP-WF01-002"
+          regra: "RN-RF083-12"
+
+      - nome: "funcionalidade_pai_id"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Auto-referencia para hierarquia pai/filha (max 3 niveis)"
+        index: true
+        mutavel: true
+        fk:
+          tabela: "sistema_funcionalidade"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-007"
+          regra: "RN-RF083-06"
+
+      - nome: "permissao_requerida"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Codigo de permissao RBAC base para acesso"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-013"
+
+      - nome: "empresas_exclusivas_json"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: "IDs de empresas com acesso exclusivo (JSON array). Vazio = todas as empresas"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC04"
+          wf: "WF-04"
+          campo_wf: "CMP-WF04-003"
+          regra: "RN-RF083-03, RN-RF083-04"
+
+      - nome: "modulos_requeridos_json"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: "IDs de modulos pre-requisitos (dependencias diretas)"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-17, RN-RF083-18, RN-RF083-19, RN-RF083-20"
+
+      - nome: "dependencias_resolvidas_json"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: "IDs de todas as dependencias (diretas + transitivas, campo calculado)"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-17, RN-RF083-19"
+
+      - nome: "modulos_dependentes_json"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: "IDs de modulos que dependem deste (relacao reversa, campo calculado)"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-18"
+
+      - nome: "ambientes_ativos_json"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: "Ambientes onde modulo esta ativo (dev/hom/prod)"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-21"
+
+      - nome: "requer_contrato"
+        tipo: "BOOLEAN"
+        nulo: false
+        default: false
+        descricao: "Se requer assinatura ativa para acesso"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-16, RN-RF083-22"
+          integracao: "RF117"
+
+      - nome: "disponivel_para_venda"
+        tipo: "BOOLEAN"
+        nulo: false
+        default: false
+        descricao: "Se esta disponivel para incluir em planos comerciais"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          integracao: "RF117"
+
+      - nome: "disponivel_preview"
+        tipo: "BOOLEAN"
+        nulo: false
+        default: false
+        descricao: "Se esta em modo preview/beta"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+
+      - nome: "clientes_preview_json"
+        tipo: "TEXT"
+        nulo: true
+        default: null
+        descricao: "IDs de clientes com acesso antecipado ao preview"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+
+      # AUDITORIA (OBRIGATORIO - 5 campos)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criacao"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-13"
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuario que criou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-13"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de atualizacao"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-13"
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuario que atualizou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-13"
+
+      # SOFT DELETE (OBRIGATORIO)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Soft delete - data de exclusao logica"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-05"
+
+    # -----------------------------
+    # 2.1.2 INDICES
+    # -----------------------------
+    indices:
+      - nome: "pk_sistema_funcionalidade"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primaria"
+
+      - nome: "uq_sistema_funcionalidade_codigo"
+        tipo: "UNIQUE"
+        colunas: ["codigo"]
+        descricao: "Codigo unico de funcionalidade (RN-RF083-01)"
+
+      - nome: "idx_sistema_funcionalidade_nome"
+        tipo: "BTREE"
+        colunas: ["nome"]
+        descricao: "Performance em buscas por nome (UC07, WF-01)"
+
+      - nome: "idx_sistema_funcionalidade_ativo"
+        tipo: "BTREE"
+        colunas: ["ativo"]
+        descricao: "Performance em filtros por status ativo (UC00, WF-01)"
+
+      - nome: "idx_sistema_funcionalidade_categoria"
+        tipo: "BTREE"
+        colunas: ["categoria"]
+        descricao: "Performance em agrupamento por categoria legada (UC02)"
+
+      - nome: "idx_sistema_funcionalidade_categoria_id"
+        tipo: "BTREE"
+        colunas: ["categoria_id"]
+        descricao: "Performance em agrupamento por categoria (UC02)"
+
+      - nome: "idx_sistema_funcionalidade_ordem"
+        tipo: "BTREE"
+        colunas: ["ordem"]
+        descricao: "Performance em ordenacao (RN-RF083-11)"
+
+      - nome: "idx_sistema_funcionalidade_pai"
+        tipo: "BTREE"
+        colunas: ["funcionalidade_pai_id"]
+        descricao: "Performance em hierarquia pai/filha (UC01)"
+
+      - nome: "idx_sistema_funcionalidade_deleted"
+        tipo: "BTREE"
+        colunas: ["deleted_at"]
+        descricao: "Performance em filtro de soft delete"
+
+    # -----------------------------
+    # 2.1.3 CONSTRAINTS
+    # -----------------------------
+    constraints:
+      - nome: "pk_sistema_funcionalidade"
+        tipo: "PRIMARY KEY"
+        definicao: "id"
+        descricao: "Chave primaria"
+
+      - nome: "uq_sistema_funcionalidade_codigo"
+        tipo: "UNIQUE"
+        definicao: "codigo"
+        descricao: "Codigo unico de funcionalidade"
+
+      - nome: "fk_sistema_funcionalidade_feature_flag"
+        tipo: "FOREIGN KEY"
+        definicao: "feature_flag_id REFERENCES feature_flag(id)"
+        on_delete: "SET NULL"
+        descricao: "Vinculacao com Feature Flag"
+
+      - nome: "fk_sistema_funcionalidade_categoria"
+        tipo: "FOREIGN KEY"
+        definicao: "categoria_id REFERENCES sistema_categoria(id)"
+        on_delete: "SET NULL"
+        descricao: "Categoria da funcionalidade"
+
+      - nome: "fk_sistema_funcionalidade_pai"
+        tipo: "FOREIGN KEY"
+        definicao: "funcionalidade_pai_id REFERENCES sistema_funcionalidade(id)"
+        on_delete: "SET NULL"
+        descricao: "Hierarquia pai/filha"
+
+      - nome: "fk_sistema_funcionalidade_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - criador"
+
+      - nome: "fk_sistema_funcionalidade_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - editor"
+
+  # ===========================================
+  # 2.2 SISTEMA FUNCIONALIDADE ACAO
+  # ===========================================
+  - nome: "sistema_funcionalidade_acao"
+    descricao: "Acao especifica dentro de uma funcionalidade (ex: Criar Usuario, Excluir Cliente)"
+
+    # -----------------------------
+    # 2.2.1 CAMPOS
+    # -----------------------------
+    campos:
+      # CHAVE PRIMARIA (OBRIGATORIO)
+      - nome: "id"
+        tipo: "GUID"
+        nulo: false
+        default: "NEWID()"
+        descricao: "Chave primaria"
+        pk: true
+        mutavel: false
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+
+      # FK PARA FUNCIONALIDADE (OBRIGATORIO)
+      - nome: "funcionalidade_id"
+        tipo: "GUID"
+        nulo: false
+        descricao: "FK para funcionalidade pai"
+        index: true
+        mutavel: false
+        fk:
+          tabela: "sistema_funcionalidade"
+          coluna: "id"
+          on_delete: "CASCADE"
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-008"
+          regra: "RN-RF083-08"
+
+      # CAMPOS DE NEGOCIO
+      - nome: "codigo"
+        tipo: "VARCHAR(100)"
+        nulo: false
+        default: null
+        descricao: "Codigo unico da acao no formato [MODULO].[ENTIDADE].[OPERACAO]"
+        unique: true
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-008"
+          regra: "RN-RF083-09"
+
+      - nome: "nome"
+        tipo: "VARCHAR(200)"
+        nulo: false
+        default: null
+        descricao: "Nome amigavel da acao"
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          campo_wf: "CMP-WF02-008"
+
+      - nome: "descricao"
+        tipo: "VARCHAR(500)"
+        nulo: true
+        default: null
+        descricao: "Descricao da acao"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+
+      - nome: "icone"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Icone heroicons para exibicao"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+
+      - nome: "permissao_codigo"
+        tipo: "VARCHAR(100)"
+        nulo: true
+        default: null
+        descricao: "Codigo de permissao RBAC vinculada"
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+
+      - nome: "tipo_acao"
+        tipo: "VARCHAR(20)"
+        nulo: false
+        default: "VIEW"
+        descricao: "Tipo padronizado da acao"
+        index: true
+        mutavel: true
+        check:
+          definicao: "tipo_acao IN ('VIEW', 'CREATE', 'UPDATE', 'DELETE', 'EXPORT', 'ADMIN')"
+          descricao: "Tipos de acao permitidos (RN-RF083-10)"
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          regra: "RN-RF083-10"
+
+      - nome: "ativo"
+        tipo: "BOOLEAN"
+        nulo: false
+        default: true
+        descricao: "Se acao esta ativa"
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+
+      - nome: "ordem"
+        tipo: "INT"
+        nulo: false
+        default: 0
+        descricao: "Ordem de exibicao"
+        index: true
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: "UC01"
+          wf: "WF-02"
+          regra: "RN-RF083-11"
+
+      - nome: "acao_padrao"
+        tipo: "BOOLEAN"
+        nulo: false
+        default: false
+        descricao: "Se e acao padrao que aparece para todos"
+        mutavel: true
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+
+      # AUDITORIA (OBRIGATORIO - 5 campos)
+      - nome: "created_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: "GETDATE()"
+        descricao: "Data de criacao"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-13"
+
+      - nome: "created_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuario que criou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-13"
+
+      - nome: "updated_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Data de atualizacao"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-13"
+
+      - nome: "updated_by"
+        tipo: "GUID"
+        nulo: true
+        default: null
+        descricao: "Usuario que atualizou"
+        audit: true
+        mutavel: false
+        fk:
+          tabela: "usuario"
+          coluna: "id"
+          on_delete: "SET NULL"
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-13"
+
+      # SOFT DELETE (OBRIGATORIO)
+      - nome: "deleted_at"
+        tipo: "DATETIME"
+        nulo: true
+        default: null
+        descricao: "Soft delete - data de exclusao logica"
+        audit: true
+        mutavel: false
+        origem:
+          documentacao: "RF083"
+          uc: null
+          wf: null
+          regra: "RN-RF083-05"
+
+    # -----------------------------
+    # 2.2.2 INDICES
+    # -----------------------------
+    indices:
+      - nome: "pk_sistema_funcionalidade_acao"
+        tipo: "PRIMARY"
+        colunas: ["id"]
+        descricao: "Chave primaria"
+
+      - nome: "uq_sistema_funcionalidade_acao_codigo"
+        tipo: "UNIQUE"
+        colunas: ["codigo"]
+        descricao: "Codigo unico de acao (RN-RF083-09)"
+
+      - nome: "idx_sistema_funcionalidade_acao_funcionalidade"
+        tipo: "BTREE"
+        colunas: ["funcionalidade_id"]
+        descricao: "Performance em listagem de acoes por funcionalidade (UC01)"
+
+      - nome: "idx_sistema_funcionalidade_acao_tipo"
+        tipo: "BTREE"
+        colunas: ["tipo_acao"]
+        descricao: "Performance em filtros por tipo de acao"
+
+      - nome: "idx_sistema_funcionalidade_acao_ativo"
+        tipo: "BTREE"
+        colunas: ["ativo"]
+        descricao: "Performance em filtro de acoes ativas"
+
+      - nome: "idx_sistema_funcionalidade_acao_ordem"
+        tipo: "BTREE"
+        colunas: ["ordem"]
+        descricao: "Performance em ordenacao"
+
+      - nome: "idx_sistema_funcionalidade_acao_deleted"
+        tipo: "BTREE"
+        colunas: ["deleted_at"]
+        descricao: "Performance em filtro de soft delete"
+
+    # -----------------------------
+    # 2.2.3 CONSTRAINTS
+    # -----------------------------
+    constraints:
+      - nome: "pk_sistema_funcionalidade_acao"
+        tipo: "PRIMARY KEY"
+        definicao: "id"
+        descricao: "Chave primaria"
+
+      - nome: "uq_sistema_funcionalidade_acao_codigo"
+        tipo: "UNIQUE"
+        definicao: "codigo"
+        descricao: "Codigo unico de acao"
+
+      - nome: "fk_sistema_funcionalidade_acao_funcionalidade"
+        tipo: "FOREIGN KEY"
+        definicao: "funcionalidade_id REFERENCES sistema_funcionalidade(id)"
+        on_delete: "CASCADE"
+        descricao: "FK para funcionalidade pai (RN-RF083-08)"
+
+      - nome: "fk_sistema_funcionalidade_acao_created_by"
+        tipo: "FOREIGN KEY"
+        definicao: "created_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - criador"
+
+      - nome: "fk_sistema_funcionalidade_acao_updated_by"
+        tipo: "FOREIGN KEY"
+        definicao: "updated_by REFERENCES usuario(id)"
+        on_delete: "SET NULL"
+        descricao: "Auditoria - editor"
+
+      - nome: "chk_sistema_funcionalidade_acao_tipo"
+        tipo: "CHECK"
+        definicao: "tipo_acao IN ('VIEW', 'CREATE', 'UPDATE', 'DELETE', 'EXPORT', 'ADMIN')"
+        descricao: "Tipos de acao padronizados (RN-RF083-10)"
+
+    # =============================================
+    # 2.2.4 MD-Seed - PERMISSOES E CENTRAL
+    # =============================================
+    seed:
+      habilitado: true
+
+      # CENTRAL DE FUNCIONALIDADES (RF083 e pre-requisito)
+      central_funcionalidades:
+        modulo:
+          codigo: "SYS"
+          nome: "Sistema"
+          descricao: "Modulos de infraestrutura e configuracao do sistema"
+          categoria: "sistema"
+          icone: "mdi-cog"
+          ordem: 1
+          ativo: true
+          url_base: "/management"
+
+        funcionalidade:
+          codigo: "SYS_CENTRAL_MODULOS"
+          nome: "Central de Modulos"
+          descricao: "Gerenciamento centralizado de todas as funcionalidades do sistema IControlIT"
+          icone: "mdi-view-module"
+          ordem: 1
+          ativo: true
+          url: "/management/central-modulos"
+          modulo_codigo: "SYS"
+
+      # PERMISSOES RBAC
+      permissoes:
+        - codigo: "CENTRAL_MODULOS.VIEW_ANY"
+          nome: "Listar Funcionalidades"
+          descricao: "Permite listar funcionalidades do sistema (filtrado por perfil)"
+          funcionalidade_codigo: "SYS_CENTRAL_MODULOS"
+          ativo: true
+          perfis_obrigatorios:
+            - "Developer"
+          perfis_sugeridos:
+            - "Super Admin"
+            - "Admin"
+            - "User"
+          uc_relacionado: "UC00, UC02, UC03, UC07"
+          endpoint_backend: "GET /api/funcionalidades"
+
+        - codigo: "CENTRAL_MODULOS.VIEW"
+          nome: "Visualizar Funcionalidade"
+          descricao: "Permite visualizar detalhes de uma funcionalidade especifica"
+          funcionalidade_codigo: "SYS_CENTRAL_MODULOS"
+          ativo: true
+          perfis_obrigatorios:
+            - "Developer"
+          perfis_sugeridos:
+            - "Super Admin"
+            - "Admin"
+            - "User"
+          uc_relacionado: "UC01"
+          endpoint_backend: "GET /api/funcionalidades/{id}"
+
+        - codigo: "CENTRAL_MODULOS.MANAGE_EXCLUSIVES"
+          nome: "Gerenciar Empresas Exclusivas"
+          descricao: "Permite definir quais empresas tem acesso exclusivo a funcionalidades"
+          funcionalidade_codigo: "SYS_CENTRAL_MODULOS"
+          ativo: true
+          perfis_obrigatorios:
+            - "Developer"
+          perfis_sugeridos: []
+          uc_relacionado: "UC04"
+          endpoint_backend: "PUT /api/funcionalidades/{id}/empresas-exclusivas"
+
+        - codigo: "CENTRAL_MODULOS.RESET"
+          nome: "Resetar Funcionalidades"
+          descricao: "Permite resetar e repopular funcionalidades com dados padrao (destrutivo)"
+          funcionalidade_codigo: "SYS_CENTRAL_MODULOS"
+          ativo: true
+          perfis_obrigatorios:
+            - "Developer"
+          perfis_sugeridos:
+            - "Super Admin"
+          uc_relacionado: "UC05"
+          endpoint_backend: "POST /api/funcionalidades/reset"
+
+      # ASSOCIACAO PERFIS x PERMISSOES
+      role_permissions:
+        - role: "Developer"
+          permissoes:
+            - "CENTRAL_MODULOS.VIEW_ANY"
+            - "CENTRAL_MODULOS.VIEW"
+            - "CENTRAL_MODULOS.MANAGE_EXCLUSIVES"
+            - "CENTRAL_MODULOS.RESET"
+          justificativa: "Perfil Developer possui acesso total para gerenciamento de funcionalidades"
+
+        - role: "Super Admin"
+          permissoes:
+            - "CENTRAL_MODULOS.VIEW_ANY"
+            - "CENTRAL_MODULOS.VIEW"
+            - "CENTRAL_MODULOS.RESET"
+          justificativa: "Super Admin pode visualizar e resetar funcionalidades"
+
+        - role: "Admin"
+          permissoes:
+            - "CENTRAL_MODULOS.VIEW_ANY"
+            - "CENTRAL_MODULOS.VIEW"
+          justificativa: "Admin pode apenas visualizar funcionalidades (filtradas por perfil System)"
+
+        - role: "User"
+          permissoes:
+            - "CENTRAL_MODULOS.VIEW_ANY"
+            - "CENTRAL_MODULOS.VIEW"
+          justificativa: "User pode apenas visualizar funcionalidades (filtradas por perfil Tenant)"
+
+      # VALIDACAO DE SEEDS
+      validacao_seeds:
+        - item: "Modulo registrado na Central de Funcionalidades?"
+          status: "ok"
+
+        - item: "Funcionalidade registrada na Central de Funcionalidades?"
+          status: "ok"
+
+        - item: "TODAS as acoes possuem permissao segregada?"
+          status: "ok"
+
+        - item: "Perfil Developer associado a TODAS as permissoes?"
+          status: "ok"
+
+        - item: "Codigo de permissoes segue padrao MODULO.ENTIDADE.ACAO?"
+          status: "ok"
+
+        - item: "Todas as permissoes possuem endpoint_backend documentado?"
+          status: "ok"
+
+        - item: "Todas as permissoes possuem uc_relacionado documentado?"
+          status: "ok"
+
+        - item: "Todas as permissoes possuem funcionalidade_codigo correto?"
+          status: "ok"
+
+# =============================================
+# 3. RELACIONAMENTOS GLOBAIS
+# =============================================
+relacionamentos_globais:
+  - origem: "sistema_funcionalidade"
+    cardinalidade: "1:N"
+    destino: "sistema_funcionalidade_acao"
+    descricao: "Uma funcionalidade possui muitas acoes"
+
+  - origem: "sistema_funcionalidade"
+    cardinalidade: "1:N"
+    destino: "sistema_funcionalidade"
+    descricao: "Hierarquia pai/filha de funcionalidades (auto-referencia)"
+
+  - origem: "sistema_categoria"
+    cardinalidade: "1:N"
+    destino: "sistema_funcionalidade"
+    descricao: "Uma categoria agrupa muitas funcionalidades"
+
+  - origem: "feature_flag"
+    cardinalidade: "1:N"
+    destino: "sistema_funcionalidade"
+    descricao: "Uma feature flag pode controlar muitas funcionalidades"
+
+# =============================================
+# 4. OBSERVACOES E DECISOES
+# =============================================
+observacoes:
+  - categoria: "Modelagem"
+    descricao: |
+      DECISAO ARQUITETURAL: As entidades deste RF sao GLOBAIS (multi_tenant: false).
+      O isolamento e feito por PERFIL (Developer/System/Tenant), nao por tenant_id.
+      Esta decisao esta documentada em RF083.yaml (seguranca.isolamento_tenant: false).
+      Justificativa: Funcionalidades sao compartilhadas por todo o sistema e filtradas
+      dinamicamente com base no perfil do usuario autenticado (RN-RF083-02).
+
+  - categoria: "Performance"
+    descricao: |
+      Indices criados para suportar:
+      - UC00: Listagem ordenada por ordem e nome
+      - UC02: Agrupamento por categoria
+      - UC07: Busca por nome e codigo
+      - Filtros de soft delete e ativo
+      Campos JSON (empresas_exclusivas_json, modulos_requeridos_json, etc.) nao possuem
+      indices por serem dados de configuracao com baixa cardinalidade de consulta.
+
+  - categoria: "Seguranca"
+    descricao: |
+      - Soft delete obrigatorio (RN-RF083-05)
+      - Auditoria completa com 5 campos (RN-RF083-13)
+      - Isolamento por perfil, nao por tenant (RN-RF083-02)
+      - Gerenciamento de exclusividade restrito a Developer (RN-RF083-04)
+      - Reset restrito a Developer/Super Admin (RN-RF083-15)
+
+  - categoria: "Integracao"
+    descricao: |
+      - RF117 (Gestao de Assinaturas): Campos requer_contrato e disponivel_para_venda
+      - Feature Flags: Campo feature_flag_id para ativacao dinamica
+      - RBAC: Campos permissao_requerida e permissao_codigo
+      - Empresas: Campo empresas_exclusivas_json para whitelist
+
+  - categoria: "Central de Funcionalidades"
+    descricao: |
+      RF083 e o proprio RF que define a Central de Funcionalidades.
+      Ele serve como pre-requisito para todos os demais RFs do sistema.
+      Todas as funcionalidades devem se registrar nesta central.
+
+# =============================================
+# 5. HISTORICO DE ALTERACOES
+# =============================================
+historico:
+  - versao: "2.0"
+    data: "2026-01-30"
+    autor: "Agencia ALC - alc.dev.br"
+    descricao: |
+      Versao inicial do MD-RF083 derivada de:
+      - RF083.yaml (2 entidades principais)
+      - UC-RF083.yaml (8 casos de uso)
+      - WF-RF083.md (5 wireframes)
+
+      Entidades criadas:
+      - sistema_funcionalidade (25 campos)
+      - sistema_funcionalidade_acao (15 campos)
+
+      Caracteristicas especiais:
+      - Multi-tenancy: false (entidades GLOBAIS por decisao arquitetural)
+      - Auditoria: 5 campos em ambas as tabelas
+      - Soft delete: sim
+      - 22 regras de negocio cobertas
+      - 4 permissoes RBAC definidas

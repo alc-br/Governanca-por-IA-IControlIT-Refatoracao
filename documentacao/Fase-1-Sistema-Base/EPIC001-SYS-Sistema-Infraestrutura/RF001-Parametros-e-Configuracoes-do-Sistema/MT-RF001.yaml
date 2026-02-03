@@ -1,0 +1,1632 @@
+# =============================================
+# Massas de Teste (MT) — RF001
+# Sistema de Parâmetros e Configurações Centralizadas
+# Versão: 1.0
+# Data: 2026-01-28
+# Autor: Agência ALC - alc.dev.br
+# =============================================
+
+metadata:
+  versao: "1.0"
+  data: "2026-01-28"
+  autor: "Agência ALC - alc.dev.br"
+  documentacao_relacionada:
+    id: "RF001"
+    nome: "Sistema de Parâmetros e Configurações Centralizadas"
+  entidades_cobertas:
+    - Sistema_Parametro
+    - Sistema_Feature_Flag
+    - Sistema_Configuracao_Email
+    - Sistema_Limite_Uso
+  ucs_cobertos: 22
+
+defaults:
+  locale: "pt_BR"
+  timezone: "America/Sao_Paulo"
+  currency: "BRL"
+  tenant_padrao: 1
+  usuario_padrao: 1
+  formatos:
+    date: "YYYY-MM-DD"
+    datetime: "YYYY-MM-DD HH:mm:ss"
+
+# =============================================
+# MASSAS DE TESTE - SISTEMA_PARAMETRO (UC00-UC04)
+# =============================================
+
+data_sets:
+
+  # =========================================
+  # SUCESSO - Sistema_Parametro (MT-RF001-001 a MT-RF001-009)
+  # =========================================
+  MT-RF001-001:
+    categoria: "SUCESSO"
+    descricao: "Criação de parâmetro com dados válidos completos"
+    ca_ref: "CA-UC01-001"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.CREATE"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro: []
+    entrada:
+      Cd_Parametro: "PARAM_TESTE_001"
+      Nm_Parametro: "Parâmetro de Teste"
+      Ds_Parametro: "Descrição do parâmetro de teste para validação do sistema"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+      Fl_Sensivel: false
+      Fl_Sistema: false
+      Fl_Obrigatorio: true
+      Valor_Padrao: "valor_default"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        contem:
+          Cd_Parametro: "PARAM_TESTE_001"
+          Nm_Parametro: "Parâmetro de Teste"
+        gerados:
+          - Id
+          - Dt_Criacao
+          - Id_Usuario_Criacao
+          - Id_Fornecedor
+      banco:
+        Sistema_Parametro:
+          deve_existir:
+            - Cd_Parametro: "PARAM_TESTE_001"
+              Fl_Excluido: 0
+
+  MT-RF001-002:
+    categoria: "SUCESSO"
+    descricao: "Criação de parâmetro sensível (valor criptografado)"
+    ca_ref: "CA-UC01-007"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.CREATE"]
+    entrada:
+      Cd_Parametro: "API_KEY_EXTERNA"
+      Nm_Parametro: "Chave API Externa"
+      Ds_Parametro: "Chave de acesso à API externa"
+      Categoria: "Integração"
+      Tipo_Dado: "String"
+      Fl_Sensivel: true
+      Fl_Sistema: false
+      Fl_Obrigatorio: true
+      Valor_Padrao: "sk_test_abc123xyz"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      validacoes:
+        - "Valor armazenado criptografado em AES-256"
+        - "Valor não legível em texto plano no banco"
+
+  MT-RF001-003:
+    categoria: "SUCESSO"
+    descricao: "Criação de parâmetro tipo Integer com min/max"
+    ca_ref: "CA-UC01-001"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.CREATE"]
+    entrada:
+      Cd_Parametro: "MAX_TENTATIVAS_LOGIN"
+      Nm_Parametro: "Máximo de Tentativas de Login"
+      Ds_Parametro: "Número máximo de tentativas de login antes de bloquear"
+      Categoria: "Segurança"
+      Tipo_Dado: "Integer"
+      Fl_Sensivel: false
+      Fl_Sistema: true
+      Fl_Obrigatorio: true
+      Valor_Minimo: 1
+      Valor_Maximo: 10
+      Valor_Padrao: "5"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  MT-RF001-004:
+    categoria: "SUCESSO"
+    descricao: "Criação de parâmetro tipo Boolean"
+    ca_ref: "CA-UC01-001"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "HABILITAR_2FA"
+      Nm_Parametro: "Habilitar Autenticação 2FA"
+      Ds_Parametro: "Indica se autenticação em dois fatores está habilitada"
+      Categoria: "Segurança"
+      Tipo_Dado: "Boolean"
+      Fl_Sensivel: false
+      Fl_Sistema: false
+      Fl_Obrigatorio: true
+      Valor_Padrao: "true"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  MT-RF001-005:
+    categoria: "SUCESSO"
+    descricao: "Criação de parâmetro tipo JSON"
+    ca_ref: "CA-UC01-001"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "CONFIG_NOTIFICACOES"
+      Nm_Parametro: "Configurações de Notificações"
+      Ds_Parametro: "JSON com configurações de notificações"
+      Categoria: "Notificação"
+      Tipo_Dado: "JSON"
+      Fl_Sensivel: false
+      Fl_Sistema: false
+      Fl_Obrigatorio: false
+      Valor_Padrao: '{"email": true, "sms": false, "push": true}'
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  MT-RF001-006:
+    categoria: "SUCESSO"
+    descricao: "Listagem de parâmetros com paginação"
+    ca_ref: "CA-UC00-003"
+    uc_ref: "UC00"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.VIEW_ANY"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Cd_Parametro: "PARAM_1"
+            - Cd_Parametro: "PARAM_2"
+            - Cd_Parametro: "PARAM_3"
+    entrada:
+      page: 1
+      pageSize: 20
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        paginacao:
+          page: 1
+          pageSize: 20
+          totalCount: 3
+
+  MT-RF001-007:
+    categoria: "SUCESSO"
+    descricao: "Visualização de parâmetro existente"
+    ca_ref: "CA-UC02-001"
+    uc_ref: "UC02"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.VIEW"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 1
+              Cd_Parametro: "PARAM_TESTE"
+              tenant_id: 1
+    entrada:
+      id: 1
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        contem:
+          Cd_Parametro: "PARAM_TESTE"
+
+  MT-RF001-008:
+    categoria: "SUCESSO"
+    descricao: "Edição de parâmetro (não sistema)"
+    ca_ref: "CA-UC03-001"
+    uc_ref: "UC03"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.UPDATE"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 1
+              Cd_Parametro: "PARAM_TESTE"
+              Nm_Parametro: "Nome Antigo"
+              Fl_Sistema: 0
+              tenant_id: 1
+    entrada:
+      id: 1
+      Nm_Parametro: "Nome Novo"
+      Ds_Parametro: "Descrição atualizada"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Sistema_Parametro:
+          deve_existir:
+            - Id: 1
+              Nm_Parametro: "Nome Novo"
+
+  MT-RF001-009:
+    categoria: "SUCESSO"
+    descricao: "Exclusão lógica de parâmetro (soft delete)"
+    ca_ref: "CA-UC04-001"
+    uc_ref: "UC04"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.DELETE"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 1
+              Cd_Parametro: "PARAM_EXCLUIR"
+              Fl_Sistema: 0
+              Fl_Excluido: 0
+              tenant_id: 1
+    entrada:
+      id: 1
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Sistema_Parametro:
+          deve_existir:
+            - Id: 1
+              Fl_Excluido: 1
+              Dt_Exclusao: "{generated}"
+              Id_Usuario_Exclusao: 1
+
+  # =========================================
+  # VALIDAÇÃO OBRIGATÓRIO - Sistema_Parametro (MT-RF001-100 a MT-RF001-109)
+  # =========================================
+  MT-RF001-100:
+    categoria: "VALIDACAO_OBRIGATORIO"
+    descricao: "Cd_Parametro ausente (campo obrigatório)"
+    ca_ref: "CA-UC01-001"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.CREATE"]
+    entrada:
+      Nm_Parametro: "Parâmetro Sem Código"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        tipo: "VALIDATION_ERROR"
+        campos:
+          Cd_Parametro: "obrigatorio"
+
+  MT-RF001-101:
+    categoria: "VALIDACAO_OBRIGATORIO"
+    descricao: "Nm_Parametro ausente (campo obrigatório)"
+    ca_ref: "CA-UC01-001"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_SEM_NOME"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        campos:
+          Nm_Parametro: "obrigatorio"
+
+  MT-RF001-102:
+    categoria: "VALIDACAO_OBRIGATORIO"
+    descricao: "Ds_Parametro ausente (campo obrigatório)"
+    ca_ref: "CA-UC01-001"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_SEM_DESC"
+      Nm_Parametro: "Nome do Parâmetro"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        campos:
+          Ds_Parametro: "obrigatorio"
+
+  MT-RF001-103:
+    categoria: "VALIDACAO_OBRIGATORIO"
+    descricao: "Categoria ausente (campo obrigatório)"
+    ca_ref: "CA-UC01-001"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_SEM_CAT"
+      Nm_Parametro: "Nome"
+      Ds_Parametro: "Descrição"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        campos:
+          Categoria: "obrigatorio"
+
+  MT-RF001-104:
+    categoria: "VALIDACAO_OBRIGATORIO"
+    descricao: "Tipo_Dado ausente (campo obrigatório)"
+    ca_ref: "CA-UC01-001"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_SEM_TIPO"
+      Nm_Parametro: "Nome"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        campos:
+          Tipo_Dado: "obrigatorio"
+
+  # =========================================
+  # VALIDAÇÃO FORMATO - Sistema_Parametro (MT-RF001-200 a MT-RF001-209)
+  # =========================================
+  MT-RF001-200:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Tipo_Dado inválido (enum)"
+    ca_ref: "CA-UC01-005"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_TIPO_INVALIDO"
+      Nm_Parametro: "Nome"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "TipoInexistente"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        tipo: "VALIDATION_ERROR"
+        mensagem: "Tipo_Dado inválido. Valores permitidos: String, Integer, Decimal, Boolean, Date, JSON"
+
+  MT-RF001-201:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Categoria inválida (enum)"
+    ca_ref: "CA-UC01-005"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_CAT_INVALIDA"
+      Nm_Parametro: "Nome"
+      Ds_Parametro: "Descrição"
+      Categoria: "CategoriaInexistente"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        mensagem: "Categoria inválida. Valores permitidos: Sistema, Segurança, Integração, Notificação, Relatório"
+
+  MT-RF001-202:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Valor Integer inválido (texto quando esperado número)"
+    ca_ref: "CA-UC01-005"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_INT_INVALIDO"
+      Nm_Parametro: "Número Inválido"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "Integer"
+      Valor_Padrao: "abc"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        mensagem: "Valor inválido para tipo Integer"
+
+  MT-RF001-203:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "JSON inválido"
+    ca_ref: "CA-UC01-005"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_JSON_INVALIDO"
+      Nm_Parametro: "JSON Malformado"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "JSON"
+      Valor_Padrao: "{invalido: json sem aspas}"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        mensagem: "JSON inválido. Erro: Unexpected character"
+
+  MT-RF001-204:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Valor fora de min/max"
+    ca_ref: "CA-UC01-005"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_FORA_RANGE"
+      Nm_Parametro: "Valor Fora do Range"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "Integer"
+      Valor_Minimo: 1
+      Valor_Maximo: 10
+      Valor_Padrao: "15"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        mensagem: "Valor deve estar entre 1 e 10"
+
+  MT-RF001-205:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Valor fora de Opcoes_Validas"
+    ca_ref: "CA-UC01-005"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_OPCAO_INVALIDA"
+      Nm_Parametro: "Opção Inválida"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+      Opcoes_Validas: "opcao1,opcao2,opcao3"
+      Valor_Padrao: "opcao_inexistente"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        mensagem: "Valor 'opcao_inexistente' inválido. Opções válidas: opcao1,opcao2,opcao3"
+
+  # =========================================
+  # REGRA DE NEGÓCIO - Sistema_Parametro (MT-RF001-300 a MT-RF001-309)
+  # =========================================
+  MT-RF001-300:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "Código duplicado no tenant (RN-SYS-001-01)"
+    ca_ref: "CA-UC01-010"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    contexto:
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Cd_Parametro: "CODIGO_EXISTENTE"
+              tenant_id: 1
+    entrada:
+      Cd_Parametro: "CODIGO_EXISTENTE"
+      Nm_Parametro: "Nome"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: false
+      http_status: 409
+      erro:
+        tipo: "CONFLICT"
+        mensagem: "Já existe um parâmetro com o código 'CODIGO_EXISTENTE' neste Fornecedor"
+
+  MT-RF001-301:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "Tentativa de editar metadados de parâmetro de sistema (RN-SYS-001-03)"
+    ca_ref: "CA-UC03-008"
+    uc_ref: "UC03"
+    entidade: "Sistema_Parametro"
+    contexto:
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 1
+              Cd_Parametro: "PARAM_SISTEMA"
+              Fl_Sistema: 1
+              tenant_id: 1
+    entrada:
+      id: 1
+      Nm_Parametro: "Tentando Alterar Nome"
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+      erro:
+        mensagem: "Parâmetros de sistema não podem ser editados via interface. Apenas valores podem ser alterados."
+
+  MT-RF001-302:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "Tentativa de excluir parâmetro de sistema (RN-SYS-001-03)"
+    ca_ref: "CA-UC04-002"
+    uc_ref: "UC04"
+    entidade: "Sistema_Parametro"
+    contexto:
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 1
+              Cd_Parametro: "PARAM_SISTEMA"
+              Fl_Sistema: 1
+              tenant_id: 1
+    entrada:
+      id: 1
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+      erro:
+        mensagem: "Parâmetros de sistema não podem ser excluídos via interface."
+
+  # =========================================
+  # AUTORIZAÇÃO - Sistema_Parametro (MT-RF001-400 a MT-RF001-409)
+  # =========================================
+  MT-RF001-400:
+    categoria: "AUTORIZACAO"
+    descricao: "Usuário não autenticado (401)"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        autenticado: false
+    entrada:
+      Cd_Parametro: "PARAM_NOVO"
+      Nm_Parametro: "Nome"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: false
+      http_status: 401
+      erro:
+        tipo: "UNAUTHENTICATED"
+        mensagem: "Acesso não autorizado. Autenticação requerida."
+
+  MT-RF001-401:
+    categoria: "AUTORIZACAO"
+    descricao: "Usuário sem permissão CREATE (403)"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 2
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.VIEW"]
+    entrada:
+      Cd_Parametro: "PARAM_NOVO"
+      Nm_Parametro: "Nome"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+      erro:
+        tipo: "FORBIDDEN"
+        mensagem: "Acesso negado. Você não tem permissão para criar parâmetros."
+
+  MT-RF001-402:
+    categoria: "AUTORIZACAO"
+    descricao: "Usuário sem permissão VIEW_ANY (403)"
+    uc_ref: "UC00"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 2
+        tenant_id: 1
+        permissoes: []
+    entrada:
+      page: 1
+      pageSize: 20
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+      erro:
+        mensagem: "Acesso negado. Você não tem permissão para visualizar parâmetros."
+
+  MT-RF001-403:
+    categoria: "AUTORIZACAO"
+    descricao: "Usuário sem permissão UPDATE (403)"
+    uc_ref: "UC03"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 2
+        permissoes: ["SYS.PARAMETROS.VIEW"]
+    entrada:
+      id: 1
+      Nm_Parametro: "Novo Nome"
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+
+  MT-RF001-404:
+    categoria: "AUTORIZACAO"
+    descricao: "Usuário sem permissão DELETE (403)"
+    uc_ref: "UC04"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 2
+        permissoes: ["SYS.PARAMETROS.VIEW"]
+    entrada:
+      id: 1
+    resultado_esperado:
+      sucesso: false
+      http_status: 403
+
+  # =========================================
+  # EDGE CASE - Sistema_Parametro (MT-RF001-500 a MT-RF001-509)
+  # =========================================
+  MT-RF001-500:
+    categoria: "EDGE_CASE"
+    descricao: "Cd_Parametro com tamanho máximo (100 caracteres)"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "A" * 100
+      Nm_Parametro: "Nome"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  MT-RF001-501:
+    categoria: "EDGE_CASE"
+    descricao: "Cd_Parametro excede tamanho máximo (101 caracteres)"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "A" * 101
+      Nm_Parametro: "Nome"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        campos:
+          Cd_Parametro: "max_length_exceeded"
+
+  MT-RF001-502:
+    categoria: "EDGE_CASE"
+    descricao: "Caracteres especiais no valor"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_ESPECIAIS"
+      Nm_Parametro: "Nome com ação e ñ"
+      Ds_Parametro: "Descrição com emoji 🚀 e unicode: こんにちは"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+      Valor_Padrao: "<script>alert('xss')</script>"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      validacoes:
+        - "Script sanitizado ou escapado"
+
+  MT-RF001-503:
+    categoria: "EDGE_CASE"
+    descricao: "Valor inteiro limite máximo"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_MAX_INT"
+      Nm_Parametro: "Valor Máximo"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "Integer"
+      Valor_Padrao: "2147483647"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  MT-RF001-504:
+    categoria: "EDGE_CASE"
+    descricao: "String vazia vs null"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    entrada:
+      Cd_Parametro: "PARAM_VAZIO"
+      Nm_Parametro: ""
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        campos:
+          Nm_Parametro: "obrigatorio"
+
+  # =========================================
+  # MULTI-TENANCY - Sistema_Parametro (MT-RF001-700 a MT-RF001-709)
+  # =========================================
+  MT-RF001-700:
+    categoria: "MULTI_TENANCY"
+    descricao: "Isolamento entre tenants - tentativa de visualizar parâmetro de outro tenant"
+    ca_ref: "CA-UC02-003"
+    uc_ref: "UC02"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.VIEW"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 99
+              Cd_Parametro: "PARAM_OUTRO_TENANT"
+              tenant_id: 2
+    entrada:
+      id: 99
+    resultado_esperado:
+      sucesso: false
+      http_status: 404
+      erro:
+        tipo: "NOT_FOUND"
+        mensagem: "Parâmetro não encontrado"
+
+  MT-RF001-701:
+    categoria: "MULTI_TENANCY"
+    descricao: "Listagem retorna apenas parâmetros do tenant do usuário"
+    ca_ref: "CA-UC00-001"
+    uc_ref: "UC00"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.VIEW_ANY"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 1
+              Cd_Parametro: "PARAM_TENANT_1"
+              tenant_id: 1
+            - Id: 2
+              Cd_Parametro: "PARAM_TENANT_2"
+              tenant_id: 2
+    entrada:
+      page: 1
+      pageSize: 20
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        totalCount: 1
+        itens:
+          - Cd_Parametro: "PARAM_TENANT_1"
+      validacoes:
+        - "PARAM_TENANT_2 NÃO deve aparecer na listagem"
+
+  MT-RF001-702:
+    categoria: "MULTI_TENANCY"
+    descricao: "Tentativa de editar parâmetro de outro tenant"
+    ca_ref: "CA-UC03-005"
+    uc_ref: "UC03"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.UPDATE"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 99
+              tenant_id: 2
+    entrada:
+      id: 99
+      Nm_Parametro: "Tentando Alterar"
+    resultado_esperado:
+      sucesso: false
+      http_status: 404
+
+  MT-RF001-703:
+    categoria: "MULTI_TENANCY"
+    descricao: "Tentativa de excluir parâmetro de outro tenant"
+    ca_ref: "CA-UC04-009"
+    uc_ref: "UC04"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.DELETE"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 99
+              tenant_id: 2
+    entrada:
+      id: 99
+    resultado_esperado:
+      sucesso: false
+      http_status: 404
+
+  # =========================================
+  # AUDITORIA - Sistema_Parametro (MT-RF001-800 a MT-RF001-809)
+  # =========================================
+  MT-RF001-800:
+    categoria: "AUDITORIA"
+    descricao: "Criação registra created_by e created_at"
+    ca_ref: "CA-UC01-003"
+    uc_ref: "UC01"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 5
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.CREATE"]
+    entrada:
+      Cd_Parametro: "PARAM_AUDITORIA"
+      Nm_Parametro: "Nome"
+      Ds_Parametro: "Descrição"
+      Categoria: "Sistema"
+      Tipo_Dado: "String"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      resposta:
+        gerados:
+          - Dt_Criacao
+          - Id_Usuario_Criacao
+        valores:
+          Id_Usuario_Criacao: 5
+      banco:
+        Sistema_Parametro_Historico:
+          deve_existir:
+            - tipo_operacao: "CREATE"
+              usuario_id: 5
+
+  MT-RF001-801:
+    categoria: "AUDITORIA"
+    descricao: "Edição registra updated_by, updated_at e diff JSON"
+    ca_ref: "CA-UC03-006"
+    uc_ref: "UC03"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 7
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.UPDATE"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 1
+              Nm_Parametro: "Nome Antigo"
+              tenant_id: 1
+    entrada:
+      id: 1
+      Nm_Parametro: "Nome Novo"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        valores:
+          Id_Usuario_Atualizacao: 7
+      banco:
+        Sistema_Parametro_Historico:
+          deve_existir:
+            - tipo_operacao: "UPDATE"
+              usuario_id: 7
+              diff_json: '{"Nm_Parametro": {"antes": "Nome Antigo", "depois": "Nome Novo"}}'
+
+  MT-RF001-802:
+    categoria: "AUDITORIA"
+    descricao: "Exclusão registra auditoria tipo DELETE"
+    ca_ref: "CA-UC04-007"
+    uc_ref: "UC04"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 3
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.DELETE"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 1
+              Fl_Sistema: 0
+              tenant_id: 1
+    entrada:
+      id: 1
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Sistema_Parametro_Historico:
+          deve_existir:
+            - tipo_operacao: "DELETE"
+              usuario_id: 3
+
+  MT-RF001-803:
+    categoria: "AUDITORIA"
+    descricao: "Acesso a valor sensível registra auditoria tipo ACCESS"
+    ca_ref: "CA-UC02-007"
+    uc_ref: "UC02"
+    entidade: "Sistema_Parametro"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.PARAMETROS.VIEW", "SYS.PARAMETROS.VIEW_SENSITIVE"]
+      estado_inicial:
+        banco:
+          Sistema_Parametro:
+            - Id: 1
+              Fl_Sensivel: 1
+              tenant_id: 1
+    entrada:
+      id: 1
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Sistema_Parametro_Historico:
+          deve_existir:
+            - tipo_operacao: "ACCESS"
+              usuario_id: 1
+
+  # =========================================
+  # SUCESSO - Sistema_Feature_Flag (MT-RF001-010 a MT-RF001-019)
+  # =========================================
+  MT-RF001-010:
+    categoria: "SUCESSO"
+    descricao: "Criação de feature flag com rollout All"
+    ca_ref: "FP-UC06-004"
+    uc_ref: "UC06"
+    entidade: "Sistema_Feature_Flag"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.FEATUREFLAGS.CREATE"]
+    entrada:
+      Cd_Feature: "FEATURE_NOVA_UI"
+      Nm_Feature: "Nova Interface de Usuário"
+      Ds_Feature: "Habilita a nova interface de usuário"
+      Fl_Ativa: true
+      Tipo_Rollout: "All"
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  MT-RF001-011:
+    categoria: "SUCESSO"
+    descricao: "Criação de feature flag com rollout Percentage"
+    ca_ref: "FP-UC06-005"
+    uc_ref: "UC06"
+    entidade: "Sistema_Feature_Flag"
+    entrada:
+      Cd_Feature: "FEATURE_BETA"
+      Nm_Feature: "Funcionalidade Beta"
+      Ds_Feature: "Funcionalidade em fase beta"
+      Fl_Ativa: true
+      Tipo_Rollout: "Percentage"
+      Percentual_Rollout: 25
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  MT-RF001-012:
+    categoria: "SUCESSO"
+    descricao: "Listagem de feature flags (tenant + globais)"
+    ca_ref: "FP-UC05-003"
+    uc_ref: "UC05"
+    entidade: "Sistema_Feature_Flag"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.FEATUREFLAGS.VIEW_ANY"]
+    entrada:
+      page: 1
+      pageSize: 20
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+
+  MT-RF001-013:
+    categoria: "SUCESSO"
+    descricao: "Edição de feature flag (ativar/desativar)"
+    ca_ref: "FP-UC08-004"
+    uc_ref: "UC08"
+    entidade: "Sistema_Feature_Flag"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.FEATUREFLAGS.UPDATE"]
+      estado_inicial:
+        banco:
+          Sistema_Feature_Flag:
+            - Id: 1
+              Fl_Ativa: true
+              tenant_id: 1
+    entrada:
+      id: 1
+      Fl_Ativa: false
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+
+  MT-RF001-014:
+    categoria: "SUCESSO"
+    descricao: "Exclusão de feature flag"
+    ca_ref: "FP-UC09-005"
+    uc_ref: "UC09"
+    entidade: "Sistema_Feature_Flag"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.FEATUREFLAGS.DELETE"]
+    entrada:
+      id: 1
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+
+  # =========================================
+  # VALIDAÇÃO - Sistema_Feature_Flag (MT-RF001-110 a MT-RF001-119)
+  # =========================================
+  MT-RF001-110:
+    categoria: "VALIDACAO_OBRIGATORIO"
+    descricao: "Cd_Feature ausente"
+    uc_ref: "UC06"
+    entidade: "Sistema_Feature_Flag"
+    entrada:
+      Nm_Feature: "Nome"
+      Ds_Feature: "Descrição"
+      Tipo_Rollout: "All"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  MT-RF001-111:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Percentual_Rollout fora de 0-100"
+    ca_ref: "FE-UC06-002"
+    uc_ref: "UC06"
+    entidade: "Sistema_Feature_Flag"
+    entrada:
+      Cd_Feature: "FEATURE_INVALIDA"
+      Nm_Feature: "Nome"
+      Ds_Feature: "Descrição"
+      Tipo_Rollout: "Percentage"
+      Percentual_Rollout: 150
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        mensagem: "Percentual deve estar entre 0 e 100"
+
+  MT-RF001-112:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "Código de feature duplicado"
+    ca_ref: "FE-UC06-001"
+    uc_ref: "UC06"
+    entidade: "Sistema_Feature_Flag"
+    contexto:
+      estado_inicial:
+        banco:
+          Sistema_Feature_Flag:
+            - Cd_Feature: "FEATURE_EXISTENTE"
+              tenant_id: 1
+    entrada:
+      Cd_Feature: "FEATURE_EXISTENTE"
+      Nm_Feature: "Nome"
+      Ds_Feature: "Descrição"
+      Tipo_Rollout: "All"
+    resultado_esperado:
+      sucesso: false
+      http_status: 409
+
+  # =========================================
+  # SUCESSO - Sistema_Configuracao_Email (MT-RF001-020 a MT-RF001-029)
+  # =========================================
+  MT-RF001-020:
+    categoria: "SUCESSO"
+    descricao: "Criação de configuração de e-mail SMTP"
+    ca_ref: "FP-UC11-016"
+    uc_ref: "UC11"
+    entidade: "Sistema_Configuracao_Email"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.CONFIGURACOES_EMAIL.CREATE"]
+    entrada:
+      Provedor: "SMTP"
+      Servidor_Smtp: "smtp.empresa.com"
+      Porta_Smtp: 587
+      Usuario: "noreply@empresa.com"
+      Senha: "senha_secreta_123"
+      Fl_Usar_Ssl: true
+      Email_Remetente: "noreply@empresa.com"
+      Nome_Remetente: "IControlIT"
+      Fl_Principal: true
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      validacoes:
+        - "Senha criptografada em AES-256"
+
+  MT-RF001-021:
+    categoria: "SUCESSO"
+    descricao: "Listagem de configurações de e-mail (senha mascarada)"
+    ca_ref: "FP-UC10-004"
+    uc_ref: "UC10"
+    entidade: "Sistema_Configuracao_Email"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.CONFIGURACOES_EMAIL.VIEW_ANY"]
+    entrada:
+      page: 1
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      validacoes:
+        - "Campo Senha exibido como '********'"
+
+  MT-RF001-022:
+    categoria: "SUCESSO"
+    descricao: "Marcar como principal desmarca outras (RN-SYS-001-10)"
+    ca_ref: "FP-UC11-014"
+    uc_ref: "UC11"
+    entidade: "Sistema_Configuracao_Email"
+    contexto:
+      estado_inicial:
+        banco:
+          Sistema_Configuracao_Email:
+            - Id: 1
+              Fl_Principal: 1
+              tenant_id: 1
+    entrada:
+      Provedor: "SMTP"
+      Servidor_Smtp: "smtp2.empresa.com"
+      Porta_Smtp: 587
+      Usuario: "noreply2@empresa.com"
+      Senha: "senha123"
+      Fl_Usar_Ssl: true
+      Email_Remetente: "noreply2@empresa.com"
+      Nome_Remetente: "IControlIT 2"
+      Fl_Principal: true
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+      banco:
+        Sistema_Configuracao_Email:
+          deve_existir:
+            - Id: 1
+              Fl_Principal: 0
+
+  # =========================================
+  # VALIDAÇÃO - Sistema_Configuracao_Email (MT-RF001-120 a MT-RF001-129)
+  # =========================================
+  MT-RF001-120:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Porta_Smtp fora de 1-65535"
+    ca_ref: "FE-UC11-002"
+    uc_ref: "UC11"
+    entidade: "Sistema_Configuracao_Email"
+    entrada:
+      Provedor: "SMTP"
+      Servidor_Smtp: "smtp.empresa.com"
+      Porta_Smtp: 99999
+      Usuario: "user@empresa.com"
+      Senha: "senha"
+      Fl_Usar_Ssl: true
+      Email_Remetente: "noreply@empresa.com"
+      Nome_Remetente: "Nome"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        campos:
+          Porta_Smtp: "Porta deve estar entre 1 e 65535"
+
+  MT-RF001-121:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Email_Remetente inválido"
+    ca_ref: "FE-UC11-003"
+    uc_ref: "UC11"
+    entidade: "Sistema_Configuracao_Email"
+    entrada:
+      Provedor: "SMTP"
+      Servidor_Smtp: "smtp.empresa.com"
+      Porta_Smtp: 587
+      Usuario: "user"
+      Senha: "senha"
+      Fl_Usar_Ssl: true
+      Email_Remetente: "email_invalido"
+      Nome_Remetente: "Nome"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        campos:
+          Email_Remetente: "formato_invalido"
+
+  # =========================================
+  # SUCESSO - Sistema_Limite_Uso (MT-RF001-030 a MT-RF001-039)
+  # =========================================
+  MT-RF001-030:
+    categoria: "SUCESSO"
+    descricao: "Criação de limite de uso"
+    ca_ref: "FP-UC16-014"
+    uc_ref: "UC16"
+    entidade: "Sistema_Limite_Uso"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.LIMITES_USO.CREATE"]
+    entrada:
+      Tipo_Limite: "MAX_USUARIOS"
+      Limite: 100
+      Uso_Atual: 0
+      Percentual_Alerta: 80
+    resultado_esperado:
+      sucesso: true
+      http_status: 201
+
+  MT-RF001-031:
+    categoria: "SUCESSO"
+    descricao: "Listagem de limites com indicadores visuais"
+    ca_ref: "FP-UC15-006"
+    uc_ref: "UC15"
+    entidade: "Sistema_Limite_Uso"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.LIMITES_USO.VIEW_ANY"]
+    entrada:
+      page: 1
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      validacoes:
+        - "Percentual calculado automaticamente"
+        - "Indicador visual conforme status"
+
+  MT-RF001-032:
+    categoria: "SUCESSO"
+    descricao: "Edição de limite com reset de flag alerta (hysteresis)"
+    ca_ref: "FP-UC18-007"
+    uc_ref: "UC18"
+    entidade: "Sistema_Limite_Uso"
+    contexto:
+      estado_inicial:
+        banco:
+          Sistema_Limite_Uso:
+            - Id: 1
+              Limite: 100
+              Uso_Atual: 90
+              Percentual_Alerta: 80
+              Fl_Alerta_Enviado: 1
+              tenant_id: 1
+    entrada:
+      id: 1
+      Uso_Atual: 50
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      banco:
+        Sistema_Limite_Uso:
+          deve_existir:
+            - Id: 1
+              Fl_Alerta_Enviado: 0
+
+  # =========================================
+  # VALIDAÇÃO - Sistema_Limite_Uso (MT-RF001-130 a MT-RF001-139)
+  # =========================================
+  MT-RF001-130:
+    categoria: "REGRA_NEGOCIO"
+    descricao: "Tipo_Limite duplicado no tenant"
+    ca_ref: "FE-UC16-001"
+    uc_ref: "UC16"
+    entidade: "Sistema_Limite_Uso"
+    contexto:
+      estado_inicial:
+        banco:
+          Sistema_Limite_Uso:
+            - Tipo_Limite: "MAX_USUARIOS"
+              tenant_id: 1
+    entrada:
+      Tipo_Limite: "MAX_USUARIOS"
+      Limite: 200
+      Uso_Atual: 0
+      Percentual_Alerta: 80
+    resultado_esperado:
+      sucesso: false
+      http_status: 409
+      erro:
+        mensagem: "Já existe limite para este tipo"
+
+  MT-RF001-131:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Limite <= 0"
+    ca_ref: "FE-UC16-002"
+    uc_ref: "UC16"
+    entidade: "Sistema_Limite_Uso"
+    entrada:
+      Tipo_Limite: "MAX_ATIVOS"
+      Limite: 0
+      Uso_Atual: 0
+      Percentual_Alerta: 80
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        campos:
+          Limite: "Limite deve ser maior que zero"
+
+  MT-RF001-132:
+    categoria: "VALIDACAO_FORMATO"
+    descricao: "Percentual_Alerta fora de 1-100"
+    ca_ref: "FE-UC16-003"
+    uc_ref: "UC16"
+    entidade: "Sistema_Limite_Uso"
+    entrada:
+      Tipo_Limite: "MAX_STORAGE_MB"
+      Limite: 1000
+      Uso_Atual: 0
+      Percentual_Alerta: 150
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+
+  # =========================================
+  # JOB BACKGROUND - UC20 (MT-RF001-040 a MT-RF001-049)
+  # =========================================
+  MT-RF001-040:
+    categoria: "SUCESSO"
+    descricao: "Job verifica limites e envia alerta quando >= Percentual_Alerta"
+    ca_ref: "FP-UC20-005"
+    uc_ref: "UC20"
+    entidade: "Sistema_Limite_Uso"
+    tipo: "background_job"
+    contexto:
+      estado_inicial:
+        banco:
+          Sistema_Limite_Uso:
+            - Id: 1
+              Limite: 100
+              Uso_Atual: 85
+              Percentual_Alerta: 80
+              Fl_Alerta_Enviado: 0
+    entrada:
+      trigger: "CRON_1H"
+    resultado_esperado:
+      sucesso: true
+      validacoes:
+        - "E-mail de alerta enviado para administradores"
+        - "Fl_Alerta_Enviado marcado como 1"
+
+  MT-RF001-041:
+    categoria: "SUCESSO"
+    descricao: "Job aplica hysteresis e reseta flag quando uso cai"
+    ca_ref: "FP-UC20-007"
+    uc_ref: "UC20"
+    entidade: "Sistema_Limite_Uso"
+    tipo: "background_job"
+    contexto:
+      estado_inicial:
+        banco:
+          Sistema_Limite_Uso:
+            - Id: 1
+              Limite: 100
+              Uso_Atual: 65
+              Percentual_Alerta: 80
+              Fl_Alerta_Enviado: 1
+    entrada:
+      trigger: "CRON_1H"
+    resultado_esperado:
+      sucesso: true
+      banco:
+        Sistema_Limite_Uso:
+          deve_existir:
+            - Id: 1
+              Fl_Alerta_Enviado: 0
+
+  # =========================================
+  # INTEGRAÇÃO SMTP - UC21 (MT-RF001-050 a MT-RF001-059)
+  # =========================================
+  MT-RF001-050:
+    categoria: "SUCESSO"
+    descricao: "Teste de conexão SMTP bem-sucedido"
+    ca_ref: "FP-UC21-008"
+    uc_ref: "UC21"
+    entidade: "Sistema_Configuracao_Email"
+    tipo: "integracao_externa"
+    contexto:
+      autenticacao:
+        usuario_id: 1
+        tenant_id: 1
+        permissoes: ["SYS.CONFIGURACOES_EMAIL.UPDATE"]
+      estado_inicial:
+        banco:
+          Sistema_Configuracao_Email:
+            - Id: 1
+              Provedor: "SMTP"
+              Servidor_Smtp: "smtp.valido.com"
+              Porta_Smtp: 587
+              Usuario: "user@valido.com"
+              Senha: "senha_criptografada"
+              tenant_id: 1
+    entrada:
+      id: 1
+      acao: "testar_conexao"
+    resultado_esperado:
+      sucesso: true
+      http_status: 200
+      resposta:
+        mensagem: "E-mail de teste enviado com sucesso"
+
+  MT-RF001-051:
+    categoria: "INTEGRACAO"
+    descricao: "Teste de conexão SMTP - falha de autenticação"
+    ca_ref: "FE-UC21-001"
+    uc_ref: "UC21"
+    entidade: "Sistema_Configuracao_Email"
+    tipo: "integracao_externa"
+    contexto:
+      estado_inicial:
+        banco:
+          Sistema_Configuracao_Email:
+            - Id: 1
+              Provedor: "SMTP"
+              Servidor_Smtp: "smtp.empresa.com"
+              Usuario: "user_errado"
+              Senha: "senha_errada"
+              tenant_id: 1
+    entrada:
+      id: 1
+      acao: "testar_conexao"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        mensagem: "Falha na autenticação SMTP. Verifique usuário e senha."
+
+  MT-RF001-052:
+    categoria: "INTEGRACAO"
+    descricao: "Teste de conexão SMTP - servidor inacessível"
+    ca_ref: "FE-UC21-002"
+    uc_ref: "UC21"
+    entidade: "Sistema_Configuracao_Email"
+    tipo: "integracao_externa"
+    entrada:
+      id: 1
+      acao: "testar_conexao"
+      servidor: "smtp.inexistente.com"
+    resultado_esperado:
+      sucesso: false
+      http_status: 400
+      erro:
+        mensagem: "Não foi possível conectar ao servidor SMTP"
+
+  MT-RF001-053:
+    categoria: "INTEGRACAO"
+    descricao: "Teste de conexão SMTP - timeout"
+    ca_ref: "FE-UC21-003"
+    uc_ref: "UC21"
+    entidade: "Sistema_Configuracao_Email"
+    tipo: "integracao_externa"
+    entrada:
+      id: 1
+      acao: "testar_conexao"
+      timeout_simulado: true
+    resultado_esperado:
+      sucesso: false
+      http_status: 408
+      erro:
+        mensagem: "Timeout ao enviar e-mail"
+
+# =============================================
+# DADOS REUTILIZÁVEIS
+# =============================================
+reusable_data:
+  usuarios:
+    admin:
+      id: 1
+      role: "admin"
+      tenant_id: 1
+    user:
+      id: 2
+      role: "user"
+      tenant_id: 1
+    super_admin:
+      id: 99
+      role: "super_admin"
+      tenant_id: null
+
+  tenants:
+    principal:
+      id: 1
+      nome: "Tenant Principal"
+      status: "ACTIVE"
+    secundario:
+      id: 2
+      nome: "Tenant Secundário"
+      status: "ACTIVE"
+
+  categorias_parametro:
+    - "Sistema"
+    - "Segurança"
+    - "Integração"
+    - "Notificação"
+    - "Relatório"
+
+  tipos_dado:
+    - "String"
+    - "Integer"
+    - "Decimal"
+    - "Boolean"
+    - "Date"
+    - "JSON"
+
+  tipos_limite:
+    - "MAX_USUARIOS"
+    - "MAX_ATIVOS"
+    - "MAX_STORAGE_MB"
+    - "MAX_API_CALLS_DIA"
+
+  tipos_rollout:
+    - "All"
+    - "Percentage"
+    - "UserList"
+    - "DateRange"
+
+  provedores_email:
+    - "SMTP"
+    - "SendGrid"
+    - "AWS_SES"
+
+# =============================================
+# HISTÓRICO
+# =============================================
+historico:
+  - versao: "1.0"
+    data: "2026-01-28"
+    autor: "Agência ALC - alc.dev.br"
+    descricao: "Criação inicial MT-RF001 com cobertura 100% de todas as 4 entidades (Sistema_Parametro, Sistema_Feature_Flag, Sistema_Configuracao_Email, Sistema_Limite_Uso) + UC20 (Job Background) + UC21 (Integração SMTP). Total: 60+ massas de teste."

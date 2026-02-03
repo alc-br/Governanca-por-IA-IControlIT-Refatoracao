@@ -1,0 +1,742 @@
+# =============================================
+# MT-RF083 - Massa de Teste
+# Central de Módulos
+# Versão: 1.0
+# Data: 2026-02-01
+# Autor: Agente Claude Code
+# =============================================
+# IMPORTANTE: RF083 é funcionalidade GLOBAL (não multi-tenant)
+# - Funcionalidades são compartilhadas entre todos os tenants
+# - Acesso filtrado por PERFIL (Developer/System/Tenant)
+# - Não há isolamento por tenant_id
+# =============================================
+
+mt:
+  rf_id: "RF083"
+  nome: "Central de Módulos - Massa de Teste"
+  versao: "1.0"
+  data: "2026-02-01"
+  tipo: "leitura_e_admin"  # Leitura pública + Ações administrativas restritas
+
+rastreabilidade:
+  rf: "RF083"
+  uc_ids: ["UC00", "UC01", "UC02", "UC03", "UC04", "UC05", "UC06", "UC07"]
+  regras_negocio:
+    - "RN-RF083-02" # Isolamento por perfil
+    - "RN-RF083-03" # Empresas exclusivas vazias = acesso total
+    - "RN-RF083-04" # Apenas Developer gerencia exclusivas
+    - "RN-RF083-05" # Soft delete
+    - "RN-RF083-07" # Vinculação Feature Flag
+    - "RN-RF083-11" # Ordenação
+    - "RN-RF083-13" # Auditoria
+    - "RN-RF083-14" # Estatísticas ativos/não excluídos
+    - "RN-RF083-15" # Reset restrito
+
+contexto:
+  multi_tenancy: false  # RF083 é GLOBAL por decisão arquitetural
+  soft_delete: true
+  auditoria: true
+  perfis_sistema:
+    - "Developer"     # Acesso total + gerenciamento exclusivas + reset
+    - "Admin"         # Visualização (System)
+    - "User"          # Visualização (Tenant - apenas Corporativo)
+
+# =============================================
+# CATEGORIAS DE MASSA DE TESTE
+# =============================================
+
+data_sets:
+
+  # ==========================================================
+  # SUCESSO (001-099)
+  # Cenários de sucesso para UCs principais
+  # ==========================================================
+
+  MT-RF083-001:
+    categoria: "SUCESSO"
+    descricao: "UC00 - Listar funcionalidades como Developer (acesso total)"
+    ca_ref: []  # UC00 não tem CAs explícitos
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.VIEW_ANY"]
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades"
+      query_params:
+        apenasAtivas: true
+        incluirAcoes: true
+        incluirFilhas: true
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body:
+        - id: "{guid}"
+          codigo: "FF.SYS.CLIENTES"
+          nome: "Gestão de Clientes"
+          descricao: "Gerenciamento de clientes multi-tenant"
+          icone: "user-group"
+          rota: "/cadastros/clientes"
+          ativo: true
+          ordem: 1
+          categoria: "Cadastros"
+          acoes: []
+          filhas: []
+      validacoes:
+        - "Array não vazio (mínimo 10 funcionalidades)"
+        - "Ordenação: primeiro por 'ordem', depois por 'nome'"
+        - "Developer vê TODAS as funcionalidades (incluindo Sistema e Corporativo)"
+
+  MT-RF083-002:
+    categoria: "SUCESSO"
+    descricao: "UC00 - Listar funcionalidades como Admin (System - vê Corporativo + Sistema)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "22222222-2222-2222-2222-222222222222"
+        perfil: "Admin"
+        permissoes: ["CENTRAL_MODULOS.VIEW_ANY"]
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades"
+      query_params:
+        apenasAtivas: true
+        incluirAcoes: false
+      headers:
+        Authorization: "Bearer {jwt_token_admin}"
+    response_esperada:
+      http_status: 200
+      body:
+        - id: "{guid}"
+          codigo: "FF.SYS.CLIENTES"
+          nome: "Gestão de Clientes"
+          ativo: true
+      validacoes:
+        - "Admin vê funcionalidades Corporativo + Sistema"
+        - "NÃO vê funcionalidades Developer-only"
+        - "Array menor que Developer"
+
+  MT-RF083-003:
+    categoria: "SUCESSO"
+    descricao: "UC00 - Listar funcionalidades como User (Tenant - vê apenas Corporativo)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "33333333-3333-3333-3333-333333333333"
+        perfil: "User"
+        permissoes: ["CENTRAL_MODULOS.VIEW_ANY"]
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades"
+      query_params:
+        apenasAtivas: true
+      headers:
+        Authorization: "Bearer {jwt_token_user}"
+    response_esperada:
+      http_status: 200
+      body:
+        - id: "{guid}"
+          codigo: "FF.COR.DASHBOARD"
+          nome: "Dashboard Principal"
+          ativo: true
+      validacoes:
+        - "User vê APENAS funcionalidades Corporativo"
+        - "NÃO vê Sistema nem Developer"
+        - "Array menor que Admin"
+
+  MT-RF083-004:
+    categoria: "SUCESSO"
+    descricao: "UC01 - Visualizar detalhes de funcionalidade existente"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.VIEW"]
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades/{id}"
+      path_params:
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"  # ID existente
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body:
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        codigo: "FF.SYS.CLIENTES"
+        nome: "Gestão de Clientes"
+        descricao: "Gerenciamento de clientes multi-tenant SaaS"
+        icone: "user-group"
+        rota: "/cadastros/clientes"
+        featureFlagId: null
+        ativo: true
+        ordem: 10
+        categoria: "Cadastros"
+        funcionalidadePaiId: null
+        permissaoRequerida: "CLIENTES.VIEW_ANY"
+        created: "2026-01-13T00:00:00Z"
+        createdBy: "system"
+        lastModified: "2026-01-30T12:00:00Z"
+        lastModifiedBy: "developer@icontrolit.com"
+        acoes:
+          - id: "{guid}"
+            codigo: "CLIENTES.CREATE"
+            nome: "Criar Cliente"
+            tipoAcao: "CREATE"
+            ativo: true
+        filhas: []
+      validacoes:
+        - "Inclui campos de auditoria (created, createdBy, lastModified, lastModifiedBy)"
+        - "Inclui ações associadas"
+        - "Inclui funcionalidades filhas (se existirem)"
+
+  MT-RF083-005:
+    categoria: "SUCESSO"
+    descricao: "UC02 - Listar funcionalidades por categoria específica"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.VIEW_ANY"]
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades/categoria/{categoria}"
+      path_params:
+        categoria: "Cadastros"
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body:
+        - id: "{guid}"
+          codigo: "FF.SYS.CLIENTES"
+          nome: "Gestão de Clientes"
+          categoria: "Cadastros"
+        - id: "{guid}"
+          codigo: "FF.SYS.USUARIOS"
+          nome: "Gestão de Usuários"
+          categoria: "Cadastros"
+      validacoes:
+        - "TODAS as funcionalidades retornadas pertencem à categoria 'Cadastros'"
+        - "Não retorna funcionalidades de outras categorias"
+
+  MT-RF083-006:
+    categoria: "SUCESSO"
+    descricao: "UC03 - Obter estatísticas de funcionalidades"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.VIEW_ANY"]
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades/estatisticas"
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body:
+        totalGeral: 35
+        porCategoria:
+          Cadastros: 12
+          Sistema: 10
+          Configuracoes: 8
+          Relatorios: 5
+      validacoes:
+        - "totalGeral é soma de todos os grupos"
+        - "porCategoria é objeto com chave = categoria, valor = count"
+        - "Considera apenas funcionalidades ativas e não excluídas"
+
+  MT-RF083-007:
+    categoria: "SUCESSO"
+    descricao: "UC04 - Atualizar empresas exclusivas (Developer com lista de empresas)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.MANAGE_EXCLUSIVES"]
+    request:
+      metodo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      path_params:
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+      body:
+        empresasIds:
+          - "11111111-0000-0000-0000-000000000001"
+          - "11111111-0000-0000-0000-000000000002"
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body: true
+      validacoes:
+        - "empresasExclusivasJson atualizado com JSON serializado dos IDs"
+        - "Auditoria: lastModifiedBy = developer@icontrolit.com"
+
+  MT-RF083-008:
+    categoria: "SUCESSO"
+    descricao: "UC04 - Limpar empresas exclusivas (array vazio = todas as empresas)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.MANAGE_EXCLUSIVES"]
+    request:
+      metodo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      path_params:
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+      body:
+        empresasIds: []  # Array vazio = acesso total
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body: true
+      validacoes:
+        - "empresasExclusivasJson definido como null (acesso total)"
+        - "Funcionalidade disponível para TODAS as empresas"
+
+  MT-RF083-009:
+    categoria: "SUCESSO"
+    descricao: "UC05 - Resetar funcionalidades (Developer/Super Admin)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.RESET"]
+    request:
+      metodo: "POST"
+      endpoint: "/api/funcionalidades/reset"
+      body: {}
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body:
+        sucesso: true
+        mensagem: "Funcionalidades resetadas e repopuladas com sucesso. 35 funcionalidades criadas."
+      validacoes:
+        - "TODAS as funcionalidades existentes foram deletadas"
+        - "35 funcionalidades padrão foram recriadas"
+        - "Operação destrutiva completada com sucesso"
+
+  # ==========================================================
+  # VALIDACAO (100-199)
+  # Cenários de validação de entrada
+  # ==========================================================
+
+  MT-RF083-100:
+    categoria: "VALIDACAO"
+    descricao: "UC00 - Filtrar funcionalidades por categoria inexistente (retorna vazio)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.VIEW_ANY"]
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades"
+      query_params:
+        categoria: "CategoriaInexistente"
+        apenasAtivas: true
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body: []  # Array vazio (não é erro, apenas sem resultados)
+      validacoes:
+        - "Retorna array vazio (não 404)"
+        - "Categoria inexistente não gera erro, apenas sem resultados"
+
+  MT-RF083-101:
+    categoria: "VALIDACAO"
+    descricao: "UC01 - Visualizar funcionalidade com ID inexistente (404 Not Found)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.VIEW"]
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades/{id}"
+      path_params:
+        id: "99999999-9999-9999-9999-999999999999"  # ID inexistente
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 404
+      body:
+        type: "https://tools.ietf.org/html/rfc7231#section-6.5.4"
+        title: "Not Found"
+        status: 404
+        detail: "Funcionalidade com ID 99999999-9999-9999-9999-999999999999 nao encontrada"
+      validacoes:
+        - "404 Not Found retornado"
+        - "Mensagem clara informando ID não encontrado"
+
+  MT-RF083-102:
+    categoria: "VALIDACAO"
+    descricao: "UC01 - Visualizar funcionalidade excluída (soft delete = 404)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.VIEW"]
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades/{id}"
+      path_params:
+        id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"  # ID excluído (fl_excluido = true)
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 404
+      body:
+        type: "https://tools.ietf.org/html/rfc7231#section-6.5.4"
+        title: "Not Found"
+        status: 404
+      validacoes:
+        - "Funcionalidades excluídas (fl_excluido = true) não são retornadas"
+        - "Comportamento idêntico a ID inexistente"
+
+  MT-RF083-103:
+    categoria: "VALIDACAO"
+    descricao: "UC04 - Atualizar empresas exclusivas de funcionalidade inexistente (404)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.MANAGE_EXCLUSIVES"]
+    request:
+      metodo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      path_params:
+        id: "99999999-9999-9999-9999-999999999999"
+      body:
+        empresasIds:
+          - "11111111-0000-0000-0000-000000000001"
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 404
+      body:
+        type: "https://tools.ietf.org/html/rfc7231#section-6.5.4"
+        title: "Not Found"
+        status: 404
+        detail: "Funcionalidade com ID 99999999-9999-9999-9999-999999999999 nao encontrada"
+      validacoes:
+        - "404 Not Found retornado"
+        - "Operação não realizada"
+
+  # ==========================================================
+  # SEGURANCA (400-499)
+  # Cenários de autenticação e autorização
+  # ==========================================================
+
+  MT-RF083-400:
+    categoria: "SEGURANCA"
+    descricao: "UC00 - Listar funcionalidades sem autenticação (401 Unauthorized)"
+    ca_ref: []
+    contexto:
+      autenticacao: null  # SEM autenticação
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades"
+      headers: {}  # SEM header Authorization
+    response_esperada:
+      http_status: 401
+      body:
+        type: "https://tools.ietf.org/html/rfc7235#section-3.1"
+        title: "Unauthorized"
+        status: 401
+      validacoes:
+        - "Requisição sem token JWT retorna 401"
+        - "Endpoint protegido por autenticação"
+
+  MT-RF083-401:
+    categoria: "SEGURANCA"
+    descricao: "UC01 - Visualizar funcionalidade sem autenticação (401 Unauthorized)"
+    ca_ref: []
+    contexto:
+      autenticacao: null
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades/{id}"
+      path_params:
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+      headers: {}
+    response_esperada:
+      http_status: 401
+      body:
+        type: "https://tools.ietf.org/html/rfc7235#section-3.1"
+        title: "Unauthorized"
+        status: 401
+      validacoes:
+        - "Requisição sem token JWT retorna 401"
+
+  MT-RF083-402:
+    categoria: "SEGURANCA"
+    descricao: "UC04 - Atualizar empresas exclusivas sem ser Developer (403 Forbidden)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "22222222-2222-2222-2222-222222222222"
+        perfil: "Admin"  # NÃO é Developer
+        permissoes: []  # NÃO tem MANAGE_EXCLUSIVES
+    request:
+      metodo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      path_params:
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+      body:
+        empresasIds:
+          - "11111111-0000-0000-0000-000000000001"
+      headers:
+        Authorization: "Bearer {jwt_token_admin}"
+    response_esperada:
+      http_status: 403
+      body:
+        type: "https://tools.ietf.org/html/rfc7231#section-6.5.3"
+        title: "Forbidden"
+        status: 403
+        detail: "Apenas desenvolvedores podem gerenciar empresas exclusivas"
+      validacoes:
+        - "403 Forbidden retornado"
+        - "Apenas Developer pode gerenciar empresas exclusivas (RN-RF083-04)"
+
+  MT-RF083-403:
+    categoria: "SEGURANCA"
+    descricao: "UC05 - Resetar funcionalidades sem ser Developer/Super Admin (403 Forbidden)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "33333333-3333-3333-3333-333333333333"
+        perfil: "User"  # NÃO é Developer nem Super Admin
+        permissoes: []
+    request:
+      metodo: "POST"
+      endpoint: "/api/funcionalidades/reset"
+      body: {}
+      headers:
+        Authorization: "Bearer {jwt_token_user}"
+    response_esperada:
+      http_status: 403
+      body:
+        type: "https://tools.ietf.org/html/rfc7231#section-6.5.3"
+        title: "Forbidden"
+        status: 403
+      validacoes:
+        - "403 Forbidden retornado"
+        - "Apenas Developer/Super Admin podem resetar (RN-RF083-15)"
+
+  # ==========================================================
+  # MULTI_TENANCY (700-799)
+  # NOTA: RF083 é GLOBAL (não multi-tenant)
+  # ==========================================================
+
+  MT-RF083-700:
+    categoria: "MULTI_TENANCY"
+    descricao: "N/A - RF083 não implementa multi-tenancy"
+    ca_ref: []
+    contexto:
+      observacao: |
+        RF083 é funcionalidade GLOBAL por decisão arquitetural.
+        - Funcionalidades são compartilhadas entre todos os tenants
+        - Acesso filtrado por PERFIL (Developer/System/Tenant)
+        - Não há isolamento por tenant_id
+        - Campo ClienteId não aplicável
+
+        JUSTIFICATIVA (ARCHITECTURE.md):
+        - Central de Módulos registra funcionalidades GLOBAIS do sistema
+        - Todos os tenants compartilham o mesmo catálogo de funcionalidades
+        - Isolamento é por perfil, não por tenant
+
+        Esta categoria é N/A (Not Applicable) para RF083.
+    request: null
+    response_esperada: null
+
+  # ==========================================================
+  # AUDITORIA (800-899)
+  # Cenários de auditoria de operações
+  # ==========================================================
+
+  MT-RF083-800:
+    categoria: "AUDITORIA"
+    descricao: "UC04 - Auditoria ao atualizar empresas exclusivas"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.MANAGE_EXCLUSIVES"]
+    request:
+      metodo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      path_params:
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+      body:
+        empresasIds:
+          - "11111111-0000-0000-0000-000000000001"
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body: true
+      validacoes:
+        - "lastModifiedBy atualizado com email do usuário autenticado"
+        - "lastModified atualizado com timestamp atual (UTC)"
+        - "Campos de auditoria persistidos no banco"
+    verificacao_banco:
+      tabela: "sistema_funcionalidade"
+      condicao: "id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'"
+      campos_auditoria:
+        - campo: "last_modified_by"
+          valor_esperado: "developer@icontrolit.com"
+        - campo: "last_modified"
+          validacao: "timestamp_recente"  # Últimos 5 segundos
+
+  MT-RF083-801:
+    categoria: "AUDITORIA"
+    descricao: "UC05 - Auditoria ao resetar funcionalidades (operação destrutiva)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.RESET"]
+    request:
+      metodo: "POST"
+      endpoint: "/api/funcionalidades/reset"
+      body: {}
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body:
+        sucesso: true
+        mensagem: "Funcionalidades resetadas e repopuladas com sucesso. 35 funcionalidades criadas."
+      validacoes:
+        - "Funcionalidades antigas deletadas (ou marcadas fl_excluido = true)"
+        - "Novas funcionalidades criadas com created_by = 'system' (seed inicial)"
+        - "Operação destrutiva auditada via logs do sistema"
+
+  # ==========================================================
+  # INTEGRACAO (900-999)
+  # Cenários de integração com outros módulos
+  # ==========================================================
+
+  MT-RF083-900:
+    categoria: "INTEGRACAO"
+    descricao: "UC00 - Listar funcionalidades com Feature Flag vinculada (opcional)"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.VIEW_ANY"]
+    request:
+      metodo: "GET"
+      endpoint: "/api/funcionalidades"
+      query_params:
+        apenasAtivas: true
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body:
+        - id: "{guid}"
+          codigo: "FF.SYS.BETA_FEATURE"
+          nome: "Funcionalidade Beta"
+          featureFlagId: "ffff0000-0000-0000-0000-000000000001"  # FK para feature_flags
+          ativo: true
+      validacoes:
+        - "featureFlagId pode ser null (funcionalidade sempre disponível se ativa)"
+        - "featureFlagId não nulo = FK constraint válida (feature_flags existente)"
+        - "Integração com RF de Feature Flags (se existir)"
+
+  MT-RF083-901:
+    categoria: "INTEGRACAO"
+    descricao: "UC04 - Atualizar empresas exclusivas com IDs válidos de empresas"
+    ca_ref: []
+    contexto:
+      autenticacao:
+        usuario_id: "11111111-1111-1111-1111-111111111111"
+        perfil: "Developer"
+        permissoes: ["CENTRAL_MODULOS.MANAGE_EXCLUSIVES"]
+    request:
+      metodo: "PUT"
+      endpoint: "/api/funcionalidades/{id}/empresas-exclusivas"
+      path_params:
+        id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+      body:
+        empresasIds:
+          - "11111111-0000-0000-0000-000000000001"  # ID de empresa existente
+          - "11111111-0000-0000-0000-000000000002"  # ID de empresa existente
+      headers:
+        Authorization: "Bearer {jwt_token_developer}"
+    response_esperada:
+      http_status: 200
+      body: true
+      validacoes:
+        - "IDs de empresas são GUIDs válidos"
+        - "Backend NÃO valida se IDs existem (por performance)"
+        - "Validação de existência é responsabilidade do frontend (opcional)"
+        - "empresasExclusivasJson armazena JSON serializado dos IDs"
+
+# =============================================
+# RESUMO DE COBERTURA
+# =============================================
+
+cobertura:
+  categorias_implementadas:
+    - "SUCESSO (9 massas): MT-RF083-001 a 009"
+    - "VALIDACAO (4 massas): MT-RF083-100 a 103"
+    - "SEGURANCA (4 massas): MT-RF083-400 a 403"
+    - "MULTI_TENANCY (1 N/A): MT-RF083-700 (RF083 é GLOBAL)"
+    - "AUDITORIA (2 massas): MT-RF083-800 a 801"
+    - "INTEGRACAO (2 massas): MT-RF083-900 a 901"
+
+  total_massas: 22  # 9 + 4 + 4 + 1(N/A) + 2 + 2
+
+  ucs_cobertos:
+    - "UC00: Listar Funcionalidades (MT-001, 002, 003, 100, 400, 900)"
+    - "UC01: Visualizar Funcionalidade (MT-004, 101, 102, 401)"
+    - "UC02: Listar por Categoria (MT-005)"
+    - "UC03: Obter Estatísticas (MT-006)"
+    - "UC04: Gerenciar Empresas Exclusivas (MT-007, 008, 103, 402, 800, 901)"
+    - "UC05: Resetar Funcionalidades (MT-009, 403, 801)"
+    - "UC06: Expandir/Contrair Categorias (Frontend-only - sem MT backend)"
+    - "UC07: Filtrar Funcionalidades (Frontend-only - comportamento local)"
+
+  regras_negocio_cobertas:
+    - "RN-RF083-02: Isolamento por perfil (MT-001, 002, 003)"
+    - "RN-RF083-03: Empresas exclusivas vazias = acesso total (MT-008)"
+    - "RN-RF083-04: Apenas Developer gerencia exclusivas (MT-402)"
+    - "RN-RF083-05: Soft delete (MT-102)"
+    - "RN-RF083-07: Feature Flag opcional (MT-900)"
+    - "RN-RF083-11: Ordenação (MT-001)"
+    - "RN-RF083-13: Auditoria (MT-800, 801)"
+    - "RN-RF083-14: Estatísticas ativos/não excluídos (MT-006)"
+    - "RN-RF083-15: Reset restrito (MT-403)"
+
+observacoes:
+  - "RF083 é funcionalidade GLOBAL (não multi-tenant) - MT-700 marcado como N/A"
+  - "UC06 e UC07 são comportamentos frontend (filtros locais, expansão UI) - sem MT backend"
+  - "Endpoints implementados: GET /funcionalidades, GET /{id}, PUT /empresas-exclusivas, GET /categoria/{cat}, GET /estatisticas, POST /reset"
+  - "Todos os endpoints exigem autenticação (401 se não autenticado)"
+  - "Endpoints administrativos (empresas exclusivas, reset) restritos por perfil (403 se não autorizado)"
+  - "Soft delete aplicado: funcionalidades excluídas (fl_excluido = true) não são retornadas"
+  - "Auditoria completa: created, createdBy, lastModified, lastModifiedBy em todas as operações"
