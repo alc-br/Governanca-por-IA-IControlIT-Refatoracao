@@ -201,24 +201,28 @@ REGRA CRITICA:
 CHECKLIST OBRIGATÓRIO:
 Validar todos os itens de D:\IC2_Governanca\governanca\checklists\testes\pre-execucao.yaml antes de prosseguir.
 
-SELECAO DE ESTRATEGIA (OBRIGATORIO - PERGUNTAR ANTES DE EXECUTAR):
+SELECAO DE ESTRATEGIA (v1.6 - ATIVA, NAO PASSIVA):
 
-ANTES de iniciar a execucao de testes, o agente DEVE perguntar ao usuario:
+⚠️ REGRA: O agente NAO PODE apenas perguntar e parar. DEVE executar imediatamente apos obter resposta.
 
-"Este RF vai para:
-A) HOMOLOGACAO (usar MVS: 2-4h, 80% cobertura, 1 smoke test E2E)
-B) PRODUCAO (usar COMPLETO: 10+h, 95-100% cobertura, todos os testes E2E)
+ESTRATEGIA PADRAO (se usuario nao especificou):
+- ✅ ASSUMIR: MVS (Minimo Viavel Seguro) para HOMOLOGACAO
+- ✅ PERGUNTAR: "Vou executar MVS (HOM). Se quiser COMPLETO (PRD), responda 'PRD'."
+- ✅ EXECUTAR: Imediatamente se usuario nao responder em 5s
 
-Responda A ou B."
+SE usuario JA especificou no prompt:
+- "para HOM" ou "MVS" → EXECUTAR MVS imediatamente
+- "para PRD" ou "COMPLETO" → EXECUTAR COMPLETO imediatamente
+- Nao especificou → ASSUMIR MVS e EXECUTAR
 
-SE usuario responder "A" ou "HOM" ou "homologacao":
-- ✅ Ativar contrato: D:\IC2_Governanca\governanca\contracts\testes\CONTRATO-TESTES-MINIMO-VIAVEL-SEGURO.md
-- ✅ Executar apenas: Unitarios (100%) + Smoke E2E (1 spec) + Seguranca Critica (2 tipos)
-- ✅ Tempo esperado: 2-4 horas
-- ✅ Resultado: APROVADO_HOM ou REPROVADO
+ESTRATEGIA MVS (rapido, para HOM):
+- Contrato: D:\IC2_Governanca\governanca\contracts\testes\CONTRATO-TESTES-MINIMO-VIAVEL-SEGURO.md
+- Testes: Unitarios (100%) + Smoke E2E (1 spec) + Seguranca Critica (2 tipos)
+- Tempo: 2-4h
+- Cobertura: 80%
 
-SE usuario responder "B" ou "PRD" ou "producao":
-- ✅ Continuar com este contrato (execucao-completa.md)
+ESTRATEGIA COMPLETO (completo, para PRD):
+- Contrato: Este (execucao-completa.md)
 - ✅ Executar todos os testes: Unitarios + Frontend + E2E Completo + Seguranca Completa
 - ✅ Tempo esperado: 10+ horas
 - ✅ Resultado: APROVADO_PRD ou REPROVADO
