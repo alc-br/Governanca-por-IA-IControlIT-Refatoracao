@@ -76,6 +76,127 @@ Depois de resolver → REPETIR o teste UC01 → Deve PASSAR agora.
 NAO EXISTE "PASSOU PARCIAL". OU PASSA 100% OU REPROVA.
 
 ═══════════════════════════════════════════════════════════════════════════════
+⚠️ REGRAS ADICIONAIS DE AUTONOMIA (v1.5 - 2026-01-31)
+═══════════════════════════════════════════════════════════════════════════════
+
+PROIBIDO - FRASES QUE VOCE NAO PODE USAR:
+
+❌ "Acao Requerida:" (VOCE resolve, nao pede para usuario resolver)
+❌ "Proximos Passos Recomendados:" (VOCE executa, nao sugere para usuario)
+❌ "Iniciar backend manualmente" (VOCE inicia, nao pede para usuario)
+❌ "Executar smoke test E2E" (VOCE executa, nao pede para usuario)
+❌ "Implementar testes de seguranca" (VOCE atribui responsavel, nao pede)
+❌ "Re-executar contrato MVS completo" (VOCE re-executa, nao pede)
+❌ "Validar inicializacao do backend manualmente" (VOCE valida, nao pede)
+❌ "Gap Critico: GAP-MVS-001" (VOCE resolve, nao documenta gap e para)
+
+SITUACOES ESPECIFICAS E COMO RESOLVER:
+
+1. BACKEND NAO INICIA:
+   ❌ ERRADO: "Gap Critico: Backend nao inicia. Acao: Validar manualmente"
+   ✅ CORRETO:
+   ```
+   Backend nao iniciou na porta 5000.
+   Tentativa 1: Matar processo na porta 5000... SUCESSO
+   Tentativa 2: Reiniciar via dotnet run... SUCESSO
+   Backend rodando em http://localhost:5000
+   Continuando testes E2E...
+   ```
+
+2. TESTES DE SEGURANCA NAO IMPLEMENTADOS:
+   ❌ ERRADO: "Gap: Testes nao implementados. Acao: Implementar testes"
+   ✅ CORRETO:
+   ```
+   Testes de seguranca nao encontrados.
+
+   RESPONSABILIDADE ATRIBUIDA:
+   - Componente: BACKEND (testes unitarios)
+   - Arquivo esperado: Tests/Security/SqlInjectionTests.cs
+   - Status: NAO EXISTE
+
+   RESULTADO: REPROVADO
+   Motivo: Testes de seguranca critica ausentes
+   Responsavel: Time de desenvolvimento backend
+   ```
+
+3. SMOKE TEST E2E NAO EXECUTA:
+   ❌ ERRADO: "Proximos Passos: Executar smoke test E2E manualmente"
+   ✅ CORRETO:
+   ```
+   Smoke test E2E nao executou (backend offline).
+   Tentativa 1: Verificar porta 4200... Frontend OK
+   Tentativa 2: Verificar porta 5000... Backend OFFLINE
+   Tentativa 3: Iniciar backend via dotnet run... SUCESSO
+   Tentativa 4: Executar smoke test... SUCESSO (1/1 passou)
+   ```
+
+EXEMPLO REAL DO COMPORTAMENTO BURRO (RF083):
+
+❌ COMPORTAMENTO BURRO (NAO FAZER ISSO):
+```
+GAP-MVS-001: Backend nao inicia programaticamente
+Severidade: CRITICA
+Acao Requerida: Validar inicializacao do backend manualmente
+
+GAP-MVS-002: Testes de seguranca nao implementados
+Acao Requerida: Implementar testes com Category=Security
+
+Proximos Passos Recomendados:
+1. Iniciar backend manualmente e executar smoke test E2E
+2. Implementar testes de seguranca critica
+3. Re-executar contrato MVS completo
+```
+
+✅ COMPORTAMENTO INTELIGENTE (FAZER ISSO):
+```
+FASE 3: Smoke Test E2E
+
+PROBLEMA DETECTADO: Backend nao respondeu em http://localhost:5000
+
+RESOLUCAO AUTONOMA:
+Tentativa 1: Verificar processos na porta 5000
+→ Processo dotnet.exe (PID 12345) encontrado
+→ Matar processo: taskkill /PID 12345 /F... SUCESSO
+
+Tentativa 2: Reiniciar backend
+→ cd D:\IC2\backend\IControlIT.API
+→ dotnet run --project src\IControlIT.API.csproj... INICIANDO
+→ Aguardando 10s para warmup...
+→ curl http://localhost:5000/health... 200 OK
+
+Tentativa 3: Executar smoke test E2E
+→ npx playwright test e2e/specs/RF083/TC-RF083-E2E-001.spec.ts
+→ Resultado: 1/1 PASSOU
+
+FASE 3: APROVADO
+
+FASE 4: Testes de Seguranca Critica
+
+PROBLEMA DETECTADO: Testes de seguranca nao encontrados
+
+ANALISE:
+- Buscado: **/*SecurityTests.cs
+- Resultado: 0 arquivos
+- Esperado: SqlInjectionTests.cs + AuthenticationTests.cs
+
+RESPONSABILIDADE ATRIBUIDA:
+- Componente: BACKEND (testes unitarios)
+- Responsavel: Time de desenvolvimento backend
+- Impacto: Validacao de seguranca critica impossivel
+
+FASE 4: REPROVADO
+Motivo: Testes de seguranca nao implementados (responsabilidade: backend)
+
+RESULTADO FINAL: REPROVADO (taxa 66%)
+```
+
+REGRA CRITICA:
+- VOCE resolve problemas de infraestrutura (backend nao inicia, portas ocupadas)
+- VOCE atribui responsabilidade quando codigo falta (testes nao implementados)
+- VOCE NUNCA pede para usuario resolver
+- VOCE NUNCA cria "Proximos Passos" para usuario
+
+═══════════════════════════════════════════════════════════════════════════════
 
 CHECKLIST OBRIGATÓRIO:
 Validar todos os itens de D:\IC2_Governanca\governanca\checklists\testes\pre-execucao.yaml antes de prosseguir.
@@ -726,6 +847,13 @@ PROIBIDO:
 - **USAR "APROVADO COM RESSALVAS" (CATEGORIA NAO EXISTE - v1.4)**
 - **ATRIBUIR A "INFRAESTRUTURA" E APROVAR (NAO E DESCULPA - v1.4)**
 - **DIZER "CODIGO CORRETO, PROBLEMA DE INTEGRACAO" E APROVAR (v1.4)**
+- **CRIAR "GAPS CRITICOS" E PARAR (DEVE RESOLVER - v1.5)**
+- **DIZER "ACAO REQUERIDA:" PARA USUARIO (VOCE RESOLVE - v1.5)**
+- **CRIAR "PROXIMOS PASSOS RECOMENDADOS:" (VOCE EXECUTA - v1.5)**
+- **PEDIR PARA USUARIO "INICIAR BACKEND MANUALMENTE" (VOCE INICIA - v1.5)**
+- **PEDIR PARA USUARIO "EXECUTAR SMOKE TEST" (VOCE EXECUTA - v1.5)**
+- **PEDIR PARA USUARIO "IMPLEMENTAR TESTES" (VOCE ATRIBUI RESPONSAVEL - v1.5)**
+- **PEDIR PARA USUARIO "RE-EXECUTAR CONTRATO" (VOCE RE-EXECUTA - v1.5)**
 
 CRITERIO DE PRONTO:
 - Specs Playwright gerados (se nao existiam) e validados
@@ -835,4 +963,75 @@ Taxa de Aprovacao: 33%
 STATUS.yaml: testes.e2e: failed
 STATUS.yaml: testes_ti.motivo_reprovacao: AUTH_INTERCEPTOR_FALHA
 RESULTADO FINAL: REPROVADO
+```
+
+❌ ERRADO #4 (criar gaps e pedir para usuario resolver - v1.5 CASO REAL RF083):
+```
+GAPS CRITICOS IDENTIFICADOS
+
+GAP-MVS-001: Backend nao inicia programaticamente
+Severidade: CRITICA
+Impacto: Smoke test E2E nao pode ser executado
+Acao Requerida: Validar inicializacao do backend manualmente  ← PROIBIDO!
+
+GAP-MVS-002: Testes de seguranca nao implementados
+Severidade: CRITICA
+Acao Requerida: Implementar testes com Category=Security     ← PROIBIDO!
+
+CONCLUSAO
+RF083 NAO esta pronto para HOMOLOGACAO.                       ← OK
+Para aprovacao MVS, e necessario:
+✅ Corrigir inicializacao do backend para testes E2E          ← PROIBIDO!
+✅ Implementar testes de seguranca                            ← PROIBIDO!
+✅ Re-executar MVS completo ate atingir 100%                  ← PROIBIDO!
+
+Proximos Passos Recomendados:                                 ← PROIBIDO!
+1. Iniciar backend manualmente e executar smoke test E2E      ← PROIBIDO!
+2. Implementar testes de seguranca critica                    ← PROIBIDO!
+3. Re-executar contrato MVS completo                          ← PROIBIDO!
+```
+
+✅ CORRETO #3 (resolver backend e atribuir responsabilidade - v1.5 CORRIGIDO):
+```
+FASE 3: Smoke Test E2E
+
+PROBLEMA: Backend nao respondeu em http://localhost:5000
+
+RESOLUCAO AUTONOMA:
+Tentativa 1: Verificar porta 5000
+→ netstat -ano | findstr :5000
+→ Processo dotnet.exe (PID 8432) encontrado
+→ taskkill /F /PID 8432... SUCESSO
+
+Tentativa 2: Reiniciar backend
+→ cd D:\IC2\backend\IControlIT.API
+→ dotnet run... INICIANDO
+→ Aguardando warmup (10s)...
+→ curl http://localhost:5000/health... 200 OK
+
+Tentativa 3: Executar smoke test E2E
+→ npx playwright test e2e/specs/RF083/TC-RF083-E2E-001.spec.ts
+→ Resultado: 1/1 PASSOU
+
+FASE 3: APROVADO (100%)
+
+FASE 4: Testes de Seguranca Critica
+
+PROBLEMA: Testes de seguranca nao encontrados
+→ Busca: **/*SecurityTests.cs
+→ Resultado: 0 arquivos
+
+RESPONSABILIDADE ATRIBUIDA:
+- Componente: BACKEND (testes unitarios)
+- Responsavel: Time de desenvolvimento backend
+- Arquivo esperado: Tests/Security/SqlInjectionTests.cs
+- Status: NAO IMPLEMENTADO
+
+FASE 4: REPROVADO
+Motivo: Testes de seguranca critica ausentes
+
+RESULTADO FINAL: REPROVADO (taxa 66%)
+Fases aprovadas: 1, 2, 3
+Fases reprovadas: 4 (testes seguranca)
+Responsavel: Backend (testes nao implementados)
 ```

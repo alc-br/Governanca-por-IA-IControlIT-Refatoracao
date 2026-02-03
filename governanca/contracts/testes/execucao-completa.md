@@ -2769,6 +2769,65 @@ STATUS.yaml: testes_ti.motivo_reprovacao = AUTH_INTERCEPTOR_FALHA"
 - Não existe "código correto mas testes falhando"
 - Se testes falham, algo está errado e DEVE ser corrigido
 
+### 7.5. Proibições de Comportamento Passivo (v1.5 - 2026-01-31)
+
+**O agente NÃO PODE criar "Gaps" e pedir para usuário resolver:**
+
+- ❌ **"Gap Crítico: GAP-MVS-001"** → VOCE resolve, não documenta gap e para
+- ❌ **"Ação Requerida:"** → VOCE resolve, não pede para usuário
+- ❌ **"Próximos Passos Recomendados:"** → VOCE executa, não sugere para usuário
+- ❌ **"Iniciar backend manualmente"** → VOCE inicia, não pede para usuário
+- ❌ **"Executar smoke test E2E"** → VOCE executa, não pede para usuário
+- ❌ **"Implementar testes de segurança"** → VOCE atribui responsável, não pede
+- ❌ **"Re-executar contrato MVS completo"** → VOCE re-executa, não pede
+- ❌ **"Validar inicialização do backend manualmente"** → VOCE valida, não pede
+
+**Exemplos de comportamento PASSIVO (PROIBIDO):**
+
+```
+❌ PASSIVO (RF083 real):
+GAP-MVS-001: Backend não inicia programaticamente
+Ação Requerida: Validar inicialização do backend manualmente
+
+GAP-MVS-002: Testes de segurança não implementados
+Ação Requerida: Implementar testes com Category=Security
+
+Próximos Passos Recomendados:
+1. Iniciar backend manualmente e executar smoke test E2E
+2. Implementar testes de segurança crítica
+3. Re-executar contrato MVS completo
+```
+
+**Exemplos de comportamento ATIVO (OBRIGATÓRIO):**
+
+```
+✅ ATIVO:
+FASE 3: Backend não respondeu em http://localhost:5000
+
+RESOLUÇÃO AUTÔNOMA:
+Tentativa 1: Matar processo na porta 5000... SUCESSO
+Tentativa 2: Reiniciar backend... SUCESSO
+Tentativa 3: Executar smoke test... PASSOU (1/1)
+
+FASE 3: APROVADO
+
+FASE 4: Testes de segurança não encontrados
+
+RESPONSABILIDADE ATRIBUÍDA:
+- Componente: BACKEND (testes unitários)
+- Responsável: Time de desenvolvimento backend
+- Status: NÃO IMPLEMENTADO
+
+FASE 4: REPROVADO
+RESULTADO FINAL: REPROVADO (taxa 66%)
+```
+
+**REGRA CRÍTICA:**
+- VOCE resolve problemas de infraestrutura (backend não inicia, portas ocupadas)
+- VOCE atribui responsabilidade quando código falta (testes não implementados)
+- VOCE NUNCA pede para usuário resolver
+- VOCE NUNCA cria "Próximos Passos" para usuário
+
 ---
 
 ## 8. CRITÉRIO DE PRONTO
