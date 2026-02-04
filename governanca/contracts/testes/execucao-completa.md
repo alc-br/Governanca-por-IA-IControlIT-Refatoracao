@@ -2047,6 +2047,207 @@ Esta validação **previne problemas sistemáticos** de contaminação de estado
 
 **Resultado:** PASS/FAIL
 
+#### PASSO 6.2: PRINTS OBRIGATÓRIOS (v2.3 - 2026-01-31)
+
+**REGRA:** Durante execução dos testes de segurança, o agente DEVE exibir PRINTs estruturados confirmando execução e resultados.
+
+### Formato de PRINT de Início de Fase
+
+```
+═══════════════════════════════════════════════════════════════
+📋 FASE 6: TESTES DE SEGURANÇA
+═══════════════════════════════════════════════════════════════
+RF: RFXXX
+Data/Hora: 2026-01-31 15:27:00
+Categorias: SQL Injection, XSS, CSRF, Autenticação, Autorização, Multi-tenancy
+Log: D:\IC2\.temp_ia\EVIDENCIAS-SEGURANCA-RFXXX.log
+───────────────────────────────────────────────────────────────
+```
+
+### Formato de PRINT de Cada Teste de Segurança
+
+```
+🛡️ TESTANDO: SQL Injection
+───────────────────────────────────────────────────────────────
+TC: SEC-001 - Injeção SQL via campo de busca
+Payload: ' OR '1'='1
+Expected: Backend deve rejeitar (400 Bad Request)
+───────────────────────────────────────────────────────────────
+✅ APROVADO: Backend rejeitou payload malicioso
+   Response: 400 Bad Request
+   Message: "Invalid input: special characters not allowed"
+   Time: 0.3s
+───────────────────────────────────────────────────────────────
+
+🛡️ TESTANDO: XSS (Cross-Site Scripting)
+───────────────────────────────────────────────────────────────
+TC: SEC-002 - Script injection via campo de nome
+Payload: <script>alert('XSS')</script>
+Expected: Frontend deve escapar, backend deve sanitizar
+───────────────────────────────────────────────────────────────
+✅ APROVADO: Payload sanitizado corretamente
+   Frontend: &lt;script&gt;alert('XSS')&lt;/script&gt;
+   Backend: Script tags removidos
+   Time: 0.5s
+───────────────────────────────────────────────────────────────
+
+🛡️ TESTANDO: Autenticação
+───────────────────────────────────────────────────────────────
+TC: SEC-003 - Acesso sem token
+Expected: 401 Unauthorized
+───────────────────────────────────────────────────────────────
+✅ APROVADO: Endpoint protegido corretamente
+   Response: 401 Unauthorized
+   Time: 0.2s
+───────────────────────────────────────────────────────────────
+
+🛡️ TESTANDO: Autorização (RBAC)
+───────────────────────────────────────────────────────────────
+TC: SEC-004 - Usuário sem permissão tentando criar
+Expected: 403 Forbidden
+───────────────────────────────────────────────────────────────
+✅ APROVADO: RBAC bloqueou acesso
+   Response: 403 Forbidden
+   Message: "Insufficient permissions"
+   Time: 0.4s
+───────────────────────────────────────────────────────────────
+
+🛡️ TESTANDO: Multi-tenancy
+───────────────────────────────────────────────────────────────
+TC: SEC-005 - Acesso a dados de outro tenant
+Expected: 404 Not Found ou 403 Forbidden
+───────────────────────────────────────────────────────────────
+✅ APROVADO: Isolamento de tenant funcional
+   Response: 404 Not Found (dados não visíveis)
+   Time: 0.6s
+───────────────────────────────────────────────────────────────
+
+🛡️ TESTANDO: CSRF (Cross-Site Request Forgery)
+───────────────────────────────────────────────────────────────
+TC: SEC-006 - Request sem CSRF token
+Expected: 403 Forbidden
+───────────────────────────────────────────────────────────────
+❌ REPROVADO: CSRF token não validado
+   Response: 200 OK (DEVERIA SER 403)
+   VULNERABILIDADE CRÍTICA: Endpoint aceita requests sem CSRF token
+   Time: 0.3s
+   Responsabilidade: BACKEND (middleware CSRF ausente)
+───────────────────────────────────────────────────────────────
+```
+
+### Formato de PRINT de Resumo de Fase
+
+```
+═══════════════════════════════════════════════════════════════
+📊 RESUMO: FASE 6 - TESTES DE SEGURANÇA
+═══════════════════════════════════════════════════════════════
+Total de testes: 6
+✅ Aprovados: 5 (83.3%)
+❌ Reprovados: 1 (16.7%)
+Tempo total: 2.3s
+Evidências: D:\IC2\.temp_ia\EVIDENCIAS-SEGURANCA-RFXXX.log
+Status da fase: ❌ REPROVADO (1 vulnerabilidade crítica)
+───────────────────────────────────────────────────────────────
+Vulnerabilidades identificadas:
+  1. SEC-006: CSRF token não validado (BACKEND - middleware ausente)
+───────────────────────────────────────────────────────────────
+⚠️ AÇÃO NECESSÁRIA: Corrigir vulnerabilidade de segurança crítica antes de deploy
+═══════════════════════════════════════════════════════════════
+```
+
+### Comando de Execução Atualizado
+
+```bash
+# Criar diretório de evidências se não existir
+mkdir -p D:/IC2/.temp_ia/
+
+# Definir nome do arquivo de log
+LOG_FILE="D:/IC2/.temp_ia/EVIDENCIAS-SEGURANCA-RFXXX.log"
+
+# PRINT de início
+echo "═══════════════════════════════════════════════════════════════"
+echo "📋 FASE 6: TESTES DE SEGURANÇA"
+echo "═══════════════════════════════════════════════════════════════"
+echo "RF: RFXXX"
+echo "Data/Hora: $(date +"%Y-%m-%d %H:%M:%S")"
+echo "Log: $LOG_FILE"
+echo "───────────────────────────────────────────────────────────────"
+
+# Executar cada teste de segurança e registrar
+{
+  echo "🛡️ TESTANDO: SQL Injection"
+  # ... executar teste SQL injection
+  echo "✅ APROVADO: Backend rejeitou payload malicioso"
+  echo ""
+
+  echo "🛡️ TESTANDO: XSS"
+  # ... executar teste XSS
+  echo "✅ APROVADO: Payload sanitizado corretamente"
+  echo ""
+
+  echo "🛡️ TESTANDO: Autenticação"
+  # ... executar teste de autenticação
+  echo "✅ APROVADO: Endpoint protegido corretamente"
+  echo ""
+
+  echo "🛡️ TESTANDO: Autorização (RBAC)"
+  # ... executar teste de autorização
+  echo "✅ APROVADO: RBAC bloqueou acesso"
+  echo ""
+
+  echo "🛡️ TESTANDO: Multi-tenancy"
+  # ... executar teste de multi-tenancy
+  echo "✅ APROVADO: Isolamento de tenant funcional"
+  echo ""
+
+  echo "🛡️ TESTANDO: CSRF"
+  # ... executar teste CSRF
+  echo "❌ REPROVADO: CSRF token não validado"
+  echo ""
+} | tee "$LOG_FILE"
+
+# Calcular resumo
+PASSED=$(grep -c "✅ APROVADO" "$LOG_FILE" || echo "0")
+FAILED=$(grep -c "❌ REPROVADO" "$LOG_FILE" || echo "0")
+TOTAL=$((PASSED + FAILED))
+
+# PRINT de resumo
+echo "═══════════════════════════════════════════════════════════════"
+echo "📊 RESUMO: FASE 6 - TESTES DE SEGURANÇA"
+echo "═══════════════════════════════════════════════════════════════"
+echo "Total de testes: $TOTAL"
+echo "✅ Aprovados: $PASSED"
+echo "❌ Reprovados: $FAILED"
+echo "Evidências: $LOG_FILE"
+if [ "$FAILED" -eq 0 ]; then
+  echo "Status da fase: ✅ APROVADO"
+else
+  echo "Status da fase: ❌ REPROVADO ($FAILED vulnerabilidades)"
+  grep "❌ REPROVADO" "$LOG_FILE" | while read line; do
+    echo "  - $line"
+  done
+fi
+echo "═══════════════════════════════════════════════════════════════"
+```
+
+### Validação de Evidências
+
+```bash
+# Validar que arquivo de log foi gerado
+if [ ! -f "$LOG_FILE" ]; then
+  echo "❌ ERRO: Arquivo de evidências de segurança não foi gerado"
+  exit 1
+fi
+
+# Validar que arquivo não está vazio
+if [ ! -s "$LOG_FILE" ]; then
+  echo "❌ ERRO: Arquivo de evidências de segurança está vazio"
+  exit 1
+fi
+
+echo "✅ Evidências de segurança registradas: $LOG_FILE"
+```
+
 ---
 
 ### FASE 6.5: AUDITORIA DE CONFORMIDADE FUNCIONAL E UX
@@ -3036,6 +3237,149 @@ relatorios/RFXXX/testes/
 │   └── security-scan-results.txt
 └── RELATORIO-CONSOLIDADO-TESTES-RFXXX.md
 ```
+
+#### PASSO 9.3: Consolidar Logs de Evidências (v2.3 - 2026-01-31)
+
+**REGRA:** Consolidar todos os logs de evidências gerados durante as fases em um único relatório.
+
+### Logs Gerados por Fase
+
+```
+D:\IC2\.temp_ia\
+├── EVIDENCIAS-BACKEND-RFXXX.log          # FASE 3
+├── EVIDENCIAS-FRONTEND-RFXXX.log         # FASE 4
+├── EVIDENCIAS-E2E-RFXXX.log              # FASE 5
+└── EVIDENCIAS-SEGURANCA-RFXXX.log        # FASE 6
+```
+
+### Criar Relatório Consolidado
+
+```bash
+# Definir arquivo consolidado
+CONSOLIDATED_LOG="D:/IC2/.temp_ia/EVIDENCIAS-CONSOLIDADAS-RFXXX-$(date +%Y%m%d-%H%M%S).log"
+
+# Consolidar todos os logs
+{
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "📊 RELATÓRIO CONSOLIDADO DE EVIDÊNCIAS"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "RF: RFXXX"
+  echo "Data: $(date +"%Y-%m-%d %H:%M:%S")"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+
+  if [ -f "D:/IC2/.temp_ia/EVIDENCIAS-BACKEND-RFXXX.log" ]; then
+    echo "📋 FASE 3: TESTES BACKEND"
+    echo "───────────────────────────────────────────────────────────────"
+    cat "D:/IC2/.temp_ia/EVIDENCIAS-BACKEND-RFXXX.log"
+    echo ""
+  fi
+
+  if [ -f "D:/IC2/.temp_ia/EVIDENCIAS-FRONTEND-RFXXX.log" ]; then
+    echo "📋 FASE 4: TESTES FRONTEND"
+    echo "───────────────────────────────────────────────────────────────"
+    cat "D:/IC2/.temp_ia/EVIDENCIAS-FRONTEND-RFXXX.log"
+    echo ""
+  fi
+
+  if [ -f "D:/IC2/.temp_ia/EVIDENCIAS-E2E-RFXXX.log" ]; then
+    echo "📋 FASE 5: TESTES E2E"
+    echo "───────────────────────────────────────────────────────────────"
+    cat "D:/IC2/.temp_ia/EVIDENCIAS-E2E-RFXXX.log"
+    echo ""
+  fi
+
+  if [ -f "D:/IC2/.temp_ia/EVIDENCIAS-SEGURANCA-RFXXX.log" ]; then
+    echo "📋 FASE 6: TESTES DE SEGURANÇA"
+    echo "───────────────────────────────────────────────────────────────"
+    cat "D:/IC2/.temp_ia/EVIDENCIAS-SEGURANCA-RFXXX.log"
+    echo ""
+  fi
+
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "📊 RESUMO FINAL DE TODAS AS FASES"
+  echo "═══════════════════════════════════════════════════════════════"
+
+  # Calcular totais
+  BACKEND_PASSED=$(grep -c "✅" "D:/IC2/.temp_ia/EVIDENCIAS-BACKEND-RFXXX.log" 2>/dev/null || echo "0")
+  BACKEND_FAILED=$(grep -c "❌" "D:/IC2/.temp_ia/EVIDENCIAS-BACKEND-RFXXX.log" 2>/dev/null || echo "0")
+
+  FRONTEND_PASSED=$(grep -c "PASS" "D:/IC2/.temp_ia/EVIDENCIAS-FRONTEND-RFXXX.log" 2>/dev/null || echo "0")
+  FRONTEND_FAILED=$(grep -c "FAIL" "D:/IC2/.temp_ia/EVIDENCIAS-FRONTEND-RFXXX.log" 2>/dev/null || echo "0")
+
+  E2E_PASSED=$(grep -c "✓" "D:/IC2/.temp_ia/EVIDENCIAS-E2E-RFXXX.log" 2>/dev/null || echo "0")
+  E2E_FAILED=$(grep -c "✘" "D:/IC2/.temp_ia/EVIDENCIAS-E2E-RFXXX.log" 2>/dev/null || echo "0")
+
+  SECURITY_PASSED=$(grep -c "✅ APROVADO" "D:/IC2/.temp_ia/EVIDENCIAS-SEGURANCA-RFXXX.log" 2>/dev/null || echo "0")
+  SECURITY_FAILED=$(grep -c "❌ REPROVADO" "D:/IC2/.temp_ia/EVIDENCIAS-SEGURANCA-RFXXX.log" 2>/dev/null || echo "0")
+
+  TOTAL_PASSED=$((BACKEND_PASSED + FRONTEND_PASSED + E2E_PASSED + SECURITY_PASSED))
+  TOTAL_FAILED=$((BACKEND_FAILED + FRONTEND_FAILED + E2E_FAILED + SECURITY_FAILED))
+  TOTAL_TESTS=$((TOTAL_PASSED + TOTAL_FAILED))
+
+  if [ "$TOTAL_TESTS" -gt 0 ]; then
+    APPROVAL_RATE=$((TOTAL_PASSED * 100 / TOTAL_TESTS))
+  else
+    APPROVAL_RATE=0
+  fi
+
+  echo "FASE 3 (Backend):   $BACKEND_PASSED aprovados, $BACKEND_FAILED reprovados"
+  echo "FASE 4 (Frontend):  $FRONTEND_PASSED aprovados, $FRONTEND_FAILED reprovados"
+  echo "FASE 5 (E2E):       $E2E_PASSED aprovados, $E2E_FAILED reprovados"
+  echo "FASE 6 (Segurança): $SECURITY_PASSED aprovados, $SECURITY_FAILED reprovados"
+  echo "───────────────────────────────────────────────────────────────"
+  echo "TOTAL:              $TOTAL_PASSED aprovados, $TOTAL_FAILED reprovados"
+  echo "Taxa de aprovação:  $APPROVAL_RATE%"
+  echo ""
+
+  if [ "$TOTAL_FAILED" -eq 0 ]; then
+    echo "RESULTADO FINAL: ✅ APROVADO 100%"
+  else
+    echo "RESULTADO FINAL: ❌ REPROVADO ($APPROVAL_RATE%)"
+  fi
+
+  echo "═══════════════════════════════════════════════════════════════"
+} > "$CONSOLIDATED_LOG"
+
+echo "✅ Relatório consolidado gerado: $CONSOLIDATED_LOG"
+```
+
+### Validação do Relatório Consolidado
+
+```bash
+# Validar que relatório foi gerado
+if [ ! -f "$CONSOLIDATED_LOG" ]; then
+  echo "❌ ERRO: Relatório consolidado não foi gerado"
+  exit 1
+fi
+
+# Validar que contém dados
+if [ ! -s "$CONSOLIDATED_LOG" ]; then
+  echo "❌ ERRO: Relatório consolidado está vazio"
+  exit 1
+fi
+
+# Exibir localização
+echo "═══════════════════════════════════════════════════════════════"
+echo "📄 EVIDÊNCIAS CONSOLIDADAS"
+echo "═══════════════════════════════════════════════════════════════"
+echo "Relatório: $CONSOLIDATED_LOG"
+echo "Tamanho: $(wc -l < "$CONSOLIDATED_LOG") linhas"
+echo "═══════════════════════════════════════════════════════════════"
+```
+
+### Estrutura Final de Evidências
+
+```
+D:\IC2\.temp_ia\
+├── EVIDENCIAS-BACKEND-RFXXX.log                    # FASE 3 (individual)
+├── EVIDENCIAS-FRONTEND-RFXXX.log                   # FASE 4 (individual)
+├── EVIDENCIAS-E2E-RFXXX.log                        # FASE 5 (individual)
+├── EVIDENCIAS-SEGURANCA-RFXXX.log                  # FASE 6 (individual)
+└── EVIDENCIAS-CONSOLIDADAS-RFXXX-20260131-152800.log  # Consolidado (todas as fases)
+```
+
+**Observação:** Os logs individuais são mantidos para análise detalhada, e o consolidado fornece visão geral.
 
 ---
 
