@@ -197,6 +197,80 @@ REGRA CRITICA:
 - VOCE NUNCA cria "Proximos Passos" para usuario
 
 ═══════════════════════════════════════════════════════════════════════════════
+⚠️ PRINTS OBRIGATORIOS DE EVIDENCIAS (v2.3 - 2026-01-31)
+═══════════════════════════════════════════════════════════════════════════════
+
+VOCE DEVE EXIBIR PRINTS ESTRUTURADOS CONFIRMANDO EXECUCAO E RESULTADOS DE CADA TESTE.
+
+FORMATO PADRAO DE PRINTS:
+
+1. PRINT DE INICIO DE FASE:
+```
+═══════════════════════════════════════════════════════════════
+📋 FASE [N]: [NOME DA FASE]
+═══════════════════════════════════════════════════════════════
+RF: RFXXX
+Data/Hora: [timestamp]
+Log: D:\IC2\.temp_ia\EVIDENCIAS-[TIPO]-RFXXX.log
+───────────────────────────────────────────────────────────────
+```
+
+2. PRINT DURANTE EXECUCAO:
+- Mostrar nome do teste em execucao
+- Mostrar resultado (✅ APROVADO / ❌ REPROVADO)
+- Mostrar tempo de execucao
+- Mostrar evidencias geradas (screenshots, traces, logs)
+
+3. PRINT DE RESUMO DE FASE:
+```
+═══════════════════════════════════════════════════════════════
+📊 RESUMO: FASE [N] - [NOME]
+═══════════════════════════════════════════════════════════════
+Total de testes: XX
+✅ Aprovados: XX (XX%)
+❌ Reprovados: XX (XX%)
+Tempo total: XXm XXs
+Evidencias: D:\IC2\.temp_ia\EVIDENCIAS-[TIPO]-RFXXX.log
+Status da fase: ✅ APROVADO / ❌ REPROVADO
+═══════════════════════════════════════════════════════════════
+```
+
+LOGS DE EVIDENCIAS OBRIGATORIOS:
+
+- FASE 3 (Backend):   D:\IC2\.temp_ia\EVIDENCIAS-BACKEND-RFXXX.log
+- FASE 4 (Frontend):  D:\IC2\.temp_ia\EVIDENCIAS-FRONTEND-RFXXX.log
+- FASE 5 (E2E):       D:\IC2\.temp_ia\EVIDENCIAS-E2E-RFXXX.log
+- FASE 6 (Seguranca): D:\IC2\.temp_ia\EVIDENCIAS-SEGURANCA-RFXXX.log
+
+CONSOLIDACAO FINAL (FASE 9):
+
+Ao final, gerar arquivo consolidado:
+D:\IC2\.temp_ia\EVIDENCIAS-CONSOLIDADAS-RFXXX-[TIMESTAMP].log
+
+Contendo:
+- Todos os logs das fases
+- Resumo geral de totais
+- Taxa de aprovacao final
+- Resultado final (APROVADO/REPROVADO)
+
+COMANDOS COM TEE:
+
+Sempre usar `tee` para salvar logs:
+
+```bash
+cd backend/IControlIT.API
+dotnet test 2>&1 | tee D:/IC2/.temp_ia/EVIDENCIAS-BACKEND-RFXXX.log
+
+cd frontend/icontrolit-app
+npm run test 2>&1 | tee D:/IC2/.temp_ia/EVIDENCIAS-FRONTEND-RFXXX.log
+npx playwright test 2>&1 | tee D:/IC2/.temp_ia/EVIDENCIAS-E2E-RFXXX.log
+```
+
+VALIDACAO:
+
+Apos cada fase, validar que arquivo de log foi gerado e nao esta vazio.
+
+═══════════════════════════════════════════════════════════════════════════════
 
 CHECKLIST OBRIGATÓRIO:
 Validar todos os itens de D:\IC2_Governanca\governanca\checklists\testes\pre-execucao.yaml antes de prosseguir.
