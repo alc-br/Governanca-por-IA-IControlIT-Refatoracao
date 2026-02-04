@@ -1,7 +1,11 @@
+<!-- Versao: 2.4 | Data: 2026-02-04 | Changelog: v2.4 - Regra de Nao Parada adicionada -->
+
 Executar testes automatizados do RFXXX conforme D:\IC2_Governanca\governanca\contracts\testes\execucao-completa.md.
 
 Modo governanca rigida. Nao negociar escopo. Nao extrapolar.
 Seguir D:\IC2\CLAUDE.md.
+
+ATENÇÃO: Você tem autonomia para minupular o front e backend caso esteja travado ou com problemas. Não pare simplesmente por erros, você deve ser autonomo nesse sentido!
 
 EXCECAO IMPORTANTE - STATUS.yaml (v1.3):
 A regra do CLAUDE.md "Se voce estiver rodando a partir de D:\IC2\ nunca altere nada em D:\IC2_Governanca" TEM UMA UNICA EXCECAO:
@@ -269,6 +273,115 @@ npx playwright test 2>&1 | tee D:/IC2/.temp_ia/EVIDENCIAS-E2E-RFXXX.log
 VALIDACAO:
 
 Apos cada fase, validar que arquivo de log foi gerado e nao esta vazio.
+
+═══════════════════════════════════════════════════════════════════════════════
+⚠️ REGRA DE NAO PARADA - NUNCA PARE EM ESTADO PARCIAL (v2.4 - 2026-02-04)
+═══════════════════════════════════════════════════════════════════════════════
+
+VOCE NAO PODE PARAR EM 66%, 80%, OU QUALQUER % < 100%.
+
+SE a taxa atual for < 100%:
+1. IDENTIFICAR exatamente qual teste/fase falhou
+2. INVESTIGAR a causa raiz do problema
+3. TENTAR TODAS as opcoes de resolucao (seeds, API, config, reiniciar)
+4. SE resolver: CONTINUAR ate 100%
+5. SE nao resolver: TENTAR proxima opcao
+6. SOMENTE REPROVAR quando TODAS as tentativas falharem
+
+COMPORTAMENTO PROIBIDO (caso real RF007 - 66%):
+
+❌ ERRADO:
+```
+RESULTADO FINAL: PARCIAL (66% aprovado)
+
+⚠️ PROBLEMAS IDENTIFICADOS:
+1. TESTES E2E - PARCIAL (11% aprovado)
+   Motivo: Endpoint /auth/login nao retorna token
+
+PROXIMA ACAO RECOMENDADA:
+Aguardar seeds completarem e re-executar testes E2E
+```
+
+ISSO E VIOLACAO GRAVE! O agente parou sem tentar resolver.
+
+✅ CORRETO:
+```
+FASE 5: TESTES E2E
+
+PROBLEMA DETECTADO: 8/9 testes E2E falharam (endpoint /auth/login sem token)
+
+INVESTIGACAO:
+Tentativa 1: Verificar logs do backend
+→ Encontrado: "Seeds ainda executando em InitialiseDatabaseAsync"
+→ Problema: Backend aceitou requisicoes antes de seeds terminarem
+
+Tentativa 2: Aguardar seeds completarem
+→ curl http://localhost:5000/health... 200 OK
+→ Aguardando 30s para seeds terminarem...
+→ Verificando tabela Users: SELECT COUNT(*) FROM Users WHERE Email='test@example.com'
+→ Resultado: 0 registros (seed ainda nao completou)
+
+Tentativa 3: Executar seed manualmente
+→ cd D:\IC2\backend\IControlIT.API
+→ dotnet run -- seed --entity=User
+→ Resultado: SUCESSO (usuario de teste criado)
+
+Tentativa 4: Re-executar testes E2E
+→ npx playwright test e2e/specs/RF007/*.spec.ts
+→ Resultado: 9/9 PASSOU (100%)
+
+FASE 5: APROVADO (100%)
+
+RESULTADO FINAL: APROVADO (100%)
+```
+
+REGRA DE OURO:
+
+NAO EXISTE:
+❌ "Taxa 66% - continuarei depois"
+❌ "Problemas identificados - proximos passos..."
+❌ "Recomendacao: aguardar X e tentar novamente"
+❌ "PARCIAL (66%)" como resultado final
+❌ Relatorio final sem ter tentado TODAS as opcoes
+
+EXISTE APENAS:
+✅ APROVADO (100%) - apos resolver TODOS os problemas
+✅ REPROVADO (XX%) - apos ESGOTAR TODAS as tentativas de resolucao
+
+SE voce criar relatorio final com taxa < 100% SEM documentar TODAS as tentativas de resolucao:
+→ Execucao e INVALIDA
+→ Aprovacao e NULA
+→ Voce VIOLOU o contrato
+
+EXEMPLO DE TENTATIVAS EXAUSTIVAS:
+
+Problema: Testes E2E falharam (11% aprovado)
+
+TENTATIVAS OBRIGATORIAS (nesta ordem):
+1. Verificar logs backend (identificar problema)
+2. Aguardar seeds (se seeds ainda executando)
+3. Executar seeds manualmente (se nao completaram)
+4. Inserir dados via API (se seeds falharam)
+5. Verificar configuracao JWT (se problema de token)
+6. Verificar CORS (se problema de cross-origin)
+7. Verificar auth.interceptor.ts (se header ausente)
+8. Reiniciar backend (se timeout/travamento)
+9. Limpar localStorage (se token invalido/expirado)
+10. Re-executar testes E2E (apos cada resolucao)
+
+SOMENTE REPROVAR quando:
+- Todas as 10 tentativas falharam
+- Problema nao e resolvivel (codigo com bug)
+- Responsabilidade atribuida (backend/frontend)
+- Evidencias de TODAS as tentativas documentadas
+
+TEMPO ESPERADO:
+- Tentativas de resolucao: 1-2h
+- Nao tenha pressa para reprovar
+- Esgote TODAS as opcoes primeiro
+
+EXCEPCAO (quando pode parar sem 100%):
+- NENHUMA. SEMPRE tente resolver ate 100% ou esgotamento total.
 
 ═══════════════════════════════════════════════════════════════════════════════
 

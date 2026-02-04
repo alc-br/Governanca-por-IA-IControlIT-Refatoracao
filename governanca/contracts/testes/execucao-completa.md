@@ -1,10 +1,11 @@
 # CONTRATO DE EXECUÇÃO COMPLETA DE TESTES
 
-**Versão:** 2.2
-**Data:** 2026-01-11
+**Versão:** 2.3
+**Data:** 2026-02-04
 **Status:** Ativo
-**Última Atualização:** 2026-01-11 (NOVA ESTRATÉGIA: Seção 2.5 - MVS vs COMPLETO)
+**Última Atualização:** 2026-02-04 (REGRA DE NÃO PARADA: Nunca pare em estado parcial)
 **Changelog:**
+- v2.3 (2026-02-04): **REGRA CRÍTICA DE NÃO PARADA**: Agente NUNCA pode parar em estado parcial (66%, 80%) sem esgotar TODAS as tentativas de resolução - Resposta ao caso RF007 onde agente parou aos 66% sem tentar resolver problema de autenticação
 - v2.2 (2026-01-11): NOVA SEÇÃO 2.5: Seleção de Estratégia de Testes (MVS para HOM, COMPLETO para PRD) - Reduz tempo de 10h → 2-4h para homologação mantendo 80% cobertura de riscos críticos
 - v2.1 (2026-01-11): NOVO PASSO 5.10 BLOQUEANTE: Validar isolamento de testes E2E (isolated vs stateful, beforeEach/afterEach, closeAllOverlays) - Detecta padrão test.describe.serial PROIBIDO em testes isolated
 - v2.0 (2026-01-11): NOVO PASSO 5.9 BLOQUEANTE: Validar cobertura 100% de TCs (resolve GAP 2 do RF006 - 75% não testado)
@@ -2448,6 +2449,121 @@ test('Estado ativo/inativo refletido corretamente na UI', async ({ page }) => {
 **Ação se REPROVADO:**
 - Gerar prompt de correção para cada incongruência CRÍTICA ou ALTA
 - Bloquear RF de ir para produção até correção
+
+---
+
+## ⚠️ REGRA DE NÃO PARADA - NUNCA PARE EM ESTADO PARCIAL (v2.3 - 2026-02-04)
+
+**VOCÊ NÃO PODE PARAR EM 66%, 80%, OU QUALQUER % < 100%.**
+
+### Princípio Fundamental
+
+SE a taxa atual for < 100%:
+1. **IDENTIFICAR** exatamente qual teste/fase falhou
+2. **INVESTIGAR** a causa raiz do problema
+3. **TENTAR TODAS** as opções de resolução (seeds, API, config, reiniciar)
+4. **SE RESOLVER**: CONTINUAR até 100%
+5. **SE NÃO RESOLVER**: TENTAR próxima opção
+6. **SOMENTE REPROVAR** quando TODAS as tentativas falharem
+
+### Comportamento Proibido (Caso Real RF007 - 66%)
+
+❌ **ERRADO:**
+```
+RESULTADO FINAL: PARCIAL (66% aprovado)
+
+⚠️ PROBLEMAS IDENTIFICADOS:
+1. TESTES E2E - PARCIAL (11% aprovado)
+   Motivo: Endpoint /auth/login não retorna token
+
+PRÓXIMA AÇÃO RECOMENDADA:
+Aguardar seeds completarem e re-executar testes E2E
+```
+
+**ISSO É VIOLAÇÃO GRAVE!** O agente parou sem tentar resolver.
+
+### Comportamento Correto
+
+✅ **CORRETO:**
+```
+FASE 5: TESTES E2E
+
+PROBLEMA DETECTADO: 8/9 testes E2E falharam (endpoint /auth/login sem token)
+
+INVESTIGAÇÃO:
+Tentativa 1: Verificar logs do backend
+→ Encontrado: "Seeds ainda executando em InitialiseDatabaseAsync"
+→ Problema: Backend aceitou requisições antes de seeds terminarem
+
+Tentativa 2: Aguardar seeds completarem
+→ curl http://localhost:5000/health... 200 OK
+→ Aguardando 30s para seeds terminarem...
+→ Verificando tabela Users: SELECT COUNT(*) FROM Users WHERE Email='test@example.com'
+→ Resultado: 0 registros (seed ainda não completou)
+
+Tentativa 3: Executar seed manualmente
+→ cd D:\IC2\backend\IControlIT.API
+→ dotnet run -- seed --entity=User
+→ Resultado: SUCESSO (usuário de teste criado)
+
+Tentativa 4: Re-executar testes E2E
+→ npx playwright test e2e/specs/RF007/*.spec.ts
+→ Resultado: 9/9 PASSOU (100%)
+
+FASE 5: APROVADO (100%)
+
+RESULTADO FINAL: APROVADO (100%)
+```
+
+### Regra de Ouro
+
+**NÃO EXISTE:**
+- ❌ "Taxa 66% - continuarei depois"
+- ❌ "Problemas identificados - próximos passos..."
+- ❌ "Recomendação: aguardar X e tentar novamente"
+- ❌ "PARCIAL (66%)" como resultado final
+- ❌ Relatório final sem ter tentado TODAS as opções
+
+**EXISTE APENAS:**
+- ✅ **APROVADO (100%)** - após resolver TODOS os problemas
+- ✅ **REPROVADO (XX%)** - após ESGOTAR TODAS as tentativas de resolução
+
+**SE você criar relatório final com taxa < 100% SEM documentar TODAS as tentativas de resolução:**
+- Execução é **INVÁLIDA**
+- Aprovação é **NULA**
+- Você **VIOLOU** o contrato
+
+### Tentativas Exaustivas Obrigatórias
+
+**Problema:** Testes E2E falharam (11% aprovado)
+
+**TENTATIVAS OBRIGATÓRIAS (nesta ordem):**
+1. Verificar logs backend (identificar problema)
+2. Aguardar seeds (se seeds ainda executando)
+3. Executar seeds manualmente (se não completaram)
+4. Inserir dados via API (se seeds falharam)
+5. Verificar configuração JWT (se problema de token)
+6. Verificar CORS (se problema de cross-origin)
+7. Verificar auth.interceptor.ts (se header ausente)
+8. Reiniciar backend (se timeout/travamento)
+9. Limpar localStorage (se token inválido/expirado)
+10. Re-executar testes E2E (após cada resolução)
+
+**SOMENTE REPROVAR quando:**
+- Todas as 10 tentativas falharam
+- Problema não é resolvível (código com bug)
+- Responsabilidade atribuída (backend/frontend)
+- Evidências de TODAS as tentativas documentadas
+
+### Tempo Esperado
+
+- Tentativas de resolução: 1-2h
+- Não tenha pressa para reprovar
+- Esgote TODAS as opções primeiro
+
+### Exceção (quando pode parar sem 100%)
+
+- **NENHUMA.** SEMPRE tente resolver até 100% ou esgotamento total.
 
 ---
 
