@@ -957,6 +957,134 @@ Total: 31/54 testes (23 bloqueados por infraestrutura)
 
 **Resultado:** PASS/FAIL/BLOCKED
 
+#### PASSO 3.3: PRINTS OBRIGATÓRIOS (v2.3 - 2026-01-31)
+
+**REGRA:** Durante execução dos testes backend, o agente DEVE exibir PRINTs estruturados confirmando execução e resultados.
+
+### Formato de PRINT de Início de Fase
+
+```
+═══════════════════════════════════════════════════════════════
+📋 FASE 3: TESTES BACKEND
+═══════════════════════════════════════════════════════════════
+RF: RFXXX
+Data/Hora: 2026-01-31 15:23:45
+Comando: cd backend/IControlIT.API && dotnet test --verbosity normal
+Log: D:\IC2\.temp_ia\EVIDENCIAS-BACKEND-RFXXX.log
+───────────────────────────────────────────────────────────────
+```
+
+### Formato de PRINT Durante Execução
+
+O agente DEVE exibir os resultados do `dotnet test` em tempo real, incluindo:
+
+```
+🧪 EXECUTANDO: Domain.UnitTests
+  ✅ ValidarCNPJ_ComDigitosCorretos_DeveRetornarTrue (0.1s)
+  ✅ ValidarCNPJ_ComDigitosIncorretos_DeveRetornarFalse (0.1s)
+  ✅ ValidarCPF_ComDigitosCorretos_DeveRetornarTrue (0.1s)
+  ✅ ValidarCPF_ComDigitosIncorretos_DeveRetornarFalse (0.1s)
+  ✅ ValidarEmail_ComFormatoValido_DeveRetornarTrue (0.05s)
+───────────────────────────────────────────────────────────────
+📊 Domain.UnitTests: 5/5 PASS (0.35s)
+
+🧪 EXECUTANDO: Application.UnitTests
+  ✅ CreateEmpresaCommand_ComDadosValidos_DeveRetornarSucesso (0.2s)
+  ✅ CreateEmpresaCommand_SemCNPJ_DeveRetornarErro (0.15s)
+  ✅ UpdateEmpresaCommand_ComDadosValidos_DeveRetornarSucesso (0.18s)
+  ...
+───────────────────────────────────────────────────────────────
+📊 Application.UnitTests: 26/26 PASS (4.5s)
+
+🧪 EXECUTANDO: Application.FunctionalTests
+  ⏳ Inicializando Testcontainers... (SQL Server)
+  ✅ CreateEmpresa_Integration_DeveInserirNoBanco (2.1s)
+  ✅ UpdateEmpresa_Integration_DeveAtualizarNoBanco (1.8s)
+  ...
+───────────────────────────────────────────────────────────────
+📊 Application.FunctionalTests: 23/23 PASS (35.2s)
+```
+
+### Formato de PRINT de Resumo de Fase
+
+```
+═══════════════════════════════════════════════════════════════
+📊 RESUMO: FASE 3 - TESTES BACKEND
+═══════════════════════════════════════════════════════════════
+Total de testes: 54
+✅ Aprovados: 54 (100%)
+❌ Reprovados: 0 (0%)
+⏭️ Pulados: 0 (0%)
+⚠️ Bloqueados: 0 (0%)
+Tempo total: 40.05s
+Evidências: D:\IC2\.temp_ia\EVIDENCIAS-BACKEND-RFXXX.log
+Status da fase: ✅ APROVADO
+═══════════════════════════════════════════════════════════════
+```
+
+### Comando de Execução Atualizado
+
+```bash
+# Criar diretório de evidências se não existir
+mkdir -p D:/IC2/.temp_ia/
+
+# Definir nome do arquivo de log
+LOG_FILE="D:/IC2/.temp_ia/EVIDENCIAS-BACKEND-RFXXX.log"
+
+# PRINT de início
+echo "═══════════════════════════════════════════════════════════════"
+echo "📋 FASE 3: TESTES BACKEND"
+echo "═══════════════════════════════════════════════════════════════"
+echo "RF: RFXXX"
+echo "Data/Hora: $(date +"%Y-%m-%d %H:%M:%S")"
+echo "Log: $LOG_FILE"
+echo "───────────────────────────────────────────────────────────────"
+
+# Executar testes e salvar log
+cd backend/IControlIT.API
+dotnet test --verbosity normal 2>&1 | tee "$LOG_FILE"
+
+# Calcular resumo
+TOTAL=$(grep -c "Passed\|Failed\|Skipped" "$LOG_FILE" || echo "0")
+PASSED=$(grep -c "Passed" "$LOG_FILE" || echo "0")
+FAILED=$(grep -c "Failed" "$LOG_FILE" || echo "0")
+SKIPPED=$(grep -c "Skipped" "$LOG_FILE" || echo "0")
+
+# PRINT de resumo
+echo "═══════════════════════════════════════════════════════════════"
+echo "📊 RESUMO: FASE 3 - TESTES BACKEND"
+echo "═══════════════════════════════════════════════════════════════"
+echo "Total de testes: $TOTAL"
+echo "✅ Aprovados: $PASSED"
+echo "❌ Reprovados: $FAILED"
+echo "⏭️ Pulados: $SKIPPED"
+echo "Evidências: $LOG_FILE"
+if [ "$FAILED" -eq 0 ]; then
+  echo "Status da fase: ✅ APROVADO"
+else
+  echo "Status da fase: ❌ REPROVADO"
+fi
+echo "═══════════════════════════════════════════════════════════════"
+```
+
+### Validação de Evidências
+
+```bash
+# Validar que arquivo de log foi gerado
+if [ ! -f "$LOG_FILE" ]; then
+  echo "❌ ERRO: Arquivo de evidências backend não foi gerado"
+  exit 1
+fi
+
+# Validar que arquivo não está vazio
+if [ ! -s "$LOG_FILE" ]; then
+  echo "❌ ERRO: Arquivo de evidências backend está vazio"
+  exit 1
+fi
+
+echo "✅ Evidências backend registradas: $LOG_FILE"
+```
+
 ---
 
 ### FASE 4: TESTES FRONTEND (Prioridade 2)
@@ -988,6 +1116,128 @@ npm run test
 - ✅ Validações de formulário funcionando
 
 **Resultado:** PASS/FAIL
+
+#### PASSO 4.3: PRINTS OBRIGATÓRIOS (v2.3 - 2026-01-31)
+
+**REGRA:** Durante execução dos testes frontend, o agente DEVE exibir PRINTs estruturados confirmando execução e resultados.
+
+### Formato de PRINT de Início de Fase
+
+```
+═══════════════════════════════════════════════════════════════
+📋 FASE 4: TESTES FRONTEND
+═══════════════════════════════════════════════════════════════
+RF: RFXXX
+Data/Hora: 2026-01-31 15:24:30
+Comando: cd frontend/icontrolit-app && npm run test
+Log: D:\IC2\.temp_ia\EVIDENCIAS-FRONTEND-RFXXX.log
+───────────────────────────────────────────────────────────────
+```
+
+### Formato de PRINT Durante Execução
+
+O agente DEVE exibir os resultados do `npm run test` em tempo real, incluindo:
+
+```
+🧪 EXECUTANDO: app.component.spec.ts
+  ✅ should create the app (0.05s)
+  ✅ should have title 'IControlIT' (0.03s)
+───────────────────────────────────────────────────────────────
+📊 app.component.spec.ts: 2/2 PASS (0.08s)
+
+🧪 EXECUTANDO: login/login.component.spec.ts
+  ✅ should create (0.12s)
+  ✅ should validate email format (0.08s)
+  ✅ should validate required fields (0.06s)
+  ✅ should emit loginSuccess on valid submit (0.15s)
+───────────────────────────────────────────────────────────────
+📊 login.component.spec.ts: 4/4 PASS (0.41s)
+
+🧪 EXECUTANDO: services/auth.service.spec.ts
+  ✅ should be created (0.05s)
+  ✅ should store token on successful login (0.12s)
+  ✅ should clear token on logout (0.08s)
+  ✅ should return user from token (0.10s)
+───────────────────────────────────────────────────────────────
+📊 auth.service.spec.ts: 4/4 PASS (0.35s)
+```
+
+### Formato de PRINT de Resumo de Fase
+
+```
+═══════════════════════════════════════════════════════════════
+📊 RESUMO: FASE 4 - TESTES FRONTEND
+═══════════════════════════════════════════════════════════════
+Total de testes: 30
+✅ Aprovados: 30 (100%)
+❌ Reprovados: 0 (0%)
+⏭️ Pulados: 0 (0%)
+Tempo total: 5.2s
+Evidências: D:\IC2\.temp_ia\EVIDENCIAS-FRONTEND-RFXXX.log
+Status da fase: ✅ APROVADO
+═══════════════════════════════════════════════════════════════
+```
+
+### Comando de Execução Atualizado
+
+```bash
+# Criar diretório de evidências se não existir
+mkdir -p D:/IC2/.temp_ia/
+
+# Definir nome do arquivo de log
+LOG_FILE="D:/IC2/.temp_ia/EVIDENCIAS-FRONTEND-RFXXX.log"
+
+# PRINT de início
+echo "═══════════════════════════════════════════════════════════════"
+echo "📋 FASE 4: TESTES FRONTEND"
+echo "═══════════════════════════════════════════════════════════════"
+echo "RF: RFXXX"
+echo "Data/Hora: $(date +"%Y-%m-%d %H:%M:%S")"
+echo "Log: $LOG_FILE"
+echo "───────────────────────────────────────────────────────────────"
+
+# Executar testes e salvar log
+cd frontend/icontrolit-app
+npm run test 2>&1 | tee "$LOG_FILE"
+
+# Calcular resumo
+TOTAL=$(grep -c "PASS\|FAIL" "$LOG_FILE" || echo "0")
+PASSED=$(grep -c "PASS" "$LOG_FILE" || echo "0")
+FAILED=$(grep -c "FAIL" "$LOG_FILE" || echo "0")
+
+# PRINT de resumo
+echo "═══════════════════════════════════════════════════════════════"
+echo "📊 RESUMO: FASE 4 - TESTES FRONTEND"
+echo "═══════════════════════════════════════════════════════════════"
+echo "Total de testes: $TOTAL"
+echo "✅ Aprovados: $PASSED"
+echo "❌ Reprovados: $FAILED"
+echo "Evidências: $LOG_FILE"
+if [ "$FAILED" -eq 0 ]; then
+  echo "Status da fase: ✅ APROVADO"
+else
+  echo "Status da fase: ❌ REPROVADO"
+fi
+echo "═══════════════════════════════════════════════════════════════"
+```
+
+### Validação de Evidências
+
+```bash
+# Validar que arquivo de log foi gerado
+if [ ! -f "$LOG_FILE" ]; then
+  echo "❌ ERRO: Arquivo de evidências frontend não foi gerado"
+  exit 1
+fi
+
+# Validar que arquivo não está vazio
+if [ ! -s "$LOG_FILE" ]; then
+  echo "❌ ERRO: Arquivo de evidências frontend está vazio"
+  exit 1
+fi
+
+echo "✅ Evidências frontend registradas: $LOG_FILE"
+```
 
 ---
 
@@ -1163,6 +1413,166 @@ npm run e2e
 - Traces do Playwright
 
 **Resultado:** PASS/FAIL
+
+#### PASSO 5.7.1: PRINTS OBRIGATÓRIOS (v2.3 - 2026-01-31)
+
+**REGRA:** Durante execução dos testes E2E, o agente DEVE exibir PRINTs estruturados confirmando execução e resultados.
+
+### Formato de PRINT de Início de Fase
+
+```
+═══════════════════════════════════════════════════════════════
+📋 FASE 5: TESTES E2E (PLAYWRIGHT)
+═══════════════════════════════════════════════════════════════
+RF: RFXXX
+Data/Hora: 2026-01-31 15:25:15
+Comando: cd frontend/icontrolit-app && npm run e2e
+Log: D:\IC2\.temp_ia\EVIDENCIAS-E2E-RFXXX.log
+Specs: e2e/specs/RFXXX/
+───────────────────────────────────────────────────────────────
+```
+
+### Formato de PRINT Durante Execução
+
+O agente DEVE exibir os resultados do Playwright em tempo real, incluindo:
+
+```
+🧪 EXECUTANDO: TC-RF007-E2E-001.spec.ts - Login com credenciais válidas
+───────────────────────────────────────────────────────────────
+[Chromium] Login com credenciais válidas
+  ✅ Deve exibir formulário de login (0.5s)
+  ✅ Deve aceitar credenciais válidas (1.2s)
+  ✅ Deve redirecionar para dashboard (0.8s)
+  ✅ Deve exibir nome do usuário logado (0.3s)
+───────────────────────────────────────────────────────────────
+📊 TC-RF007-E2E-001.spec.ts: 4/4 PASS (2.8s)
+📸 Screenshots: e2e/screenshots/TC-RF007-E2E-001/
+🎬 Video: e2e/videos/TC-RF007-E2E-001.webm
+📝 Trace: e2e/traces/TC-RF007-E2E-001.zip
+
+🧪 EXECUTANDO: TC-RF007-E2E-002.spec.ts - Login com credenciais inválidas
+───────────────────────────────────────────────────────────────
+[Chromium] Login com credenciais inválidas
+  ✅ Deve exibir erro de credenciais incorretas (1.0s)
+  ✅ Deve manter usuário na tela de login (0.4s)
+  ✅ Deve limpar campo de senha (0.2s)
+───────────────────────────────────────────────────────────────
+📊 TC-RF007-E2E-002.spec.ts: 3/3 PASS (1.6s)
+📸 Screenshots: e2e/screenshots/TC-RF007-E2E-002/
+🎬 Video: e2e/videos/TC-RF007-E2E-002.webm
+📝 Trace: e2e/traces/TC-RF007-E2E-002.zip
+
+🧪 EXECUTANDO: TC-RF007-E2E-003.spec.ts - Logout
+───────────────────────────────────────────────────────────────
+[Chromium] Logout
+  ✅ Deve fazer login primeiro (1.1s)
+  ✅ Deve clicar em menu de usuário (0.3s)
+  ✅ Deve clicar em logout (0.4s)
+  ✅ Deve redirecionar para tela de login (0.6s)
+  ❌ Deve limpar token do localStorage (0.2s)
+     Error: expected '' but got 'eyJhbGc...'
+     at logout.spec.ts:45:11
+───────────────────────────────────────────────────────────────
+📊 TC-RF007-E2E-003.spec.ts: 4/5 FAIL (2.6s)
+📸 Screenshots: e2e/screenshots/TC-RF007-E2E-003/
+🎬 Video: e2e/videos/TC-RF007-E2E-003.webm
+📝 Trace: e2e/traces/TC-RF007-E2E-003.zip
+❌ RESPONSABILIDADE: FRONTEND (auth.service.ts - método logout)
+```
+
+### Formato de PRINT de Resumo de Fase
+
+```
+═══════════════════════════════════════════════════════════════
+📊 RESUMO: FASE 5 - TESTES E2E
+═══════════════════════════════════════════════════════════════
+Total de specs: 15
+Total de testes: 45
+✅ Aprovados: 43 (95.6%)
+❌ Reprovados: 2 (4.4%)
+⏭️ Pulados: 0 (0%)
+Tempo total: 2m 15s
+Evidências: D:\IC2\.temp_ia\EVIDENCIAS-E2E-RFXXX.log
+Screenshots: frontend/icontrolit-app/e2e/screenshots/
+Videos: frontend/icontrolit-app/e2e/videos/
+Traces: frontend/icontrolit-app/e2e/traces/
+Status da fase: ❌ REPROVADO (2 falhas)
+───────────────────────────────────────────────────────────────
+Falhas identificadas:
+  1. TC-RF007-E2E-003: Token não limpo no logout (FRONTEND)
+  2. TC-RF007-E2E-012: Lista não atualiza após criar (FRONTEND)
+═══════════════════════════════════════════════════════════════
+```
+
+### Comando de Execução Atualizado
+
+```bash
+# Criar diretório de evidências se não existir
+mkdir -p D:/IC2/.temp_ia/
+
+# Definir nome do arquivo de log
+LOG_FILE="D:/IC2/.temp_ia/EVIDENCIAS-E2E-RFXXX.log"
+
+# PRINT de início
+echo "═══════════════════════════════════════════════════════════════"
+echo "📋 FASE 5: TESTES E2E (PLAYWRIGHT)"
+echo "═══════════════════════════════════════════════════════════════"
+echo "RF: RFXXX"
+echo "Data/Hora: $(date +"%Y-%m-%d %H:%M:%S")"
+echo "Log: $LOG_FILE"
+echo "Specs: e2e/specs/RFXXX/"
+echo "───────────────────────────────────────────────────────────────"
+
+# Executar testes E2E e salvar log
+cd frontend/icontrolit-app
+npx playwright test 2>&1 | tee "$LOG_FILE"
+
+# Calcular resumo
+TOTAL_SPECS=$(find e2e/specs/RFXXX/ -name "*.spec.ts" | wc -l)
+PASSED=$(grep -c "✓" "$LOG_FILE" || echo "0")
+FAILED=$(grep -c "✘" "$LOG_FILE" || echo "0")
+
+# PRINT de resumo
+echo "═══════════════════════════════════════════════════════════════"
+echo "📊 RESUMO: FASE 5 - TESTES E2E"
+echo "═══════════════════════════════════════════════════════════════"
+echo "Total de specs: $TOTAL_SPECS"
+echo "✅ Aprovados: $PASSED"
+echo "❌ Reprovados: $FAILED"
+echo "Evidências: $LOG_FILE"
+echo "Screenshots: $(pwd)/e2e/screenshots/"
+echo "Videos: $(pwd)/e2e/videos/"
+echo "Traces: $(pwd)/e2e/traces/"
+if [ "$FAILED" -eq 0 ]; then
+  echo "Status da fase: ✅ APROVADO"
+else
+  echo "Status da fase: ❌ REPROVADO ($FAILED falhas)"
+fi
+echo "═══════════════════════════════════════════════════════════════"
+```
+
+### Validação de Evidências
+
+```bash
+# Validar que arquivo de log foi gerado
+if [ ! -f "$LOG_FILE" ]; then
+  echo "❌ ERRO: Arquivo de evidências E2E não foi gerado"
+  exit 1
+fi
+
+# Validar que arquivo não está vazio
+if [ ! -s "$LOG_FILE" ]; then
+  echo "❌ ERRO: Arquivo de evidências E2E está vazio"
+  exit 1
+fi
+
+# Validar que screenshots foram gerados
+if [ ! -d "e2e/screenshots/" ]; then
+  echo "⚠️ AVISO: Pasta de screenshots não foi criada"
+fi
+
+echo "✅ Evidências E2E registradas: $LOG_FILE"
+```
 
 ---
 
